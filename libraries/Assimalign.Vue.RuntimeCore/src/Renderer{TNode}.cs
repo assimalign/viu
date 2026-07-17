@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 
 using Assimalign.Vue.Reactivity;
@@ -17,9 +18,10 @@ namespace Assimalign.Vue.RuntimeCore;
 /// <see cref="ComponentInstance"/>s with per-instance render effects whose scheduler jobs
 /// carry the instance uid, so parents update before children ([V01.01.03.06]). A positive
 /// <see cref="VirtualNode.PatchFlag"/> follows the compiled patch contract (targeted
-/// class/style/props/text updates); unflagged vnodes take the full diff. Array children patch
-/// positionally for now — keyed longest-increasing-subsequence reordering lands with
-/// [V01.01.03.03]. Component slots ([V01.01.03.09]) are installed on the instance and their
+/// class/style/props/text updates); unflagged vnodes take the full diff. Array children take the
+/// keyed diff by default (head/tail sync then longest-increasing-subsequence minimal moves,
+/// [V01.01.03.03]); an <see cref="PatchFlags.UnkeyedFragment"/> keeps the positional fast path.
+/// Component slots ([V01.01.03.09]) are installed on the instance and their
 /// <see cref="Shared.SlotFlags"/> stability drives whether a parent re-render forces the child.
 /// Created through <see cref="RendererFactory.CreateRenderer{TNode}"/>.
 /// Not thread-safe (single-threaded JS event-loop model).
@@ -721,7 +723,17 @@ public sealed class Renderer<TNode>
         {
             if ((nextShape & ShapeFlags.ArrayChildren) != 0)
             {
-                PatchUnkeyedChildren(current.ArrayChildren!, next.ArrayChildren!, container, anchor, elementNamespace, parentComponent);
+                // Upstream patchChildren routing: only an explicit UnkeyedFragment flag keeps the
+                // positional fast path; every other array-vs-array case takes the keyed diff
+                // (upstream's default), which reconciles keyed and keyless children alike.
+                if ((int)next.PatchFlag > 0 && (next.PatchFlag & PatchFlags.UnkeyedFragment) != 0)
+                {
+                    PatchUnkeyedChildren(current.ArrayChildren!, next.ArrayChildren!, container, anchor, elementNamespace, parentComponent);
+                }
+                else
+                {
+                    PatchKeyedChildren(current.ArrayChildren!, next.ArrayChildren!, container, anchor, elementNamespace, parentComponent);
+                }
             }
             else
             {
@@ -767,6 +779,342 @@ public sealed class Renderer<TNode>
             MountChildren(nextChildren, container, anchor, elementNamespace, parentComponent, startIndex: commonLength);
         }
     }
+
+    private void PatchKeyedChildren(
+        VirtualNode[] previousChildren,
+        VirtualNode[] nextChildren,
+        TNode container,
+        TNode? parentAnchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
+    {
+        // The C# port of patchKeyedChildren in @vue/runtime-core renderer.ts
+        // (https://github.com/vuejs/core/blob/main/packages/runtime-core/src/renderer.ts): head
+        // sync, tail sync, common-sequence mount/unmount, then a key->new-index map plus a
+        // longest-increasing-subsequence over the middle so the reorder issues the fewest host
+        // moves — each avoided move is an avoided insert interop call on WASM.
+        var i = 0;
+        var l2 = nextChildren.Length;
+        var e1 = previousChildren.Length - 1;
+        var e2 = l2 - 1;
+
+        // 1. sync from start: (a b) c / (a b) d e
+        while (i <= e1 && i <= e2)
+        {
+            var n1 = previousChildren[i];
+            var n2 = nextChildren[i] = VirtualNodeFactory.Normalize(nextChildren[i]);
+            if (!IsSameVirtualNodeType(n1, n2))
+            {
+                break;
+            }
+            Patch(n1, n2, container, default, elementNamespace, parentComponent);
+            i++;
+        }
+
+        // 2. sync from end: a (b c) / d e (b c)
+        while (i <= e1 && i <= e2)
+        {
+            var n1 = previousChildren[e1];
+            var n2 = nextChildren[e2] = VirtualNodeFactory.Normalize(nextChildren[e2]);
+            if (!IsSameVirtualNodeType(n1, n2))
+            {
+                break;
+            }
+            Patch(n1, n2, container, default, elementNamespace, parentComponent);
+            e1--;
+            e2--;
+        }
+
+        if (i > e1)
+        {
+            // 3. common sequence + mount: the old run is exhausted, so mount the extra new nodes.
+            if (i <= e2)
+            {
+                var nextPosition = e2 + 1;
+                var anchor = nextPosition < l2 ? AsHostNode(nextChildren[nextPosition].El) : parentAnchor;
+                while (i <= e2)
+                {
+                    var n2 = nextChildren[i] = VirtualNodeFactory.Normalize(nextChildren[i]);
+                    Patch(null, n2, container, anchor, elementNamespace, parentComponent);
+                    i++;
+                }
+            }
+        }
+        else if (i > e2)
+        {
+            // 4. common sequence + unmount: the new run is exhausted, so unmount the extra old nodes.
+            while (i <= e1)
+            {
+                Unmount(previousChildren[i], doRemove: true);
+                i++;
+            }
+        }
+        else
+        {
+            // 5. unknown sequence: a b [c d e] f g -> a b [e d c h] f g.
+            PatchUnknownSequence(
+                previousChildren, nextChildren, container, parentAnchor, elementNamespace, parentComponent, i, l2, e1, e2);
+        }
+    }
+
+    private void PatchUnknownSequence(
+        VirtualNode[] previousChildren,
+        VirtualNode[] nextChildren,
+        TNode container,
+        TNode? parentAnchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent,
+        int start,
+        int l2,
+        int e1,
+        int e2)
+    {
+        var s1 = start;
+        var s2 = start;
+
+        // 5.1 build a key->new-index map for the new-children middle, warning on duplicate keys
+        // and on a keyed/keyless mix (both upstream dev warnings; the sink compiles out in release).
+        var keyToNewIndexMap = new Dictionary<object, int>();
+        var hasKeyed = false;
+        var hasKeyless = false;
+        for (var index = s2; index <= e2; index++)
+        {
+            var nextChild = nextChildren[index] = VirtualNodeFactory.Normalize(nextChildren[index]);
+            if (nextChild.Key is not null)
+            {
+                hasKeyed = true;
+                if (keyToNewIndexMap.ContainsKey(nextChild.Key))
+                {
+                    RuntimeWarnings.Warn(
+                        $"Duplicate keys found during update: \"{nextChild.Key}\". Make sure keys are unique.");
+                }
+                keyToNewIndexMap[nextChild.Key] = index;
+            }
+            else if (nextChild.Type != VirtualNodeType.Comment)
+            {
+                hasKeyless = true;
+            }
+        }
+        if (hasKeyed && hasKeyless)
+        {
+            RuntimeWarnings.Warn(
+                "Mixed keyed and unkeyed children detected during update. Give every iterated child a "
+                + "key (or none) so the keyed diff can track them reliably.");
+        }
+
+        // 5.2 patch matched old children, unmount the ones with no new counterpart, and record each
+        // matched new slot's old index (offset by +1; 0 marks a brand-new node).
+        var toBePatched = e2 - s2 + 1;
+        var newIndexToOldIndexMap = ArrayPool<int>.Shared.Rent(toBePatched);
+        int[]? sequence = null;
+        try
+        {
+            Array.Clear(newIndexToOldIndexMap, 0, toBePatched);
+            var patched = 0;
+            var moved = false;
+            var maxNewIndexSoFar = 0;
+            for (var index = s1; index <= e1; index++)
+            {
+                var previousChild = previousChildren[index];
+                if (patched >= toBePatched)
+                {
+                    // Every new node is already matched, so any remaining old node is a removal.
+                    Unmount(previousChild, doRemove: true);
+                    continue;
+                }
+                var newIndex = -1;
+                if (previousChild.Key is not null)
+                {
+                    if (keyToNewIndexMap.TryGetValue(previousChild.Key, out var mapped))
+                    {
+                        newIndex = mapped;
+                    }
+                }
+                else
+                {
+                    // Keyless: match the first same-type new node not already claimed.
+                    for (var j = s2; j <= e2; j++)
+                    {
+                        if (newIndexToOldIndexMap[j - s2] == 0 && IsSameVirtualNodeType(previousChild, nextChildren[j]))
+                        {
+                            newIndex = j;
+                            break;
+                        }
+                    }
+                }
+                if (newIndex < 0)
+                {
+                    Unmount(previousChild, doRemove: true);
+                }
+                else
+                {
+                    newIndexToOldIndexMap[newIndex - s2] = index + 1;
+                    if (newIndex >= maxNewIndexSoFar)
+                    {
+                        maxNewIndexSoFar = newIndex;
+                    }
+                    else
+                    {
+                        moved = true;
+                    }
+                    Patch(previousChild, nextChildren[newIndex], container, default, elementNamespace, parentComponent);
+                    patched++;
+                }
+            }
+
+            // 5.3 walk the middle back-to-front, mounting new nodes and moving only the reused nodes
+            // that fall outside the longest increasing subsequence — the minimal set of host moves.
+            var sequenceLength = 0;
+            if (moved)
+            {
+                sequence = ArrayPool<int>.Shared.Rent(toBePatched);
+                sequenceLength = GetSequence(newIndexToOldIndexMap, toBePatched, sequence);
+            }
+            var stableCursor = sequenceLength - 1;
+            for (var index = toBePatched - 1; index >= 0; index--)
+            {
+                var nextChildIndex = s2 + index;
+                var nextChild = nextChildren[nextChildIndex];
+                var anchor = nextChildIndex + 1 < l2 ? AsHostNode(nextChildren[nextChildIndex + 1].El) : parentAnchor;
+                if (newIndexToOldIndexMap[index] == 0)
+                {
+                    // A new node: mount it before the next child's host node.
+                    Patch(null, nextChild, container, anchor, elementNamespace, parentComponent);
+                }
+                else if (moved)
+                {
+                    // No stable subsequence (e.g. a full reverse) or this node is not part of it →
+                    // move it; otherwise it is already in place, so advance the stable cursor.
+                    if (stableCursor < 0 || index != sequence![stableCursor])
+                    {
+                        Move(nextChild, container, anchor);
+                    }
+                    else
+                    {
+                        stableCursor--;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            ArrayPool<int>.Shared.Return(newIndexToOldIndexMap);
+            if (sequence is not null)
+            {
+                ArrayPool<int>.Shared.Return(sequence);
+            }
+        }
+    }
+
+    private void Move(VirtualNode node, TNode container, TNode? anchor)
+    {
+        // The C# port of move() in renderer.ts: relocate an already-mounted vnode's host node(s)
+        // before `anchor`. Components move their subtree; fragments and static nodes move their
+        // whole owned range; element/text/comment nodes move as a single host node (descendants
+        // travel with them).
+        switch (node.Type)
+        {
+            case VirtualNodeType.Component:
+                Move(((ComponentInstance)node.Component!).Subtree!, container, anchor);
+                return;
+            case VirtualNodeType.Fragment:
+                _options.Insert((TNode)node.El!, container, anchor);
+                var fragmentChildren = node.ArrayChildren!;
+                for (var index = 0; index < fragmentChildren.Length; index++)
+                {
+                    Move(fragmentChildren[index], container, anchor);
+                }
+                _options.Insert((TNode)node.Anchor!, container, anchor);
+                return;
+            case VirtualNodeType.Static:
+                MoveStaticNode(node, container, anchor);
+                return;
+            default:
+                _options.Insert((TNode)node.El!, container, anchor);
+                return;
+        }
+    }
+
+    private void MoveStaticNode(VirtualNode node, TNode container, TNode? anchor)
+    {
+        // Move every host node from the start through the end anchor inclusive (upstream:
+        // moveStaticNode); the next sibling is captured before each move mutates the sibling links.
+        var currentNode = (TNode)node.El!;
+        var endNode = (TNode)node.Anchor!;
+        while (!NodeComparer.Equals(currentNode, endNode))
+        {
+            var nextNode = _options.NextSibling(currentNode);
+            _options.Insert(currentNode, container, anchor);
+            currentNode = nextNode!;
+        }
+        _options.Insert(endNode, container, anchor);
+    }
+
+    private static int GetSequence(int[] source, int length, int[] result)
+    {
+        // Longest increasing subsequence — the C# port of getSequence in renderer.ts. Fills
+        // `result[0..count)` with indices into `source` (0..length) forming an increasing
+        // subsequence of maximal length, skipping zero entries (brand-new nodes). `result` must
+        // have length >= `length`; `predecessors` is a rented scratch buffer (upstream's `p`).
+        var predecessors = ArrayPool<int>.Shared.Rent(length);
+        try
+        {
+            Array.Copy(source, predecessors, length);
+            result[0] = 0;
+            var resultLength = 1;
+            for (var i = 0; i < length; i++)
+            {
+                var value = source[i];
+                if (value == 0)
+                {
+                    continue;
+                }
+                var last = result[resultLength - 1];
+                if (source[last] < value)
+                {
+                    predecessors[i] = last;
+                    result[resultLength++] = i;
+                    continue;
+                }
+                var low = 0;
+                var high = resultLength - 1;
+                while (low < high)
+                {
+                    var middle = (low + high) >> 1;
+                    if (source[result[middle]] < value)
+                    {
+                        low = middle + 1;
+                    }
+                    else
+                    {
+                        high = middle;
+                    }
+                }
+                if (value < source[result[low]])
+                {
+                    if (low > 0)
+                    {
+                        predecessors[i] = result[low - 1];
+                    }
+                    result[low] = i;
+                }
+            }
+            var cursor = resultLength;
+            var predecessor = result[cursor - 1];
+            while (cursor-- > 0)
+            {
+                result[cursor] = predecessor;
+                predecessor = predecessors[predecessor];
+            }
+            return resultLength;
+        }
+        finally
+        {
+            ArrayPool<int>.Shared.Return(predecessors);
+        }
+    }
+
+    private static TNode? AsHostNode(object? node) => node is null ? default : (TNode)node;
 
     private void MountChildren(
         VirtualNode[] children,
