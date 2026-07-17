@@ -1,0 +1,5 @@
+<Solution>
+	<Project Path="src/Assimalign.Vue.Shared.csproj" />
+	<Project Path="test/Assimalign.Vue.Shared.Tests.csproj" />
+	<Project Path="test/Assimalign.Vue.Shared.GeneratorFixture/Assimalign.Vue.Shared.GeneratorFixture.csproj" />
+</Solution>

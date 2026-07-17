@@ -1,0 +1,46 @@
+# Area build+test for Assimalign.Vue.Reactivity ([V01.01.12.02]): path-filtered so a PR only
+# runs the areas it touches; shared build files trigger every area. The build scope is the
+# per-area slnx, keeping CI and local builds in lockstep. Jobs are independent by design —
+# cross-area contracts are enforced by project references at build time, not workflow ordering.
+name: area-reactivity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'libraries/Assimalign.Vue.Reactivity/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-reactivity.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'libraries/Assimalign.Vue.Reactivity/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-reactivity.yml'
+
+jobs:
+  build-test:
+    name: build+test Reactivity
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build (warnings are errors)
+        run: dotnet build libraries/Assimalign.Vue.Reactivity/Assimalign.Vue.Reactivity.slnx --configuration Release -warnaserror
+
+      - name: Test
+        run: dotnet test libraries/Assimalign.Vue.Reactivity/Assimalign.Vue.Reactivity.slnx --configuration Release --no-build

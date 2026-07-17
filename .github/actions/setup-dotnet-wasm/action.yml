@@ -1,0 +1,36 @@
+# The single point of CI environment setup ([V01.01.12.02]): every workflow consumes this
+# composite instead of duplicating SDK/workload/cache steps, so wasm-tools version drift cannot
+# occur between areas. The repository checkout stays in each workflow — a local composite action
+# cannot run before the repository that contains it is checked out.
+name: Set up .NET for Vuecs
+description: >-
+  .NET 10 SDK (pinned by global.json), NuGet + workload-pack caching, and optionally the
+  wasm-tools workload for WebAssembly app builds.
+
+inputs:
+  install-wasm-tools:
+    description: Install the wasm-tools workload (needed only for WebAssembly app builds).
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+
+    - name: Cache NuGet packages (includes workload packs)
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        # Central package versions live in the build targets; global.json pins the SDK.
+        key: nuget-${{ runner.os }}-${{ hashFiles('build/Targets/Build.References.Packages.targets', 'global.json') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+
+    - name: Install wasm-tools workload
+      if: inputs.install-wasm-tools == 'true'
+      shell: bash
+      run: dotnet workload install wasm-tools --skip-manifest-update
