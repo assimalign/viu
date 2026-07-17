@@ -3,4 +3,5 @@
 	<Import Project="Targets\Build.References.Packages.targets" />
 	<Import Project="Targets\Build.References.Projects.targets" />
 	<Import Project="Targets\Build.References.Analyzers.targets" />
+	<Import Project="Targets\Build.StaticWebAssets.targets" />
 </Project>

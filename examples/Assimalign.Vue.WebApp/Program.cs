@@ -5,16 +5,37 @@ using System.Threading.Tasks;
 
 using Assimalign.Vue.Reactivity;
 using Assimalign.Vue.RuntimeCore;
+using Assimalign.Vue.RuntimeDom;
 
-var rootHandle = BrowserDomInterop.QuerySelector("#app");
+// The production DOM bridge ([V01.01.04.01]/[V01.01.04.02]) ships with
+// Assimalign.Vue.RuntimeDom; the app just initializes it and mounts reactively.
+await BrowserRuntime.InitializeAsync();
+
+var rootHandle = BrowserRuntime.QuerySelector("#app");
+
+// ?diagnostics=1 runs the handle-lifecycle stress check and the marshaling-strategy
+// benchmark behind the [V01.01.04.01] ADR instead of the stopwatch.
+await JSHost.ImportAsync("benchmark", "/benchmark.js");
+if (DiagnosticsInterop.GetQuery().Contains("diagnostics", StringComparison.Ordinal))
+{
+    try
+    {
+        await VuecsDiagnostics.RunAsync(rootHandle);
+    }
+    catch (Exception exception)
+    {
+        DiagnosticsInterop.ReportCrash(exception.ToString());
+    }
+    return;
+}
+
 var app = new VuecsApp(rootHandle);
 
-// Advance the stopwatch STATE on a timer; rendering is driven purely by reactivity —
-// the render effect re-renders only when a tracked ref actually changes ([V01.01.03.05]
-// replaces the POC's manual Render() polling loop).
+// Advance the stopwatch STATE on a timer; rendering is driven purely by reactivity
+// ([V01.01.03.05] — no polling, no manual render loop).
 await app.RunAsync();
 
-internal sealed partial class VuecsApp
+internal sealed class VuecsApp
 {
     private readonly Reference<bool> _isRunning = Reactive.Reference(false);
     private readonly Reference<string> _elapsedText = Reactive.Reference("00:00:00");
@@ -29,7 +50,7 @@ internal sealed partial class VuecsApp
     {
         _toggleHandler = Toggle;
         _resetHandler = Reset;
-        var renderer = RendererFactory.CreateRenderer(BrowserRendererOptions.Create());
+        var renderer = BrowserRuntime.CreateRenderer();
         // Mounts immediately and re-renders whenever _isRunning or _elapsedText changes.
         _renderEffect = renderer.CreateRenderEffect(BuildView, rootHandle);
     }
@@ -64,7 +85,7 @@ internal sealed partial class VuecsApp
                 VirtualNodeFactory.Element(
                     "p",
                     VirtualNodeFactory.Properties(("class", "lead")),
-                    VirtualNodeFactory.Text("State mutations drive the render effect — the DOM below patches only when tracked refs change.")),
+                    VirtualNodeFactory.Text("State mutations drive the render effect — the DOM below patches through the production RuntimeDom bridge.")),
                 VirtualNodeFactory.Element(
                     "div",
                     VirtualNodeFactory.Properties(("class", "meter")),
@@ -118,11 +139,5 @@ internal sealed partial class VuecsApp
 
         _elapsedText.Value = FormatElapsed();
         _isRunning.Value = _stopwatch.IsRunning;
-    }
-
-    [JSExport]
-    internal static void DispatchEvent(int nodeHandle, string eventName)
-    {
-        BrowserRendererOptions.Dispatch(nodeHandle, eventName);
     }
 }

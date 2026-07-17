@@ -242,13 +242,13 @@ public sealed class Renderer<TNode>
                 {
                     continue;
                 }
-                _options.PatchProperty(element, name, null, value, elementNamespace);
+                _options.PatchProperty(element, node.ElementTag!, name, null, value, elementNamespace);
             }
             // "value" is patched last so it can depend on properties like <input type> and on
             // mounted <option> children (upstream parity).
             if (node.Properties.TryGetValue("value", out var valueProperty))
             {
-                _options.PatchProperty(element, "value", null, valueProperty, elementNamespace);
+                _options.PatchProperty(element, node.ElementTag!, "value", null, valueProperty, elementNamespace);
             }
         }
         InvokeHook(node, null, "onVnodeBeforeMount");
@@ -268,7 +268,7 @@ public sealed class Renderer<TNode>
             // skipped patchProp visit is a skipped interop call.
             if ((next.PatchFlag & PatchFlags.FullProps) != 0)
             {
-                PatchProperties(element, current.Properties, next.Properties, elementNamespace);
+                PatchProperties(element, next.ElementTag!, current.Properties, next.Properties, elementNamespace);
             }
             else
             {
@@ -278,13 +278,18 @@ public sealed class Renderer<TNode>
                     var nextClass = next.Properties?["class"];
                     if (!Equals(previousClass, nextClass))
                     {
-                        _options.PatchProperty(element, "class", previousClass, nextClass, elementNamespace);
+                        _options.PatchProperty(element, next.ElementTag!, "class", previousClass, nextClass, elementNamespace);
                     }
                 }
                 if ((next.PatchFlag & PatchFlags.Style) != 0)
                 {
                     _options.PatchProperty(
-                        element, "style", current.Properties?["style"], next.Properties?["style"], elementNamespace);
+                        element,
+                        next.ElementTag!,
+                        "style",
+                        current.Properties?["style"],
+                        next.Properties?["style"],
+                        elementNamespace);
                 }
                 if ((next.PatchFlag & PatchFlags.Props) != 0 && next.DynamicProperties is not null)
                 {
@@ -296,7 +301,7 @@ public sealed class Renderer<TNode>
                         next.Properties?.TryGetValue(name, out nextValue);
                         if (!Equals(previousValue, nextValue) || string.Equals(name, "value", StringComparison.Ordinal))
                         {
-                            _options.PatchProperty(element, name, previousValue, nextValue, elementNamespace);
+                            _options.PatchProperty(element, next.ElementTag!, name, previousValue, nextValue, elementNamespace);
                         }
                     }
                 }
@@ -312,13 +317,13 @@ public sealed class Renderer<TNode>
         else
         {
             // Unoptimized (or Bail): full props diff and full children diff.
-            PatchProperties(element, current.Properties, next.Properties, elementNamespace);
+            PatchProperties(element, next.ElementTag!, current.Properties, next.Properties, elementNamespace);
             PatchChildren(current, next, element, default, ChildrenNamespace(next, elementNamespace));
         }
         QueuePostHook(next, current, "onVnodeUpdated");
     }
 
-    private void PatchProperties(TNode element, VirtualNodeProperties? previous, VirtualNodeProperties? next, string? elementNamespace)
+    private void PatchProperties(TNode element, string elementTag, VirtualNodeProperties? previous, VirtualNodeProperties? next, string? elementNamespace)
     {
         if (ReferenceEquals(previous, next))
         {
@@ -330,7 +335,7 @@ public sealed class Renderer<TNode>
             {
                 if (!IsReservedProperty(name) && (next is null || !next.ContainsName(name)))
                 {
-                    _options.PatchProperty(element, name, value, null, elementNamespace);
+                    _options.PatchProperty(element, elementTag, name, value, null, elementNamespace);
                 }
             }
         }
@@ -346,7 +351,7 @@ public sealed class Renderer<TNode>
                 previous?.TryGetValue(name, out previousValue);
                 if (!Equals(previousValue, value))
                 {
-                    _options.PatchProperty(element, name, previousValue, value, elementNamespace);
+                    _options.PatchProperty(element, elementTag, name, previousValue, value, elementNamespace);
                 }
             }
             // "value" is forced last: the live platform value can drift from the vnode value,
@@ -355,7 +360,7 @@ public sealed class Renderer<TNode>
             {
                 object? previousBagValue = null;
                 previous?.TryGetValue("value", out previousBagValue);
-                _options.PatchProperty(element, "value", previousBagValue, nextValue, elementNamespace);
+                _options.PatchProperty(element, elementTag, "value", previousBagValue, nextValue, elementNamespace);
             }
         }
     }

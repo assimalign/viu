@@ -398,3 +398,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Library static web assets copied into example apps by build/Targets/Build.StaticWebAssets.targets
+examples/**/wwwroot/_content/

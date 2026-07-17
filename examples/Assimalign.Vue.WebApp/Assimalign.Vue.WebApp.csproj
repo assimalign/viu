@@ -10,6 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <VuecsProjectReference Include="Assimalign.Vue.RuntimeCore" />
+    <VuecsProjectReference Include="Assimalign.Vue.RuntimeDom" />
   </ItemGroup>
 </Project>

@@ -92,7 +92,7 @@ public static class TestNodeOperations
                 var index = siblings.IndexOf(node);
                 return index >= 0 && index + 1 < siblings.Count ? siblings[index + 1] : null;
             },
-            PatchProperty = (node, propertyName, previousValue, nextValue, _) =>
+            PatchProperty = (node, _, propertyName, previousValue, nextValue, _) =>
             {
                 var element = (TestElement)node;
                 element.Properties[propertyName] = nextValue;
