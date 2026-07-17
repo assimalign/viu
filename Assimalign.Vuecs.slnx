@@ -34,6 +34,7 @@
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/">
 		<Project Path="libraries/Assimalign.Vue.Shared/src/Assimalign.Vue.Shared.csproj" />
 		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.Tests.csproj" />
+		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.GeneratorFixture/Assimalign.Vue.Shared.GeneratorFixture.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/">
 		<Project Path="libraries/Assimalign.Vue.Testing/src/Assimalign.Vue.Testing.csproj" />
