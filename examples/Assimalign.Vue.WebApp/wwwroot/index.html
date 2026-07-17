@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Vuecs Virtual DOM</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preload" id="webassembly" />
+  <script type="importmap"></script>
+  <script type="module" src="main#[.{fingerprint}].js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(255, 196, 128, 0.55), transparent 34rem),
+        linear-gradient(180deg, #fff8ef 0%, #f2f4f7 100%);
+      color: #10243b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      background: inherit;
+    }
+
+    #app {
+      width: min(100%, 48rem);
+    }
+
+    .shell {
+      display: grid;
+    }
+
+    .card {
+      display: grid;
+      gap: 1.25rem;
+      padding: clamp(1.5rem, 2vw + 1rem, 2.75rem);
+      border-radius: 1.75rem;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(16, 36, 59, 0.08);
+      box-shadow: 0 1.25rem 4rem rgba(24, 35, 52, 0.12);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      font-size: 0.8rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #b84f1d;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1;
+    }
+
+    .lead {
+      margin: 0;
+      color: #42556d;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .meter {
+      display: grid;
+      gap: 0.5rem;
+      padding: 1.25rem;
+      border-radius: 1.25rem;
+      background: linear-gradient(135deg, #10243b 0%, #1f4f77 100%);
+      color: white;
+    }
+
+    .meter-label {
+      font-size: 0.85rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      opacity: 0.72;
+    }
+
+    .meter-value {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      background: #e6eff8;
+      color: #12365a;
+      font-weight: 700;
+    }
+
+    .status-hint {
+      color: #53667b;
+      font-size: 0.95rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 0.9rem 1.25rem;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary {
+      background: #f05a28;
+      color: white;
+      box-shadow: 0 0.75rem 2rem rgba(240, 90, 40, 0.28);
+    }
+
+    .secondary {
+      background: white;
+      color: #12365a;
+      border: 1px solid rgba(18, 54, 90, 0.14);
+    }
+
+    .code-sample {
+      margin: 0;
+      padding: 1rem 1.15rem;
+      border-radius: 1rem;
+      background: #0b1c2e;
+      color: #d5e7fb;
+      overflow-x: auto;
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 1rem;
+      }
+
+      .actions {
+        display: grid;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+</body>
+</html>

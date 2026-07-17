@@ -1,0 +1,45 @@
+name: Feature (WBS)
+description: A feature under an area epic. Prefer New-VuecsWorkItem.ps1, which computes the WBS code and links the sub-issue automatically.
+title: "[V01.01.NN.MM] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Prefer the script** (`New-VuecsWorkItem.ps1 -As feature ...`) so the WBS code, the
+        native sub-issue link, and the Project #15 fields (Kind=Feature, Area, Origin, Status) are
+        set for you. Use this form only as a fallback — then replace `NN.MM` in the title with the
+        next free code, set the parent area epic, and set the Project fields manually.
+  - type: input
+    id: parent
+    attributes:
+      label: Parent area epic
+      description: The area epic this feature belongs under.
+      placeholder: "#2 [V01.01.02] Framework - Reactivity"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What and why (one or two sentences). Name the Vue 3 counterpart where one exists.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      value: |
+        - <observable, testable outcome>
+        - Tests cover the new behavior.
+        - The implementation remains trimming-safe and WASM/NativeAOT-compatible.
+    validations:
+      required: true
+  - type: textarea
+    id: standards
+    attributes:
+      label: Standards and Compliance
+      value: |
+        - <Vue 3 API parity reference (vuejs.org / vuejs/core), WHATWG/W3C spec for DOM behavior, or a note that it is a Vuecs runtime-contract concern>
+    validations:
+      required: false
