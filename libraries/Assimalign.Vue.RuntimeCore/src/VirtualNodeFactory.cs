@@ -235,15 +235,17 @@ public static class VirtualNodeFactory
     /// <summary>
     /// Renders the named slot as a fragment (upstream: <c>renderSlot</c>,
     /// <c>packages/runtime-core/src/helpers/renderSlot.ts</c>). Invokes the slot with
-    /// <paramref name="properties"/> (the scoped-slot scope) when present; otherwise renders
-    /// <paramref name="fallback"/>'s content — upstream uses fallback only when the slot is
-    /// <b>absent</b>, not when it returns empty. The result is a keyed fragment so it patches in
-    /// place across re-renders.
+    /// <paramref name="properties"/> (the scoped-slot scope); <paramref name="fallback"/>'s content
+    /// renders when the slot is absent <b>or</b> when its content renders empty — upstream's
+    /// <c>ensureValidVNode</c> treats comment-only and empty output as no content, and a null entry
+    /// is this model's comment-placeholder idiom. The result is a keyed fragment so it patches in
+    /// place across re-renders; the fallback branch takes a distinct <c>_fb</c>-suffixed key
+    /// (upstream parity) so slot content and fallback content never patch against each other.
     /// </summary>
     /// <param name="slots">The instance's slots (<see cref="ComponentInstance.Slots"/>), or null.</param>
     /// <param name="name">The slot name (<c>"default"</c> for the default slot).</param>
     /// <param name="properties">The scoped-slot props to pass, or null.</param>
-    /// <param name="fallback">The fallback content factory used when the slot is absent, or null.</param>
+    /// <param name="fallback">The fallback content factory, or null.</param>
     /// <returns>A fragment vnode wrapping the slot's (or fallback's) vnodes.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     public static VirtualNode RenderSlot(
@@ -257,10 +259,41 @@ public static class VirtualNodeFactory
         // that content as part of the child's subtree. Reactive reads therefore attribute to the
         // child's render effect (upstream withCtx parity — reactive tracking stays live; only the
         // block-tracking suppression is deferred to the block-tree work [V01.01.03.15]).
-        VirtualNode?[]? children = slots is not null && slots.TryGetSlot(name, out var slot)
-            ? slot(properties)
-            : fallback?.Invoke();
-        return Fragment(children, "_" + name);
+        VirtualNode?[]? children = null;
+        if (slots is not null && slots.TryGetSlot(name, out var slot))
+        {
+            children = slot(properties);
+        }
+        if (fallback is null || HasRenderableContent(children))
+        {
+            return Fragment(children, "_" + name);
+        }
+        return Fragment(fallback(), "_" + name + "_fb");
+    }
+
+    private static bool HasRenderableContent(VirtualNode?[]? children)
+    {
+        // Upstream ensureValidVNode: slot output counts as content only if some child is neither a
+        // comment nor a fragment that itself renders empty. Null entries are this model's
+        // comment-placeholder idiom (see Fragment), so they count as empty too.
+        if (children is null)
+        {
+            return false;
+        }
+        for (var index = 0; index < children.Length; index++)
+        {
+            var child = children[index];
+            if (child is null || child.Type == VirtualNodeType.Comment)
+            {
+                continue;
+            }
+            if (child.Type == VirtualNodeType.Fragment && !HasRenderableContent(child.ArrayChildren))
+            {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /// <summary>Creates a fragment vnode wrapping multiple root nodes.</summary>

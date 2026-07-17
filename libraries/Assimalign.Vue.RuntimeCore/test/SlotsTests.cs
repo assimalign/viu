@@ -268,6 +268,83 @@ public class SlotsTests : IDisposable
     }
 
     [Fact]
+    public void RenderSlot_SlotRendersEmpty_UsesFallback()
+    {
+        // Upstream renderSlot: validSlotContent || fallback() — a present slot whose content
+        // renders empty (null, empty array) falls back, exactly like an absent slot
+        // (packages/runtime-core/src/helpers/renderSlot.ts, ensureValidVNode).
+        var slots = new ComponentSlots
+        {
+            ["empty"] = _ => null,
+            ["hollow"] = _ => [],
+        };
+        var child = new TestComponent
+        {
+            SetupFunction = (_, context) => () => VirtualNodeFactory.Element(
+                "div",
+                VirtualNodeFactory.RenderSlot(context.Slots, "empty", null, () => [VirtualNodeFactory.Element("em", "fb-empty")]),
+                VirtualNodeFactory.RenderSlot(context.Slots, "hollow", null, () => [VirtualNodeFactory.Element("em", "fb-hollow")])),
+        };
+
+        _renderer.Render(VirtualNodeFactory.Component(child, null, slots), _container);
+
+        TestNodeSerializer.Serialize(_container)
+            .ShouldBe("<root><div><em>fb-empty</em><em>fb-hollow</em></div></root>");
+    }
+
+    [Fact]
+    public void RenderSlot_SlotRendersOnlyCommentPlaceholders_UsesFallback()
+    {
+        // Upstream ensureValidVNode filters comment-only content (a v-if'd-out slot body) so the
+        // fallback shows; null entries are this model's comment-placeholder idiom.
+        var slots = new ComponentSlots
+        {
+            ["default"] = _ => [null, VirtualNodeFactory.Comment("v-if")],
+        };
+        var child = new TestComponent
+        {
+            SetupFunction = (_, context) => () => VirtualNodeFactory.Element(
+                "div",
+                VirtualNodeFactory.RenderSlot(context.Slots, "default", null, () => [VirtualNodeFactory.Element("em", "fallback")])),
+        };
+
+        _renderer.Render(VirtualNodeFactory.Component(child, null, slots), _container);
+
+        TestNodeSerializer.Serialize(_container)
+            .ShouldBe("<root><div><em>fallback</em></div></root>");
+    }
+
+    [Fact]
+    public void RenderSlot_TogglingBetweenSlotContentAndFallback_PatchesCleanly()
+    {
+        // The fallback branch renders under a "_fb"-suffixed fragment key (upstream parity), so
+        // toggling between slot content and fallback replaces the fragment rather than patching
+        // one against the other.
+        var showContent = Reactive.Reference(true);
+        var slots = new ComponentSlots(SlotFlags.Dynamic)
+        {
+            ["default"] = _ => showContent.Value ? [VirtualNodeFactory.Element("span", "content")] : null,
+        };
+        var child = new TestComponent
+        {
+            SetupFunction = (_, context) => () => VirtualNodeFactory.Element(
+                "div",
+                VirtualNodeFactory.RenderSlot(context.Slots, "default", null, () => [VirtualNodeFactory.Element("em", "fallback")])),
+        };
+
+        _renderer.Render(VirtualNodeFactory.Component(child, null, slots), _container);
+        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div><span>content</span></div></root>");
+
+        showContent.Value = false;
+        _pump.RunUntilIdle();
+        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div><em>fallback</em></div></root>");
+
+        showContent.Value = true;
+        _pump.RunUntilIdle();
+        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div><span>content</span></div></root>");
+    }
+
+    [Fact]
     public void RenderSlot_InvokedOutsideAnyRenderEffect_ReturnsContentSafely()
     {
         var dependency = Reactive.Reference("v");
