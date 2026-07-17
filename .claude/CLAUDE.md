@@ -14,7 +14,10 @@ AOT/trimming territory, so reflection-based serialization and dynamic code gener
   no area wrapper folders)
 - `examples/` — sample WASM apps (`Assimalign.Vue.WebApp` is the current demo)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
-- `.claude/rules/` — the canonical working conventions for this repo; read `workflow.md` first
+- `.claude/rules/` — the canonical working conventions for this repo (auto-load by path):
+  `general-rules` (C# style, Abstraction/Internal folders, whole-word naming, explicit usings, AOT),
+  `build-system` (central `build/`, `VuecsProjectReference`/`VuecsPackageReference`), `testing`,
+  `documentation`, `deviations`, `checklist`, and `workflow` (branches, WBS, scope creep)
 
 ## Build and test
 
