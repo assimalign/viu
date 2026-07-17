@@ -73,11 +73,14 @@ public sealed class SchedulerJob
     internal long InsertionSequence;
 
     /// <summary>
-    /// The sort key: <see cref="Identifier"/> (null last) with pre-flush jobs ordered before
-    /// render jobs of the same id, mirroring upstream <c>findInsertionIndex</c>.
+    /// The sort key: <see cref="Identifier"/> with pre-flush jobs ordered before render jobs of
+    /// the same id, mirroring upstream <c>findInsertionIndex</c>. An id-less job sorts last —
+    /// except an id-less <em>pre-flush</em> job, which sorts first (upstream <c>getId</c>:
+    /// <c>job.id == null ? (PRE ? -1 : Infinity) : job.id</c> — an instance-less pre watcher runs
+    /// ahead of every render).
     /// </summary>
     internal long OrderKey
-        => ((long)(Identifier ?? int.MaxValue) << 1) | (IsPreFlush ? 0L : 1L);
+        => ((long)(Identifier ?? (IsPreFlush ? -1 : int.MaxValue)) << 1) | (IsPreFlush ? 0L : 1L);
 
     internal void Invoke() => _callback();
 }
