@@ -11,15 +11,10 @@ namespace Assimalign.Vue.Reactivity;
 /// invokes its <see cref="Scheduler"/> (exactly once per batch) or re-runs synchronously.
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
-public class ReactiveEffect : ISubscriber
+public sealed class ReactiveEffect : Subscriber
 {
     private readonly Action _function;
     private bool _pendingWhilePaused;
-
-    internal SubscriberFlags Flags;
-    internal Link? Dependencies;
-    internal Link? DependenciesTail;
-    internal ISubscriber? NextBatched;
 
     /// <summary>
     /// Creates an effect over <paramref name="function"/>. The effect does not run until
@@ -166,31 +161,12 @@ public class ReactiveEffect : ISubscriber
         }
     }
 
-    Link? ISubscriber.Dependencies
-    {
-        get => Dependencies;
-        set => Dependencies = value;
-    }
-
-    Link? ISubscriber.DependenciesTail
-    {
-        get => DependenciesTail;
-        set => DependenciesTail = value;
-    }
-
-    SubscriberFlags ISubscriber.Flags
-    {
-        get => Flags;
-        set => Flags = value;
-    }
-
-    ISubscriber? ISubscriber.NextBatched
-    {
-        get => NextBatched;
-        set => NextBatched = value;
-    }
-
-    bool ISubscriber.Notify()
+    /// <summary>
+    /// Called when a tracked dependency triggers: queues this effect into the current batch unless a
+    /// recursion guard suppresses it. Always returns <see langword="false"/> — effects have no
+    /// readers to propagate to.
+    /// </summary>
+    internal override bool Notify()
     {
         // Recursion guard: an effect writing its own dependency does not re-enter
         // unless AllowRecurse is set.

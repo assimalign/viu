@@ -18,18 +18,13 @@ namespace Assimalign.Vue.Reactivity;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The computed value type.</typeparam>
-public sealed class Computed<T> : IReference<T>, IComputed, ITrackedReference
+public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference
 {
     private readonly Func<T> _getter;
     private readonly Action<T>? _setter;
     private readonly Dependency _dependency;
     private T? _value;
     private int _globalVersion = -1;
-
-    internal SubscriberFlags Flags;
-    internal Link? Dependencies;
-    internal Link? DependenciesTail;
-    internal ISubscriber? NextBatched;
 
     /// <summary>
     /// Creates a computed over <paramref name="getter"/>; pass a <paramref name="setter"/> for the
@@ -84,10 +79,8 @@ public sealed class Computed<T> : IReference<T>, IComputed, ITrackedReference
     /// <inheritdoc />
     object? IReference.Value => Value;
 
-    Dependency IComputed.Dependency => _dependency;
-
     /// <summary>Port of Vue 3.5's <c>refreshComputed</c>.</summary>
-    internal void Refresh()
+    internal override void Refresh()
     {
         // Fast bail: a tracked computed that no dependency has dirtied cannot be stale.
         if ((Flags & SubscriberFlags.Tracking) != 0 && (Flags & SubscriberFlags.Dirty) == 0)
@@ -149,35 +142,21 @@ public sealed class Computed<T> : IReference<T>, IComputed, ITrackedReference
         }
     }
 
-    void IComputed.Refresh() => Refresh();
+    /// <summary>
+    /// Propagates a real value change to this computed's own readers by notifying the
+    /// <see cref="Dependency"/> they subscribe through (invoked by the caller only when
+    /// <see cref="Notify"/> returned <see langword="true"/>).
+    /// </summary>
+    internal override void NotifyReaders() => _dependency.Notify();
 
     Dependency ITrackedReference.Dependency => _dependency;
 
-    Link? ISubscriber.Dependencies
-    {
-        get => Dependencies;
-        set => Dependencies = value;
-    }
-
-    Link? ISubscriber.DependenciesTail
-    {
-        get => DependenciesTail;
-        set => DependenciesTail = value;
-    }
-
-    SubscriberFlags ISubscriber.Flags
-    {
-        get => Flags;
-        set => Flags = value;
-    }
-
-    ISubscriber? ISubscriber.NextBatched
-    {
-        get => NextBatched;
-        set => NextBatched = value;
-    }
-
-    bool ISubscriber.Notify()
+    /// <summary>
+    /// Called when a source dependency triggers: marks this computed dirty and, when it is being
+    /// observed, queues it and returns <see langword="true"/> so the caller propagates to this
+    /// computed's own readers.
+    /// </summary>
+    internal override bool Notify()
     {
         Flags |= SubscriberFlags.Dirty;
         if ((Flags & SubscriberFlags.Notified) == 0 && !ReferenceEquals(ReactivityState.ActiveSubscriber, this))

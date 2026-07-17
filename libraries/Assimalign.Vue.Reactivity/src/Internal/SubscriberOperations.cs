@@ -81,7 +81,7 @@ internal static class SubscriberOperations
     }
 
     /// <summary>Marks every link stale (version -1) and installs the links as their dependencies' active links.</summary>
-    internal static void PrepareDependencies(ISubscriber subscriber)
+    internal static void PrepareDependencies(Subscriber subscriber)
     {
         for (var link = subscriber.Dependencies; link is not null; link = link.NextDependency)
         {
@@ -95,7 +95,7 @@ internal static class SubscriberOperations
     /// Unlinks every dependency not re-read during the latest run (version still -1) and restores
     /// each dependency's previous active link, then fixes up the subscriber's list head/tail.
     /// </summary>
-    internal static void CleanupDependencies(ISubscriber subscriber)
+    internal static void CleanupDependencies(Subscriber subscriber)
     {
         Link? head = null;
         var tail = subscriber.DependenciesTail;
@@ -128,7 +128,7 @@ internal static class SubscriberOperations
     /// Returns whether any tracked dependency changed since the link last observed it, refreshing
     /// computed sources along the way (their version bumps only on real value change).
     /// </summary>
-    internal static bool IsDirty(ISubscriber subscriber)
+    internal static bool IsDirty(Subscriber subscriber)
     {
         for (var link = subscriber.Dependencies; link is not null; link = link.NextDependency)
         {

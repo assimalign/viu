@@ -13,7 +13,7 @@ namespace Assimalign.Vue.Reactivity;
 internal static class ReactivityState
 {
     /// <summary>The subscriber currently collecting dependencies, if any.</summary>
-    internal static ISubscriber? ActiveSubscriber;
+    internal static Subscriber? ActiveSubscriber;
 
     /// <summary>Whether dependency tracking is currently enabled.</summary>
     internal static bool ShouldTrack = true;
@@ -26,8 +26,8 @@ internal static class ReactivityState
 
     private static readonly Stack<bool> TrackStack = new();
     private static int _batchDepth;
-    private static ISubscriber? _batchedSubscriber;
-    private static ISubscriber? _batchedComputed;
+    private static Subscriber? _batchedSubscriber;
+    private static Subscriber? _batchedComputed;
 
     /// <summary>Pushes the current tracking state and disables tracking.</summary>
     internal static void PauseTracking()
@@ -43,7 +43,7 @@ internal static class ReactivityState
     }
 
     /// <summary>Queues a notified subscriber for execution when the outermost batch ends.</summary>
-    internal static void Batch(ISubscriber subscriber, bool isComputed)
+    internal static void Batch(Subscriber subscriber, bool isComputed)
     {
         subscriber.Flags |= SubscriberFlags.Notified;
         if (isComputed)

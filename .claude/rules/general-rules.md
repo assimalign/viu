@@ -59,6 +59,14 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 
 - **Interface-first**: the public contract is an interface under `Abstraction/`; prefer `internal`
   concrete implementations (surfaced through the interface or a public facade like `Reactive`).
+- **Dispatch on hot paths**: interfaces are for public contracts and cold paths. On the engine's hot
+  paths (per-trigger notification, patching, diffing) prefer an **abstract base class** over an
+  interface — .NET interface dispatch is measurably costlier than a vtable virtual call, and the gap
+  widens on mono-wasm / NativeAOT. Put shared per-instance state on the base as fields (direct loads,
+  no property-getter dispatch); `seal` concrete leaf types so the JIT can devirtualize. When a public
+  type must derive from an otherwise-internal base, make the base a `public abstract` class with
+  `internal` members and a `private protected` constructor so it stays opaque and un-subclassable
+  externally (see `Assimalign.Vue.Reactivity`'s `Subscriber`).
 - **Single-threaded model**: the runtime targets the JS event loop. Ambient `static` state is acceptable,
   but any non-thread-safe type must say so in its XML docs.
 

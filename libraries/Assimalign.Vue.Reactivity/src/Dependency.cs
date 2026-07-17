@@ -24,7 +24,7 @@ public sealed class Dependency
     internal Link? Subscribers;
 
     /// <summary>Set when this dependency is owned by a computed (dual dependency/subscriber role).</summary>
-    internal IComputed? Computed;
+    internal Subscriber? Computed;
 
     /// <summary>Total number of subscriber links (used for object-keyed dependency-map cleanup).</summary>
     internal int SubscriberCount;
@@ -116,7 +116,7 @@ public sealed class Dependency
                 if (link.Subscriber.Notify())
                 {
                     // A computed became dirty: propagate to the computed's own readers.
-                    ((IComputed)link.Subscriber).Dependency.Notify();
+                    link.Subscriber.NotifyReaders();
                 }
             }
         }

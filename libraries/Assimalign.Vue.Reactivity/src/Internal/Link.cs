@@ -1,7 +1,7 @@
 namespace Assimalign.Vue.Reactivity;
 
 /// <summary>
-/// The edge node connecting one <see cref="Dependency"/> to one <see cref="ISubscriber"/>. Each
+/// The edge node connecting one <see cref="Dependency"/> to one <see cref="Subscriber"/>. Each
 /// link participates in two intrusive doubly-linked lists — the subscriber's dependency list
 /// (<see cref="PreviousDependency"/>/<see cref="NextDependency"/>) and the dependency's subscriber
 /// list (<see cref="PreviousSubscriber"/>/<see cref="NextSubscriber"/>) — enabling O(1) unlink from
@@ -11,7 +11,7 @@ namespace Assimalign.Vue.Reactivity;
 internal sealed class Link
 {
     /// <summary>The subscriber side of the edge.</summary>
-    internal readonly ISubscriber Subscriber;
+    internal readonly Subscriber Subscriber;
 
     /// <summary>The dependency side of the edge.</summary>
     internal readonly Dependency Dependency;
@@ -37,7 +37,7 @@ internal sealed class Link
     /// <summary>Saved <see cref="Dependency.ActiveLink"/> so nested subscriber runs can restore it.</summary>
     internal Link? PreviousActiveLink;
 
-    internal Link(ISubscriber subscriber, Dependency dependency)
+    internal Link(Subscriber subscriber, Dependency dependency)
     {
         Subscriber = subscriber;
         Dependency = dependency;
