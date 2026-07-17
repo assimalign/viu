@@ -94,6 +94,43 @@ public sealed class VueApplication<TNode>
     }
 
     /// <summary>
+    /// Registers a directive under <paramref name="name"/> so descendants of the root can resolve
+    /// it by name through <see cref="Directives.ResolveDirective"/> (upstream:
+    /// <c>app.directive(name, directive)</c>). Registering a duplicate name, or registering after
+    /// mount, warns in dev. Returns the app for chaining.
+    /// </summary>
+    /// <param name="name">The directive name (resolved case-insensitively at render).</param>
+    /// <param name="directive">The directive definition.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="directive"/> is null.</exception>
+    public VueApplication<TNode> Directive(string name, IDirective directive)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(directive);
+        WarnIfMounted(nameof(Directive));
+        if (_context.Directives.ContainsKey(name))
+        {
+            RuntimeWarnings.Warn($"Directive \"{name}\" has already been registered in target app.");
+        }
+        _context.Directives[name] = directive;
+        return this;
+    }
+
+    /// <summary>
+    /// Returns the directive registered under <paramref name="name"/>, or null (upstream:
+    /// <c>app.directive(name)</c> getter — an exact-name lookup).
+    /// </summary>
+    /// <param name="name">The registered name.</param>
+    /// <returns>The registered directive, or null.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    public IDirective? Directive(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return _context.Directives.TryGetValue(name, out var directive) ? directive : null;
+    }
+
+    /// <summary>
     /// Provides <paramref name="value"/> app-wide under the typed <paramref name="key"/> (upstream:
     /// <c>app.provide(key, value)</c>) — the final fallback in the inject lookup chain
     /// ([V01.01.03.10]), resolved by any component that does not have a nearer provider. Providing

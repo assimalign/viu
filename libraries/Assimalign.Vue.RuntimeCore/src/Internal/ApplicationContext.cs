@@ -24,6 +24,9 @@ internal sealed class ApplicationContext
     /// <summary>The name → definition registry (upstream: <c>appContext.components</c>).</summary>
     public Dictionary<string, IComponentDefinition> Components { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>The name → directive registry (upstream: <c>appContext.directives</c>).</summary>
+    public Dictionary<string, IDirective> Directives { get; } = new(StringComparer.Ordinal);
+
     /// <summary>The app-level configuration (upstream: <c>appContext.config</c>).</summary>
     public ApplicationConfiguration Config { get; } = new();
 
@@ -34,19 +37,30 @@ internal sealed class ApplicationContext
     /// </summary>
     /// <param name="name">The component name as used at the call site.</param>
     /// <returns>The registered definition, or null when none matches.</returns>
-    public IComponentDefinition? ResolveComponent(string name)
+    public IComponentDefinition? ResolveComponent(string name) => Resolve(Components, name);
+
+    /// <summary>
+    /// Resolves a registered directive by name (upstream: <c>resolveAsset(DIRECTIVES, name)</c>),
+    /// using the same raw/camelCase/PascalCase matching as components.
+    /// </summary>
+    /// <param name="name">The directive name as used at the call site.</param>
+    /// <returns>The registered directive, or null when none matches.</returns>
+    public IDirective? ResolveDirective(string name) => Resolve(Directives, name);
+
+    private static TAsset? Resolve<TAsset>(Dictionary<string, TAsset> registry, string name)
+        where TAsset : class
     {
-        if (Components.TryGetValue(name, out var direct))
+        if (registry.TryGetValue(name, out var direct))
         {
             return direct;
         }
         var camel = ComponentInstance.Camelize(name);
-        if (!string.Equals(camel, name, StringComparison.Ordinal) && Components.TryGetValue(camel, out var camelized))
+        if (!string.Equals(camel, name, StringComparison.Ordinal) && registry.TryGetValue(camel, out var camelized))
         {
             return camelized;
         }
         var pascal = Capitalize(camel);
-        return !string.Equals(pascal, camel, StringComparison.Ordinal) && Components.TryGetValue(pascal, out var capitalized)
+        return !string.Equals(pascal, camel, StringComparison.Ordinal) && registry.TryGetValue(pascal, out var capitalized)
             ? capitalized
             : null;
     }

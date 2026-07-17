@@ -129,6 +129,14 @@ public sealed class VirtualNode
     internal ApplicationContext? AppContext { get; set; }
 
     /// <summary>
+    /// The runtime directive bindings attached through
+    /// <see cref="Directives.WithDirectives(VirtualNode, DirectiveArgument[])"/> (upstream:
+    /// <c>vnode.dirs</c>), or null when the vnode has no directives — the common case, kept to a
+    /// single null check on the mount/patch/unmount hot path ([V01.01.03.13]).
+    /// </summary>
+    internal List<DirectiveBinding>? Directives { get; set; }
+
+    /// <summary>
     /// Looks up a <see cref="VirtualNodeHook"/> prop (e.g. <c>"onVnodeMounted"</c>), or null.
     /// </summary>
     /// <param name="name">The hook prop name.</param>
