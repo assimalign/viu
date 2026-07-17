@@ -66,6 +66,10 @@ internal static class BrowserNodeOperations
     internal static int DispatchEvent(int nodeHandle, bool capture, BrowserEvent browserEvent)
         => Invokers.Dispatch(nodeHandle, capture, browserEvent);
 
+    /// <summary>Clears an element's content (pre-mount container reset), purging released handles.</summary>
+    internal static void ClearElement(int nodeHandle)
+        => Invokers.PurgeReleasedHandles(BrowserDomBridge.SetElementText(nodeHandle, string.Empty));
+
     /// <summary>Registry sizes for leak diagnostics: JS nodes, JS listener maps, .NET invokers.</summary>
     internal static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
     {

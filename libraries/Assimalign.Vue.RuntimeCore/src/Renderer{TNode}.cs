@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 
+using Assimalign.Vue.Reactivity;
 using Assimalign.Vue.Shared;
 
 namespace Assimalign.Vue.RuntimeCore;
@@ -12,11 +13,13 @@ namespace Assimalign.Vue.RuntimeCore;
 /// The patch dispatcher routes by <see cref="VirtualNode.Type"/> and
 /// <see cref="VirtualNode.ShapeFlag"/> to element, text, comment, static, fragment, and
 /// component paths; mismatched node types unmount and remount; fragments mount between
-/// start/end anchors; insertion honors the anchor throughout. A positive
+/// start/end anchors; insertion honors the anchor throughout. Components mount through
+/// <see cref="ComponentInstance"/>s with per-instance render effects whose scheduler jobs
+/// carry the instance uid, so parents update before children ([V01.01.03.06]). A positive
 /// <see cref="VirtualNode.PatchFlag"/> follows the compiled patch contract (targeted
 /// class/style/props/text updates); unflagged vnodes take the full diff. Array children patch
 /// positionally for now — keyed longest-increasing-subsequence reordering lands with
-/// [V01.01.03.03]; the component path lands with [V01.01.03.06].
+/// [V01.01.03.03]; slots land with [V01.01.03.09].
 /// Created through <see cref="RendererFactory.CreateRenderer{TNode}"/>.
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
@@ -56,7 +59,7 @@ public sealed class Renderer<TNode>
         }
         else
         {
-            Patch(current, node, container, default, null);
+            Patch(current, node, container, default, null, null);
             _containerRoots[container] = node;
         }
         Scheduler.FlushAfterSynchronousRender();
@@ -78,7 +81,27 @@ public sealed class Renderer<TNode>
         return new RenderEffect<TNode>(this, renderFunction, container);
     }
 
-    private void Patch(VirtualNode? current, VirtualNode next, TNode container, TNode? anchor, string? elementNamespace)
+    /// <summary>
+    /// Creates the minimal application shell over this renderer (upstream:
+    /// <c>createAppAPI(render)</c>; see <see cref="VueApplication{TNode}"/>).
+    /// </summary>
+    /// <param name="rootComponent">The root component definition.</param>
+    /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <returns>The app; mount it into a container.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
+    public VueApplication<TNode> CreateApplication(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootComponent);
+        return new VueApplication<TNode>(this, rootComponent, rootProperties);
+    }
+
+    private void Patch(
+        VirtualNode? current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
     {
         if (ReferenceEquals(current, next))
         {
@@ -103,14 +126,14 @@ public sealed class Renderer<TNode>
                 ProcessStatic(current, next, container, anchor, elementNamespace);
                 break;
             case VirtualNodeType.Fragment:
-                ProcessFragment(current, next, container, anchor, elementNamespace);
+                ProcessFragment(current, next, container, anchor, elementNamespace, parentComponent);
                 break;
             case VirtualNodeType.Element:
-                ProcessElement(current, next, container, anchor, elementNamespace);
+                ProcessElement(current, next, container, anchor, elementNamespace, parentComponent);
                 break;
             case VirtualNodeType.Component:
-                throw new NotSupportedException(
-                    "Component vnodes are not renderable yet — the component instance model lands with [V01.01.03.06].");
+                ProcessComponent(current, next, container, anchor, elementNamespace, parentComponent);
+                break;
             default:
                 throw new InvalidOperationException($"Unknown vnode type: {next.Type}.");
         }
@@ -120,7 +143,11 @@ public sealed class Renderer<TNode>
         => current.Type == next.Type
             && Equals(current.Key, next.Key)
             && (next.Type != VirtualNodeType.Element
-                || string.Equals(current.ElementTag, next.ElementTag, StringComparison.Ordinal));
+                || string.Equals(current.ElementTag, next.ElementTag, StringComparison.Ordinal))
+            && (next.Type != VirtualNodeType.Component
+                || ReferenceEquals(current.ComponentType, next.ComponentType));
+
+    // --- text / comment / static ---------------------------------------------------------------
 
     private void ProcessText(VirtualNode? current, VirtualNode next, TNode container, TNode? anchor)
     {
@@ -177,7 +204,15 @@ public sealed class Renderer<TNode>
         }
     }
 
-    private void ProcessFragment(VirtualNode? current, VirtualNode next, TNode container, TNode? anchor, string? elementNamespace)
+    // --- fragments -----------------------------------------------------------------------------
+
+    private void ProcessFragment(
+        VirtualNode? current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
     {
         if (current is null)
         {
@@ -188,17 +223,25 @@ public sealed class Renderer<TNode>
             next.Anchor = end;
             _options.Insert(start, container, anchor);
             _options.Insert(end, container, anchor);
-            MountChildren(next.ArrayChildren ?? [], container, end, elementNamespace);
+            MountChildren(next.ArrayChildren ?? [], container, end, elementNamespace, parentComponent);
         }
         else
         {
             next.El = current.El;
             next.Anchor = current.Anchor;
-            PatchChildren(current, next, container, (TNode)next.Anchor!, elementNamespace);
+            PatchChildren(current, next, container, (TNode)next.Anchor!, elementNamespace, parentComponent);
         }
     }
 
-    private void ProcessElement(VirtualNode? current, VirtualNode next, TNode container, TNode? anchor, string? elementNamespace)
+    // --- elements ------------------------------------------------------------------------------
+
+    private void ProcessElement(
+        VirtualNode? current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
     {
         // Namespace switching per upstream mountElement: an <svg>/<math> subtree switches
         // namespace; <foreignObject> children return to HTML (resolveChildrenNamespace).
@@ -213,15 +256,15 @@ public sealed class Renderer<TNode>
         }
         if (current is null)
         {
-            MountElement(next, container, anchor, elementNamespace);
+            MountElement(next, container, anchor, elementNamespace, parentComponent);
         }
         else
         {
-            PatchElement(current, next, elementNamespace);
+            PatchElement(current, next, elementNamespace, parentComponent);
         }
     }
 
-    private void MountElement(VirtualNode node, TNode container, TNode? anchor, string? elementNamespace)
+    private void MountElement(VirtualNode node, TNode container, TNode? anchor, string? elementNamespace, ComponentInstance? parentComponent)
     {
         var element = _options.CreateElement(node.ElementTag!, elementNamespace);
         node.El = element;
@@ -232,7 +275,7 @@ public sealed class Renderer<TNode>
         }
         else if ((node.ShapeFlag & ShapeFlags.ArrayChildren) != 0)
         {
-            MountChildren(node.ArrayChildren!, element, default, ChildrenNamespace(node, elementNamespace));
+            MountChildren(node.ArrayChildren!, element, default, ChildrenNamespace(node, elementNamespace), parentComponent);
         }
         if (node.Properties is not null)
         {
@@ -256,7 +299,7 @@ public sealed class Renderer<TNode>
         QueuePostHook(node, null, "onVnodeMounted");
     }
 
-    private void PatchElement(VirtualNode current, VirtualNode next, string? elementNamespace)
+    private void PatchElement(VirtualNode current, VirtualNode next, string? elementNamespace, ComponentInstance? parentComponent)
     {
         next.El = current.El;
         var element = (TNode)next.El!;
@@ -318,7 +361,7 @@ public sealed class Renderer<TNode>
         {
             // Unoptimized (or Bail): full props diff and full children diff.
             PatchProperties(element, next.ElementTag!, current.Properties, next.Properties, elementNamespace);
-            PatchChildren(current, next, element, default, ChildrenNamespace(next, elementNamespace));
+            PatchChildren(current, next, element, default, ChildrenNamespace(next, elementNamespace), parentComponent);
         }
         QueuePostHook(next, current, "onVnodeUpdated");
     }
@@ -365,7 +408,270 @@ public sealed class Renderer<TNode>
         }
     }
 
-    private void PatchChildren(VirtualNode current, VirtualNode next, TNode container, TNode? anchor, string? elementNamespace)
+    // --- components ([V01.01.03.06]) -----------------------------------------------------------
+
+    private void ProcessComponent(
+        VirtualNode? current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
+    {
+        if (current is null)
+        {
+            MountComponent(next, container, anchor, elementNamespace, parentComponent);
+        }
+        else
+        {
+            UpdateComponent(current, next);
+        }
+    }
+
+    private void MountComponent(VirtualNode next, TNode container, TNode? anchor, string? elementNamespace, ComponentInstance? parentComponent)
+    {
+        var definition = (IComponentDefinition)next.ComponentType!;
+        var instance = new ComponentInstance(definition, next, parentComponent);
+        next.Component = instance;
+        ComponentPropertyResolution.Resolve(instance, next);
+        SetupComponent(instance);
+        SetupComponentRenderEffect(instance, container, anchor, elementNamespace);
+    }
+
+    private static void SetupComponent(ComponentInstance instance)
+    {
+        // Setup runs exactly once per instance, with the instance current and inside its
+        // effect scope so created effects/computeds stop with the component (upstream parity).
+        var context = new ComponentSetupContext(instance);
+        instance.PushCurrent();
+        try
+        {
+            instance.RenderFunction = instance.Scope.Run(() => instance.Definition.Setup(instance.Properties, context));
+        }
+        catch (Exception exception)
+        {
+            ComponentErrorHandling.Handle(exception, instance, "setup function");
+        }
+        finally
+        {
+            instance.PopCurrent();
+        }
+        instance.RenderFunction ??= static () => null;
+    }
+
+    private void SetupComponentRenderEffect(ComponentInstance instance, TNode container, TNode? anchor, string? elementNamespace)
+    {
+        // The per-instance render effect (upstream: setupRenderEffect): invalidation enqueues
+        // a job carrying the instance uid, so parents flush before children; the effect
+        // registers with the instance scope so teardown stops it.
+        var job = new SchedulerJob(() => instance.Effect!.Run())
+        {
+            Identifier = instance.Uid,
+            AllowRecurse = true,
+            Name = instance.DisplayName,
+        };
+        instance.UpdateJob = job;
+        instance.Scope.Run(() =>
+        {
+            instance.Effect = new ReactiveEffect(() => ComponentUpdateFunction(instance, container, anchor, elementNamespace))
+            {
+                AllowRecurse = true,
+                Scheduler = () =>
+                {
+                    if (!instance.IsUnmounted)
+                    {
+                        Scheduler.QueueJob(job);
+                    }
+                },
+            };
+        });
+        instance.Effect!.Run();
+    }
+
+    private void ComponentUpdateFunction(ComponentInstance instance, TNode container, TNode? anchor, string? elementNamespace)
+    {
+        if (instance.IsUnmounted)
+        {
+            return;
+        }
+        if (!instance.IsMounted)
+        {
+            // Upstream toggleRecurse: hooks run with self-triggering off, render with it on.
+            instance.ToggleRecurse(false);
+            instance.InvokeHooks(LifecycleHookKind.BeforeMount);
+            instance.ToggleRecurse(true);
+            var subtree = RenderComponentRoot(instance);
+            instance.Subtree = subtree;
+            Patch(null, subtree, container, anchor, elementNamespace, instance);
+            instance.VirtualNode.El = subtree.El;
+            instance.VirtualNode.Anchor = subtree.Anchor;
+            instance.IsMounted = true;
+            QueueInstanceHooks(instance, LifecycleHookKind.Mounted);
+        }
+        else
+        {
+            // A parent-driven update carries the pending vnode; props re-resolve with
+            // self-triggering off so the write cannot requeue the running effect
+            // (upstream: toggleRecurse(false) around updateComponentPreRender + beforeUpdate).
+            instance.ToggleRecurse(false);
+            var pending = instance.NextVirtualNode;
+            if (pending is not null)
+            {
+                instance.NextVirtualNode = null;
+                pending.Component = instance;
+                instance.VirtualNode = pending;
+                ComponentPropertyResolution.Resolve(instance, pending);
+            }
+            instance.InvokeHooks(LifecycleHookKind.BeforeUpdate);
+            instance.ToggleRecurse(true);
+            var previous = instance.Subtree!;
+            var nextTree = RenderComponentRoot(instance);
+            instance.Subtree = nextTree;
+            var hostParent = _options.ParentNode((TNode)previous.El!);
+            Patch(previous, nextTree, hostParent!, GetNextHostNode(previous), elementNamespace, instance);
+            instance.VirtualNode.El = nextTree.El;
+            instance.VirtualNode.Anchor = nextTree.Anchor;
+            QueueInstanceHooks(instance, LifecycleHookKind.Updated);
+        }
+    }
+
+    private static VirtualNode RenderComponentRoot(ComponentInstance instance)
+    {
+        // Upstream renderComponentRoot: run the render function with the instance current,
+        // normalize, and apply single-element-root attrs fallthrough via mergeProps.
+        VirtualNode? root = null;
+        instance.PushCurrent();
+        try
+        {
+            root = instance.RenderFunction!();
+        }
+        catch (Exception exception)
+        {
+            ComponentErrorHandling.Handle(exception, instance, "render function");
+        }
+        finally
+        {
+            instance.PopCurrent();
+        }
+        var normalized = VirtualNodeFactory.Normalize(root);
+        if (instance.Definition.InheritAttributes
+            && instance.Attributes.Count > 0
+            && normalized.Type == VirtualNodeType.Element)
+        {
+            normalized = VirtualNodeFactory.Clone(normalized, instance.Attributes.ToProperties());
+        }
+        return normalized;
+    }
+
+    private void UpdateComponent(VirtualNode current, VirtualNode next)
+    {
+        var instance = (ComponentInstance)current.Component!;
+        if (ShouldUpdateComponent(current, next))
+        {
+            // Cancel any queued reactive update and re-render synchronously with the pending
+            // vnode (upstream: invalidateJob + instance.update()).
+            instance.NextVirtualNode = next;
+            Scheduler.InvalidateJob(instance.UpdateJob!);
+            instance.Effect!.Run();
+        }
+        else
+        {
+            // Nothing relevant changed: adopt the new vnode without re-rendering.
+            next.El = current.El;
+            next.Anchor = current.Anchor;
+            next.Component = instance;
+            instance.VirtualNode = next;
+        }
+    }
+
+    private static bool ShouldUpdateComponent(VirtualNode current, VirtualNode next)
+    {
+        // Upstream shouldUpdateComponent, minus slots (which land with [V01.01.03.09]).
+        var previousProperties = current.Properties;
+        var nextProperties = next.Properties;
+        if (ReferenceEquals(previousProperties, nextProperties))
+        {
+            return false;
+        }
+        if ((int)next.PatchFlag > 0
+            && (next.PatchFlag & PatchFlags.Props) != 0
+            && next.DynamicProperties is not null)
+        {
+            foreach (var name in next.DynamicProperties)
+            {
+                object? previousValue = null;
+                object? nextValue = null;
+                previousProperties?.TryGetValue(name, out previousValue);
+                nextProperties?.TryGetValue(name, out nextValue);
+                if (!Equals(previousValue, nextValue))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (previousProperties is null)
+        {
+            return nextProperties is not null && nextProperties.Count > 0;
+        }
+        if (nextProperties is null)
+        {
+            return true;
+        }
+        if (previousProperties.Count != nextProperties.Count)
+        {
+            return true;
+        }
+        foreach (var (name, nextValue) in nextProperties)
+        {
+            if (!previousProperties.TryGetValue(name, out var previousValue) || !Equals(previousValue, nextValue))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void UnmountComponent(VirtualNode node, bool doRemove)
+    {
+        var instance = (ComponentInstance)node.Component!;
+        // Teardown order (upstream parity): BeforeUnmount parent-first, then effects/scope,
+        // then the subtree, then Unmounted queued post-flush (children queue theirs first, so
+        // the stable post-flush order runs them child-first).
+        instance.InvokeHooks(LifecycleHookKind.BeforeUnmount);
+        if (instance.UpdateJob is not null)
+        {
+            instance.UpdateJob.IsDisposed = true;
+        }
+        instance.Scope.Stop();
+        if (instance.Subtree is not null)
+        {
+            Unmount(instance.Subtree, doRemove);
+        }
+        instance.IsUnmounted = true;
+        QueueInstanceHooks(instance, LifecycleHookKind.Unmounted);
+    }
+
+    private static void QueueInstanceHooks(ComponentInstance instance, LifecycleHookKind kind)
+    {
+        if (!instance.HasHooks(kind))
+        {
+            return;
+        }
+        // Post-flush phase (upstream: queuePostRenderEffect); stable ordering keeps
+        // child-before-parent for Mounted/Unmounted.
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() => instance.InvokeHooks(kind)));
+    }
+
+    // --- children ------------------------------------------------------------------------------
+
+    private void PatchChildren(
+        VirtualNode current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
     {
         var previousShape = current.ShapeFlag;
         var nextShape = next.ShapeFlag;
@@ -385,7 +691,7 @@ public sealed class Renderer<TNode>
         {
             if ((nextShape & ShapeFlags.ArrayChildren) != 0)
             {
-                PatchUnkeyedChildren(current.ArrayChildren!, next.ArrayChildren!, container, anchor, elementNamespace);
+                PatchUnkeyedChildren(current.ArrayChildren!, next.ArrayChildren!, container, anchor, elementNamespace, parentComponent);
             }
             else
             {
@@ -400,12 +706,18 @@ public sealed class Renderer<TNode>
             }
             if ((nextShape & ShapeFlags.ArrayChildren) != 0)
             {
-                MountChildren(next.ArrayChildren!, container, anchor, elementNamespace);
+                MountChildren(next.ArrayChildren!, container, anchor, elementNamespace, parentComponent);
             }
         }
     }
 
-    private void PatchUnkeyedChildren(VirtualNode[] previousChildren, VirtualNode[] nextChildren, TNode container, TNode? anchor, string? elementNamespace)
+    private void PatchUnkeyedChildren(
+        VirtualNode[] previousChildren,
+        VirtualNode[] nextChildren,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
     {
         // Positional diff (upstream patchUnkeyedChildren). Keyed minimal-move reordering lands
         // with [V01.01.03.03]; a positional key mismatch still replaces correctly via the
@@ -414,7 +726,7 @@ public sealed class Renderer<TNode>
         for (var index = 0; index < commonLength; index++)
         {
             var nextChild = nextChildren[index] = VirtualNodeFactory.Normalize(nextChildren[index]);
-            Patch(previousChildren[index], nextChild, container, anchor, elementNamespace);
+            Patch(previousChildren[index], nextChild, container, anchor, elementNamespace, parentComponent);
         }
         if (previousChildren.Length > nextChildren.Length)
         {
@@ -422,18 +734,24 @@ public sealed class Renderer<TNode>
         }
         else
         {
-            MountChildren(nextChildren, container, anchor, elementNamespace, startIndex: commonLength);
+            MountChildren(nextChildren, container, anchor, elementNamespace, parentComponent, startIndex: commonLength);
         }
     }
 
-    private void MountChildren(VirtualNode[] children, TNode container, TNode? anchor, string? elementNamespace, int startIndex = 0)
+    private void MountChildren(
+        VirtualNode[] children,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent,
+        int startIndex = 0)
     {
         for (var index = startIndex; index < children.Length; index++)
         {
             // Normalized in place so the array holds the mounted instances (upstream write-back
             // in mountChildren; cloning protects an already-mounted reused vnode's El).
             var child = children[index] = VirtualNodeFactory.Normalize(children[index]);
-            Patch(null, child, container, anchor, elementNamespace);
+            Patch(null, child, container, anchor, elementNamespace, parentComponent);
         }
     }
 
@@ -451,6 +769,9 @@ public sealed class Renderer<TNode>
         InvokeHook(node, null, "onVnodeBeforeUnmount");
         switch (node.Type)
         {
+            case VirtualNodeType.Component:
+                UnmountComponent(node, doRemove);
+                break;
             case VirtualNodeType.Fragment:
                 // Children tear down without individual removals; the fragment range removal
                 // below takes their nodes out in one anchored walk.
@@ -512,6 +833,11 @@ public sealed class Renderer<TNode>
 
     private TNode? GetNextHostNode(VirtualNode node)
     {
+        if (node.Type == VirtualNodeType.Component)
+        {
+            var instance = (ComponentInstance)node.Component!;
+            return instance.Subtree is null ? default : GetNextHostNode(instance.Subtree);
+        }
         if (node.Type is VirtualNodeType.Fragment or VirtualNodeType.Static)
         {
             return node.Anchor is null ? default : _options.NextSibling((TNode)node.Anchor);

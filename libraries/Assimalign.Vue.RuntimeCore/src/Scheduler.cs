@@ -33,6 +33,7 @@ public static class Scheduler
     private static bool _isFlushing;
     private static bool _isFlushPending;
     private static TaskCompletionSource? _flushCompletion;
+    private static long _nextInsertionSequence;
 
     /// <summary>
     /// Test seam: when set, scheduled flushes are handed to this dispatcher instead of the
@@ -81,6 +82,7 @@ public static class Scheduler
         {
             return;
         }
+        callback.InsertionSequence = _nextInsertionSequence++;
         _pendingPostFlushCallbacks.Add(callback);
         callback.Flags |= SchedulerJobFlags.Queued;
         ScheduleFlush();
@@ -93,6 +95,22 @@ public static class Scheduler
     /// </summary>
     public static Task NextTick()
         => _flushCompletion?.Task ?? Task.CompletedTask;
+
+    /// <summary>
+    /// Removes a not-yet-flushed job from the queue (upstream: <c>invalidateJob</c>) — a
+    /// parent-driven component update runs the effect synchronously and must cancel the
+    /// reactive update queued for the same instance.
+    /// </summary>
+    /// <param name="job">The job to remove.</param>
+    internal static void InvalidateJob(SchedulerJob job)
+    {
+        var index = _queue.IndexOf(job);
+        if (index > _flushIndex)
+        {
+            _queue.RemoveAt(index);
+            job.Flags &= ~SchedulerJobFlags.Queued;
+        }
+    }
 
     /// <summary>
     /// Runs queued pre-flush jobs immediately, in queue order (upstream:
@@ -136,7 +154,13 @@ public static class Scheduler
                 return;
             }
             _activePostFlushCallbacks = callbacks;
-            callbacks.Sort(static (left, right) => left.OrderKey.CompareTo(right.OrderKey));
+            // Stable id ordering (JS sort is spec-stable; List<T>.Sort is not): equal-id
+            // callbacks keep insertion order, which is what makes Mounted fire child-first.
+            callbacks.Sort(static (left, right) =>
+            {
+                var byOrder = left.OrderKey.CompareTo(right.OrderKey);
+                return byOrder != 0 ? byOrder : left.InsertionSequence.CompareTo(right.InsertionSequence);
+            });
             try
             {
                 for (_postFlushIndex = 0; _postFlushIndex < _activePostFlushCallbacks.Count; _postFlushIndex++)

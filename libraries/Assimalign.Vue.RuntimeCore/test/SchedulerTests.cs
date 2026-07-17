@@ -268,6 +268,23 @@ public class SchedulerTests : IDisposable
     }
 
     [Fact]
+    public void PostFlushCallbacks_WithEqualIds_KeepInsertionOrder()
+    {
+        // JS array sort is spec-stable; List<T>.Sort is not — the scheduler's explicit
+        // insertion-sequence tiebreak is what keeps Mounted hooks child-before-parent.
+        var order = new List<string>();
+        for (var index = 0; index < 8; index++)
+        {
+            var name = $"cb{index}";
+            Scheduler.QueuePostFlushCallback(new SchedulerJob(() => order.Add(name)));
+        }
+
+        _pump.RunUntilIdle();
+
+        order.ShouldBe(["cb0", "cb1", "cb2", "cb3", "cb4", "cb5", "cb6", "cb7"]);
+    }
+
+    [Fact]
     public void FlushPreFlushCallbacks_RunsOnlyPreJobsImmediately()
     {
         var order = new List<string>();

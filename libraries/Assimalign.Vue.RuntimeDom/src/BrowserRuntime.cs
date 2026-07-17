@@ -29,8 +29,7 @@ public static class BrowserRuntime
         => _initialization ??= InitializeCoreAsync(cancellationToken);
 
     /// <summary>
-    /// Creates a renderer over the browser node-ops (the <c>createApp</c>-less equivalent of
-    /// upstream's DOM renderer; app bootstrap lands with [V01.01.04.04]).
+    /// Creates a renderer over the browser node-ops (upstream: <c>ensureRenderer()</c>).
     /// </summary>
     /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
     public static Renderer<int> CreateRenderer()
@@ -38,6 +37,30 @@ public static class BrowserRuntime
         EnsureInitialized();
         return RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
     }
+
+    /// <summary>
+    /// Creates a browser application for <paramref name="rootComponent"/> (upstream:
+    /// <c>createApp(rootComponent)</c>, https://vuejs.org/api/application.html) —
+    /// <c>BrowserRuntime.CreateApp(root).Mount("#app")</c> is a Vuecs WASM app's whole
+    /// bootstrap ([V01.01.04.04]).
+    /// </summary>
+    /// <param name="rootComponent">The root component definition.</param>
+    /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <returns>The app; mount it by selector or handle.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
+    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
+    public static BrowserApplication CreateApp(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootComponent);
+        EnsureInitialized();
+        var renderer = RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
+        return new BrowserApplication(renderer.CreateApplication(rootComponent, rootProperties));
+    }
+
+    /// <summary>Clears a container's content in one interop call, releasing registered child handles.</summary>
+    /// <param name="containerHandle">The container's node handle.</param>
+    internal static void ClearContainer(int containerHandle)
+        => BrowserNodeOperations.ClearElement(containerHandle);
 
     /// <summary>Resolves a selector to a node handle (e.g. the mount container).</summary>
     /// <param name="selector">The CSS selector.</param>

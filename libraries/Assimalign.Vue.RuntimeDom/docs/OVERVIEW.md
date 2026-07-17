@@ -8,9 +8,12 @@ node-ops and prop patching that the platform-agnostic renderer
 ## What it contains
 
 - **`BrowserRuntime`** (public entry): `InitializeAsync()` loads the package's JS bridge module;
+  `CreateApp(rootComponent).Mount("#app")` is a whole app bootstrap ([V01.01.04.04]);
   `CreateRenderer()` returns a `Renderer<int>` over the browser node-ops; `QuerySelector()`
   resolves mount containers; `GetRegistryDiagnostics()` exposes handle-registry sizes for leak
   checks.
+- **`BrowserApplication`** (public): the mounted app — selector or handle mounting with
+  clear-before-mount, and `Unmount()` returning the bridge registry to its pre-mount baseline.
 - **`BrowserDomException`** (public): typed interop failure carrying the operation name and the
   node handle.
 - **`vuecs-dom.js`** (`src/wwwroot/`, shipped with the package): the JS half — the handle
@@ -29,9 +32,7 @@ node-ops and prop patching that the platform-agnostic renderer
 
 ```csharp
 await BrowserRuntime.InitializeAsync();
-var renderer = BrowserRuntime.CreateRenderer();
-var container = BrowserRuntime.QuerySelector("#app");
-renderer.CreateRenderEffect(BuildView, container); // reactive mount
+BrowserRuntime.CreateApp(new RootComponent()).Mount("#app");
 ```
 
 The example app (`examples/Assimalign.Vue.WebApp`) is the living usage sample; its

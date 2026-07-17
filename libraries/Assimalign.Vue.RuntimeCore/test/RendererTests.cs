@@ -477,13 +477,4 @@ public class RendererTests : IDisposable
         TestNodeSerializer.Serialize(secondContainer).ShouldBe("<root><div><span>shared</span></div></root>");
     }
 
-    [Fact]
-    public void ComponentVnodes_ReportTheirPendingWorkItem()
-    {
-        // The component path exists in the dispatcher but lands with [V01.01.03.06].
-        var component = new VirtualNode(VirtualNodeType.Component);
-
-        Should.Throw<NotSupportedException>(() => _renderer.Render(component, _container))
-            .Message.ShouldContain("V01.01.03.06");
-    }
 }
