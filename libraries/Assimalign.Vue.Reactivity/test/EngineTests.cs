@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using Shouldly;
 using Xunit;
@@ -9,57 +10,57 @@ public sealed class EngineTests
     [Fact]
     public void ReReadingTheSameDepInOneRunReusesTheLink()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var effect = new ReactiveEffect(() =>
         {
             _ = count.Value;
-            _ = count.Value; // second read of the same dep in the same run
+            _ = count.Value; // second read of the same dependency in the same run
         });
         effect.Run();
 
-        // Exactly one link node for the dep.
-        effect.Deps.ShouldNotBeNull();
-        effect.Deps.ShouldBeSameAs(effect.DepsTail);
-        effect.Deps!.NextDep.ShouldBeNull();
-        var originalLink = effect.Deps;
+        // Exactly one link node for the dependency.
+        effect.Dependencies.ShouldNotBeNull();
+        effect.Dependencies.ShouldBeSameAs(effect.DependenciesTail);
+        effect.Dependencies!.NextDependency.ShouldBeNull();
+        var originalLink = effect.Dependencies;
 
         // Re-run (via trigger): the link node is reused, not reallocated.
         count.Value = 2;
-        effect.Deps.ShouldBeSameAs(originalLink);
-        effect.Deps.ShouldBeSameAs(effect.DepsTail);
+        effect.Dependencies.ShouldBeSameAs(originalLink);
+        effect.Dependencies.ShouldBeSameAs(effect.DependenciesTail);
     }
 
     [Fact]
     public void TriggerBumpsDepVersionAndGlobalVersion()
     {
-        var dep = new Dep();
-        dep.Version.ShouldBe(0);
+        var dependency = new Dependency();
+        dependency.Version.ShouldBe(0);
         var globalBefore = ReactivityState.GlobalVersion;
 
-        dep.Trigger();
+        dependency.Trigger();
 
-        dep.Version.ShouldBe(1);
+        dependency.Version.ShouldBe(1);
         ReactivityState.GlobalVersion.ShouldBe(globalBefore + 1);
     }
 
     [Fact]
     public void StaleBranchLinksAreUnlinkedFromTheDepSubscriberList()
     {
-        var flag = Reactive.Ref(true);
-        var a = Reactive.Ref(1);
-        var b = Reactive.Ref(10);
+        var flag = Reactive.Reference(true);
+        var a = Reactive.Reference(1);
+        var b = Reactive.Reference(10);
         Reactive.Effect(() => _ = flag.Value ? a.Value : b.Value);
 
-        var aDep = ((ITrackedRef)a).Dep;
-        var bDep = ((ITrackedRef)b).Dep;
-        aDep.Subs.ShouldNotBeNull();
-        bDep.Subs.ShouldBeNull();
+        var aDependency = ((ITrackedReference)a).Dependency;
+        var bDependency = ((ITrackedReference)b).Dependency;
+        aDependency.Subscribers.ShouldNotBeNull();
+        bDependency.Subscribers.ShouldBeNull();
 
         flag.Value = false;
 
-        // The untaken branch was fully unlinked from the dep side.
-        aDep.Subs.ShouldBeNull();
-        bDep.Subs.ShouldNotBeNull();
+        // The untaken branch was fully unlinked from the dependency side.
+        aDependency.Subscribers.ShouldBeNull();
+        bDependency.Subscribers.ShouldNotBeNull();
     }
 
     [Fact]
@@ -84,8 +85,8 @@ public sealed class EngineTests
     [Fact]
     public void StoppingTheLastSubscriberSoftDetachesAComputedAndAReadReattaches()
     {
-        var count = Reactive.Ref(1);
-        var sourceDep = ((ITrackedRef)count).Dep;
+        var count = Reactive.Reference(1);
+        var sourceDependency = ((ITrackedReference)count).Dependency;
         var getterRuns = 0;
         var doubled = Reactive.Computed(() =>
         {
@@ -94,12 +95,12 @@ public sealed class EngineTests
         });
         var effect = Reactive.Effect(() => _ = doubled.Value);
         getterRuns.ShouldBe(1);
-        sourceDep.Subs.ShouldNotBeNull(); // the computed is linked into the source's sub list
+        sourceDependency.Subscribers.ShouldNotBeNull(); // the computed is linked into the source's sub list
 
         // Stopping the computed's only subscriber soft-unsubscribes it from its sources:
         // a source write no longer reaches the computed (the getter does not re-run).
         effect.Stop();
-        sourceDep.Subs.ShouldBeNull();
+        sourceDependency.Subscribers.ShouldBeNull();
         count.Value = 2;
         getterRuns.ShouldBe(1);
 
@@ -112,7 +113,7 @@ public sealed class EngineTests
         var rerunSeen = 0;
         Reactive.Effect(() => rerunSeen = doubled.Value);
         rerunSeen.ShouldBe(4);
-        sourceDep.Subs.ShouldNotBeNull();
+        sourceDependency.Subscribers.ShouldNotBeNull();
 
         count.Value = 3;
         rerunSeen.ShouldBe(6);

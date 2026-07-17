@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
@@ -8,7 +10,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void EffectsCreatedInScopeStopWithTheScope()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var scope = Reactive.EffectScope();
         scope.Run(() =>
@@ -34,7 +36,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void NestedScopeStopsWithParent()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var parent = Reactive.EffectScope();
         parent.Run(() =>
@@ -59,7 +61,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void DetachedScopeSurvivesParentStopAndStopsIndependently()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         EffectScope? detached = null;
         var parent = Reactive.EffectScope();
@@ -128,7 +130,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void UsingBlockStopsTheScope()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         using (var scope = Reactive.EffectScope())
         {
@@ -168,7 +170,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void StoppedScopeNoLongerCollects()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var scope = Reactive.EffectScope();
         scope.Stop();
@@ -196,7 +198,7 @@ public sealed class EffectScopeTests
         // Upstream Vue 3.5 contract: effectScope() never collects computeds. After scope.stop()
         // a computed keeps serving FRESH values and stays fully reactive; unused computeds detach
         // from their sources automatically via the soft-unsubscribe protocol instead.
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         Computed<int>? doubled = null;
         var scope = Reactive.EffectScope();
         scope.Run(() => doubled = Reactive.Computed(() => count.Value * 2));
@@ -226,7 +228,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void StopCompletesTeardownAndRethrowsTheFirstOnStopException()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var effect2Runs = 0;
         var cleanupRan = false;
         ReactiveEffect? effect2 = null;
@@ -259,7 +261,7 @@ public sealed class EffectScopeTests
     [Fact]
     public void CleanupStoppingASiblingChildScopeDoesNotCorruptTeardown()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runsB = 0;
         EffectScope? childA = null;
         EffectScope? childB = null;
@@ -296,8 +298,8 @@ public sealed class EffectScopeTests
     [Fact]
     public void PauseAndResumeCascadeToChildScopesAndEffects()
     {
-        var a = Reactive.Ref(1);
-        var b = Reactive.Ref(10);
+        var a = Reactive.Reference(1);
+        var b = Reactive.Reference(10);
         var outerRuns = 0;
         var innerRuns = 0;
         var parent = Reactive.EffectScope();

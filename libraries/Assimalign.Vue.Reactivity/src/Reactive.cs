@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 
 namespace Assimalign.Vue.Reactivity;
@@ -14,19 +15,19 @@ public static class Reactive
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
     /// <returns>The new ref.</returns>
-    public static Ref<T> Ref<T>(T value) => new(value);
+    public static Reference<T> Reference<T>(T value) => new(value);
 
     /// <summary>Creates a shallow ref holding <paramref name="value"/> (Vue's <c>shallowRef()</c>).</summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
     /// <returns>The new shallow ref.</returns>
-    public static ShallowRef<T> ShallowRef<T>(T value) => new(value);
+    public static ShallowReference<T> ShallowReference<T>(T value) => new(value);
 
     /// <summary>Creates a custom ref with explicit track/trigger control (Vue's <c>customRef()</c>).</summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="factory">Receives track/trigger delegates and returns the getter/setter pair.</param>
     /// <returns>The new custom ref.</returns>
-    public static CustomRef<T> CustomRef<T>(CustomRefFactory<T> factory) => new(factory);
+    public static CustomReference<T> CustomReference<T>(CustomReferenceFactory<T> factory) => new(factory);
 
     /// <summary>
     /// Creates a lazy cached computed over <paramref name="getter"/>; pass <paramref name="setter"/>
@@ -95,18 +96,18 @@ public static class Reactive
 
     /// <summary>
     /// Force-notifies a ref's subscribers regardless of value equality — used after in-place
-    /// mutation of a <see cref="ShallowRef{T}"/>'s inner object (Vue's <c>triggerRef()</c>).
-    /// Anything that owns a dep is triggered, including <see cref="Computed{T}"/> (upstream
+    /// mutation of a <see cref="ShallowReference{T}"/>'s inner object (Vue's <c>triggerRef()</c>).
+    /// Anything that owns a dependency is triggered, including <see cref="Computed{T}"/> (upstream
     /// parity): effects reading the computed re-run even though its cached value is unchanged.
     /// </summary>
     /// <param name="reference">The ref to force-trigger.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
-    public static void TriggerRef(IRef reference)
+    public static void TriggerReference(IReference reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
-        if (reference is ITrackedRef tracked)
+        if (reference is ITrackedReference tracked)
         {
-            tracked.Dep.Trigger();
+            tracked.Dependency.Trigger();
         }
     }
 

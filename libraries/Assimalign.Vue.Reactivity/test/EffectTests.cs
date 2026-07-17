@@ -1,3 +1,4 @@
+using System;
 using Shouldly;
 using Xunit;
 
@@ -16,9 +17,9 @@ public sealed class EffectTests
     [Fact]
     public void ConditionalBranchStopsReactingToAbandonedBranch()
     {
-        var flag = Reactive.Ref(true);
-        var a = Reactive.Ref(1);
-        var b = Reactive.Ref(10);
+        var flag = Reactive.Reference(true);
+        var a = Reactive.Reference(1);
+        var b = Reactive.Reference(10);
         var runs = 0;
         Reactive.Effect(() =>
         {
@@ -48,8 +49,8 @@ public sealed class EffectTests
     [Fact]
     public void NestedEffectsTrackToTheCorrectOwner()
     {
-        var outerRef = Reactive.Ref(1);
-        var innerRef = Reactive.Ref(10);
+        var outerRef = Reactive.Reference(1);
+        var innerRef = Reactive.Reference(10);
         var outerRuns = 0;
         var innerRuns = 0;
         Reactive.Effect(() =>
@@ -79,7 +80,7 @@ public sealed class EffectTests
     [Fact]
     public void ActiveSubscriberIsRestoredWhenInnerEffectThrows()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var outerRuns = 0;
         Reactive.Effect(() =>
         {
@@ -104,7 +105,7 @@ public sealed class EffectTests
     [Fact]
     public void StopDetachesTheEffect()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var effect = Reactive.Effect(() =>
         {
@@ -124,7 +125,7 @@ public sealed class EffectTests
     [Fact]
     public void RunAfterStopExecutesUntracked()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var effect = Reactive.Effect(() =>
         {
@@ -144,7 +145,7 @@ public sealed class EffectTests
     [Fact]
     public void EffectThrowingOnFirstRunIsStoppedAndLeavesNoSubscription()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
 
         // The exception from the first run propagates to the caller (upstream effect() parity)...
@@ -176,7 +177,7 @@ public sealed class EffectTests
     [Fact]
     public void SchedulerReceivesInvalidationInsteadOfAutoRun()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var seen = 0;
         var invalidations = 0;
@@ -204,8 +205,8 @@ public sealed class EffectTests
     [Fact]
     public void SchedulerIsInvokedOncePerBatch()
     {
-        var a = Reactive.Ref(1);
-        var b = Reactive.Ref(2);
+        var a = Reactive.Reference(1);
+        var b = Reactive.Reference(2);
         var invalidations = 0;
         Reactive.Effect(
             () =>
@@ -227,7 +228,7 @@ public sealed class EffectTests
     [Fact]
     public void SelfMutatingEffectDoesNotInfinitelyLoop()
     {
-        var count = Reactive.Ref(0);
+        var count = Reactive.Reference(0);
         var runs = 0;
         Reactive.Effect(() =>
         {
@@ -246,7 +247,7 @@ public sealed class EffectTests
     [Fact]
     public void AllowRecurseLetsAnEffectReTriggerItself()
     {
-        var count = Reactive.Ref(0);
+        var count = Reactive.Reference(0);
         var runs = 0;
         var effect = new ReactiveEffect(() =>
         {
@@ -268,7 +269,7 @@ public sealed class EffectTests
     [Fact]
     public void PauseDefersRunsAndResumeDeliversSingleTrailingRun()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var effect = Reactive.Effect(() =>
         {
@@ -294,7 +295,7 @@ public sealed class EffectTests
     [Fact]
     public void RunIfDirtyOnlyRunsWhenADependencyChanged()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         var effect = Reactive.Effect(
             () =>

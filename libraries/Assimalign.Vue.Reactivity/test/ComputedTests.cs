@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
@@ -8,7 +10,7 @@ public sealed class ComputedTests
     [Fact]
     public void GetterIsLazyUntilFirstRead()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var getterRuns = 0;
         var doubled = Reactive.Computed(() =>
         {
@@ -24,7 +26,7 @@ public sealed class ComputedTests
     [Fact]
     public void RepeatReadsWithoutDepChangeUseTheCache()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var getterRuns = 0;
         var doubled = Reactive.Computed(() =>
         {
@@ -46,7 +48,7 @@ public sealed class ComputedTests
     [Fact]
     public void DependencyChangeMarksDirtyButDoesNotRecomputeEagerly()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var getterRuns = 0;
         var doubled = Reactive.Computed(() =>
         {
@@ -67,7 +69,7 @@ public sealed class ComputedTests
     [Fact]
     public void ChainedComputedsRecomputeMinimally()
     {
-        var a = Reactive.Ref(1);
+        var a = Reactive.Reference(1);
         var bRuns = 0;
         var cRuns = 0;
         var b = Reactive.Computed(() =>
@@ -104,7 +106,7 @@ public sealed class ComputedTests
     [Fact]
     public void EqualValueRecomputationDoesNotNotifyDownstream()
     {
-        var a = Reactive.Ref(1);
+        var a = Reactive.Reference(1);
         var bRuns = 0;
         var effectRuns = 0;
         var positive = Reactive.Computed(() =>
@@ -134,7 +136,7 @@ public sealed class ComputedTests
     [Fact]
     public void ChainedEqualValueCutoffStopsMidChain()
     {
-        var a = Reactive.Ref(1);
+        var a = Reactive.Reference(1);
         var bRuns = 0;
         var cRuns = 0;
         var sign = Reactive.Computed(() =>
@@ -161,8 +163,8 @@ public sealed class ComputedTests
     [Fact]
     public void WritableComputedRoutesAssignmentThroughSetter()
     {
-        var first = Reactive.Ref("John");
-        var last = Reactive.Ref("Doe");
+        var first = Reactive.Reference("John");
+        var last = Reactive.Reference("Doe");
         var full = Reactive.Computed(
             () => first.Value + " " + last.Value,
             value =>
@@ -191,7 +193,7 @@ public sealed class ComputedTests
     [Fact]
     public void EffectOverComputedOverRefPropagates()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var getterRuns = 0;
         var effectRuns = 0;
         var seen = 0;
@@ -218,8 +220,8 @@ public sealed class ComputedTests
     [Fact]
     public void UnrelatedGlobalChangeDoesNotReRunGetter()
     {
-        var tracked = Reactive.Ref(1);
-        var unrelated = Reactive.Ref(100);
+        var tracked = Reactive.Reference(1);
+        var unrelated = Reactive.Reference(100);
         var getterRuns = 0;
         var doubled = Reactive.Computed(() =>
         {
@@ -239,7 +241,7 @@ public sealed class ComputedTests
     [Fact]
     public void ThrowingGetterIsNotPoisonedAndRetriesOnTheNextRead()
     {
-        var source = Reactive.Ref(1);
+        var source = Reactive.Reference(1);
         var calls = 0;
         var flaky = Reactive.Computed(() =>
         {
@@ -268,7 +270,7 @@ public sealed class ComputedTests
     [Fact]
     public void TriggerRefOnAComputedForceRerunsItsEffects()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var effectRuns = 0;
         var doubled = Reactive.Computed(() => count.Value * 2);
         Reactive.Effect(() =>
@@ -279,7 +281,7 @@ public sealed class ComputedTests
         effectRuns.ShouldBe(1);
 
         // Upstream triggerRef() force-notifies anything with a dep, including computeds.
-        Reactive.TriggerRef(doubled);
+        Reactive.TriggerReference(doubled);
         effectRuns.ShouldBe(2);
         doubled.Value.ShouldBe(2); // value itself is unchanged
     }
@@ -287,7 +289,7 @@ public sealed class ComputedTests
     [Fact]
     public void ComputedReadInsideEffectTracksLikeADep()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var isEven = Reactive.Computed(() => count.Value % 2 == 0);
         var observed = new List<bool>();
         Reactive.Effect(() => observed.Add(isEven.Value));

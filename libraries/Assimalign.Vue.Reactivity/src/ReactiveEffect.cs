@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 
 namespace Assimalign.Vue.Reactivity;
@@ -6,31 +7,31 @@ namespace Assimalign.Vue.Reactivity;
 /// The subscriber primitive underneath render effects and watchers — the C# port of Vue 3.5's
 /// <c>ReactiveEffect</c>. <see cref="Run"/> executes the function with this effect installed as
 /// the ambient active subscriber, re-collecting dependencies with version-based cleanup (deps not
-/// read in the latest run are unlinked). When a tracked dep triggers, the effect either invokes
-/// its <see cref="Scheduler"/> (exactly once per batch) or re-runs synchronously.
+/// read in the latest run are unlinked). When a tracked dependency triggers, the effect either
+/// invokes its <see cref="Scheduler"/> (exactly once per batch) or re-runs synchronously.
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 public class ReactiveEffect : ISubscriber
 {
-    private readonly Action _fn;
+    private readonly Action _function;
     private bool _pendingWhilePaused;
 
     internal SubscriberFlags Flags;
-    internal Link? Deps;
-    internal Link? DepsTail;
+    internal Link? Dependencies;
+    internal Link? DependenciesTail;
     internal ISubscriber? NextBatched;
 
     /// <summary>
-    /// Creates an effect over <paramref name="fn"/>. The effect does not run until
+    /// Creates an effect over <paramref name="function"/>. The effect does not run until
     /// <see cref="Run"/> is called. If an <see cref="EffectScope"/> is active, the effect
     /// registers with it and is stopped when the scope stops.
     /// </summary>
-    /// <param name="fn">The reactive function to track.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="fn"/> is null.</exception>
-    public ReactiveEffect(Action fn)
+    /// <param name="function">The reactive function to track.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="function"/> is null.</exception>
+    public ReactiveEffect(Action function)
     {
-        ArgumentNullException.ThrowIfNull(fn);
-        _fn = fn;
+        ArgumentNullException.ThrowIfNull(function);
+        _function = function;
         Flags = SubscriberFlags.Active | SubscriberFlags.Tracking;
         EffectScope.Current?.RegisterEffect(this);
     }
@@ -77,25 +78,25 @@ public class ReactiveEffect : ISubscriber
     {
         if ((Flags & SubscriberFlags.Active) == 0)
         {
-            _fn();
+            _function();
             return;
         }
         Flags |= SubscriberFlags.Running;
-        SubscriberOps.PrepareDeps(this);
-        var prevSub = ReactivityState.ActiveSub;
-        var prevShouldTrack = ReactivityState.ShouldTrack;
-        ReactivityState.ActiveSub = this;
+        SubscriberOperations.PrepareDependencies(this);
+        var previousSubscriber = ReactivityState.ActiveSubscriber;
+        var previousShouldTrack = ReactivityState.ShouldTrack;
+        ReactivityState.ActiveSubscriber = this;
         ReactivityState.ShouldTrack = true;
         try
         {
-            _fn();
+            _function();
         }
         finally
         {
-            Debug.Assert(ReferenceEquals(ReactivityState.ActiveSub, this), "Active subscriber stack corrupted.");
-            SubscriberOps.CleanupDeps(this);
-            ReactivityState.ActiveSub = prevSub;
-            ReactivityState.ShouldTrack = prevShouldTrack;
+            Debug.Assert(ReferenceEquals(ReactivityState.ActiveSubscriber, this), "Active subscriber stack corrupted.");
+            SubscriberOperations.CleanupDependencies(this);
+            ReactivityState.ActiveSubscriber = previousSubscriber;
+            ReactivityState.ShouldTrack = previousShouldTrack;
             Flags &= ~SubscriberFlags.Running;
         }
     }
@@ -110,11 +111,11 @@ public class ReactiveEffect : ISubscriber
         {
             return;
         }
-        for (var link = Deps; link is not null; link = link.NextDep)
+        for (var link = Dependencies; link is not null; link = link.NextDependency)
         {
-            SubscriberOps.RemoveSub(link);
+            SubscriberOperations.RemoveSubscriber(link);
         }
-        Deps = DepsTail = null;
+        Dependencies = DependenciesTail = null;
         Flags &= ~SubscriberFlags.Active;
         OnStop?.Invoke();
     }
@@ -142,7 +143,7 @@ public class ReactiveEffect : ISubscriber
     /// <summary>Re-runs the effect only if a tracked dependency actually changed.</summary>
     public void RunIfDirty()
     {
-        if (SubscriberOps.IsDirty(this))
+        if (SubscriberOperations.IsDirty(this))
         {
             Run();
         }
@@ -165,16 +166,16 @@ public class ReactiveEffect : ISubscriber
         }
     }
 
-    Link? ISubscriber.Deps
+    Link? ISubscriber.Dependencies
     {
-        get => Deps;
-        set => Deps = value;
+        get => Dependencies;
+        set => Dependencies = value;
     }
 
-    Link? ISubscriber.DepsTail
+    Link? ISubscriber.DependenciesTail
     {
-        get => DepsTail;
-        set => DepsTail = value;
+        get => DependenciesTail;
+        set => DependenciesTail = value;
     }
 
     SubscriberFlags ISubscriber.Flags

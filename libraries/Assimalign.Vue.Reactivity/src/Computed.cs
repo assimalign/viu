@@ -1,9 +1,12 @@
+using System;
+using System.Collections.Generic;
+
 namespace Assimalign.Vue.Reactivity;
 
 /// <summary>
 /// Lazily evaluated, version-cached derived state — the C# port of Vue 3.5's <c>computed()</c>.
-/// A computed plays a dual role in the dependency graph: it is a <see cref="Dep"/> to its readers
-/// and a subscriber to its sources. The getter never runs at construction; the first
+/// A computed plays a dual role in the dependency graph: it is a <see cref="Dependency"/> to its
+/// readers and a subscriber to its sources. The getter never runs at construction; the first
 /// <see cref="Value"/> read evaluates it, and later reads return the cached value unless a
 /// dependency changed (with a global-version fast path that skips traversal entirely when nothing
 /// reactive changed anywhere). Recomputing to an equal value (per
@@ -15,17 +18,17 @@ namespace Assimalign.Vue.Reactivity;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The computed value type.</typeparam>
-public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
+public sealed class Computed<T> : IReference<T>, IComputed, ITrackedReference
 {
     private readonly Func<T> _getter;
     private readonly Action<T>? _setter;
-    private readonly Dep _dep;
+    private readonly Dependency _dependency;
     private T? _value;
     private int _globalVersion = -1;
 
     internal SubscriberFlags Flags;
-    internal Link? Deps;
-    internal Link? DepsTail;
+    internal Link? Dependencies;
+    internal Link? DependenciesTail;
     internal ISubscriber? NextBatched;
 
     /// <summary>
@@ -42,7 +45,7 @@ public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
         ArgumentNullException.ThrowIfNull(getter);
         _getter = getter;
         _setter = setter;
-        _dep = new Dep { Computed = this };
+        _dependency = new Dependency { Computed = this };
         Flags = SubscriberFlags.Dirty;
     }
 
@@ -60,11 +63,11 @@ public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
     {
         get
         {
-            var link = _dep.TrackLink();
+            var link = _dependency.TrackLink();
             Refresh();
             if (link is not null)
             {
-                link.Version = _dep.Version;
+                link.Version = _dependency.Version;
             }
             return _value!;
         }
@@ -79,14 +82,14 @@ public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
     }
 
     /// <inheritdoc />
-    object? IRef.Value => Value;
+    object? IReference.Value => Value;
 
-    Dep IComputed.Dep => _dep;
+    Dependency IComputed.Dependency => _dependency;
 
     /// <summary>Port of Vue 3.5's <c>refreshComputed</c>.</summary>
     internal void Refresh()
     {
-        // Fast bail: a tracked computed that no dep has dirtied cannot be stale.
+        // Fast bail: a tracked computed that no dependency has dirtied cannot be stale.
         if ((Flags & SubscriberFlags.Tracking) != 0 && (Flags & SubscriberFlags.Dirty) == 0)
         {
             return;
@@ -101,34 +104,34 @@ public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
         _globalVersion = ReactivityState.GlobalVersion;
 
         Flags |= SubscriberFlags.Running;
-        var dep = _dep;
-        if (dep.Version > 0 && Deps is not null && (Flags & SubscriberFlags.Evaluated) != 0
-            && !SubscriberOps.IsDirty(this))
+        var dependency = _dependency;
+        if (dependency.Version > 0 && Dependencies is not null && (Flags & SubscriberFlags.Evaluated) != 0
+            && !SubscriberOperations.IsDirty(this))
         {
             Flags &= ~SubscriberFlags.Running;
             return;
         }
-        var prevSub = ReactivityState.ActiveSub;
-        var prevShouldTrack = ReactivityState.ShouldTrack;
-        ReactivityState.ActiveSub = this;
+        var previousSubscriber = ReactivityState.ActiveSubscriber;
+        var previousShouldTrack = ReactivityState.ShouldTrack;
+        ReactivityState.ActiveSubscriber = this;
         ReactivityState.ShouldTrack = true;
         try
         {
-            SubscriberOps.PrepareDeps(this);
+            SubscriberOperations.PrepareDependencies(this);
             var value = _getter();
             Flags |= SubscriberFlags.Evaluated;
 
-            // Equal-value cutoff: only bump the dep version (notifying readers on their next
+            // Equal-value cutoff: only bump the dependency version (notifying readers on their next
             // dirtiness check) when the value actually changed.
-            if (dep.Version == 0 || !EqualityComparer<T>.Default.Equals(value, _value!))
+            if (dependency.Version == 0 || !EqualityComparer<T>.Default.Equals(value, _value!))
             {
                 _value = value;
-                dep.Version++;
+                dependency.Version++;
             }
         }
         catch
         {
-            dep.Version++;
+            dependency.Version++;
 
             // Un-poison the bookkeeping synced above so the NEXT read re-invokes the getter
             // instead of fast-pathing to a stale value; the current reader gets the exception.
@@ -139,27 +142,27 @@ public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
         }
         finally
         {
-            ReactivityState.ActiveSub = prevSub;
-            ReactivityState.ShouldTrack = prevShouldTrack;
-            SubscriberOps.CleanupDeps(this);
+            ReactivityState.ActiveSubscriber = previousSubscriber;
+            ReactivityState.ShouldTrack = previousShouldTrack;
+            SubscriberOperations.CleanupDependencies(this);
             Flags &= ~SubscriberFlags.Running;
         }
     }
 
     void IComputed.Refresh() => Refresh();
 
-    Dep ITrackedRef.Dep => _dep;
+    Dependency ITrackedReference.Dependency => _dependency;
 
-    Link? ISubscriber.Deps
+    Link? ISubscriber.Dependencies
     {
-        get => Deps;
-        set => Deps = value;
+        get => Dependencies;
+        set => Dependencies = value;
     }
 
-    Link? ISubscriber.DepsTail
+    Link? ISubscriber.DependenciesTail
     {
-        get => DepsTail;
-        set => DepsTail = value;
+        get => DependenciesTail;
+        set => DependenciesTail = value;
     }
 
     SubscriberFlags ISubscriber.Flags
@@ -177,7 +180,7 @@ public sealed class Computed<T> : IRef<T>, IComputed, ITrackedRef
     bool ISubscriber.Notify()
     {
         Flags |= SubscriberFlags.Dirty;
-        if ((Flags & SubscriberFlags.Notified) == 0 && !ReferenceEquals(ReactivityState.ActiveSub, this))
+        if ((Flags & SubscriberFlags.Notified) == 0 && !ReferenceEquals(ReactivityState.ActiveSubscriber, this))
         {
             ReactivityState.Batch(this, isComputed: true);
             return true;

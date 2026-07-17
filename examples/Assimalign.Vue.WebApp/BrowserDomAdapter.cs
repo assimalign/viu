@@ -1,11 +1,13 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices.JavaScript;
-using Assimalign.Vue.RuntimeCore.VirtualDom;
+using Assimalign.Vue.RuntimeCore;
 
 internal sealed class BrowserDomAdapter : IVirtualDomAdapter<int>
 {
     private readonly Dictionary<(int NodeHandle, string EventName), string> _eventBindings = new();
-    private readonly Dictionary<string, VEventHandler> _callbacks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, VirtualEventHandler> _callbacks = new(StringComparer.Ordinal);
 
     public int CreateElement(string tagName) => BrowserDomInterop.CreateElement(tagName);
 
@@ -88,9 +90,9 @@ internal sealed class BrowserDomAdapter : IVirtualDomAdapter<int>
             : name;
     }
 
-    private static bool TryGetEventProperty(string name, object? value, out string eventName, out VEventHandler handler)
+    private static bool TryGetEventProperty(string name, object? value, out string eventName, out VirtualEventHandler handler)
     {
-        if (value is VEventHandler eventHandler && TryGetEventName(name, out eventName))
+        if (value is VirtualEventHandler eventHandler && TryGetEventName(name, out eventName))
         {
             handler = eventHandler;
             return true;
@@ -114,7 +116,7 @@ internal sealed class BrowserDomAdapter : IVirtualDomAdapter<int>
         return false;
     }
 
-    private void SetEventListener(int node, string eventName, VEventHandler handler)
+    private void SetEventListener(int node, string eventName, VirtualEventHandler handler)
     {
         var key = (node, eventName);
         if (_eventBindings.TryGetValue(key, out var previousCallbackId))

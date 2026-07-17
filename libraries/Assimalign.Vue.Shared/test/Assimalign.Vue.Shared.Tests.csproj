@@ -1,14 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="Shouldly" Version="4.3.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.0" />
+    <VuecsPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <VuecsPackageReference Include="xunit" />
+    <VuecsPackageReference Include="xunit.runner.visualstudio" />
+    <VuecsPackageReference Include="Shouldly" />
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\src\Assimalign.Vue.Shared.csproj" />
+    <VuecsProjectReference Include="Assimalign.Vue.Shared" />
   </ItemGroup>
-
 </Project>

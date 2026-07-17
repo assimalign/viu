@@ -1,6 +1,8 @@
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices.JavaScript;
-using Assimalign.Vue.RuntimeCore.VirtualDom;
+using System.Threading.Tasks;
+using Assimalign.Vue.RuntimeCore;
 
 var rootHandle = BrowserDomInterop.QuerySelector("#app");
 var app = new VuecsApp(rootHandle);
@@ -25,8 +27,8 @@ internal sealed partial class VuecsApp
     private readonly BrowserDomAdapter _adapter;
     private readonly VirtualDomRenderer<int> _renderer;
     private readonly Stopwatch _stopwatch = new();
-    private readonly VEventHandler _toggleHandler;
-    private readonly VEventHandler _resetHandler;
+    private readonly VirtualEventHandler _toggleHandler;
+    private readonly VirtualEventHandler _resetHandler;
 
     private string _lastSnapshot = string.Empty;
 
@@ -35,8 +37,8 @@ internal sealed partial class VuecsApp
         _rootHandle = rootHandle;
         _adapter = new BrowserDomAdapter();
         _renderer = new VirtualDomRenderer<int>(_adapter);
-        _toggleHandler = V.On(Toggle);
-        _resetHandler = V.On(Reset);
+        _toggleHandler = VirtualNodeFactory.On(Toggle);
+        _resetHandler = VirtualNodeFactory.On(Reset);
         _current = this;
     }
 
@@ -54,53 +56,53 @@ internal sealed partial class VuecsApp
         _renderer.Render(_rootHandle, BuildView());
     }
 
-    private VNode BuildView()
+    private VirtualNode BuildView()
     {
         var stateLabel = _stopwatch.IsRunning ? "Running" : "Paused";
         var buttonLabel = _stopwatch.IsRunning ? "Pause" : "Start";
         var elapsed = _stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
 
-        return V.H(
+        return VirtualNodeFactory.Element(
             "section",
-            V.Props(("className", "shell")),
-            V.H(
+            VirtualNodeFactory.Properties(("className", "shell")),
+            VirtualNodeFactory.Element(
                 "article",
-                V.Props(("className", "card")),
-                V.H("span", V.Props(("className", "eyebrow")), V.Text("Vuecs Virtual DOM")),
-                V.H("h1", V.Text("Stopwatch rendered from C#")),
-                V.H(
+                VirtualNodeFactory.Properties(("className", "card")),
+                VirtualNodeFactory.Element("span", VirtualNodeFactory.Properties(("className", "eyebrow")), VirtualNodeFactory.Text("Vuecs Virtual DOM")),
+                VirtualNodeFactory.Element("h1", VirtualNodeFactory.Text("Stopwatch rendered from C#")),
+                VirtualNodeFactory.Element(
                     "p",
-                    V.Props(("className", "lead")),
-                    V.Text("The browser DOM below is created and patched through the new virtual DOM layer.")),
-                V.H(
+                    VirtualNodeFactory.Properties(("className", "lead")),
+                    VirtualNodeFactory.Text("The browser DOM below is created and patched through the new virtual DOM layer.")),
+                VirtualNodeFactory.Element(
                     "div",
-                    V.Props(("className", "meter")),
-                    V.H("span", V.Props(("className", "meter-label")), V.Text("Elapsed")),
-                    V.H("strong", V.Props(("className", "meter-value")), V.Text(elapsed))),
-                V.H(
+                    VirtualNodeFactory.Properties(("className", "meter")),
+                    VirtualNodeFactory.Element("span", VirtualNodeFactory.Properties(("className", "meter-label")), VirtualNodeFactory.Text("Elapsed")),
+                    VirtualNodeFactory.Element("strong", VirtualNodeFactory.Properties(("className", "meter-value")), VirtualNodeFactory.Text(elapsed))),
+                VirtualNodeFactory.Element(
                     "div",
-                    V.Props(("className", "status-row")),
-                    V.H("span", V.Props(("className", "status-pill")), V.Text(stateLabel)),
-                    V.H("span", V.Props(("className", "status-hint")), V.Text("Patched in-place on every tick"))),
-                V.H(
+                    VirtualNodeFactory.Properties(("className", "status-row")),
+                    VirtualNodeFactory.Element("span", VirtualNodeFactory.Properties(("className", "status-pill")), VirtualNodeFactory.Text(stateLabel)),
+                    VirtualNodeFactory.Element("span", VirtualNodeFactory.Properties(("className", "status-hint")), VirtualNodeFactory.Text("Patched in-place on every tick"))),
+                VirtualNodeFactory.Element(
                     "div",
-                    V.Props(("className", "actions")),
-                    V.H(
+                    VirtualNodeFactory.Properties(("className", "actions")),
+                    VirtualNodeFactory.Element(
                         "button",
-                        V.Props(("className", "primary"), ("onClick", _toggleHandler), ("type", "button")),
-                        V.Text(buttonLabel)),
-                    V.H(
+                        VirtualNodeFactory.Properties(("className", "primary"), ("onClick", _toggleHandler), ("type", "button")),
+                        VirtualNodeFactory.Text(buttonLabel)),
+                    VirtualNodeFactory.Element(
                         "button",
-                        V.Props(("className", "secondary"), ("onClick", _resetHandler), ("type", "button")),
-                        V.Text("Reset"))),
-                V.H(
+                        VirtualNodeFactory.Properties(("className", "secondary"), ("onClick", _resetHandler), ("type", "button")),
+                        VirtualNodeFactory.Text("Reset"))),
+                VirtualNodeFactory.Element(
                     "pre",
-                    V.Props(("className", "code-sample")),
-                    V.Text(HtmlRenderer.Render(
-                        V.H(
+                    VirtualNodeFactory.Properties(("className", "code-sample")),
+                    VirtualNodeFactory.Text(HtmlRenderer.Render(
+                        VirtualNodeFactory.Element(
                             "button",
-                            V.Props(("className", buttonLabel.ToLowerInvariant()), ("type", "button")),
-                            V.Text(buttonLabel)))))));
+                            VirtualNodeFactory.Properties(("className", buttonLabel.ToLowerInvariant()), ("type", "button")),
+                            VirtualNodeFactory.Text(buttonLabel)))))));
     }
 
     private void Toggle()

@@ -1,3 +1,4 @@
+using System;
 using Shouldly;
 using Xunit;
 
@@ -8,8 +9,8 @@ public sealed class BatchingTests
     [Fact]
     public void BatchCoalescesMultipleWritesIntoOneEffectRun()
     {
-        var a = Reactive.Ref(1);
-        var b = Reactive.Ref(2);
+        var a = Reactive.Reference(1);
+        var b = Reactive.Reference(2);
         var runs = 0;
         var sum = 0;
         Reactive.Effect(() =>
@@ -32,7 +33,7 @@ public sealed class BatchingTests
     [Fact]
     public void NestedBatchesFlushOnlyAtTheOutermostEnd()
     {
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         Reactive.Effect(() =>
         {
@@ -58,7 +59,7 @@ public sealed class BatchingTests
         Should.Throw<InvalidOperationException>(Reactive.EndBatch);
 
         // The failed call must not have corrupted the depth: batching still coalesces.
-        var count = Reactive.Ref(1);
+        var count = Reactive.Reference(1);
         var runs = 0;
         Reactive.Effect(() =>
         {
@@ -78,8 +79,8 @@ public sealed class BatchingTests
     [Fact]
     public void PauseTrackingSuppressesDependencyCollection()
     {
-        var tracked = Reactive.Ref(1);
-        var untracked = Reactive.Ref(2);
+        var tracked = Reactive.Reference(1);
+        var untracked = Reactive.Reference(2);
         var runs = 0;
         Reactive.Effect(() =>
         {

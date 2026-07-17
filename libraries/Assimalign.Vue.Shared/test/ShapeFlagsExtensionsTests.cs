@@ -1,6 +1,7 @@
-using Assimalign.Vue.Shared;
 using Shouldly;
 using Xunit;
+
+using Assimalign.Vue.Shared;
 
 namespace Assimalign.Vue.Shared.Tests;
 

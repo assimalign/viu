@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 
 namespace Assimalign.Vue.Reactivity;
@@ -57,7 +59,7 @@ public sealed class EffectScope : IDisposable
     public void Run(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        var prev = _current;
+        var previous = _current;
         if (_active)
         {
             _current = this;
@@ -68,33 +70,33 @@ public sealed class EffectScope : IDisposable
         }
         finally
         {
-            _current = prev;
+            _current = previous;
         }
     }
 
     /// <summary>
-    /// Runs <paramref name="fn"/> with this scope as the current scope and returns its result,
+    /// Runs <paramref name="function"/> with this scope as the current scope and returns its result,
     /// restoring the previous scope afterwards (even on throw).
     /// </summary>
     /// <typeparam name="TResult">The function's return type.</typeparam>
-    /// <param name="fn">The code to run inside the scope.</param>
-    /// <returns>The value returned by <paramref name="fn"/>.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="fn"/> is null.</exception>
-    public TResult Run<TResult>(Func<TResult> fn)
+    /// <param name="function">The code to run inside the scope.</param>
+    /// <returns>The value returned by <paramref name="function"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="function"/> is null.</exception>
+    public TResult Run<TResult>(Func<TResult> function)
     {
-        ArgumentNullException.ThrowIfNull(fn);
-        var prev = _current;
+        ArgumentNullException.ThrowIfNull(function);
+        var previous = _current;
         if (_active)
         {
             _current = this;
         }
         try
         {
-            return fn();
+            return function();
         }
         finally
         {
-            _current = prev;
+            _current = previous;
         }
     }
 
@@ -181,9 +183,9 @@ public sealed class EffectScope : IDisposable
             {
                 effect.Stop();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                error ??= ExceptionDispatchInfo.Capture(ex);
+                error ??= ExceptionDispatchInfo.Capture(exception);
             }
         }
         _effects.Clear();
@@ -193,9 +195,9 @@ public sealed class EffectScope : IDisposable
             {
                 cleanup();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                error ??= ExceptionDispatchInfo.Capture(ex);
+                error ??= ExceptionDispatchInfo.Capture(exception);
             }
         }
         _cleanups.Clear();
@@ -212,9 +214,9 @@ public sealed class EffectScope : IDisposable
                 {
                     scope.Stop(fromParent: true);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    error ??= ExceptionDispatchInfo.Capture(ex);
+                    error ??= ExceptionDispatchInfo.Capture(exception);
                 }
             }
         }

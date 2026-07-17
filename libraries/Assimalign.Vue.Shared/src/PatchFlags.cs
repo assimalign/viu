@@ -1,3 +1,5 @@
+using System;
+
 namespace Assimalign.Vue.Shared;
 
 /// <summary>
