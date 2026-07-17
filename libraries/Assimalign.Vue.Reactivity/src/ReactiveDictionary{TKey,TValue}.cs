@@ -11,14 +11,17 @@ namespace Assimalign.Vue.Reactivity;
 /// <see cref="Dictionary{TKey,TValue}"/>, this is a first-class implementation wrapping private
 /// storage with tracking built in.
 /// <para>
-/// Granularity mirrors upstream: each key has its own <see cref="Dependency"/> and there is one
-/// iteration dependency. Reading <c>dict[key]</c>, <see cref="ContainsKey"/>, or
-/// <see cref="TryGetValue"/> tracks that key; reading <see cref="Count"/>, <see cref="Keys"/>,
-/// <see cref="Values"/>, or enumerating tracks iteration. Assigning an <em>existing</em> key triggers
-/// only that key (upstream <c>SET</c>); adding a <em>new</em> key or removing one triggers that key
-/// and iteration (upstream <c>ADD</c>/<c>DELETE</c>). Indexer get and <see cref="Count"/> are
-/// allocation-free once a key's dependency exists. Not thread-safe (single-threaded JS event-loop
-/// model).
+/// Granularity mirrors upstream: each key has its own <see cref="Dependency"/>, plus one entry
+/// iteration dependency (upstream <c>ITERATE_KEY</c>) and one keys-only iteration dependency
+/// (upstream <c>MAP_KEY_ITERATE_KEY</c>). Reading <c>dict[key]</c>, <see cref="ContainsKey"/>, or
+/// <see cref="TryGetValue"/> tracks that key; <see cref="Count"/>, <see cref="Values"/>, and
+/// enumerating track entry iteration; <see cref="Keys"/> tracks keys-only iteration. Assigning an
+/// <em>existing</em> key triggers that key <b>and entry iteration</b> but not keys-only iteration —
+/// upstream <c>dep.ts trigger()</c> runs <c>ITERATE_KEY</c> for a Map <c>SET</c> because
+/// <c>values()</c>/<c>entries()</c> observe values, while <c>keys()</c> re-runs only on
+/// <c>ADD</c>/<c>DELETE</c>. Adding or removing a key triggers that key and both iteration
+/// dependencies. Indexer get and <see cref="Count"/> are allocation-free once a key's dependency
+/// exists. Not thread-safe (single-threaded JS event-loop model).
 /// </para>
 /// </summary>
 /// <typeparam name="TKey">The key type.</typeparam>
@@ -28,6 +31,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 {
     private readonly Dictionary<TKey, TValue> _items;
     private readonly Dependency _iterate = new();
+    private readonly Dependency _keyIterate = new();
     private readonly KeyedDependencyTable<TKey> _keys = new();
 
     /// <summary>Creates an empty reactive dictionary.</summary>
@@ -63,12 +67,15 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     /// <summary>Always <see langword="false"/>; a reactive dictionary is mutable.</summary>
     public bool IsReadOnly => false;
 
-    /// <summary>The keys (reading the collection tracks iteration).</summary>
+    /// <summary>
+    /// The keys (reading the collection tracks keys-only iteration — upstream
+    /// <c>MAP_KEY_ITERATE_KEY</c>, so a value replacement does not re-run a keys-only effect).
+    /// </summary>
     public ICollection<TKey> Keys
     {
         get
         {
-            _iterate.Track();
+            _keyIterate.Track();
             return _items.Keys;
         }
     }
@@ -89,8 +96,9 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 
     /// <summary>
     /// Gets or sets the value for <paramref name="key"/>. The getter tracks that key. The setter
-    /// triggers only that key when it already exists and the value changes (upstream <c>SET</c>), or
-    /// the key and iteration when the key is new (upstream <c>ADD</c>).
+    /// triggers that key and entry iteration when it already exists and the value changes (upstream
+    /// <c>SET</c> runs <c>ITERATE_KEY</c> — <c>values()</c>/<c>entries()</c> observe values), or the
+    /// key and both iteration dependencies when the key is new (upstream <c>ADD</c>).
     /// </summary>
     /// <param name="key">The key.</param>
     /// <returns>The value.</returns>
@@ -110,16 +118,18 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
                 {
                     _items[key] = value;
                     _keys.Trigger(key);
+                    _iterate.Trigger();
                 }
                 return;
             }
             _items[key] = value;
             _keys.Trigger(key);
             _iterate.Trigger();
+            _keyIterate.Trigger();
         }
     }
 
-    /// <summary>Adds a new entry; triggers the key and iteration (upstream <c>ADD</c>).</summary>
+    /// <summary>Adds a new entry; triggers the key and both iteration dependencies (upstream <c>ADD</c>).</summary>
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
     /// <exception cref="ArgumentException"><paramref name="key"/> already exists.</exception>
@@ -128,9 +138,10 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         _items.Add(key, value);
         _keys.Trigger(key);
         _iterate.Trigger();
+        _keyIterate.Trigger();
     }
 
-    /// <summary>Removes the entry for <paramref name="key"/>; triggers the key and iteration when present.</summary>
+    /// <summary>Removes the entry for <paramref name="key"/>; triggers the key and both iteration dependencies when present.</summary>
     /// <param name="key">The key to remove.</param>
     /// <returns><see langword="true"/> when an entry was removed.</returns>
     public bool Remove(TKey key)
@@ -139,6 +150,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         {
             _keys.Trigger(key);
             _iterate.Trigger();
+            _keyIterate.Trigger();
             return true;
         }
         return false;
@@ -154,6 +166,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         _items.Clear();
         _keys.TriggerAll();
         _iterate.Trigger();
+        _keyIterate.Trigger();
     }
 
     /// <summary>Whether <paramref name="key"/> is present (tracks that key).</summary>
@@ -189,6 +202,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         {
             _keys.Trigger(item.Key);
             _iterate.Trigger();
+            _keyIterate.Trigger();
             return true;
         }
         return false;
@@ -223,10 +237,12 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     /// <inheritdoc />
     void IReactiveTraversable.Traverse(ReactiveTraversal traversal)
     {
+        // Entry iteration alone covers a deep watch — every mutation (value replacement included,
+        // per the upstream Map-SET rule) triggers it, so per-key tracking here would only allocate
+        // cells without adding coverage. Recurses into entry values.
         _iterate.Track();
         foreach (var pair in _items)
         {
-            _keys.Track(pair.Key);
             traversal.Visit(pair.Value);
         }
     }

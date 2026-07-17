@@ -61,14 +61,16 @@ public sealed class ReactiveCollectionTests
     }
 
     [Fact]
-    public void List_SettingExistingIndex_DoesNotTriggerIteration()
+    public void List_SettingExistingIndex_TriggersIterationAndIndex_NotLength()
     {
         var list = new ReactiveList<int>(new[] { 1, 2, 3 });
-        var iterationRuns = 0;
+        var lengthRuns = 0;
         var indexRuns = 0;
+        var enumerationRuns = 0;
+        var sum = 0;
         Reactive.Effect(() =>
         {
-            iterationRuns++;
+            lengthRuns++;
             _ = list.Count;
         });
         Reactive.Effect(() =>
@@ -76,17 +78,30 @@ public sealed class ReactiveCollectionTests
             indexRuns++;
             _ = list[1];
         });
-        iterationRuns.ShouldBe(1);
+        Reactive.Effect(() =>
+        {
+            enumerationRuns++;
+            sum = 0;
+            foreach (var value in list)
+            {
+                sum += value;
+            }
+        });
+        lengthRuns.ShouldBe(1);
         indexRuns.ShouldBe(1);
+        enumerationRuns.ShouldBe(1);
 
-        // Upstream array SET: replacing an existing slot triggers that index, not length/iteration.
+        // Upstream dep.ts trigger(): a numeric SET runs the index dep and ARRAY_ITERATE_KEY (so
+        // enumerating effects observe the replacement) but not the length dep.
         list[1] = 20;
-        iterationRuns.ShouldBe(1);
+        lengthRuns.ShouldBe(1);
         indexRuns.ShouldBe(2);
+        enumerationRuns.ShouldBe(2);
+        sum.ShouldBe(24);
     }
 
     [Fact]
-    public void List_Count_TracksIteration_AndReRunsOnStructuralChange()
+    public void List_Count_TracksLength_AndReRunsOnStructuralChange()
     {
         var list = new ReactiveList<int>();
         var runs = 0;
@@ -157,7 +172,7 @@ public sealed class ReactiveCollectionTests
     }
 
     [Fact]
-    public void Dictionary_AddNewKeyTriggersIteration_SetExistingDoesNot()
+    public void Dictionary_SetExistingAndStructuralChanges_TriggerEntryIteration()
     {
         var dictionary = new ReactiveDictionary<string, int> { ["a"] = 1 };
         var runs = 0;
@@ -168,16 +183,49 @@ public sealed class ReactiveCollectionTests
         });
         runs.ShouldBe(1);
 
-        // Upstream Map SET: setting an existing key does not trigger iteration.
+        // Upstream dep.ts trigger(): a Map SET runs ITERATE_KEY (values()/entries() observe
+        // values, and size shares that dep), so an entry-iteration effect re-runs.
         dictionary["a"] = 2;
-        runs.ShouldBe(1);
-
-        // Upstream Map ADD: a new key triggers iteration.
-        dictionary["c"] = 3;
         runs.ShouldBe(2);
 
-        dictionary.Remove("c");
+        // Equal value: no trigger (EqualityComparer<int>.Default).
+        dictionary["a"] = 2;
+        runs.ShouldBe(2);
+
+        // Upstream Map ADD / DELETE trigger iteration as well.
+        dictionary["c"] = 3;
         runs.ShouldBe(3);
+
+        dictionary.Remove("c");
+        runs.ShouldBe(4);
+    }
+
+    [Fact]
+    public void Dictionary_Keys_TracksKeyIteration_AndIgnoresValueReplacement()
+    {
+        var dictionary = new ReactiveDictionary<string, int> { ["a"] = 1 };
+        var runs = 0;
+        var keyCount = 0;
+        Reactive.Effect(() =>
+        {
+            runs++;
+            keyCount = dictionary.Keys.Count;
+        });
+        runs.ShouldBe(1);
+        keyCount.ShouldBe(1);
+
+        // Upstream MAP_KEY_ITERATE_KEY: keys() re-runs only on ADD/DELETE — a value replacement
+        // leaves a keys-only effect untouched.
+        dictionary["a"] = 99;
+        runs.ShouldBe(1);
+
+        dictionary.Add("b", 2);
+        runs.ShouldBe(2);
+        keyCount.ShouldBe(2);
+
+        dictionary.Remove("a");
+        runs.ShouldBe(3);
+        keyCount.ShouldBe(1);
     }
 
     [Fact]

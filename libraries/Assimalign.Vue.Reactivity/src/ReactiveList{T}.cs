@@ -10,11 +10,14 @@ namespace Assimalign.Vue.Reactivity;
 /// <c>baseHandlers.ts</c>). Because C# cannot proxy <see cref="List{T}"/>, this is a first-class
 /// implementation wrapping private storage with tracking built in.
 /// <para>
-/// Granularity mirrors upstream: each index has its own <see cref="Dependency"/> and there is one
-/// iteration/length dependency. Reading <c>list[i]</c> tracks index <c>i</c> only; enumerating or
-/// reading <see cref="Count"/> tracks iteration. Assigning an existing index triggers just that
-/// index (upstream <c>SET</c>); appending triggers the length dependency; a structural change that
-/// shifts elements (insert, remove, clear) triggers iteration plus the shifted indices. Indexer get
+/// Granularity mirrors upstream: each index has its own <see cref="Dependency"/>, plus one
+/// iteration dependency (upstream <c>ARRAY_ITERATE_KEY</c>) and one length dependency (the
+/// <c>length</c> key). Reading <c>list[i]</c> tracks index <c>i</c> only; enumerating,
+/// <see cref="Contains"/>, and <see cref="IndexOf"/> track iteration; <see cref="Count"/> tracks
+/// length. Assigning an existing index triggers that index <b>and iteration</b> but not length —
+/// upstream <c>dep.ts trigger()</c> runs <c>ARRAY_ITERATE_KEY</c> for every numeric <c>SET</c>
+/// while the <c>length</c> dep runs only when the length actually changes. Structural changes
+/// (append, insert, remove, clear) trigger iteration, length, and the shifted indices. Indexer get
 /// and set and <see cref="Count"/> are allocation-free once an index's dependency exists. Not
 /// thread-safe (single-threaded JS event-loop model).
 /// </para>
@@ -24,6 +27,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
 {
     private readonly List<T> _items;
     private readonly Dependency _iterate = new();
+    private readonly Dependency _length = new();
     private Dictionary<int, Dependency>? _indexCells;
 
     /// <summary>Creates an empty reactive list.</summary>
@@ -42,12 +46,12 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         _items = new List<T>(items);
     }
 
-    /// <summary>The element count (reading it tracks the iteration/length dependency).</summary>
+    /// <summary>The element count (reading it tracks the length dependency — upstream <c>length</c>).</summary>
     public int Count
     {
         get
         {
-            _iterate.Track();
+            _length.Track();
             return _items.Count;
         }
     }
@@ -57,8 +61,10 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
 
     /// <summary>
     /// Gets or sets the element at <paramref name="index"/>. The getter tracks that index; the setter
-    /// triggers only that index when the value changes per
-    /// <see cref="EqualityComparer{T}.Default"/> (upstream array <c>SET</c>: siblings are untouched).
+    /// triggers that index and iteration when the value changes per
+    /// <see cref="EqualityComparer{T}.Default"/> (upstream array <c>SET</c>: sibling index deps are
+    /// untouched, but <c>ARRAY_ITERATE_KEY</c> runs for every numeric change so enumerating effects
+    /// observe replacements; the length dep is untouched).
     /// </summary>
     /// <param name="index">The zero-based index.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> is out of range.</exception>
@@ -76,20 +82,22 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
             {
                 _items[index] = value;
                 TriggerIndex(index);
+                _iterate.Trigger();
             }
         }
     }
 
-    /// <summary>Appends <paramref name="item"/>; triggers the length dependency (upstream array push).</summary>
+    /// <summary>Appends <paramref name="item"/>; triggers iteration and length (upstream array push).</summary>
     /// <param name="item">The element to append.</param>
     public void Add(T item)
     {
         _items.Add(item);
         TriggerIndex(_items.Count - 1);
         _iterate.Trigger();
+        _length.Trigger();
     }
 
-    /// <summary>Appends every element of <paramref name="items"/>, triggering the length dependency once.</summary>
+    /// <summary>Appends every element of <paramref name="items"/>, triggering iteration and length once.</summary>
     /// <param name="items">The elements to append.</param>
     /// <exception cref="ArgumentNullException"><paramref name="items"/> is null.</exception>
     public void AddRange(IEnumerable<T> items)
@@ -101,12 +109,13 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         {
             TriggerIndexesFrom(firstNewIndex);
             _iterate.Trigger();
+            _length.Trigger();
         }
     }
 
     /// <summary>
-    /// Inserts <paramref name="item"/> at <paramref name="index"/>; triggers iteration plus every
-    /// index from <paramref name="index"/> onward (their elements shifted).
+    /// Inserts <paramref name="item"/> at <paramref name="index"/>; triggers iteration, length, and
+    /// every index from <paramref name="index"/> onward (their elements shifted).
     /// </summary>
     /// <param name="index">The insertion index.</param>
     /// <param name="item">The element to insert.</param>
@@ -116,11 +125,12 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         _items.Insert(index, item);
         TriggerIndexesFrom(index);
         _iterate.Trigger();
+        _length.Trigger();
     }
 
     /// <summary>
-    /// Removes the element at <paramref name="index"/>; triggers iteration plus every index from
-    /// <paramref name="index"/> onward (the tail shifted down; upstream array length shrink).
+    /// Removes the element at <paramref name="index"/>; triggers iteration, length, and every index
+    /// from <paramref name="index"/> onward (the tail shifted down; upstream array length shrink).
     /// </summary>
     /// <param name="index">The index to remove.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> is out of range.</exception>
@@ -129,11 +139,12 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         _items.RemoveAt(index);
         TriggerIndexesFrom(index);
         _iterate.Trigger();
+        _length.Trigger();
     }
 
     /// <summary>
     /// Removes <paramref name="count"/> elements starting at <paramref name="index"/>; triggers
-    /// iteration plus every index from <paramref name="index"/> onward.
+    /// iteration, length, and every index from <paramref name="index"/> onward.
     /// </summary>
     /// <param name="index">The start index.</param>
     /// <param name="count">The number of elements to remove.</param>
@@ -145,12 +156,13 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         {
             TriggerIndexesFrom(index);
             _iterate.Trigger();
+            _length.Trigger();
         }
     }
 
     /// <summary>
-    /// Removes the first occurrence of <paramref name="item"/>. Triggers iteration and the shifted
-    /// indices when found. Returns whether an element was removed.
+    /// Removes the first occurrence of <paramref name="item"/>. Triggers iteration, length, and the
+    /// shifted indices when found. Returns whether an element was removed.
     /// </summary>
     /// <param name="item">The element to remove.</param>
     /// <returns><see langword="true"/> when an element was removed.</returns>
@@ -165,7 +177,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         return true;
     }
 
-    /// <summary>Removes every element; triggers iteration and all tracked indices when non-empty.</summary>
+    /// <summary>Removes every element; triggers iteration, length, and all tracked indices when non-empty.</summary>
     public void Clear()
     {
         if (_items.Count == 0)
@@ -175,6 +187,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         _items.Clear();
         TriggerAllIndexes();
         _iterate.Trigger();
+        _length.Trigger();
     }
 
     /// <summary>
@@ -236,12 +249,12 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
     /// <inheritdoc />
     void IReactiveTraversable.Traverse(ReactiveTraversal traversal)
     {
-        // Deep watch of a list depends on iteration (structural changes) and every element slot
-        // (replacements), and recurses into element values.
+        // Deep watch of a list depends on iteration alone — every mutation (element replacement
+        // included, per the upstream numeric-SET rule) triggers it, so per-index tracking here
+        // would only allocate cells without adding coverage. Recurses into element values.
         _iterate.Track();
         for (var index = 0; index < _items.Count; index++)
         {
-            TrackIndex(index);
             traversal.Visit(_items[index]);
         }
     }

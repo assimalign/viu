@@ -269,10 +269,12 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlyCollection<T>, IReactiveT
     /// <inheritdoc />
     void IReactiveTraversable.Traverse(ReactiveTraversal traversal)
     {
+        // Iteration alone covers a deep watch — a set's only mutations are add/remove/clear and
+        // all of them trigger it, so per-member tracking here would only allocate cells without
+        // adding coverage. Recurses into member values.
         _iterate.Track();
         foreach (var item in _items)
         {
-            _members.Track(item);
             traversal.Visit(item);
         }
     }
