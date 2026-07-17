@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Assimalign.Vue.Reactivity;
@@ -126,4 +127,228 @@ public static class Reactive
     /// <summary>Closes the innermost batch, flushing queued effects when it is the outermost one.</summary>
     /// <exception cref="InvalidOperationException">There is no open batch to close.</exception>
     public static void EndBatch() => ReactivityState.EndBatch();
+
+    /// <summary>
+    /// Watches a ref and invokes <paramref name="callback"/> with the new and previous values when it
+    /// changes (Vue's <c>watch()</c>, https://vuejs.org/api/reactivity-core.html#watch). With
+    /// <see cref="WatchOptions.Deep"/> the ref's value is traversed so a nested reactive change also
+    /// fires the callback.
+    /// </summary>
+    /// <typeparam name="T">The watched value type.</typeparam>
+    /// <param name="source">The ref to watch.</param>
+    /// <param name="callback">Receives <c>(newValue, oldValue, onCleanup)</c>.</param>
+    /// <param name="options">Immediate/once/deep/flush options.</param>
+    /// <returns>A handle to stop or pause the watcher.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
+    public static WatchHandle Watch<T>(IReference<T> source, WatchCallback<T> callback, WatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(callback);
+        var depth = ResolveDepth(options);
+        Func<T> getter = depth <= 0
+            ? () => source.Value
+            : () =>
+            {
+                var value = source.Value;
+                new ReactiveTraversal(depth).Visit(value);
+                return value;
+            };
+        return CreateWatch(getter, callback, DefaultHasChanged, depth > 0, default!, options);
+    }
+
+    /// <summary>
+    /// Watches a getter and invokes <paramref name="callback"/> with the new and previous return
+    /// values when any reactive value the getter reads changes (Vue's <c>watch(getter, cb)</c>).
+    /// </summary>
+    /// <typeparam name="T">The watched value type.</typeparam>
+    /// <param name="source">The getter whose reactive reads are tracked.</param>
+    /// <param name="callback">Receives <c>(newValue, oldValue, onCleanup)</c>.</param>
+    /// <param name="options">Immediate/once/deep/flush options.</param>
+    /// <returns>A handle to stop or pause the watcher.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
+    public static WatchHandle Watch<T>(Func<T> source, WatchCallback<T> callback, WatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(callback);
+        var depth = ResolveDepth(options);
+        Func<T> getter = depth <= 0
+            ? source
+            : () =>
+            {
+                var value = source();
+                new ReactiveTraversal(depth).Visit(value);
+                return value;
+            };
+        return CreateWatch(getter, callback, DefaultHasChanged, depth > 0, default!, options);
+    }
+
+    /// <summary>
+    /// Watches a source-generated reactive object; the callback fires when any of its reactive
+    /// members (deep) changes (Vue's <c>watch(reactiveObject, cb)</c>, which is deep by default). The
+    /// callback receives the same instance as both new and old value — the object is mutated in place
+    /// (upstream parity). Set <see cref="WatchOptions.DeepDepth"/> to bound the traversal.
+    /// </summary>
+    /// <typeparam name="TReactive">The reactive object type.</typeparam>
+    /// <param name="source">The reactive object to watch.</param>
+    /// <param name="callback">Receives <c>(value, value, onCleanup)</c>.</param>
+    /// <param name="options">Once/flush options (deep is implied).</param>
+    /// <returns>A handle to stop or pause the watcher.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
+    public static WatchHandle Watch<TReactive>(TReactive source, WatchCallback<TReactive> callback, WatchOptions? options = null)
+        where TReactive : class, IReactiveObject
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(callback);
+        var depth = options?.DeepDepth ?? int.MaxValue;
+        Func<TReactive> getter = () =>
+        {
+            new ReactiveTraversal(depth).Visit(source);
+            return source;
+        };
+        return CreateWatch(getter, callback, NeverChanged, alwaysCallback: true, source, options);
+    }
+
+    /// <summary>
+    /// Watches several refs at once; the callback receives arrays of the new and previous values with
+    /// per-source old values preserved (Vue's array-source <c>watch</c>).
+    /// </summary>
+    /// <param name="sources">The refs to watch.</param>
+    /// <param name="callback">Receives <c>(newValues, oldValues, onCleanup)</c>.</param>
+    /// <param name="options">Immediate/once/deep/flush options.</param>
+    /// <returns>A handle to stop or pause the watcher.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="sources"/> or <paramref name="callback"/> is null.</exception>
+    public static WatchHandle Watch(IReference[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        var getters = new Func<object?>[sources.Length];
+        for (var index = 0; index < sources.Length; index++)
+        {
+            var reference = sources[index] ?? throw new ArgumentNullException(nameof(sources));
+            getters[index] = () => reference.Value;
+        }
+        return Watch(getters, callback, options);
+    }
+
+    /// <summary>
+    /// Watches several getters at once; the callback receives arrays of the new and previous values
+    /// with per-source old values preserved (Vue's array-source <c>watch</c>).
+    /// </summary>
+    /// <param name="sources">The getters to watch.</param>
+    /// <param name="callback">Receives <c>(newValues, oldValues, onCleanup)</c>.</param>
+    /// <param name="options">Immediate/once/deep/flush options.</param>
+    /// <returns>A handle to stop or pause the watcher.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="sources"/> or <paramref name="callback"/> is null.</exception>
+    public static WatchHandle Watch(Func<object?>[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(callback);
+        var count = sources.Length;
+        var depth = ResolveDepth(options);
+        Func<object?[]> getter = () =>
+        {
+            var values = new object?[count];
+            for (var index = 0; index < count; index++)
+            {
+                values[index] = sources[index]();
+            }
+            if (depth > 0)
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    new ReactiveTraversal(depth).Visit(values[index]);
+                }
+            }
+            return values;
+        };
+        // Per-source old values start unset as an array of nulls so the immediate callback can index.
+        var unset = new object?[count];
+        return CreateWatch(getter, callback, ArrayHasChanged, depth > 0, unset, options);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="effect"/> immediately, tracking every reactive value it reads, and re-runs
+    /// it whenever any of them changes (Vue's <c>watchEffect()</c>,
+    /// https://vuejs.org/api/reactivity-core.html#watcheffect). The <c>onCleanup</c> argument registers
+    /// a cleanup that runs before the next run and on stop.
+    /// </summary>
+    /// <param name="effect">The effect body; its <see cref="OnCleanup"/> argument registers a cleanup callback.</param>
+    /// <param name="options">Flush options (immediate/once/deep do not apply).</param>
+    /// <returns>A handle to stop or pause the effect.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="effect"/> is null.</exception>
+    public static WatchHandle WatchEffect(Action<OnCleanup> effect, WatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+        var watcher = new EffectWatcher(effect, options?.Flush ?? WatchFlushMode.Sync, options?.Scheduler);
+        return new WatchHandle(watcher);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="effect"/> immediately, tracking every reactive value it reads, and re-runs
+    /// it whenever any of them changes (Vue's <c>watchEffect()</c>). Overload for effects that need no
+    /// cleanup registration.
+    /// </summary>
+    /// <param name="effect">The effect body.</param>
+    /// <param name="options">Flush options.</param>
+    /// <returns>A handle to stop or pause the effect.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="effect"/> is null.</exception>
+    public static WatchHandle WatchEffect(Action effect, WatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+        return WatchEffect(_ => effect(), options);
+    }
+
+    private static WatchHandle CreateWatch<T>(
+        Func<T> getter,
+        WatchCallback<T> callback,
+        Func<T, T, bool> hasChanged,
+        bool alwaysCallback,
+        T unsetOldValue,
+        WatchOptions? options)
+    {
+        var watcher = new Watcher<T>(
+            getter,
+            callback,
+            hasChanged,
+            alwaysCallback,
+            unsetOldValue,
+            options?.Immediate ?? false,
+            options?.Flush ?? WatchFlushMode.Sync,
+            options?.Scheduler,
+            options?.Once ?? false);
+        return new WatchHandle(watcher);
+    }
+
+    private static int ResolveDepth(WatchOptions? options)
+    {
+        if (options is null)
+        {
+            return 0;
+        }
+        if (options.DeepDepth is int depth)
+        {
+            return depth < 0 ? 0 : depth;
+        }
+        return options.Deep ? int.MaxValue : 0;
+    }
+
+    private static bool DefaultHasChanged<T>(T newValue, T oldValue)
+        => !EqualityComparer<T>.Default.Equals(newValue, oldValue);
+
+    private static bool NeverChanged<T>(T newValue, T oldValue) => false;
+
+    private static bool ArrayHasChanged(object?[] newValues, object?[] oldValues)
+    {
+        if (newValues.Length != oldValues.Length)
+        {
+            return true;
+        }
+        for (var index = 0; index < newValues.Length; index++)
+        {
+            if (!Equals(newValues[index], oldValues[index]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
