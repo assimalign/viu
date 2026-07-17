@@ -62,6 +62,22 @@ public sealed class Renderer<TNode>
         Scheduler.FlushAfterSynchronousRender();
     }
 
+    /// <summary>
+    /// Binds <paramref name="renderFunction"/> reactively to <paramref name="container"/>:
+    /// mounts immediately inside a tracked effect, then re-renders through the scheduler
+    /// whenever a tracked dependency changes (upstream: <c>setupRenderEffect</c>; see
+    /// <see cref="RenderEffect{TNode}"/>).
+    /// </summary>
+    /// <param name="renderFunction">The tracked function producing the tree.</param>
+    /// <param name="container">The platform container node.</param>
+    /// <returns>The live binding; stop or dispose it to detach.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="renderFunction"/> is null.</exception>
+    public RenderEffect<TNode> CreateRenderEffect(Func<VirtualNode> renderFunction, TNode container)
+    {
+        ArgumentNullException.ThrowIfNull(renderFunction);
+        return new RenderEffect<TNode>(this, renderFunction, container);
+    }
+
     private void Patch(VirtualNode? current, VirtualNode next, TNode container, TNode? anchor, string? elementNamespace)
     {
         if (ReferenceEquals(current, next))
