@@ -1,0 +1,21 @@
+<Project>
+
+  <!-- Central build settings for every project in the repo. Individual csproj files must not
+       duplicate these. Layout rule: libraries/Assimalign.Vue.<Name>/{src|test}. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Shipping libraries must stay trimming- and AOT-clean; tests and sample apps are exempt. -->
+  <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests')) and $(MSBuildProjectDirectory.Contains('libraries'))">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>
