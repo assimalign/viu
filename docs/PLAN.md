@@ -81,8 +81,10 @@ These are deliberate, recorded divergences from upstream — everything else tra
 7. **Cohesion integration at MVP.** Vuecs will integrate with the Cohesion platform
    (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process,
    packaging aligned with Cohesion's SDK/shared-framework model (tracked as `V01.01.12.08`, #104).
-   Consequence now: hosting and server-rendering seams stay host-agnostic; ASP.NET Core is an
-   adapter, never a hard dependency of the SSR core.
+   Consequence now: hosting and server-rendering seams stay host-agnostic — [V01.01.07.04] ships
+   a server adaptor contract that any web framework implements as a thin downstream adapter
+   (Cohesion Web first; ASP.NET Core only if ever wanted), and no Assimalign.Vue.* library may
+   reference a web framework (decision reaffirmed and made binding 2026-07-17).
 
 ## Delivery model
 
@@ -108,7 +110,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W02** | Component model — instance/setup, props, emits, slots, provide/inject, lifecycle, app API, directives, refs, dynamic components, watch, `[Reactive]` source-gen, reactive collections, LIS keyed diff, browser bootstrap, test utils | TodoMVC built from components with `h()` render functions |
 | **W03** | Compiler — template parser → transforms → C# codegen source generator, patch flags + block tree end-to-end, static hoisting, diagnostics, `.vuecs` SFC format + MSBuild, interop command buffer, v-model/v-show, size budgets | TodoMVC rewritten as `.vuecs` templates; interop calls measurably collapse |
 | **W04** | Ecosystem — router, store, built-ins (Teleport/KeepAlive/Transition/async), scoped CSS + CSS modules, HackerNews sample, getting-started guide | HackerNews client: routed, stored, styled |
-| **W05** | Server + DX — SSR renderer + SSR codegen + hydration + ASP.NET Core host, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new vuecs-app` works from NuGet |
+| **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new vuecs-app` works from NuGet |
 | **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.vuecs` editor support | Docs site built by Vuecs itself |
 
 ## The planned backlog
@@ -205,7 +207,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.07.01` | Implement the SSR string renderer and helper library | W05 | P004 |
 | `V01.01.07.02` | Implement SSR compiler transforms for string-concatenation codegen | W05 | P005 |
 | `V01.01.07.03` | Implement the hydration walker | W05 | P004 |
-| `V01.01.07.04` | Integrate SSR with ASP.NET Core | W05 | P005 |
+| `V01.01.07.04` | Implement the host-agnostic server adaptor for SSR hosting | W05 | P005 |
 | `V01.01.07.05` | Implement static prerendering (SSG) | W06 | P006 |
 
 ### [V01.01.08] Framework - Router (W04, P003)
