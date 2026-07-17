@@ -65,10 +65,22 @@ consuming WASM app's source `wwwroot/_content/<AssemblyName>/` (gitignored) — 
 the RCL convention, so call sites won't change when NuGet packaging ships the files as real
 static web assets later.
 
+## Events: the invoker pattern ([V01.01.04.03])
+
+One JS listener is attached per (element, event, capture); a re-rendered handler is a .NET
+delegate swap on the invoker — zero `addEventListener`/`removeEventListener` interop between
+renders. Prop-name suffixes (`onClickOnce`/`Capture`/`Passive`, combined) map to listener
+options at attach time. The listener applies Vue's attach-timestamp guard JS-side
+(`e.timeStamp < attached` ignores events that fired before their patch attached the listener —
+zero interop for guarded events) and forwards the complete typed payload as primitives through
+the single `[JSExport]` dispatch entry (`BrowserEventDispatch.DispatchBrowserEvent`), which
+returns stop/prevent flags the listener applies to the live event. `BrowserEvents.WithModifiers`
+and `.WithKeys` port `withModifiers`/`withKeys` (guards run .NET-side over the payload).
+Handler exceptions route to the registry's error sink — a debug trace until the app
+error-handling pipeline ([V01.01.03.12]) replaces it — and never escape into the JS listener.
+
 ## Non-goals (sequenced work)
 
-- Event invoker pattern, modifiers, and the typed event contract — [V01.01.04.03] (#41). Until
-  then listeners are `Action`/`Action<object?>` delegates dispatched by `(handle, event name)`.
 - Interop command-buffer batching — [V01.01.04.05] (#43).
 - App bootstrap (`CreateApp`-equivalent, container clearing) — [V01.01.04.04] (#42).
 - `v-model` runtime — [V01.01.04.06].

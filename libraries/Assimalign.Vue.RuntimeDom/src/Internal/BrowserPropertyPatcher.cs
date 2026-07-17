@@ -72,11 +72,9 @@ internal static class BrowserPropertyPatcher
         }
         else if (VirtualNodeFactory.IsEventListenerName(propertyName))
         {
-            // onClick -> "click"; invoker pattern and modifiers land with [V01.01.04.03].
-            leafOperations.SetEventListener(
-                element,
-                propertyName[2..].ToLowerInvariant(),
-                nextValue as Delegate);
+            // The raw prop name flows through: the invoker registry parses the
+            // Once/Capture/Passive suffixes and event name ([V01.01.04.03]).
+            leafOperations.SetEventListener(element, propertyName, nextValue as Delegate);
         }
         else if (ShouldSetAsProperty(elementTag, propertyName, elementNamespace))
         {

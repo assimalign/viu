@@ -18,8 +18,8 @@ internal static partial class BrowserDomBridge
     /// <summary>The JS module name; must match <c>BrowserRuntime</c>'s import.</summary>
     internal const string ModuleName = "Assimalign.Vue.RuntimeDom";
 
-    internal static void Initialize(Action<int, string> dispatchCallback)
-        => Imports.Initialize(dispatchCallback);
+    internal static System.Threading.Tasks.Task InitializeModuleAsync()
+        => Imports.Initialize();
 
     internal static int QuerySelector(string selector)
     {
@@ -285,11 +285,11 @@ internal static partial class BrowserDomBridge
         }
     }
 
-    internal static void AddEventListener(int nodeHandle, string eventName)
+    internal static void AddEventListener(int nodeHandle, string eventName, bool once, bool capture, bool passive)
     {
         try
         {
-            Imports.AddEventListener(nodeHandle, eventName);
+            Imports.AddEventListener(nodeHandle, eventName, once, capture, passive);
         }
         catch (JSException exception)
         {
@@ -297,11 +297,11 @@ internal static partial class BrowserDomBridge
         }
     }
 
-    internal static void RemoveEventListener(int nodeHandle, string eventName)
+    internal static void RemoveEventListener(int nodeHandle, string eventName, bool capture)
     {
         try
         {
-            Imports.RemoveEventListener(nodeHandle, eventName);
+            Imports.RemoveEventListener(nodeHandle, eventName, capture);
         }
         catch (JSException exception)
         {
@@ -409,15 +409,16 @@ internal static partial class BrowserDomBridge
         internal static partial void RemoveStyleProperty(int nodeHandle, string name);
 
         [JSImport("dom.addEventListener", ModuleName)]
-        internal static partial void AddEventListener(int nodeHandle, string eventName);
+        internal static partial void AddEventListener(int nodeHandle, string eventName, bool once, bool capture, bool passive);
 
         [JSImport("dom.removeEventListener", ModuleName)]
-        internal static partial void RemoveEventListener(int nodeHandle, string eventName);
+        internal static partial void RemoveEventListener(int nodeHandle, string eventName, bool capture);
 
         [JSImport("dom.getRegistrySizes", ModuleName)]
         internal static partial int[] GetRegistrySizes();
 
         [JSImport("initialize", ModuleName)]
-        internal static partial void Initialize([JSMarshalAs<JSType.Function<JSType.Number, JSType.String>>] Action<int, string> dispatchCallback);
+        [return: JSMarshalAs<JSType.Promise<JSType.Void>>]
+        internal static partial System.Threading.Tasks.Task Initialize();
     }
 }
