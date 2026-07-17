@@ -34,6 +34,7 @@ internal static class VuecsDiagnostics
         report.AppendLine();
 
         RunHandleLifecycleStress(renderer, rootHandle, report);
+        RunApplicationLifecycleStress(rootHandle, report);
         RunMarshalingBenchmark(report);
 
         renderer.Render(
@@ -65,6 +66,32 @@ internal static class VuecsDiagnostics
         report.AppendLine($"  peak:     nodes={peakNodes}");
         report.AppendLine($"  after:    nodes={after.JsNodes} listenerMaps={after.JsListenerMaps} dotnetListeners={after.DotnetListeners}");
         report.AppendLine($"  result:   {(passed ? "PASS - registries returned to baseline" : "FAIL - leak detected")}");
+        report.AppendLine();
+    }
+
+    private static void RunApplicationLifecycleStress(int rootHandle, StringBuilder report)
+    {
+        // The [V01.01.04.04] criterion: CreateApp/Mount/Unmount cycles — with component
+        // lifecycles, props, emits, and timers — return the bridge registry to its pre-mount
+        // baseline.
+        var baseline = BrowserRuntime.GetRegistryDiagnostics();
+        var peakNodes = 0;
+        for (var iteration = 0; iteration < 25; iteration++)
+        {
+            var application = BrowserRuntime.CreateApp(new StopwatchApplication());
+            application.Mount(rootHandle);
+            var during = BrowserRuntime.GetRegistryDiagnostics();
+            peakNodes = Math.Max(peakNodes, during.JsNodes);
+            application.Unmount();
+        }
+        var after = BrowserRuntime.GetRegistryDiagnostics();
+        var passed = after == baseline;
+        report.AppendLine("APPLICATION LIFECYCLE STRESS (CreateApp/Mount/Unmount)");
+        report.AppendLine($"  cycles: 25 x component tree (root + child, listeners, timers)");
+        report.AppendLine($"  baseline: nodes={baseline.JsNodes} listenerMaps={baseline.JsListenerMaps} dotnetListeners={baseline.DotnetListeners}");
+        report.AppendLine($"  peak:     nodes={peakNodes}");
+        report.AppendLine($"  after:    nodes={after.JsNodes} listenerMaps={after.JsListenerMaps} dotnetListeners={after.DotnetListeners}");
+        report.AppendLine($"  result:   {(passed ? "PASS - registry returned to pre-mount baseline" : "FAIL - leak detected")}");
         report.AppendLine();
     }
 
