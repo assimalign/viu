@@ -194,10 +194,18 @@ public static class DependencyInjection
         }
         // Upstream reads from the parent's provides, never the instance's own: a component that
         // both provides and injects the same key sees the ancestor value, not the one it just
-        // provided for its descendants. At the root, the parent chain ends and app-level provides
-        // ([V01.01.03.12]) are the documented final-fallback seam (null until that lands).
+        // provided for its descendants.
         var provides = instance.Parent?.Provides;
         if (provides is not null && provides.TryGetValue(key, out value))
+        {
+            return InjectionLookup.Found;
+        }
+        // App-level provides are the final fallback ([V01.01.03.12], issue #28). Upstream seeds the
+        // root instance's provides prototype chain from appContext.provides, so an inject that
+        // misses the component-ancestor chain (a nearer component provider always shadows here
+        // because the flat table already holds every ancestor's entries) resolves against the app.
+        var appProvides = instance.AppContext?.Provides;
+        if (appProvides is not null && appProvides.TryGetValue(key, out value))
         {
             return InjectionLookup.Found;
         }
