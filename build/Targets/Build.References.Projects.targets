@@ -1,0 +1,51 @@
+<Project>
+    <!--
+        Project Reference By Name Only.
+
+        Lets a library/example/analyzer csproj reference another project by its
+        assembly name instead of by relative csproj path. Resolution walks
+        libraries/ once, matches each item's Include to the csproj whose filename
+        matches, and emits a regular <ProjectReference Include="<resolved-path>" />
+        with the appropriate per-flavour metadata.
+
+        Two flavours:
+
+          VuecsProjectReference         - PUBLIC code reference. Resulting
+                                            <ProjectReference> has default
+                                            semantics: compiled against,
+                                            CopyLocal'd into bin/, AND appears
+                                            as a <dependency> in this library's
+                                            .nupkg .nuspec (flows to consumers).
+
+                                            Usage (by assembly name only):
+                                              <VuecsProjectReference Include="Assimalign.Vue.Shared" />
+
+          VuecsPrivateProjectReference  - PRIVATE code reference. Same compile
+                                            + CopyLocal behaviour, but the
+                                            resulting <ProjectReference> carries
+                                            PrivateAssets="all", which suppresses
+                                            the <dependency> entry in the .nuspec.
+                                            Consumers of this library's .nupkg
+                                            never learn about the target. Use for
+                                            "this library needs X as an internal
+                                            implementation detail but should not
+                                            expose X to its consumers".
+    -->
+    <ItemGroup>
+        <!-- Index code projects ONCE. -->
+        <_VuecsProject Include="$(VuecsRepositoryDirectory)libraries\**\*.csproj" />
+        <_VuecsProject Update="@(_VuecsProject)" ProjectId="%(_VuecsProject.Filename)" ProjectPath="%(_VuecsProject.Identity)" />
+
+        <!-- Public refs -->
+        <VuecsProjectReference Update="@(_VuecsProject->'%(ProjectId)')" ProjectPath="%(_VuecsProject.ProjectPath)" />
+        <ProjectReference Include="@(VuecsProjectReference->'%(ProjectPath)')" />
+        <VuecsProjectReference Remove="@(VuecsProjectReference->HasMetadata('ProjectPath'))" />
+
+        <!-- Private refs: PrivateAssets='all' suppresses .nuspec <dependency> flow. -->
+        <VuecsPrivateProjectReference Update="@(_VuecsProject->'%(ProjectId)')" ProjectPath="%(_VuecsProject.ProjectPath)" />
+        <ProjectReference Include="@(VuecsPrivateProjectReference->'%(ProjectPath)')" PrivateAssets="all" />
+        <VuecsPrivateProjectReference Remove="@(VuecsPrivateProjectReference->HasMetadata('ProjectPath'))" />
+
+        <_VuecsProject Remove="@(_VuecsProject)" />
+    </ItemGroup>
+</Project>

@@ -1,3 +1,3 @@
 <Project>
-  <!-- Central build targets. Shared packaging/versioning logic lands here (V01.01.12.03). -->
+	<Import Project="build\Build.targets" />
 </Project>

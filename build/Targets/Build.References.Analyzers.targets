@@ -1,0 +1,83 @@
+<Project>
+    <!-- Analyzer Reference By Name Only
+
+        VuecsAnalyzerReference       - ROSLYN ANALYZER / SOURCE GENERATOR
+                                            reference. Resolves against
+                                            analyzers/**/*.csproj. Emits a
+                                            <ProjectReference> with
+                                            OutputItemType="Analyzer" +
+                                            ReferenceOutputAssembly="false" so
+                                            the analyzer activates at compile
+                                            time (dogfood); AND adds the built
+                                            analyzer DLL to the consuming
+                                            library's nupkg under
+                                            analyzers/dotnet/cs/ so external
+                                            consumers pick it up automatically
+                                            via <PackageReference>.
+    -->
+    <ItemGroup>
+        <!-- Index analyzer projects ONCE. -->
+        <_VuecsAnalyzerProject Include="$(VuecsRepositoryDirectory)analyzers\**\*.csproj" />
+        <_VuecsAnalyzerProject Update="@(_VuecsAnalyzerProject)" ProjectId="%(_VuecsAnalyzerProject.Filename)" ProjectPath="%(_VuecsAnalyzerProject.Identity)" />
+
+        <!--
+            Analyzer refs. OutputItemType=Analyzer + ReferenceOutputAssembly=false
+            tells the .NET SDK to load the project's output as a Roslyn analyzer
+            (instead of a normal assembly reference) when the consumer builds.
+            PrivateAssets=all keeps the analyzer csproj from leaking as a NuGet
+            dependency of the consuming library.
+        -->
+        <VuecsAnalyzerReference Update="@(_VuecsAnalyzerProject->'%(ProjectId)')" ProjectPath="%(_VuecsAnalyzerProject.ProjectPath)" />
+        <ProjectReference Include="@(VuecsAnalyzerReference->'%(ProjectPath)')"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"
+                          PrivateAssets="all" />
+
+        <!--
+            Capture the resolved analyzer csproj paths for the pack hook below.
+            We can't reuse @(VuecsAnalyzerReference) directly because it gets
+            consumed (Remove'd) immediately so MSBuild's incremental graph
+            cleanup is happy.
+        -->
+        <_VuecsAnalyzerResolved Include="@(VuecsAnalyzerReference->'%(ProjectPath)')" />
+        <VuecsAnalyzerReference Remove="@(VuecsAnalyzerReference->HasMetadata('ProjectPath'))" />
+
+        <_VuecsAnalyzerProject Remove="@(_VuecsAnalyzerProject)" />
+    </ItemGroup>
+
+    <!--
+        Pack each referenced analyzer DLL into the consuming library's nupkg at
+        analyzers/dotnet/cs/<Name>.dll. NuGet's built-in analyzer convention
+        picks them up automatically on every consumer that adds a
+        <PackageReference> to the library, so no extra wiring is needed on the
+        consumer side.
+
+        We hook TargetsForTfmSpecificContentInPackage (same extension point the
+        SDK pack uses) and look up each analyzer's GetTargetPath at pack time -
+        that yields the actual DLL path including the analyzer's own TFM
+        (netstandard2.0), without us having to hardcode it.
+    -->
+    <!--
+        Top-level PropertyGroup Conditions can't reference @(items) (MSB4099),
+        so extend the hook unconditionally; the target's own Condition gates
+        execution to projects that actually declared an analyzer reference.
+    -->
+    <PropertyGroup>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_CollectVuecsAnalyzersForPack</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <Target Name="_CollectVuecsAnalyzersForPack"
+            Condition="'@(_VuecsAnalyzerResolved)' != ''">
+        <MSBuild Projects="@(_VuecsAnalyzerResolved)"
+                 Targets="GetTargetPath"
+                 Properties="Configuration=$(Configuration)"
+                 RemoveProperties="OutDir;OutputPath;IntermediateOutputPath;TargetFramework;TargetFrameworks;RuntimeIdentifier">
+            <Output TaskParameter="TargetOutputs" ItemName="_VuecsAnalyzerDll" />
+        </MSBuild>
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="@(_VuecsAnalyzerDll)">
+                <PackagePath>analyzers/dotnet/cs</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+</Project>
