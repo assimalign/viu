@@ -224,6 +224,10 @@ public sealed class ComponentInstance
     /// <param name="arguments">The event payload.</param>
     internal void EmitEvent(string eventName, object?[] arguments)
     {
+        // Test-utilities observation: capture the emit (declared or not, handled or not) before
+        // dispatch, so a Testing wrapper records every event in order ([V01.01.11.02]). Inert in
+        // production (observer null).
+        AppContext?.EmitObserver?.Invoke(this, eventName, arguments);
         if (_declaredEmits is not null)
         {
             if (!_declaredEmits.TryGetValue(eventName, out var declaration))

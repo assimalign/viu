@@ -442,6 +442,12 @@ public sealed class Renderer<TNode>
     private void MountComponent(VirtualNode next, TNode container, TNode? anchor, string? elementNamespace, ComponentInstance? parentComponent)
     {
         var definition = (IComponentDefinition)next.ComponentType!;
+        // Test-utilities stubbing ([V01.01.11.02]): a registered stub replaces the real child
+        // definition here, so the stub's placeholder renders instead. Inert in production.
+        if (parentComponent?.AppContext?.ResolveStub(definition) is { } stub)
+        {
+            definition = stub;
+        }
         var instance = new ComponentInstance(definition, next, parentComponent);
         next.Component = instance;
         ComponentPropertyResolution.Resolve(instance, next);

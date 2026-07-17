@@ -3,6 +3,10 @@ using System.Collections.Generic;
 
 namespace Assimalign.Vue.RuntimeCore;
 
+// Note: EmitObserver and ComponentStubs below are seams consumed by Assimalign.Vue.Testing's
+// component test utilities ([V01.01.11.02]); both default to inert so production behavior is
+// unchanged.
+
 /// <summary>
 /// The shared per-application context — the C# port of upstream's <c>AppContext</c>
 /// (<c>packages/runtime-core/src/apiCreateApp.ts</c>). Carries the registries and app-level
@@ -29,6 +33,24 @@ internal sealed class ApplicationContext
 
     /// <summary>The app-level configuration (upstream: <c>appContext.config</c>).</summary>
     public ApplicationConfiguration Config { get; } = new();
+
+    /// <summary>
+    /// Test-utilities seam: observes every component emit (before dispatch) as
+    /// <c>(instance, eventName, arguments)</c>, so a wrapper can capture emitted events — including
+    /// events emitted during mount ([V01.01.11.02]). Null in production (no observation cost).
+    /// </summary>
+    public Action<ComponentInstance, string, object?[]>? EmitObserver { get; set; }
+
+    /// <summary>
+    /// Test-utilities seam: maps a real component definition to the stub definition the renderer
+    /// mounts in its place ([V01.01.11.02]). Null (the default) means no stubbing.
+    /// </summary>
+    public Dictionary<IComponentDefinition, IComponentDefinition>? ComponentStubs { get; set; }
+
+    /// <summary>Returns the stub registered for <paramref name="definition"/>, or null.</summary>
+    /// <param name="definition">The real component definition about to be mounted.</param>
+    public IComponentDefinition? ResolveStub(IComponentDefinition definition)
+        => ComponentStubs is not null && ComponentStubs.TryGetValue(definition, out var stub) ? stub : null;
 
     /// <summary>
     /// Resolves a registered component by name (upstream: <c>resolveAsset(COMPONENTS, name)</c> in
