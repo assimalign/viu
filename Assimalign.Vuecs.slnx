@@ -19,8 +19,16 @@
 		<Project Path="examples/Assimalign.Vue.WebApp/Assimalign.Vue.WebApp.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/">
+		<Project Path="libraries/Assimalign.Vue.Reactivity/src/Assimalign.Vue.Reactivity.csproj" />
+		<Project Path="libraries/Assimalign.Vue.Reactivity/test/Assimalign.Vue.Reactivity.Tests.csproj" />
+	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeCore/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeCore/src/Assimalign.Vue.RuntimeCore.csproj" />
 		<Project Path="libraries/Assimalign.Vue.RuntimeCore/test/Assimalign.Vue.RuntimeCore.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/">
+		<Project Path="libraries/Assimalign.Vue.Shared/src/Assimalign.Vue.Shared.csproj" />
+		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.Tests.csproj" />
 	</Folder>
 </Solution>
