@@ -50,7 +50,7 @@ public sealed class SchedulerJob
     public bool AllowRecurse
     {
         get => (Flags & SchedulerJobFlags.AllowRecurse) != 0;
-        init => Flags = value ? Flags | SchedulerJobFlags.AllowRecurse : Flags & ~SchedulerJobFlags.AllowRecurse;
+        set => Flags = value ? Flags | SchedulerJobFlags.AllowRecurse : Flags & ~SchedulerJobFlags.AllowRecurse;
     }
 
     /// <summary>
@@ -66,6 +66,11 @@ public sealed class SchedulerJob
     internal SchedulerJobFlags Flags;
 
     internal int ExecutionsInCurrentFlushCycle;
+
+    // Queue-assigned tiebreak so equal-id post-flush callbacks keep insertion order (JS array
+    // sort is spec-stable; List<T>.Sort is not — child-before-parent Mounted ordering depends
+    // on this).
+    internal long InsertionSequence;
 
     /// <summary>
     /// The sort key: <see cref="Identifier"/> (null last) with pre-flush jobs ordered before

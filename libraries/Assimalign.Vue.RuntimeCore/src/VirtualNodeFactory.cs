@@ -148,6 +148,46 @@ public static class VirtualNodeFactory
         };
     }
 
+    /// <summary>
+    /// Creates a component vnode (upstream: <c>createVNode(Component, props)</c>). The
+    /// renderer instantiates a <see cref="ComponentInstance"/> for it on mount; declared props
+    /// resolve from <paramref name="properties"/> and the rest falls through as attrs
+    /// ([V01.01.03.07]).
+    /// </summary>
+    /// <param name="definition">The component definition.</param>
+    /// <param name="properties">The props passed by the parent, or null.</param>
+    public static VirtualNode Component(IComponentDefinition definition, VirtualNodeProperties? properties = null)
+        => Component(definition, properties, default, null);
+
+    /// <summary>
+    /// Creates a compiler-shaped component vnode carrying patch hints: with
+    /// <see cref="PatchFlags.Props"/> and <paramref name="dynamicProperties"/>, the parent
+    /// update compares only the listed props to decide whether the child re-renders
+    /// (upstream: <c>shouldUpdateComponent</c>'s optimized path).
+    /// </summary>
+    /// <param name="definition">The component definition.</param>
+    /// <param name="properties">The props passed by the parent, or null.</param>
+    /// <param name="patchFlag">The compiler patch hint.</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode Component(
+        IComponentDefinition definition,
+        VirtualNodeProperties? properties,
+        PatchFlags patchFlag,
+        string[]? dynamicProperties)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        return new VirtualNode(VirtualNodeType.Component)
+        {
+            ComponentType = definition,
+            Properties = properties,
+            Key = ExtractKey(properties),
+            Reference = ExtractReference(properties),
+            ShapeFlag = ShapeFlags.StatefulComponent,
+            PatchFlag = patchFlag,
+            DynamicProperties = dynamicProperties,
+        };
+    }
+
     /// <summary>Creates a fragment vnode wrapping multiple root nodes.</summary>
     /// <param name="children">The children; null entries become comment placeholders.</param>
     public static VirtualNode Fragment(params VirtualNode?[]? children)
