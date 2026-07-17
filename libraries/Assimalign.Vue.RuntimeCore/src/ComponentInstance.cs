@@ -33,6 +33,10 @@ public sealed class ComponentInstance
         VirtualNode = virtualNode;
         Parent = parent;
         Root = parent?.Root ?? this;
+        // Inherit the parent's provides table by reference (upstream: instance.provides =
+        // parent.provides). DependencyInjection.Provide forks a layered copy on this instance's
+        // first own provide; until then the reference is shared with every non-providing ancestor.
+        Provides = parent?.Provides;
         Scope = new EffectScope(detached: true);
         Properties = new ComponentProperties(DisplayName);
         Attributes = new ComponentAttributes();
@@ -111,7 +115,12 @@ public sealed class ComponentInstance
     /// <summary>Whether the instance was torn down.</summary>
     public bool IsUnmounted { get; internal set; }
 
-    /// <summary>The provides table ([V01.01.03.10] consumes it; parents chain).</summary>
+    /// <summary>
+    /// The dependency-injection provides table (upstream: <c>instance.provides</c>), consumed by
+    /// <see cref="DependencyInjection"/>. Inherited from the parent by reference and forked into a
+    /// layered copy on this instance's first own provide (copy-on-first-provide); null when neither
+    /// this instance nor any ancestor has provided anything.
+    /// </summary>
     internal Dictionary<object, object?>? Provides { get; set; }
 
     internal Func<VirtualNode?>? RenderFunction { get; set; }
