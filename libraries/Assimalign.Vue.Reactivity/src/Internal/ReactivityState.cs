@@ -19,6 +19,13 @@ internal static class ReactivityState
     internal static bool ShouldTrack = true;
 
     /// <summary>
+    /// Whether a read right now would establish a dependency (there is an active subscriber and
+    /// tracking is enabled). Lets allocation-conscious sources — the reactive collections — skip
+    /// creating a per-key <see cref="Dependency"/> for reads that occur outside any effect.
+    /// </summary>
+    internal static bool CanTrack => ActiveSubscriber is not null && ShouldTrack;
+
+    /// <summary>
     /// Incremented on every reactive mutation anywhere; lets computeds skip dependency traversal
     /// entirely when nothing in the graph has changed (Vue 3.5 <c>globalVersion</c> fast path).
     /// </summary>

@@ -52,12 +52,23 @@
 		<File Path=".github/ISSUE_TEMPLATE/task.yml" />
 	</Folder>
 	<Folder Name="/vuecs/.github/workflows/">
+		<File Path=".github/workflows/area-generators.yml" />
 		<File Path=".github/workflows/area-reactivity.yml" />
 		<File Path=".github/workflows/area-runtimecore.yml" />
 		<File Path=".github/workflows/area-runtimedom.yml" />
 		<File Path=".github/workflows/area-shared.yml" />
 		<File Path=".github/workflows/area-testing.yml" />
 		<File Path=".github/workflows/webapp.yml" />
+	</Folder>
+	<Folder Name="/vuecs/analyzers/" />
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Reactivity.Generators/">
+		<File Path="analyzers/Assimalign.Vue.Reactivity.Generators/Assimalign.Vue.Reactivity.Generators.slnx" />
+	</Folder>
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Reactivity.Generators/src/">
+		<Project Path="analyzers/Assimalign.Vue.Reactivity.Generators/src/Assimalign.Vue.Reactivity.Generators.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Reactivity.Generators/test/">
+		<Project Path="analyzers/Assimalign.Vue.Reactivity.Generators/test/Assimalign.Vue.Reactivity.Generators.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/build/">
 		<File Path="build/Build.props" />
