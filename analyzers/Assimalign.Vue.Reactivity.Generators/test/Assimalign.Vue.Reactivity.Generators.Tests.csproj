@@ -8,13 +8,13 @@
     <VuecsPackageReference Include="xunit" />
     <VuecsPackageReference Include="xunit.runner.visualstudio" />
     <VuecsPackageReference Include="Shouldly" />
+    <VuecsPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Normal compile reference to the generator (to instantiate and drive it), plus the runtime
+         library so the test compilation can resolve [Reactive] and IReactiveObject. The generator
+         resolves by name because build/Targets/Build.References.Projects.targets also indexes analyzers/. -->
+    <VuecsPrivateProjectReference Include="Assimalign.Vue.Reactivity.Generators" />
     <VuecsProjectReference Include="Assimalign.Vue.Reactivity" />
-  </ItemGroup>
-  <!-- Run the [Reactive] source generator over this project's test classes so the behavioral tests
-       (GeneratedReactiveObjectTests) consume real generated output. -->
-  <ItemGroup>
-    <VuecsAnalyzerReference Include="Assimalign.Vue.Reactivity.Generators" />
   </ItemGroup>
 </Project>

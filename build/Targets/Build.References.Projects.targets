@@ -32,8 +32,12 @@
                                             expose X to its consumers".
     -->
     <ItemGroup>
-        <!-- Index code projects ONCE. -->
+        <!-- Index code projects ONCE. Analyzer/generator projects are indexed too so a test (or other
+             code project) can take a normal compile reference to one by assembly name — the analyzer
+             SDK's OutputItemType="Analyzer" reference (VuecsAnalyzerReference) cannot be compiled
+             against, so a generator's own snapshot tests resolve it as a VuecsPrivateProjectReference. -->
         <_VuecsProject Include="$(VuecsRepositoryDirectory)libraries\**\*.csproj" />
+        <_VuecsProject Include="$(VuecsRepositoryDirectory)analyzers\**\*.csproj" />
         <_VuecsProject Update="@(_VuecsProject)" ProjectId="%(_VuecsProject.Filename)" ProjectPath="%(_VuecsProject.Identity)" />
 
         <!-- Public refs -->
