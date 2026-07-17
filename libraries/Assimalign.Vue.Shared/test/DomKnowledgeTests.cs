@@ -1,3 +1,5 @@
+using System;
+
 using Shouldly;
 using Xunit;
 
@@ -148,6 +150,54 @@ public class DomKnowledgeTests
     [Fact]
     public void IsKnownSvgAttribute_RejectsUnknownNames()
         => DomKnowledge.IsKnownSvgAttribute("not-an-svg-attr").ShouldBeFalse();
+
+    // --- span alternate lookups: allocation-free membership for compiler tokenization -------
+
+    [Fact]
+    public void SpanOverloads_AgreeWithTheStringLookups()
+    {
+        // The compiler tests tag/attribute tokens as spans over source text; both surfaces
+        // must answer identically (same frozen sets through alternate lookups).
+        DomKnowledge.IsHtmlTag("div".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsHtmlTag("DIV".AsSpan()).ShouldBeTrue(); // case-insensitive holds for spans
+        DomKnowledge.IsHtmlTag("my-component".AsSpan()).ShouldBeFalse();
+        DomKnowledge.IsSvgTag("foreignObject".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsSvgTag("foreignobject".AsSpan()).ShouldBeFalse(); // case-sensitive holds
+        DomKnowledge.IsMathMLTag("annotation-xml".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsVoidTag("br".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsBooleanAttribute("checked".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsKnownHtmlAttribute("tabindex".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsKnownSvgAttribute("viewBox".AsSpan()).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SpanOverloads_MatchSlicedTokens_WithoutMaterializingStrings()
+    {
+        // A token sliced out of larger source text, never turned into a string.
+        var source = "<template><div class=\"x\"></div></template>".AsSpan();
+        DomKnowledge.IsHtmlTag(source.Slice(1, 8)).ShouldBeTrue();  // "template"
+        DomKnowledge.IsHtmlTag(source.Slice(11, 3)).ShouldBeTrue(); // "div"
+    }
+
+    [Fact]
+    public void TryGetAttributeName_MapsExceptionsAndReportsPassThroughs()
+    {
+        DomKnowledge.TryGetAttributeName("htmlFor".AsSpan(), out var mapped).ShouldBeTrue();
+        mapped.ShouldBe("for");
+        DomKnowledge.TryGetAttributeName("className".AsSpan(), out mapped).ShouldBeTrue();
+        mapped.ShouldBe("class");
+        DomKnowledge.TryGetAttributeName("id".AsSpan(), out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsSsrSafeAttributeName_SpanAndStringSurfacesAgree_IncludingControlCharacters()
+    {
+        DomKnowledge.IsSsrSafeAttributeName("data-x".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsSsrSafeAttributeName("bad=name".AsSpan()).ShouldBeFalse();
+        DomKnowledge.IsSsrSafeAttributeName("bad\u0001name").ShouldBeFalse(); // C0 control char
+        DomKnowledge.IsSsrSafeAttributeName("bad\u0001name".AsSpan()).ShouldBeFalse();
+        DomKnowledge.IsSsrSafeAttributeName(default(ReadOnlySpan<char>)).ShouldBeFalse(); // empty
+    }
 
     // --- generator-fixture parity: both consumption paths read one data definition ----------
 
