@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Vuecs work-item helper (preferred)
+    url: https://github.com/assimalign/vuecs/blob/main/.claude/skills/vuecs-work-items/SKILL.md
+    about: >-
+      Prefer New-VuecsWorkItem.ps1 — it computes the next WBS code, links the native
+      sub-issue, adds the item to Project #15, and tags its Origin. Use the forms below only
+      when the script isn't available.
