@@ -33,6 +33,10 @@ public sealed class ComponentInstance
         VirtualNode = virtualNode;
         Parent = parent;
         Root = parent?.Root ?? this;
+        // Inherit the parent's provides table by reference (upstream: instance.provides =
+        // parent.provides). DependencyInjection.Provide forks a layered copy on this instance's
+        // first own provide; until then the reference is shared with every non-providing ancestor.
+        Provides = parent?.Provides;
         Scope = new EffectScope(detached: true);
         Properties = new ComponentProperties(DisplayName);
         Attributes = new ComponentAttributes();
@@ -93,8 +97,12 @@ public sealed class ComponentInstance
     /// <summary>The live fallthrough attributes (upstream: <c>instance.attrs</c>).</summary>
     public ComponentAttributes Attributes { get; }
 
-    /// <summary>The slots object; typed when slots land ([V01.01.03.09]).</summary>
-    public object? Slots { get; internal set; }
+    /// <summary>
+    /// The instance's slots object (upstream: <c>instance.slots</c>), rendered through
+    /// <see cref="VirtualNodeFactory.RenderSlot"/>. Installed at mount and refreshed on a
+    /// slot-affecting parent update; null when the parent passed no slot content.
+    /// </summary>
+    public ComponentSlots? Slots { get; internal set; }
 
     /// <summary>The state surfaced to parent refs via <c>Expose</c>, or null.</summary>
     public object? Exposed { get; private set; }
@@ -111,7 +119,12 @@ public sealed class ComponentInstance
     /// <summary>Whether the instance was torn down.</summary>
     public bool IsUnmounted { get; internal set; }
 
-    /// <summary>The provides table ([V01.01.03.10] consumes it; parents chain).</summary>
+    /// <summary>
+    /// The dependency-injection provides table (upstream: <c>instance.provides</c>), consumed by
+    /// <see cref="DependencyInjection"/>. Inherited from the parent by reference and forked into a
+    /// layered copy on this instance's first own provide (copy-on-first-provide); null when neither
+    /// this instance nor any ancestor has provided anything.
+    /// </summary>
     internal Dictionary<object, object?>? Provides { get; set; }
 
     internal Func<VirtualNode?>? RenderFunction { get; set; }
