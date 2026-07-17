@@ -5,38 +5,120 @@
 		<Platform Name="x86" />
 	</Configurations>
 	<Folder Name="/vuecs/">
+		<File Path=".editorconfig" />
 		<File Path=".gitignore" />
 		<File Path="Directory.Build.props" />
 		<File Path="Directory.Build.targets" />
+		<File Path="global.json" />
 		<File Path="LICENSE" />
 		<File Path="nuget.config" />
 		<File Path="README.md" />
 	</Folder>
+	<Folder Name="/vuecs/.claude/">
+		<File Path=".claude/CLAUDE.md" />
+		<File Path=".claude/launch.json" />
+	</Folder>
+	<Folder Name="/vuecs/.claude/rules/">
+		<File Path=".claude/rules/build-system.md" />
+		<File Path=".claude/rules/checklist.md" />
+		<File Path=".claude/rules/deviations.md" />
+		<File Path=".claude/rules/documentation.md" />
+		<File Path=".claude/rules/general-rules.md" />
+		<File Path=".claude/rules/testing.md" />
+		<File Path=".claude/rules/workflow.md" />
+	</Folder>
+	<Folder Name="/vuecs/.claude/skills/" />
+	<Folder Name="/vuecs/.claude/skills/vuecs-work-items/">
+		<File Path=".claude/skills/vuecs-work-items/SKILL.md" />
+	</Folder>
+	<Folder Name="/vuecs/.claude/skills/vuecs-work-items/reference/">
+		<File Path=".claude/skills/vuecs-work-items/reference/project-schema.md" />
+	</Folder>
+	<Folder Name="/vuecs/.claude/skills/vuecs-work-items/scripts/">
+		<File Path=".claude/skills/vuecs-work-items/scripts/New-VuecsWorkItem.ps1" />
+	</Folder>
+	<Folder Name="/vuecs/.claude/worktrees/" />
+	<Folder Name="/vuecs/.github/">
+		<File Path=".github/pull_request_template.md" />
+	</Folder>
+	<Folder Name="/vuecs/.github/actions/" />
+	<Folder Name="/vuecs/.github/actions/setup-dotnet-wasm/">
+		<File Path=".github/actions/setup-dotnet-wasm/action.yml" />
+	</Folder>
+	<Folder Name="/vuecs/.github/ISSUE_TEMPLATE/">
+		<File Path=".github/ISSUE_TEMPLATE/config.yml" />
+		<File Path=".github/ISSUE_TEMPLATE/feature.yml" />
+		<File Path=".github/ISSUE_TEMPLATE/scope-creep.yml" />
+		<File Path=".github/ISSUE_TEMPLATE/task.yml" />
+	</Folder>
+	<Folder Name="/vuecs/.github/workflows/">
+		<File Path=".github/workflows/area-reactivity.yml" />
+		<File Path=".github/workflows/area-runtimecore.yml" />
+		<File Path=".github/workflows/area-runtimedom.yml" />
+		<File Path=".github/workflows/area-shared.yml" />
+		<File Path=".github/workflows/area-testing.yml" />
+		<File Path=".github/workflows/webapp.yml" />
+	</Folder>
+	<Folder Name="/vuecs/build/">
+		<File Path="build/Build.props" />
+		<File Path="build/Build.targets" />
+	</Folder>
+	<Folder Name="/vuecs/build/Targets/">
+		<File Path="build/Targets/Build.Branding.props" />
+		<File Path="build/Targets/Build.Global.props" />
+		<File Path="build/Targets/Build.References.Analyzers.targets" />
+		<File Path="build/Targets/Build.References.Packages.targets" />
+		<File Path="build/Targets/Build.References.Projects.targets" />
+		<File Path="build/Targets/Build.StaticWebAssets.targets" />
+		<File Path="build/Targets/Build.TargetFramework.props" />
+		<File Path="build/Targets/Build.Version.props" />
+	</Folder>
 	<Folder Name="/vuecs/docs/">
 		<File Path="docs/PLAN.md" />
 	</Folder>
-	<Folder Name="/vuecs/examples/">
+	<Folder Name="/vuecs/examples/" />
+	<Folder Name="/vuecs/examples/Assimalign.Vue.WebApp/">
 		<Project Path="examples/Assimalign.Vue.WebApp/Assimalign.Vue.WebApp.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/" />
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/">
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/src/">
 		<Project Path="libraries/Assimalign.Vue.Reactivity/src/Assimalign.Vue.Reactivity.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/test/">
 		<Project Path="libraries/Assimalign.Vue.Reactivity/test/Assimalign.Vue.Reactivity.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeCore/">
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeCore/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeCore/src/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeCore/src/Assimalign.Vue.RuntimeCore.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeCore/test/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeCore/test/Assimalign.Vue.RuntimeCore.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/">
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/docs/">
+		<File Path="libraries/Assimalign.Vue.RuntimeDom/docs/ADR-0001-interop-marshaling.md" />
+		<File Path="libraries/Assimalign.Vue.RuntimeDom/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Vue.RuntimeDom/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/src/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeDom/src/Assimalign.Vue.RuntimeDom.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/test/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeDom/test/Assimalign.Vue.RuntimeDom.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/">
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/src/">
 		<Project Path="libraries/Assimalign.Vue.Shared/src/Assimalign.Vue.Shared.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/test/">
 		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/">
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/src/">
 		<Project Path="libraries/Assimalign.Vue.Testing/src/Assimalign.Vue.Testing.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/test/">
 		<Project Path="libraries/Assimalign.Vue.Testing/test/Assimalign.Vue.Testing.Tests.csproj" />
 	</Folder>
 </Solution>

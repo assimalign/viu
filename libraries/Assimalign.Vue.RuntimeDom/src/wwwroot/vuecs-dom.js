@@ -23,7 +23,7 @@ const nodes = new Map()          // handle -> Node
 const nodeHandles = new WeakMap() // Node -> handle
 const listeners = new Map()      // handle -> Map(eventName -> listener)
 
-let dispatchEvent = null         // .NET callback: (handle, eventName) => void
+let dispatchEvent = null         // the single [JSExport] dispatch entry ([V01.01.04.03])
 
 function fail(operation, handle, message) {
     throw new Error(`vuecs-dom|${operation}|${handle}|${message}`)
@@ -58,8 +58,8 @@ function releaseNodeHandle(node, released) {
 
     const nodeListeners = listeners.get(handle)
     if (nodeListeners) {
-        for (const [eventName, listener] of nodeListeners.entries()) {
-            node.removeEventListener(eventName, listener)
+        for (const entry of nodeListeners.values()) {
+            node.removeEventListener(entry.eventName, entry.listener, { capture: entry.capture })
         }
         listeners.delete(handle)
     }
@@ -88,8 +88,12 @@ function releaseSubtree(node, released) {
     return released
 }
 
-export function initialize(dispatchCallback) {
-    dispatchEvent = dispatchCallback
+export async function initialize() {
+    // Bind the single .NET dispatch entry point ([V01.01.04.03]): one JSExport carries the
+    // whole typed payload as primitives and returns stop/prevent flags for the live event.
+    const { getAssemblyExports } = await globalThis.getDotnetRuntime(0)
+    const exports = await getAssemblyExports('Assimalign.Vue.RuntimeDom')
+    dispatchEvent = exports.Assimalign.Vue.RuntimeDom.BrowserEventDispatch.DispatchBrowserEvent
 }
 
 export const dom = {
@@ -257,10 +261,12 @@ export const dom = {
         getNode('removeStyleProperty', nodeHandle).style.removeProperty(name)
     },
 
-    // --- events (minimal set/remove; the invoker pattern and modifiers land with
-    // [V01.01.04.03]) ------------------------------------------------------------------------
+    // --- events (invoker pattern: one listener per (element, event, capture); handler
+    // changes are .NET-side delegate swaps with no listener churn; the attach-timestamp guard
+    // ignores events that fired before their listener was attached, matching Vue's
+    // e.timeStamp < invoker.attached check) --------------------------------------------------
 
-    addEventListener: (nodeHandle, eventName) => {
+    addEventListener: (nodeHandle, eventName, once, capture, passive) => {
         const node = getNode('addEventListener', nodeHandle)
         let nodeListeners = listeners.get(nodeHandle)
         if (!nodeListeners) {
@@ -268,34 +274,70 @@ export const dom = {
             listeners.set(nodeHandle, nodeListeners)
         }
 
-        if (nodeListeners.has(eventName)) {
+        const listenerKey = capture ? eventName + '|capture' : eventName
+        if (nodeListeners.has(listenerKey)) {
             return
         }
 
-        const listener = () => {
-            if (dispatchEvent) {
-                dispatchEvent(nodeHandle, eventName)
+        const attached = performance.now()
+        const listener = event => {
+            // Upstream parity: an event that fired before this listener attached (e.g. one
+            // bubbling into a parent whose handler landed in the same patch) is ignored.
+            if (event.timeStamp < attached) {
+                return
+            }
+            if (!dispatchEvent) {
+                return
+            }
+
+            const target = event.target
+            const hasValue = target && typeof target.value !== 'undefined'
+            const flags = dispatchEvent(
+                nodeHandle,
+                eventName,
+                capture,
+                event.timeStamp,
+                event.key ?? '',
+                event.code ?? '',
+                (event.ctrlKey ? 1 : 0) | (event.shiftKey ? 2 : 0) | (event.altKey ? 4 : 0) | (event.metaKey ? 8 : 0),
+                typeof event.button === 'number' ? event.button : -1,
+                event.buttons ?? 0,
+                event.clientX ?? 0,
+                event.clientY ?? 0,
+                event.detail ?? 0,
+                target === event.currentTarget,
+                hasValue ? String(target.value) : null,
+                !!(target && target.checked))
+            if (flags & 1) {
+                event.stopPropagation()
+            }
+            if (flags & 2) {
+                event.preventDefault()
             }
         }
 
-        node.addEventListener(eventName, listener)
-        nodeListeners.set(eventName, listener)
+        node.addEventListener(eventName, listener, { once: !!once, capture: !!capture, passive: !!passive })
+        nodeListeners.set(listenerKey, { eventName, listener, capture: !!capture })
     },
 
-    removeEventListener: (nodeHandle, eventName) => {
+    removeEventListener: (nodeHandle, eventName, capture) => {
         const node = nodes.get(nodeHandle)
         if (!node) {
             return
         }
 
         const nodeListeners = listeners.get(nodeHandle)
-        const listener = nodeListeners?.get(eventName)
-        if (!listener) {
+        const listenerKey = capture ? eventName + '|capture' : eventName
+        const entry = nodeListeners?.get(listenerKey)
+        if (!entry) {
             return
         }
 
-        node.removeEventListener(eventName, listener)
-        nodeListeners.delete(eventName)
+        node.removeEventListener(eventName, entry.listener, { capture: entry.capture })
+        nodeListeners.delete(listenerKey)
+        if (nodeListeners.size === 0) {
+            listeners.delete(nodeHandle)
+        }
     },
 
     // --- diagnostics ------------------------------------------------------------------------

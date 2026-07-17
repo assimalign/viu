@@ -1,0 +1,4 @@
+<Solution>
+	<Project Path="src/Assimalign.Vue.RuntimeDom.csproj" />
+	<Project Path="test/Assimalign.Vue.RuntimeDom.Tests.csproj" />
+</Solution>

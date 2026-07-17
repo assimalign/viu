@@ -15,7 +15,11 @@ node-ops and prop patching that the platform-agnostic renderer
   node handle.
 - **`vuecs-dom.js`** (`src/wwwroot/`, shipped with the package): the JS half — the handle
   registry, the `nodeOps` leaves (create/insert/remove/text/static-content, SVG and MathML
-  namespaces), the property/style/attribute leaf appliers, and minimal event listener wiring.
+  namespaces), the property/style/attribute leaf appliers, and the per-(element, event)
+  listeners feeding the single `[JSExport]` event dispatch.
+- **`BrowserEvent` / `BrowserEventModifiers` / `BrowserEvents`** (public): the typed event
+  payload with `StopPropagation()`/`PreventDefault()`, and the `WithModifiers`/`WithKeys`
+  guard helpers ([V01.01.04.03]).
 - **Internal:** `BrowserDomBridge` (`[JSImport]` bindings + typed-error wrappers),
   `BrowserPropertyPatcher` + `BrowserPropertyLeafOperations` (the `patchProp` decision tree over
   injected leaves), `BrowserNodeOperations` (the `RendererOptions<int>` factory and event

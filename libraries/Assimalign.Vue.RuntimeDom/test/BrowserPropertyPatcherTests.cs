@@ -276,15 +276,19 @@ public class BrowserPropertyPatcherTests
     // --- events -------------------------------------------------------------------------------
 
     [Fact]
-    public void EventProps_RegisterAndRemoveListenersByLowerCaseEventName()
+    public void EventProps_FlowTheRawNameToTheInvokerRegistry()
     {
+        // The registry parses the event name and Once/Capture/Passive suffixes
+        // ([V01.01.04.03]); the patcher passes the raw prop through untouched.
         var handler = (Action)(() => { });
         Patch("button", "onClick", null, handler);
+        Patch("button", "onClickCaptureOnce", null, handler);
         Patch("button", "onClick", handler, null);
         _calls.ShouldBe(
         [
-            $"setEventListener({Element},click,delegate)",
-            $"setEventListener({Element},click,null)",
+            $"setEventListener({Element},onClick,delegate)",
+            $"setEventListener({Element},onClickCaptureOnce,delegate)",
+            $"setEventListener({Element},onClick,null)",
         ]);
     }
 

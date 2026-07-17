@@ -69,7 +69,9 @@ public static class BrowserRuntime
             BrowserDomBridge.ModuleName,
             "/_content/Assimalign.Vue.RuntimeDom/vuecs-dom.js",
             cancellationToken);
-        BrowserDomBridge.Initialize(BrowserNodeOperations.DispatchEvent);
+        // The module resolves this assembly's exports and binds the single event-dispatch
+        // entry point ([V01.01.04.03]).
+        await BrowserDomBridge.InitializeModuleAsync();
     }
 
     private static void EnsureInitialized()

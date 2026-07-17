@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.Versioning;
 
 using Assimalign.Vue.RuntimeCore;
@@ -12,15 +11,19 @@ namespace Assimalign.Vue.RuntimeDom;
 /// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/nodeOps.ts). Handles are
 /// ints (see the marshaling ADR in <c>libraries/Assimalign.Vue.RuntimeDom/docs/</c>); 0 is the
 /// "no node" sentinel. Node removal releases the removed subtree's JS handles and DOM
-/// listeners deterministically, and the returned handle list purges the C#-side listener
-/// registry in the same call — no leaks on either side of the boundary ([V01.01.04.01]).
+/// listeners deterministically, and the returned handle list purges the invoker registry in
+/// the same call — no leaks on either side of the boundary ([V01.01.04.01]). Event handling
+/// goes through the invoker registry ([V01.01.04.03]): handler changes between renders swap a
+/// delegate with zero listener-management interop.
 /// </summary>
 [SupportedOSPlatform("browser")]
 internal static class BrowserNodeOperations
 {
-    // Listener delegates keyed by (handle, lower-case event name); the JS side dispatches back
-    // by the same pair. Multicast delegates (merged props) invoke every target.
-    private static readonly Dictionary<(int NodeHandle, string EventName), Delegate> EventListeners = [];
+    private static readonly BrowserEventInvokerRegistry Invokers = new(
+        static (handle, eventName, once, capture, passive) =>
+            BrowserDomBridge.AddEventListener(handle, eventName, once, capture, passive),
+        static (handle, eventName, capture) =>
+            BrowserDomBridge.RemoveEventListener(handle, eventName, capture));
 
     private static readonly BrowserPropertyLeafOperations LeafOperations = new()
     {
@@ -35,30 +38,19 @@ internal static class BrowserNodeOperations
         SetStyleText = static (element, cssText) => BrowserDomBridge.SetStyleText(element, cssText),
         SetStyleProperty = static (element, name, value, important) => BrowserDomBridge.SetStyleProperty(element, name, value, important),
         RemoveStyleProperty = static (element, name) => BrowserDomBridge.RemoveStyleProperty(element, name),
-        SetEventListener = static (element, eventName, listener) =>
-        {
-            if (listener is null)
-            {
-                EventListeners.Remove((element, eventName));
-                BrowserDomBridge.RemoveEventListener(element, eventName);
-            }
-            else
-            {
-                EventListeners[(element, eventName)] = listener;
-                BrowserDomBridge.AddEventListener(element, eventName);
-            }
-        },
+        SetEventListener = static (element, rawPropertyName, listener) =>
+            Invokers.SetListener(element, rawPropertyName, listener),
     };
 
     internal static RendererOptions<int> Create() => new()
     {
         Insert = static (child, parent, anchor) => BrowserDomBridge.Insert(parent, child, anchor),
-        Remove = static child => PurgeListeners(BrowserDomBridge.Remove(child)),
+        Remove = static child => Invokers.PurgeReleasedHandles(BrowserDomBridge.Remove(child)),
         CreateElement = static (tag, elementNamespace) => BrowserDomBridge.CreateElement(tag, elementNamespace),
         CreateText = static text => BrowserDomBridge.CreateText(text),
         CreateComment = static text => BrowserDomBridge.CreateComment(text),
         SetText = static (node, text) => BrowserDomBridge.SetText(node, text),
-        SetElementText = static (node, text) => PurgeListeners(BrowserDomBridge.SetElementText(node, text)),
+        SetElementText = static (node, text) => Invokers.PurgeReleasedHandles(BrowserDomBridge.SetElementText(node, text)),
         ParentNode = static node => BrowserDomBridge.ParentNode(node),
         NextSibling = static node => BrowserDomBridge.NextSibling(node),
         PatchProperty = static (element, elementTag, propertyName, previousValue, nextValue, elementNamespace) =>
@@ -71,61 +63,13 @@ internal static class BrowserNodeOperations
         },
     };
 
-    internal static void DispatchEvent(int nodeHandle, string eventName)
-    {
-        if (!EventListeners.TryGetValue((nodeHandle, eventName), out var listener))
-        {
-            return;
-        }
-        // No DynamicInvoke — reflection-free dispatch over the supported delegate shapes; the
-        // typed event contract lands with [V01.01.04.03].
-        foreach (var target in listener.GetInvocationList())
-        {
-            switch (target)
-            {
-                case Action action:
-                    action();
-                    break;
-                case Action<object?> payloadAction:
-                    payloadAction(null);
-                    break;
-                default:
-                    throw new NotSupportedException(
-                        $"Event listener for '{eventName}' is a {target.GetType().Name}; the bridge dispatches "
-                        + "Action or Action<object?> listeners until [V01.01.04.03] lands the typed event contract.");
-            }
-        }
-    }
+    internal static int DispatchEvent(int nodeHandle, bool capture, BrowserEvent browserEvent)
+        => Invokers.Dispatch(nodeHandle, capture, browserEvent);
 
-    /// <summary>Registry sizes for leak diagnostics: JS nodes, JS listener maps, C# listener entries.</summary>
+    /// <summary>Registry sizes for leak diagnostics: JS nodes, JS listener maps, .NET invokers.</summary>
     internal static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
     {
         var sizes = BrowserDomBridge.GetRegistrySizes();
-        return (sizes[0], sizes[1], EventListeners.Count);
-    }
-
-    private static void PurgeListeners(int[]? releasedHandles)
-    {
-        // The bridge reports every handle it released; drop their listener delegates so the
-        // C# side cannot leak either.
-        if (releasedHandles is null || releasedHandles.Length == 0 || EventListeners.Count == 0)
-        {
-            return;
-        }
-        List<(int, string)>? stale = null;
-        foreach (var key in EventListeners.Keys)
-        {
-            if (Array.IndexOf(releasedHandles, key.NodeHandle) >= 0)
-            {
-                (stale ??= []).Add(key);
-            }
-        }
-        if (stale is not null)
-        {
-            foreach (var key in stale)
-            {
-                EventListeners.Remove(key);
-            }
-        }
+        return (sizes[0], sizes[1], Invokers.InvokerCount);
     }
 }
