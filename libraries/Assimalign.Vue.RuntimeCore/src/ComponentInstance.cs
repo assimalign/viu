@@ -33,6 +33,10 @@ public sealed class ComponentInstance
         VirtualNode = virtualNode;
         Parent = parent;
         Root = parent?.Root ?? this;
+        // Inherit the app context from the parent, or from the root vnode at the top of the tree
+        // (upstream: appContext = parent ? parent.appContext : vnode.appContext). Carries app-level
+        // provides, the component registry, and config to every instance ([V01.01.03.12]).
+        AppContext = parent?.AppContext ?? virtualNode.AppContext;
         // Inherit the parent's provides table by reference (upstream: instance.provides =
         // parent.provides). DependencyInjection.Provide forks a layered copy on this instance's
         // first own provide; until then the reference is shared with every non-providing ancestor.
@@ -62,6 +66,14 @@ public sealed class ComponentInstance
             }
         }
     }
+
+    /// <summary>
+    /// The application context this instance belongs to (upstream: <c>instance.appContext</c>),
+    /// inherited from the parent or the root vnode. Carries app-level provides (the final inject
+    /// fallback), the component registry, and <see cref="ApplicationConfiguration"/>. Null for a
+    /// tree rendered without an application ([V01.01.03.12]).
+    /// </summary>
+    internal ApplicationContext? AppContext { get; }
 
     /// <summary>Declared-prop lookup by camelCase AND kebab-case name; null when none declared.</summary>
     internal Dictionary<string, ComponentPropertyDefinition>? DeclaredProperties { get; }
@@ -212,6 +224,10 @@ public sealed class ComponentInstance
     /// <param name="arguments">The event payload.</param>
     internal void EmitEvent(string eventName, object?[] arguments)
     {
+        // Test-utilities observation: capture the emit (declared or not, handled or not) before
+        // dispatch, so a Testing wrapper records every event in order ([V01.01.11.02]). Inert in
+        // production (observer null).
+        AppContext?.EmitObserver?.Invoke(this, eventName, arguments);
         if (_declaredEmits is not null)
         {
             if (!_declaredEmits.TryGetValue(eventName, out var declaration))

@@ -364,6 +364,8 @@ public static class VirtualNodeFactory
             PatchFlag = node.PatchFlag,
             DynamicProperties = node.DynamicProperties,
             DynamicChildren = node.DynamicChildren,
+            Directives = node.Directives,
+            AppContext = node.AppContext,
             El = node.El,
             Anchor = node.Anchor,
             Component = node.Component,

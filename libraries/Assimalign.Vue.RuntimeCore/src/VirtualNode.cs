@@ -120,6 +120,23 @@ public sealed class VirtualNode
     public object? Component { get; internal set; }
 
     /// <summary>
+    /// The application context attached to the root vnode at mount (upstream:
+    /// <c>vnode.appContext</c>, set in <c>app.mount</c>). Every <see cref="ComponentInstance"/>
+    /// created for the tree inherits it (<see cref="ComponentInstance.AppContext"/>), so app-level
+    /// provides, the component registry, and <see cref="ApplicationConfiguration"/> reach every
+    /// descendant ([V01.01.03.12]). Null on non-root vnodes and on trees rendered without an app.
+    /// </summary>
+    internal ApplicationContext? AppContext { get; set; }
+
+    /// <summary>
+    /// The runtime directive bindings attached through
+    /// <see cref="Directives.WithDirectives(VirtualNode, DirectiveArgument[])"/> (upstream:
+    /// <c>vnode.dirs</c>), or null when the vnode has no directives — the common case, kept to a
+    /// single null check on the mount/patch/unmount hot path ([V01.01.03.13]).
+    /// </summary>
+    internal List<DirectiveBinding>? Directives { get; set; }
+
+    /// <summary>
     /// Looks up a <see cref="VirtualNodeHook"/> prop (e.g. <c>"onVnodeMounted"</c>), or null.
     /// </summary>
     /// <param name="name">The hook prop name.</param>

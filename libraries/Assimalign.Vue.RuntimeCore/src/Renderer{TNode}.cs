@@ -280,6 +280,8 @@ public sealed class Renderer<TNode>
         {
             MountChildren(node.ArrayChildren!, element, default, ChildrenNamespace(node, elementNamespace), parentComponent);
         }
+        // Directive 'created' fires after children and before props (upstream mountElement order).
+        InvokeDirectiveHooks(node, null, DirectiveHookKind.Created);
         if (node.Properties is not null)
         {
             foreach (var (name, value) in node.Properties)
@@ -298,8 +300,12 @@ public sealed class Renderer<TNode>
             }
         }
         InvokeHook(node, null, "onVnodeBeforeMount");
+        InvokeDirectiveHooks(node, null, DirectiveHookKind.BeforeMount);
         _options.Insert(element, container, anchor);
         QueuePostHook(node, null, "onVnodeMounted");
+        // Directive 'mounted' runs post-flush, after the subtree is in the host (upstream:
+        // queuePostRenderEffect), so children fire child-first via the stable post-flush order.
+        QueuePostDirectiveHooks(node, null, DirectiveHookKind.Mounted);
     }
 
     private void PatchElement(VirtualNode current, VirtualNode next, string? elementNamespace, ComponentInstance? parentComponent)
@@ -307,6 +313,7 @@ public sealed class Renderer<TNode>
         next.El = current.El;
         var element = (TNode)next.El!;
         InvokeHook(next, current, "onVnodeBeforeUpdate");
+        InvokeDirectiveHooks(next, current, DirectiveHookKind.BeforeUpdate);
         var patchFlag = (int)next.PatchFlag;
         if (patchFlag > 0)
         {
@@ -367,6 +374,7 @@ public sealed class Renderer<TNode>
             PatchChildren(current, next, element, default, ChildrenNamespace(next, elementNamespace), parentComponent);
         }
         QueuePostHook(next, current, "onVnodeUpdated");
+        QueuePostDirectiveHooks(next, current, DirectiveHookKind.Updated);
     }
 
     private void PatchProperties(TNode element, string elementTag, VirtualNodeProperties? previous, VirtualNodeProperties? next, string? elementNamespace)
@@ -434,6 +442,12 @@ public sealed class Renderer<TNode>
     private void MountComponent(VirtualNode next, TNode container, TNode? anchor, string? elementNamespace, ComponentInstance? parentComponent)
     {
         var definition = (IComponentDefinition)next.ComponentType!;
+        // Test-utilities stubbing ([V01.01.11.02]): a registered stub replaces the real child
+        // definition here, so the stub's placeholder renders instead. Inert in production.
+        if (parentComponent?.AppContext?.ResolveStub(definition) is { } stub)
+        {
+            definition = stub;
+        }
         var instance = new ComponentInstance(definition, next, parentComponent);
         next.Component = instance;
         ComponentPropertyResolution.Resolve(instance, next);
@@ -565,7 +579,35 @@ public sealed class Renderer<TNode>
         {
             normalized = VirtualNodeFactory.Clone(normalized, instance.Attributes.ToProperties());
         }
+        // Directives applied to the component vnode transfer onto its rendered root so the element
+        // pipeline fires their hooks (upstream renderComponentRoot: root.dirs = root.dirs ?
+        // root.dirs.concat(vnode.dirs) : vnode.dirs, with a dev warning on a non-element root).
+        if (instance.VirtualNode.Directives is { } componentDirectives)
+        {
+            if (normalized.Type is not (VirtualNodeType.Element or VirtualNodeType.Component or VirtualNodeType.Comment))
+            {
+                RuntimeWarnings.Warn(
+                    "Runtime directive used on component with non-element root node. The directives will not "
+                    + "function as intended.");
+            }
+            // Clone a reused root before attaching so a shared/cached vnode is not corrupted.
+            if (normalized.El is not null)
+            {
+                normalized = VirtualNodeFactory.Clone(normalized);
+            }
+            normalized.Directives = normalized.Directives is null
+                ? componentDirectives
+                : ConcatenateDirectives(normalized.Directives, componentDirectives);
+        }
         return normalized;
+    }
+
+    private static List<DirectiveBinding> ConcatenateDirectives(List<DirectiveBinding> first, List<DirectiveBinding> second)
+    {
+        var combined = new List<DirectiveBinding>(first.Count + second.Count);
+        combined.AddRange(first);
+        combined.AddRange(second);
+        return combined;
     }
 
     private void UpdateComponent(VirtualNode current, VirtualNode next)
@@ -1145,6 +1187,12 @@ public sealed class Renderer<TNode>
     {
         // Cleanup order (upstream parity): hooks and child teardown run before node removal.
         InvokeHook(node, null, "onVnodeBeforeUnmount");
+        // Directive teardown fires only for element vnodes (upstream: shouldInvokeDirs = ELEMENT &&
+        // dirs); a component's transferred directives fire through its root element's unmount.
+        if (node.Type == VirtualNodeType.Element)
+        {
+            InvokeDirectiveHooks(node, null, DirectiveHookKind.BeforeUnmount);
+        }
         switch (node.Type)
         {
             case VirtualNodeType.Component:
@@ -1179,6 +1227,10 @@ public sealed class Renderer<TNode>
                 break;
         }
         QueuePostHook(node, null, "onVnodeUnmounted");
+        if (node.Type == VirtualNodeType.Element)
+        {
+            QueuePostDirectiveHooks(node, null, DirectiveHookKind.Unmounted);
+        }
     }
 
     private void RemoveFragment(VirtualNode node)
@@ -1246,4 +1298,63 @@ public sealed class Renderer<TNode>
             Scheduler.QueuePostFlushCallback(new SchedulerJob(() => hook(node, previousNode)));
         }
     }
+
+    // --- directive hooks ([V01.01.03.13]) ------------------------------------------------------
+
+    private static void InvokeDirectiveHooks(VirtualNode node, VirtualNode? previousNode, DirectiveHookKind kind)
+    {
+        // Hot path: a vnode with no directives costs exactly this null check (upstream: if (dirs)).
+        var bindings = node.Directives;
+        if (bindings is null)
+        {
+            return;
+        }
+        // The C# port of invokeDirectiveHook (directives.ts): update hooks refresh oldValue from
+        // the previous vnode's binding at the same index, then each defined hook is invoked with
+        // (el, binding, vnode, prevVnode); an exception routes through error handling with the
+        // directive-hook info code and does not abort the remaining bindings or the patch pipeline.
+        var oldBindings = previousNode?.Directives;
+        for (var index = 0; index < bindings.Count; index++)
+        {
+            var binding = bindings[index];
+            if (oldBindings is not null && index < oldBindings.Count)
+            {
+                binding.OldValue = oldBindings[index].Value;
+            }
+            var hook = SelectDirectiveHook(binding.Directive, kind);
+            if (hook is not null)
+            {
+                try
+                {
+                    hook(node.El, binding, node, previousNode);
+                }
+                catch (Exception exception)
+                {
+                    ComponentErrorHandling.Handle(exception, binding.Instance, "directive hook");
+                }
+            }
+        }
+    }
+
+    private static void QueuePostDirectiveHooks(VirtualNode node, VirtualNode? previousNode, DirectiveHookKind kind)
+    {
+        if (node.Directives is null)
+        {
+            return;
+        }
+        // Mounted/updated/unmounted directive hooks run post-flush like lifecycle hooks, keeping
+        // the same child-before-parent order via the stable post-flush queue.
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() => InvokeDirectiveHooks(node, previousNode, kind)));
+    }
+
+    private static DirectiveHook? SelectDirectiveHook(IDirective directive, DirectiveHookKind kind) => kind switch
+    {
+        DirectiveHookKind.Created => directive.Created,
+        DirectiveHookKind.BeforeMount => directive.BeforeMount,
+        DirectiveHookKind.Mounted => directive.Mounted,
+        DirectiveHookKind.BeforeUpdate => directive.BeforeUpdate,
+        DirectiveHookKind.Updated => directive.Updated,
+        DirectiveHookKind.BeforeUnmount => directive.BeforeUnmount,
+        _ => directive.Unmounted,
+    };
 }
