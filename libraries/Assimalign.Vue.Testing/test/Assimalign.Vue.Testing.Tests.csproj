@@ -10,9 +10,7 @@
     <VuecsPackageReference Include="Shouldly" />
   </ItemGroup>
   <ItemGroup>
-    <VuecsProjectReference Include="Assimalign.Vue.RuntimeCore" />
     <VuecsProjectReference Include="Assimalign.Vue.Testing" />
-    <VuecsProjectReference Include="Assimalign.Vue.Reactivity" />
-    <VuecsProjectReference Include="Assimalign.Vue.Shared" />
+    <VuecsProjectReference Include="Assimalign.Vue.RuntimeCore" />
   </ItemGroup>
 </Project>

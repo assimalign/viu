@@ -31,4 +31,8 @@
 		<Project Path="libraries/Assimalign.Vue.Shared/src/Assimalign.Vue.Shared.csproj" />
 		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.Tests.csproj" />
 	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/">
+		<Project Path="libraries/Assimalign.Vue.Testing/src/Assimalign.Vue.Testing.csproj" />
+		<Project Path="libraries/Assimalign.Vue.Testing/test/Assimalign.Vue.Testing.Tests.csproj" />
+	</Folder>
 </Solution>

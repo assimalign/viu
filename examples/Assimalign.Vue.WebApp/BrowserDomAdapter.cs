@@ -2,165 +2,102 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices.JavaScript;
+
 using Assimalign.Vue.RuntimeCore;
 
-internal sealed class BrowserDomAdapter : IVirtualDomAdapter<int>
+// The example-level browser node-ops: RendererOptions<int> over integer DOM handles
+// (0 = the "no node" sentinel). The production RuntimeDom bridge — deterministic handle
+// disposal, typed interop errors, the full patchProp decision tree — lands with
+// [V01.01.04.01] and [V01.01.04.02]; this adapter keeps the demo honest until then.
+internal static class BrowserRendererOptions
 {
-    private readonly Dictionary<(int NodeHandle, string EventName), string> _eventBindings = new();
-    private readonly Dictionary<string, VirtualEventHandler> _callbacks = new(StringComparer.Ordinal);
+    private static readonly Dictionary<(int NodeHandle, string EventName), Action> EventCallbacks = [];
 
-    public int CreateElement(string tagName) => BrowserDomInterop.CreateElement(tagName);
-
-    public int CreateText(string textContent) => BrowserDomInterop.CreateText(textContent);
-
-    public int CreateComment(string textContent) => BrowserDomInterop.CreateComment(textContent);
-
-    public void SetText(int node, string textContent) => BrowserDomInterop.SetText(node, textContent);
-
-    public void SetProperty(int node, string name, object? value)
+    public static RendererOptions<int> Create() => new()
     {
-        if (value is null || value is false)
+        Insert = static (child, parent, anchor) => BrowserDomInterop.Insert(parent, child, anchor),
+        Remove = static child =>
         {
-            RemoveProperty(node, name);
-            return;
-        }
+            BrowserDomInterop.Remove(child);
+            // JS swept the DOM-side listeners; drop this handle's callback entries too.
+            RemoveCallbacksForNode(child);
+        },
+        CreateElement = static (tag, elementNamespace) => BrowserDomInterop.CreateElement(tag, elementNamespace),
+        CreateText = static text => BrowserDomInterop.CreateText(text),
+        CreateComment = static text => BrowserDomInterop.CreateComment(text),
+        SetText = static (node, text) => BrowserDomInterop.SetText(node, text),
+        SetElementText = static (node, text) => BrowserDomInterop.SetElementText(node, text),
+        ParentNode = static node => BrowserDomInterop.ParentNode(node),
+        NextSibling = static node => BrowserDomInterop.NextSibling(node),
+        PatchProperty = static (element, name, _, nextValue, _) => PatchProperty(element, name, nextValue),
+        QuerySelector = static selector => BrowserDomInterop.QuerySelector(selector),
+    };
 
-        if (TryGetEventProperty(name, value, out var eventName, out var handler))
-        {
-            SetEventListener(node, eventName, handler);
-            return;
-        }
-
-        if (value is true)
-        {
-            BrowserDomInterop.SetBooleanProperty(node, NormalizePropertyName(name), true);
-            return;
-        }
-
-        BrowserDomInterop.SetProperty(node, NormalizePropertyName(name), FormatValue(value));
-    }
-
-    public void RemoveProperty(int node, string name)
+    public static void Dispatch(int nodeHandle, string eventName)
     {
-        if (TryGetEventName(name, out var eventName))
+        if (EventCallbacks.TryGetValue((nodeHandle, eventName), out var callback))
         {
-            RemoveEventListener(node, eventName);
-            return;
-        }
-
-        BrowserDomInterop.RemoveProperty(node, NormalizePropertyName(name));
-    }
-
-    public void AppendChild(int parent, int child) => BrowserDomInterop.AppendChild(parent, child);
-
-    public void InsertBefore(int parent, int child, int beforeChild) => BrowserDomInterop.InsertBefore(parent, child, beforeChild);
-
-    public void RemoveChild(int parent, int child) => BrowserDomInterop.RemoveChild(parent, child);
-
-    public void ClearChildren(int parent) => BrowserDomInterop.ClearChildren(parent);
-
-    public void DestroyNode(int node)
-    {
-        CleanupEventBindings(node);
-        BrowserDomInterop.DestroyNode(node);
-    }
-
-    public void Dispatch(string callbackId)
-    {
-        if (_callbacks.TryGetValue(callbackId, out var callback))
-        {
-            callback.Invoke();
+            callback();
         }
     }
 
-    private static string FormatValue(object value)
+    private static void PatchProperty(int element, string name, object? nextValue)
     {
-        return value switch
+        if (VirtualNodeFactory.IsEventListenerName(name))
         {
-            string text => text,
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty
-        };
-    }
-
-    private static string NormalizePropertyName(string name)
-    {
-        return string.Equals(name, "className", StringComparison.Ordinal)
-            ? "class"
-            : name;
-    }
-
-    private static bool TryGetEventProperty(string name, object? value, out string eventName, out VirtualEventHandler handler)
-    {
-        if (value is VirtualEventHandler eventHandler && TryGetEventName(name, out eventName))
-        {
-            handler = eventHandler;
-            return true;
-        }
-
-        eventName = string.Empty;
-        handler = null!;
-        return false;
-    }
-
-    private static bool TryGetEventName(string name, out string eventName)
-    {
-        if (name.StartsWith("on", StringComparison.Ordinal) && name.Length > 2)
-        {
-            var suffix = name.Substring(2);
-            eventName = char.ToLowerInvariant(suffix[0]) + suffix.Substring(1);
-            return true;
-        }
-
-        eventName = string.Empty;
-        return false;
-    }
-
-    private void SetEventListener(int node, string eventName, VirtualEventHandler handler)
-    {
-        var key = (node, eventName);
-        if (_eventBindings.TryGetValue(key, out var previousCallbackId))
-        {
-            _callbacks.Remove(previousCallbackId);
-        }
-
-        var callbackId = Guid.NewGuid().ToString("N");
-        _callbacks[callbackId] = handler;
-        _eventBindings[key] = callbackId;
-        BrowserDomInterop.SetEventListener(node, eventName, callbackId);
-    }
-
-    private void RemoveEventListener(int node, string eventName)
-    {
-        var key = (node, eventName);
-        if (_eventBindings.TryGetValue(key, out var callbackId))
-        {
-            _eventBindings.Remove(key);
-            _callbacks.Remove(callbackId);
-        }
-
-        BrowserDomInterop.RemoveEventListener(node, eventName);
-    }
-
-    private void CleanupEventBindings(int node)
-    {
-        var keysToRemove = new List<(int NodeHandle, string EventName)>();
-
-        foreach (var entry in _eventBindings)
-        {
-            if (entry.Key.NodeHandle == node)
+            // onClick -> "click"; the JS listener dispatches back by (handle, event name).
+            var eventName = name[2..].ToLowerInvariant();
+            if (nextValue is Action callback)
             {
-                BrowserDomInterop.RemoveEventListener(node, entry.Key.EventName);
-                _callbacks.Remove(entry.Value);
-                keysToRemove.Add(entry.Key);
+                EventCallbacks[(element, eventName)] = callback;
+                BrowserDomInterop.SetEventListener(element, eventName);
+            }
+            else
+            {
+                EventCallbacks.Remove((element, eventName));
+                BrowserDomInterop.RemoveEventListener(element, eventName);
+            }
+            return;
+        }
+        switch (nextValue)
+        {
+            case null or false:
+                BrowserDomInterop.RemoveProperty(element, name);
+                break;
+            case true:
+                BrowserDomInterop.SetBooleanProperty(element, name, true);
+                break;
+            default:
+                BrowserDomInterop.SetProperty(element, name, FormatValue(nextValue));
+                break;
+        }
+    }
+
+    private static void RemoveCallbacksForNode(int nodeHandle)
+    {
+        List<(int, string)>? stale = null;
+        foreach (var entry in EventCallbacks.Keys)
+        {
+            if (entry.NodeHandle == nodeHandle)
+            {
+                (stale ??= []).Add(entry);
             }
         }
-
-        foreach (var key in keysToRemove)
+        if (stale is not null)
         {
-            _eventBindings.Remove(key);
+            foreach (var entry in stale)
+            {
+                EventCallbacks.Remove(entry);
+            }
         }
     }
+
+    private static string FormatValue(object value) => value switch
+    {
+        string text => text,
+        IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+        _ => value.ToString() ?? string.Empty,
+    };
 }
 
 internal static partial class BrowserDomInterop
@@ -169,7 +106,7 @@ internal static partial class BrowserDomInterop
     internal static partial int QuerySelector(string selector);
 
     [JSImport("dom.createElement", "main.js")]
-    internal static partial int CreateElement(string tagName);
+    internal static partial int CreateElement(string tagName, string? namespaceName);
 
     [JSImport("dom.createText", "main.js")]
     internal static partial int CreateText(string textContent);
@@ -180,6 +117,21 @@ internal static partial class BrowserDomInterop
     [JSImport("dom.setText", "main.js")]
     internal static partial void SetText(int nodeHandle, string textContent);
 
+    [JSImport("dom.setElementText", "main.js")]
+    internal static partial void SetElementText(int nodeHandle, string textContent);
+
+    [JSImport("dom.insert", "main.js")]
+    internal static partial void Insert(int parentHandle, int childHandle, int anchorHandle);
+
+    [JSImport("dom.remove", "main.js")]
+    internal static partial void Remove(int childHandle);
+
+    [JSImport("dom.parentNode", "main.js")]
+    internal static partial int ParentNode(int nodeHandle);
+
+    [JSImport("dom.nextSibling", "main.js")]
+    internal static partial int NextSibling(int nodeHandle);
+
     [JSImport("dom.setProperty", "main.js")]
     internal static partial void SetProperty(int nodeHandle, string name, string value);
 
@@ -189,23 +141,8 @@ internal static partial class BrowserDomInterop
     [JSImport("dom.removeProperty", "main.js")]
     internal static partial void RemoveProperty(int nodeHandle, string name);
 
-    [JSImport("dom.appendChild", "main.js")]
-    internal static partial void AppendChild(int parentHandle, int childHandle);
-
-    [JSImport("dom.insertBefore", "main.js")]
-    internal static partial void InsertBefore(int parentHandle, int childHandle, int beforeChildHandle);
-
-    [JSImport("dom.removeChild", "main.js")]
-    internal static partial void RemoveChild(int parentHandle, int childHandle);
-
-    [JSImport("dom.clearChildren", "main.js")]
-    internal static partial void ClearChildren(int nodeHandle);
-
-    [JSImport("dom.destroyNode", "main.js")]
-    internal static partial void DestroyNode(int nodeHandle);
-
     [JSImport("dom.setEventListener", "main.js")]
-    internal static partial void SetEventListener(int nodeHandle, string eventName, string callbackId);
+    internal static partial void SetEventListener(int nodeHandle, string eventName);
 
     [JSImport("dom.removeEventListener", "main.js")]
     internal static partial void RemoveEventListener(int nodeHandle, string eventName);
