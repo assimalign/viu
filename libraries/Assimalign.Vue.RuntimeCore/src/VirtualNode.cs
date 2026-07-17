@@ -69,10 +69,11 @@ public sealed class VirtualNode
     public VirtualNode[]? ArrayChildren { get; internal init; }
 
     /// <summary>
-    /// The slots object when the vnode is a component with slot children. Typed as
-    /// <see cref="object"/> until slots land ([V01.01.03.09]).
+    /// The slots object when the vnode is a component carrying <see cref="ShapeFlags.SlotsChildren"/>
+    /// (upstream: the slots-object arm of <c>children</c>). Null for components rendered without
+    /// slot content.
     /// </summary>
-    public object? SlotChildren { get; internal init; }
+    public ComponentSlots? SlotChildren { get; internal init; }
 
     /// <summary>
     /// The node-kind and children-shape bitmask (upstream: <c>shapeFlag</c>); values match

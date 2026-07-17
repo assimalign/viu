@@ -97,8 +97,12 @@ public sealed class ComponentInstance
     /// <summary>The live fallthrough attributes (upstream: <c>instance.attrs</c>).</summary>
     public ComponentAttributes Attributes { get; }
 
-    /// <summary>The slots object; typed when slots land ([V01.01.03.09]).</summary>
-    public object? Slots { get; internal set; }
+    /// <summary>
+    /// The instance's slots object (upstream: <c>instance.slots</c>), rendered through
+    /// <see cref="VirtualNodeFactory.RenderSlot"/>. Installed at mount and refreshed on a
+    /// slot-affecting parent update; null when the parent passed no slot content.
+    /// </summary>
+    public ComponentSlots? Slots { get; internal set; }
 
     /// <summary>The state surfaced to parent refs via <c>Expose</c>, or null.</summary>
     public object? Exposed { get; private set; }

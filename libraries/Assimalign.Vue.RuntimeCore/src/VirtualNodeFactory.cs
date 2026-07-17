@@ -188,6 +188,81 @@ public static class VirtualNodeFactory
         };
     }
 
+    /// <summary>
+    /// Creates a component vnode carrying <paramref name="slots"/> (upstream:
+    /// <c>createVNode(Component, props, slots)</c>). The instance renders named slots through
+    /// <see cref="RenderSlot"/>. A <see cref="SlotFlags.Forwarded"/> slots object is resolved to
+    /// <see cref="SlotFlags.Stable"/> or <see cref="SlotFlags.Dynamic"/> here against the forwarding
+    /// component's own slot stability — exactly where upstream <c>normalizeChildren</c> resolves it,
+    /// using <see cref="ComponentInstance.Current"/> as the forwarding (currently rendering)
+    /// instance.
+    /// </summary>
+    /// <param name="definition">The component definition.</param>
+    /// <param name="properties">The props passed by the parent, or null.</param>
+    /// <param name="slots">The slot content, or null.</param>
+    /// <param name="patchFlag">The compiler patch hint (<see cref="PatchFlags.DynamicSlots"/> forces child updates).</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode Component(
+        IComponentDefinition definition,
+        VirtualNodeProperties? properties,
+        ComponentSlots? slots,
+        PatchFlags patchFlag = default,
+        string[]? dynamicProperties = null)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (slots is not null && slots.Flag == SlotFlags.Forwarded)
+        {
+            var forwardingSlots = ComponentInstance.Current?.Slots;
+            slots.Flag = forwardingSlots is not null && forwardingSlots.Flag == SlotFlags.Stable
+                ? SlotFlags.Stable
+                : SlotFlags.Dynamic;
+        }
+        return new VirtualNode(VirtualNodeType.Component)
+        {
+            ComponentType = definition,
+            Properties = properties,
+            Key = ExtractKey(properties),
+            Reference = ExtractReference(properties),
+            SlotChildren = slots,
+            ShapeFlag = slots is null
+                ? ShapeFlags.StatefulComponent
+                : ShapeFlags.StatefulComponent | ShapeFlags.SlotsChildren,
+            PatchFlag = patchFlag,
+            DynamicProperties = dynamicProperties,
+        };
+    }
+
+    /// <summary>
+    /// Renders the named slot as a fragment (upstream: <c>renderSlot</c>,
+    /// <c>packages/runtime-core/src/helpers/renderSlot.ts</c>). Invokes the slot with
+    /// <paramref name="properties"/> (the scoped-slot scope) when present; otherwise renders
+    /// <paramref name="fallback"/>'s content — upstream uses fallback only when the slot is
+    /// <b>absent</b>, not when it returns empty. The result is a keyed fragment so it patches in
+    /// place across re-renders.
+    /// </summary>
+    /// <param name="slots">The instance's slots (<see cref="ComponentInstance.Slots"/>), or null.</param>
+    /// <param name="name">The slot name (<c>"default"</c> for the default slot).</param>
+    /// <param name="properties">The scoped-slot props to pass, or null.</param>
+    /// <param name="fallback">The fallback content factory used when the slot is absent, or null.</param>
+    /// <returns>A fragment vnode wrapping the slot's (or fallback's) vnodes.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    public static VirtualNode RenderSlot(
+        ComponentSlots? slots,
+        string name,
+        object? properties = null,
+        Func<VirtualNode?[]?>? fallback = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        // The slot delegate captures its defining (parent) render context; invoking it here runs
+        // that content as part of the child's subtree. Reactive reads therefore attribute to the
+        // child's render effect (upstream withCtx parity — reactive tracking stays live; only the
+        // block-tracking suppression is deferred to the block-tree work [V01.01.03.15]).
+        VirtualNode?[]? children = slots is not null && slots.TryGetSlot(name, out var slot)
+            ? slot(properties)
+            : fallback?.Invoke();
+        return Fragment(children, "_" + name);
+    }
+
     /// <summary>Creates a fragment vnode wrapping multiple root nodes.</summary>
     /// <param name="children">The children; null entries become comment placeholders.</param>
     public static VirtualNode Fragment(params VirtualNode?[]? children)

@@ -19,7 +19,8 @@ namespace Assimalign.Vue.RuntimeCore;
 /// <see cref="VirtualNode.PatchFlag"/> follows the compiled patch contract (targeted
 /// class/style/props/text updates); unflagged vnodes take the full diff. Array children patch
 /// positionally for now — keyed longest-increasing-subsequence reordering lands with
-/// [V01.01.03.03]; slots land with [V01.01.03.09].
+/// [V01.01.03.03]. Component slots ([V01.01.03.09]) are installed on the instance and their
+/// <see cref="Shared.SlotFlags"/> stability drives whether a parent re-render forces the child.
 /// Created through <see cref="RendererFactory.CreateRenderer{TNode}"/>.
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
@@ -434,6 +435,7 @@ public sealed class Renderer<TNode>
         var instance = new ComponentInstance(definition, next, parentComponent);
         next.Component = instance;
         ComponentPropertyResolution.Resolve(instance, next);
+        ResolveSlots(instance, next);
         SetupComponent(instance);
         SetupComponentRenderEffect(instance, container, anchor, elementNamespace);
     }
@@ -521,6 +523,7 @@ public sealed class Renderer<TNode>
                 pending.Component = instance;
                 instance.VirtualNode = pending;
                 ComponentPropertyResolution.Resolve(instance, pending);
+                ResolveSlots(instance, pending);
             }
             instance.InvokeHooks(LifecycleHookKind.BeforeUpdate);
             instance.ToggleRecurse(true);
@@ -584,9 +587,36 @@ public sealed class Renderer<TNode>
         }
     }
 
+    private static void ResolveSlots(ComponentInstance instance, VirtualNode vnode)
+    {
+        // Install the parent-provided slots on the instance (upstream: initSlots/updateSlots).
+        // Runs at mount and on every update the component actually takes; when
+        // ShouldUpdateComponent skips a stable-slots parent re-render, the child keeps its existing
+        // slots, so the delegates it re-invokes stay the parent's latest committed ones.
+        if ((vnode.ShapeFlag & ShapeFlags.SlotsChildren) != 0)
+        {
+            instance.Slots = vnode.SlotChildren;
+        }
+    }
+
     private static bool ShouldUpdateComponent(VirtualNode current, VirtualNode next)
     {
-        // Upstream shouldUpdateComponent, minus slots (which land with [V01.01.03.09]).
+        // Upstream shouldUpdateComponent (packages/runtime-core/src/componentRenderUtils.ts).
+        // Compiled dynamic slots (v-if/v-for/dynamic names in slot content) always force an update.
+        if ((int)next.PatchFlag > 0 && (next.PatchFlag & PatchFlags.DynamicSlots) != 0)
+        {
+            return true;
+        }
+        // Non-stable slot children force a child update on any parent re-render so the child
+        // reflects the parent's latest slot content (upstream: the !$stable branch). A FORWARDED
+        // flag was already resolved to Stable/Dynamic at vnode creation, so only Stable is skipped.
+        var previousSlots = current.SlotChildren;
+        var nextSlots = next.SlotChildren;
+        if ((previousSlots is not null || nextSlots is not null)
+            && (nextSlots is null || nextSlots.Flag != SlotFlags.Stable))
+        {
+            return true;
+        }
         var previousProperties = current.Properties;
         var nextProperties = next.Properties;
         if (ReferenceEquals(previousProperties, nextProperties))

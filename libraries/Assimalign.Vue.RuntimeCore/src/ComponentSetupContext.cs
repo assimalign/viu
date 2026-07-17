@@ -21,8 +21,11 @@ public sealed class ComponentSetupContext
     /// <summary>The live fallthrough attributes (upstream: <c>context.attrs</c>).</summary>
     public ComponentAttributes Attributes => _instance.Attributes;
 
-    /// <summary>The slots object; typed when slots land ([V01.01.03.09]).</summary>
-    public object? Slots => _instance.Slots;
+    /// <summary>
+    /// The slots passed by the parent (upstream: <c>context.slots</c>), rendered through
+    /// <see cref="VirtualNodeFactory.RenderSlot"/>; null when the parent passed no slot content.
+    /// </summary>
+    public ComponentSlots? Slots => _instance.Slots;
 
     /// <summary>
     /// Emits a component event to the matching handler prop (upstream: <c>context.emit</c>;
