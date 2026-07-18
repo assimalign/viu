@@ -91,9 +91,41 @@
         </ItemGroup>
         <ItemGroup>
             <_VuecsAnalyzerBuildFile Include="%(_VuecsAnalyzerBuildDirectory.Identity)\**\*.props;%(_VuecsAnalyzerBuildDirectory.Identity)\**\*.targets" />
+            <!-- NuGet auto-imports only buildTransitive/<PackageId>.props|targets, so the files are
+                 packed under the CONSUMING package's id (also silencing NU5129), never under the
+                 analyzer's own file name. -->
             <TfmSpecificPackageFile Include="@(_VuecsAnalyzerBuildFile)">
-                <PackagePath>buildTransitive</PackagePath>
+                <PackagePath>buildTransitive\$(PackageId)%(Extension)</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
     </Target>
+    <!--
+        A generator consumed by ProjectReference (OutputItemType=Analyzer) surfaces only its own DLL to
+        the consumer's compiler, but Roslyn resolves a generator's dependencies exclusively among the
+        registered analyzer paths - so a generator with project-reference dependencies must append those
+        outputs to its own GetTargetPath result for every consumer to load the full closure. Analyzer
+        csprojs opt in with <VuecsAnalyzerBundlesProjectReferenceOutputs>true</...>.
+    -->
+    <PropertyGroup Condition="'$(VuecsAnalyzerBundlesProjectReferenceOutputs)' == 'true'">
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);_VuecsAppendAnalyzerProjectReferenceOutputs</GetTargetPathDependsOn>
+    </PropertyGroup>
+    <Target Name="_VuecsAppendAnalyzerProjectReferenceOutputs"
+            Condition="'$(VuecsAnalyzerBundlesProjectReferenceOutputs)' == 'true'"
+            DependsOnTargets="ResolveProjectReferences">
+        <ItemGroup>
+            <TargetPathWithTargetPlatformMoniker Include="@(_ResolvedProjectReferencePaths)" IncludeRuntimeDependency="false" />
+        </ItemGroup>
+    </Target>
+
+    <!--
+        In-repo dogfooding seam for the .viu generator: packaged consumers receive its MSBuild wiring
+        (the **/*.viu AdditionalFiles glob and CompilerVisibleProperty declarations) through
+        buildTransitive, but a VuecsAnalyzerReference inside this repo would not - imports evaluate
+        before items exist, so the wiring is opted into with a property instead of inferred from the
+        reference: set <VuecsUseSingleFileComponents>true</...> alongside the analyzer reference.
+    -->
+    <Import Project="$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.props"
+            Condition="'$(VuecsUseSingleFileComponents)' == 'true' and Exists('$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.props')" />
+    <Import Project="$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.targets"
+            Condition="'$(VuecsUseSingleFileComponents)' == 'true' and Exists('$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.targets')" />
 </Project>

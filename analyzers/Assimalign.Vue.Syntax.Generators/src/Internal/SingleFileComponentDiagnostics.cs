@@ -98,7 +98,16 @@ internal static class SingleFileComponentDiagnostics
     {
         var descriptor = Map(fromTemplate, diagnostic.Severity);
         var location = BuildLocation(filePath, diagnostic.Location, blockContentStart);
-        return new DiagnosticInfo(descriptor, location, diagnostic.Message);
+
+        // The base surface deliberately projects each language's unbounded code catalog as RawCode;
+        // carrying it in the message keeps the upstream-pinned CompilerErrorCode / Vuecs-defined
+        // SingleFileComponentErrorCode visible to consumers without minting one descriptor per code.
+        var message = diagnostic.Message
+            + " ("
+            + (fromTemplate ? "template compiler code " : "single-file-component code ")
+            + diagnostic.RawCode.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + ")";
+        return new DiagnosticInfo(descriptor, location, message);
     }
 
     private static DiagnosticDescriptor Map(bool fromTemplate, SyntaxDiagnosticSeverity severity)

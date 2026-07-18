@@ -71,7 +71,7 @@ internal static class GeneratorTestHarness
             generators: new[] { new SingleFileComponentGenerator().AsSourceGenerator() },
             additionalTexts: files,
             parseOptions: ParseOptions,
-            optionsProvider: new InMemoryConfigOptionsProvider(new InMemoryConfigOptions(globalOptions)),
+            optionsProvider: new InMemoryAnalyzerConfigOptionsProvider(new InMemoryAnalyzerConfigOptions(globalOptions)),
             driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true));
     }
 
@@ -143,22 +143,22 @@ internal sealed class InMemoryAdditionalText : AdditionalText
 }
 
 /// <summary>An in-memory <see cref="AnalyzerConfigOptions"/> over a fixed key/value map.</summary>
-internal sealed class InMemoryConfigOptions : AnalyzerConfigOptions
+internal sealed class InMemoryAnalyzerConfigOptions : AnalyzerConfigOptions
 {
     private readonly Dictionary<string, string> _values;
 
-    internal InMemoryConfigOptions(Dictionary<string, string> values) => _values = values;
+    internal InMemoryAnalyzerConfigOptions(Dictionary<string, string> values) => _values = values;
 
     /// <inheritdoc />
     public override bool TryGetValue(string key, out string value) => _values.TryGetValue(key, out value!);
 }
 
 /// <summary>An <see cref="AnalyzerConfigOptionsProvider"/> that returns one set of global options everywhere.</summary>
-internal sealed class InMemoryConfigOptionsProvider : AnalyzerConfigOptionsProvider
+internal sealed class InMemoryAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
 {
     private readonly AnalyzerConfigOptions _options;
 
-    internal InMemoryConfigOptionsProvider(AnalyzerConfigOptions options) => _options = options;
+    internal InMemoryAnalyzerConfigOptionsProvider(AnalyzerConfigOptions options) => _options = options;
 
     /// <inheritdoc />
     public override AnalyzerConfigOptions GlobalOptions => _options;

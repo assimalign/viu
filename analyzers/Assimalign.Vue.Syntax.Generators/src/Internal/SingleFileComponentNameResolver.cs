@@ -29,28 +29,31 @@ internal static class SingleFileComponentNameResolver
         var lastSlash = normalizedPath.LastIndexOf('/');
         var fileName = lastSlash >= 0 ? normalizedPath.Substring(lastSlash + 1) : normalizedPath;
         var baseName = StripExtension(fileName);
-        var className = Sanitize(baseName);
+        var className = EscapeKeyword(Sanitize(baseName));
 
         var relativeDirectory = ResolveRelativeDirectory(normalizedPath, projectDirectory);
 
         var namespaceValue = BuildNamespace(rootNamespace, relativeDirectory);
-        var hintName = BuildHintName(relativeDirectory, baseName);
+        var hintName = BuildHintName(relativeDirectory, baseName, normalizedPath);
 
         return new SingleFileComponentName(namespaceValue, className, hintName);
     }
 
-    private static string ResolveRelativeDirectory(string normalizedPath, string? projectDirectory)
+    // Returns null (not empty) when the directory is unknown or the file sits outside it, so hint
+    // naming can tell "project root" (safe, unique) apart from "location unknown" (needs the path-hash
+    // disambiguator - two linked files with the same leaf name must not collide in AddSource).
+    private static string? ResolveRelativeDirectory(string normalizedPath, string? projectDirectory)
     {
         if (string.IsNullOrEmpty(projectDirectory))
         {
-            return string.Empty;
+            return null;
         }
 
         var normalizedDirectory = projectDirectory!.Replace('\\', '/').TrimEnd('/');
         var prefix = normalizedDirectory + "/";
         if (!normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
-            return string.Empty;
+            return null;
         }
 
         var relative = normalizedPath.Substring(prefix.Length);
@@ -58,7 +61,7 @@ internal static class SingleFileComponentNameResolver
         return lastSlash >= 0 ? relative.Substring(0, lastSlash) : string.Empty;
     }
 
-    private static string? BuildNamespace(string? rootNamespace, string relativeDirectory)
+    private static string? BuildNamespace(string? rootNamespace, string? relativeDirectory)
     {
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(rootNamespace))
@@ -67,31 +70,73 @@ internal static class SingleFileComponentNameResolver
             parts.Add(rootNamespace!);
         }
 
-        foreach (var segment in relativeDirectory.Split('/'))
+        foreach (var segment in (relativeDirectory ?? string.Empty).Split('/'))
         {
             if (segment.Length > 0)
             {
-                parts.Add(Sanitize(segment));
+                parts.Add(EscapeKeyword(Sanitize(segment)));
             }
         }
 
         return parts.Count == 0 ? null : string.Join(".", parts);
     }
 
-    private static string BuildHintName(string relativeDirectory, string baseName)
+    private static string BuildHintName(string? relativeDirectory, string baseName, string normalizedPath)
     {
+        // Roslyn's AddSource throws on a duplicate hint name and the exception kills the entire
+        // generator run, so hint names must be unique BY CONSTRUCTION: whenever the relative directory
+        // is unknown (linked/out-of-project files) or sanitizing was lossy (distinct names collapsing
+        // to one identifier, e.g. Foo-Bar and Foo_Bar), a short stable hash of the full normalized path
+        // disambiguates. Files properly under the project with clean names keep readable hints.
+        var lossy = false;
         var builder = new StringBuilder();
-        foreach (var segment in relativeDirectory.Split('/'))
+        foreach (var segment in (relativeDirectory ?? string.Empty).Split('/'))
         {
             if (segment.Length > 0)
             {
-                builder.Append(Sanitize(segment)).Append('.');
+                builder.Append(SanitizeTracked(segment, ref lossy)).Append('.');
             }
         }
 
-        builder.Append(Sanitize(baseName)).Append(".SingleFileComponent.g.cs");
+        builder.Append(SanitizeTracked(baseName, ref lossy));
+        if (relativeDirectory is null || lossy)
+        {
+            builder.Append('.').Append(HashPath(normalizedPath));
+        }
+
+        builder.Append(".SingleFileComponent.g.cs");
         return builder.ToString();
     }
+
+    private static string SanitizeTracked(string candidate, ref bool lossy)
+    {
+        var sanitized = Sanitize(candidate);
+        lossy |= !string.Equals(sanitized, candidate, StringComparison.Ordinal);
+        return sanitized;
+    }
+
+    // FNV-1a over the normalized path: deterministic, culture-free, stable across runs and machines -
+    // the incremental-caching contract requires the hint name to be a pure function of the inputs.
+    private static string HashPath(string normalizedPath)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var character in normalizedPath)
+            {
+                hash = (hash ^ character) * 16777619u;
+            }
+
+            return hash.ToString("x8", System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    // Generated namespaces and class names must survive C# keywords ("class.viu" emits "@class"); the
+    // fully-qualified reference avoids pulling the whole CSharp namespace into scope for one check.
+    private static string EscapeKeyword(string identifier)
+        => Microsoft.CodeAnalysis.CSharp.SyntaxFacts.GetKeywordKind(identifier) == Microsoft.CodeAnalysis.CSharp.SyntaxKind.None
+            ? identifier
+            : "@" + identifier;
 
     private static string StripExtension(string fileName)
         => fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase)
@@ -123,5 +168,5 @@ internal static class SingleFileComponentNameResolver
 /// <summary>The resolved names for a generated component: its namespace (or <see langword="null"/>), class, and hint name.</summary>
 /// <param name="Namespace">The containing namespace, or <see langword="null"/> for the global namespace.</param>
 /// <param name="ClassName">The generated partial class name.</param>
-/// <param name="HintName">The stable, unique <c>AddSource</c> hint name.</param>
+/// <param name="HintName">The stable <c>AddSource</c> hint name, unique by construction (a path hash disambiguates out-of-project files and lossy sanitizations).</param>
 internal readonly record struct SingleFileComponentName(string? Namespace, string ClassName, string HintName);

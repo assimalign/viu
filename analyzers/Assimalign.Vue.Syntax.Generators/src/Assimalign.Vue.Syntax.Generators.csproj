@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- The generator's parser dependencies (Assimalign.Vue.Syntax + the two language libraries) must
+         load in the consumer's analyzer context; this flows their outputs through GetTargetPath (see
+         build/Targets/Build.References.Analyzers.targets). -->
+    <VuecsAnalyzerBundlesProjectReferenceOutputs>true</VuecsAnalyzerBundlesProjectReferenceOutputs>
+    <!-- The generator's parser dependencies (Assimalign.Vue.Syntax + the two language libraries) must
+         load in the consumer's analyzer context; this flows their outputs through GetTargetPath (see
+         build/Targets/Build.References.Analyzers.targets). -->
+    <VuecsAnalyzerBundlesProjectReferenceOutputs>true</VuecsAnalyzerBundlesProjectReferenceOutputs>
     <!-- Source generators must target the stable analyzer surface: opt out of the repo-wide preview
          features switch (see build/Targets/Build.TargetFramework.props) so no [RequiresPreviewFeatures]
          leaks into the netstandard2.0 analyzer. Mirrors the sibling Reactivity.Generators csproj. -->

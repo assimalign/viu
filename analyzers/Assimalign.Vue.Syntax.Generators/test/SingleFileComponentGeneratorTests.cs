@@ -130,7 +130,7 @@ namespace Demo
     public void IdenticalInput_AcrossTwoRuns_ReusesCachedOutputs()
     {
         // Incremental cache contract: running the same driver again over unchanged input leaves the
-        // model step Cached/Unchanged (Roslyn incremental-generator cookbook).
+        // model step Cached - strictly Cached, because Unchanged means the step RE-EXECUTED and merely produced an equal output, the exact regression the caching contract must catch.
         var file = new InMemoryAdditionalText($"{ProjectDirectory}/Counter.viu", CounterSource);
         var compilation = GeneratorTestHarness.CreateCompilation();
         var driver = GeneratorTestHarness.CreateDriver(
@@ -140,14 +140,14 @@ namespace Demo
         driver = driver.RunGenerators(compilation);
 
         ModelStepReasons(driver).ShouldAllBe(
-            reason => reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged);
+            reason => reason == IncrementalStepRunReason.Cached);
     }
 
     [Fact]
     public void UnrelatedCompilationEdit_DoesNotReRunGeneration()
     {
         // The pipeline depends only on .viu additional files and two build properties, never the
-        // compilation, so adding an unrelated C# tree leaves the model step Cached/Unchanged.
+        // compilation, so adding an unrelated C# tree leaves the model step strictly Cached.
         var file = new InMemoryAdditionalText($"{ProjectDirectory}/Counter.viu", CounterSource);
         var compilation = GeneratorTestHarness.CreateCompilation();
         var driver = GeneratorTestHarness.CreateDriver(
@@ -159,7 +159,7 @@ namespace Demo
         driver = driver.RunGenerators(withUnrelated);
 
         ModelStepReasons(driver).ShouldAllBe(
-            reason => reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged);
+            reason => reason == IncrementalStepRunReason.Cached);
     }
 
     [Fact]
@@ -203,4 +203,70 @@ namespace Demo
             .ToImmutableArray();
 
     private static string Normalize(string text) => text.Replace("\r\n", "\n").TrimEnd() + "\n";
+
+    [Fact]
+    public void TemplateDiagnostic_ComposesBlockPositionIntoFileCoordinates()
+    {
+        // The block-to-file coordinate mapping: the @template content starts on file line 2, and the
+        // unterminated interpolation sits on content line 2, so the reported (zero-based) position is
+        // file line 2 (= one-based line 3, the "{{ message" line) at column 0 — pinning the
+        // Compose() arithmetic, not just the location path.
+        const string source =
+            "@template {\n" +
+            "<b>\n" +
+            "{{ message\n" +
+            "</b>\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
+
+        // The unterminated interpolation swallows to EOF, so the unclosed <b> is also reported —
+        // both template diagnostics, each composed onto its own .viu file line.
+        outcome.Diagnostics.Count().ShouldBe(2);
+        var interpolation = outcome.Diagnostics.Single(
+            candidate => candidate.GetMessage().Contains("Interpolation end sign"));
+        interpolation.Id.ShouldBe("VUECS1101");
+        // The per-language catalog code rides on the message (CompilerErrorCode.MissingInterpolationEnd = 25).
+        interpolation.GetMessage().ShouldContain("(template compiler code 25)");
+        var span = interpolation.Location.GetLineSpan();
+        span.Path.ShouldBe($"{ProjectDirectory}/Counter.viu");
+        span.StartLinePosition.Line.ShouldBe(2);
+        span.StartLinePosition.Character.ShouldBe(0);
+
+        var missingEndTag = outcome.Diagnostics.Single(
+            candidate => candidate.GetMessage().Contains("missing end tag"));
+        missingEndTag.Location.GetLineSpan().StartLinePosition.Line.ShouldBe(1);
+    }
+
+    [Fact]
+    public void HintNames_OfCollidingSources_AreDisambiguated()
+    {
+        // Roslyn's AddSource throws on duplicate hint names and the exception kills the whole generator
+        // run, so names that sanitize to the same identifier (and files whose location is unknown) get
+        // a stable path-hash suffix — unique by construction.
+        var dashed = SingleFileComponentNameResolver.Resolve($"{ProjectDirectory}/Foo-Bar.viu", ProjectDirectory, RootNamespace);
+        var underscored = SingleFileComponentNameResolver.Resolve($"{ProjectDirectory}/Foo_Bar.viu", ProjectDirectory, RootNamespace);
+        dashed.ClassName.ShouldBe("Foo_Bar");
+        underscored.ClassName.ShouldBe("Foo_Bar");
+        dashed.HintName.ShouldNotBe(underscored.HintName);
+
+        var outside = SingleFileComponentNameResolver.Resolve("/elsewhere/Counter.viu", ProjectDirectory, RootNamespace);
+        var inside = SingleFileComponentNameResolver.Resolve($"{ProjectDirectory}/Counter.viu", ProjectDirectory, RootNamespace);
+        outside.HintName.ShouldNotBe(inside.HintName);
+
+        // The disambiguator is deterministic — the same path always yields the same hint (the
+        // incremental-caching contract).
+        SingleFileComponentNameResolver.Resolve("/elsewhere/Counter.viu", ProjectDirectory, RootNamespace)
+            .HintName.ShouldBe(outside.HintName);
+    }
+
+    [Fact]
+    public void GeneratedIdentifiers_EscapeCSharpKeywords()
+    {
+        // "class.viu" must emit a legal identifier: the class (and any keyword directory segment)
+        // gets the verbatim-identifier prefix.
+        var resolved = SingleFileComponentNameResolver.Resolve($"{ProjectDirectory}/class.viu", ProjectDirectory, RootNamespace);
+        resolved.ClassName.ShouldBe("@class");
+        resolved.HintName.ShouldBe("class.SingleFileComponent.g.cs");
+    }
 }
