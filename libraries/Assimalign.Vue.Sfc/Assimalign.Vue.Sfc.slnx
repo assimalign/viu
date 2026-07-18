@@ -1,0 +1,4 @@
+<Solution>
+	<Project Path="src/Assimalign.Vue.Sfc.csproj" />
+	<Project Path="test/Assimalign.Vue.Sfc.Tests.csproj" />
+</Solution>
