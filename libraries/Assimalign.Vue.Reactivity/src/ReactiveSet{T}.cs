@@ -42,6 +42,13 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlyCollection<T>, IReactiveT
         _items = new HashSet<T>(items);
     }
 
+    /// <summary>
+    /// The live underlying storage, exposed to <see cref="Reactive.ToRaw{T}(ReactiveSet{T})"/> as the
+    /// untracked raw view (Vue's <c>toRaw</c> on a reactive Set). Reads off it never track and writes
+    /// through it never trigger — it is the same data, minus the instrumentation.
+    /// </summary>
+    internal HashSet<T> RawStorage => _items;
+
     /// <summary>The member count (reading it tracks iteration).</summary>
     public int Count
     {

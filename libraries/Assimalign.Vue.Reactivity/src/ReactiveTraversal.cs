@@ -50,6 +50,14 @@ public sealed class ReactiveTraversal
             return;
         }
 
+        // markRaw exclusion (Vue traverse checks ReactiveFlags.SKIP before any branch): a marked
+        // object is a leaf here — neither its own dependency nor its members are subscribed, so a
+        // deep watch never re-runs for a change inside it.
+        if (RawMarkers.IsMarked(value))
+        {
+            return;
+        }
+
         // A ref: reading Value tracks the ref's own dependency, then we recurse one level into the
         // unwrapped value (Vue traverse: isRef -> traverse(value.value, depth - 1)).
         if (value is IReference reference)

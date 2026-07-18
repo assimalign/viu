@@ -18,7 +18,7 @@ namespace Assimalign.Vue.Reactivity;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The computed value type.</typeparam>
-public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference
+public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference, IReadonlyReactive
 {
     private readonly Func<T> _getter;
     private readonly Action<T>? _setter;
@@ -46,6 +46,12 @@ public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference
 
     /// <summary>Whether this computed has a setter (Vue's writable computed).</summary>
     public bool IsWritable => _setter is not null;
+
+    /// <summary>
+    /// A getter-only computed is read-only (the port of Vue's readonly <c>ComputedRef</c>); a
+    /// writable computed is not. Surfaced through <see cref="Reactive.IsReadonly"/>.
+    /// </summary>
+    bool IReadonlyReactive.IsReadonly => _setter is null;
 
     /// <summary>
     /// Gets the (possibly recomputed) value, tracking the ambient subscriber; or routes assignment
