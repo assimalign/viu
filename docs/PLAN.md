@@ -39,8 +39,8 @@ package root is **`Assimalign.Vue.*`**:
 | Reactivity (`V01.01.02`) | `Assimalign.Vue.Reactivity` | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
 | RuntimeCore (`V01.01.03`) | `Assimalign.Vue.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Vue.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
-| Compiler (`V01.01.05`) | `Assimalign.Vue.Compiler` (+ source generators) | `@vue/compiler-core` + `compiler-dom` |
-| SingleFileComponent (`V01.01.06`) | `Assimalign.Vue.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup) |
+| Compiler (`V01.01.05`) | `Assimalign.Vue.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Vue.Syntax` base) |
+| SingleFileComponent (`V01.01.06`) | `Assimalign.Vue.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Vue.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Vue.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
 | Router (`V01.01.08`) | `Assimalign.Vue.Router` | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Vue.Store` | `pinia` |
@@ -48,6 +48,15 @@ package root is **`Assimalign.Vue.*`**:
 | Testing (`V01.01.11`) | `Assimalign.Vue.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
 | Tooling (`V01.01.12`) | build/CI/templates/dev loop | Vite + `create-vue` + monorepo infra |
 | Documentation (`V01.01.13`) | docs + samples | vuejs.org + examples |
+
+The parsing side of the map is the **`Assimalign.Vue.Syntax` cluster**: the shared base defines the
+node/diagnostic primitives and a registration-based parser pipeline (`SyntaxParser`,
+`AggregateSyntaxParser` — the seam build tooling uses to attach a parser to a block name, `lang`
+option, or file type, the role Vite plugins play in a Vue build), and one library per language roots
+on it: `Assimalign.Vue.Syntax.Templates` (the Vue template language), `.SingleFileComponent` (the
+`.viu` container), and the browser-language scaffolds `.Css`, `.Html`, and `.JavaScript` (raw-root
+parsers today; rule/element/statement-level parsing lands with their work items, starting with scoped
+CSS [V01.01.06.04]).
 
 ## Founding design decisions (C#/WASM divergences)
 

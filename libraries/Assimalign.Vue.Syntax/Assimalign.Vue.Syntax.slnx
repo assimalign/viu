@@ -1,0 +1,14 @@
+<Solution>
+	<Project Path="src/Assimalign.Vue.Syntax.csproj" />
+	<Project Path="test/Assimalign.Vue.Syntax.Tests.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.Templates/src/Assimalign.Vue.Syntax.Templates.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.Templates/test/Assimalign.Vue.Syntax.Templates.Tests.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.SingleFileComponent/src/Assimalign.Vue.Syntax.SingleFileComponent.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.SingleFileComponent/test/Assimalign.Vue.Syntax.SingleFileComponent.Tests.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.Css/src/Assimalign.Vue.Syntax.Css.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.Css/test/Assimalign.Vue.Syntax.Css.Tests.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.Html/src/Assimalign.Vue.Syntax.Html.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.Html/test/Assimalign.Vue.Syntax.Html.Tests.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.JavaScript/src/Assimalign.Vue.Syntax.JavaScript.csproj" />
+	<Project Path="../Assimalign.Vue.Syntax.JavaScript/test/Assimalign.Vue.Syntax.JavaScript.Tests.csproj" />
+</Solution>
