@@ -144,13 +144,25 @@ internal static class ExpressionProcessor
             // A definite ref: insert .Value in read and write positions (the settable Ref<T>.Value contract).
             BindingType.SetupReference => raw + ".Value",
 
-            // A maybe-ref: guard reads through unref; a write cannot be statically unwrapped, so leave it bare.
+            // A maybe-ref: guard reads through unref; a WRITE unwraps to .Value — upstream rewrites
+            // SETUP_MAYBE_REF to `.value` in assignment/update position because a write to a const
+            // binding is only legal when it is a ref (vuejs/core v3.5 transformExpression.ts
+            // rewriteIdentifier).
             BindingType.SetupMaybeReference => isWriteTarget
+                ? raw + ".Value"
+                : context.HelperString(HelperNames.Unref) + "(" + raw + ")",
+
+            // A let binding may or may not hold a ref: reads guard through unref, matching upstream.
+            // Writes stay bare — upstream emits an `isRef(x) ? x.value = y : x = y` runtime guard,
+            // which is not expressible as a C# expression without a runtime helper; the divergence is
+            // deliberate, recorded in docs/DESIGN.md, and a helper-backed guarded write is deferred to
+            // the codegen work ([V01.01.05.05]).
+            BindingType.SetupLet => isWriteTarget
                 ? raw
                 : context.HelperString(HelperNames.Unref) + "(" + raw + ")",
 
             // Non-reference setup state and literal constants are locals of the render closure: never unwrapped.
-            BindingType.SetupLet or BindingType.SetupConstant or BindingType.SetupReactiveConstant
+            BindingType.SetupConstant or BindingType.SetupReactiveConstant
                 or BindingType.LiteralConstant => raw,
 
             // A destructured prop whose real name differs: resolve through the alias table.
@@ -349,6 +361,20 @@ internal static class ExpressionProcessor
             base.VisitSingleVariableDesignation(node);
         }
 
+        public override void VisitVariableDeclarator(VariableDeclaratorSyntax node)
+        {
+            // Locals declared in a multi-statement inline handler (`var next = …;`) are scope
+            // identifiers, mirroring upstream walkIdentifiers' variable-declaration handling.
+            declared.Add(node.Identifier.ValueText);
+            base.VisitVariableDeclarator(node);
+        }
+
+        public override void VisitForEachStatement(ForEachStatementSyntax node)
+        {
+            declared.Add(node.Identifier.ValueText);
+            base.VisitForEachStatement(node);
+        }
+
         public override void VisitFromClause(FromClauseSyntax node)
         {
             declared.Add(node.Identifier.ValueText);
@@ -416,8 +442,31 @@ internal static class ExpressionProcessor
             ObjectCreationExpressionSyntax creation when creation.Type == node => false,
             CastExpressionSyntax cast when cast.Type == node => false,
             TypeArgumentListSyntax => false,
-            _ => true,
+            // The member name in an object initializer (`new Point { X = x }`) names a member of the
+            // constructed type, never a component binding (upstream's walk never rewrites object keys).
+            AssignmentExpressionSyntax initializerAssignment
+                when initializerAssignment.Left == node &&
+                     initializerAssignment.Parent is InitializerExpressionSyntax => false,
+            // The nameof operand is a name, not a value read; rewriting it would change the produced
+            // string.
+            InvocationExpressionSyntax invocation
+                when invocation.Expression == node && node.Identifier.ValueText == "nameof" => false,
+            _ => !IsInsideNameOf(node),
         };
+
+        private static bool IsInsideNameOf(Microsoft.CodeAnalysis.SyntaxNode node)
+        {
+            for (var current = node.Parent; current is not null; current = current.Parent)
+            {
+                if (current is InvocationExpressionSyntax invocation &&
+                    invocation.Expression is IdentifierNameSyntax { Identifier.ValueText: "nameof" })
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private static bool IsWriteTarget(IdentifierNameSyntax node)
         {

@@ -137,21 +137,21 @@ public class ExpressionBindingTests
     {
         // upstream: `count++` on a ref becomes `count.value++` inside the inline handler.
         HandlerBody("<button @click=\"count++\"></button>", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("$event => (count.Value++)");
+            .ShouldBe("__event => (count.Value++)");
     }
 
     [Fact]
     public void ProcessExpression_CompoundAssignmentOnReference_UnwrapsWriteTarget()
     {
         HandlerBody("<button @click=\"count += 1\"></button>", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("$event => (count.Value += 1)");
+            .ShouldBe("__event => (count.Value += 1)");
     }
 
     [Fact]
     public void ProcessExpression_SimpleAssignmentOnReference_UnwrapsWriteTarget()
     {
         HandlerBody("<button @click=\"count = 5\"></button>", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("$event => (count.Value = 5)");
+            .ShouldBe("__event => (count.Value = 5)");
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public class ExpressionBindingTests
     {
         // A data member assigned in a handler resolves through _ctx and gains no .Value.
         HandlerBody("<button @click=\"open = true\"></button>", Bindings(("open", BindingType.Data)))
-            .ShouldBe("$event => (_ctx.open = true)");
+            .ShouldBe("__event => (_ctx.open = true)");
     }
 
     [Fact]
@@ -354,6 +354,139 @@ public class ExpressionBindingTests
         var second = FirstInterpolationContent("<div>{{ count + step }}</div>", metadata);
 
         first.ShouldBe(second);
+    }
+
+    // ---- structural-directive expression sites (vIf.ts processIf, vSlot.ts trackVForSlotScopes) ----
+
+    [Fact]
+    public void ProcessExpression_VIfCondition_RewritesUnderPrefixing()
+    {
+        // Upstream processIf runs processExpression on dir.exp under prefixIdentifiers because vIf is a
+        // structural transform applied before transformExpression (vuejs/core v3.5 transforms/vIf.ts).
+        var result = TransformPrefixed(
+            "<span v-if=\"visible\">a</span><span v-else-if=\"other\">b</span>",
+            Bindings(("visible", BindingType.SetupReference), ("other", BindingType.Data)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var ifNode = result.Children[0].ShouldBeOfType<IfNode>();
+        Flatten(ifNode.Branches[0].Condition).ShouldBe("visible.Value");
+        Flatten(ifNode.Branches[1].Condition).ShouldBe("_ctx.other");
+    }
+
+    [Fact]
+    public void ProcessExpression_TemplateVForSlot_AliasStaysLocalAndSourceRewrites()
+    {
+        // The structural-directive factory skips template-with-v-slot, so trackVForSlotScopes registers
+        // the v-for aliases and buildSlots processes the source (vuejs/core v3.5 transforms/vSlot.ts).
+        var result = TransformPrefixed(
+            "<Comp><template v-for=\"item in items\" v-slot:row><span>{{ item }}</span></template></Comp>",
+            Bindings(("items", BindingType.Data)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var flattened = FlattenTree(result.RootCodegen());
+        flattened.ShouldContain("_ctx.items");
+        flattened.ShouldNotContain("_ctx.item)");
+        SingleInterpolation(
+            "<Comp><template v-for=\"item in items\" v-slot:row><span>{{ item }}</span></template></Comp>",
+            Bindings(("items", BindingType.Data)))
+            .ShouldBe("item");
+    }
+
+    // ---- write-position unwrapping (upstream rewriteIdentifier assignment/update handling) ----
+
+    [Fact]
+    public void ProcessExpression_MaybeReferenceWrite_UnwrapsToValue()
+    {
+        // upstream SETUP_MAYBE_REF in assignment position -> `.value`: a write to a const binding is
+        // only legal when it is a ref (transformExpression.ts rewriteIdentifier).
+        SingleInterpolation("{{ maybe = 1 }}", Bindings(("maybe", BindingType.SetupMaybeReference)))
+            .ShouldBe("maybe.Value = 1");
+    }
+
+    [Fact]
+    public void ProcessExpression_SetupLetRead_GuardsWithUnref()
+    {
+        // upstream SETUP_LET read -> `unref(x)`; the guarded write stays bare (documented divergence,
+        // docs/DESIGN.md).
+        SingleInterpolation("{{ letBinding }}", Bindings(("letBinding", BindingType.SetupLet)))
+            .ShouldBe("_unref(letBinding)");
+    }
+
+    [Fact]
+    public void ProcessExpression_SetupLetWrite_StaysBare()
+    {
+        SingleInterpolation("{{ letBinding = 1 }}", Bindings(("letBinding", BindingType.SetupLet)))
+            .ShouldBe("letBinding = 1");
+    }
+
+    // ---- statement-mode locals, object members, and nameof ----
+
+    [Fact]
+    public void ProcessExpression_StatementHandlerLocal_IsNotPrefixed()
+    {
+        // A local declared in a multi-statement handler is a scope identifier, mirroring upstream
+        // walkIdentifiers' variable-declaration handling.
+        var result = TransformPrefixed(
+            "<button @click=\"var next = count + 1; total = next;\"></button>",
+            Bindings(("count", BindingType.SetupReference), ("total", BindingType.Data)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var flattened = FlattenTree(result.RootCodegen());
+        flattened.ShouldContain("var next = count.Value + 1");
+        flattened.ShouldContain("_ctx.total = next");
+        flattened.ShouldNotContain("_ctx.next");
+    }
+
+    [Fact]
+    public void ProcessExpression_ObjectInitializerMemberNames_AreNotRewritten()
+    {
+        // `new Point { X = x }`: X names a member of the constructed type; only x is a reference.
+        var result = TransformPrefixed(
+            "<div :data-point=\"new Point { X = x, Y = y }\"></div>",
+            Bindings(("x", BindingType.Data), ("y", BindingType.Data)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var flattened = FlattenTree(result.RootCodegen());
+        flattened.ShouldContain("X = _ctx.x");
+        flattened.ShouldContain("Y = _ctx.y");
+        flattened.ShouldNotContain("_ctx.X", Case.Sensitive);
+    }
+
+    [Fact]
+    public void ProcessExpression_NameOf_IsNotRewritten()
+    {
+        // The nameof operand is a name, not a value read; rewriting it would change the produced string.
+        var result = TransformPrefixed(
+            "<div :title=\"nameof(count)\"></div>",
+            Bindings(("count", BindingType.SetupReference)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var flattened = FlattenTree(result.RootCodegen());
+        flattened.ShouldContain("nameof(count)");
+        flattened.ShouldNotContain("_ctx.nameof");
+        flattened.ShouldNotContain("count.Value");
+    }
+
+    // ---- the Vuecs event identifier (docs/DESIGN.md: template $event <-> C# __event) ----
+
+    [Fact]
+    public void ProcessExpression_EventVariable_SubstitutesLegalIdentifierUnderPrefixing()
+    {
+        var result = TransformPrefixed(
+            "<button @click=\"save($event)\"></button>",
+            Bindings(("save", BindingType.SetupConstant)),
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var flattened = FlattenTree(result.RootCodegen());
+        flattened.ShouldContain("__event => ");
+        flattened.ShouldContain("save(__event)");
+        flattened.ShouldNotContain("$event");
     }
 
     // ---- helpers ----

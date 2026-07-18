@@ -27,7 +27,7 @@ Scope registration and per-directive expression handling live in the owning tran
 - `VForTransform` rewrites the iterated **source** in the outer scope, then registers the value/key/index
   aliases before the loop body is traversed and removes them on exit.
 - `VSlotTransform.TrackSlotScopes` registers the slot props for the slot children and removes them on exit.
-- `VOnTransform` processes the handler expression (with `$event`-style locals in scope for inline statements),
+- `VOnTransform` processes the handler expression (inline statements are parsed against the Vuecs event identifier `__event`, the C# spelling of Vue's `$event`),
   so ref writes inside handlers unwrap.
 
 All of the above are gated on `PrefixIdentifiers`, matching upstream's `!__BROWSER__ && context.prefixIdentifiers`
@@ -46,8 +46,9 @@ single closure over the component), and the table below is the compiler-owned co
 | template-local (`v-for`/`v-slot` alias in scope) | `name` | `name` |
 | allowed global (`GlobalAllowList`) | `name` | `name` |
 | `SetupReference` | `name.Value` | `name.Value` |
-| `SetupMaybeReference` | `unref(name)` | `name` |
-| `SetupLet` / `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `name` | `name` |
+| `SetupMaybeReference` | `unref(name)` | `name.Value` (upstream: a write to a const binding is only legal when it is a ref) |
+| `SetupLet` | `unref(name)` | `name` — upstream emits an `isRef`-guarded write, which a C# expression cannot; the helper-backed guarded write is deferred to [V01.01.05.05] |
+| `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `name` | `name` |
 | `Property` / `PropertyAliased` / `Data` / `Options` | `_ctx.name` (alias resolved for `PropertyAliased`) | same |
 | unresolved | `_ctx.name` | `_ctx.name` |
 
@@ -91,10 +92,12 @@ the common .NET base-class surface a template legitimately reaches (`Math`, `Con
   can under-rewrite a same-named outer reference in the rare case an expression both shadows and separately
   reads the same name. Template-scope shadowing — the case the acceptance criteria pin — is exact, driven by the
   `TransformContext` identifier stack.
-- **Inline-handler event parameter.** `$event` is not a legal C# identifier, so a handler body that references
-  the event variable cannot be parsed under prefixing today. The event-variable identifier is a `v-on` /
-  code-generation contract ([V01.01.05.03] / [V01.01.05.05]); handlers that do not reference it (the
-  `count++` / `count += 1` / `count = literal` cases the acceptance criteria call out) unwrap correctly now.
+- **Inline-handler event parameter.** `$event` is not a legal C# identifier, so under prefixing an inline
+  statement is parsed and emitted against the Vuecs spelling `__event`: `VOnTransform` substitutes
+  `$event` → `__event` in the handler content before processing and names the wrapping lambda's parameter
+  `__event`, so `@input="save($event)"` emits `__event => (_ctx.save(__event))`. Template authors keep
+  Vue's `$event`; without prefixing the emitted wrapper keeps `$event` for upstream output parity. Pinned
+  by `ExpressionBindingTests`.
 - **`asParams` validation is lenient.** Alias/prop declaration positions are registered for scope but not
   hard-validated as expressions, because C# deconstruction forms (`(a, b)`, `var (a, b)`) and JavaScript-style
   `{ a }` destructures do not all parse as C# expressions; a lenient identifier scan still contributes their
