@@ -16,6 +16,17 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <param name="HasScript">Whether the component declares an <c>@script</c> block.</param>
 /// <param name="StyleCount">The number of <c>@style</c> blocks.</param>
 /// <param name="CustomBlockCount">The number of custom blocks.</param>
+/// <param name="RenderBody">
+/// The compiled <c>@template</c> render-method body emitted by the template compiler's
+/// <c>RenderFunctionEmitter</c> ([V01.01.05.05]), pre-indented for the render method's nesting depth,
+/// or <see langword="null"/> when the component has no <c>@template</c> block. A plain string, so the
+/// pipeline stays value-equatable.
+/// </param>
+/// <param name="RenderCacheSize">
+/// The number of <c>_cache</c> slots the render function uses (<c>v-once</c> subtrees and cached
+/// handlers); surfaced as a generated constant because C# arrays cannot grow on assignment the way
+/// upstream's JavaScript render cache does.
+/// </param>
 internal readonly record struct SingleFileComponentModel(
     string? Namespace,
     string ClassName,
@@ -24,7 +35,9 @@ internal readonly record struct SingleFileComponentModel(
     bool HasTemplate,
     bool HasScript,
     int StyleCount,
-    int CustomBlockCount);
+    int CustomBlockCount,
+    string? RenderBody,
+    int RenderCacheSize);
 
 /// <summary>
 /// One <c>.viu</c> file's pipeline result: the scaffold model to emit (always present — the descriptor

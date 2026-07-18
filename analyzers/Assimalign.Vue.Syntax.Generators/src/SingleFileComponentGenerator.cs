@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 
 using Assimalign.Vue.Syntax.SingleFileComponent;
+using Assimalign.Vue.Syntax.Templates;
 
 namespace Assimalign.Vue.Syntax.Generators;
 
@@ -57,8 +58,11 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             .Select(static (pair, cancellationToken) => ReadFile(pair.Left, pair.Right, cancellationToken))
             .WithTrackingName(FileTrackingName);
 
+        // BindingMetadata is a render-compilation input, not a pipeline model: script-driven metadata is
+        // [V01.01.06.03]'s deliverable, so the composition root supplies the permissive default here and
+        // the script-merge item swaps in the script-derived metadata through the same parameter.
         var results = files
-            .Select(static (file, cancellationToken) => BuildResult(file, cancellationToken))
+            .Select(static (file, cancellationToken) => BuildResult(file, BindingMetadata.Empty, cancellationToken))
             .WithTrackingName(ModelTrackingName);
 
         context.RegisterSourceOutput(results, static (production, result) => Execute(production, result));
@@ -86,6 +90,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 
     private static SingleFileComponentGeneratorResult BuildResult(
         SingleFileComponentFile file,
+        BindingMetadata bindingMetadata,
         System.Threading.CancellationToken cancellationToken)
     {
         var parse = Parser.ParseComponent(file.Text, cancellationToken);
@@ -111,6 +116,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             }
         }
 
+        var render = CompileRenderFunction(file, parse, bindingMetadata, diagnostics, cancellationToken);
+
         var model = new SingleFileComponentModel(
             file.Namespace,
             file.ClassName,
@@ -119,13 +126,63 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             HasTemplate: descriptor.Template is not null,
             HasScript: descriptor.Script is not null,
             StyleCount: descriptor.Styles.Count,
-            CustomBlockCount: descriptor.CustomBlocks.Count);
+            CustomBlockCount: descriptor.CustomBlocks.Count,
+            RenderBody: render.Body,
+            RenderCacheSize: render.CacheSize);
 
         var array = diagnostics.Count == 0
             ? EquatableArray<DiagnosticInfo>.Empty
             : new EquatableArray<DiagnosticInfo>(diagnostics.ToArray());
 
         return new SingleFileComponentGeneratorResult(model, array);
+    }
+
+    /// <summary>
+    /// Compiles the dispatched <c>@template</c> parse into the C# render-method body ([V01.01.05.05]):
+    /// the registered <see cref="TemplateSyntaxParser"/>'s AST runs through <see cref="Transformer"/>
+    /// under <c>PrefixIdentifiers</c> (with <paramref name="bindingMetadata"/> resolving identifier
+    /// classifications) and the result is serialized by <see cref="RenderFunctionEmitter"/>. Transform
+    /// diagnostics surface on the <c>.viu</c> file exactly like dispatched parse diagnostics.
+    /// </summary>
+    private static (string? Body, int CacheSize) CompileRenderFunction(
+        SingleFileComponentFile file,
+        SingleFileComponentSyntaxParserResult parse,
+        BindingMetadata bindingMetadata,
+        List<DiagnosticInfo> diagnostics,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        foreach (var sourceResult in parse.SourceResults)
+        {
+            if (!SingleFileComponentParserComposition.IsTemplateBlock(sourceResult.Source) ||
+                sourceResult.Result is not TemplateSyntaxParserResult templateResult)
+            {
+                continue;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var blockContentStart = sourceResult.Node.ContentLocation.Start;
+            var transformOptions = TransformOptions.CreateDom();
+            transformOptions.PrefixIdentifiers = true;
+            transformOptions.BindingMetadata = bindingMetadata;
+            // CacheHandlers stays off: the upstream cached member-expression wrapper `(...args) => ...`
+            // has no C# spelling yet; handler caching is runtime-binding follow-up work. v-once caching
+            // is independent of this switch and fully emitted.
+            transformOptions.OnError = error => diagnostics.Add(
+                SingleFileComponentDiagnostics.Create(file.FilePath, error, fromTemplate: true, blockContentStart));
+
+            var transformed = Transformer.Transform(templateResult.Root, transformOptions);
+            var emitted = RenderFunctionEmitter.Emit(transformed, new RenderFunctionEmitterOptions
+            {
+                // namespace + class + method-body nesting, or class + method-body without a namespace.
+                IndentLevel = string.IsNullOrEmpty(file.Namespace) ? 2 : 3,
+            });
+
+            // The first @template block is the component's template (the descriptor carries one).
+            return (emitted.Code, emitted.CacheSlotCount);
+        }
+
+        return (null, 0);
     }
 
     private static void Execute(SourceProductionContext context, SingleFileComponentGeneratorResult result)
