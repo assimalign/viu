@@ -24,6 +24,18 @@
     <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Roslyn expression parsing ([V01.01.05.04]): the C# analogue of Vue 3.5's @babel/parser dependency
+         in transformExpression. Used by the netstandard2.0 compiler front end to parse, validate, and rewrite
+         template expressions. The version is centralized in build/Targets/Build.References.Packages.targets
+         (never inline here). This is a generator-only dependency by graph position, not by
+         PrivateAssets: the library sits build-time-only in the dependency graph (consumed by the codegen
+         generator [V01.01.05.05], whose Roslyn is provided by the compiler host), so Microsoft.CodeAnalysis
+         never reaches the WASM runtime — nothing mechanical enforces that, and the analyzer packaging chain
+         ([V01.01.05.05]) is where the guarantee gets pinned. The reference flows normally so this library's
+         net10.0 test project resolves Roslyn at run time. -->
+    <VuecsPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Linked netstandard2.0 shims ([V01.01.05.09]): IsExternalInit and the required-member attributes
          are authored once in Assimalign.Vue.Syntax and <Compile Include>'d here (still internal) because
          an internal shim in a referenced assembly is not visible to this compilation — each netstandard2.0

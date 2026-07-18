@@ -9,9 +9,10 @@ namespace Assimalign.Vue.Syntax.Templates;
 /// </summary>
 /// <remarks>
 /// The <see cref="PatchFlag"/> and <see cref="DynamicProps"/> fields are populated by prop analysis
-/// ([V01.01.05.03]); the full element-level patch-flag inference (class/style/text elision) is refined by
-/// [V01.01.05.06]. This node deliberately carries every field those stages fill so downstream passes never
-/// reshape it.
+/// ([V01.01.05.03]) and the element-level patch-flag inference and block-emission decisions ([V01.01.05.06]);
+/// <see cref="IsBlock"/> and <see cref="DisableTracking"/> record whether this vnode opens an optimization
+/// block and whether its block tracking is suppressed. This node deliberately carries every field those
+/// stages fill so downstream passes never reshape it.
 /// </remarks>
 public sealed record VNodeCall : TemplateSyntaxNode
 {

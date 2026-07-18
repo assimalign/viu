@@ -33,6 +33,13 @@ internal static class VForTransform
             return null;
         }
 
+        // The iterated source is evaluated in the outer scope, so rewrite it before the aliases enter scope
+        // (upstream processExpression(source) precedes addIdentifiers of value/key/index).
+        if (context.PrefixIdentifiers && parseResult.Source is SimpleExpressionNode sourceExpression)
+        {
+            parseResult = parseResult with { Source = ExpressionProcessor.ProcessExpression(sourceExpression, context) };
+        }
+
         var workingFor = new WorkingFor
         {
             Source = parseResult.Source,
@@ -67,13 +74,61 @@ internal static class VForTransform
         context.ReplaceNode(workingFor);
         context.ScopeVFor++;
 
+        // Register the value/key/index aliases so the loop body's expressions treat them as template-locals
+        // (upstream addIdentifiers, gated on prefixIdentifiers). They are declarations, never rewritten.
+        if (context.PrefixIdentifiers)
+        {
+            AddAliasIdentifiers(context, parseResult);
+        }
+
         var onExit = ProcessCodegen(element, directive, context, workingFor, parseResult, isTemplate);
 
         return () =>
         {
             context.ScopeVFor--;
+            if (context.PrefixIdentifiers)
+            {
+                RemoveAliasIdentifiers(context, parseResult);
+            }
+
             onExit?.Invoke();
         };
+    }
+
+    private static void AddAliasIdentifiers(TransformContext context, ForParseResult parseResult)
+    {
+        if (parseResult.Value is not null)
+        {
+            context.AddIdentifiers(parseResult.Value);
+        }
+
+        if (parseResult.Key is not null)
+        {
+            context.AddIdentifiers(parseResult.Key);
+        }
+
+        if (parseResult.Index is not null)
+        {
+            context.AddIdentifiers(parseResult.Index);
+        }
+    }
+
+    private static void RemoveAliasIdentifiers(TransformContext context, ForParseResult parseResult)
+    {
+        if (parseResult.Value is not null)
+        {
+            context.RemoveIdentifiers(parseResult.Value);
+        }
+
+        if (parseResult.Key is not null)
+        {
+            context.RemoveIdentifiers(parseResult.Key);
+        }
+
+        if (parseResult.Index is not null)
+        {
+            context.RemoveIdentifiers(parseResult.Index);
+        }
     }
 
     private static Action ProcessCodegen(
