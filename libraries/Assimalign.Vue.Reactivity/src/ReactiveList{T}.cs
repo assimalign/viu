@@ -46,6 +46,13 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         _items = new List<T>(items);
     }
 
+    /// <summary>
+    /// The live underlying storage, exposed to <see cref="Reactive.ToRaw{T}(ReactiveList{T})"/> as the
+    /// untracked raw view (Vue's <c>toRaw</c> on a reactive array). Reads off it never track and writes
+    /// through it never trigger — it is the same data, minus the instrumentation.
+    /// </summary>
+    internal List<T> RawStorage => _items;
+
     /// <summary>The element count (reading it tracks the length dependency — upstream <c>length</c>).</summary>
     public int Count
     {

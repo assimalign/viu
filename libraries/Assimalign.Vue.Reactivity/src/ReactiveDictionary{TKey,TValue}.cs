@@ -54,6 +54,14 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         }
     }
 
+    /// <summary>
+    /// The live underlying storage, exposed to
+    /// <see cref="Reactive.ToRaw{TKey,TValue}(ReactiveDictionary{TKey,TValue})"/> as the untracked raw
+    /// view (Vue's <c>toRaw</c> on a reactive Map). Reads off it never track and writes through it never
+    /// trigger — it is the same data, minus the instrumentation.
+    /// </summary>
+    internal Dictionary<TKey, TValue> RawStorage => _items;
+
     /// <summary>The entry count (reading it tracks iteration).</summary>
     public int Count
     {

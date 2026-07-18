@@ -297,6 +297,202 @@ public static class Reactive
         return WatchEffect(_ => effect(), options);
     }
 
+    // ---- Reactivity utilities and escape hatches ----
+    // The C# port of @vue/reactivity's utility surface (https://vuejs.org/api/reactivity-utilities.html)
+    // and advanced escape hatches (https://vuejs.org/api/reactivity-advanced.html). All introspection is
+    // interface/type-check based so it stays O(1), reflection-free, and trim/AOT-safe.
+
+    /// <summary>
+    /// Whether <paramref name="value"/> is a ref (any <see cref="IReference"/>: a plain, shallow, custom,
+    /// or computed ref, or a <see cref="ToRef{T}(Func{T}, Action{T})"/>/<c>ToReferences()</c> projection)
+    /// — the C# port of Vue 3.5's <c>isRef()</c> (https://vuejs.org/api/reactivity-utilities.html#isref).
+    /// </summary>
+    /// <param name="value">The value to test.</param>
+    /// <returns><see langword="true"/> when <paramref name="value"/> is a ref.</returns>
+    public static bool IsRef(object? value) => value is IReference;
+
+    /// <summary>
+    /// Whether <paramref name="value"/> is a reactive object — a source-generated
+    /// <c>[Reactive]</c>/<c>[ShallowReactive]</c> object or a reactive collection
+    /// (<see cref="ReactiveList{T}"/>/<see cref="ReactiveDictionary{TKey,TValue}"/>/<see cref="ReactiveSet{T}"/>),
+    /// and not one excluded by <see cref="MarkRaw{T}"/> — the C# port of Vue 3.5's <c>isReactive()</c>
+    /// (https://vuejs.org/api/reactivity-utilities.html#isreactive). Refs and computeds are not reactive
+    /// objects (use <see cref="IsRef"/>). The check keys on <see cref="IReactiveTraversable"/>, which in
+    /// Vuecs is implemented by exactly those two families.
+    /// </summary>
+    /// <param name="value">The value to test.</param>
+    /// <returns><see langword="true"/> when <paramref name="value"/> is a (non-marked) reactive object.</returns>
+    public static bool IsReactive(object? value)
+        => value is IReactiveTraversable traversable && !RawMarkers.IsMarked(traversable);
+
+    /// <summary>
+    /// Whether <paramref name="value"/> is a read-only reactive view — a getter-only
+    /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(Readonly = true)]</c>/
+    /// <c>[ShallowReactive(Readonly = true)]</c> object — the C# port of Vue 3.5's <c>isReadonly()</c>
+    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly). Keys on <see cref="IReadonlyReactive"/>.
+    /// </summary>
+    /// <param name="value">The value to test.</param>
+    /// <returns><see langword="true"/> when <paramref name="value"/> rejects writes.</returns>
+    public static bool IsReadonly(object? value)
+        => value is IReadonlyReactive readonlyReactive && readonlyReactive.IsReadonly;
+
+    /// <summary>
+    /// Returns the value inside a ref, or the argument itself when it is not a ref — the C# port of Vue
+    /// 3.5's <c>unref()</c> (https://vuejs.org/api/reactivity-utilities.html#unref). This overload unwraps
+    /// any <see cref="IReference{T}"/> without boxing <typeparamref name="T"/>.
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="reference">The ref to unwrap.</param>
+    /// <returns>The ref's current value (a tracked read).</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
+    public static T Unref<T>(IReference<T> reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference.Value;
+    }
+
+    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    public static T Unref<T>(Reference<T> reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference.Value;
+    }
+
+    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    public static T Unref<T>(ShallowReference<T> reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference.Value;
+    }
+
+    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    public static T Unref<T>(CustomReference<T> reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference.Value;
+    }
+
+    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    public static T Unref<T>(Computed<T> reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference.Value;
+    }
+
+    /// <summary>
+    /// Returns <paramref name="value"/> unchanged — the non-ref branch of <c>unref()</c>. The concrete-ref
+    /// overloads take precedence for ref arguments, so a struct value flows through this overload without
+    /// boxing. (A ref whose static type is only <see cref="object"/> is opaque to overload resolution and
+    /// is returned as-is; unwrap it through <see cref="Unref{T}(IReference{T})"/> instead.)
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="value">The value to pass through.</param>
+    /// <returns><paramref name="value"/> itself.</returns>
+    public static T Unref<T>(T value) => value;
+
+    /// <summary>
+    /// Creates a ref projected through <paramref name="getter"/> (and optional <paramref name="setter"/>)
+    /// — the delegate-based form of Vue 3.5's <c>toRef()</c>
+    /// (https://vuejs.org/api/reactivity-utilities.html#toref). Reading the ref invokes the getter, so it
+    /// tracks whatever reactive source the getter reads; writing routes through the setter, so it triggers
+    /// that source. With no setter the ref is read-only (a write is a warned no-op), mirroring a
+    /// getter-only <c>toRef</c>. Property-name-string forms are intentionally omitted (AOT/trim: no
+    /// reflection) — a per-property write-through ref instead comes from a generated object's
+    /// <c>ToReferences()</c> (the <c>toRefs</c> counterpart).
+    /// </summary>
+    /// <typeparam name="T">The projected value type.</typeparam>
+    /// <param name="getter">Invoked on read; its reactive reads become the ref's dependencies.</param>
+    /// <param name="setter">Invoked on write, or <see langword="null"/> for a read-only ref.</param>
+    /// <returns>A ref backed by the delegates.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="getter"/> is null.</exception>
+    public static IReference<T> ToRef<T>(Func<T> getter, Action<T>? setter = null)
+    {
+        ArgumentNullException.ThrowIfNull(getter);
+        return new AccessorReference<T>(getter, setter);
+    }
+
+    /// <summary>
+    /// Returns the raw, non-reactive view of <paramref name="value"/> — the C# port of Vue 3.5's
+    /// <c>toRaw()</c> (https://vuejs.org/api/reactivity-advanced.html#toraw). Vuecs has no identity-swapping
+    /// proxy, so a source-generated <c>[Reactive]</c> object (or any non-collection value) is its own raw
+    /// and is returned by identity — reads through the returned instance still track, because it <em>is</em>
+    /// the reactive instance (documented C# divergence from <c>toRaw</c>, which strips a proxy). For an
+    /// untracked view whose reads do not track and writes do not trigger, use the reactive-collection
+    /// overloads (which return the underlying storage) or a generated object's <c>ToRawValues()</c>
+    /// view (emitted per <c>[Reactive]</c> class straight over the raw backing fields).
+    /// </summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="value">The value to unwrap.</param>
+    /// <returns><paramref name="value"/> itself.</returns>
+    public static T ToRaw<T>(T value) => value;
+
+    /// <summary>
+    /// Returns the untracked underlying <see cref="List{T}"/> of <paramref name="list"/> — Vue's
+    /// <c>toRaw</c> on a reactive array. It is the same live storage, so reads off it do not track and
+    /// writes through it do not trigger (an effect reading the reactive list does not re-run).
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="list">The reactive list.</param>
+    /// <returns>The underlying storage list.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="list"/> is null.</exception>
+    public static List<T> ToRaw<T>(ReactiveList<T> list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        return list.RawStorage;
+    }
+
+    /// <summary>
+    /// Returns the untracked underlying <see cref="Dictionary{TKey,TValue}"/> of <paramref name="dictionary"/>
+    /// — Vue's <c>toRaw</c> on a reactive Map. It is the same live storage, so reads off it do not track
+    /// and writes through it do not trigger.
+    /// </summary>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TValue">The value type.</typeparam>
+    /// <param name="dictionary">The reactive dictionary.</param>
+    /// <returns>The underlying storage dictionary.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="dictionary"/> is null.</exception>
+    public static Dictionary<TKey, TValue> ToRaw<TKey, TValue>(ReactiveDictionary<TKey, TValue> dictionary)
+        where TKey : notnull
+    {
+        ArgumentNullException.ThrowIfNull(dictionary);
+        return dictionary.RawStorage;
+    }
+
+    /// <summary>
+    /// Returns the untracked underlying <see cref="HashSet{T}"/> of <paramref name="set"/> — Vue's
+    /// <c>toRaw</c> on a reactive Set. It is the same live storage, so reads off it do not track and
+    /// writes through it do not trigger.
+    /// </summary>
+    /// <typeparam name="T">The member type.</typeparam>
+    /// <param name="set">The reactive set.</param>
+    /// <returns>The underlying storage set.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="set"/> is null.</exception>
+    public static HashSet<T> ToRaw<T>(ReactiveSet<T> set)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        return set.RawStorage;
+    }
+
+    /// <summary>
+    /// Marks <paramref name="value"/> so it is permanently excluded from reactivity — the C# port of Vue
+    /// 3.5's <c>markRaw()</c> (https://vuejs.org/api/reactivity-advanced.html#markraw). A marked object is
+    /// skipped by deep-watch traversal (a change inside it never re-runs a deep watcher) and is reported as
+    /// non-reactive by <see cref="IsReactive"/>, even when it is itself a generated
+    /// <see cref="IReactiveObject"/>. There is no wrapper to strip (Vuecs objects are their own raw);
+    /// marking is by reference identity and never keeps the object alive. Returns the same instance so
+    /// calls can be chained.
+    /// </summary>
+    /// <typeparam name="T">The reference type of the marked value.</typeparam>
+    /// <param name="value">The object to exclude from reactivity.</param>
+    /// <returns><paramref name="value"/> itself.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+    public static T MarkRaw<T>(T value) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        RawMarkers.Mark(value);
+        return value;
+    }
+
     private static WatchHandle CreateWatch<T>(
         Func<T> getter,
         WatchCallback<T> callback,
