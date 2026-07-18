@@ -692,7 +692,10 @@ internal static class TransformElement
 
     private static bool IsComponentTag(string tag) => tag is "component" or "Component";
 
-    private static string ToValidAssetId(string name, string type)
+    // Internal (not private) because code generation ([V01.01.05.05]) re-derives the same asset ids for
+    // its resolveComponent/resolveDirective preamble — upstream shares toValidAssetId the same way
+    // (@vue/compiler-core utils.ts, used by both transformElement.ts and codegen.ts).
+    internal static string ToValidAssetId(string name, string type)
     {
         var builder = new StringBuilder("_").Append(type).Append('_');
         foreach (var character in name)

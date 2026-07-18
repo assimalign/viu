@@ -235,7 +235,9 @@ public sealed class SingleFileComponentScriptTests
             FilePath: "C:/proj/Counter.viu",
             ScriptContent: "    public Reference<int> Count = default!;\n",
             ScriptContentStartLine: 1,
-            Bindings: bindings);
+            Bindings: bindings,
+            RenderBody: null,
+            RenderCacheSize: 0);
 
         var metadata = model.ToBindingMetadata();
 
@@ -262,7 +264,9 @@ public sealed class SingleFileComponentScriptTests
             FilePath: "C:/proj/Counter.viu",
             ScriptContent: null,
             ScriptContentStartLine: 0,
-            Bindings: EquatableArray<ScriptBinding>.Empty);
+            Bindings: EquatableArray<ScriptBinding>.Empty,
+            RenderBody: null,
+            RenderCacheSize: 0);
 
         var metadata = model.ToBindingMetadata();
 
@@ -334,4 +338,26 @@ public sealed class SingleFileComponentScriptTests
 
     private static IReadOnlyList<RoslynDiagnostic> CompileErrors(ImmutableArray<RoslynDiagnostic> diagnostics)
         => diagnostics.Where(diagnostic => diagnostic.Severity == RoslynDiagnosticSeverity.Error).ToList();
+
+    [Fact]
+    public void ScriptReference_DrivesRenderUnwrap_EndToEnd()
+    {
+        // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the @script block declares a Reference<int>
+        // member, so the @template's use of it compiles to a _ctx-routed .Value unwrap in the emitted
+        // render body — the whole point of feeding script-classified BindingMetadata into the template
+        // compiler (upstream analogue: SETUP_REF resolving through $setup in function mode).
+        const string source =
+            "@template {\n" +
+            "    <div>{{ Count }}</div>\n" +
+            "}\n" +
+            "@script {\n" +
+            "    public Assimalign.Vue.Reactivity.Reference<int> Count = new(0);\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Counter.SingleFileComponent.g.cs");
+        generated.ShouldContain("_toDisplayString(_ctx.Count.Value)");
+    }
 }

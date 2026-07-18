@@ -28,6 +28,17 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <param name="ScriptContent">The <c>@script</c> block's verbatim C# body to merge into the partial class, or <see langword="null"/> when the component declares no script.</param>
 /// <param name="ScriptContentStartLine">The one-based <c>.viu</c> line where the script content begins (the <c>#line</c> anchor); <c>0</c> when there is no script.</param>
 /// <param name="Bindings">The classified top-level script members, for the template compiler's ref-unwrapping decisions.</param>
+/// <param name="RenderBody">
+/// The compiled <c>@template</c> render-method body emitted by the template compiler's
+/// <c>RenderFunctionEmitter</c> ([V01.01.05.05]), pre-indented for the render method's nesting depth,
+/// or <see langword="null"/> when the component has no <c>@template</c> block. A plain string, so the
+/// pipeline stays value-equatable.
+/// </param>
+/// <param name="RenderCacheSize">
+/// The number of <c>_cache</c> slots the render function uses (<c>v-once</c> subtrees and cached
+/// handlers); surfaced as a generated constant because C# arrays cannot grow on assignment the way
+/// upstream's JavaScript render cache does.
+/// </param>
 internal readonly record struct SingleFileComponentModel(
     string? Namespace,
     string ClassName,
@@ -40,7 +51,9 @@ internal readonly record struct SingleFileComponentModel(
     string FilePath,
     string? ScriptContent,
     int ScriptContentStartLine,
-    EquatableArray<ScriptBinding> Bindings)
+    EquatableArray<ScriptBinding> Bindings,
+    string? RenderBody,
+    int RenderCacheSize)
 {
     /// <summary>
     /// Materializes the template compiler's <see cref="BindingMetadata"/> from the classified
