@@ -578,8 +578,10 @@ public static class VirtualNodeFactory
     private static object? ExtractKey(VirtualNodeProperties? properties)
         => properties is not null && properties.TryGetValue("key", out var key) ? key : null;
 
-    private static object? ExtractReference(VirtualNodeProperties? properties)
-        => properties is not null && properties.TryGetValue("ref", out var reference) ? reference : null;
+    private static TemplateReference? ExtractReference(VirtualNodeProperties? properties)
+        => properties is not null && properties.TryGetValue("ref", out var reference)
+            ? TemplateReference.FromRaw(reference)
+            : null;
 
     private static object? MergeClassValues(object? existing, object? incoming)
     {

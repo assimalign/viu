@@ -48,10 +48,11 @@ public sealed class VirtualNode
 
     /// <summary>
     /// The template-ref binding extracted from the <c>"ref"</c> prop at creation (upstream:
-    /// <c>ref</c>). Carried as data for now; the renderer wires refs when the component model
-    /// lands ([V01.01.03.06]).
+    /// <c>ref</c>, normalized by <c>normalizeRef</c>), or null when the vnode carries no ref. The
+    /// renderer applies it in the post-flush phase after mount/patch and clears it on unmount
+    /// (<see cref="Renderer{TNode}"/>'s <c>SetReference</c>, [V01.01.03.14]).
     /// </summary>
-    public object? Reference { get; internal init; }
+    public TemplateReference? Reference { get; internal init; }
 
     /// <summary>
     /// The text payload: element text children (<see cref="ShapeFlags.TextChildren"/>),

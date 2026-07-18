@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
+using Assimalign.Vue.Reactivity;
 using Assimalign.Vue.Shared;
 
 namespace Assimalign.Vue.RuntimeCore.Tests;
@@ -48,13 +49,17 @@ public class VirtualNodeTests
     [Fact]
     public void Element_KeyAndReferenceAreExtractedFromPropertiesAtCreation()
     {
-        var reference = new object();
+        // The "ref" prop is classified into a TemplateReference at creation ([V01.01.03.14]): a
+        // reactive ref-object becomes a ref-object binding. String refs are intentionally excluded.
+        var reference = new Reference<object?>(null);
         var node = VirtualNodeFactory.Element(
             "div",
             VirtualNodeFactory.Properties(("key", "k1"), ("ref", reference), ("class", "c")));
 
         node.Key.ShouldBe("k1");
-        node.Reference.ShouldBeSameAs(reference);
+        node.Reference.ShouldNotBeNull();
+        node.Reference.Value.ShouldBe(TemplateReference.FromReference(reference));
+        node.Reference.Value.IsReferenceObject.ShouldBeTrue();
     }
 
     [Fact]

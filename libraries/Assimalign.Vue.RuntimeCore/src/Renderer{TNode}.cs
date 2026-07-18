@@ -148,6 +148,13 @@ public sealed class Renderer<TNode>
             default:
                 throw new InvalidOperationException($"Unknown vnode type: {next.Type}.");
         }
+        // Set the template ref (upstream setRef call site: the end of patch). A mismatched-type
+        // replacement already cleared the old ref through the unmount above (current is now null),
+        // so only the new binding is applied here.
+        if (next.Reference is { } reference)
+        {
+            SetReference(reference, current?.Reference, next, isUnmount: false, parentComponent);
+        }
     }
 
     private static bool IsSameVirtualNodeType(VirtualNode current, VirtualNode next)
@@ -1262,6 +1269,14 @@ public sealed class Renderer<TNode>
 
     private void Unmount(VirtualNode node, bool doRemove)
     {
+        // Unset any template ref first (upstream unmount order: setRef with isUnmount before the
+        // node's teardown hooks). No owner instance is threaded through unmount, so a throwing
+        // function ref surfaces to the host — an acceptable simplification, since clearing sets null
+        // or drops from a collection and does not normally throw.
+        if (node.Reference is { } reference)
+        {
+            SetReference(reference, oldReference: null, node, isUnmount: true, owner: null);
+        }
         // Cleanup order (upstream parity): hooks and child teardown run before node removal.
         InvokeHook(node, null, "onVnodeBeforeUnmount");
         // Directive teardown fires only for element vnodes (upstream: shouldInvokeDirs = ELEMENT &&
@@ -1374,6 +1389,79 @@ public sealed class Renderer<TNode>
             // Lifecycle hooks fire in the post-flush phase (upstream: queuePostRenderEffect).
             Scheduler.QueuePostFlushCallback(new SchedulerJob(() => hook(node, previousNode)));
         }
+    }
+
+    // --- template refs ([V01.01.03.14]) --------------------------------------------------------
+
+    private static void SetReference(
+        TemplateReference reference,
+        TemplateReference? oldReference,
+        VirtualNode vnode,
+        bool isUnmount,
+        ComponentInstance? owner)
+    {
+        // The C# port of setRef (rendererTemplateRef.ts): the applied value is the mounted element,
+        // or a component's exposed surface, or null on unmount.
+        var value = isUnmount ? null : ResolveReferenceValue(vnode);
+        // Unset the previous ref-object when the binding changed to a different ref (upstream's
+        // "unset old ref" block): only a ref-object is nulled; a changed function old is simply
+        // dropped, never invoked with null (upstream parity).
+        if (oldReference is { } previous && previous != reference && previous.ReferenceObject is { } previousObject)
+        {
+            previousObject.Value = null;
+        }
+        if (value is not null)
+        {
+            // #1789: a non-null value is applied after render, id -1 so the ref is populated before
+            // user mounted/updated hooks observe it (upstream: doSet.id = -1; queuePostRenderEffect).
+            // Deviates from upstream Vue 3 parity per the #30 acceptance criteria: upstream invokes a
+            // function ref synchronously inside setRef, but Vuecs defers it here like a ref-object so
+            // that no template ref is ever applied synchronously mid-patch ("never synchronously
+            // mid-patch"). Both ref kinds therefore observe identical, post-flush timing.
+            var applied = value;
+            Scheduler.QueuePostFlushCallback(
+                new SchedulerJob(() => ApplyReference(reference, applied, owner)) { Identifier = -1 });
+        }
+        else
+        {
+            // Unmount (or a falsy value): applied synchronously (upstream doSet()).
+            ApplyReference(reference, null, owner);
+        }
+    }
+
+    private static void ApplyReference(TemplateReference reference, object? value, ComponentInstance? owner)
+    {
+        if (reference.ReferenceObject is { } referenceObject)
+        {
+            referenceObject.Value = value;
+        }
+        else if (reference.Function is { } function)
+        {
+            // A function ref (the v-for collection pattern) can run arbitrary user code; route its
+            // exceptions through the owner's error-capture chain (upstream: callWithErrorHandling
+            // with ErrorCodes.FUNCTION_REF) so one throwing ref cannot abandon the flush.
+            try
+            {
+                function(value);
+            }
+            catch (Exception exception)
+            {
+                ComponentErrorHandling.Handle(exception, owner, "template ref function");
+            }
+        }
+    }
+
+    private static object? ResolveReferenceValue(VirtualNode vnode)
+    {
+        // Upstream getComponentPublicInstance: a component ref receives the exposed surface, else the
+        // public instance. Vuecs has no public instance proxy, so the ComponentInstance itself stands
+        // in for instance.proxy (documented deviation: the fallback surface is the instance). An
+        // element ref receives the platform node.
+        if (vnode.Type == VirtualNodeType.Component && vnode.Component is ComponentInstance instance)
+        {
+            return instance.Exposed ?? instance;
+        }
+        return vnode.El;
     }
 
     // --- directive hooks ([V01.01.03.13]) ------------------------------------------------------
