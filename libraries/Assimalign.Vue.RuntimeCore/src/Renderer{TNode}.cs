@@ -32,6 +32,13 @@ public sealed class Renderer<TNode>
 {
     private static readonly EqualityComparer<TNode> NodeComparer = EqualityComparer<TNode>.Default;
 
+    /// <summary>
+    /// Test seam: counts every <see cref="Patch"/> entry so a block-tree test can pin that a
+    /// re-render of a tree with N static nodes and K dynamic bindings visits O(K) vnodes, not O(N)
+    /// (issue [V01.01.03.15]). Reset it before the patch under test. Ambient static, single-threaded.
+    /// </summary>
+    internal static int PatchVisitCount;
+
     private readonly RendererOptions<TNode> _options;
     private readonly Dictionary<TNode, VirtualNode> _containerRoots = new(NodeComparer);
 
@@ -106,6 +113,7 @@ public sealed class Renderer<TNode>
         string? elementNamespace,
         ComponentInstance? parentComponent)
     {
+        PatchVisitCount++;
         if (ReferenceEquals(current, next))
         {
             return;
@@ -232,7 +240,21 @@ public sealed class Renderer<TNode>
         {
             next.El = current.El;
             next.Anchor = current.Anchor;
-            PatchChildren(current, next, container, (TNode)next.Anchor!, elementNamespace, parentComponent);
+            // Upstream processFragment routing: a stable fragment carrying a block tree patches only
+            // its dynamic descendants (positionally, never the keyed diff); every other fragment —
+            // keyed/unkeyed v-for, or a hand-written fragment — takes the full children diff. The
+            // block container is the fragment's parent, not its anchor (fragments own no element).
+            if ((int)next.PatchFlag > 0
+                && (next.PatchFlag & PatchFlags.StableFragment) != 0
+                && next.DynamicChildren is not null
+                && current.DynamicChildren is not null)
+            {
+                PatchBlockChildren(current.DynamicChildren, next.DynamicChildren, container, elementNamespace, parentComponent);
+            }
+            else
+            {
+                PatchChildren(current, next, container, (TNode)next.Anchor!, elementNamespace, parentComponent);
+            }
         }
     }
 
@@ -315,66 +337,121 @@ public sealed class Renderer<TNode>
         InvokeHook(next, current, "onVnodeBeforeUpdate");
         InvokeDirectiveHooks(next, current, DirectiveHookKind.BeforeUpdate);
         var patchFlag = (int)next.PatchFlag;
-        if (patchFlag > 0)
+        if (next.DynamicChildren is not null)
         {
-            // Compiled patch contract: only what the flags name can have changed. On WASM every
-            // skipped patchProp visit is a skipped interop call.
-            if ((next.PatchFlag & PatchFlags.FullProps) != 0)
-            {
-                PatchProperties(element, next.ElementTag!, current.Properties, next.Properties, elementNamespace);
-            }
-            else
-            {
-                if ((next.PatchFlag & PatchFlags.Class) != 0)
-                {
-                    var previousClass = current.Properties?["class"];
-                    var nextClass = next.Properties?["class"];
-                    if (!Equals(previousClass, nextClass))
-                    {
-                        _options.PatchProperty(element, next.ElementTag!, "class", previousClass, nextClass, elementNamespace);
-                    }
-                }
-                if ((next.PatchFlag & PatchFlags.Style) != 0)
-                {
-                    _options.PatchProperty(
-                        element,
-                        next.ElementTag!,
-                        "style",
-                        current.Properties?["style"],
-                        next.Properties?["style"],
-                        elementNamespace);
-                }
-                if ((next.PatchFlag & PatchFlags.Props) != 0 && next.DynamicProperties is not null)
-                {
-                    foreach (var name in next.DynamicProperties)
-                    {
-                        object? previousValue = null;
-                        object? nextValue = null;
-                        current.Properties?.TryGetValue(name, out previousValue);
-                        next.Properties?.TryGetValue(name, out nextValue);
-                        if (!Equals(previousValue, nextValue) || string.Equals(name, "value", StringComparison.Ordinal))
-                        {
-                            _options.PatchProperty(element, next.ElementTag!, name, previousValue, nextValue, elementNamespace);
-                        }
-                    }
-                }
-            }
-            if ((next.PatchFlag & PatchFlags.Text) != 0)
-            {
-                if (!string.Equals(current.TextChildren, next.TextChildren, StringComparison.Ordinal))
-                {
-                    _options.SetElementText(element, next.TextChildren ?? string.Empty);
-                }
-            }
+            // Block element: patch only the dynamic descendants the block collected — the static
+            // subtree is skipped entirely (on WASM every skipped node is a skipped interop call).
+            // The block still patches its OWN props through its patch flag; a flag of 0 means the
+            // props are static, so ApplyPatchFlagProperties leaves them untouched (upstream parity:
+            // the `else if (!optimized && dynamicChildren == null)` full-props branch is not taken).
+            PatchBlockChildren(current.DynamicChildren ?? [], next.DynamicChildren, element, ChildrenNamespace(next, elementNamespace), parentComponent);
+            ApplyPatchFlagProperties(element, current, next, elementNamespace);
+        }
+        else if (patchFlag > 0)
+        {
+            // Compiled leaf: only what the flags name can have changed; the children are static (or
+            // the single dynamic text handled by the TEXT flag). Every skipped patchProp visit is a
+            // skipped interop call on WASM.
+            ApplyPatchFlagProperties(element, current, next, elementNamespace);
         }
         else
         {
-            // Unoptimized (or Bail): full props diff and full children diff.
+            // Unoptimized (or Bail) and not a block: full props diff and full children diff.
             PatchProperties(element, next.ElementTag!, current.Properties, next.Properties, elementNamespace);
             PatchChildren(current, next, element, default, ChildrenNamespace(next, elementNamespace), parentComponent);
         }
         QueuePostHook(next, current, "onVnodeUpdated");
         QueuePostDirectiveHooks(next, current, DirectiveHookKind.Updated);
+    }
+
+    private void ApplyPatchFlagProperties(TNode element, VirtualNode current, VirtualNode next, string? elementNamespace)
+    {
+        // The compiled prop fast paths (upstream patchElement's patchFlag block): update only what
+        // the flag names. FULL_PROPS forces a full prop-bag diff; otherwise class, style, and the
+        // dynamicProps list are each visited independently; TEXT updates only the element text.
+        // NEED_PATCH / NEED_HYDRATION carry no prop work here — refs, directives, and vnode hooks
+        // are processed at their own call sites (documented N/A). A non-positive flag (a block with
+        // static props) falls through untouched.
+        var patchFlag = next.PatchFlag;
+        if ((int)patchFlag <= 0)
+        {
+            return;
+        }
+        if ((patchFlag & PatchFlags.FullProps) != 0)
+        {
+            PatchProperties(element, next.ElementTag!, current.Properties, next.Properties, elementNamespace);
+        }
+        else
+        {
+            if ((patchFlag & PatchFlags.Class) != 0)
+            {
+                var previousClass = current.Properties?["class"];
+                var nextClass = next.Properties?["class"];
+                if (!Equals(previousClass, nextClass))
+                {
+                    _options.PatchProperty(element, next.ElementTag!, "class", previousClass, nextClass, elementNamespace);
+                }
+            }
+            if ((patchFlag & PatchFlags.Style) != 0)
+            {
+                _options.PatchProperty(
+                    element,
+                    next.ElementTag!,
+                    "style",
+                    current.Properties?["style"],
+                    next.Properties?["style"],
+                    elementNamespace);
+            }
+            if ((patchFlag & PatchFlags.Props) != 0 && next.DynamicProperties is not null)
+            {
+                foreach (var name in next.DynamicProperties)
+                {
+                    object? previousValue = null;
+                    object? nextValue = null;
+                    current.Properties?.TryGetValue(name, out previousValue);
+                    next.Properties?.TryGetValue(name, out nextValue);
+                    if (!Equals(previousValue, nextValue) || string.Equals(name, "value", StringComparison.Ordinal))
+                    {
+                        _options.PatchProperty(element, next.ElementTag!, name, previousValue, nextValue, elementNamespace);
+                    }
+                }
+            }
+        }
+        if ((patchFlag & PatchFlags.Text) != 0)
+        {
+            if (!string.Equals(current.TextChildren, next.TextChildren, StringComparison.Ordinal))
+            {
+                _options.SetElementText(element, next.TextChildren ?? string.Empty);
+            }
+        }
+    }
+
+    private void PatchBlockChildren(
+        IReadOnlyList<VirtualNode> oldChildren,
+        IReadOnlyList<VirtualNode> newChildren,
+        TNode fallbackContainer,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
+    {
+        // The C# port of patchBlockChildren (renderer.ts): patch the paired dynamic descendants the
+        // block collected, never the static ones — so a tree of N static nodes with K dynamic
+        // bindings costs O(K) patch visits. Each pair resolves its container the way upstream does:
+        // the real host parent when the child may insert or move nodes (a fragment, a replaced type,
+        // or a component), otherwise the block element itself — which the patch never reads for an
+        // in-place prop/text update, so the parentNode call is skipped.
+        for (var index = 0; index < newChildren.Count; index++)
+        {
+            var oldChild = oldChildren[index];
+            var newChild = newChildren[index];
+            var container =
+                oldChild.El is not null
+                && (oldChild.Type == VirtualNodeType.Fragment
+                    || !IsSameVirtualNodeType(oldChild, newChild)
+                    || oldChild.Type == VirtualNodeType.Component)
+                    ? _options.ParentNode((TNode)oldChild.El)!
+                    : fallbackContainer;
+            Patch(oldChild, newChild, container, default, elementNamespace, parentComponent);
+        }
     }
 
     private void PatchProperties(TNode element, string elementTag, VirtualNodeProperties? previous, VirtualNodeProperties? next, string? elementNamespace)

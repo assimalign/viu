@@ -66,6 +66,18 @@ public static class VirtualNodeFactory
         PatchFlags patchFlag,
         string[]? dynamicProperties = null)
     {
+        var vnode = BuildElement(tag, properties, textChildren, patchFlag, dynamicProperties);
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
+    }
+
+    private static VirtualNode BuildElement(
+        string tag,
+        VirtualNodeProperties? properties,
+        string textChildren,
+        PatchFlags patchFlag,
+        string[]? dynamicProperties)
+    {
         ArgumentException.ThrowIfNullOrEmpty(tag);
         return new VirtualNode(VirtualNodeType.Element)
         {
@@ -96,6 +108,18 @@ public static class VirtualNodeFactory
         PatchFlags patchFlag,
         string[]? dynamicProperties = null)
     {
+        var vnode = BuildElement(tag, properties, children, patchFlag, dynamicProperties);
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
+    }
+
+    private static VirtualNode BuildElement(
+        string tag,
+        VirtualNodeProperties? properties,
+        VirtualNode?[]? children,
+        PatchFlags patchFlag,
+        string[]? dynamicProperties)
+    {
         ArgumentException.ThrowIfNullOrEmpty(tag);
         var normalizedChildren = NormalizeArrayChildren(children);
         return new VirtualNode(VirtualNodeType.Element)
@@ -113,17 +137,79 @@ public static class VirtualNodeFactory
         };
     }
 
+    /// <summary>
+    /// Opens a block so the vnodes created until the matching block factory call are collected as
+    /// its dynamic descendants (upstream: <c>openBlock</c>,
+    /// https://vuejs.org/guide/extras/rendering-mechanism.html#compiler-informed-virtual-dom). Pair
+    /// every call with a block factory — <see cref="ElementBlock(string, VirtualNodeProperties?, VirtualNode?[]?, PatchFlags, string[]?)"/>
+    /// or <see cref="FragmentBlock"/> — that closes it. Not thread-safe (single-threaded JS
+    /// event-loop model).
+    /// </summary>
+    /// <param name="disableTracking">
+    /// True for v-once content whose descendants are created once and never collected.
+    /// </param>
+    public static void OpenBlock(bool disableTracking = false) => BlockStack.OpenBlock(disableTracking);
+
+    /// <summary>
+    /// Suspends or resumes block-tree tracking (upstream: <c>setBlockTracking</c>): a v-once
+    /// expression brackets its cached content with <c>SetBlockTracking(-1)</c> then
+    /// <c>SetBlockTracking(1)</c> so the content is not collected as a dynamic child.
+    /// </summary>
+    /// <param name="value">-1 suspends collection; +1 resumes it.</param>
+    public static void SetBlockTracking(int value) => BlockStack.SetBlockTracking(value);
+
+    /// <summary>
+    /// Creates a block element vnode whose <see cref="VirtualNode.DynamicChildren"/> are the dynamic
+    /// descendants collected since <see cref="OpenBlock"/> (upstream: <c>createElementBlock</c>); the
+    /// renderer patches only those descendants on update, skipping the static subtree.
+    /// </summary>
+    /// <param name="tag">The element tag.</param>
+    /// <param name="properties">The properties, or null.</param>
+    /// <param name="children">The children; null entries become comment placeholders.</param>
+    /// <param name="patchFlag">The compiler patch hint for this element's own props.</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode ElementBlock(
+        string tag,
+        VirtualNodeProperties? properties,
+        VirtualNode?[]? children,
+        PatchFlags patchFlag = default,
+        string[]? dynamicProperties = null)
+        => BlockStack.CloseBlockAndSetup(BuildElement(tag, properties, children, patchFlag, dynamicProperties));
+
+    /// <summary>
+    /// Creates a block element vnode with text children whose
+    /// <see cref="VirtualNode.DynamicChildren"/> are the dynamic descendants collected since
+    /// <see cref="OpenBlock"/> (upstream: <c>createElementBlock</c>).
+    /// </summary>
+    /// <param name="tag">The element tag.</param>
+    /// <param name="properties">The properties, or null.</param>
+    /// <param name="textChildren">The text content.</param>
+    /// <param name="patchFlag">The compiler patch hint for this element's own props.</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode ElementBlock(
+        string tag,
+        VirtualNodeProperties? properties,
+        string textChildren,
+        PatchFlags patchFlag = default,
+        string[]? dynamicProperties = null)
+        => BlockStack.CloseBlockAndSetup(BuildElement(tag, properties, textChildren, patchFlag, dynamicProperties));
+
     /// <summary>Creates a text vnode (upstream: <c>createTextVNode</c>).</summary>
     /// <param name="content">The text content.</param>
     /// <param name="patchFlag">
     /// The compiler hint — <see cref="PatchFlags.Text"/> when the content is a dynamic expression.
     /// </param>
     public static VirtualNode Text(string content, PatchFlags patchFlag = default)
-        => new(VirtualNodeType.Text)
+    {
+        var vnode = new VirtualNode(VirtualNodeType.Text)
         {
             TextChildren = content ?? string.Empty,
             PatchFlag = patchFlag,
         };
+        // Dynamic text (PatchFlags.Text) is a collected block child (upstream createTextVNode).
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
+    }
 
     /// <summary>Creates a comment vnode (upstream: <c>createCommentVNode</c>).</summary>
     /// <param name="content">The comment text.</param>
@@ -176,7 +262,7 @@ public static class VirtualNodeFactory
         string[]? dynamicProperties)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        return new VirtualNode(VirtualNodeType.Component)
+        var vnode = new VirtualNode(VirtualNodeType.Component)
         {
             ComponentType = definition,
             Properties = properties,
@@ -186,6 +272,10 @@ public static class VirtualNodeFactory
             PatchFlag = patchFlag,
             DynamicProperties = dynamicProperties,
         };
+        // A component is always collected into the enclosing block (upstream: shapeFlag & COMPONENT):
+        // it must persist its instance to the next vnode even when its own props do not change.
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
     }
 
     /// <summary>
@@ -217,7 +307,7 @@ public static class VirtualNodeFactory
                 ? SlotFlags.Stable
                 : SlotFlags.Dynamic;
         }
-        return new VirtualNode(VirtualNodeType.Component)
+        var vnode = new VirtualNode(VirtualNodeType.Component)
         {
             ComponentType = definition,
             Properties = properties,
@@ -230,6 +320,9 @@ public static class VirtualNodeFactory
             PatchFlag = patchFlag,
             DynamicProperties = dynamicProperties,
         };
+        // A component is always collected into the enclosing block (upstream: shapeFlag & COMPONENT).
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
     }
 
     /// <summary>
@@ -309,6 +402,27 @@ public static class VirtualNodeFactory
     /// <see cref="PatchFlags.KeyedFragment"/>, or <see cref="PatchFlags.UnkeyedFragment"/>).
     /// </param>
     public static VirtualNode Fragment(VirtualNode?[]? children, object? key, PatchFlags patchFlag = default)
+    {
+        var vnode = BuildFragment(children, key, patchFlag);
+        // A flagged fragment (keyed/unkeyed/stable v-for) is a collected block child; a plain
+        // fragment (patchFlag 0, e.g. RenderSlot's output) is not, keeping slot behavior identical.
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
+    }
+
+    /// <summary>
+    /// Creates a block fragment vnode whose <see cref="VirtualNode.DynamicChildren"/> are the
+    /// dynamic descendants collected since <see cref="OpenBlock"/> (upstream: <c>createBlock</c> over
+    /// the <c>Fragment</c> type). A stable fragment with a block tree patches only those descendants
+    /// positionally, never through the keyed diff.
+    /// </summary>
+    /// <param name="children">The children; null entries become comment placeholders.</param>
+    /// <param name="key">The diffing key, or null.</param>
+    /// <param name="patchFlag">The compiler hint (typically <see cref="PatchFlags.StableFragment"/>).</param>
+    public static VirtualNode FragmentBlock(VirtualNode?[]? children, object? key = null, PatchFlags patchFlag = default)
+        => BlockStack.CloseBlockAndSetup(BuildFragment(children, key, patchFlag));
+
+    private static VirtualNode BuildFragment(VirtualNode?[]? children, object? key, PatchFlags patchFlag)
         => new(VirtualNodeType.Fragment)
         {
             Key = key,

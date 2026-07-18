@@ -96,11 +96,13 @@ public sealed class VirtualNode
     public string[]? DynamicProperties { get; internal init; }
 
     /// <summary>
-    /// The block's dynamic descendants collected by the block tree (upstream:
-    /// <c>dynamicChildren</c>). Populated once block-tree fast paths land ([V01.01.03.15]);
-    /// the field exists now so compiled vnodes round-trip.
+    /// The block's dynamic descendants, collected by the block tree and flattened across static
+    /// depth (upstream: <c>dynamicChildren</c>, set by <c>setupBlock</c>). Non-null marks this
+    /// vnode as a block: the renderer patches only these nodes and skips the static subtree
+    /// (<see cref="Renderer{TNode}"/>'s <c>PatchBlockChildren</c>, [V01.01.03.15]). A block with
+    /// no dynamic descendants carries an empty list, not null.
     /// </summary>
-    public IList<VirtualNode>? DynamicChildren { get; set; }
+    public IReadOnlyList<VirtualNode>? DynamicChildren { get; internal set; }
 
     /// <summary>
     /// The platform node this vnode is mounted to (upstream: <c>el</c>). Renderer-owned; the
