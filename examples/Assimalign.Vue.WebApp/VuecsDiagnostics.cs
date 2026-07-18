@@ -35,6 +35,7 @@ internal static class VuecsDiagnostics
 
         RunHandleLifecycleStress(renderer, rootHandle, report);
         RunApplicationLifecycleStress(rootHandle, report);
+        RunApplicationLifecycleStress(rootHandle, report, useCommandBuffer: true);
         RunMarshalingBenchmark(report);
 
         renderer.Render(
@@ -69,16 +70,19 @@ internal static class VuecsDiagnostics
         report.AppendLine();
     }
 
-    private static void RunApplicationLifecycleStress(int rootHandle, StringBuilder report)
+    private static void RunApplicationLifecycleStress(int rootHandle, StringBuilder report, bool useCommandBuffer = false)
     {
         // The [V01.01.04.04] criterion: CreateApp/Mount/Unmount cycles — with component
         // lifecycles, props, emits, and timers — return the bridge registry to its pre-mount
-        // baseline.
+        // baseline. Run once in direct mode and once with the interop command buffer
+        // ([V01.01.04.05]): buffered mode must clean up handles and listeners identically — every
+        // create/insert/remove flows through the batched apply, and released handles come back from
+        // the single apply call to purge the invoker registry.
         var baseline = BrowserRuntime.GetRegistryDiagnostics();
         var peakNodes = 0;
         for (var iteration = 0; iteration < 25; iteration++)
         {
-            var application = BrowserRuntime.CreateApp(new StopwatchApplication());
+            var application = BrowserRuntime.CreateApp(new StopwatchApplication(), useCommandBuffer: useCommandBuffer);
             application.Mount(rootHandle);
             var during = BrowserRuntime.GetRegistryDiagnostics();
             peakNodes = Math.Max(peakNodes, during.JsNodes);
@@ -86,7 +90,7 @@ internal static class VuecsDiagnostics
         }
         var after = BrowserRuntime.GetRegistryDiagnostics();
         var passed = after == baseline;
-        report.AppendLine("APPLICATION LIFECYCLE STRESS (CreateApp/Mount/Unmount)");
+        report.AppendLine($"APPLICATION LIFECYCLE STRESS (CreateApp/Mount/Unmount, {(useCommandBuffer ? "BUFFERED" : "direct")} mode)");
         report.AppendLine($"  cycles: 25 x component tree (root + child, listeners, timers)");
         report.AppendLine($"  baseline: nodes={baseline.JsNodes} listenerMaps={baseline.JsListenerMaps} dotnetListeners={baseline.DotnetListeners}");
         report.AppendLine($"  peak:     nodes={peakNodes}");
