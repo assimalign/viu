@@ -79,8 +79,20 @@ internal static class BrowserNodeOperations
         },
     };
 
+    /// <summary>
+    /// Overrides the invoker registry the single <c>[JSExport]</c> dispatch entry
+    /// (<see cref="BrowserEventDispatch"/>) routes to. Buffered mode ([V01.01.04.05]) sets this to its
+    /// own registry — whose add/remove callbacks encode listener ops into the command buffer rather
+    /// than call the bridge directly — so a live event reaches the handlers registered on the buffered
+    /// renderer. Null selects the direct-path registry. Ambient static (single active renderer per
+    /// process, single-threaded JS event-loop model).
+    /// </summary>
+    internal static Func<int, bool, BrowserEvent, int>? OverrideDispatcher;
+
     internal static int DispatchEvent(int nodeHandle, bool capture, BrowserEvent browserEvent)
-        => Invokers.Dispatch(nodeHandle, capture, browserEvent);
+        => OverrideDispatcher is { } dispatcher
+            ? dispatcher(nodeHandle, capture, browserEvent)
+            : Invokers.Dispatch(nodeHandle, capture, browserEvent);
 
     /// <summary>Clears an element's content (pre-mount container reset), purging released handles.</summary>
     internal static void ClearElement(int nodeHandle)

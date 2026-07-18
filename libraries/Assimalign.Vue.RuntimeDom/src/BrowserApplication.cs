@@ -19,10 +19,12 @@ namespace Assimalign.Vue.RuntimeDom;
 public sealed class BrowserApplication
 {
     private readonly VueApplication<int> _application;
+    private readonly BufferedBrowserNodeOperations? _bufferedOperations;
 
-    internal BrowserApplication(VueApplication<int> application)
+    internal BrowserApplication(VueApplication<int> application, BufferedBrowserNodeOperations? bufferedOperations = null)
     {
         _application = application;
+        _bufferedOperations = bufferedOperations;
     }
 
     /// <summary>Whether the app is currently mounted.</summary>
@@ -164,6 +166,10 @@ public sealed class BrowserApplication
     {
         if (!_application.IsMounted)
         {
+            // The container is a foreign node the bridge registered (a QuerySelector result); fold its
+            // handle into the buffered handle counter so a buffered create never reuses it. Harmless
+            // in direct mode (no buffered operations).
+            _bufferedOperations?.ObserveForeignHandle(containerHandle);
             // Non-hydrating client mount clears existing container content (upstream parity);
             // one interop call that also releases any registered child handles.
             BrowserRuntime.ClearContainer(containerHandle);
@@ -174,7 +180,12 @@ public sealed class BrowserApplication
     /// <summary>
     /// Unmounts the app (upstream: <c>app.unmount()</c>): runs component teardown lifecycles,
     /// removes the rendered DOM, and releases every JS-side handle and listener the app
-    /// created.
+    /// created. In buffered mode the teardown mutations commit through the command buffer before the
+    /// buffered operations are detached from the ambient scheduler/dispatch seams.
     /// </summary>
-    public void Unmount() => _application.Unmount();
+    public void Unmount()
+    {
+        _application.Unmount();
+        _bufferedOperations?.Deactivate();
+    }
 }
