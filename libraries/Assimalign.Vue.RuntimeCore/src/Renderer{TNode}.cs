@@ -39,6 +39,14 @@ public sealed class Renderer<TNode>
     /// </summary>
     internal static int PatchVisitCount;
 
+    /// <summary>
+    /// Test seam: counts every <see cref="Unmount"/> entry so a block-unmount test can pin that
+    /// tearing down a tree of N static nodes with K dynamic descendants visits O(K) vnodes, not O(N) —
+    /// the dynamicChildren fast path (issue [V01.01.03.15.01]). Reset it before the unmount under test.
+    /// Ambient static, single-threaded.
+    /// </summary>
+    internal static int UnmountVisitCount;
+
     private readonly RendererOptions<TNode> _options;
     private readonly Dictionary<TNode, VirtualNode> _containerRoots = new(NodeComparer);
 
@@ -63,7 +71,8 @@ public sealed class Renderer<TNode>
         {
             if (current is not null)
             {
-                Unmount(current, doRemove: true);
+                // Root unmount: no owning component instance for error routing (upstream: null).
+                Unmount(current, parentComponent: null, doRemove: true);
                 _containerRoots.Remove(container);
             }
         }
@@ -122,7 +131,7 @@ public sealed class Renderer<TNode>
         {
             // Mismatched type: unmount and remount in place (upstream parity).
             anchor = GetNextHostNode(current);
-            Unmount(current, doRemove: true);
+            Unmount(current, parentComponent, doRemove: true);
             current = null;
         }
         switch (next.Type)
@@ -808,7 +817,8 @@ public sealed class Renderer<TNode>
         instance.Scope.Stop();
         if (instance.Subtree is not null)
         {
-            Unmount(instance.Subtree, doRemove);
+            // The subtree's owner is this instance (upstream: unmount(subTree, instance, ...)).
+            Unmount(instance.Subtree, instance, doRemove);
         }
         instance.IsUnmounted = true;
         QueueInstanceHooks(instance, LifecycleHookKind.Unmounted);
@@ -841,7 +851,7 @@ public sealed class Renderer<TNode>
         {
             if ((previousShape & ShapeFlags.ArrayChildren) != 0)
             {
-                UnmountChildren(current.ArrayChildren!, doRemove: true);
+                UnmountChildren(current.ArrayChildren!, parentComponent, doRemove: true);
             }
             if ((previousShape & ShapeFlags.TextChildren) == 0
                 || !string.Equals(current.TextChildren, next.TextChildren, StringComparison.Ordinal))
@@ -867,7 +877,7 @@ public sealed class Renderer<TNode>
             }
             else
             {
-                UnmountChildren(current.ArrayChildren!, doRemove: true);
+                UnmountChildren(current.ArrayChildren!, parentComponent, doRemove: true);
             }
         }
         else
@@ -902,7 +912,7 @@ public sealed class Renderer<TNode>
         }
         if (previousChildren.Length > nextChildren.Length)
         {
-            UnmountChildren(previousChildren, doRemove: true, startIndex: commonLength);
+            UnmountChildren(previousChildren, parentComponent, doRemove: true, startIndex: commonLength);
         }
         else
         {
@@ -975,7 +985,7 @@ public sealed class Renderer<TNode>
             // 4. common sequence + unmount: the new run is exhausted, so unmount the extra old nodes.
             while (i <= e1)
             {
-                Unmount(previousChildren[i], doRemove: true);
+                Unmount(previousChildren[i], parentComponent, doRemove: true);
                 i++;
             }
         }
@@ -1049,7 +1059,7 @@ public sealed class Renderer<TNode>
                 if (patched >= toBePatched)
                 {
                     // Every new node is already matched, so any remaining old node is a removal.
-                    Unmount(previousChild, doRemove: true);
+                    Unmount(previousChild, parentComponent, doRemove: true);
                     continue;
                 }
                 var newIndex = -1;
@@ -1074,7 +1084,7 @@ public sealed class Renderer<TNode>
                 }
                 if (newIndex < 0)
                 {
-                    Unmount(previousChild, doRemove: true);
+                    Unmount(previousChild, parentComponent, doRemove: true);
                 }
                 else
                 {
@@ -1263,23 +1273,37 @@ public sealed class Renderer<TNode>
         }
     }
 
-    private void UnmountChildren(VirtualNode[] children, bool doRemove, int startIndex = 0)
+    private void UnmountChildren(
+        IReadOnlyList<VirtualNode> children,
+        ComponentInstance? parentComponent,
+        bool doRemove,
+        bool optimized = false,
+        int startIndex = 0)
     {
-        for (var index = startIndex; index < children.Length; index++)
+        // The C# port of unmountChildren (renderer.ts): tear down each child, threading the owner so a
+        // throwing function template-ref routes through its error-capture chain, and the optimized flag
+        // so a block's dynamic descendants do not re-walk their own static children.
+        for (var index = startIndex; index < children.Count; index++)
         {
-            Unmount(children[index], doRemove);
+            Unmount(children[index], parentComponent, doRemove, optimized);
         }
     }
 
-    private void Unmount(VirtualNode node, bool doRemove)
+    private void Unmount(VirtualNode node, ComponentInstance? parentComponent, bool doRemove, bool optimized = false)
     {
+        UnmountVisitCount++;
+        // A Bail vnode forces the full, unoptimized children walk on teardown (upstream unmount:
+        // `if (patchFlag === PatchFlags.BAIL) optimized = false`).
+        if (node.PatchFlag == PatchFlags.Bail)
+        {
+            optimized = false;
+        }
         // Unset any template ref first (upstream unmount order: setRef with isUnmount before the
-        // node's teardown hooks). No owner instance is threaded through unmount, so a throwing
-        // function ref surfaces to the host — an acceptable simplification, since clearing sets null
-        // or drops from a collection and does not normally throw.
+        // node's teardown hooks). parentComponent is the owner, so a throwing function ref routes
+        // through its error-capture chain instead of surfacing to the host ([V01.01.03.15.01]).
         if (node.Reference is { } reference)
         {
-            SetReference(reference, oldReference: null, node, isUnmount: true, owner: null);
+            SetReference(reference, oldReference: null, node, isUnmount: true, parentComponent);
         }
         // Cleanup order (upstream parity): hooks and child teardown run before node removal.
         InvokeHook(node, null, "onVnodeBeforeUnmount");
@@ -1289,38 +1313,58 @@ public sealed class Renderer<TNode>
         {
             InvokeDirectiveHooks(node, null, DirectiveHookKind.BeforeUnmount);
         }
-        switch (node.Type)
+        if (node.Type == VirtualNodeType.Component)
         {
-            case VirtualNodeType.Component:
-                UnmountComponent(node, doRemove);
-                break;
-            case VirtualNodeType.Fragment:
-                // Children tear down without individual removals; the fragment range removal
-                // below takes their nodes out in one anchored walk.
-                UnmountChildren(node.ArrayChildren ?? [], doRemove: false);
-                if (doRemove)
+            UnmountComponent(node, doRemove);
+        }
+        else
+        {
+            var dynamicChildren = node.DynamicChildren;
+            if (dynamicChildren is not null
+                && !node.HasOnce
+                && (node.Type != VirtualNodeType.Fragment
+                    || ((int)node.PatchFlag > 0 && (node.PatchFlag & PatchFlags.StableFragment) != 0)))
+            {
+                // Fast path for block nodes: tear down only the collected dynamic descendants — the
+                // static subtree leaves with the host removal below, so on WASM every skipped visit is
+                // a skipped interop round-trip. Their own static children are not re-walked
+                // (optimized: true). A v-once block (HasOnce) and a non-stable (v-for) fragment are
+                // excluded because their teardown-relevant descendants are absent from DynamicChildren
+                // (upstream #5154 / #1153).
+                UnmountChildren(dynamicChildren, parentComponent, doRemove: false, optimized: true);
+            }
+            else if ((node.Type == VirtualNodeType.Fragment
+                    && (int)node.PatchFlag > 0
+                    && (node.PatchFlag & (PatchFlags.KeyedFragment | PatchFlags.UnkeyedFragment)) != 0)
+                || (!optimized && (node.ShapeFlag & ShapeFlags.ArrayChildren) != 0))
+            {
+                // Full walk: a keyed/unkeyed v-for fragment, or any unoptimized array-children vnode,
+                // visits every child so their teardown hooks and refs fire. Their platform nodes leave
+                // with the range/host removal below (doRemove: false here). The `> 0` gate keeps the
+                // fragment test off the negative Bail/Cached sentinels (repo PatchFlags convention).
+                UnmountChildren(node.ArrayChildren ?? [], parentComponent, doRemove: false);
+            }
+            if (doRemove)
+            {
+                switch (node.Type)
                 {
-                    RemoveFragment(node);
+                    case VirtualNodeType.Fragment:
+                        // One anchored walk removes the fragment's whole owned range.
+                        RemoveFragment(node);
+                        break;
+                    case VirtualNodeType.Static:
+                        RemoveStaticNode(node);
+                        break;
+                    default:
+                        // Element/Text/Comment: a single host removal takes the node and, for an
+                        // element, its descendants' platform nodes with it.
+                        if (node.El is not null)
+                        {
+                            _options.Remove((TNode)node.El);
+                        }
+                        break;
                 }
-                break;
-            case VirtualNodeType.Static:
-                if (doRemove)
-                {
-                    RemoveStaticNode(node);
-                }
-                break;
-            default:
-                if (node.Type == VirtualNodeType.Element && node.ArrayChildren is not null)
-                {
-                    // Walk children for their teardown hooks; their platform nodes leave with
-                    // this element's single removal.
-                    UnmountChildren(node.ArrayChildren, doRemove: false);
-                }
-                if (doRemove && node.El is not null)
-                {
-                    _options.Remove((TNode)node.El);
-                }
-                break;
+            }
         }
         QueuePostHook(node, null, "onVnodeUnmounted");
         if (node.Type == VirtualNodeType.Element)

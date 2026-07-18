@@ -256,4 +256,49 @@ public class TemplateReferenceTests : IDisposable
         node.Reference.ShouldBeNull();
         warnings.Messages.ShouldContain(message => message.Contains("Invalid template ref"));
     }
+
+    [Fact]
+    public void FunctionRefThrowingOnUnmount_RoutesThroughTheOwnersErrorChain()
+    {
+        // Upstream setRef routes a throwing function ref through callWithErrorHandling with the owning
+        // component as context. Vuecs now threads parentComponent through unmount, so an unmount-time
+        // throw reaches the owner's OnErrorCaptured chain instead of surfacing to the host — previously
+        // the unmount path passed owner: null and the throw escaped ([V01.01.03.15.01]).
+        Exception? captured = null;
+        string? capturedInfo = null;
+        Action<object?> throwingRef = value =>
+        {
+            if (value is null)
+            {
+                throw new InvalidOperationException("ref teardown boom");
+            }
+        };
+        var child = new TestComponent
+        {
+            SetupFunction = (_, _) => () => VirtualNodeFactory.Element(
+                "div", VirtualNodeFactory.Properties(("ref", throwingRef)), "x"),
+        };
+        var parent = new TestComponent
+        {
+            SetupFunction = (_, _) =>
+            {
+                Lifecycle.OnErrorCaptured((exception, _, info) =>
+                {
+                    captured = exception;
+                    capturedInfo = info;
+                    return false; // handled
+                });
+                return () => VirtualNodeFactory.Element("section", VirtualNodeFactory.Component(child));
+            },
+        };
+
+        _renderer.Render(VirtualNodeFactory.Component(parent), _container); // mount: ref(element), no throw
+
+        // Unmount invokes the function ref with null (synchronous doSet); it throws and must be captured.
+        Should.NotThrow(() => _renderer.Render(null, _container));
+
+        captured.ShouldBeOfType<InvalidOperationException>().Message.ShouldBe("ref teardown boom");
+        capturedInfo.ShouldNotBeNull();
+        capturedInfo.ShouldContain("template ref");
+    }
 }
