@@ -43,16 +43,36 @@ public static class BrowserRuntime
     /// <c>createApp(rootComponent)</c>, https://vuejs.org/api/application.html) —
     /// <c>BrowserRuntime.CreateApp(root).Mount("#app")</c> is a Vuecs WASM app's whole
     /// bootstrap ([V01.01.04.04]).
+    /// <para>
+    /// Set <paramref name="useCommandBuffer"/> to run the renderer over the interop command buffer
+    /// ([V01.01.04.05]): node-ops serialize into a shared binary frame that a single interop call
+    /// applies per scheduler flush instead of one call per mutation. It is behaviorally invisible —
+    /// buffered and direct modes produce byte-identical DOM — and is a construction-time choice the
+    /// renderer and RuntimeCore see through the identical adapter. Default is direct; buffered is
+    /// opt-in for this delivery.
+    /// </para>
     /// </summary>
     /// <param name="rootComponent">The root component definition.</param>
     /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <param name="useCommandBuffer">Whether to batch node-ops through the command buffer.</param>
     /// <returns>The app; mount it by selector or handle.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
     /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
-    public static BrowserApplication CreateApp(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    public static BrowserApplication CreateApp(
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties = null,
+        bool useCommandBuffer = false)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         EnsureInitialized();
+        if (useCommandBuffer)
+        {
+            var bufferedOperations = BufferedBrowserNodeOperations.CreateProduction();
+            var bufferedRenderer = RendererFactory.CreateRenderer(bufferedOperations.Create());
+            return new BrowserApplication(
+                bufferedRenderer.CreateApplication(rootComponent, rootProperties),
+                bufferedOperations);
+        }
         var renderer = RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
         return new BrowserApplication(renderer.CreateApplication(rootComponent, rootProperties));
     }
