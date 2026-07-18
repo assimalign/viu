@@ -25,6 +25,7 @@ public class SchedulerTests : IDisposable
 
     public void Dispose()
     {
+        Scheduler.FlushBoundaryCallback = null;
         Scheduler.Reset();
         _pump.Dispose();
     }
@@ -85,6 +86,56 @@ public class SchedulerTests : IDisposable
         _pump.RunUntilIdle();
 
         order.ShouldBe(["pre", "render", "post"]);
+    }
+
+    // The interop command-buffer seam ([V01.01.04.05]): the boundary callback commits batched DOM
+    // mutations after the render queue drains and before post-flush (mounted/updated) callbacks,
+    // which may read the DOM.
+    [Fact]
+    public void FlushBoundaryCallback_FiresOnce_AfterRenderJobs_BeforePostFlushCallbacks()
+    {
+        var order = new List<string>();
+        var boundaryRuns = 0;
+        Scheduler.FlushBoundaryCallback = () =>
+        {
+            boundaryRuns++;
+            order.Add("boundary");
+        };
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() => order.Add("post")));
+        Scheduler.QueueJob(new SchedulerJob(() => order.Add("render")) { Identifier = 1 });
+
+        _pump.RunUntilIdle();
+
+        order.ShouldBe(["render", "boundary", "post"]);
+        boundaryRuns.ShouldBe(1); // exactly one commit per flush, regardless of op count
+    }
+
+    // The buffered batch must commit even when nothing observes it afterwards — otherwise a
+    // reactive update with no lifecycle hooks would never reach the DOM.
+    [Fact]
+    public void FlushBoundaryCallback_FiresEvenWithNoPostFlushCallbacks()
+    {
+        var boundaryRuns = 0;
+        Scheduler.FlushBoundaryCallback = () => boundaryRuns++;
+        Scheduler.QueueJob(new SchedulerJob(static () => { }) { Identifier = 1 });
+
+        _pump.RunUntilIdle();
+
+        boundaryRuns.ShouldBe(1);
+    }
+
+    // The synchronous post-render drain (a direct Render / app mount) also commits its batch, so a
+    // mounted hook reading the DOM sees the committed tree.
+    [Fact]
+    public void FlushBoundaryCallback_FiresOnSynchronousRenderDrain_BeforePostFlush()
+    {
+        var order = new List<string>();
+        Scheduler.FlushBoundaryCallback = () => order.Add("boundary");
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() => order.Add("post")));
+
+        Scheduler.FlushAfterSynchronousRender();
+
+        order.ShouldBe(["boundary", "post"]);
     }
 
     [Fact]

@@ -43,6 +43,22 @@ public static class Scheduler
     /// </summary>
     internal static Action<Action>? FlushDispatcher;
 
+    /// <summary>
+    /// Platform seam invoked exactly once per flush, immediately after the pre/render job queue
+    /// drains and <em>before</em> post-flush callbacks run. It exists for
+    /// <c>Assimalign.Vue.RuntimeDom</c>'s interop command buffer ([V01.01.04.05]): buffered node-ops
+    /// accumulate DOM mutations during the drain and this seam is where the single batched interop
+    /// call applies them. The boundary is deliberate — post-flush callbacks are the mounted/updated
+    /// lifecycle phase, and that user code may read the DOM (layout, template refs), so the buffer
+    /// must be committed before it runs. Fires on both the scheduled flush and the synchronous
+    /// post-render drain (<see cref="FlushAfterSynchronousRender"/>) so a direct <c>Render</c>/mount
+    /// commits its batch too; a nested synchronous render inside an active scheduled flush is covered
+    /// by the outer flush, never double-applied. Owner-managed like <see cref="FlushDispatcher"/>
+    /// (armed by the buffered renderer, cleared on teardown); direct-mode hosts leave it null and pay
+    /// nothing. Ambient static, single-threaded — NOT thread-safe.
+    /// </summary>
+    internal static Action? FlushBoundaryCallback;
+
     /// <summary>Whether a flush is executing right now.</summary>
     public static bool IsFlushing => _isFlushing;
 
@@ -194,6 +210,9 @@ public static class Scheduler
             return;
         }
         FlushPreFlushCallbacks();
+        // Commit batched interop mutations from this synchronous render (mount / direct Render)
+        // before its post-flush callbacks run. See FlushBoundaryCallback.
+        FlushBoundaryCallback?.Invoke();
         FlushPostFlushCallbacks();
         if (_isFlushPending && _queue.Count == 0 && _pendingPostFlushCallbacks.Count == 0)
         {
@@ -312,6 +331,9 @@ public static class Scheduler
             }
             _queue.Clear();
             _flushIndex = -1;
+            // Commit any batched interop mutations before post-flush (mounted/updated) callbacks,
+            // which may read the DOM. See FlushBoundaryCallback.
+            FlushBoundaryCallback?.Invoke();
             FlushPostFlushCallbacks();
             _isFlushing = false;
             if (_queue.Count > 0 || _pendingPostFlushCallbacks.Count > 0)
