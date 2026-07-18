@@ -132,6 +132,18 @@
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/test/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeDom/test/Assimalign.Vue.RuntimeDom.Tests.csproj" />
 	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Sfc/">
+		<File Path="libraries/Assimalign.Vue.Sfc/Assimalign.Vue.Sfc.slnx" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Sfc/docs/">
+		<File Path="libraries/Assimalign.Vue.Sfc/docs/FORMAT.md" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Sfc/src/">
+		<Project Path="libraries/Assimalign.Vue.Sfc/src/Assimalign.Vue.Sfc.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Sfc/test/">
+		<Project Path="libraries/Assimalign.Vue.Sfc/test/Assimalign.Vue.Sfc.Tests.csproj" />
+	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/src/">
 		<Project Path="libraries/Assimalign.Vue.Shared/src/Assimalign.Vue.Shared.csproj" />

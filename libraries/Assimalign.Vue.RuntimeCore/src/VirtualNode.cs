@@ -106,6 +106,16 @@ public sealed class VirtualNode
     public IReadOnlyList<VirtualNode>? DynamicChildren { get; internal set; }
 
     /// <summary>
+    /// Whether this block wraps <c>v-once</c> content whose descendants were <b>not</b> collected into
+    /// <see cref="DynamicChildren"/> (upstream: <c>dynamicChildren.hasOnce</c>, set when
+    /// <c>setBlockTracking(-1, true)</c> marks <c>currentBlock.hasOnce</c> — vuejs/core#5154). When set,
+    /// the renderer must <b>not</b> take the block unmount fast path: a component nested in the
+    /// suspended-collection content is absent from <see cref="DynamicChildren"/> and would otherwise
+    /// never be torn down (<see cref="Renderer{TNode}"/>'s <c>Unmount</c>, [V01.01.03.15.01]).
+    /// </summary>
+    internal bool HasOnce { get; set; }
+
+    /// <summary>
     /// The platform node this vnode is mounted to (upstream: <c>el</c>). Renderer-owned; the
     /// boxed <c>TNode</c> of the active renderer.
     /// </summary>
