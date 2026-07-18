@@ -13,7 +13,7 @@ namespace Assimalign.Vue.Syntax;
 /// generators' internal <c>EquatableArray&lt;T&gt;</c> helper.
 /// </summary>
 /// <typeparam name="T">The element type, a reference type with its own value equality (a parse record).</typeparam>
-public readonly struct SyntaxList<T> : IReadOnlyList<T>, IEquatable<SyntaxList<T>> where T : SyntaxNode
+public readonly struct SyntaxList<T> : IReadOnlyList<T>, IEquatable<SyntaxList<T>> where T : class
 {
     /// <summary>The empty list.</summary>
     public static readonly SyntaxList<T> Empty = new(Array.Empty<T>());
@@ -60,9 +60,12 @@ public readonly struct SyntaxList<T> : IReadOnlyList<T>, IEquatable<SyntaxList<T
     /// <inheritdoc />
     public override int GetHashCode()
     {
+        // A default list equals Empty (Equals normalizes null to an empty array), so it must hash
+        // like Empty too — returning a different value here would put equal values in different
+        // hash buckets and silently defeat hash-keyed incremental caches.
         if (items is null)
         {
-            return 0;
+            return 17;
         }
 
         var hash = 17;

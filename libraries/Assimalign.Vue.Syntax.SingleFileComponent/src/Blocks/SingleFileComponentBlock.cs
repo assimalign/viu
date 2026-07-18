@@ -35,6 +35,9 @@ public abstract record SingleFileComponentBlock : SyntaxNode
     /// <summary>The block kind discriminator.</summary>
     public abstract SingleFileComponentBlockKind Kind { get; }
 
+    /// <inheritdoc />
+    public sealed override int RawKind => (int)Kind;
+
     /// <summary>
     /// The <c>lang</c> option's value, or <see langword="null"/> when absent. Mirrors Vue's block
     /// <c>lang</c> attribute (e.g. <c>@style lang="scss"</c>, <c>@script lang="csharp"</c>).

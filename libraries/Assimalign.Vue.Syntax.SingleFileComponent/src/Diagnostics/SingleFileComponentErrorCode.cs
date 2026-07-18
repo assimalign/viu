@@ -2,7 +2,7 @@ namespace Assimalign.Vue.Syntax.SingleFileComponent;
 
 /// <summary>
 /// The catalog of diagnostic codes the <c>.viu</c> block parser emits. Unlike
-/// <c>Assimalign.Vue.Syntax.Compiler</c>'s <c>CompilerErrorCode</c> — whose numbering mirrors vuejs/core's
+/// <c>Assimalign.Vue.Syntax.Templates</c>'s <c>CompilerErrorCode</c> — whose numbering mirrors vuejs/core's
 /// <c>ErrorCodes</c> — these are <b>Vuecs-defined</b> codes with no upstream counterpart: the
 /// <c>@name { }</c> container is a Vuecs divergence, so its structural diagnostics have no vuejs/core
 /// numbering to align to. Values start at 1000 to stay visibly distinct from any upstream-aligned

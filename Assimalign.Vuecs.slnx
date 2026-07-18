@@ -99,22 +99,47 @@
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/">
 		<File Path="libraries/Assimalign.Vue.Syntax/Assimalign.Vue.Syntax.slnx" />
 	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/docs/">
+		<File Path="libraries/Assimalign.Vue.Syntax/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Vue.Syntax/docs/OVERVIEW.md" />
+	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/src/">
 		<Project Path="libraries/Assimalign.Vue.Syntax/src/Assimalign.Vue.Syntax.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/test/">
 		<Project Path="libraries/Assimalign.Vue.Syntax/test/Assimalign.Vue.Syntax.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/" />
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/src/">
-		<Project Path="libraries/Assimalign.Vue.Syntax.Compiler/src/Assimalign.Vue.Syntax.Compiler.csproj" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Css/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Css/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Css/src/Assimalign.Vue.Syntax.Css.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/test/">
-		<Project Path="libraries/Assimalign.Vue.Syntax.Compiler/test/Assimalign.Vue.Syntax.Compiler.Tests.csproj" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Css/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Css/test/Assimalign.Vue.Syntax.Css.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/tools/">
-		<File Path="libraries/Assimalign.Vue.Syntax.Compiler/tools/Generate-HtmlEntities.ps1" />
-		<File Path="libraries/Assimalign.Vue.Syntax.Compiler/tools/README.md" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Html/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Html/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Html/src/Assimalign.Vue.Syntax.Html.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Html/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Html/test/Assimalign.Vue.Syntax.Html.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.JavaScript/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.JavaScript/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.JavaScript/src/Assimalign.Vue.Syntax.JavaScript.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.JavaScript/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.JavaScript/test/Assimalign.Vue.Syntax.JavaScript.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Templates/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Templates/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Templates/src/Assimalign.Vue.Syntax.Templates.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Templates/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Templates/test/Assimalign.Vue.Syntax.Templates.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Templates/tools/">
+		<File Path="libraries/Assimalign.Vue.Syntax.Templates/tools/Generate-HtmlEntities.ps1" />
+		<File Path="libraries/Assimalign.Vue.Syntax.Templates/tools/README.md" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/docs/">

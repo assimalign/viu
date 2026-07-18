@@ -1,10 +1,10 @@
-namespace Assimalign.Vue.Syntax.Diagnostics;
+namespace Assimalign.Vue.Syntax;
 
 /// <summary>
 /// The uniform diagnostic surface every <c>Assimalign.Vue.Syntax.*</c> parser exposes: a
-/// human-readable message, a source location, and an integer code. The code-generation layer that
-/// consumes parse output ([V01.01.06.02]) reads diagnostics through this base without knowing which
-/// language produced them.
+/// human-readable message, a source location, a severity, and an integer code. The code-generation
+/// layer that consumes parse output ([V01.01.06.02]) reads diagnostics through this base without
+/// knowing which language produced them.
 /// </summary>
 /// <remarks>
 /// This base deliberately unifies <em>only</em> the shape of a diagnostic. Concrete code catalogs and
@@ -23,6 +23,7 @@ public abstract record Diagnostic
     /// <summary>The source range the diagnostic points at.</summary>
     public required SourceLocation Location { get; init; }
 
+    /// <summary>The diagnostic's severity.</summary>
     public required DiagnosticSeverity Severity { get; init; }
 
     /// <summary>The diagnostic's code as an integer, projected from the derived record's enum-typed code.</summary>

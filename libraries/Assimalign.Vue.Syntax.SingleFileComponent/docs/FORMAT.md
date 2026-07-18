@@ -36,7 +36,7 @@ Only the **container** is different. The block *semantics* — what `template`/`
 blocks mean, and what their options mean — follow the Vue SFC spec unchanged. In particular, the markup
 inside `@template` is **standard Vue template syntax**; the block parser does not parse it. It only
 slices the file into blocks and records their source spans. The template markup is parsed later by the
-template compiler (`Assimalign.Vue.Syntax.Compiler`, [V01.01.05.01]); the C# in `@script` is analysed by
+template compiler (`Assimalign.Vue.Syntax.Templates`, [V01.01.05.01]); the C# in `@script` is analysed by
 [V01.01.06.03].
 
 ### Upstream-semantics mapping
@@ -218,7 +218,7 @@ never throws for bad content (a `null` source argument throws `ArgumentNullExcep
 misuse, not input). Multiple problems are reported in a single pass, each with a code, a message, and a
 source location.
 
-The diagnostic codes (`SingleFileComponentErrorCode`) are **Vuecs-defined**. Unlike `Assimalign.Vue.Syntax.Compiler`'s
+The diagnostic codes (`SingleFileComponentErrorCode`) are **Vuecs-defined**. Unlike `Assimalign.Vue.Syntax.Templates`'s
 `CompilerErrorCode`, which mirrors vuejs/core's numbering, the `@`-block container is a Vuecs divergence
 and has no upstream vuejs/core codes to align to. Values start at 1000 to stay visibly distinct from any
 upstream-aligned catalog.

@@ -4,7 +4,7 @@ namespace Assimalign.Vue.Syntax.SingleFileComponent;
 
 /// <summary>
 /// A recoverable parse diagnostic: its code, human-readable message, and source location. Modeled on
-/// <c>Assimalign.Vue.Syntax.Compiler</c>'s <c>CompilerError</c> but carrying the SingleFileComponent
+/// <c>Assimalign.Vue.Syntax.Templates</c>'s <c>CompilerError</c> but carrying the SingleFileComponent
 /// area's own <see cref="SingleFileComponentErrorCode"/> catalog. The parser reports these through
 /// <see cref="SingleFileComponentParseResult.Errors"/> and never throws for malformed input, matching
 /// Vue's recoverable-parsing model (<c>@vue/compiler-sfc</c> <c>parse().errors</c>). A
@@ -23,6 +23,9 @@ public sealed record SingleFileComponentError : Diagnostic
         Code = code;
         Message = message;
         Location = location;
+        // The whole Vuecs-defined catalog is recoverable *errors*, mirroring @vue/compiler-sfc's
+        // parse().errors; a warning tier would be a new catalog decision, not a per-instance choice.
+        Severity = DiagnosticSeverity.Error;
     }
 
     /// <summary>The diagnostic code.</summary>

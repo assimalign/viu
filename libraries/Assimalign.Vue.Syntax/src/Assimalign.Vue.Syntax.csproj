@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
          per the reviewer's architectural steer: this shared base carries the primitives (Position,
-         SourceLocation, SyntaxList, SyntaxNode, SyntaxDiagnostic) the template compiler ([V01.01.05.05])
+         SourceLocation, SyntaxList, SyntaxNode, Diagnostic) the template compiler ([V01.01.05.05])
          and single-file-component ([V01.01.06.02]) generators consume INSIDE their netstandard2.0 Roslyn
          analyzer hosts. It therefore targets the analyzer TFM alias — the same central property the
          derived parsers and the generators projects use — never a hardcoded string. Its net10.0 test

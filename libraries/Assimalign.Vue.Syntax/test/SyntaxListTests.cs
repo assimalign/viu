@@ -47,6 +47,9 @@ public class SyntaxListTests
     public void SyntaxList_EmptyEqualsDefault()
     {
         SyntaxList<Item>.Empty.ShouldBe(default);
+        // Equal values must hash equally — a default (null-backed) list and Empty land in the same
+        // hash bucket, or hash-keyed incremental caches silently miss.
+        SyntaxList<Item>.Empty.GetHashCode().ShouldBe(default(SyntaxList<Item>).GetHashCode());
     }
 
     private static SourceLocation Location(int start, int end)

@@ -5,7 +5,7 @@ namespace Assimalign.Vue.Syntax.SingleFileComponent;
 /// <summary>
 /// The human-readable messages for each <see cref="SingleFileComponentErrorCode"/>. Kept off the public surface; the
 /// parser attaches the message to each <see cref="SingleFileComponentError"/> it reports. Mirrors the shape of
-/// <c>Assimalign.Vue.Syntax.Compiler</c>'s <c>CompilerErrorMessages</c>.
+/// <c>Assimalign.Vue.Syntax.Templates</c>'s <c>CompilerErrorMessages</c>.
 /// </summary>
 internal static class SingleFileComponentErrorMessages
 {

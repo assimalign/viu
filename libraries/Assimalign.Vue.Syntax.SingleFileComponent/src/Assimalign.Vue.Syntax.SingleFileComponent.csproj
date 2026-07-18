@@ -8,7 +8,7 @@
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
     <!-- Source-generator-hosted code must target the stable analyzer surface: opt out of the repo-wide
          preview-features switch (see build/Targets/Build.TargetFramework.props) so no
-         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the Compiler csproj. -->
+         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the sibling parsers. -->
     <EnablePreviewFeatures>false</EnablePreviewFeatures>
     <!-- Deviates from the checklist rule "shipping libraries set IsAotCompatible=true": the AOT analyzers
          require net7.0+, so the switch is inert on netstandard2.0. The central libraries targets
@@ -19,7 +19,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- The shared base ([V01.01.05.09]): Position, SourceLocation, SyntaxList, SyntaxNode, and the
-         SyntaxDiagnostic surface live in Assimalign.Vue.Syntax; SingleFileComponentBlock and
+         Diagnostic surface live in Assimalign.Vue.Syntax; SingleFileComponentBlock and
          SingleFileComponentError derive from them. -->
     <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
   </ItemGroup>
