@@ -40,7 +40,7 @@ package root is **`Assimalign.Vue.*`**:
 | RuntimeCore (`V01.01.03`) | `Assimalign.Vue.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Vue.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
 | Compiler (`V01.01.05`) | `Assimalign.Vue.Compiler` (+ source generators) | `@vue/compiler-core` + `compiler-dom` |
-| Sfc (`V01.01.06`) | `Assimalign.Vue.Sfc` | `@vue/compiler-sfc` — `.vuecs` single-file components |
+| Sfc (`V01.01.06`) | `Assimalign.Vue.Sfc` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Vue.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
 | Router (`V01.01.08`) | `Assimalign.Vue.Router` | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Vue.Store` | `pinia` |
@@ -66,7 +66,7 @@ These are deliberate, recorded divergences from upstream — everything else tra
    types, not proxied BCL types. The dependency engine ports Vue 3.5's version-counter +
    doubly-linked-list design.
 3. **No runtime template compilation.** Vue's full build compiles templates with `new Function` —
-   impossible in WASM. Templates and `.vuecs` SFCs compile at build time via Roslyn source
+   impossible in WASM. Templates and `.viu` SFCs compile at build time (the `.viu` container uses `@template`/`@script`/`@style` @-block syntax — a deliberate divergence from Vue's tag-based SFC container, decided 2026-07-17, defined by `V01.01.06.01`; the markup inside `@template` remains standard Vue template syntax) via Roslyn source
    generators; that is the only path, and it is also how the tooling story (diagnostics, IDE
    integration) gets Razor-grade.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
@@ -108,10 +108,10 @@ Work is tracked exactly like the sibling Cohesion repo:
 | --- | --- | --- |
 | **W01** | Rendering foundation — shared contracts, reactivity core (deps/Ref/effect/computed/scope), VNode v2 + renderer + scheduler + render effects, hardened DOM bridge + patchProp + events, in-memory test renderer, solution restructure + CI | The stopwatch re-renders reactively (no polling) through the new pipeline, tested DOM-free |
 | **W02** | Component model — instance/setup, props, emits, slots, provide/inject, lifecycle, app API, directives, refs, dynamic components, watch, `[Reactive]` source-gen, reactive collections, LIS keyed diff, browser bootstrap, test utils | TodoMVC built from components with `h()` render functions |
-| **W03** | Compiler — template parser → transforms → C# codegen source generator, patch flags + block tree end-to-end, static hoisting, diagnostics, `.vuecs` SFC format + MSBuild, interop command buffer, v-model/v-show, size budgets | TodoMVC rewritten as `.vuecs` templates; interop calls measurably collapse |
+| **W03** | Compiler — template parser → transforms → C# codegen source generator, patch flags + block tree end-to-end, static hoisting, diagnostics, `.viu` SFC format + MSBuild, interop command buffer, v-model/v-show, size budgets | TodoMVC rewritten as `.viu` components; interop calls measurably collapse |
 | **W04** | Ecosystem — router, store, built-ins (Teleport/KeepAlive/Transition/async), scoped CSS + CSS modules, HackerNews sample, getting-started guide | HackerNews client: routed, stored, styled |
 | **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new vuecs-app` works from NuGet |
-| **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.vuecs` editor support | Docs site built by Vuecs itself |
+| **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.viu` editor support | Docs site built by Vuecs itself |
 
 ## The planned backlog
 
@@ -193,7 +193,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
-| `V01.01.06.01` | Define the .vuecs SFC file format and block parser | W03 | P003 |
+| `V01.01.06.01` | Define the .viu SFC file format (@-block syntax) and block parser | W03 | P003 |
 | `V01.01.06.02` | Integrate SFC compilation into MSBuild and the source generator | W03 | P003 |
 | `V01.01.06.03` | Implement script-block integration with partial classes | W03 | P003 |
 | `V01.01.06.04` | Implement scoped CSS compilation | W04 | P004 |
@@ -256,7 +256,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.12.04` | Create dotnet new project templates | W05 | P005 |
 | `V01.01.12.05` | Build the dev-loop experience | W05 | P005 |
 | `V01.01.12.06` | Establish WASM size and AOT budget gates | W03 | P003 |
-| `V01.01.12.07` | Build .vuecs editor support | W06 | P007 |
+| `V01.01.12.07` | Build .viu editor support | W06 | P007 |
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 
