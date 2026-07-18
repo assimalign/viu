@@ -30,15 +30,15 @@ public class ExpressionBindingTests
     {
         // upstream SETUP_REF -> `foo.value`; Vuecs uses the C# settable Ref<T>.Value.
         SingleInterpolation("{{ count }}", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("count.Value");
+            .ShouldBe("_ctx.count.Value");
     }
 
     [Fact]
     public void ProcessExpression_SetupConstant_StaysBare()
     {
         // upstream SETUP_CONST in inline mode returns the raw name (a render-closure local); never unwrapped.
-        SingleInterpolation("{{ total }}", Bindings(("total", BindingType.SetupConstant)))
-            .ShouldBe("total");
+        SingleInterpolation("{{ total }}", Bindings(("_ctx.total", BindingType.SetupConstant)))
+            .ShouldBe("_ctx.total");
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class ExpressionBindingTests
     {
         // upstream SETUP_MAYBE_REF read -> `unref(x)`.
         SingleInterpolation("{{ maybe }}", Bindings(("maybe", BindingType.SetupMaybeReference)))
-            .ShouldBe("_unref(maybe)");
+            .ShouldBe("_unref(_ctx.maybe)");
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class ExpressionBindingTests
     {
         // A ref used as a member-access receiver unwraps first: `user.Name` -> `user.Value.Name`.
         SingleInterpolation("{{ user.Name }}", Bindings(("user", BindingType.SetupReference)))
-            .ShouldBe("user.Value.Name");
+            .ShouldBe("_ctx.user.Value.Name");
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class ExpressionBindingTests
     {
         // A ref used as an indexer receiver unwraps; the literal index is untouched.
         SingleInterpolation("{{ items[0] }}", Bindings(("items", BindingType.SetupReference)))
-            .ShouldBe("items.Value[0]");
+            .ShouldBe("_ctx.items.Value[0]");
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class ExpressionBindingTests
         SingleInterpolation(
             "{{ count + step }}",
             Bindings(("count", BindingType.SetupReference), ("step", BindingType.Data)))
-            .ShouldBe("count.Value + _ctx.step");
+            .ShouldBe("_ctx.count.Value + _ctx.step");
     }
 
     [Fact]
@@ -137,21 +137,21 @@ public class ExpressionBindingTests
     {
         // upstream: `count++` on a ref becomes `count.value++` inside the inline handler.
         HandlerBody("<button @click=\"count++\"></button>", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("__event => (count.Value++)");
+            .ShouldBe("__event => (_ctx.count.Value++)");
     }
 
     [Fact]
     public void ProcessExpression_CompoundAssignmentOnReference_UnwrapsWriteTarget()
     {
         HandlerBody("<button @click=\"count += 1\"></button>", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("__event => (count.Value += 1)");
+            .ShouldBe("__event => (_ctx.count.Value += 1)");
     }
 
     [Fact]
     public void ProcessExpression_SimpleAssignmentOnReference_UnwrapsWriteTarget()
     {
         HandlerBody("<button @click=\"count = 5\"></button>", Bindings(("count", BindingType.SetupReference)))
-            .ShouldBe("__event => (count.Value = 5)");
+            .ShouldBe("__event => (_ctx.count.Value = 5)");
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class ExpressionBindingTests
     public void ProcessExpression_VBindReference_UnwrapsBoundValue()
     {
         var result = TransformPrefixed("<div :id=\"itemId\"></div>", Bindings(("itemId", BindingType.SetupReference)), out _);
-        Flatten(PropertyValue(result, "id")).ShouldBe("itemId.Value");
+        Flatten(PropertyValue(result, "id")).ShouldBe("_ctx.itemId.Value");
     }
 
     [Fact]
@@ -370,7 +370,7 @@ public class ExpressionBindingTests
 
         errors.ShouldBeEmpty();
         var ifNode = result.Children[0].ShouldBeOfType<IfNode>();
-        Flatten(ifNode.Branches[0].Condition).ShouldBe("visible.Value");
+        Flatten(ifNode.Branches[0].Condition).ShouldBe("_ctx.visible.Value");
         Flatten(ifNode.Branches[1].Condition).ShouldBe("_ctx.other");
     }
 
@@ -402,7 +402,7 @@ public class ExpressionBindingTests
         // upstream SETUP_MAYBE_REF in assignment position -> `.value`: a write to a const binding is
         // only legal when it is a ref (transformExpression.ts rewriteIdentifier).
         SingleInterpolation("{{ maybe = 1 }}", Bindings(("maybe", BindingType.SetupMaybeReference)))
-            .ShouldBe("maybe.Value = 1");
+            .ShouldBe("_ctx.maybe.Value = 1");
     }
 
     [Fact]
@@ -411,14 +411,14 @@ public class ExpressionBindingTests
         // upstream SETUP_LET read -> `unref(x)`; the guarded write stays bare (documented divergence,
         // docs/DESIGN.md).
         SingleInterpolation("{{ letBinding }}", Bindings(("letBinding", BindingType.SetupLet)))
-            .ShouldBe("_unref(letBinding)");
+            .ShouldBe("_unref(_ctx.letBinding)");
     }
 
     [Fact]
     public void ProcessExpression_SetupLetWrite_StaysBare()
     {
         SingleInterpolation("{{ letBinding = 1 }}", Bindings(("letBinding", BindingType.SetupLet)))
-            .ShouldBe("letBinding = 1");
+            .ShouldBe("_ctx.letBinding = 1");
     }
 
     // ---- statement-mode locals, object members, and nameof ----
@@ -430,12 +430,14 @@ public class ExpressionBindingTests
         // walkIdentifiers' variable-declaration handling.
         var result = TransformPrefixed(
             "<button @click=\"var next = count + 1; total = next;\"></button>",
-            Bindings(("count", BindingType.SetupReference), ("total", BindingType.Data)),
+            Bindings(("count", BindingType.SetupReference), ("_ctx.total", BindingType.Data)),
             out var errors);
 
         errors.ShouldBeEmpty();
         var flattened = FlattenTree(result.RootCodegen());
-        flattened.ShouldContain("var next = count.Value + 1");
+        flattened.ShouldContain("var next = _ctx.count.Value + 1");
+        // `var` parses as an IdentifierName in the declared-type position; it must never be prefixed.
+        flattened.ShouldNotContain("_ctx.var", Case.Sensitive);
         flattened.ShouldContain("_ctx.total = next");
         flattened.ShouldNotContain("_ctx.next");
     }
@@ -469,7 +471,7 @@ public class ExpressionBindingTests
         var flattened = FlattenTree(result.RootCodegen());
         flattened.ShouldContain("nameof(count)");
         flattened.ShouldNotContain("_ctx.nameof");
-        flattened.ShouldNotContain("count.Value");
+        flattened.ShouldNotContain("_ctx.count.Value");
     }
 
     // ---- the Vuecs event identifier (docs/DESIGN.md: template $event <-> C# __event) ----

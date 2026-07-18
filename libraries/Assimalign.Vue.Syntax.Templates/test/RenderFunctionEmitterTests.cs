@@ -35,7 +35,7 @@ public class RenderFunctionEmitterTests
         // dynamicProps array emits verbatim as a C# collection expression targeting string[].
         var emitted = EmitPrefixed("<div :id=\"dynamicId\" class=\"static\">{{ message }}</div>");
 
-        emitted.Code.ShouldBe(
+        emitted.Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), "div", _createProps(
     ("id", _ctx.dynamicId),
@@ -51,7 +51,7 @@ return _createElementBlock(_openBlock(), "div", _createProps(
     {
         // genNullableArgs parity: trailing null arguments are trimmed, so a fully static element is
         // just tag + children.
-        EmitPrefixed("<div>x</div>").Code.ShouldBe(
+        EmitPrefixed("<div>x</div>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), "div", null, "x");
 
@@ -62,7 +62,7 @@ return _createElementBlock(_openBlock(), "div", null, "x");
     public void ManyChildren_SplitAcrossLines()
     {
         // genNodeListAsArray parity: more than three children switch to the multiline array form.
-        EmitPrefixed("<ul><li>1</li><li>2</li><li>3</li><li>{{ four }}</li></ul>").Code.ShouldBe(
+        EmitPrefixed("<ul><li>1</li><li>2</li><li>3</li><li>{{ four }}</li></ul>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), "ul", null, new object?[] {
     _createElementVNode("li", null, "1"),
@@ -81,7 +81,7 @@ return _createElementBlock(_openBlock(), "ul", null, new object?[] {
     {
         // Each branch opens its own block with the synthetic key (0, 1, 2); the alternate of each
         // conditional is the next branch, stair-stepped exactly like upstream's needNewline layout.
-        EmitPrefixed("<div v-if=\"visible\">A</div><span v-else-if=\"other\">B</span><p v-else>C</p>").Code.ShouldBe(
+        EmitPrefixed("<div v-if=\"visible\">A</div><span v-else-if=\"other\">B</span><p v-else>C</p>").Code.ShouldBeCode(
 """
 return (_ctx.visible)
     ? _createElementBlock(_openBlock(), "div", _createProps(("key", 0)), "A")
@@ -96,7 +96,7 @@ return (_ctx.visible)
     public void LoneVIf_TerminatesChainWithCommentVNode()
     {
         // Upstream terminates a v-if without v-else with createCommentVNode("v-if", true).
-        EmitPrefixed("<div v-if=\"ok\">A</div>").Code.ShouldBe(
+        EmitPrefixed("<div v-if=\"ok\">A</div>").Code.ShouldBeCode(
 """
 return (_ctx.ok)
     ? _createElementBlock(_openBlock(), "div", _createProps(("key", 0)), "A")
@@ -112,7 +112,7 @@ return (_ctx.ok)
     {
         // The fragment opens its block with tracking disabled (_openBlock(true)); the iterator is a
         // braced lambda (upstream newline: true) whose per-item vnode is itself a keyed block.
-        EmitPrefixed("<li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>").Code.ShouldBe(
+        EmitPrefixed("<li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.items, (item) => {
     return _createElementBlock(_openBlock(), "li", _createProps(("key", item.id)), _toDisplayString(item.label), 1 /* TEXT */);
@@ -124,7 +124,7 @@ return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.i
     [Fact]
     public void TemplateVFor_WrapsEachIterationInStableFragment()
     {
-        EmitPrefixed("<template v-for=\"row in rows\"><td>{{ row }}</td><td>b</td></template>").Code.ShouldBe(
+        EmitPrefixed("<template v-for=\"row in rows\"><td>{{ row }}</td><td>b</td></template>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.rows, (row) => {
     return _createElementBlock(_openBlock(), _Fragment, null, new object?[] { _createElementVNode("td", null, _toDisplayString(row), 1 /* TEXT */), _createElementVNode("td", null, "b") }, 64 /* STABLE_FRAGMENT */);
@@ -144,7 +144,7 @@ return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.r
             "<MyButton :kind=\"kind\"><template #header=\"headerProperties\"><b>{{ headerProperties }}</b></template>" +
             "<span>{{ label }}</span></MyButton>");
 
-        emitted.Code.ShouldBe(
+        emitted.Code.ShouldBeCode(
 """
 var _component_MyButton = _resolveComponent("MyButton");
 
@@ -162,7 +162,7 @@ return _createBlock(_openBlock(), _component_MyButton, _createProps(("kind", _ct
     {
         // <component :is> compiles to a resolveDynamicComponent tag inside a createBlock (issue #52
         // acceptance criterion; upstream resolveComponentType).
-        EmitPrefixed("<component :is=\"viewName\"></component>").Code.ShouldBe(
+        EmitPrefixed("<component :is=\"viewName\"></component>").Code.ShouldBeCode(
 """
 return _createBlock(_openBlock(), _resolveDynamicComponent(_ctx.viewName));
 
@@ -175,7 +175,7 @@ return _createBlock(_openBlock(), _resolveDynamicComponent(_ctx.viewName));
         // Upstream renderSlot($slots, "header", {}, fallback): `$slots` has no legal C# spelling, so
         // the contract emits _ctx.__slots (the __event precedent), and the `{}` placeholder becomes
         // the empty _createProps() (docs/DESIGN.md divergence table).
-        EmitPrefixed("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>").Code.ShouldBe(
+        EmitPrefixed("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>").Code.ShouldBeCode(
 """
 return _renderSlot(_ctx.__slots, "header", _createProps(), () => new object?[] { _createElementVNode("p", null, "fallback " + _toDisplayString(_ctx.hint), 1 /* TEXT */) });
 
@@ -185,7 +185,7 @@ return _renderSlot(_ctx.__slots, "header", _createProps(), () => new object?[] {
     [Fact]
     public void Teleport_EmitsBuiltInHelperTagBlock()
     {
-        EmitPrefixed("<Teleport to=\"body\"><div>{{ tip }}</div></Teleport>").Code.ShouldBe(
+        EmitPrefixed("<Teleport to=\"body\"><div>{{ tip }}</div></Teleport>").Code.ShouldBeCode(
 """
 return _createBlock(_openBlock(), _Teleport, _createProps(("to", "body")), new object?[] { _createElementVNode("div", null, _toDisplayString(_ctx.tip), 1 /* TEXT */) });
 
@@ -197,7 +197,7 @@ return _createBlock(_openBlock(), _Teleport, _createProps(("to", "body")), new o
     [Fact]
     public void MultiRoot_EmitsStableFragmentBlock()
     {
-        EmitPrefixed("<div>one</div><span>{{ two }}</span>").Code.ShouldBe(
+        EmitPrefixed("<div>one</div><span>{{ two }}</span>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), _Fragment, null, new object?[] { _createElementVNode("div", null, "one"), _createElementVNode("span", null, _toDisplayString(_ctx.two), 1 /* TEXT */) }, 64 /* STABLE_FRAGMENT */);
 
@@ -216,7 +216,7 @@ return _createElementBlock(_openBlock(), _Fragment, null, new object?[] { _creat
         // resumes tracking, and returns the value.
         var emitted = EmitPrefixed("<div v-once><span>{{ frozen }}</span></div>");
 
-        emitted.Code.ShouldBe(
+        emitted.Code.ShouldBeCode(
 """
 return (_cache[0] ??= _setCache(0, _setBlockTracking(-1, true), _createElementVNode("div", null, new object?[] { _createElementVNode("span", null, _toDisplayString(_ctx.frozen), 1 /* TEXT */) })));
 
@@ -232,7 +232,7 @@ return (_cache[0] ??= _setCache(0, _setBlockTracking(-1, true), _createElementVN
         // A C# lambda or method group has no natural type in an object-typed position, so handler
         // property values wrap in the contract helper _withHandler (docs/DESIGN.md). The inline
         // statement uses the __event parameter spelling pinned by [V01.01.05.04].
-        EmitPrefixed("<button @click=\"count++\" @submit=\"save\">Go</button>").Code.ShouldBe(
+        EmitPrefixed("<button @click=\"count++\" @submit=\"save\">Go</button>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), "button", _createProps(
     ("onClick", _withHandler(__event => (_ctx.count++))),
@@ -247,7 +247,7 @@ return _createElementBlock(_openBlock(), "button", _createProps(
     {
         // withModifiers/withKeys already give the inner lambda its delegate target type through their
         // own contract signature, so no extra _withHandler wrapper is added around them.
-        EmitPrefixed("<button @click.stop=\"save($event)\">x</button>").Code.ShouldBe(
+        EmitPrefixed("<button @click.stop=\"save($event)\">x</button>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withModifiers(__event => (_ctx.save(__event)), ["stop"]))), "x", 8 /* PROPS */, ["onClick"]);
 
@@ -260,7 +260,7 @@ return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _wit
         // The v-model assignment handler is authored by the transform with Vue's $event variable;
         // serialization maps it to the Vuecs __event spelling, and the vModelText runtime directive
         // rides in the withDirectives array.
-        EmitPrefixed("<input v-model=\"name\" />").Code.ShouldBe(
+        EmitPrefixed("<input v-model=\"name\" />").Code.ShouldBeCode(
 """
 return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] { _vModelText, _ctx.name } });
 
@@ -274,7 +274,7 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps((
     {
         // Upstream [[_vShow, exp]] emits as nested object?[] arrays (JavaScript array literals have no
         // untyped C# counterpart; docs/DESIGN.md).
-        EmitPrefixed("<div v-show=\"visible\">shown</div>").Code.ShouldBe(
+        EmitPrefixed("<div v-show=\"visible\">shown</div>").Code.ShouldBeCode(
 """
 return _withDirectives(_createElementBlock(_openBlock(), "div", null, "shown", 512 /* NEED_PATCH */), new object?[] { new object?[] { _vShow, _ctx.visible } });
 
@@ -284,7 +284,7 @@ return _withDirectives(_createElementBlock(_openBlock(), "div", null, "shown", 5
     [Fact]
     public void CustomDirective_EmitsResolveDirectivePreamble()
     {
-        EmitPrefixed("<input v-focus />").Code.ShouldBe(
+        EmitPrefixed("<input v-focus />").Code.ShouldBeCode(
 """
 var _directive_focus = _resolveDirective("focus");
 
@@ -299,20 +299,20 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
     public void TextRoot_ReturnsStringLiteral()
     {
         // Upstream returns the bare text for a single text root; the runtime normalizes it.
-        EmitPrefixed("hello").Code.ShouldBe("return \"hello\";\n");
+        EmitPrefixed("hello").Code.ShouldBeCode("return \"hello\";\n");
     }
 
     [Fact]
     public void EmptyTemplate_ReturnsNull()
     {
-        EmitPrefixed(string.Empty).Code.ShouldBe("return null;\n");
+        EmitPrefixed(string.Empty).Code.ShouldBeCode("return null;\n");
     }
 
     [Fact]
     public void IndentLevel_PrefixesEveryLine()
     {
         var emitted = Emit("<div>x</div>", new RenderFunctionEmitterOptions { IndentLevel = 2 });
-        emitted.Code.ShouldBe("        return _createElementBlock(_openBlock(), \"div\", null, \"x\");\n");
+        emitted.Code.ShouldBeCode("        return _createElementBlock(_openBlock(), \"div\", null, \"x\");\n");
     }
 
     // ---- parse validity: every emitted body is syntactically valid C# ----
@@ -366,7 +366,7 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
         var first = EmitPrefixed(source);
         var second = EmitPrefixed(source);
 
-        second.Code.ShouldBe(first.Code);
+        second.Code.ShouldBeCode(first.Code);
         second.ShouldBe(first);
         second.GetHashCode().ShouldBe(first.GetHashCode());
     }
@@ -399,4 +399,19 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
         var result = Transformer.Transform(root, transformOptions);
         return RenderFunctionEmitter.Emit(result, options);
     }
+}
+
+/// <summary>
+/// Compares emitted render code against a snapshot expectation with the expectation's line endings
+/// normalized to LF: snapshot literals inherit the checkout's line endings (nothing pins them), while
+/// the emitter's documented contract is LF — normalizing keeps the pins checkout-independent instead
+/// of failing on autocrlf working trees.
+/// </summary>
+internal static class RenderCodeAssertions
+{
+    /// <summary>Asserts <paramref name="actual"/> equals <paramref name="expected"/> after LF-normalizing the expectation.</summary>
+    /// <param name="actual">The emitted render code (LF by contract).</param>
+    /// <param name="expected">The snapshot expectation, in the checkout's line endings.</param>
+    public static void ShouldBeCode(this string actual, string expected)
+        => actual.ShouldBe(expected.Replace("\r\n", "\n"));
 }

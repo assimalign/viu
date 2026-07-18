@@ -6,12 +6,17 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <summary>
 /// Renders a <see cref="SingleFileComponentModel"/> into the generated partial class for a <c>.viu</c>
 /// component. The output is deterministic and fully statically analyzable (no reflection, no dynamic
-/// code generation), so it is trimming- and WASM/NativeAOT-safe. The <c>@template</c> block's compiled
-/// render function ([V01.01.05.05]) is emitted here from the model's pre-serialized render body; helper
-/// names bind <b>by name</b> to the runtime render-helper surface through the file-level
-/// <c>using static</c> — the generator never references the runtime assembly, and the name/signature
-/// contract is documented in <c>libraries/Assimalign.Vue.Syntax.Templates/docs/DESIGN.md</c>. The merged
-/// <c>@script</c> C# ([V01.01.06.03]) remains a clearly-marked seam for its own work item.
+/// code generation), so it is trimming- and WASM/NativeAOT-safe. Both seams are filled: the
+/// <c>@template</c> block's compiled render function ([V01.01.05.05]) is emitted from the model's
+/// pre-serialized render body — helper names bind <b>by name</b> to the runtime render-helper surface
+/// through the file-level <c>using static</c> (the generator never references the runtime assembly; the
+/// name/signature contract is documented in
+/// <c>libraries/Assimalign.Vue.Syntax.Templates/docs/DESIGN.md</c>) — and the <c>@script</c> block's C#
+/// ([V01.01.06.03]) is merged verbatim under a <c>#line</c> map so compiler errors and debugger stepping
+/// resolve to the <c>.viu</c> source. Beyond the reserved render members (<c>Render</c>,
+/// <c>RenderCacheSize</c>), the scaffold emits no members of its own and the class stays
+/// <c>partial</c>, so a user-authored sibling <c>.cs</c> partial and the merged script coexist without
+/// collision.
 /// </summary>
 internal static class SingleFileComponentSourceEmitter
 {
@@ -109,10 +114,8 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         builder.Append('\n');
-        AppendIndent(builder, bodyIndent);
-        builder.Append("// [V01.01.06.03] Script merge seam. The @script block's C# is merged into this partial class\n");
-        AppendIndent(builder, bodyIndent);
-        builder.Append("// (with #line mapping) once script analysis lands; the scaffold emits no @script body yet.\n");
+
+        AppendScriptSeam(builder, bodyIndent, model);
 
         AppendIndent(builder, indent);
         builder.Append("}\n");
@@ -123,6 +126,48 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         return builder.ToString();
+    }
+
+    // [V01.01.06.03] The @script merge seam — the only seam this work item fills. When the component
+    // declares a script block, its C# body is merged into the partial class under a #line map; otherwise
+    // the seam is a documenting comment. The [V01.01.05.05] render seam above stays a placeholder.
+    private static void AppendScriptSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        if (model.ScriptContent is not { } scriptContent)
+        {
+            AppendIndent(builder, indent);
+            builder.Append("// [V01.01.06.03] Script merge seam. This component declares no @script block, so no C#\n");
+            AppendIndent(builder, indent);
+            builder.Append("// body is merged into the partial class.\n");
+            return;
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("// [V01.01.06.03] Merged @script block. The block's C# is emitted verbatim below, wrapped in\n");
+        AppendIndent(builder, indent);
+        builder.Append("// #line directives that map every line back to the .viu source, so compiler errors and\n");
+        AppendIndent(builder, indent);
+        builder.Append("// debugger stepping land in the .viu file rather than this generated file.\n");
+        AppendScript(builder, model.FilePath, model.ScriptContentStartLine, scriptContent);
+    }
+
+    // Emits the @script body flush against column 0 (no scaffold indentation added). The C# #line
+    // directive remaps the LINE of the following text but takes each token's COLUMN verbatim from this
+    // generated file; because a .viu block's content begins at column 1 (docs/FORMAT.md §3), emitting each
+    // script line un-indented preserves its original column, so a reported (line, column) lands on the
+    // exact .viu coordinate — the same block-to-file mapping SingleFileComponentDiagnostics composes. The
+    // trailing #line default restores this generated file's own line mapping for the scaffold that follows.
+    private static void AppendScript(StringBuilder builder, string filePath, int startLine, string content)
+    {
+        builder.Append("#line ").Append(startLine.ToString(CultureInfo.InvariantCulture))
+            .Append(" \"").Append(filePath).Append("\"\n");
+        builder.Append(content);
+        if (content.Length == 0 || content[content.Length - 1] != '\n')
+        {
+            builder.Append('\n');
+        }
+
+        builder.Append("#line default\n");
     }
 
     private static string Present(bool present) => present ? "present" : "absent";

@@ -76,8 +76,12 @@ namespace Demo
             return _createElementBlock(_openBlock(), "div", null, _toDisplayString(_ctx.message), 1 /* TEXT */);
         }
 
-        // [V01.01.06.03] Script merge seam. The @script block's C# is merged into this partial class
-        // (with #line mapping) once script analysis lands; the scaffold emits no @script body yet.
+        // [V01.01.06.03] Merged @script block. The block's C# is emitted verbatim below, wrapped in
+        // #line directives that map every line back to the .viu source, so compiler errors and
+        // debugger stepping land in the .viu file rather than this generated file.
+#line 6 "C:/proj/Counter.viu"
+    public string Message = "Hello";
+#line default
     }
 }
 """;

@@ -45,10 +45,10 @@ single closure over the component), and the table below is the compiler-owned co
 | --- | --- | --- |
 | template-local (`v-for`/`v-slot` alias in scope) | `name` | `name` |
 | allowed global (`GlobalAllowList`) | `name` | `name` |
-| `SetupReference` | `name.Value` | `name.Value` |
-| `SetupMaybeReference` | `unref(name)` | `name.Value` (upstream: a write to a const binding is only legal when it is a ref) |
-| `SetupLet` | `unref(name)` | `name` — upstream emits an `isRef`-guarded write, which a C# expression cannot; the helper-backed guarded write is deferred to [V01.01.05.05] |
-| `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `name` | `name` |
+| `SetupReference` | `_ctx.name.Value` | `_ctx.name.Value` |
+| `SetupMaybeReference` | `unref(_ctx.name)` | `_ctx.name.Value` (upstream: a write to a const binding is only legal when it is a ref) |
+| `SetupLet` | `unref(_ctx.name)` | `_ctx.name` — upstream emits an `isRef`-guarded write, which a C# expression cannot; the helper-backed guarded write is deferred to [V01.01.05.05] |
+| `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `_ctx.name` | `_ctx.name` |
 | `Property` / `PropertyAliased` / `Data` / `Options` | `_ctx.name` (alias resolved for `PropertyAliased`) | same |
 | unresolved | `_ctx.name` | `_ctx.name` |
 
@@ -58,7 +58,9 @@ Key divergences from Vue's JS contract, all forced by C# semantics:
   `count++`, and `count = x` on a ref rewrite cleanly to `count.Value …`, replacing Vue's read-time `unref`
   plus an `isRef(…) ? … .value = … : … = …` assignment guard. This is the direct answer to the acceptance
   criterion on compound assignment / increment / inline-handler unwrapping.
-- **`_ctx.` member access and bare setup locals** rather than Vue's `$setup.`/`$props.`/`__props.` split — a
+- **Every binding routes through `_ctx.`** rather than Vue's `$setup.`/`$props.`/`__props.` split — the
+  generated render function is a static method receiving the component instance (upstream's non-inline
+  function mode adapted to C#: no proxy exists to auto-unref, so refs additionally unwrap with `.Value`) — a
   single inline render closure has the component context in `_ctx` and setup state as locals.
 - **Unresolved identifiers can be an error.** Vue silently emits `_ctx.name` for any unknown identifier because
   the runtime proxy resolves it. C# cannot: an identifier that is neither a template-local, an allowed global,

@@ -58,11 +58,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             .Select(static (pair, cancellationToken) => ReadFile(pair.Left, pair.Right, cancellationToken))
             .WithTrackingName(FileTrackingName);
 
-        // BindingMetadata is a render-compilation input, not a pipeline model: script-driven metadata is
-        // [V01.01.06.03]'s deliverable, so the composition root supplies the permissive default here and
-        // the script-merge item swaps in the script-derived metadata through the same parameter.
         var results = files
-            .Select(static (file, cancellationToken) => BuildResult(file, BindingMetadata.Empty, cancellationToken))
+            .Select(static (file, cancellationToken) => BuildResult(file, cancellationToken))
             .WithTrackingName(ModelTrackingName);
 
         context.RegisterSourceOutput(results, static (production, result) => Execute(production, result));
@@ -90,7 +87,6 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 
     private static SingleFileComponentGeneratorResult BuildResult(
         SingleFileComponentFile file,
-        BindingMetadata bindingMetadata,
         System.Threading.CancellationToken cancellationToken)
     {
         var parse = Parser.ParseComponent(file.Text, cancellationToken);
@@ -116,7 +112,18 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             }
         }
 
-        var render = CompileRenderFunction(file, parse, bindingMetadata, diagnostics, cancellationToken);
+        // [V01.01.06.03] @script integration: when the component declares a script, validate its C# and
+        // extract binding metadata (routing any Roslyn parse diagnostics onto the .viu file), and carry
+        // the verbatim body plus its content-start line so the emitter can merge it under a #line map.
+        string? scriptContent = null;
+        var scriptContentStartLine = 0;
+        var bindings = EquatableArray<ScriptBinding>.Empty;
+        if (descriptor.Script is { } script)
+        {
+            scriptContent = script.Content;
+            scriptContentStartLine = script.ContentLocation.Start.Line;
+            bindings = ScriptBlockAnalyzer.Analyze(file.FilePath, script, diagnostics);
+        }
 
         var model = new SingleFileComponentModel(
             file.Namespace,
@@ -127,8 +134,18 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             HasScript: descriptor.Script is not null,
             StyleCount: descriptor.Styles.Count,
             CustomBlockCount: descriptor.CustomBlocks.Count,
-            RenderBody: render.Body,
-            RenderCacheSize: render.CacheSize);
+            FilePath: file.FilePath,
+            ScriptContent: scriptContent,
+            ScriptContentStartLine: scriptContentStartLine,
+            Bindings: bindings,
+            RenderBody: null,
+            RenderCacheSize: 0);
+
+        // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the script's classified bindings drive the
+        // template compiler's ref-unwrapping decisions, so a Reference<T> member reads as `.Value` in
+        // the emitted render body instead of falling back to `_ctx.`.
+        var render = CompileRenderFunction(file, parse, model.ToBindingMetadata(), diagnostics, cancellationToken);
+        model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
 
         var array = diagnostics.Count == 0
             ? EquatableArray<DiagnosticInfo>.Empty
