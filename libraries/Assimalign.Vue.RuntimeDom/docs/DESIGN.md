@@ -79,8 +79,46 @@ and `.WithKeys` port `withModifiers`/`withKeys` (guards run .NET-side over the p
 Handler exceptions route to the registry's error sink — a debug trace until the app
 error-handling pipeline ([V01.01.03.12]) replaces it — and never escape into the JS listener.
 
+## Interop command-buffer batching ([V01.01.04.05])
+
+The boundary is the budget, so the batched mode collapses a whole scheduler flush's node-ops into
+**one** interop call. There is no upstream Vue counterpart — the prior art is Blazor's `RenderBatch`
+— but it is behaviorally invisible: buffered and direct modes produce byte-identical DOM. It is a
+construction-time choice (`BrowserRuntime.CreateApp(root, props, useCommandBuffer: true)`); the
+renderer and RuntimeCore see the identical `RendererOptions<int>` either way. Default is direct;
+buffered is opt-in for this delivery.
+
+- **Encoder** (`DomCommandBuffer`): every write op — create/insert/remove/text and each `patchProp`
+  leaf — encodes as `[opcode][operands]` into one growable, reused `byte[]`. A per-flush string table
+  interns repeated tag/prop/event names; a magic + version header byte pair lets the JS applier reject
+  a drifted frame loudly. Little-endian is explicit (`BinaryPrimitives` ↔ `DataView` littleEndian).
+  Zero per-flush managed allocation at steady state.
+- **One-way handles**: a buffered `createElement/Text/Comment` cannot return the JS id, so .NET
+  pre-allocates the handle from its own counter and the op carries "create X **AS** handle N"; the JS
+  applier registers the node under N. The counter rides each frame header so the JS side keeps its
+  own foreign-node allocator (querySelector/parentNode/nextSibling) above it, and a forced-flush read
+  folds any foreign handle it returns back into the counter — the two allocators never collide.
+- **Reads force a flush**: ops that genuinely return data (`parentNode`, `nextSibling`,
+  `querySelector`, `insertStaticContent`) commit the pending batch first (one apply), then read the
+  live bridge. Steady-state block-tree updates issue no such reads, so hundreds of mutations collapse
+  into exactly one apply — the interop-call-counter acceptance criterion.
+- **Released handles**: `remove`/`setElementText` no longer return per op; the applier collects every
+  handle it releases while draining the batch and returns them from the single apply call, feeding the
+  same `PurgeReleasedHandles` path (this settles ADR-0001's "revisit the released-handle shape with
+  the command buffer" consequence).
+- **Flush boundary** (`Scheduler.FlushBoundaryCallback`, the one minimal RuntimeCore seam): the batch
+  applies after the render queue drains and *before* post-flush callbacks (so mounted/updated hooks
+  read the committed DOM), and again *after* them (so post-flush DOM writes — a `v-show` `updated`
+  hook — commit within the same flush). The callback is idempotent, so a render-only flush still
+  crosses the boundary once.
+- **Span marshaling**: the frame crosses as `[JSMarshalAs<JSType.MemoryView>] Span<byte>` — the JS
+  applier reads a typed-array view over WASM memory, not a copied argument — and a static switch over
+  the opcode replays each op, reusing the exact `dom.*` leaves the direct path uses.
+- **Differential proof**: the full renderer scenario battery runs through direct and buffered modes
+  and asserts byte-identical serialized DOM; an instrumented apply counter proves one boundary
+  crossing per flush over hundreds of mutations. Full 10k-row benchmarks belong to [V01.01.11.04].
+
 ## Non-goals (sequenced work)
 
-- Interop command-buffer batching — [V01.01.04.05] (#43).
 - App bootstrap (`CreateApp`-equivalent, container clearing) — [V01.01.04.04] (#42).
 - `v-model` runtime — [V01.01.04.06].

@@ -25,6 +25,7 @@ public class SchedulerTests : IDisposable
 
     public void Dispose()
     {
+        Scheduler.FlushBoundaryCallback = null;
         Scheduler.Reset();
         _pump.Dispose();
     }
@@ -85,6 +86,53 @@ public class SchedulerTests : IDisposable
         _pump.RunUntilIdle();
 
         order.ShouldBe(["pre", "render", "post"]);
+    }
+
+    // The interop command-buffer seam ([V01.01.04.05]): the boundary callback commits batched DOM
+    // mutations after the render queue drains AND again after post-flush callbacks — before them so
+    // mounted/updated hooks that read the DOM see the committed render, after them so hooks that
+    // write the DOM (e.g. v-show's post-flush updated hook) commit within the same flush. The
+    // callback is idempotent (a no-op when nothing is buffered), so a render-only flush still crosses
+    // the interop boundary exactly once in practice.
+    [Fact]
+    public void FlushBoundaryCallback_BracketsPostFlushCallbacks()
+    {
+        var order = new List<string>();
+        Scheduler.FlushBoundaryCallback = () => order.Add("boundary");
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() => order.Add("post")));
+        Scheduler.QueueJob(new SchedulerJob(() => order.Add("render")) { Identifier = 1 });
+
+        _pump.RunUntilIdle();
+
+        order.ShouldBe(["render", "boundary", "post", "boundary"]);
+    }
+
+    // The buffered batch must commit even when nothing observes it afterwards — otherwise a
+    // reactive update with no lifecycle hooks would never reach the DOM.
+    [Fact]
+    public void FlushBoundaryCallback_FiresEvenWithNoPostFlushCallbacks()
+    {
+        var boundaryRuns = 0;
+        Scheduler.FlushBoundaryCallback = () => boundaryRuns++;
+        Scheduler.QueueJob(new SchedulerJob(static () => { }) { Identifier = 1 });
+
+        _pump.RunUntilIdle();
+
+        boundaryRuns.ShouldBe(2); // brackets the (empty) post-flush phase; the second call no-ops
+    }
+
+    // The synchronous post-render drain (a direct Render / app mount) also brackets its post-flush
+    // callbacks, so a mounted hook both reads the committed tree and commits any DOM it writes.
+    [Fact]
+    public void FlushBoundaryCallback_BracketsPostFlush_OnSynchronousRenderDrain()
+    {
+        var order = new List<string>();
+        Scheduler.FlushBoundaryCallback = () => order.Add("boundary");
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() => order.Add("post")));
+
+        Scheduler.FlushAfterSynchronousRender();
+
+        order.ShouldBe(["boundary", "post", "boundary"]);
     }
 
     [Fact]

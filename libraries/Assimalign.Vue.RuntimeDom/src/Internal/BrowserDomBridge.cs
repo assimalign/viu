@@ -321,6 +321,23 @@ internal static partial class BrowserDomBridge
         }
     }
 
+    // The command-buffer apply ([V01.01.04.05]): the whole batched op frame crosses the boundary
+    // once per flush as a MemoryView over WASM memory (no copy of the argument), and the applier
+    // returns every handle it released while draining the batch so the .NET side purges its invoker
+    // delegates in the same single call — the batched analogue of remove/setElementText's per-op
+    // released-handle return.
+    internal static int[] ApplyCommandBuffer(byte[] frame, int length)
+    {
+        try
+        {
+            return Imports.ApplyCommandBuffer(frame.AsSpan(0, length));
+        }
+        catch (JSException exception)
+        {
+            throw Translate("applyCommandBuffer", 0, exception);
+        }
+    }
+
     // Takes Exception (not JSException) so the pure parsing is testable on the CoreCLR host —
     // JSException cannot even be constructed off-browser.
     internal static BrowserDomException Translate(string operationName, int nodeHandle, Exception exception)
@@ -416,6 +433,9 @@ internal static partial class BrowserDomBridge
 
         [JSImport("dom.getRegistrySizes", ModuleName)]
         internal static partial int[] GetRegistrySizes();
+
+        [JSImport("dom.applyCommandBuffer", ModuleName)]
+        internal static partial int[] ApplyCommandBuffer([JSMarshalAs<JSType.MemoryView>] Span<byte> buffer);
 
         [JSImport("initialize", ModuleName)]
         [return: JSMarshalAs<JSType.Promise<JSType.Void>>]
