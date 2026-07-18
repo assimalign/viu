@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
+         per the reviewer's architectural steer: the template compiler front end runs INSIDE the Roslyn
+         codegen generator ([V01.01.05.05]), which is a netstandard2.0 analyzer host. It therefore targets
+         the analyzer TFM alias — the same central property the generators project uses — never a hardcoded
+         string. Its net10.0 test project references it normally. -->
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Source-generator-hosted code must target the stable analyzer surface: opt out of the repo-wide
+         preview-features switch (see build/Targets/Build.TargetFramework.props) so no
+         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the generators csproj. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <!-- Deviates from the checklist rule "shipping libraries set IsAotCompatible=true": the AOT analyzers
+         require net7.0+, so the switch is inert on netstandard2.0. The central libraries targets
+         (libraries/Directory.Build.targets) clear the inherited IsAotCompatible=true once this
+         netstandard2.0 TFM is known. This library is consumed at build time by the generator, not shipped
+         into the WASM app, so AOT-compat analysis does not apply; the runtime AOT boundary is enforced on
+         the generator's OUTPUT, which is ordinary net10.0 code. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The shared base ([V01.01.05.09]): Position, SourceLocation, SyntaxList, SyntaxNode, and the
+         SyntaxDiagnostic surface live in Assimalign.Vue.Syntax; TemplateSyntaxNode and CompilerError
+         derive from them. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Linked netstandard2.0 shims ([V01.01.05.09]): IsExternalInit and the required-member attributes
+         are authored once in Assimalign.Vue.Syntax and <Compile Include>'d here (still internal) because
+         an internal shim in a referenced assembly is not visible to this compilation — each netstandard2.0
+         assembly needs its own copy to light up `init`/`record`/`required`. -->
+    <Compile Include="..\..\Assimalign.Vue.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
+    <Compile Include="..\..\Assimalign.Vue.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Linked shared-source seam ([V01.01.01.03]): the single authoritative DOM knowledge data is authored
+         in Assimalign.Vue.Shared against the netstandard2.0 lowest common denominator precisely so the
+         template compiler can <Compile Include> it here without a net10.0 project reference (Shared is
+         net10.0 and cannot be referenced from netstandard2.0). See the file header and the
+         Assimalign.Vue.Shared.GeneratorFixture precedent. -->
+    <Compile Include="..\..\Assimalign.Vue.Shared\src\Internal\DomKnowledgeData.cs" Link="Internal\DomKnowledgeData.cs" />
+    <!-- Linked shared-source seam ([V01.01.01.03], per the #50 boundary note): PatchFlags and SlotFlags are the
+         compiler <-> runtime contract authored in Assimalign.Vue.Shared. Shared is net10.0 and cannot be
+         referenced from this netstandard2.0 analyzer-host project, so — exactly as with DomKnowledgeData above —
+         the two enum source files are <Compile Include>'d here. Both are netstandard2.0-clean (a [Flags] enum and
+         a plain enum, System-only), keeping one authoritative definition instead of a drifting mirror. The
+         compiler assembly is consumed only at build time by the generator ([V01.01.05.05]), never shipped into the
+         same runtime as Shared, so the duplicated public type is inert. -->
+    <Compile Include="..\..\Assimalign.Vue.Shared\src\PatchFlags.cs" Link="Shared\PatchFlags.cs" />
+    <Compile Include="..\..\Assimalign.Vue.Shared\src\SlotFlags.cs" Link="Shared\SlotFlags.cs" />
+  </ItemGroup>
+</Project>

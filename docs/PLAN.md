@@ -39,8 +39,8 @@ package root is **`Assimalign.Vue.*`**:
 | Reactivity (`V01.01.02`) | `Assimalign.Vue.Reactivity` | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
 | RuntimeCore (`V01.01.03`) | `Assimalign.Vue.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Vue.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
-| Compiler (`V01.01.05`) | `Assimalign.Vue.Compiler` (+ source generators) | `@vue/compiler-core` + `compiler-dom` |
-| SingleFileComponent (`V01.01.06`) | `Assimalign.Vue.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup) |
+| Compiler (`V01.01.05`) | `Assimalign.Vue.Syntax.Compiler` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Vue.Syntax` base) |
+| SingleFileComponent (`V01.01.06`) | `Assimalign.Vue.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Vue.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Vue.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
 | Router (`V01.01.08`) | `Assimalign.Vue.Router` | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Vue.Store` | `pinia` |

@@ -52,12 +52,12 @@
 		<File Path=".github/ISSUE_TEMPLATE/task.yml" />
 	</Folder>
 	<Folder Name="/vuecs/.github/workflows/">
-		<File Path=".github/workflows/area-compiler.yml" />
 		<File Path=".github/workflows/area-generators.yml" />
 		<File Path=".github/workflows/area-reactivity.yml" />
 		<File Path=".github/workflows/area-runtimecore.yml" />
 		<File Path=".github/workflows/area-runtimedom.yml" />
 		<File Path=".github/workflows/area-shared.yml" />
+		<File Path=".github/workflows/area-syntax.yml" />
 		<File Path=".github/workflows/area-testing.yml" />
 		<File Path=".github/workflows/webapp.yml" />
 	</Folder>
@@ -96,18 +96,33 @@
 		<File Path="libraries/Directory.Build.props" />
 		<File Path="libraries/Directory.Build.targets" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/">
-		<File Path="libraries/Assimalign.Vue.Compiler/Assimalign.Vue.Compiler.slnx" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/">
+		<File Path="libraries/Assimalign.Vue.Syntax/Assimalign.Vue.Syntax.slnx" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/src/">
-		<Project Path="libraries/Assimalign.Vue.Compiler/src/Assimalign.Vue.Compiler.csproj" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax/src/Assimalign.Vue.Syntax.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/test/">
-		<Project Path="libraries/Assimalign.Vue.Compiler/test/Assimalign.Vue.Compiler.Tests.csproj" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax/test/Assimalign.Vue.Syntax.Tests.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/tools/">
-		<File Path="libraries/Assimalign.Vue.Compiler/tools/Generate-HtmlEntities.ps1" />
-		<File Path="libraries/Assimalign.Vue.Compiler/tools/README.md" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Compiler/src/Assimalign.Vue.Syntax.Compiler.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.Compiler/test/Assimalign.Vue.Syntax.Compiler.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/tools/">
+		<File Path="libraries/Assimalign.Vue.Syntax.Compiler/tools/Generate-HtmlEntities.ps1" />
+		<File Path="libraries/Assimalign.Vue.Syntax.Compiler/tools/README.md" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/docs/">
+		<File Path="libraries/Assimalign.Vue.Syntax.SingleFileComponent/docs/FORMAT.md" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/src/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.SingleFileComponent/src/Assimalign.Vue.Syntax.SingleFileComponent.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/test/">
+		<Project Path="libraries/Assimalign.Vue.Syntax.SingleFileComponent/test/Assimalign.Vue.Syntax.SingleFileComponent.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/src/">
@@ -134,18 +149,6 @@
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/test/">
 		<Project Path="libraries/Assimalign.Vue.RuntimeDom/test/Assimalign.Vue.RuntimeDom.Tests.csproj" />
-	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.SingleFileComponent/">
-		<File Path="libraries/Assimalign.Vue.SingleFileComponent/Assimalign.Vue.SingleFileComponent.slnx" />
-	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.SingleFileComponent/docs/">
-		<File Path="libraries/Assimalign.Vue.SingleFileComponent/docs/FORMAT.md" />
-	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.SingleFileComponent/src/">
-		<Project Path="libraries/Assimalign.Vue.SingleFileComponent/src/Assimalign.Vue.SingleFileComponent.csproj" />
-	</Folder>
-	<Folder Name="/vuecs/libraries/Assimalign.Vue.SingleFileComponent/test/">
-		<Project Path="libraries/Assimalign.Vue.SingleFileComponent/test/Assimalign.Vue.SingleFileComponent.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/src/">
