@@ -102,16 +102,16 @@ public sealed class Renderer<TNode>
 
     /// <summary>
     /// Creates the minimal application shell over this renderer (upstream:
-    /// <c>createAppAPI(render)</c>; see <see cref="VueApplication{TNode}"/>).
+    /// <c>createAppAPI(render)</c>; see <see cref="Application{TNode}"/>).
     /// </summary>
     /// <param name="rootComponent">The root component definition.</param>
     /// <param name="rootProperties">Props for the root component, or null.</param>
     /// <returns>The app; mount it into a container.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    public VueApplication<TNode> CreateApplication(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    public Application<TNode> CreateApplication(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
-        return new VueApplication<TNode>(this, rootComponent, rootProperties);
+        return new Application<TNode>(this, rootComponent, rootProperties);
     }
 
     private void Patch(

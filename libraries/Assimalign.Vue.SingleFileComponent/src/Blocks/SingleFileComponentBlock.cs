@@ -22,16 +22,16 @@ public abstract record SingleFileComponentBlock
     public required string Name { get; init; }
 
     /// <summary>The options on the block header, in source order.</summary>
-    public required SyntaxList<BlockOption> Options { get; init; }
+    public required SyntaxList<SingleFileComponentBlockOption> Options { get; init; }
 
     /// <summary>The raw block content — the exact source between the header line and the closing brace.</summary>
     public required string Content { get; init; }
 
     /// <summary>The source range covering the whole block, from the <c>@</c> through the closing <c>}</c>.</summary>
-    public required SourceLocation Location { get; init; }
+    public required SingleFileComponentSourceLocation Location { get; init; }
 
     /// <summary>The source range covering the content region only (exactly what <see cref="Content"/> holds).</summary>
-    public required SourceLocation ContentLocation { get; init; }
+    public required SingleFileComponentSourceLocation ContentLocation { get; init; }
 
     /// <summary>The block kind discriminator.</summary>
     public abstract SingleFileComponentBlockKind Kind { get; }

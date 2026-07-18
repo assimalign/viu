@@ -14,3 +14,21 @@ public abstract record SyntaxNode
     /// <summary>The node kind discriminator.</summary>
     public abstract NodeType NodeType { get; }
 }
+
+
+/*
+    Assimalign.Vue.Syntax
+    Assimalign.Vue.Syntax.Compiler
+    Assimalign.Vue.Syntax.SingleFileComponent
+
+
+public abstract class SyntaxNode {
+
+}
+
+public abstract class SyntaxParser 
+{
+    
+}
+ 
+ */

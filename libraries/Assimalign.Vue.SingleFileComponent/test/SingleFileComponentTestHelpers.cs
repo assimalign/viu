@@ -66,7 +66,7 @@ internal static class SingleFileComponentTestHelpers
         }
     }
 
-    private static void AssertSpan(SourceLocation location, string source)
+    private static void AssertSpan(SingleFileComponentSourceLocation location, string source)
     {
         var length = location.End.Offset - location.Start.Offset;
         location.Source.ShouldBe(source.Substring(location.Start.Offset, length));

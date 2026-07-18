@@ -10,4 +10,4 @@ namespace Assimalign.Vue.SingleFileComponent;
 /// <param name="Name">The option name (e.g. <c>scoped</c>, <c>lang</c>, <c>module</c>).</param>
 /// <param name="Value">The double-quoted value, or <see langword="null"/> for a valueless flag.</param>
 /// <param name="Location">The source range covering the whole option token.</param>
-public sealed record BlockOption(string Name, string? Value, SourceLocation Location);
+public sealed record SingleFileComponentBlockOption(string Name, string? Value, SingleFileComponentSourceLocation Location);

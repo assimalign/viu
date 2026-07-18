@@ -16,4 +16,4 @@ namespace Assimalign.Vue.SingleFileComponent;
 /// <param name="Start">The inclusive start position.</param>
 /// <param name="End">The exclusive end position.</param>
 /// <param name="Source">The exact source substring covered by the range.</param>
-public sealed record SourceLocation(Position Start, Position End, string Source);
+public sealed record SingleFileComponentSourceLocation(SingleFileComponentPosition Start, SingleFileComponentPosition End, string Source);

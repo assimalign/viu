@@ -17,12 +17,12 @@ public class LocationTests
         var descriptor = SingleFileComponentTestHelpers.Parse("@template {\n    <div/>\n}\n");
         var template = descriptor.Template!;
 
-        template.Location.Start.ShouldBe(new Position(0, 1, 1));
-        template.Location.End.ShouldBe(new Position(24, 3, 2));
+        template.Location.Start.ShouldBe(new SingleFileComponentPosition(0, 1, 1));
+        template.Location.End.ShouldBe(new SingleFileComponentPosition(24, 3, 2));
         template.Location.Source.ShouldBe("@template {\n    <div/>\n}");
 
-        template.ContentLocation.Start.ShouldBe(new Position(12, 2, 1));
-        template.ContentLocation.End.ShouldBe(new Position(23, 3, 1));
+        template.ContentLocation.Start.ShouldBe(new SingleFileComponentPosition(12, 2, 1));
+        template.ContentLocation.End.ShouldBe(new SingleFileComponentPosition(23, 3, 1));
         template.Content.ShouldBe("    <div/>\n");
     }
 
@@ -33,9 +33,9 @@ public class LocationTests
         var descriptor = SingleFileComponentTestHelpers.Parse("@template {\n}\n@script {\n    x\n}\n");
 
         descriptor.Template!.Content.ShouldBe(string.Empty);
-        descriptor.Template!.ContentLocation.Start.ShouldBe(new Position(12, 2, 1));
+        descriptor.Template!.ContentLocation.Start.ShouldBe(new SingleFileComponentPosition(12, 2, 1));
 
-        descriptor.Script!.Location.Start.ShouldBe(new Position(14, 3, 1));
+        descriptor.Script!.Location.Start.ShouldBe(new SingleFileComponentPosition(14, 3, 1));
         descriptor.Script!.Content.ShouldBe("    x\n");
     }
 
@@ -48,8 +48,8 @@ public class LocationTests
 
         scoped.Name.ShouldBe("scoped");
         scoped.Location.Source.ShouldBe("scoped");
-        scoped.Location.Start.ShouldBe(new Position(7, 1, 8));
-        scoped.Location.End.ShouldBe(new Position(13, 1, 14));
+        scoped.Location.Start.ShouldBe(new SingleFileComponentPosition(7, 1, 8));
+        scoped.Location.End.ShouldBe(new SingleFileComponentPosition(13, 1, 14));
     }
 
     [Fact]

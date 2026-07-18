@@ -10,7 +10,7 @@ namespace Assimalign.Vue.RuntimeCore;
 /// unmounted as a whole, over a shared <see cref="ApplicationContext"/> that carries the component
 /// registry, app-level provides, and <see cref="ApplicationConfiguration"/> to every descendant.
 /// <see cref="Component(string, IComponentDefinition)"/>, <see cref="Provide{T}"/>, and
-/// <see cref="Use(IVuePlugin{TNode}, object?)"/> configure the app before mounting; registering
+/// <see cref="Use(IPlugin{TNode}, object?)"/> configure the app before mounting; registering
 /// after <see cref="Mount"/> warns (upstream parity). Platform packages wrap this with container
 /// resolution (the browser's <c>CreateApp(...).Mount("#app")</c> is [V01.01.04.04]).
 /// <para>
@@ -21,7 +21,7 @@ namespace Assimalign.Vue.RuntimeCore;
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 /// <typeparam name="TNode">The platform node type.</typeparam>
-public sealed class VueApplication<TNode>
+public sealed class Application<TNode>
     where TNode : notnull
 {
     private readonly Renderer<TNode> _renderer;
@@ -34,7 +34,7 @@ public sealed class VueApplication<TNode>
     private Action<string>? _previousWarnSink;
     private bool _warnSinkInstalled;
 
-    internal VueApplication(Renderer<TNode> renderer, IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties)
+    internal Application(Renderer<TNode> renderer, IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties)
     {
         _renderer = renderer;
         _rootComponent = rootComponent;
@@ -67,7 +67,7 @@ public sealed class VueApplication<TNode>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
-    public VueApplication<TNode> Component(string name, IComponentDefinition definition)
+    public Application<TNode> Component(string name, IComponentDefinition definition)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(definition);
@@ -104,7 +104,7 @@ public sealed class VueApplication<TNode>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="directive"/> is null.</exception>
-    public VueApplication<TNode> Directive(string name, IDirective directive)
+    public Application<TNode> Directive(string name, IDirective directive)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(directive);
@@ -141,7 +141,7 @@ public sealed class VueApplication<TNode>
     /// <param name="value">The value to provide.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
-    public VueApplication<TNode> Provide<T>(InjectionKey<T> key, T value)
+    public Application<TNode> Provide<T>(InjectionKey<T> key, T value)
     {
         ArgumentNullException.ThrowIfNull(key);
         ProvideCore(key, value);
@@ -156,7 +156,7 @@ public sealed class VueApplication<TNode>
     /// <param name="value">The value to provide.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentException"><paramref name="key"/> is null or empty.</exception>
-    public VueApplication<TNode> Provide(string key, object? value)
+    public Application<TNode> Provide(string key, object? value)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         ProvideCore(key, value);
@@ -166,7 +166,7 @@ public sealed class VueApplication<TNode>
     /// <summary>
     /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>).
     /// A repeat <c>Use</c> of the same plugin instance is deduplicated with a dev warning; a plugin
-    /// installed after mount warns. The plugin's <see cref="IVuePlugin{TNode}.Install"/> receives
+    /// installed after mount warns. The plugin's <see cref="IPlugin{TNode}.Install"/> receives
     /// this app, through which it registers components, directives, and provides. Returns the app
     /// for chaining.
     /// </summary>
@@ -174,7 +174,7 @@ public sealed class VueApplication<TNode>
     /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public VueApplication<TNode> Use(IVuePlugin<TNode> plugin, object? options = null)
+    public Application<TNode> Use(IPlugin<TNode> plugin, object? options = null)
     {
         ArgumentNullException.ThrowIfNull(plugin);
         WarnIfMounted(nameof(Use));

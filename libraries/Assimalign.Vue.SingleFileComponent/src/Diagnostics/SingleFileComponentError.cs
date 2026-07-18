@@ -10,4 +10,4 @@ namespace Assimalign.Vue.SingleFileComponent;
 /// <param name="Code">The diagnostic code.</param>
 /// <param name="Message">The human-readable message for <paramref name="Code"/>.</param>
 /// <param name="Location">The source range the diagnostic points at.</param>
-public sealed record SingleFileComponentError(SingleFileComponentErrorCode Code, string Message, SourceLocation Location);
+public sealed record SingleFileComponentError(SingleFileComponentErrorCode Code, string Message, SingleFileComponentSourceLocation Location);

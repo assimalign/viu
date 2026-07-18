@@ -128,7 +128,7 @@ internal sealed class SingleFileComponentParseEngine
 
         var name = source.Substring(nameStart, position - nameStart);
 
-        var options = new List<BlockOption>();
+        var options = new List<SingleFileComponentBlockOption>();
         var headerHadError = false;
         var braceOffset = -1;
 
@@ -207,7 +207,7 @@ internal sealed class SingleFileComponentParseEngine
                     }
                 }
 
-                options.Add(new BlockOption(optionName, optionValue, SpanOf(optionStart, position)));
+                options.Add(new SingleFileComponentBlockOption(optionName, optionValue, SpanOf(optionStart, position)));
                 continue;
             }
 
@@ -241,7 +241,7 @@ internal sealed class SingleFileComponentParseEngine
     private SingleFileComponentBlock BuildBlock(ParsedHeader header, int blockStart, int blockEnd, int contentStart, int contentEnd)
     {
         var content = source.Substring(contentStart, contentEnd - contentStart);
-        var options = new SyntaxList<BlockOption>(header.Options);
+        var options = new SyntaxList<SingleFileComponentBlockOption>(header.Options);
         var blockLocation = SpanOf(blockStart, blockEnd);
         var contentLocation = SpanOf(contentStart, contentEnd);
         var name = header.Name;
@@ -352,14 +352,14 @@ internal sealed class SingleFileComponentParseEngine
         return true;
     }
 
-    private void Report(SingleFileComponentErrorCode code, SourceLocation location)
+    private void Report(SingleFileComponentErrorCode code, SingleFileComponentSourceLocation location)
         => errors.Add(new SingleFileComponentError(code, SingleFileComponentErrorMessages.GetMessage(code), location));
 
-    private SourceLocation SpanOf(int startOffset, int endOffset)
+    private SingleFileComponentSourceLocation SpanOf(int startOffset, int endOffset)
         => new(PositionAt(startOffset), PositionAt(endOffset), source.Substring(startOffset, endOffset - startOffset));
 
     // Maps an absolute offset to its (offset, line, column) via the pre-computed line table.
-    private Position PositionAt(int offset)
+    private SingleFileComponentPosition PositionAt(int offset)
     {
         var low = 0;
         var high = lines.Length - 1;
@@ -377,7 +377,7 @@ internal sealed class SingleFileComponentParseEngine
         }
 
         var line = lines[low];
-        return new Position(offset, line.Number, (offset - line.Start) + 1);
+        return new SingleFileComponentPosition(offset, line.Number, (offset - line.Start) + 1);
     }
 
     // Splits source into lines, treating \n, \r\n, and a lone \r each as one terminator. A final line
@@ -439,7 +439,7 @@ internal sealed class SingleFileComponentParseEngine
     // diagnostic).
     private readonly struct ParsedHeader
     {
-        public ParsedHeader(string name, BlockOption[] options, SourceLocation headerLocation)
+        public ParsedHeader(string name, SingleFileComponentBlockOption[] options, SingleFileComponentSourceLocation headerLocation)
         {
             Name = name;
             Options = options;
@@ -448,9 +448,9 @@ internal sealed class SingleFileComponentParseEngine
 
         public string Name { get; }
 
-        public BlockOption[] Options { get; }
+        public SingleFileComponentBlockOption[] Options { get; }
 
-        public SourceLocation HeaderLocation { get; }
+        public SingleFileComponentSourceLocation HeaderLocation { get; }
     }
 
     // A single source line: [Start, TextEnd) is the visible text, End is the next line's start (past the

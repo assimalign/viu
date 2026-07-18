@@ -92,7 +92,10 @@
 	<Folder Name="/vuecs/examples/Assimalign.Vue.WebApp/">
 		<Project Path="examples/Assimalign.Vue.WebApp/Assimalign.Vue.WebApp.csproj" />
 	</Folder>
-	<Folder Name="/vuecs/libraries/" />
+	<Folder Name="/vuecs/libraries/">
+		<File Path="libraries/Directory.Build.props" />
+		<File Path="libraries/Directory.Build.targets" />
+	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/">
 		<File Path="libraries/Assimalign.Vue.Compiler/Assimalign.Vue.Compiler.slnx" />
 	</Folder>
@@ -149,6 +152,7 @@
 		<Project Path="libraries/Assimalign.Vue.Shared/src/Assimalign.Vue.Shared.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/test/">
+		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.GeneratorFixture/Assimalign.Vue.Shared.GeneratorFixture.csproj" />
 		<Project Path="libraries/Assimalign.Vue.Shared/test/Assimalign.Vue.Shared.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Testing/" />

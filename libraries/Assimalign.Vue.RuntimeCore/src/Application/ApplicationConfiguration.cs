@@ -6,13 +6,13 @@ namespace Assimalign.Vue.RuntimeCore;
 /// The app-level configuration bag — the C# port of <c>app.config</c> from
 /// <c>@vue/runtime-core</c> (<c>packages/runtime-core/src/apiCreateApp.ts</c>,
 /// https://vuejs.org/api/application.html#app-config). Reached through
-/// <see cref="VueApplication{TNode}.Config"/>; its handlers are consulted by the runtime as a
+/// <see cref="Application{TNode}.Config"/>; its handlers are consulted by the runtime as a
 /// last resort once the per-component chains have run.
 /// <para>
 /// <b>globalProperties is deliberately excluded.</b> Upstream's
 /// <c>app.config.globalProperties</c> injects members onto every component's <c>this</c> proxy;
 /// Vuecs has no <c>this</c> proxy (there is no <c>Proxy</c> under AOT/trimming) and favors typed
-/// app-level <see cref="VueApplication{TNode}.Provide{T}"/> /
+/// app-level <see cref="Application{TNode}.Provide{T}"/> /
 /// <see cref="DependencyInjection.Inject{T}(InjectionKey{T})"/> instead. The decision and its
 /// rationale are recorded in the founding ADR ([V01.01.13.01]).
 /// </para>

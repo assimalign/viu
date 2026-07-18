@@ -11,4 +11,4 @@ namespace Assimalign.Vue.SingleFileComponent;
 /// <param name="Offset">Zero-based character offset from the start of the file.</param>
 /// <param name="Line">One-based line number.</param>
 /// <param name="Column">One-based column number.</param>
-public readonly record struct Position(int Offset, int Line, int Column);
+public readonly record struct SingleFileComponentPosition(int Offset, int Line, int Column);
