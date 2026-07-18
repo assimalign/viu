@@ -105,6 +105,21 @@ internal static class BlockStack
     }
 
     /// <summary>
+    /// Clears every open block after a throwing render function (upstream renderComponentRoot's
+    /// <c>blockStack.length = 0</c> in its catch): a render that threw between <see cref="OpenBlock"/>
+    /// and its closing block factory would otherwise leak an open accumulator, and — when an
+    /// ErrorCaptured hook or the app-level errorHandler swallows the error — corrupt every later
+    /// render's dynamic-child collection. The tracking counter is also restored (a small hardening
+    /// over upstream, which leaves an unbalanced v-once bracket broken).
+    /// </summary>
+    internal static void ClearAfterRenderFailure()
+    {
+        Stack.Clear();
+        current = null;
+        enabled = 1;
+    }
+
+    /// <summary>
     /// Test hook: clears the stack, current block, pool, and enable counter so one test's block
     /// state cannot leak into the next (ambient static state is the single-threaded design).
     /// </summary>

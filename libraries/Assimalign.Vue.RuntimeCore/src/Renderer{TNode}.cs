@@ -650,6 +650,10 @@ public sealed class Renderer<TNode>
         }
         catch (Exception exception)
         {
+            // Upstream renderComponentRoot clears the block stack in its catch (blockStack.length
+            // = 0): a render that threw mid-block must not leak its open accumulator into later
+            // renders when an ErrorCaptured hook or the app-level errorHandler swallows the error.
+            BlockStack.ClearAfterRenderFailure();
             ComponentErrorHandling.Handle(exception, instance, "render function");
         }
         finally

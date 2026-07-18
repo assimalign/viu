@@ -368,4 +368,40 @@ public class BlockTreeTests : IDisposable
         patches[0].PropertyName.ShouldBe("id");
         patches[0].NextValue.ShouldBe("b");
     }
+
+    [Fact]
+    public void RenderFunctionThrowingMidBlock_DoesNotCorruptLaterBlockCollection()
+    {
+        // Upstream renderComponentRoot clears the block stack in its catch (blockStack.length = 0).
+        // A render that throws between OpenBlock and its closing block factory, with the error
+        // swallowed by the app-level errorHandler, must not leak its open accumulator into later
+        // renders' dynamic-child collection.
+        var failing = new TestComponent
+        {
+            SetupFunction = (_, _) => () =>
+            {
+                VirtualNodeFactory.OpenBlock();
+                throw new InvalidOperationException("mid-block boom");
+            },
+        };
+        var application = _renderer.Renderer.CreateApplication(failing);
+        var handled = 0;
+        application.Config.ErrorHandler = (_, _, _) => handled++;
+        application.Mount(_container);
+        handled.ShouldBe(1);
+
+        // A later, unrelated block render must collect exactly its own dynamic children.
+        VirtualNodeFactory.OpenBlock();
+        var block = VirtualNodeFactory.ElementBlock(
+            "div",
+            null,
+            [
+                VirtualNodeFactory.Element("span", null, "static", default),
+                VirtualNodeFactory.Element("span", VirtualNodeFactory.Properties(("id", "x")), (VirtualNode?[]?)null, PatchFlags.Props, ["id"]),
+            ]);
+
+        block.DynamicChildren.ShouldNotBeNull();
+        block.DynamicChildren!.Count.ShouldBe(1);
+        block.DynamicChildren[0].ElementTag.ShouldBe("span");
+    }
 }
