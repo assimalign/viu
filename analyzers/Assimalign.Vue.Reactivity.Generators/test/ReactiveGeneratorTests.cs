@@ -117,6 +117,30 @@ namespace Demo
         }
 
         public ReactiveReferences ToReferences() => new ReactiveReferences(this);
+
+        public readonly struct RawValues
+        {
+            private readonly TodoItem _owner;
+
+            internal RawValues(TodoItem owner)
+            {
+                this._owner = owner;
+            }
+
+            public string Title
+            {
+                get => this._owner.__TitleValue;
+                set => this._owner.__TitleValue = value;
+            }
+
+            public bool Done
+            {
+                get => this._owner.__DoneValue;
+                set => this._owner.__DoneValue = value;
+            }
+        }
+
+        public RawValues ToRawValues() => new RawValues(this);
     }
 }
 """;

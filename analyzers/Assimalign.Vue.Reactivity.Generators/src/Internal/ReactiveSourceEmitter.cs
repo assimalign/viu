@@ -68,6 +68,7 @@ internal static class ReactiveSourceEmitter
         EmitTraversal(builder, model, bodyIndent);
         EmitReadonlyMarker(builder, model, bodyIndent);
         EmitReferences(builder, model, bodyIndent);
+        EmitRawView(builder, model, bodyIndent);
 
         AppendIndent(builder, indent);
         builder.Append("}\n");
@@ -267,6 +268,63 @@ internal static class ReactiveSourceEmitter
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("public ReactiveReferences ToReferences() => new ReactiveReferences(this);\n");
+    }
+
+    private static void EmitRawView(StringBuilder builder, in ReactiveClassModel model, int indent)
+    {
+        if (model.Properties.Count == 0)
+        {
+            return;
+        }
+
+        var sourceType = model.TypeName + model.TypeParameterList;
+
+        // The compiled counterpart of Vue 3.5's toRaw() for reactive objects
+        // (https://vuejs.org/api/reactivity-advanced.html#toraw): an untracked view straight over
+        // the raw value fields — reads do not track and writes do not trigger, exactly like
+        // reading/writing the raw target behind Vue's proxy. Emitted for readonly variants too:
+        // upstream toRaw(readonly(obj)) returns the underlying mutable target. As a nested type it
+        // reaches the private backing fields without reflection.
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("public readonly struct RawValues\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+
+        AppendIndent(builder, indent + 1);
+        builder.Append("private readonly ").Append(sourceType).Append(" _owner;\n");
+
+        builder.Append('\n');
+        AppendIndent(builder, indent + 1);
+        builder.Append("internal RawValues(").Append(sourceType).Append(" owner)\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("{\n");
+        AppendIndent(builder, indent + 2);
+        builder.Append("this._owner = owner;\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("}\n");
+
+        foreach (var property in model.Properties)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent + 1);
+            builder.Append("public ").Append(property.TypeFullName).Append(' ').Append(property.Name).Append('\n');
+            AppendIndent(builder, indent + 1);
+            builder.Append("{\n");
+            AppendIndent(builder, indent + 2);
+            builder.Append("get => this._owner.__").Append(property.Name).Append("Value;\n");
+            AppendIndent(builder, indent + 2);
+            builder.Append("set => this._owner.__").Append(property.Name).Append("Value = value;\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("}\n");
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("}\n");
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("public RawValues ToRawValues() => new RawValues(this);\n");
     }
 
     private static void AppendIndent(StringBuilder builder, int levels)

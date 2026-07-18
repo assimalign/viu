@@ -88,4 +88,57 @@ public sealed class GeneratedReferencesTests
         // A mutable [Reactive] object is reactive but not readonly.
         Reactive.IsReadonly(new ReactivePerson { Name = "A" }).ShouldBeFalse();
     }
+
+    [Fact]
+    public void ToRawValues_Reads_DoNotTrack()
+    {
+        // Upstream toRaw contract (https://vuejs.org/api/reactivity-advanced.html#toraw): reads
+        // through the raw view do not establish dependencies, so the effect never re-runs.
+        var person = new ReactivePerson { Name = "Ada", Age = 30 };
+        var raw = person.ToRawValues();
+        var runs = 0;
+        string? seen = null;
+        Reactive.Effect(() =>
+        {
+            runs++;
+            seen = raw.Name;
+        });
+        runs.ShouldBe(1);
+        seen.ShouldBe("Ada");
+
+        person.Name = "Grace";
+        runs.ShouldBe(1); // untracked read: no re-run
+
+        // The raw view still observes the tracked write's value (same backing field).
+        raw.Name.ShouldBe("Grace");
+    }
+
+    [Fact]
+    public void ToRawValues_Writes_DoNotTrigger_ButLandInTheSharedState()
+    {
+        var person = new ReactivePerson { Name = "Ada", Age = 30 };
+        var runs = 0;
+        string? seen = null;
+        Reactive.Effect(() =>
+        {
+            runs++;
+            seen = person.Name;
+        });
+        runs.ShouldBe(1);
+
+        // A raw write mutates the shared backing field without triggering (upstream: writes to the
+        // raw target bypass the proxy's trigger).
+        var raw = person.ToRawValues();
+        raw.Name = "Grace";
+        runs.ShouldBe(1);
+        person.ToRawValues().Name.ShouldBe("Grace");
+
+        // The instrumented path is intact: a tracked write still triggers, and its equality guard
+        // compares against the raw-updated value (writing the same value is a no-op).
+        person.Name = "Grace";
+        runs.ShouldBe(1);
+        person.Name = "Hopper";
+        runs.ShouldBe(2);
+        seen.ShouldBe("Hopper");
+    }
 }

@@ -418,7 +418,8 @@ public static class Reactive
     /// and is returned by identity — reads through the returned instance still track, because it <em>is</em>
     /// the reactive instance (documented C# divergence from <c>toRaw</c>, which strips a proxy). For an
     /// untracked view whose reads do not track and writes do not trigger, use the reactive-collection
-    /// overloads, which return the underlying storage.
+    /// overloads (which return the underlying storage) or a generated object's <c>ToRawValues()</c>
+    /// view (emitted per <c>[Reactive]</c> class straight over the raw backing fields).
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The value to unwrap.</param>
