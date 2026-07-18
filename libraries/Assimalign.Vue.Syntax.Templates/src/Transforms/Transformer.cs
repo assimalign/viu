@@ -46,8 +46,9 @@ public static class Transformer
             context.CachedSlots);
     }
 
-    // The base preset order: structural transforms, then slot outlet, then element, then slot-scope tracking,
-    // then text. Expression transforms ([V01.01.05.04]) slot in before transformSlotOutlet when added.
+    // The base preset order: structural transforms, then (when prefixing) expression rewriting, then slot
+    // outlet, element, slot-scope tracking, and text. transformExpression slots in before transformSlotOutlet,
+    // exactly as upstream inserts it in getBaseTransformPreset when !__BROWSER__ && prefixIdentifiers.
     private static IReadOnlyList<NodeTransform> BuildNodeTransforms(TransformOptions options)
     {
         var transforms = new List<NodeTransform>
@@ -56,11 +57,17 @@ public static class Transformer
             VIfTransform.Transform,
             VMemoTransform.Transform,
             VForTransform.Transform,
-            TransformSlotOutlet.Transform,
-            TransformElement.Transform,
-            VSlotTransform.TrackSlotScopes,
-            TransformText.Transform,
         };
+
+        if (options.PrefixIdentifiers)
+        {
+            transforms.Add(TransformExpression.Transform);
+        }
+
+        transforms.Add(TransformSlotOutlet.Transform);
+        transforms.Add(TransformElement.Transform);
+        transforms.Add(VSlotTransform.TrackSlotScopes);
+        transforms.Add(TransformText.Transform);
         transforms.AddRange(options.NodeTransforms);
         return transforms;
     }

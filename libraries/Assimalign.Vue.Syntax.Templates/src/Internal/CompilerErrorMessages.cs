@@ -107,6 +107,11 @@ internal static class CompilerErrorMessages
             "<Transition> expects exactly one child element or component.",
         [CompilerErrorCode.XIgnoredSideEffectTag] =
             "Tags with side effect (<script> and <style>) are ignored in client component templates.",
+
+        // Vuecs-specific expression/scope analysis messages ([V01.01.05.04]); the offending name is appended.
+        [CompilerErrorCode.XVuecsUnresolvedIdentifier] =
+            "Cannot resolve template identifier against any component binding, template scope variable, or " +
+            "allowed global: ",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>

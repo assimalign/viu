@@ -25,13 +25,85 @@ internal static class VSlotTransform
     public static Action? TrackSlotScopes(TemplateSyntaxNode node, TransformContext context)
     {
         if (node is ElementNode { ElementType: ElementType.Component or ElementType.Template } element &&
-            TransformUtilities.FindDirective(element, "slot") is not null)
+            TransformUtilities.FindDirective(element, "slot", allowEmpty: true) is { } slotDirective)
         {
+            // Register the slot props so the slot children's expressions treat them as template-locals
+            // (upstream addIdentifiers of the slot exp, gated on prefixIdentifiers).
+            var slotProperties = slotDirective.Expression;
+            if (context.PrefixIdentifiers && slotProperties is not null)
+            {
+                context.AddIdentifiers(slotProperties);
+            }
+
+            // A dynamic slot's v-for aliases are registered here too: the structural-directive factory
+            // deliberately skips template-with-v-slot nodes, so no other transform sees this v-for —
+            // the C# port of trackVForSlotScopes (vuejs/core v3.5 compiler-core transforms/vSlot.ts).
+            ForParseResult? forAliases = null;
+            if (context.PrefixIdentifiers &&
+                element.ElementType == ElementType.Template &&
+                TransformUtilities.FindDirective(element, "for") is { Expression: SimpleExpressionNode forExpression })
+            {
+                forAliases = ForExpressionParser.Parse(forExpression);
+                if (forAliases is not null)
+                {
+                    AddForAliasIdentifiers(forAliases, context);
+                }
+            }
+
             context.ScopeVSlot++;
-            return () => context.ScopeVSlot--;
+            return () =>
+            {
+                if (forAliases is not null)
+                {
+                    RemoveForAliasIdentifiers(forAliases, context);
+                }
+
+                if (context.PrefixIdentifiers && slotProperties is not null)
+                {
+                    context.RemoveIdentifiers(slotProperties);
+                }
+
+                context.ScopeVSlot--;
+            };
         }
 
         return null;
+    }
+
+    private static void AddForAliasIdentifiers(ForParseResult parseResult, TransformContext context)
+    {
+        if (parseResult.Value is not null)
+        {
+            context.AddIdentifiers(parseResult.Value);
+        }
+
+        if (parseResult.Key is not null)
+        {
+            context.AddIdentifiers(parseResult.Key);
+        }
+
+        if (parseResult.Index is not null)
+        {
+            context.AddIdentifiers(parseResult.Index);
+        }
+    }
+
+    private static void RemoveForAliasIdentifiers(ForParseResult parseResult, TransformContext context)
+    {
+        if (parseResult.Value is not null)
+        {
+            context.RemoveIdentifiers(parseResult.Value);
+        }
+
+        if (parseResult.Key is not null)
+        {
+            context.RemoveIdentifiers(parseResult.Key);
+        }
+
+        if (parseResult.Index is not null)
+        {
+            context.RemoveIdentifiers(parseResult.Index);
+        }
     }
 
     /// <summary>Compiles a component's slots into a slots object (upstream <c>buildSlots</c>).</summary>
@@ -163,6 +235,13 @@ internal static class VSlotTransform
                     : null;
                 if (parseResult is not null)
                 {
+                    if (context.PrefixIdentifiers && parseResult.Source is SimpleExpressionNode sourceExpression)
+                    {
+                        // Upstream finalizes a slot v-for's parse result with processExpression under
+                        // prefixIdentifiers (vSlot.ts buildSlots); mirror VForTransform's source rewrite.
+                        parseResult = parseResult with { Source = ExpressionProcessor.ProcessExpression(sourceExpression, context) };
+                    }
+
                     dynamicSlots.Add(Ir.CallExpression(
                         context.Helper(HelperNames.RenderList),
                         new object[]

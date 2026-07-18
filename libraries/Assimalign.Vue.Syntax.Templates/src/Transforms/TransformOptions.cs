@@ -37,6 +37,21 @@ public sealed class TransformOptions
     public Action<CompilerError>? OnError { get; set; }
 
     /// <summary>
+    /// Whether the expression and scope analysis pass runs (upstream <c>prefixIdentifiers</c>). Defaults to
+    /// <see langword="false"/>, keeping expression bodies opaque like Vue's browser build; set it, together with
+    /// <see cref="BindingMetadata"/>, to enable identifier classification and <c>Ref&lt;T&gt;</c> unwrapping
+    /// ([V01.01.05.04]).
+    /// </summary>
+    public bool PrefixIdentifiers { get; set; }
+
+    /// <summary>
+    /// The component binding classifications expression rewriting resolves identifiers against (upstream
+    /// <c>bindingMetadata</c>), produced by the component/setup source model. Defaults to
+    /// <see cref="BindingMetadata.Empty"/> and is only consulted when <see cref="PrefixIdentifiers"/> is set.
+    /// </summary>
+    public BindingMetadata? BindingMetadata { get; set; }
+
+    /// <summary>
     /// Whether static event handlers are cached so blocks are not invalidated (upstream <c>cacheHandlers</c>).
     /// Defaults to <see langword="false"/>.
     /// </summary>

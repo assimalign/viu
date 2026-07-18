@@ -63,7 +63,7 @@ internal static class VIfTransform
 
         if (directive.Name == "if")
         {
-            var branch = CreateIfBranch(element, directive);
+            var branch = CreateIfBranch(element, directive, context);
             var workingIf = new WorkingIf { Location = element.Location };
             workingIf.Branches.Add(branch);
             context.ReplaceNode(workingIf);
@@ -107,7 +107,7 @@ internal static class VIfTransform
                 }
 
                 context.RemoveNode();
-                var branch = CreateIfBranch(element, directive);
+                var branch = CreateIfBranch(element, directive, context);
                 if (comments.Count > 0 && !IsTransitionParent(context.Parent))
                 {
                     branch.Children.InsertRange(0, comments);
@@ -142,13 +142,23 @@ internal static class VIfTransform
         return null;
     }
 
-    private static WorkingIfBranch CreateIfBranch(ElementNode element, DirectiveNode directive)
+    private static WorkingIfBranch CreateIfBranch(ElementNode element, DirectiveNode directive, TransformContext context)
     {
+        // The structural v-if transform runs before TransformExpression and consumes the directive, so
+        // the condition must be rewritten here — upstream processIf calls processExpression(dir.exp)
+        // under prefixIdentifiers for exactly this reason (vuejs/core v3.5 compiler-core
+        // transforms/vIf.ts).
+        var condition = directive.Name == "else" ? null : directive.Expression;
+        if (context.PrefixIdentifiers && condition is SimpleExpressionNode simpleCondition)
+        {
+            condition = ExpressionProcessor.ProcessExpression(simpleCondition, context);
+        }
+
         var isTemplateIf = element.ElementType == ElementType.Template;
         var branch = new WorkingIfBranch
         {
             Location = element.Location,
-            Condition = directive.Name == "else" ? null : directive.Expression,
+            Condition = condition,
             UserKey = TransformUtilities.FindProperty(element, "key"),
             IsTemplateIf = isTemplateIf,
         };

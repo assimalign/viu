@@ -115,11 +115,39 @@ internal static class VOnTransform
             var isInlineStatement = !(isMemberExpression || ExpressionShape.IsFunctionExpression(expression));
             var hasMultipleStatements = expression.Content.IndexOf(';') >= 0;
 
+            // Rewrite the handler's identifiers, with the event variable in scope for an inline
+            // statement so its assignments unwrap refs (upstream transformOn: addIdentifiers($event)
+            // around processExpression). `$event` is not a legal C# identifier, so under prefixing the
+            // inline statement is parsed against the Vuecs spelling `__event` — the parameter name the
+            // wrapping lambda emits below. Template authors keep Vue's `$event`; the substitution is
+            // the documented C# divergence (docs/DESIGN.md).
+            ExpressionNode processedExpression = expression;
+            if (context.PrefixIdentifiers)
+            {
+                if (isInlineStatement)
+                {
+                    if (expression.Content.Contains("$event"))
+                    {
+                        expression = expression with { Content = expression.Content.Replace("$event", "__event") };
+                    }
+
+                    context.AddIdentifiers("__event");
+                }
+
+                processedExpression = ExpressionProcessor.ProcessExpression(expression, context, asRawStatements: hasMultipleStatements);
+
+                if (isInlineStatement)
+                {
+                    context.RemoveIdentifiers("__event");
+                }
+            }
+
+            handler = processedExpression;
             if (isInlineStatement || (shouldCache && isMemberExpression))
             {
                 handler = Ir.CompoundExpression(
-                    (isInlineStatement ? "$event" : "(...args)") + " => " + (hasMultipleStatements ? "{" : "("),
-                    expression,
+                    (isInlineStatement ? (context.PrefixIdentifiers ? "__event" : "$event") : "(...args)") + " => " + (hasMultipleStatements ? "{" : "("),
+                    processedExpression,
                     hasMultipleStatements ? "}" : ")");
             }
         }
