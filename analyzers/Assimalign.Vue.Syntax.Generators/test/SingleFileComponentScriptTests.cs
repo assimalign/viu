@@ -105,7 +105,9 @@ public sealed class SingleFileComponentScriptTests
         // location); the mapped span is what an IDE/CLI build and the debugger resolve to.
         var span = conversion.Location.GetMappedLineSpan();
         span.Path.ShouldEndWith("Widget.viu");
-        span.StartLinePosition.Line.ShouldBe(1); // .viu file line 2, zero-based
+        span.StartLinePosition.Line.ShouldBe(1);       // .viu file line 2, zero-based
+        span.StartLinePosition.Character.ShouldBe(21); // the "not an int" literal column, preserved because
+                                                       // the script is emitted flush at column 0 (no re-indent)
     }
 
     [Fact]
