@@ -52,6 +52,7 @@
 		<File Path=".github/ISSUE_TEMPLATE/task.yml" />
 	</Folder>
 	<Folder Name="/vuecs/.github/workflows/">
+		<File Path=".github/workflows/area-compiler.yml" />
 		<File Path=".github/workflows/area-generators.yml" />
 		<File Path=".github/workflows/area-reactivity.yml" />
 		<File Path=".github/workflows/area-runtimecore.yml" />
@@ -92,6 +93,19 @@
 		<Project Path="examples/Assimalign.Vue.WebApp/Assimalign.Vue.WebApp.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/">
+		<File Path="libraries/Assimalign.Vue.Compiler/Assimalign.Vue.Compiler.slnx" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/src/">
+		<Project Path="libraries/Assimalign.Vue.Compiler/src/Assimalign.Vue.Compiler.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/test/">
+		<Project Path="libraries/Assimalign.Vue.Compiler/test/Assimalign.Vue.Compiler.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Compiler/tools/">
+		<File Path="libraries/Assimalign.Vue.Compiler/tools/Generate-HtmlEntities.ps1" />
+		<File Path="libraries/Assimalign.Vue.Compiler/tools/README.md" />
+	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/src/">
 		<Project Path="libraries/Assimalign.Vue.Reactivity/src/Assimalign.Vue.Reactivity.csproj" />
