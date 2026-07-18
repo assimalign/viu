@@ -7,7 +7,7 @@ namespace Assimalign.Vue.RuntimeCore;
 /// hooks the renderer invokes on the element the directive is bound to. Every hook defaults to
 /// null (no dispatch), so a directive implements only the phases it needs and the renderer skips
 /// the rest — mirroring upstream's <c>if (hook)</c> guard. Register directives on the app by name
-/// (<see cref="VueApplication{TNode}.Directive(string, IDirective)"/>) or attach them directly with
+/// (<see cref="Application{TNode}.Directive(string, IDirective)"/>) or attach them directly with
 /// <see cref="Directives.WithDirectives(VirtualNode, DirectiveArgument[])"/>. Implement this
 /// interface for a stateful directive, or use the <see cref="Directive"/> record for a bundle of
 /// lambdas. Hook dispatch is direct invocation — never reflection over hook names (AOT/trimming

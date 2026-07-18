@@ -18,7 +18,7 @@ namespace Assimalign.Vue.RuntimeDom.Tests;
 [SupportedOSPlatform("browser")]
 public sealed class BrowserApplicationTests
 {
-    private static BrowserApplication CreateApp(out VueApplication<int> wrapped)
+    private static BrowserApplication CreateApp(out Application<int> wrapped)
     {
         // An inert int-handle renderer: the registration surface never invokes node operations.
         var renderer = RendererFactory.CreateRenderer(new RendererOptions<int>
@@ -132,15 +132,15 @@ public sealed class BrowserApplicationTests
         returned.ShouldBeSameAs(app);
     }
 
-    private sealed class CountingPlugin : IVuePlugin<int>
+    private sealed class CountingPlugin : IPlugin<int>
     {
         public int InstallCount { get; private set; }
 
-        public VueApplication<int>? SeenApplication { get; private set; }
+        public Application<int>? SeenApplication { get; private set; }
 
         public object? SeenOptions { get; private set; }
 
-        public void Install(VueApplication<int> application, object? options)
+        public void Install(Application<int> application, object? options)
         {
             InstallCount++;
             SeenApplication = application;

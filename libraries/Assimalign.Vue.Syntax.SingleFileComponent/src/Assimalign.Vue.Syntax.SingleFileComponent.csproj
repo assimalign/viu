@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
+         per the reviewer's architectural steer: the .viu block parser runs INSIDE the Roslyn SFC
+         generator ([V01.01.06.02]), which is a netstandard2.0 analyzer host. It therefore targets the
+         analyzer TFM alias — the same central property the template compiler and generators projects use
+         — never a hardcoded string. Its net10.0 test project references it normally. -->
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Source-generator-hosted code must target the stable analyzer surface: opt out of the repo-wide
+         preview-features switch (see build/Targets/Build.TargetFramework.props) so no
+         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the sibling parsers. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <!-- Deviates from the checklist rule "shipping libraries set IsAotCompatible=true": the AOT analyzers
+         require net7.0+, so the switch is inert on netstandard2.0. The central libraries targets
+         (libraries/Directory.Build.targets) clear the inherited IsAotCompatible=true once this
+         netstandard2.0 TFM is known. This library is consumed at build time by the generator, not shipped
+         into the WASM app, so AOT-compat analysis does not apply; the runtime AOT boundary is enforced on
+         the generator's OUTPUT, which is ordinary net10.0 code. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The shared base ([V01.01.05.09]): Position, SourceLocation, SyntaxList, SyntaxNode, and the
+         Diagnostic surface live in Assimalign.Vue.Syntax; SingleFileComponentBlock and
+         SingleFileComponentError derive from them. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Linked netstandard2.0 shims ([V01.01.05.09]): IsExternalInit and the required-member attributes
+         are authored once in Assimalign.Vue.Syntax and <Compile Include>'d here (still internal) because
+         an internal shim in a referenced assembly is not visible to this compilation — each netstandard2.0
+         assembly needs its own copy to light up `init`/`record`/`required`. -->
+    <Compile Include="..\..\Assimalign.Vue.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
+    <Compile Include="..\..\Assimalign.Vue.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
+  </ItemGroup>
+</Project>

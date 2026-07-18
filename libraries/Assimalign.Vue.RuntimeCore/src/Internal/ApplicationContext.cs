@@ -14,7 +14,7 @@ namespace Assimalign.Vue.RuntimeCore;
 /// mount and inherited by every <see cref="ComponentInstance"/> down the tree
 /// (<see cref="ComponentInstance.AppContext"/>), exactly as upstream inherits
 /// <c>instance.appContext</c> from the parent (or the root vnode). Internal — the public surface is
-/// <see cref="VueApplication{TNode}"/>. Not thread-safe (single-threaded JS event-loop model).
+/// <see cref="Application{TNode}"/>. Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 internal sealed class ApplicationContext
 {

@@ -9,7 +9,7 @@ namespace Assimalign.Vue.RuntimeDom;
 /// A browser-mounted Vuecs application — the C# port of the app object
 /// <c>createApp</c> returns in <c>@vue/runtime-dom</c>
 /// (https://vuejs.org/api/application.html, <c>packages/runtime-dom/src/index.ts</c>). Wraps
-/// the platform-agnostic <see cref="VueApplication{TNode}"/> with browser container concerns:
+/// the platform-agnostic <see cref="Application{TNode}"/> with browser container concerns:
 /// selector resolution, clearing existing content before a non-hydrating client mount
 /// (upstream parity), and full interop cleanup on <see cref="Unmount"/> — the bridge registry
 /// returns to its pre-mount baseline. Create through
@@ -18,10 +18,10 @@ namespace Assimalign.Vue.RuntimeDom;
 [SupportedOSPlatform("browser")]
 public sealed class BrowserApplication
 {
-    private readonly VueApplication<int> _application;
+    private readonly Application<int> _application;
     private readonly BufferedBrowserNodeOperations? _bufferedOperations;
 
-    internal BrowserApplication(VueApplication<int> application, BufferedBrowserNodeOperations? bufferedOperations = null)
+    internal BrowserApplication(Application<int> application, BufferedBrowserNodeOperations? bufferedOperations = null)
     {
         _application = application;
         _bufferedOperations = bufferedOperations;
@@ -38,7 +38,7 @@ public sealed class BrowserApplication
     /// https://vuejs.org/api/application.html#app-config) — the
     /// <see cref="ApplicationConfiguration.ErrorHandler"/> and
     /// <see cref="ApplicationConfiguration.WarnHandler"/>. Set its handlers before
-    /// <see cref="Mount(string)"/>. Delegates to the wrapped <see cref="VueApplication{TNode}.Config"/>.
+    /// <see cref="Mount(string)"/>. Delegates to the wrapped <see cref="Application{TNode}.Config"/>.
     /// </summary>
     public ApplicationConfiguration Config => _application.Config;
 
@@ -47,7 +47,7 @@ public sealed class BrowserApplication
     /// name — including <c>&lt;component :is="name"&gt;</c> (upstream:
     /// <c>app.component(name, definition)</c>, https://vuejs.org/api/application.html#app-component).
     /// Registering a duplicate name, or registering after mount, warns in dev. Delegates to the
-    /// wrapped <see cref="VueApplication{TNode}"/>.
+    /// wrapped <see cref="Application{TNode}"/>.
     /// </summary>
     /// <param name="name">The component name (resolved case-insensitively at render).</param>
     /// <param name="definition">The component definition.</param>
@@ -74,7 +74,7 @@ public sealed class BrowserApplication
     /// <see cref="Directives.ResolveDirective"/> (upstream: <c>app.directive(name, directive)</c>,
     /// https://vuejs.org/api/application.html#app-directive). Registering a duplicate name, or
     /// registering after mount, warns in dev. Delegates to the wrapped
-    /// <see cref="VueApplication{TNode}"/>.
+    /// <see cref="Application{TNode}"/>.
     /// </summary>
     /// <param name="name">The directive name (resolved case-insensitively at render).</param>
     /// <param name="directive">The directive definition.</param>
@@ -100,7 +100,7 @@ public sealed class BrowserApplication
     /// Provides <paramref name="value"/> app-wide under the typed <paramref name="key"/> (upstream:
     /// <c>app.provide(key, value)</c>, https://vuejs.org/api/application.html#app-provide) — the
     /// final fallback in the inject lookup chain. Providing a duplicate key, or providing after
-    /// mount, warns in dev. Delegates to the wrapped <see cref="VueApplication{TNode}"/>.
+    /// mount, warns in dev. Delegates to the wrapped <see cref="Application{TNode}"/>.
     /// </summary>
     /// <typeparam name="T">The provided value type.</typeparam>
     /// <param name="key">The identity-based key descendants inject with.</param>
@@ -116,7 +116,7 @@ public sealed class BrowserApplication
     /// <summary>
     /// Provides <paramref name="value"/> app-wide under a string <paramref name="key"/> (upstream:
     /// <c>app.provide</c> with a string key). Delegates to the wrapped
-    /// <see cref="VueApplication{TNode}"/>.
+    /// <see cref="Application{TNode}"/>.
     /// </summary>
     /// <param name="key">The string key descendants inject with.</param>
     /// <param name="value">The value to provide.</param>
@@ -133,13 +133,13 @@ public sealed class BrowserApplication
     /// https://vuejs.org/api/application.html#app-use). A repeat <c>Use</c> of the same plugin
     /// instance is deduplicated with a dev warning; a plugin installed after mount warns. The
     /// plugin's <see cref="IVuePlugin{TNode}.Install"/> receives the wrapped
-    /// <see cref="VueApplication{TNode}"/>. Delegates to the wrapped application.
+    /// <see cref="Application{TNode}"/>. Delegates to the wrapped application.
     /// </summary>
     /// <param name="plugin">The plugin to install (over the browser's <see cref="int"/> node handles).</param>
     /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public BrowserApplication Use(IVuePlugin<int> plugin, object? options = null)
+    public BrowserApplication Use(IPlugin<int> plugin, object? options = null)
     {
         _application.Use(plugin, options);
         return this;

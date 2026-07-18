@@ -1,8 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
-    <IsAotCompatible>true</IsAotCompatible>
-  </PropertyGroup>
   <ItemGroup>
     <VuecsProjectReference Include="Assimalign.Vue.Shared" />
     <VuecsProjectReference Include="Assimalign.Vue.Reactivity" />
