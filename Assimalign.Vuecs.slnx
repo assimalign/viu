@@ -105,6 +105,7 @@
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax/test/">
 		<Project Path="libraries/Assimalign.Vue.Syntax/test/Assimalign.Vue.Syntax.Tests.csproj" />
 	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.Compiler/src/">
 		<Project Path="libraries/Assimalign.Vue.Syntax.Compiler/src/Assimalign.Vue.Syntax.Compiler.csproj" />
 	</Folder>
@@ -115,6 +116,7 @@
 		<File Path="libraries/Assimalign.Vue.Syntax.Compiler/tools/Generate-HtmlEntities.ps1" />
 		<File Path="libraries/Assimalign.Vue.Syntax.Compiler/tools/README.md" />
 	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/docs/">
 		<File Path="libraries/Assimalign.Vue.Syntax.SingleFileComponent/docs/FORMAT.md" />
 	</Folder>

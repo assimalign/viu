@@ -13,8 +13,7 @@ namespace Assimalign.Vue.Syntax;
 /// generators' internal <c>EquatableArray&lt;T&gt;</c> helper.
 /// </summary>
 /// <typeparam name="T">The element type, a reference type with its own value equality (a parse record).</typeparam>
-public readonly struct SyntaxList<T> : IReadOnlyList<T>, IEquatable<SyntaxList<T>>
-    where T : class
+public readonly struct SyntaxList<T> : IReadOnlyList<T>, IEquatable<SyntaxList<T>> where T : SyntaxNode
 {
     /// <summary>The empty list.</summary>
     public static readonly SyntaxList<T> Empty = new(Array.Empty<T>());

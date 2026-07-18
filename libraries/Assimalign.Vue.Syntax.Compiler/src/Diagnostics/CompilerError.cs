@@ -6,10 +6,10 @@ namespace Assimalign.Vue.Syntax.Compiler;
 /// A parse error with its code, human-readable message, and source location. The C# port of Vue 3.5's
 /// <c>CompilerError</c> (<c>@vue/compiler-core</c> <c>errors.ts</c>). The parser reports errors through
 /// <see cref="ParserOptions.OnError"/> rather than throwing, matching Vue's recoverable-parsing model.
-/// A <see cref="SyntaxDiagnostic"/> whose language-specific code catalog and push delivery stay distinct
+/// A <see cref="Diagnostic"/> whose language-specific code catalog and push delivery stay distinct
 /// from the single-file-component parser's, per the shared base's per-language contract.
 /// </summary>
-public sealed record CompilerError : SyntaxDiagnostic
+public sealed record CompilerError : Diagnostic
 {
     /// <summary>Creates a compiler error for <paramref name="code"/> at <paramref name="location"/>.</summary>
     /// <param name="code">The error code.</param>

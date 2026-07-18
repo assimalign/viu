@@ -26,4 +26,16 @@ public abstract record SyntaxNode
 {
     /// <summary>The source range this node spans, with the exact original slice.</summary>
     public required SourceLocation Location { get; init; }
+
+    public abstract SyntaxNodeKind Kind { get; }
 }
+
+/*
+ 
+SyntaxNode
+-> Template
+-> Component
+-> Css
+
+ 
+ */

@@ -1,4 +1,4 @@
-namespace Assimalign.Vue.Syntax;
+namespace Assimalign.Vue.Syntax.Diagnostics;
 
 /// <summary>
 /// The uniform diagnostic surface every <c>Assimalign.Vue.Syntax.*</c> parser exposes: a
@@ -15,13 +15,15 @@ namespace Assimalign.Vue.Syntax;
 /// split as <c>@vue/compiler-core</c> (onError push) versus <c>@vue/compiler-sfc</c> (result errors pull).
 /// Each derived record surfaces its own enum-typed code and projects it here as <see cref="RawCode"/>.
 /// </remarks>
-public abstract record SyntaxDiagnostic
+public abstract record Diagnostic
 {
     /// <summary>The human-readable message for the diagnostic.</summary>
     public required string Message { get; init; }
 
     /// <summary>The source range the diagnostic points at.</summary>
     public required SourceLocation Location { get; init; }
+
+    public required DiagnosticSeverity Severity { get; init; }
 
     /// <summary>The diagnostic's code as an integer, projected from the derived record's enum-typed code.</summary>
     public abstract int RawCode { get; }

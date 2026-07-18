@@ -8,10 +8,10 @@ namespace Assimalign.Vue.Syntax.SingleFileComponent;
 /// area's own <see cref="SingleFileComponentErrorCode"/> catalog. The parser reports these through
 /// <see cref="SingleFileComponentParseResult.Errors"/> and never throws for malformed input, matching
 /// Vue's recoverable-parsing model (<c>@vue/compiler-sfc</c> <c>parse().errors</c>). A
-/// <see cref="SyntaxDiagnostic"/> whose Vuecs-defined code catalog and result-errors delivery stay
+/// <see cref="Diagnostic"/> whose Vuecs-defined code catalog and result-errors delivery stay
 /// distinct from the template compiler's, per the shared base's per-language contract.
 /// </summary>
-public sealed record SingleFileComponentError : SyntaxDiagnostic
+public sealed record SingleFileComponentError : Diagnostic
 {
     /// <summary>Creates a diagnostic for <paramref name="code"/> at <paramref name="location"/>.</summary>
     /// <param name="code">The diagnostic code.</param>
