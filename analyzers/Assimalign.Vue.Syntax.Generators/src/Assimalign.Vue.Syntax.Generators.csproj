@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- The generator's parser dependencies (Assimalign.Vue.Syntax + the two language libraries) must
+         load in the consumer's analyzer context; this flows their outputs through GetTargetPath (see
+         build/Targets/Build.References.Analyzers.targets). -->
+    <VuecsAnalyzerBundlesProjectReferenceOutputs>true</VuecsAnalyzerBundlesProjectReferenceOutputs>
+    <!-- The generator's parser dependencies (Assimalign.Vue.Syntax + the two language libraries) must
+         load in the consumer's analyzer context; this flows their outputs through GetTargetPath (see
+         build/Targets/Build.References.Analyzers.targets). -->
+    <VuecsAnalyzerBundlesProjectReferenceOutputs>true</VuecsAnalyzerBundlesProjectReferenceOutputs>
+    <!-- Source generators must target the stable analyzer surface: opt out of the repo-wide preview
+         features switch (see build/Targets/Build.TargetFramework.props) so no [RequiresPreviewFeatures]
+         leaks into the netstandard2.0 analyzer. Mirrors the sibling Reactivity.Generators csproj. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- The analyzer DLL is packed into consuming libraries' nupkgs by
+         build/Targets/Build.References.Analyzers.targets, never shipped as its own package. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <VuecsPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The composition root ([V01.01.06.02]): this is the ONLY place the Assimalign.Vue.Syntax.*
+         parsers meet. It constructs the .viu block parser and registers the template parser for
+         @template blocks on the aggregate registration seam ([V01.01.05.09]). Language libraries never
+         reference each other; the generator references all three. Compile-time only — never shipped into
+         the WASM payload. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax.SingleFileComponent" />
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax.Templates" />
+  </ItemGroup>
+  <!-- Analyzer release tracking (RS2008): the shipped diagnostic IDs are recorded here. -->
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

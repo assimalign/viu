@@ -1,8 +1,12 @@
-# Area build+test for Assimalign.Vue.Reactivity.Generators ([V01.01.12.02]): path-filtered so a PR
-# only runs the areas it touches; shared build files trigger every area. The build scope is the
-# per-area slnx, keeping CI and local builds in lockstep. The generator's tests compile against the
-# Assimalign.Vue.Reactivity runtime library (for the [Reactive] attribute), so changes there also
-# trigger this area; cross-area contracts are enforced by project references at build time.
+# Area build+test for the Vuecs source generators ([V01.01.12.02]): path-filtered so a PR only runs the
+# areas it touches; shared build files trigger every area. The build scope is each per-area slnx, keeping
+# CI and local builds in lockstep.
+#   - Assimalign.Vue.Reactivity.Generators compiles against the Assimalign.Vue.Reactivity runtime library
+#     (for the [Reactive] attribute), so changes there also trigger this area.
+#   - Assimalign.Vue.Syntax.Generators is the composition root of the Assimalign.Vue.Syntax.* cluster
+#     ([V01.01.06.02]); it references the base parser and the SingleFileComponent + Templates language
+#     libraries, so a change to any Assimalign.Vue.Syntax* library must re-run this area.
+# Cross-area contracts are enforced by project references at build time.
 name: area-generators
 
 on:
@@ -10,7 +14,9 @@ on:
     branches: [main]
     paths:
       - 'analyzers/Assimalign.Vue.Reactivity.Generators/**'
+      - 'analyzers/Assimalign.Vue.Syntax.Generators/**'
       - 'libraries/Assimalign.Vue.Reactivity/**'
+      - 'libraries/Assimalign.Vue.Syntax*/**'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
@@ -22,7 +28,9 @@ on:
     branches: [main]
     paths:
       - 'analyzers/Assimalign.Vue.Reactivity.Generators/**'
+      - 'analyzers/Assimalign.Vue.Syntax.Generators/**'
       - 'libraries/Assimalign.Vue.Reactivity/**'
+      - 'libraries/Assimalign.Vue.Syntax*/**'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
@@ -42,8 +50,14 @@ jobs:
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
 
-      - name: Build (warnings are errors)
+      - name: Build Reactivity generator (warnings are errors)
         run: dotnet build analyzers/Assimalign.Vue.Reactivity.Generators/Assimalign.Vue.Reactivity.Generators.slnx --configuration Release -warnaserror
 
-      - name: Test
+      - name: Test Reactivity generator
         run: dotnet test analyzers/Assimalign.Vue.Reactivity.Generators/Assimalign.Vue.Reactivity.Generators.slnx --configuration Release --no-build
+
+      - name: Build SingleFileComponent generator (warnings are errors)
+        run: dotnet build analyzers/Assimalign.Vue.Syntax.Generators/Assimalign.Vue.Syntax.Generators.slnx --configuration Release -warnaserror
+
+      - name: Test SingleFileComponent generator
+        run: dotnet test analyzers/Assimalign.Vue.Syntax.Generators/Assimalign.Vue.Syntax.Generators.slnx --configuration Release --no-build

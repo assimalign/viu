@@ -71,6 +71,17 @@
 	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Reactivity.Generators/test/">
 		<Project Path="analyzers/Assimalign.Vue.Reactivity.Generators/test/Assimalign.Vue.Reactivity.Generators.Tests.csproj" />
 	</Folder>
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Syntax.Generators/">
+		<File Path="analyzers/Assimalign.Vue.Syntax.Generators/Assimalign.Vue.Syntax.Generators.slnx" />
+		<File Path="analyzers/Assimalign.Vue.Syntax.Generators/build/Assimalign.Vue.Syntax.Generators.props" />
+		<File Path="analyzers/Assimalign.Vue.Syntax.Generators/build/Assimalign.Vue.Syntax.Generators.targets" />
+	</Folder>
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Syntax.Generators/src/">
+		<Project Path="analyzers/Assimalign.Vue.Syntax.Generators/src/Assimalign.Vue.Syntax.Generators.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Syntax.Generators/test/">
+		<Project Path="analyzers/Assimalign.Vue.Syntax.Generators/test/Assimalign.Vue.Syntax.Generators.Tests.csproj" />
+	</Folder>
 	<Folder Name="/vuecs/build/">
 		<File Path="build/Build.props" />
 		<File Path="build/Build.targets" />
