@@ -27,10 +27,12 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 
 ## Folders within `src/`
 
-- **Public interfaces** → `src/Abstraction/`.
-- **Internal types** (classes, structs, enums, records, **and internal interfaces**) → `src/Internal/`.
-- **Public non-interface types** → `src/` root.
-- Create a folder only when it will contain files (a library with no interfaces has no `Abstraction/`).
+- **Public interfaces** → `src/Abstraction/` (flat).
+- **Internal types** (classes, structs, enums, records, **and internal interfaces**) → `src/Internal/` (flat).
+- **Delegates** (public delegate declarations) → `src/Delegates/`.
+- **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
+- Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
+- Linked shared-source files (`PatchFlags.cs`, `SlotFlags.cs`, `Internal/DomKnowledgeData.cs`) are `<Compile Include>` targets from netstandard2.0 projects — **their paths are frozen**; moving them requires updating every linking csproj in the same change.
 
 ## Files and types
 
@@ -45,7 +47,10 @@ win** — link the reference in the code, test, or issue that pins the behavior.
   `Operations`, `Prev` → `Previous`, `Prop`/`Props` → `Property`/`Properties`. This applies to types,
   members, parameters, and locals.
 - **Well-known acronyms stay acronyms**: DOM, HTML, CSS, SSR, AOT, JSON, WASM (e.g. `IVirtualDomAdapter`,
-  `HtmlRenderer`).
+  `HtmlRenderer`). The approved list is exactly those seven; nothing else is treated as an acronym.
+  **SFC is _not_ on the list** — identifiers spell out `SingleFileComponent` (the
+  `Assimalign.Vue.SingleFileComponent` area), never `Sfc`. Prose may still write "single-file component
+  (SFC)".
 - Interfaces begin with `I` (editorconfig-enforced at **error** severity).
 
 ## Using directives

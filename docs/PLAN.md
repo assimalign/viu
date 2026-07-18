@@ -40,7 +40,7 @@ package root is **`Assimalign.Vue.*`**:
 | RuntimeCore (`V01.01.03`) | `Assimalign.Vue.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Vue.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
 | Compiler (`V01.01.05`) | `Assimalign.Vue.Compiler` (+ source generators) | `@vue/compiler-core` + `compiler-dom` |
-| Sfc (`V01.01.06`) | `Assimalign.Vue.Sfc` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup) |
+| SingleFileComponent (`V01.01.06`) | `Assimalign.Vue.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Vue.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
 | Router (`V01.01.08`) | `Assimalign.Vue.Router` | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Vue.Store` | `pinia` |
@@ -189,7 +189,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.05.07` | Implement static hoisting and stringification | W03 | P003 |
 | `V01.01.05.08` | Implement compiler diagnostics with template source mapping | W03 | P003 |
 
-### [V01.01.06] Framework - Sfc (W03, P003)
+### [V01.01.06] Framework - SingleFileComponent (W03, P003)
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
