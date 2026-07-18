@@ -6,10 +6,12 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <summary>
 /// Renders a <see cref="SingleFileComponentModel"/> into the partial-class scaffold the generator adds
 /// for a <c>.viu</c> component. The output is deterministic and fully statically analyzable (no
-/// reflection, no runtime type references), so it is trimming- and WASM/NativeAOT-safe. The scaffold is
-/// intentionally a shell with two clearly-marked seams: the render function ([V01.01.05.05]) and the
-/// merged <c>@script</c> C# ([V01.01.06.03]) fill in their bodies in their own work items — this
-/// composition root emits the seam, not their internals.
+/// reflection, no runtime type references), so it is trimming- and WASM/NativeAOT-safe. The scaffold
+/// carries two seams: the render function ([V01.01.05.05]), still a placeholder its own work item
+/// completes, and the merged <c>@script</c> C# ([V01.01.06.03]) — filled here — which emits the block's
+/// body verbatim into the partial class under a <c>#line</c> map so compiler errors and debugger stepping
+/// resolve to the <c>.viu</c> source. The class stays <c>partial</c> and the scaffold emits no members of
+/// its own, so a user-authored sibling <c>.cs</c> partial and the merged script coexist without collision.
 /// </summary>
 internal static class SingleFileComponentSourceEmitter
 {
@@ -55,10 +57,8 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, bodyIndent);
         builder.Append("// here once template code generation lands; the scaffold emits no render output yet.\n");
         builder.Append('\n');
-        AppendIndent(builder, bodyIndent);
-        builder.Append("// [V01.01.06.03] Script merge seam. The @script block's C# is merged into this partial class\n");
-        AppendIndent(builder, bodyIndent);
-        builder.Append("// (with #line mapping) once script analysis lands; the scaffold emits no @script body yet.\n");
+
+        AppendScriptSeam(builder, bodyIndent, model);
 
         AppendIndent(builder, indent);
         builder.Append("}\n");
@@ -69,6 +69,48 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         return builder.ToString();
+    }
+
+    // [V01.01.06.03] The @script merge seam — the only seam this work item fills. When the component
+    // declares a script block, its C# body is merged into the partial class under a #line map; otherwise
+    // the seam is a documenting comment. The [V01.01.05.05] render seam above stays a placeholder.
+    private static void AppendScriptSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        if (model.ScriptContent is not { } scriptContent)
+        {
+            AppendIndent(builder, indent);
+            builder.Append("// [V01.01.06.03] Script merge seam. This component declares no @script block, so no C#\n");
+            AppendIndent(builder, indent);
+            builder.Append("// body is merged into the partial class.\n");
+            return;
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("// [V01.01.06.03] Merged @script block. The block's C# is emitted verbatim below, wrapped in\n");
+        AppendIndent(builder, indent);
+        builder.Append("// #line directives that map every line back to the .viu source, so compiler errors and\n");
+        AppendIndent(builder, indent);
+        builder.Append("// debugger stepping land in the .viu file rather than this generated file.\n");
+        AppendScript(builder, model.FilePath, model.ScriptContentStartLine, scriptContent);
+    }
+
+    // Emits the @script body flush against column 0 (no scaffold indentation added). The C# #line
+    // directive remaps the LINE of the following text but takes each token's COLUMN verbatim from this
+    // generated file; because a .viu block's content begins at column 1 (docs/FORMAT.md §3), emitting each
+    // script line un-indented preserves its original column, so a reported (line, column) lands on the
+    // exact .viu coordinate — the same block-to-file mapping SingleFileComponentDiagnostics composes. The
+    // trailing #line default restores this generated file's own line mapping for the scaffold that follows.
+    private static void AppendScript(StringBuilder builder, string filePath, int startLine, string content)
+    {
+        builder.Append("#line ").Append(startLine.ToString(CultureInfo.InvariantCulture))
+            .Append(" \"").Append(filePath).Append("\"\n");
+        builder.Append(content);
+        if (content.Length == 0 || content[content.Length - 1] != '\n')
+        {
+            builder.Append('\n');
+        }
+
+        builder.Append("#line default\n");
     }
 
     private static string Present(bool present) => present ? "present" : "absent";
