@@ -30,6 +30,11 @@ internal static class BlockStack
     // disable-tracking block (v-once content, upstream openBlock(true)).
     private static readonly List<List<VirtualNode>?> Stack = [];
 
+    // Parallel to Stack: whether each open block has had a v-once bracket suspend collection inside it
+    // (upstream: the hasOnce flag carried on currentBlock / dynamicChildren). Kept as a separate list
+    // rather than a property on the pooled accumulator so pooling stays a plain clear-and-reuse.
+    private static readonly List<bool> StackHasOnce = [];
+
     // A free-list of accumulator lists: rented on OpenBlock, returned once the block is closed and
     // its children copied out, so collection reuses lists instead of allocating per render.
     private static readonly Stack<List<VirtualNode>> Pool = new();
@@ -51,17 +56,29 @@ internal static class BlockStack
     {
         var block = disableTracking ? null : Rent();
         Stack.Add(block);
+        StackHasOnce.Add(false);
         current = block;
     }
 
     /// <summary>
-    /// Adjusts block-tree tracking (upstream: <c>setBlockTracking</c>). The upstream <c>hasOnce</c>
-    /// marking is intentionally omitted: Vuecs unmount always walks the full children rather than
-    /// the <c>DynamicChildren</c> fast path, so nested components inside v-once content are always
-    /// torn down and the guard it protects is not reachable.
+    /// Adjusts block-tree tracking (upstream: <c>setBlockTracking</c>). When
+    /// <paramref name="inVOnce"/> suspends collection (<paramref name="value"/> &lt; 0) inside an open
+    /// block, that block is marked so unmount skips the <see cref="VirtualNode.DynamicChildren"/> fast
+    /// path (upstream #5154: <c>currentBlock.hasOnce = true</c>) — otherwise a component nested in the
+    /// v-once content, absent from the block's collected descendants, would never be torn down.
     /// </summary>
     /// <param name="value">-1 suspends collection; +1 resumes it.</param>
-    internal static void SetBlockTracking(int value) => enabled += value;
+    /// <param name="inVOnce">True when the suspension brackets v-once content (marks the block).</param>
+    internal static void SetBlockTracking(int value, bool inVOnce = false)
+    {
+        enabled += value;
+        if (value < 0 && inVOnce && current is not null)
+        {
+            // Mark the innermost open (tracking) block; a disable-tracking block has current == null
+            // and is intentionally not marked (upstream: the `currentBlock &&` guard).
+            StackHasOnce[^1] = true;
+        }
+    }
 
     /// <summary>
     /// Closes the current block and stamps its collected dynamic descendants onto
@@ -76,6 +93,9 @@ internal static class BlockStack
         var accumulator = current;
         // Upstream: dynamicChildren = isBlockTreeEnabled > 0 ? currentBlock || EMPTY_ARR : null.
         block.DynamicChildren = enabled > 0 ? Materialize(accumulator) : null;
+        // Carry the v-once mark from the open block onto the vnode (upstream: dynamicChildren.hasOnce),
+        // read before CloseBlock pops the frame.
+        block.HasOnce = StackHasOnce.Count > 0 && StackHasOnce[^1];
         Recycle(accumulator);
         CloseBlock();
         if (enabled > 0 && current is not null)
@@ -115,6 +135,7 @@ internal static class BlockStack
     internal static void ClearAfterRenderFailure()
     {
         Stack.Clear();
+        StackHasOnce.Clear();
         current = null;
         enabled = 1;
     }
@@ -126,6 +147,7 @@ internal static class BlockStack
     internal static void Reset()
     {
         Stack.Clear();
+        StackHasOnce.Clear();
         Pool.Clear();
         current = null;
         enabled = 1;
@@ -135,6 +157,7 @@ internal static class BlockStack
     {
         // Upstream closeBlock: pop the stack and restore the parent block as current.
         Stack.RemoveAt(Stack.Count - 1);
+        StackHasOnce.RemoveAt(StackHasOnce.Count - 1);
         current = Stack.Count > 0 ? Stack[^1] : null;
     }
 

@@ -152,11 +152,15 @@ public static class VirtualNodeFactory
 
     /// <summary>
     /// Suspends or resumes block-tree tracking (upstream: <c>setBlockTracking</c>): a v-once
-    /// expression brackets its cached content with <c>SetBlockTracking(-1)</c> then
-    /// <c>SetBlockTracking(1)</c> so the content is not collected as a dynamic child.
+    /// expression brackets its cached content with <c>SetBlockTracking(-1, inVOnce: true)</c> then
+    /// <c>SetBlockTracking(1)</c> so the content is not collected as a dynamic child. Passing
+    /// <paramref name="inVOnce"/> on the suspending call also marks the enclosing block so unmount
+    /// skips the fast path and still tears down components nested in the v-once content
+    /// (upstream #5154; see <see cref="VirtualNode.HasOnce"/>).
     /// </summary>
     /// <param name="value">-1 suspends collection; +1 resumes it.</param>
-    public static void SetBlockTracking(int value) => BlockStack.SetBlockTracking(value);
+    /// <param name="inVOnce">True when the suspension brackets v-once content (marks the block).</param>
+    public static void SetBlockTracking(int value, bool inVOnce = false) => BlockStack.SetBlockTracking(value, inVOnce);
 
     /// <summary>
     /// Creates a block element vnode whose <see cref="VirtualNode.DynamicChildren"/> are the dynamic
@@ -478,6 +482,7 @@ public static class VirtualNodeFactory
             PatchFlag = node.PatchFlag,
             DynamicProperties = node.DynamicProperties,
             DynamicChildren = node.DynamicChildren,
+            HasOnce = node.HasOnce,
             Directives = node.Directives,
             AppContext = node.AppContext,
             El = node.El,
