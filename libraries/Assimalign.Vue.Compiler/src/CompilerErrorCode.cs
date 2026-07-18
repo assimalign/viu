@@ -181,8 +181,56 @@ public enum CompilerErrorCode
     XVBindInvalidSameNameArgument = 52,
 
     /// <summary>
-    /// The reserved value one past the last defined code, so higher-order compilers can extend the
-    /// catalog without collisions (upstream <c>__EXTEND_POINT__</c>). Always keep this last.
+    /// The reserved value one past the last defined <b>core</b> code, matching upstream
+    /// <c>@vue/compiler-core</c>'s <c>__EXTEND_POINT__</c>. The DOM diagnostics below extend the catalog from
+    /// here, exactly as <c>@vue/compiler-dom</c>'s <c>DOMErrorCodes</c> enum extends core's error codes.
     /// </summary>
     ExtendPoint = 53,
+
+    // ---- DOM directive transform errors ([V01.01.05.03], the C# port of @vue/compiler-dom's DOMErrorCodes) ----
+    //
+    // DESIGN DECISION (flagged): Vuecs merges @vue/compiler-core and @vue/compiler-dom into a single
+    // Assimalign.Vue.Compiler project, so the DOM codes live in THIS one enum rather than a separate one.
+    // Upstream's DOMErrorCodes begins at core's __EXTEND_POINT__ value (53) — its first real code reuses the
+    // sentinel's number because the two enums are distinct types. A single C# enum cannot give ExtendPoint the
+    // value 53 (pinned by ErrorCatalog_NumericValues_MatchUpstreamErrorCodes, which must not change) AND give
+    // X_V_HTML_NO_EXPRESSION the same 53. The DOM codes are therefore appended after the preserved sentinel
+    // (starting at 54), so each equals its upstream DOMErrorCodes value + 1. Core codes 0..53 remain numeric-
+    // exact with upstream; the +1 DOM offset is pinned by DomErrorCatalog_NumericValues below.
+
+    /// <summary><c>v-html</c> is missing its expression (upstream DOM <c>X_V_HTML_NO_EXPRESSION</c>).</summary>
+    XVHtmlNoExpression = 54,
+
+    /// <summary><c>v-html</c> will override the element's children (upstream DOM <c>X_V_HTML_WITH_CHILDREN</c>).</summary>
+    XVHtmlWithChildren = 55,
+
+    /// <summary><c>v-text</c> is missing its expression (upstream DOM <c>X_V_TEXT_NO_EXPRESSION</c>).</summary>
+    XVTextNoExpression = 56,
+
+    /// <summary><c>v-text</c> will override the element's children (upstream DOM <c>X_V_TEXT_WITH_CHILDREN</c>).</summary>
+    XVTextWithChildren = 57,
+
+    /// <summary><c>v-model</c> used on an unsupported element (upstream DOM <c>X_V_MODEL_ON_INVALID_ELEMENT</c>).</summary>
+    XVModelOnInvalidElement = 58,
+
+    /// <summary><c>v-model</c> argument used on a plain element (upstream DOM <c>X_V_MODEL_ARG_ON_ELEMENT</c>).</summary>
+    XVModelArgumentOnElement = 59,
+
+    /// <summary><c>v-model</c> used on a file input (upstream DOM <c>X_V_MODEL_ON_FILE_INPUT_ELEMENT</c>).</summary>
+    XVModelOnFileInputElement = 60,
+
+    /// <summary>Unnecessary <c>value</c> binding alongside <c>v-model</c> (upstream DOM <c>X_V_MODEL_UNNECESSARY_VALUE</c>).</summary>
+    XVModelUnnecessaryValue = 61,
+
+    /// <summary><c>v-show</c> is missing its expression (upstream DOM <c>X_V_SHOW_NO_EXPRESSION</c>).</summary>
+    XVShowNoExpression = 62,
+
+    /// <summary><c>&lt;Transition&gt;</c> expects exactly one child (upstream DOM <c>X_TRANSITION_INVALID_CHILDREN</c>).</summary>
+    XTransitionInvalidChildren = 63,
+
+    /// <summary>A side-effect tag (<c>&lt;script&gt;</c>/<c>&lt;style&gt;</c>) was ignored (upstream DOM <c>X_IGNORED_SIDE_EFFECT_TAG</c>).</summary>
+    XIgnoredSideEffectTag = 64,
+
+    /// <summary>The reserved value one past the last defined DOM code (upstream DOM <c>__EXTEND_POINT__</c>).</summary>
+    DomExtendPoint = 65,
 }

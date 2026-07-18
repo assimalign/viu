@@ -89,6 +89,24 @@ internal static class CompilerErrorMessages
             "@vnode-* hooks in templates are no longer supported. Use the vue: prefix instead. " +
             "For example, @vnode-mounted should be changed to @vue:mounted. " +
             "@vnode-* hooks support has been removed in 3.4.",
+
+        // DOM directive transform errors (verbatim from @vue/compiler-dom errors.ts DOMErrorMessages)
+        [CompilerErrorCode.XVHtmlNoExpression] = "v-html is missing expression.",
+        [CompilerErrorCode.XVHtmlWithChildren] = "v-html will override element children.",
+        [CompilerErrorCode.XVTextNoExpression] = "v-text is missing expression.",
+        [CompilerErrorCode.XVTextWithChildren] = "v-text will override element children.",
+        [CompilerErrorCode.XVModelOnInvalidElement] =
+            "v-model can only be used on <input>, <textarea> and <select> elements.",
+        [CompilerErrorCode.XVModelArgumentOnElement] = "v-model argument is not supported on plain elements.",
+        [CompilerErrorCode.XVModelOnFileInputElement] =
+            "v-model cannot be used on file inputs since they are read-only. Use a v-on:change listener instead.",
+        [CompilerErrorCode.XVModelUnnecessaryValue] =
+            "Unnecessary value binding used alongside v-model. It will interfere with v-model's behavior.",
+        [CompilerErrorCode.XVShowNoExpression] = "v-show is missing expression.",
+        [CompilerErrorCode.XTransitionInvalidChildren] =
+            "<Transition> expects exactly one child element or component.",
+        [CompilerErrorCode.XIgnoredSideEffectTag] =
+            "Tags with side effect (<script> and <style>) are ignored in client component templates.",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>
