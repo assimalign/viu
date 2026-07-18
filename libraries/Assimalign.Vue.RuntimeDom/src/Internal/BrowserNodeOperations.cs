@@ -42,6 +42,22 @@ internal static class BrowserNodeOperations
             Invokers.SetListener(element, rawPropertyName, listener),
     };
 
+    // Installs the ambient operations the DOM v-model/v-show directives ([V01.01.04.06]) write
+    // through: model listeners ride the invoker registry's model channel, DOM writes reuse the same
+    // leaf ops as the patch engine. Runs once on first touch of this type (which precedes any render).
+    static BrowserNodeOperations()
+    {
+        BrowserDirectiveOperations.Current = new BrowserDirectiveOperations
+        {
+            SetModelListener = static (element, rawPropertyName, handler) =>
+                Invokers.SetModelListener(element, rawPropertyName, handler),
+            SetValueGuarded = LeafOperations.SetValueGuarded,
+            SetBooleanProperty = LeafOperations.SetBooleanProperty,
+            SetStyleProperty = LeafOperations.SetStyleProperty,
+            RemoveStyleProperty = LeafOperations.RemoveStyleProperty,
+        };
+    }
+
     internal static RendererOptions<int> Create() => new()
     {
         Insert = static (child, parent, anchor) => BrowserDomBridge.Insert(parent, child, anchor),

@@ -159,4 +159,64 @@ public class BrowserEventInvokerRegistryTests
 
         invoked.ShouldBe(["first", "second:click"]);
     }
+
+    // --- model channel ([V01.01.04.06]: v-model listeners coexist with template @event props;
+    // upstream attaches the directive's listener with a separate raw addEventListener) ----------
+
+    [Fact]
+    public void ModelAndPropertyChannels_ShareOneDomListener_AndBothFire()
+    {
+        var invoked = new List<string>();
+        _registry.SetListener(Element, "onInput", (Action)(() => invoked.Add("property")));
+        _registry.SetModelListener(Element, "onInput", (Action)(() => invoked.Add("model")));
+
+        _bridgeCalls.Count.ShouldBe(1); // one addEventListener for both channels
+
+        _registry.Dispatch(Element, capture: false, Event("input"));
+        invoked.ShouldBe(["property", "model"]); // property fires first, then the directive
+    }
+
+    [Fact]
+    public void RemovingThePropertyChannel_KeepsTheModelChannelListening()
+    {
+        var invoked = new List<string>();
+        _registry.SetModelListener(Element, "onInput", (Action)(() => invoked.Add("model")));
+        _registry.SetListener(Element, "onInput", (Action)(() => invoked.Add("property")));
+
+        _registry.SetListener(Element, "onInput", null); // template handler removed on re-render
+
+        _bridgeCalls.ShouldBe([$"add({Element},input,once:False,capture:False,passive:False)"]); // no remove
+        _registry.Dispatch(Element, capture: false, Event("input"));
+        invoked.ShouldBe(["model"]);
+    }
+
+    [Fact]
+    public void RemovingBothChannels_RemovesTheDomListenerOnce()
+    {
+        _registry.SetModelListener(Element, "onInput", (Action)(() => { }));
+        _registry.SetListener(Element, "onInput", (Action)(() => { }));
+
+        _registry.SetListener(Element, "onInput", null);
+        _registry.SetModelListener(Element, "onInput", null);
+
+        _bridgeCalls.ShouldBe(
+        [
+            $"add({Element},input,once:False,capture:False,passive:False)",
+            $"remove({Element},input,capture:False)",
+        ]);
+        _registry.InvokerCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void SwappingTheModelHandler_MakesZeroBridgeCalls()
+    {
+        var invoked = new List<string>();
+        _registry.SetModelListener(Element, "onChange", (Action)(() => invoked.Add("first")));
+        _registry.SetModelListener(Element, "onChange", (Action)(() => invoked.Add("second")));
+
+        _bridgeCalls.Count.ShouldBe(1); // re-rendered directive handler is a delegate swap only
+
+        _registry.Dispatch(Element, capture: false, Event("change"));
+        invoked.ShouldBe(["second"]);
+    }
 }

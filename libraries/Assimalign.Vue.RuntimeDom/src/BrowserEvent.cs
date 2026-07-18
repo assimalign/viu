@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Assimalign.Vue.RuntimeDom;
 
@@ -9,6 +10,11 @@ namespace Assimalign.Vue.RuntimeDom;
 /// <c>JSObject</c> property reads and no proxy retained per event.
 /// <see cref="StopPropagation"/>/<see cref="PreventDefault"/> record intents the bridge applies
 /// to the live JS event when the synchronous dispatch returns.
+/// <para>
+/// <see cref="TargetValue"/>, <see cref="TargetChecked"/>, and <see cref="SelectedValues"/> carry
+/// the form-control state <c>v-model</c> ([V01.01.04.06]) reads, so the directive never issues a
+/// follow-up interop read per event (the issue's interop-boundary requirement).
+/// </para>
 /// </summary>
 public sealed class BrowserEvent
 {
@@ -25,7 +31,8 @@ public sealed class BrowserEvent
         int detail,
         bool isSelfTarget,
         string? targetValue,
-        bool targetChecked)
+        bool targetChecked,
+        string[]? selectedValues = null)
     {
         EventName = eventName;
         TimeStamp = timeStamp;
@@ -40,6 +47,7 @@ public sealed class BrowserEvent
         IsSelfTarget = isSelfTarget;
         TargetValue = targetValue;
         TargetChecked = targetChecked;
+        SelectedValues = selectedValues;
     }
 
     /// <summary>The DOM event type (e.g. <c>"click"</c>, <c>"keydown"</c>).</summary>
@@ -83,6 +91,14 @@ public sealed class BrowserEvent
 
     /// <summary>The target element's <c>checked</c> state at dispatch, when it has one.</summary>
     public bool TargetChecked { get; }
+
+    /// <summary>
+    /// The values of the selected <c>&lt;option&gt;</c>s when the target is a <c>&lt;select
+    /// multiple&gt;</c> (upstream reads <c>el.selectedOptions</c>), or null for every other event.
+    /// Carried so <c>VModelSelect</c> maps a multi-select change to its bound list or set without a
+    /// follow-up interop read.
+    /// </summary>
+    public IReadOnlyList<string>? SelectedValues { get; }
 
     /// <summary>Whether <see cref="StopPropagation"/> was requested.</summary>
     public bool PropagationStopped { get; private set; }

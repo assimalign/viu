@@ -11,5 +11,9 @@
   </ItemGroup>
   <ItemGroup>
     <VuecsProjectReference Include="Assimalign.Vue.RuntimeDom" />
+    <VuecsProjectReference Include="Assimalign.Vue.RuntimeCore" />
+    <VuecsProjectReference Include="Assimalign.Vue.Reactivity" />
+    <VuecsProjectReference Include="Assimalign.Vue.Shared" />
+    <VuecsProjectReference Include="Assimalign.Vue.Testing" />
   </ItemGroup>
 </Project>

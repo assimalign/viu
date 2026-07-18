@@ -292,6 +292,11 @@ export const dom = {
 
             const target = event.target
             const hasValue = target && typeof target.value !== 'undefined'
+            // <select multiple> v-model reads the selected option values here rather than issuing
+            // a follow-up interop read per change ([V01.01.04.06]); null for every other target.
+            const selectedValues = (target && target.multiple && target.options)
+                ? Array.prototype.filter.call(target.options, option => option.selected).map(option => option.value)
+                : null
             const flags = dispatchEvent(
                 nodeHandle,
                 eventName,
@@ -307,7 +312,8 @@ export const dom = {
                 event.detail ?? 0,
                 target === event.currentTarget,
                 hasValue ? String(target.value) : null,
-                !!(target && target.checked))
+                !!(target && target.checked),
+                selectedValues)
             if (flags & 1) {
                 event.stopPropagation()
             }

@@ -32,6 +32,118 @@ public sealed class BrowserApplication
     public ComponentInstance? RootInstance => _application.RootInstance;
 
     /// <summary>
+    /// The app-level configuration (upstream: <c>app.config</c>,
+    /// https://vuejs.org/api/application.html#app-config) — the
+    /// <see cref="ApplicationConfiguration.ErrorHandler"/> and
+    /// <see cref="ApplicationConfiguration.WarnHandler"/>. Set its handlers before
+    /// <see cref="Mount(string)"/>. Delegates to the wrapped <see cref="VueApplication{TNode}.Config"/>.
+    /// </summary>
+    public ApplicationConfiguration Config => _application.Config;
+
+    /// <summary>
+    /// Registers a component under <paramref name="name"/> so descendants of the root resolve it by
+    /// name — including <c>&lt;component :is="name"&gt;</c> (upstream:
+    /// <c>app.component(name, definition)</c>, https://vuejs.org/api/application.html#app-component).
+    /// Registering a duplicate name, or registering after mount, warns in dev. Delegates to the
+    /// wrapped <see cref="VueApplication{TNode}"/>.
+    /// </summary>
+    /// <param name="name">The component name (resolved case-insensitively at render).</param>
+    /// <param name="definition">The component definition.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
+    public BrowserApplication Component(string name, IComponentDefinition definition)
+    {
+        _application.Component(name, definition);
+        return this;
+    }
+
+    /// <summary>
+    /// Returns the component registered under <paramref name="name"/>, or null (upstream:
+    /// <c>app.component(name)</c> getter — an exact-name lookup).
+    /// </summary>
+    /// <param name="name">The registered name.</param>
+    /// <returns>The registered definition, or null.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    public IComponentDefinition? Component(string name) => _application.Component(name);
+
+    /// <summary>
+    /// Registers a directive under <paramref name="name"/> so descendants resolve it by name through
+    /// <see cref="Directives.ResolveDirective"/> (upstream: <c>app.directive(name, directive)</c>,
+    /// https://vuejs.org/api/application.html#app-directive). Registering a duplicate name, or
+    /// registering after mount, warns in dev. Delegates to the wrapped
+    /// <see cref="VueApplication{TNode}"/>.
+    /// </summary>
+    /// <param name="name">The directive name (resolved case-insensitively at render).</param>
+    /// <param name="directive">The directive definition.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="directive"/> is null.</exception>
+    public BrowserApplication Directive(string name, IDirective directive)
+    {
+        _application.Directive(name, directive);
+        return this;
+    }
+
+    /// <summary>
+    /// Returns the directive registered under <paramref name="name"/>, or null (upstream:
+    /// <c>app.directive(name)</c> getter — an exact-name lookup).
+    /// </summary>
+    /// <param name="name">The registered name.</param>
+    /// <returns>The registered directive, or null.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    public IDirective? Directive(string name) => _application.Directive(name);
+
+    /// <summary>
+    /// Provides <paramref name="value"/> app-wide under the typed <paramref name="key"/> (upstream:
+    /// <c>app.provide(key, value)</c>, https://vuejs.org/api/application.html#app-provide) — the
+    /// final fallback in the inject lookup chain. Providing a duplicate key, or providing after
+    /// mount, warns in dev. Delegates to the wrapped <see cref="VueApplication{TNode}"/>.
+    /// </summary>
+    /// <typeparam name="T">The provided value type.</typeparam>
+    /// <param name="key">The identity-based key descendants inject with.</param>
+    /// <param name="value">The value to provide.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
+    public BrowserApplication Provide<T>(InjectionKey<T> key, T value)
+    {
+        _application.Provide(key, value);
+        return this;
+    }
+
+    /// <summary>
+    /// Provides <paramref name="value"/> app-wide under a string <paramref name="key"/> (upstream:
+    /// <c>app.provide</c> with a string key). Delegates to the wrapped
+    /// <see cref="VueApplication{TNode}"/>.
+    /// </summary>
+    /// <param name="key">The string key descendants inject with.</param>
+    /// <param name="value">The value to provide.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentException"><paramref name="key"/> is null or empty.</exception>
+    public BrowserApplication Provide(string key, object? value)
+    {
+        _application.Provide(key, value);
+        return this;
+    }
+
+    /// <summary>
+    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>,
+    /// https://vuejs.org/api/application.html#app-use). A repeat <c>Use</c> of the same plugin
+    /// instance is deduplicated with a dev warning; a plugin installed after mount warns. The
+    /// plugin's <see cref="IVuePlugin{TNode}.Install"/> receives the wrapped
+    /// <see cref="VueApplication{TNode}"/>. Delegates to the wrapped application.
+    /// </summary>
+    /// <param name="plugin">The plugin to install (over the browser's <see cref="int"/> node handles).</param>
+    /// <param name="options">Options passed to the plugin's install, or null.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
+    public BrowserApplication Use(IVuePlugin<int> plugin, object? options = null)
+    {
+        _application.Use(plugin, options);
+        return this;
+    }
+
+    /// <summary>
     /// Resolves <paramref name="selector"/> and mounts there (upstream:
     /// <c>app.mount('#app')</c>). A selector matching nothing throws a
     /// <see cref="BrowserDomException"/> naming the selector.
