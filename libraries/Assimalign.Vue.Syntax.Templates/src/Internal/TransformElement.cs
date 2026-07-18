@@ -15,7 +15,9 @@ namespace Assimalign.Vue.Syntax.Templates;
 /// <remarks>
 /// The patch-flag analysis in <see cref="BuildProps"/> is ported here because it is inseparable from prop
 /// building and because [V01.01.05.03] requires the <c>FULL_PROPS</c> escalation and the <c>dynamicProps</c>
-/// list. The full element-level patch-flag refinement (static class/style elision, text) is [V01.01.05.06].
+/// list. The element-level patch-flag refinement it drives — static class/style elision, the <c>TEXT</c> flag
+/// for a single dynamic text child, and the block-emission decisions stamped onto the resulting
+/// <see cref="VNodeCall"/> (<c>shouldUseBlock</c>) — landed in [V01.01.05.06].
 /// </remarks>
 internal static class TransformElement
 {
