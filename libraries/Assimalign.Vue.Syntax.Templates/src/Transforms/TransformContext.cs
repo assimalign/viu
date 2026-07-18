@@ -27,6 +27,7 @@ public sealed class TransformContext
     private readonly HashSet<TemplateSyntaxNode> seenOnce = new(ReferenceComparer.Instance);
     private readonly HashSet<TemplateSyntaxNode> seenMemo = new(ReferenceComparer.Instance);
     private readonly Dictionary<TemplateSyntaxNode, RuntimeHelper> directiveRuntime = new(ReferenceComparer.Instance);
+    private readonly Dictionary<string, int> identifiers = new();
 
     internal TransformContext(
         RootNode root,
@@ -40,6 +41,8 @@ public sealed class TransformContext
         IsBuiltInComponent = options.IsBuiltInComponent;
         IsCustomElement = options.IsCustomElement;
         CacheHandlers = options.CacheHandlers;
+        PrefixIdentifiers = options.PrefixIdentifiers;
+        BindingMetadata = options.BindingMetadata ?? BindingMetadata.Empty;
         InSSR = options.InSSR;
         Ssr = options.Ssr;
         Slotted = options.Slotted;
@@ -70,10 +73,17 @@ public sealed class TransformContext
     public bool CacheHandlers { get; }
 
     /// <summary>
-    /// Whether identifier prefixing is enabled. Always <see langword="false"/> in this build; expression and
-    /// scope analysis is [V01.01.05.04].
+    /// Whether identifier prefixing and scope analysis is enabled (upstream <c>prefixIdentifiers</c>). When
+    /// <see langword="false"/> expression bodies stay opaque, matching Vue's browser build; when
+    /// <see langword="true"/> the <see cref="TransformExpression"/> pass rewrites identifiers ([V01.01.05.04]).
     /// </summary>
-    public bool PrefixIdentifiers => false;
+    public bool PrefixIdentifiers { get; }
+
+    /// <summary>
+    /// The component binding classifications expression rewriting resolves identifiers against (upstream
+    /// <c>bindingMetadata</c>). Defaults to <see cref="BindingMetadata.Empty"/>.
+    /// </summary>
+    public BindingMetadata BindingMetadata { get; }
 
     /// <summary>Whether this is a nested SSR slot compilation.</summary>
     public bool InSSR { get; }
@@ -118,6 +128,69 @@ public sealed class TransformContext
     /// <summary>Reports a transform diagnostic (never throws; recoverable), matching upstream's <c>onError</c>.</summary>
     /// <param name="error">The diagnostic to report.</param>
     public void ReportError(CompilerError error) => onError?.Invoke(error);
+
+    // ---- template-local identifier scope (upstream context.identifiers / addIdentifiers / removeIdentifiers) ----
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is currently a template-local (a <c>v-for</c> alias or <c>v-slot</c> prop
+    /// in scope). Such identifiers shadow bindings and are never prefixed or unwrapped (upstream reads
+    /// <c>context.identifiers</c>).
+    /// </summary>
+    /// <param name="name">The identifier name.</param>
+    public bool IsLocalIdentifier(string name) => identifiers.TryGetValue(name, out var count) && count > 0;
+
+    /// <summary>Pushes <paramref name="name"/> onto the local scope (upstream <c>addIdentifiers</c>).</summary>
+    /// <param name="name">The identifier name.</param>
+    public void AddIdentifiers(string name)
+    {
+        identifiers.TryGetValue(name, out var count);
+        identifiers[name] = count + 1;
+    }
+
+    /// <summary>
+    /// Pushes the identifiers <paramref name="expression"/> declares onto the local scope — a plain alias, a
+    /// tuple, or a deconstruction (upstream <c>addIdentifiers</c> over an expression's declared identifiers).
+    /// </summary>
+    /// <param name="expression">The alias or slot-prop expression.</param>
+    public void AddIdentifiers(ExpressionNode expression)
+    {
+        foreach (var name in DeclaredIdentifiersOf(expression))
+        {
+            AddIdentifiers(name);
+        }
+    }
+
+    /// <summary>Pops <paramref name="name"/> from the local scope (upstream <c>removeIdentifiers</c>).</summary>
+    /// <param name="name">The identifier name.</param>
+    public void RemoveIdentifiers(string name)
+    {
+        if (identifiers.TryGetValue(name, out var count))
+        {
+            if (count <= 1)
+            {
+                identifiers.Remove(name);
+            }
+            else
+            {
+                identifiers[name] = count - 1;
+            }
+        }
+    }
+
+    /// <summary>Pops the identifiers <paramref name="expression"/> declares (upstream <c>removeIdentifiers</c>).</summary>
+    /// <param name="expression">The alias or slot-prop expression.</param>
+    public void RemoveIdentifiers(ExpressionNode expression)
+    {
+        foreach (var name in DeclaredIdentifiersOf(expression))
+        {
+            RemoveIdentifiers(name);
+        }
+    }
+
+    private static IReadOnlyList<string> DeclaredIdentifiersOf(ExpressionNode expression)
+        => expression is SimpleExpressionNode simple
+            ? IdentifierExtraction.CollectDeclaredIdentifiers(simple.Content)
+            : System.Array.Empty<string>();
 
     // ---- helper / component / directive registration ----
 

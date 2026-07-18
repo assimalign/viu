@@ -233,4 +233,18 @@ public enum CompilerErrorCode
 
     /// <summary>The reserved value one past the last defined DOM code (upstream DOM <c>__EXTEND_POINT__</c>).</summary>
     DomExtendPoint = 65,
+
+    // ---- Vuecs-specific expression/scope analysis codes ([V01.01.05.04], no upstream counterpart) ----
+    //
+    // These extend the catalog past both upstream sentinels, exactly as @vue/compiler-dom's DOMErrorCodes
+    // extended core's __EXTEND_POINT__. They have no vuejs/core equivalent because they encode a divergence
+    // C# forces: with no runtime Proxy fallback, a template identifier that resolves to nothing real is an
+    // error the compiler must surface, where Vue would silently emit a _ctx member access.
+
+    /// <summary>
+    /// A template identifier resolved to neither a template-local, an allowed global, nor a known component
+    /// binding, under strict binding metadata (<see cref="BindingMetadata.ReportsUnresolvedIdentifiers"/>).
+    /// Vuecs-specific; no upstream counterpart.
+    /// </summary>
+    XVuecsUnresolvedIdentifier = 66,
 }

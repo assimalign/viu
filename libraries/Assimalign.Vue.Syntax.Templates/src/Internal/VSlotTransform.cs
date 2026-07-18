@@ -25,10 +25,26 @@ internal static class VSlotTransform
     public static Action? TrackSlotScopes(TemplateSyntaxNode node, TransformContext context)
     {
         if (node is ElementNode { ElementType: ElementType.Component or ElementType.Template } element &&
-            TransformUtilities.FindDirective(element, "slot") is not null)
+            TransformUtilities.FindDirective(element, "slot") is { } slotDirective)
         {
+            // Register the slot props so the slot children's expressions treat them as template-locals
+            // (upstream addIdentifiers of the slot exp, gated on prefixIdentifiers).
+            var slotProperties = slotDirective.Expression;
+            if (context.PrefixIdentifiers && slotProperties is not null)
+            {
+                context.AddIdentifiers(slotProperties);
+            }
+
             context.ScopeVSlot++;
-            return () => context.ScopeVSlot--;
+            return () =>
+            {
+                if (context.PrefixIdentifiers && slotProperties is not null)
+                {
+                    context.RemoveIdentifiers(slotProperties);
+                }
+
+                context.ScopeVSlot--;
+            };
         }
 
         return null;

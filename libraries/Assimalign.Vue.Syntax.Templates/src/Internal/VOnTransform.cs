@@ -115,11 +115,30 @@ internal static class VOnTransform
             var isInlineStatement = !(isMemberExpression || ExpressionShape.IsFunctionExpression(expression));
             var hasMultipleStatements = expression.Content.IndexOf(';') >= 0;
 
+            // Rewrite the handler's identifiers, with $event in scope for an inline statement so its
+            // assignments unwrap refs (upstream transformOn: addIdentifiers($event) around processExpression).
+            ExpressionNode processedExpression = expression;
+            if (context.PrefixIdentifiers)
+            {
+                if (isInlineStatement)
+                {
+                    context.AddIdentifiers("$event");
+                }
+
+                processedExpression = ExpressionProcessor.ProcessExpression(expression, context, asRawStatements: hasMultipleStatements);
+
+                if (isInlineStatement)
+                {
+                    context.RemoveIdentifiers("$event");
+                }
+            }
+
+            handler = processedExpression;
             if (isInlineStatement || (shouldCache && isMemberExpression))
             {
                 handler = Ir.CompoundExpression(
                     (isInlineStatement ? "$event" : "(...args)") + " => " + (hasMultipleStatements ? "{" : "("),
-                    expression,
+                    processedExpression,
                     hasMultipleStatements ? "}" : ")");
             }
         }
