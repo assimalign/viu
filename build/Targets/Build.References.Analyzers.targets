@@ -79,5 +79,21 @@
                 <PackagePath>analyzers/dotnet/cs</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
+
+        <!--
+            An analyzer may ship consumer-facing MSBuild logic in a sibling build/ folder next to its src/
+            (e.g. Assimalign.Vue.Syntax.Generators flows .viu files in as AdditionalFiles). Pack those
+            props/targets into the consuming library's nupkg under buildTransitive/ so the packaged
+            consumer picks them up. Dormant for analyzers with no build/ folder (the glob matches nothing).
+        -->
+        <ItemGroup>
+            <_VuecsAnalyzerBuildDirectory Include="@(_VuecsAnalyzerResolved->'%(RootDir)%(Directory)..\build')" />
+        </ItemGroup>
+        <ItemGroup>
+            <_VuecsAnalyzerBuildFile Include="%(_VuecsAnalyzerBuildDirectory.Identity)\**\*.props;%(_VuecsAnalyzerBuildDirectory.Identity)\**\*.targets" />
+            <TfmSpecificPackageFile Include="@(_VuecsAnalyzerBuildFile)">
+                <PackagePath>buildTransitive</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
     </Target>
 </Project>
