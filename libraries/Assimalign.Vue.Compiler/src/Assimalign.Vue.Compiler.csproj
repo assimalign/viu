@@ -22,5 +22,14 @@
          net10.0 and cannot be referenced from netstandard2.0). See the file header and the
          Assimalign.Vue.Shared.GeneratorFixture precedent. -->
     <Compile Include="..\..\Assimalign.Vue.Shared\src\Internal\DomKnowledgeData.cs" Link="Internal\DomKnowledgeData.cs" />
+    <!-- Linked shared-source seam ([V01.01.01.03], per the #50 boundary note): PatchFlags and SlotFlags are the
+         compiler <-> runtime contract authored in Assimalign.Vue.Shared. Shared is net10.0 and cannot be
+         referenced from this netstandard2.0 analyzer-host project, so — exactly as with DomKnowledgeData above —
+         the two enum source files are <Compile Include>'d here. Both are netstandard2.0-clean (a [Flags] enum and
+         a plain enum, System-only), keeping one authoritative definition instead of a drifting mirror. The
+         compiler assembly is consumed only at build time by the generator ([V01.01.05.05]), never shipped into the
+         same runtime as Shared, so the duplicated public type is inert. -->
+    <Compile Include="..\..\Assimalign.Vue.Shared\src\PatchFlags.cs" Link="Shared\PatchFlags.cs" />
+    <Compile Include="..\..\Assimalign.Vue.Shared\src\SlotFlags.cs" Link="Shared\SlotFlags.cs" />
   </ItemGroup>
 </Project>
