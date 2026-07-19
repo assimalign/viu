@@ -112,17 +112,17 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             }
         }
 
-        // [V01.01.06.03] @script integration: when the component declares a script, validate its C# and
-        // extract binding metadata (routing any Roslyn parse diagnostics onto the .viu file), and carry
-        // the verbatim body plus its content-start line so the emitter can merge it under a #line map.
-        string? scriptContent = null;
-        var scriptContentStartLine = 0;
+        // [V01.01.06.03]/[V01.01.06.03.01] @script integration: when the component declares a script,
+        // split it into a hoisted using region and a class-body member region, validate both, and extract
+        // binding metadata (routing any Roslyn parse diagnostics onto the .viu file). The regions carry
+        // their own #line anchors so the emitter maps each back to the .viu source.
+        var scriptRegions = ScriptRegions.None;
         var bindings = EquatableArray<ScriptBinding>.Empty;
         if (descriptor.Script is { } script)
         {
-            scriptContent = script.Content;
-            scriptContentStartLine = script.ContentLocation.Start.Line;
-            bindings = ScriptBlockAnalyzer.Analyze(file.FilePath, script, diagnostics);
+            var analysis = ScriptBlockAnalyzer.Analyze(file.FilePath, script, diagnostics);
+            scriptRegions = analysis.Regions;
+            bindings = analysis.Bindings;
         }
 
         var model = new SingleFileComponentModel(
@@ -135,8 +135,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             StyleCount: descriptor.Styles.Count,
             CustomBlockCount: descriptor.CustomBlocks.Count,
             FilePath: file.FilePath,
-            ScriptContent: scriptContent,
-            ScriptContentStartLine: scriptContentStartLine,
+            Script: scriptRegions,
             Bindings: bindings,
             RenderBody: null,
             RenderCacheSize: 0);
