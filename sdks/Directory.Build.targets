@@ -1,0 +1,146 @@
+<Project>
+    <Import Project="..\Directory.Build.targets" />
+    <PropertyGroup>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- The SDK-shaped nupkg layout: Sdk/ and Targets/ at package root -
+             exactly what NuGet's MSBuild SDK resolver expects. -->
+        <None Include="$(MSBuildProjectDirectory)\..\Sdk\**\*" Pack="true" PackagePath="Sdk\%(RecursiveDir)%(Filename)%(Extension)">
+            <Visible>false</Visible>
+        </None>
+        <None Include="$(MSBuildProjectDirectory)\..\Targets\**\*" Pack="true" PackagePath="Targets\%(RecursiveDir)%(Filename)%(Extension)">
+            <Visible>false</Visible>
+        </None>
+
+        <!--
+            Consumer-facing build logic packed FROM ITS IN-REPO SOURCE so the
+            SDK can never drift from the dogfooded implementation:
+              * the .viu AdditionalFiles wiring that
+                build/Targets/Build.References.Analyzers.targets imports for
+                in-repo projects, and
+              * the CSS bundling targets (Sdk.props presets
+                $(ViuBundleCssTaskAssembly) to the packaged Tasks/ copy, so the
+                file's in-repo default path stays dormant).
+        -->
+        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.props"
+              Pack="true" PackagePath="Targets\Assimalign.Viu.Syntax.Generators.props" Visible="false" />
+        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.targets"
+              Pack="true" PackagePath="Targets\Assimalign.Viu.Syntax.Generators.targets" Visible="false" />
+        <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
+              Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
+
+        <!--
+            Framework static web assets. A FrameworkReference delivers DLLs
+            only, so the JS half of the RuntimeDom interop bridge rides in the
+            SDK package and Assimalign.Viu.Sdk.StaticWebAssets.targets copies
+            it into the consumer's wwwroot/_content/<library>/ (the same
+            /_content/<id>/ URL shape the in-repo
+            build/Targets/Build.StaticWebAssets.targets produces).
+        -->
+        <None Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.RuntimeDom\src\wwwroot\**\*"
+              Pack="true" PackagePath="assets\Assimalign.Viu.RuntimeDom\%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
+
+        <None Include="$(ViuRepositoryDirectory)sdks\README.md" Pack="true" PackagePath="README.md" Visible="false" />
+    </ItemGroup>
+
+    <!-- #region Loose local-SDK layout copies under $(ViuOutputPathForSdk) -->
+    <Target Name="CopyRootSdkFiles" AfterTargets="Build">
+        <ItemGroup>
+            <_ViuSdkRootFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))\Sdk\*.*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuSdkRootFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Sdk\" />
+    </Target>
+    <Target Name="CopyTargetSdkFiles" AfterTargets="Build">
+        <ItemGroup>
+            <_ViuSdkTargetsFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))\Targets\*.*" />
+            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.props" />
+            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.targets" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuSdkTargetsFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
+        <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
+              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" />
+        <ItemGroup>
+            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.RuntimeDom\src\wwwroot\**\*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuSdkAssetFile)"
+              DestinationFiles="@(_ViuSdkAssetFile->'$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\assets\Assimalign.Viu.RuntimeDom\%(RecursiveDir)%(Filename)%(Extension)')" />
+    </Target>
+
+    <!--
+        Emit a static, version-resolved snapshot of Build.Version.props.
+        The repo's build/Targets/Build.Version.props derives ViuMajorVersion
+        from $(TargetFrameworkLatest), which is empty at a consumer's
+        Sdk.props evaluation phase (MSB4184). A shipped artifact's version is
+        frozen at pack time, so this writes a literal snapshot into obj/ and
+        CollectShippedVersionProps packs it as Targets/Build.Version.props -
+        resolving the base Sdk.props import.
+    -->
+    <Target Name="GenerateShippedVersionProps" AfterTargets="Build">
+        <PropertyGroup>
+            <_ShippedVersionPropsPath>$(IntermediateOutputPath)Build.Version.props</_ShippedVersionPropsPath>
+        </PropertyGroup>
+        <ItemGroup>
+            <_ShippedVersionPropsLines Include="&lt;!-- Auto-generated by sdks/Directory.Build.targets at SDK pack time." />
+            <_ShippedVersionPropsLines Include="     Snapshot of build/Targets/Build.Version.props with values frozen at $(ViuVersion). --&gt;" />
+            <_ShippedVersionPropsLines Include="&lt;Project&gt;" />
+            <_ShippedVersionPropsLines Include="    &lt;PropertyGroup&gt;" />
+            <_ShippedVersionPropsLines Include="        &lt;ViuMajorVersion&gt;$(ViuMajorVersion)&lt;/ViuMajorVersion&gt;" />
+            <_ShippedVersionPropsLines Include="        &lt;ViuMinorVersion&gt;$(ViuMinorVersion)&lt;/ViuMinorVersion&gt;" />
+            <_ShippedVersionPropsLines Include="        &lt;ViuPatchVersion&gt;$(ViuPatchVersion)&lt;/ViuPatchVersion&gt;" />
+            <_ShippedVersionPropsLines Include="        &lt;ViuVersionPrefix&gt;$(ViuVersionPrefix)&lt;/ViuVersionPrefix&gt;" />
+            <_ShippedVersionPropsLines Include="        &lt;ViuVersionSuffix&gt;$(ViuVersionSuffix)&lt;/ViuVersionSuffix&gt;" />
+            <_ShippedVersionPropsLines Include="        &lt;ViuVersion&gt;$(ViuVersion)&lt;/ViuVersion&gt;" />
+            <_ShippedVersionPropsLines Include="    &lt;/PropertyGroup&gt;" />
+            <_ShippedVersionPropsLines Include="&lt;/Project&gt;" />
+        </ItemGroup>
+        <MakeDir Directories="$(IntermediateOutputPath)" />
+        <WriteLinesToFile File="$(_ShippedVersionPropsPath)"
+                          Lines="@(_ShippedVersionPropsLines)"
+                          Overwrite="true"
+                          Encoding="UTF-8" />
+        <Copy SourceFiles="$(_ShippedVersionPropsPath)"
+              DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
+    </Target>
+
+    <Target Name="CollectShippedVersionProps" DependsOnTargets="GenerateShippedVersionProps">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(IntermediateOutputPath)Build.Version.props">
+                <PackagePath>Targets\Build.Version.props</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+    <!-- #endregion -->
+
+    <Target Name="CollectSdkTaskFiles">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(OutDir)**\*" Exclude="$(OutDir)**\*.nupkg;$(OutDir)**\*.snupkg;$(OutDir)**\*.nuspec">
+                <PackagePath>Tasks\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+
+    <!-- Optional: pack every shipping library into the local feed alongside the
+         SDK (dotnet pack -p:PackViuProjects=true on the Tasks csproj). -->
+    <Target Name="PackViuProjects" BeforeTargets="GenerateNuspec" Condition="'$(PackViuProjects)' == 'true'">
+        <ItemGroup>
+            <ViuSdkPackProject Include="$(ViuRepositoryDirectory)libraries\**\src\*.csproj"
+                Exclude="**\bin\**;**\obj\**;**\test\**;**\*.Tests.csproj;**\*Tests.csproj" />
+        </ItemGroup>
+        <Message Text="Packing Viu libraries into $(ViuOutputPathForLibraries)" Importance="High" />
+        <MSBuild
+            Projects="@(ViuSdkPackProject)"
+            Targets="Restore;Pack"
+            BuildInParallel="true"
+            Properties="Configuration=$(Configuration);PackageOutputPath=$(ViuOutputPathForLibraries)"
+            RemoveProperties="OutDir;PackageId;TargetFramework;TargetFrameworks;IncludeBuildOutput;GenerateDependencyFile;CopyLocalLockFileAssemblies"
+            ContinueOnError="WarnAndContinue" />
+    </Target>
+
+    <Target Name="CleanOutDir" AfterTargets="Clean">
+        <ItemGroup>
+            <_ViuSdkOutputToClean Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\**\*" />
+        </ItemGroup>
+        <Delete Files="@(_ViuSdkOutputToClean)" />
+    </Target>
+</Project>

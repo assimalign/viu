@@ -5,10 +5,11 @@
         <TargetFrameworkForLibraries>$(TargetFrameworkLatest)</TargetFrameworkForLibraries>
         <TargetFrameworkForSdks>$(TargetFrameworkLatest)</TargetFrameworkForSdks>
         <!--
-            Alias consumed by framework Ref/Runtime targets (frameworks\Assimalign.Cohesion.App.targets)
+            Alias consumed by the framework Ref/Runtime targets (frameworks\Assimalign.Viu.App.targets)
             in path construction. Kept derived from TargetFramework so bumping the TFM here continues to
             drive everything from one place.
         -->
+        <TargetFrameworkForFrameworks>$(TargetFrameworkLatest)</TargetFrameworkForFrameworks>
         <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
 		<RollForward>LatestPatch</RollForward>
     </PropertyGroup>

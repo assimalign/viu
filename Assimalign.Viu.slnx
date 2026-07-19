@@ -53,6 +53,7 @@
 	</Folder>
 	<Folder Name="/viu/.github/workflows/">
 		<File Path=".github/workflows/area-generators.yml" />
+		<File Path=".github/workflows/area-packaging.yml" />
 		<File Path=".github/workflows/area-reactivity.yml" />
 		<File Path=".github/workflows/area-runtimecore.yml" />
 		<File Path=".github/workflows/area-runtimedom.yml" />
@@ -103,6 +104,39 @@
 	</Folder>
 	<Folder Name="/viu/docs/">
 		<File Path="docs/PLAN.md" />
+		<File Path="docs/UTILITY-CSS-DESIGN.md" />
+	</Folder>
+	<Folder Name="/viu/frameworks/">
+		<File Path="frameworks/Assimalign.Viu.App.props" />
+		<File Path="frameworks/Assimalign.Viu.App.targets" />
+		<File Path="frameworks/Directory.Build.props" />
+		<File Path="frameworks/Directory.Build.targets" />
+	</Folder>
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/" />
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/src/">
+		<Project Path="frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj" />
+	</Folder>
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Runtime/" />
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Runtime/src/">
+		<Project Path="frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj" />
+	</Folder>
+	<Folder Name="/viu/sdks/">
+		<File Path="sdks/Directory.Build.props" />
+		<File Path="sdks/Directory.Build.targets" />
+		<File Path="sdks/README.md" />
+	</Folder>
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/">
+		<File Path="sdks/Assimalign.Viu.Sdk/Sdk/Sdk.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Sdk/Sdk.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.Common.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.StaticWebAssets.targets" />
+	</Folder>
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Tasks/">
+		<Project Path="sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj" />
+	</Folder>
+	<Folder Name="/viu/scripts/">
+		<File Path="scripts/Install-Local.ps1" />
 	</Folder>
 	<Folder Name="/viu/examples/" />
 	<Folder Name="/viu/examples/Assimalign.Viu.WebApp/">

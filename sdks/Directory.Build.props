@@ -1,0 +1,33 @@
+<Project>
+	<Import Project="..\Directory.Build.props" />
+	<!-- Shared package properties for every SDK Tasks project ([V01.01.12.19], #174 -
+	     the Viu port of cohesion's sdks/Directory.Build.props). -->
+	<PropertyGroup>
+		<TargetFramework>$(TargetFrameworkForSdks)</TargetFramework>
+		<OutputType>Library</OutputType>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+		<!-- The Tasks DLL ships under Tasks/ in the nupkg, never under lib/. -->
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<NoPackageAnalysis>true</NoPackageAnalysis>
+		<!-- Pull the ViuBundleCss task and its parser closure into $(OutDir) so
+		     CollectSdkTaskFiles can sweep the whole dependency set into Tasks/. -->
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<IsPackable>true</IsPackable>
+		<AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+		<!-- Build-task code targets the stable surface (see Build.TargetFramework.props). -->
+		<EnablePreviewFeatures>false</EnablePreviewFeatures>
+	</PropertyGroup>
+	<!-- Package metadata -->
+	<PropertyGroup>
+		<!-- VersionPrefix/VersionSuffix split (not <Version> directly): a prerelease
+		     semver handed straight to <Version> propagates to AssemblyVersion and
+		     trips CS7034. The SDK composes Version at the end, which becomes
+		     PackageVersion via the default. -->
+		<VersionPrefix>$(ViuVersionPrefix)</VersionPrefix>
+		<VersionSuffix Condition="'$(ViuVersionSuffix)' != ''">$(ViuVersionSuffix)</VersionSuffix>
+		<Authors>Assimalign</Authors>
+		<Description>Viu MSBuild SDK: chains Microsoft.NET.Sdk.WebAssembly, references the Assimalign.Viu.App shared framework, and compiles .viu single-file components.</Description>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageTags>Sdk;MSBuild;Viu;WebAssembly</PackageTags>
+	</PropertyGroup>
+</Project>

@@ -1,0 +1,41 @@
+<Project>
+    <!--
+        WebAssembly integration shims for Assimalign.Viu.Sdk consumers.
+
+        1. Runtime-pack selection: Microsoft.NET.Runtime.WebAssembly.Sdk's
+           _InitializeCommonProperties derives MicrosoftNetCoreAppRuntimePackDir
+           by batching over ALL @(ResolvedRuntimePack) items - with the
+           Assimalign.Viu.App runtime pack resolved alongside the Mono one, the
+           wrong pack can win and the WASM build fails with "Could not find
+           System.Runtime.dll in ...assimalign.viu.app.runtime.browser-wasm...".
+           Pin the property to the Microsoft.NETCore.App pack before that
+           target runs.
+
+        2. Browser platform identity: a Viu app is browser-only, so emit
+           [assembly: SupportedOSPlatform("browser")] (exactly what the repo's
+           example app declares by hand) so browser-only framework APIs
+           (BrowserRuntime, BrowserApplication) don't raise CA1416 in every
+           consumer. Opt out with ViuImplicitBrowserPlatform=false.
+    -->
+
+    <Target Name="_ViuPinMicrosoftNetCoreAppRuntimePack"
+            BeforeTargets="_InitializeCommonProperties"
+            Condition="'$(MicrosoftNetCoreAppRuntimePackDir)' == ''">
+        <ItemGroup>
+            <_ViuMicrosoftNetCoreAppRuntimePack Include="@(ResolvedRuntimePack)"
+                Condition="'%(ResolvedRuntimePack.FrameworkName)' == 'Microsoft.NETCore.App' or $([System.String]::new('%(ResolvedRuntimePack.NuGetPackageId)').StartsWith('Microsoft.NETCore.App.Runtime'))" />
+        </ItemGroup>
+        <PropertyGroup>
+            <MicrosoftNetCoreAppRuntimePackDir Condition="'@(_ViuMicrosoftNetCoreAppRuntimePack)' != ''">%(_ViuMicrosoftNetCoreAppRuntimePack.PackageDirectory)</MicrosoftNetCoreAppRuntimePackDir>
+        </PropertyGroup>
+        <ItemGroup>
+            <_ViuMicrosoftNetCoreAppRuntimePack Remove="@(_ViuMicrosoftNetCoreAppRuntimePack)" />
+        </ItemGroup>
+    </Target>
+
+    <ItemGroup Condition="'$(ViuImplicitBrowserPlatform)' != 'false' and '$(GenerateAssemblyInfo)' != 'false'">
+        <AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatformAttribute">
+            <_Parameter1>browser</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+</Project>

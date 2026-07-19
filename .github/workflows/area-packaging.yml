@@ -1,0 +1,61 @@
+# Area build+pack for the Viu SDK and shared-framework packs ([V01.01.12.19]): proves the
+# Assimalign.Viu.Sdk nupkg and the Assimalign.Viu.App Ref/Runtime pack shapes stay healthy.
+# Path-filtered like the other area workflows; shared build files trigger every area.
+name: area-packaging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sdks/**'
+      - 'frameworks/**'
+      - 'scripts/Install-Local.ps1'
+      - 'libraries/**'
+      - 'analyzers/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-packaging.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sdks/**'
+      - 'frameworks/**'
+      - 'scripts/Install-Local.ps1'
+      - 'libraries/**'
+      - 'analyzers/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-packaging.yml'
+
+jobs:
+  pack:
+    name: pack SDK + framework
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Pack SDK, runtime pack, and ref pack
+        shell: pwsh
+        run: ./scripts/Install-Local.ps1
+
+      - name: Assert package shapes
+        shell: pwsh
+        run: |
+          $feed = "_out/packages"
+          $expected = @('Assimalign.Viu.Sdk.*.nupkg', 'Assimalign.Viu.App.Ref.*.nupkg', 'Assimalign.Viu.App.Runtime.browser-wasm.*.nupkg')
+          foreach ($pattern in $expected) {
+            if (-not (Get-ChildItem $feed -Filter $pattern)) { throw "Missing package: $pattern" }
+          }
+          Get-ChildItem $feed -Filter 'Assimalign.Viu.*.nupkg' | ForEach-Object { Write-Host $_.Name }

@@ -93,3 +93,31 @@ set `IsAotCompatible` (they are not shipping libraries).
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
+5. If the library is a runtime framework member (ships in every Viu app), add it to
+   `@(ViuFrameworkAssembly)` in `frameworks/Assimalign.Viu.App.props` so the framework packs
+   deliver it.
+
+## SDK and shared-framework packaging ([V01.01.12.19], #174)
+
+External consumers use `<Project Sdk="Assimalign.Viu.Sdk">` — never `ViuProjectReference`, which is
+the **in-repo dogfooding** mechanism. The packaging layer mirrors `assimalign/cohesion`:
+
+- **`frameworks/Assimalign.Viu.App.props`** — the authoritative `@(ViuFrameworkAssembly)` /
+  `@(ViuFrameworkAnalyzer)` manifest, gated on `$(ViuFrameworkName)`.
+- **`frameworks/Assimalign.Viu.App.targets`** — the `ViuWriteFrameworkList` manifest writer and
+  pack layout, branching on `$(ViuFrameworkKind)` = `Ref` (targeting pack: `ref/<tfm>/` +
+  `data/FrameworkList.xml` + the generators and their parser closure at `analyzers/dotnet/cs/`,
+  every DLL listed as an `Analyzer` entry) | `Runtime` (per-RID runtime pack: `runtimes/<rid>/lib/`
+  + `data/RuntimeList.xml`).
+- **`sdks/Assimalign.Viu.Sdk/`** — the SDK package (packable unit: `Tasks/…Tasks.csproj` with
+  `PackageId=Assimalign.Viu.Sdk`). `Sdk.props` chains `Microsoft.NET.Sdk.WebAssembly`, imports a
+  pack-time-frozen `Build.Version.props` snapshot, and registers the `KnownFrameworkReference` for
+  `Assimalign.Viu.App` (`browser-wasm`). The `.viu` AdditionalFiles wiring and
+  `Build.Css.Bundling.targets` are packed **from their in-repo source files**; the `ViuBundleCss`
+  task ships under `Tasks/`; `viu-dom.js` ships under `assets/` and flows into consumer
+  `wwwroot/_content/`.
+- **Local loop**: `scripts/Install-Local.ps1` packs SDK → runtime pack(s) → ref pack into
+  `_out/packages` (gitignored). Consumption docs: `sdks/README.md`.
+- The `frameworks/` csprojs carry documented deviations from the no-raw-`ProjectReference` rule
+  (build-order edges needing `ReferenceOutputAssembly=false` + `UndefineProperties` metadata the
+  `ViuProjectReference` transform does not carry).

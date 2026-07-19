@@ -1,0 +1,23 @@
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<!--
+		Assimalign.Viu.Sdk ([V01.01.12.19], #174): the entry point for
+		<Project Sdk="Assimalign.Viu.Sdk"> consumers. A Viu app is a WASM
+		browser app, so the chain starts at Microsoft.NET.Sdk.WebAssembly
+		(in-box; resolved by the default MSBuild SDK resolver).
+	-->
+	<Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.props" />
+	<!-- Define $(ViuVersion) FIRST so every subsequent import can use it.
+	     Without this, FrameworkReference.props evaluates KnownFrameworkReference
+	     with TargetingPackVersion="" and NuGet's restore fails with
+	     "'[]' is not a valid version string" before any pack is extracted.
+	     (This file is a pack-time-frozen snapshot; see sdks/Directory.Build.targets.) -->
+	<Import Project="..\Targets\Build.Version.props" />
+	<Import Project="..\Targets\Assimalign.Viu.Sdk.Common.props" />
+	<Import Project="..\Targets\Assimalign.Viu.Sdk.FrameworkReference.props" />
+	<!-- .viu single-file component compiler wiring (CompilerVisibleProperty
+	     declarations; the AdditionalFiles glob lives in the paired .targets).
+	     The file's own EnableSingleFileComponentGeneration gate honors
+	     consumer-body overrides because item evaluation sees final property
+	     values. -->
+	<Import Project="..\Targets\Assimalign.Viu.Syntax.Generators.props" Condition="Exists('..\Targets\Assimalign.Viu.Syntax.Generators.props')" />
+</Project>

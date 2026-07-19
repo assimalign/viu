@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- The Tasks csproj is the packable unit: its PackageId is the SDK id
+		     (not ...Tasks), IncludeBuildOutput=false (sdks/Directory.Build.props)
+		     keeps the DLLs out of lib/, and sdks/Directory.Build.targets places
+		     Sdk/, Targets/, Tasks/, and assets/ at the nupkg root - the shape
+		     NuGet's MSBuild SDK resolver expects. -->
+		<PackageId>Assimalign.Viu.Sdk</PackageId>
+		<OutDir>$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Tasks</OutDir>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- The ViuBundleCss MSBuild task ([V01.01.12.12]) and its parser
+		     closure (Tooling.Css -> Syntax/SingleFileComponent/Templates/Css)
+		     CopyLocal into $(OutDir) and are swept into the package's Tasks/
+		     folder by CollectSdkTaskFiles. Private: the Tooling.Tasks project
+		     is IsPackable=false, so it must never surface as a .nuspec
+		     dependency of this package. -->
+		<ViuPrivateProjectReference Include="Assimalign.Viu.Tooling.Tasks" />
+	</ItemGroup>
+</Project>

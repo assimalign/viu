@@ -1,0 +1,29 @@
+<Project>
+    <!--
+        Flow the framework's static web assets into the consuming WebAssembly
+        app's SOURCE wwwroot under _content/<library>/ (a gitignored build
+        artifact) - the SDK-consumer counterpart of the in-repo
+        build/Targets/Build.StaticWebAssets.targets, and the same
+        [V01.01.04.01] dev-host constraint: the WasmAppHost only serves the
+        app's source wwwroot, so /_content/... URLs (JSHost.ImportAsync of
+        viu-dom.js) must exist there.
+
+        Sources come from the SDK package's assets/ folder
+        (assets/Assimalign.Viu.RuntimeDom/viu-dom.js today; the RecursiveDir
+        carries the library folder into the _content path).
+    -->
+    <Target Name="ViuFlowFrameworkWebAssets"
+            BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
+            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
+        <ItemGroup>
+            <_ViuSdkFrameworkWebAsset Include="$(MSBuildThisFileDirectory)..\assets\**\*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuSdkFrameworkWebAsset)"
+              DestinationFiles="@(_ViuSdkFrameworkWebAsset->'$(MSBuildProjectDirectory)\wwwroot\_content\%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true"
+              Condition="'@(_ViuSdkFrameworkWebAsset)' != ''" />
+        <ItemGroup>
+            <_ViuSdkFrameworkWebAsset Remove="@(_ViuSdkFrameworkWebAsset)" />
+        </ItemGroup>
+    </Target>
+</Project>

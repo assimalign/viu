@@ -1,0 +1,16 @@
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.targets" />
+	<!-- WASM runtime-pack selection shim + implicit browser platform identity. -->
+	<Import Project="..\Targets\Assimalign.Viu.Sdk.WebAssembly.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.WebAssembly.targets')" />
+	<!-- .viu -> AdditionalFiles glob (evaluated after the consumer's items and
+	     default excludes are known). -->
+	<Import Project="..\Targets\Assimalign.Viu.Syntax.Generators.targets" Condition="Exists('..\Targets\Assimalign.Viu.Syntax.Generators.targets')" />
+	<!-- CSS bundling for .viu @style blocks: the in-repo
+	     build/Targets/Build.Css.Bundling.targets packed verbatim;
+	     Assimalign.Viu.Sdk.Common.props preset $(ViuBundleCssTaskAssembly) to
+	     the packaged Tasks/ copy of the ViuBundleCss task. -->
+	<Import Project="..\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets')" />
+	<!-- Flow the framework's static web assets (viu-dom.js) into the
+	     consumer's wwwroot/_content/. -->
+	<Import Project="..\Targets\Assimalign.Viu.Sdk.StaticWebAssets.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.StaticWebAssets.targets')" />
+</Project>

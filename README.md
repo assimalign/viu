@@ -15,6 +15,12 @@ C# through a handle-based JS-interop bridge. See the stopwatch demo in
 Libraries use the `Assimalign.Viu.*` package root with the inverted layout
 `libraries/Assimalign.Viu.<Name>/{src|test}`.
 
+Viu apps consume the framework through an MSBuild project SDK — a complete app csproj is
+`<Project Sdk="Assimalign.Viu.Sdk">` — which chains `Microsoft.NET.Sdk.WebAssembly` and delivers
+the framework libraries plus the `[Reactive]`/`.viu` source generators via the
+`Assimalign.Viu.App` shared framework (`.Ref` targeting pack + `.Runtime.browser-wasm` runtime
+pack). See [`sdks/README.md`](sdks/README.md).
+
 ## Plan and tracking
 
 - [Delivery plan](docs/PLAN.md) — architecture mapping (Vue 3 package → Viu library), founding

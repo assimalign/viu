@@ -1,0 +1,20 @@
+<Project>
+    <Import Project="..\Directory.Build.props" />
+
+    <!--
+        Framework Ref/Runtime pack producers ([V01.01.12.19], #174).
+
+        TargetFramework comes from the central alias. VersionPrefix/VersionSuffix
+        are forced here because Microsoft.NET.Sdk pre-seeds VersionPrefix=1.0.0
+        early in evaluation; build/Targets/Build.Version.props handles that
+        default for ordinary projects, but framework pack versions must never
+        drift from $(ViuVersion), so the split is pinned explicitly (prefix
+        feeds AssemblyVersion/FileVersion - numeric only per CS7034; suffix
+        feeds PackageVersion/InformationalVersion).
+    -->
+    <PropertyGroup>
+        <TargetFramework>$(TargetFrameworkForFrameworks)</TargetFramework>
+        <VersionPrefix>$(ViuVersionPrefix)</VersionPrefix>
+        <VersionSuffix Condition="'$(ViuVersionSuffix)' != ''">$(ViuVersionSuffix)</VersionSuffix>
+    </PropertyGroup>
+</Project>
