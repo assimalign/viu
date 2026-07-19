@@ -14,3 +14,6 @@ VUECS1103 | Assimalign.Vue.Syntax.Generators | Info | Single-file component temp
 VUECS1201 | Assimalign.Vue.Syntax.Generators | Error | Single-file component script parse error
 VUECS1202 | Assimalign.Vue.Syntax.Generators | Warning | Single-file component script parse warning
 VUECS1203 | Assimalign.Vue.Syntax.Generators | Info | Single-file component script parse information
+VUECS1301 | Assimalign.Vue.Syntax.Generators | Error | Single-file component style parse error
+VUECS1302 | Assimalign.Vue.Syntax.Generators | Warning | Single-file component style parse warning
+VUECS1303 | Assimalign.Vue.Syntax.Generators | Info | Single-file component style parse information

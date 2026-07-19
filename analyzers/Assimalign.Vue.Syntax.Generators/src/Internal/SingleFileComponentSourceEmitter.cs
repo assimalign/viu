@@ -117,6 +117,8 @@ internal static class SingleFileComponentSourceEmitter
 
         AppendScriptSeam(builder, bodyIndent, model);
 
+        AppendStyleSeam(builder, bodyIndent, model);
+
         AppendIndent(builder, indent);
         builder.Append("}\n");
 
@@ -169,6 +171,61 @@ internal static class SingleFileComponentSourceEmitter
 
         builder.Append("#line default\n");
     }
+
+    // [V01.01.06.04] The @style seam — emitted at the tail of the class body so it never interleaves with
+    // the @script merge region. When the component declares @style blocks, their compiled CSS rides as an
+    // ExtractedStyles constant and, for scoped components, the ScopeId constant carries the data-v-<hash>
+    // the renderer stamps on elements (the C# analogue of Vue's component __scopeId). No @style block
+    // leaves the seam as a documenting comment, matching the render/script seams.
+    private static void AppendStyleSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        if (model.ExtractedStyles is not { } styles)
+        {
+            AppendIndent(builder, indent);
+            builder.Append("// [V01.01.06.04] Style seam. This component declares no @style block, so no scope id\n");
+            AppendIndent(builder, indent);
+            builder.Append("// or compiled CSS is emitted.\n");
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("// [V01.01.06.04] Compiled @style blocks: scoped blocks are rewritten with the component's\n");
+        AppendIndent(builder, indent);
+        builder.Append("// data-v-<hash> scope id and non-scoped blocks pass through unmodified. The renderer stamps\n");
+        AppendIndent(builder, indent);
+        builder.Append("// ScopeId on the component's elements; static-web-asset bundling is the MSBuild follow-up.\n");
+
+        if (model.ScopeId is { } scopeId)
+        {
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// The scoped-CSS scope id — the C# analogue of Vue 3.5's component <c>__scopeId</c>. The runtime\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// renderer stamps this <c>data-v-&lt;hash&gt;</c> attribute on the component's own elements.\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// </summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("internal const string ScopeId = ").Append(Literal(scopeId)).Append(";\n");
+            builder.Append('\n');
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// The component's compiled CSS — scoped <c>@style</c> blocks rewritten with <see cref=\"ScopeId\"/>,\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// non-scoped blocks verbatim — extracted at build time (the WASM runtime does zero CSS work).\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal const string ExtractedStyles = ").Append(Literal(styles)).Append(";\n");
+    }
+
+    // A valid C# string literal for arbitrary CSS text (quotes, backslashes, and newlines escaped).
+    private static string Literal(string value)
+        => Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(value, quote: true);
 
     private static string Present(bool present) => present ? "present" : "absent";
 

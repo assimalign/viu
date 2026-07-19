@@ -237,7 +237,9 @@ public sealed class SingleFileComponentScriptTests
             ScriptContentStartLine: 1,
             Bindings: bindings,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: null,
+            ExtractedStyles: null);
 
         var metadata = model.ToBindingMetadata();
 
@@ -266,7 +268,9 @@ public sealed class SingleFileComponentScriptTests
             ScriptContentStartLine: 0,
             Bindings: EquatableArray<ScriptBinding>.Empty,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: null,
+            ExtractedStyles: null);
 
         var metadata = model.ToBindingMetadata();
 

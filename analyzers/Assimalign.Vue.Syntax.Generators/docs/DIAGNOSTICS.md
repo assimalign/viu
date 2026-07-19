@@ -21,9 +21,9 @@ enum. The generator is a **mapping over that shape** (`SingleFileComponentDiagno
   compiler's upstream-pinned `CompilerErrorCode`, the `.viu` container's Vuecs-defined
   `SingleFileComponentErrorCode`, both unbounded). A generator cannot enumerate those into one descriptor each
   without mirroring them, so diagnostics are enveloped by their **origin** (`.viu` block container,
-  dispatched `@template` parse, or the Roslyn parse of the `@script` C#) and severity, and the per-language
-  `RawCode` rides on the message text (e.g. `... (template compiler code 25)`) so the exact catalog code stays
-  visible.
+  dispatched `@template` parse, the dispatched `@style` CSS parse, or the Roslyn parse of the `@script` C#)
+  and severity, and the per-language `RawCode` rides on the message text (e.g. `... (template compiler code
+  25)`, `... (CSS code 2006)`) so the exact catalog code stays visible.
 - **Base `Severity` → Roslyn severity.** Vue's error-vs-warning split is pinned on the base `Diagnostic` at
   parse time, not re-derived here. `Error`/`Warning`/`Information` map to the same-tier descriptor; `Hidden`
   collapses into the informational descriptor (surfaced, never dropped).
@@ -61,6 +61,7 @@ severity tier its own stable ID.
 | `.viu` block container | `VUECS1001` | `VUECS1002` | `VUECS1003` |
 | dispatched `@template` parse | `VUECS1101` | `VUECS1102` | `VUECS1103` |
 | `@script` C# parse | `VUECS1201` | `VUECS1202` | `VUECS1203` |
+| dispatched `@style` CSS parse | `VUECS1301` | `VUECS1302` | `VUECS1303` |
 
 ### VUECS1001
 
@@ -104,3 +105,20 @@ Single-file component script parse warning — a C# parse warning in the `@scrip
 
 Single-file component script parse information — an informational (or `Hidden`) C# parse diagnostic in the
 `@script` block.
+
+### VUECS1301
+
+Single-file component style parse error — a recoverable error from the dispatched `@style` CSS parse
+([V01.01.06.04]), a Vuecs-defined `CssErrorCode` following CSS Syntax Module Level 3 error recovery
+(e.g. an unterminated block, a stray `}`, or a declaration missing its `:`). The CSS parser never throws;
+the scaffold is still emitted, and the `CssErrorCode` (2000-based) rides on the message (e.g. `... (CSS code
+2006)`).
+
+### VUECS1302
+
+Single-file component style parse warning — a warning from the dispatched `@style` CSS parse.
+
+### VUECS1303
+
+Single-file component style parse information — an informational message (or `Hidden`) from the dispatched
+`@style` CSS parse.
