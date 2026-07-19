@@ -194,6 +194,36 @@ execution tests against the renderer are the runtime area's integration delivera
 project consuming `.viu` files does not compile the emitted render bodies, which is why the pinning here
 is snapshot + Roslyn parse-validity tests.
 
+### Render source mapping ([V01.01.05.08])
+
+`RenderFunctionEmitter.Emit` returns a `SyntaxList<RenderSourceMapping>` alongside the code — the C#
+counterpart of the source map Vue 3.5's `generate()` produces under `sourceMap`
+([`codegen.ts`](https://github.com/vuejs/core/blob/v3.5.13/packages/compiler-core/src/codegen.ts)), but
+targeting Roslyn's `#line` mechanism rather than a browser devtools source map, because Vuecs diagnostics
+travel through the C# compiler. Each dynamic expression `RenderCodeWriter` emits records a mapping: the
+absolute offset of its **original template text** inside the emitted output (found by locating
+`node.Location.Source` within the rewritten content, so the map points past the inserted `_ctx.` prefix or
+`unref(...)` wrapper at the identifier the template author wrote) paired with that node's template
+`SourceLocation`. Static string literals, synthesized nodes (the empty-`Source` `Ir.LocationStub`), and any
+emission whose original text is not a recognizable substring (a future `_hoisted_N` placeholder) are skipped
+— they have no faithful template span to point at. The map is value-equatable, preserving the caching
+contract.
+
+This library owns the *correspondence*; the composition root (the generator, [V01.01.06.02]) owns turning it
+into `#line` directives, because only it holds the block-content-start position and the `.viu` file path. A
+C# `#line (startLine,startColumn)-(endLine,endColumn) charOffset "file"` **span** directive (not the
+line-only form, which cannot correct the `_ctx.`-shifted column) aligns physical column `charOffset` on the
+following line to the template `(startLine, startColumn)` and maps linearly; that mapping stays in effect
+across the rest of the physical line, so the generator brackets each expression-bearing render line
+individually — anchored to its first (leftmost) expression — and closes it with `#line default`. The
+divergence from the line-only `@script` seam is forced: script content is emitted verbatim (columns already
+match), whereas a render expression is rewritten, so its column must be re-aligned. A C# error inside a
+template expression (a typo'd member under permissive metadata) therefore resolves to the offending `.viu`
+line **and** column, proved through the real compiler in the generator's
+`SingleFileComponentTemplateSourceMapTests` exactly as the `@script` `#line` map is proved. Non-expression
+scaffolding — and any second expression that happens to share one physical render line — falls back to the
+generated file, the standard generated-code practice.
+
 ### Known deferrals (non-goals for [V01.01.05.05])
 
 - **`v-memo` bodies are serialized but not C#-legal end to end.** The memo condition parts authored by

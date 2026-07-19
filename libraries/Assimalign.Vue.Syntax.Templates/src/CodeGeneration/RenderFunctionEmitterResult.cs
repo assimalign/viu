@@ -2,11 +2,11 @@ namespace Assimalign.Vue.Syntax.Templates;
 
 /// <summary>
 /// The output of <see cref="RenderFunctionEmitter.Emit(TransformResult, RenderFunctionEmitterOptions)"/>:
-/// the C# render-function body plus the cache-slot count the hosting runtime must allocate. The C#
-/// counterpart of the <c>CodegenResult</c> Vue 3.5's <c>generate()</c> returns
-/// (<c>@vue/compiler-core</c> <c>codegen.ts</c>) — <c>code</c> maps to <see cref="Code"/>; the
-/// <c>preamble</c>/<c>ast</c>/source-map members have no counterpart because the composition root owns
-/// the method declaration and [V01.01.05.08] owns source mapping.
+/// the C# render-function body, the cache-slot count the hosting runtime must allocate, and the render
+/// source map ([V01.01.05.08]). The C# counterpart of the <c>CodegenResult</c> Vue 3.5's <c>generate()</c>
+/// returns (<c>@vue/compiler-core</c> <c>codegen.ts</c>) — <c>code</c> maps to <see cref="Code"/> and
+/// <c>map</c> to <see cref="SourceMappings"/>; the <c>preamble</c>/<c>ast</c> members have no counterpart
+/// because the composition root owns the method declaration.
 /// </summary>
 /// <remarks>
 /// A record over value-equatable members, so an incremental-generator pipeline stage carrying this result
@@ -28,4 +28,14 @@ public sealed record RenderFunctionEmitterResult
     /// arrays, cannot grow on assignment.
     /// </summary>
     public required int CacheSlotCount { get; init; }
+
+    /// <summary>
+    /// The render source map ([V01.01.05.08]): each dynamic template expression's position in
+    /// <see cref="Code"/> paired with the template location it came from. The composition root
+    /// ([V01.01.06.02]) turns these into <c>#line</c> span directives so a C# compile error inside an
+    /// emitted expression resolves to the <c>.viu</c> template rather than to generated code. A
+    /// <see cref="SyntaxList{T}"/> so the result stays value-equatable (the caching contract); empty when
+    /// the template has no mappable dynamic expressions.
+    /// </summary>
+    public SyntaxList<RenderSourceMapping> SourceMappings { get; init; } = SyntaxList<RenderSourceMapping>.Empty;
 }
