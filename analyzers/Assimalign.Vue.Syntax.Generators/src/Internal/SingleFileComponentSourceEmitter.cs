@@ -31,6 +31,17 @@ internal static class SingleFileComponentSourceEmitter
     /// </summary>
     private const string RenderHelperSurface = "global::Assimalign.Vue.RuntimeCore.RenderHelpers";
 
+    /// <summary>
+    /// The fully qualified DOM render-helper surface the emitted render body binds the DOM directive/modifier
+    /// helpers against (<c>_vShow</c>, the <c>_vModel*</c> directives, <c>_withModifiers</c>/<c>_withKeys</c>,
+    /// <c>_Transition</c>/<c>_TransitionGroup</c>) — the DOM sibling of <see cref="RenderHelperSurface"/>. It
+    /// is emitted alongside the runtime-core import so a <c>.viu</c> using DOM directives compiles end to end;
+    /// the DOM surface ships with <c>Assimalign.Vue.RuntimeDom</c> ([V01.01.04.09]) and the generator only ever
+    /// names it. A browser <c>.viu</c> always has RuntimeDom available (it is the DOM renderer), so both
+    /// imports are unconditional whenever a render body is present.
+    /// </summary>
+    private const string DomRenderHelperSurface = "global::Assimalign.Vue.RuntimeDom.DomRenderHelpers";
+
     /// <summary>Emits the full generated source for <paramref name="model"/>.</summary>
     /// <param name="model">The scaffold to render.</param>
     /// <returns>The generated C# source text.</returns>
@@ -42,9 +53,13 @@ internal static class SingleFileComponentSourceEmitter
         if (model.RenderBody is not null)
         {
             // The by-name binding site for every emitted helper invocation (_openBlock,
-            // _createElementBlock, _toDisplayString, ...): one file-level static import, mirroring
-            // upstream's aliased helper preamble.
-            builder.Append("using static ").Append(RenderHelperSurface).Append(";\n\n");
+            // _createElementBlock, _toDisplayString, ...): file-level static imports, mirroring
+            // upstream's aliased helper preamble. Two surfaces: the platform-agnostic runtime-core helpers
+            // and the DOM directive/modifier helpers (_vShow, _vModel*, _withModifiers/_withKeys,
+            // _Transition/_TransitionGroup — [V01.01.04.09]), so a .viu using DOM directives binds by name
+            // against both.
+            builder.Append("using static ").Append(RenderHelperSurface).Append(";\n");
+            builder.Append("using static ").Append(DomRenderHelperSurface).Append(";\n\n");
         }
 
         // [V01.01.06.03.01] Hoisted @script using directives. Leading usings (plain, using static, and
