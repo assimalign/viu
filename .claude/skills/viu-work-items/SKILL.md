@@ -1,6 +1,6 @@
 ---
 name: viu-work-items
-description: Create and link GitHub work items (area epics / features / tasks) in the assimalign/vuecs Project #15 using the gh CLI — following the V01.01.NN WBS scheme, native parent/sub-issue links, and the Summary / Acceptance Criteria body template. Use whenever new development is requested, and ESPECIALLY when scope creep is discovered mid-branch: file the out-of-scope work as its own tracked work item so one PR can attach and close several items. Triggers include "create a work item", "file an issue for this", "capture this scope creep", "track this extra change", "open a Viu issue", "this is out of scope — log it", or "assemble the Closes list for my PR". Use only in the assimalign/vuecs repo.
+description: Create and link GitHub work items (area epics / features / tasks) in the assimalign/viu Project #15 using the gh CLI — following the V01.01.NN WBS scheme, native parent/sub-issue links, and the Summary / Acceptance Criteria body template. Use whenever new development is requested, and ESPECIALLY when scope creep is discovered mid-branch: file the out-of-scope work as its own tracked work item so one PR can attach and close several items. Triggers include "create a work item", "file an issue for this", "capture this scope creep", "track this extra change", "open a Viu issue", "this is out of scope — log it", or "assemble the Closes list for my PR". Use only in the assimalign/viu repo.
 ---
 
 # Viu Work Items
@@ -141,7 +141,7 @@ Closing a parent feature does not close its sub-issues and vice-versa, so list e
 
 ## Guardrails
 
-- **Only operate on `assimalign/vuecs`** and Project #15. Confirm `gh auth status` has the `project` scope.
+- **Only operate on `assimalign/viu`** and Project #15. Confirm `gh auth status` has the `project` scope.
   Project #15 also lists `assimalign/cohesion` items — never modify those from this repo.
 - **Never invent a WBS code** — always derive the next child from existing siblings (the script does this; if
   doing it by hand, list the parent's children and take max+1, zero-padded to two digits).

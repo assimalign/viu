@@ -80,7 +80,7 @@ A consumer outside this repo points a `nuget.config` at the feed:
 ```xml
 <configuration>
     <packageSources>
-        <add key="viu-local" value="C:\Source\repos\assimalign\vuecs\_out\packages" />
+        <add key="viu-local" value="C:\Source\repos\assimalign\viu\_out\packages" />
         <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
     </packageSources>
 </configuration>

@@ -30,7 +30,7 @@ internal static class SingleFileComponentDiagnostics
     // The stable per-id help-link target: the VIU diagnostic catalog documents every descriptor's ID,
     // origin, severity, and configuration ([V01.01.05.08]). Each descriptor links its own heading anchor.
     private const string HelpLinkBase =
-        "https://github.com/assimalign/vuecs/blob/main/analyzers/Assimalign.Viu.Syntax.Generators/docs/DIAGNOSTICS.md";
+        "https://github.com/assimalign/viu/blob/main/analyzers/Assimalign.Viu.Syntax.Generators/docs/DIAGNOSTICS.md";
 
     private static string HelpLink(string id) => HelpLinkBase + "#" + id.ToLowerInvariant();
 

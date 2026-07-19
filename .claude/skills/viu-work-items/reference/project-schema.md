@@ -8,7 +8,7 @@ understanding the model. If an ID stops working, re-run the discovery commands a
 
 | Thing | Value |
 | --- | --- |
-| Repo | `assimalign/vuecs` |
+| Repo | `assimalign/viu` |
 | Org / owner | `assimalign` |
 | Project | **#15 "Viu"** |
 | Project node id | `PVT_kwDOA9eCcc4BdkOB` |
@@ -55,7 +55,7 @@ in the branch names the **feature** currently in flight.
 
 (Program root: `#1 [V01.01.00] Viu - Framework Libraries`.)
 
-(Re-list with: `gh issue list --repo assimalign/vuecs --state open --search '"Framework -" in:title' --json number,title`)
+(Re-list with: `gh issue list --repo assimalign/viu --state open --search '"Framework -" in:title' --json number,title`)
 
 ## Custom fields (single-select)
 
@@ -89,7 +89,7 @@ W06 enterprise polish.
 
 ```bash
 # By label (issues CLI):
-gh issue list --repo assimalign/vuecs --label scope-creep --state all --json number,title,state
+gh issue list --repo assimalign/viu --label scope-creep --state all --json number,title,state
 # By field on the board: filter or group Project #15 by Origin (DiscoveredTask / DiscoveredFeature).
 ```
 
@@ -111,7 +111,7 @@ gh issue list --repo assimalign/vuecs --label scope-creep --state all --json num
 ## Manual recipe (when not using the helper script)
 
 ```bash
-REPO=assimalign/vuecs ; OWNER=assimalign ; PROJ=15
+REPO=assimalign/viu ; OWNER=assimalign ; PROJ=15
 PROJECT_ID=PVT_kwDOA9eCcc4BdkOB
 
 # 1. Find the parent + its node id (feature for a task, area epic for a sibling feature)
