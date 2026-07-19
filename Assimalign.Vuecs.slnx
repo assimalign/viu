@@ -174,6 +174,7 @@
 		<Project Path="libraries/Assimalign.Vue.RuntimeCore/src/Assimalign.Vue.RuntimeCore.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeCore/test/">
+		<Project Path="libraries/Assimalign.Vue.RuntimeCore/test/Assimalign.Vue.RuntimeCore.CompiledRenderTests/Assimalign.Vue.RuntimeCore.CompiledRenderTests.csproj" />
 		<Project Path="libraries/Assimalign.Vue.RuntimeCore/test/Assimalign.Vue.RuntimeCore.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/" />

@@ -265,17 +265,7 @@ public static class VirtualNodeFactory
         PatchFlags patchFlag,
         string[]? dynamicProperties)
     {
-        ArgumentNullException.ThrowIfNull(definition);
-        var vnode = new VirtualNode(VirtualNodeType.Component)
-        {
-            ComponentType = definition,
-            Properties = properties,
-            Key = ExtractKey(properties),
-            Reference = ExtractReference(properties),
-            ShapeFlag = ShapeFlags.StatefulComponent,
-            PatchFlag = patchFlag,
-            DynamicProperties = dynamicProperties,
-        };
+        var vnode = BuildComponent(definition, properties, null, patchFlag, dynamicProperties);
         // A component is always collected into the enclosing block (upstream: shapeFlag & COMPONENT):
         // it must persist its instance to the next vnode even when its own props do not change.
         BlockStack.TrackDynamicChild(vnode);
@@ -303,6 +293,40 @@ public static class VirtualNodeFactory
         PatchFlags patchFlag = default,
         string[]? dynamicProperties = null)
     {
+        var vnode = BuildComponent(definition, properties, slots, patchFlag, dynamicProperties);
+        // A component is always collected into the enclosing block (upstream: shapeFlag & COMPONENT).
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
+    }
+
+    /// <summary>
+    /// Creates a block component vnode whose <see cref="VirtualNode.DynamicChildren"/> are the dynamic
+    /// descendants collected since <see cref="OpenBlock"/> (upstream: <c>createBlock</c> over a component
+    /// type, i.e. <c>setupBlock(createVNode(Component, ...))</c>). This is the block-form counterpart of
+    /// <see cref="Component(IComponentDefinition, VirtualNodeProperties?, ComponentSlots?, PatchFlags, string[]?)"/>
+    /// that the compiled render emits as <c>createBlock</c>; it closes the open block onto the component
+    /// vnode instead of tracking the vnode into that same block.
+    /// </summary>
+    /// <param name="definition">The component definition.</param>
+    /// <param name="properties">The props passed by the parent, or null.</param>
+    /// <param name="slots">The slot content, or null.</param>
+    /// <param name="patchFlag">The compiler patch hint.</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode ComponentBlock(
+        IComponentDefinition definition,
+        VirtualNodeProperties? properties,
+        ComponentSlots? slots,
+        PatchFlags patchFlag = default,
+        string[]? dynamicProperties = null)
+        => BlockStack.CloseBlockAndSetup(BuildComponent(definition, properties, slots, patchFlag, dynamicProperties));
+
+    private static VirtualNode BuildComponent(
+        IComponentDefinition definition,
+        VirtualNodeProperties? properties,
+        ComponentSlots? slots,
+        PatchFlags patchFlag,
+        string[]? dynamicProperties)
+    {
         ArgumentNullException.ThrowIfNull(definition);
         if (slots is not null && slots.Flag == SlotFlags.Forwarded)
         {
@@ -311,7 +335,7 @@ public static class VirtualNodeFactory
                 ? SlotFlags.Stable
                 : SlotFlags.Dynamic;
         }
-        var vnode = new VirtualNode(VirtualNodeType.Component)
+        return new VirtualNode(VirtualNodeType.Component)
         {
             ComponentType = definition,
             Properties = properties,
@@ -324,9 +348,6 @@ public static class VirtualNodeFactory
             PatchFlag = patchFlag,
             DynamicProperties = dynamicProperties,
         };
-        // A component is always collected into the enclosing block (upstream: shapeFlag & COMPONENT).
-        BlockStack.TrackDynamicChild(vnode);
-        return vnode;
     }
 
     /// <summary>
