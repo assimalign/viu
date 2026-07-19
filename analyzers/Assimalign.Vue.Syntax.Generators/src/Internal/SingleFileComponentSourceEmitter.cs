@@ -388,7 +388,9 @@ internal static class SingleFileComponentSourceEmitter
 
     // Turns an authored class name into a valid C# member identifier: non-identifier characters become '_'
     // and a leading digit is prefixed with '_'. Deterministic so the accessor is stable across rebuilds.
-    private static string MemberName(string original)
+    // Internal so the template-compile path ([V01.01.05.04.01]) resolves `$style.<member>` references against
+    // the exact same member names this emitter writes as the accessor class's consts.
+    internal static string MemberName(string original)
     {
         var builder = new StringBuilder(original.Length);
         foreach (var character in original)

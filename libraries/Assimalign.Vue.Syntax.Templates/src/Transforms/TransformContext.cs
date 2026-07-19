@@ -44,6 +44,7 @@ public sealed class TransformContext
         CacheHandlers = options.CacheHandlers;
         PrefixIdentifiers = options.PrefixIdentifiers;
         BindingMetadata = options.BindingMetadata ?? BindingMetadata.Empty;
+        CssModules = options.CssModules ?? CssModuleAccessors.Empty;
         InSSR = options.InSSR;
         Ssr = options.Ssr;
         Slotted = options.Slotted;
@@ -85,6 +86,12 @@ public sealed class TransformContext
     /// <c>bindingMetadata</c>). Defaults to <see cref="BindingMetadata.Empty"/>.
     /// </summary>
     public BindingMetadata BindingMetadata { get; }
+
+    /// <summary>
+    /// The CSS Modules accessors ([V01.01.05.04.01]) expression classification resolves <c>$style</c> (and
+    /// named-module) references against. Defaults to <see cref="CssModuleAccessors.Empty"/>.
+    /// </summary>
+    public CssModuleAccessors CssModules { get; }
 
     /// <summary>Whether this is a nested SSR slot compilation.</summary>
     public bool InSSR { get; }

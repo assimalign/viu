@@ -50,6 +50,7 @@ single closure over the component), and the table below is the compiler-owned co
 | `SetupLet` | `unref(_ctx.name)` | `_ctx.name` — upstream emits an `isRef`-guarded write, which a C# expression cannot; the helper-backed guarded write is deferred to [V01.01.05.05] |
 | `SetupConstant` / `SetupReactiveConstant` / `LiteralConstant` | `_ctx.name` | `_ctx.name` |
 | `Property` / `PropertyAliased` / `Data` / `Options` | `_ctx.name` (alias resolved for `PropertyAliased`) | same |
+| CSS module accessor (`$style`, named module) | `Style.member` / `<Accessor>.member` (bare accessor class) | n/a (read-only) |
 | unresolved | `_ctx.name` | `_ctx.name` |
 
 Key divergences from Vue's JS contract, all forced by C# semantics:
@@ -68,6 +69,40 @@ Key divergences from Vue's JS contract, all forced by C# semantics:
   (`BindingMetadata.ReportsUnresolvedIdentifiers`), such an identifier surfaces `XVuecsUnresolvedIdentifier`
   (code 66 — a Vuecs-specific extension past the upstream and DOM `__EXTEND_POINT__` sentinels) while still
   emitting the recoverable `_ctx.` fallback. With the default permissive metadata the behavior matches Vue.
+
+### CSS Modules accessors (`$style` and named modules, [V01.01.05.04.01])
+
+Vue exposes a `<style module>` block's class map to templates as the `$style` render-context object (a named
+module `<style module="theme">` as `theme`), indexed at runtime: `:class="$style.box"`. Vuecs generates static
+C# with no render-context object to index, so [V01.01.06.06] emits the map as a compile-time nested `const` class
+(`internal static class Style { public const string box = "box_<hash>"; }`). This feature wires that class into
+expression classification as a **new binding source**, so `$style.box` resolves to `Style.box` (the emitted
+const) instead of a phantom component member — the loop [V01.01.06.06] left open. The seam is
+`CssModuleAccessors`, a transform-input object (like `BindingMetadata`) the composition-root generator supplies
+on `TransformOptions.CssModules`; it is rebuilt from the model's already-value-equatable module-class map, so it
+never rides in the cached model and the incremental cache stays `Cached`.
+
+- **`$` spelling.** `$` is not a legal C# identifier character, so before the Roslyn parse the accessor spelling
+  is rewritten to a parse identifier — `$style`→`_style` — the same spelling-substitution precedent as
+  `$event`→`__event` and `$slots`→`__slots`. The substitution is **length-preserving**, so every offset in the
+  expression (and therefore every remapped diagnostic span) is unchanged; classification then maps the parse
+  identifier to the accessor class name (`Style`). A named module is referenced by its authored name (`theme`),
+  already C#-parseable, and maps to its pascal-cased accessor class (`Theme`) — a divergence from Vue's runtime
+  string-indexed access, forced because the accessor is a C# type. A member with a non-identifier name (`.a-b`)
+  is reached through its sanitized C# member (`$style.a_b`), the same name the emitter writes as the const.
+- **Precedence (shadowing).** A module accessor is resolved before component bindings, so a same-named component
+  member is shadowed — matching Vue's render context, which exposes `$style`/named modules over component state.
+- **Unknown members are a compile-time error.** The generator supplies the *complete* class map, so an access to
+  an undeclared class (`$style.missing`) is decidably wrong and surfaces `XVuecsUnknownCssModuleMember` (code
+  1001, the Vuecs-specific band) on the exact template coordinate under strict metadata
+  (`CssModuleAccessors.ReportsUnknownMembers`, which the generator sets). The access still emits the accessor
+  member (recoverable), so the C# compiler is the backstop; with a partial map the check is silent and only the
+  C# compiler catches it. Pinned by `ExpressionBindingTests`, `SingleFileComponentCssModuleTests`, and the
+  compiled-render projects.
+- **Known simplification (collision).** The `$`→`_` substitution means a component member literally named
+  `_style` referenced in a template while a `$style` module is in scope would be misclassified as the accessor
+  (both spell `_style` post-substitution). This mirrors the documented lambda-shadowing approximation and is
+  vanishingly rare given the repo's whole-word naming; a real `$style` reference is always unambiguous.
 
 ### Diagnostics and source mapping
 

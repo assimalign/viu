@@ -73,6 +73,59 @@ public sealed class SingleFileComponentCssModuleTests
     }
 
     [Fact]
+    public void ModuleStyle_TemplateStyleReference_ResolvesToAccessorClass()
+    {
+        // [V01.01.05.04.01] `:class="$style.box"` in the template resolves to the generated `Style` accessor
+        // class, so the render body binds `Style.box` (a const) — not a phantom `_ctx.box` member.
+        const string source =
+            "@template {\n    <div :class=\"$style.box\">hi</div>\n}\n" +
+            "@style module {\n    .box { color: red; }\n}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
+        generated.ShouldContain("Style.box");
+        generated.ShouldContain("internal static class Style");
+        generated.ShouldNotContain("_ctx.box");
+    }
+
+    [Fact]
+    public void ModuleStyle_NamedTemplateReference_ResolvesToPascalCasedAccessorClass()
+    {
+        // [V01.01.05.04.01] A named module `<style module="theme">` is referenced by its authored name
+        // `theme` in the template and resolves to the pascal-cased `Theme` accessor class.
+        const string source =
+            "@template {\n    <div :class=\"theme.active\">hi</div>\n}\n" +
+            "@style module=\"theme\" {\n    .active { color: red; }\n}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
+        generated.ShouldContain("Theme.active");
+        generated.ShouldContain("internal static class Theme");
+    }
+
+    [Fact]
+    public void ModuleStyle_UnknownTemplateMember_SurfacesMappedDiagnostic()
+    {
+        // [V01.01.05.04.01] The generator supplies the complete class map, so a `$style.<missing>` reference is
+        // reported on the .viu template coordinate (line 2), recoverable.
+        const string source =
+            "@template {\n    <div :class=\"$style.missing\">hi</div>\n}\n" +  // line 2 — the bad member
+            "@style module {\n    .box { color: red; }\n}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
+
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VUECS1101"); // a dispatched @template-compile diagnostic
+        diagnostic.GetMessage().ShouldContain("'$style' has no member 'missing'.");
+        diagnostic.Location.GetLineSpan().StartLinePosition.Line.ShouldBe(1); // .viu file line 2, zero-based
+        outcome.Sources.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public void ModuleAndVBind_ComposeWithScoped()
     {
         const string source =
@@ -128,6 +181,31 @@ public sealed class SingleFileComponentCssModuleTests
         diagnostic.Location.GetLineSpan().StartLinePosition.Line.ShouldBe(5); // .viu file line 6, zero-based
         // Recoverable: the scaffold is still emitted.
         outcome.Sources.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void ModuleTemplateReference_IdenticalInput_StaysStrictlyCached()
+    {
+        // [V01.01.05.04.01] The CSS module accessor threaded into the template compile is rebuilt from the
+        // value-equatable module-class map, so an unchanged component still re-runs to an equal model — the
+        // model step stays strictly Cached (not Unchanged, which would mean it re-executed and merely matched).
+        const string source =
+            "@template {\n    <div :class=\"$style.box\">hi</div>\n}\n" +
+            "@style module {\n    .box { color: red; }\n}\n";
+
+        var file = new InMemoryAdditionalText($"{ProjectDirectory}/Card.viu", source);
+        var compilation = GeneratorTestHarness.CreateCompilation();
+        var driver = GeneratorTestHarness.CreateDriver(
+            ImmutableArray.Create<AdditionalText>(file), RootNamespace, ProjectDirectory);
+
+        driver = driver.RunGenerators(compilation);
+        driver = driver.RunGenerators(compilation);
+
+        driver.GetRunResult().Results[0]
+            .TrackedSteps[SingleFileComponentGenerator.ModelTrackingName]
+            .SelectMany(step => step.Outputs)
+            .Select(output => output.Reason)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
     [Fact]

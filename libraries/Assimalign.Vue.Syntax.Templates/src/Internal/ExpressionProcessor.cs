@@ -81,6 +81,17 @@ internal static class ExpressionProcessor
             return node;
         }
 
+        // CSS Modules accessor spelling ([V01.01.05.04.01]): `$style` is not C#-parseable (`$` is an illegal
+        // identifier character), so rewrite it to its parse identifier (`$style`->`_style`) before the
+        // identifier fast-path and the Roslyn parse. The substitution is length-preserving, so every offset in
+        // the expression — and therefore every remapped diagnostic and member span — is unchanged. Named
+        // modules (`theme.box`) are already C#-parseable and pass through untouched. The classification and
+        // member validation below recognize the parse identifier through `context.CssModules`.
+        if (context.CssModules.Count > 0)
+        {
+            raw = context.CssModules.Substitute(raw);
+        }
+
         // Fast path: a lone identifier (upstream's isSimpleIdentifier branch).
         if (!asParams && CompilerText.IsSimpleIdentifier(raw))
         {
@@ -133,6 +144,15 @@ internal static class ExpressionProcessor
             return node;
         }
 
+        // CSS Modules member validation ([V01.01.05.04.01]): the generator supplies the complete class map, so a
+        // `$style.<member>` (or named-module) access to an undeclared class is decidably wrong and surfaces a
+        // mapped diagnostic on the exact template coordinate (the C# compiler would also reject the emitted
+        // accessor member, but this points at the .viu instead of the generated accessor class).
+        if (context.CssModules.ReportsUnknownMembers && context.CssModules.Count > 0)
+        {
+            ValidateModuleMembers(parsed, context, node, raw, prefixLength);
+        }
+
         var references = CollectReferences(parsed, context, prefixLength);
         if (references.Count == 0)
         {
@@ -148,6 +168,14 @@ internal static class ExpressionProcessor
 
     private static string RewriteIdentifier(string raw, TransformContext context, bool isWriteTarget, SourceLocation location)
     {
+        // A CSS Modules accessor ([V01.01.05.04.01]) resolves to its generated accessor class, taking
+        // precedence over component bindings and the unresolved-identifier fallback — the compile-time analogue
+        // of Vue's render context exposing `$style`/named modules over same-named component state.
+        if (context.CssModules.Count > 0 && context.CssModules.TryResolve(raw, out var accessor))
+        {
+            return accessor.AccessorClass;
+        }
+
         if (context.BindingMetadata.TryGetBindingType(raw, out var type))
         {
             return RewriteBoundIdentifier(raw, type, isWriteTarget, context);
@@ -200,6 +228,45 @@ internal static class ExpressionProcessor
             // Props, options-API members, and plain data are component-instance members reached through _ctx.
             _ => "_ctx." + raw,
         };
+
+    // ---- CSS Modules member validation ([V01.01.05.04.01]) ----
+
+    // Reports an XVuecsUnknownCssModuleMember diagnostic for each `<accessor>.<member>` whose member is not a
+    // declared class of the resolved CSS module accessor. The offending member span is remapped from the
+    // expression-relative offset back into template coordinates so the diagnostic lands on the exact .viu
+    // position (the same remapping X_INVALID_EXPRESSION uses). The substitution above is length-preserving, so
+    // the parsed span aligns with the original template text.
+    private static void ValidateModuleMembers(
+        Microsoft.CodeAnalysis.SyntaxNode root,
+        TransformContext context,
+        SimpleExpressionNode node,
+        string raw,
+        int prefixLength)
+    {
+        foreach (var descendant in root.DescendantNodesAndSelf())
+        {
+            if (descendant is not MemberAccessExpressionSyntax access ||
+                access.Expression is not IdentifierNameSyntax identifier ||
+                !context.CssModules.TryResolve(identifier.Identifier.ValueText, out var accessor))
+            {
+                continue;
+            }
+
+            var member = access.Name.Identifier.ValueText;
+            if (member.Length == 0 || accessor.HasMember(member))
+            {
+                continue;
+            }
+
+            var span = access.Name.Span;
+            var start = Clamp(span.Start - prefixLength, 0, raw.Length);
+            var length = start + span.Length > raw.Length ? raw.Length - start : span.Length;
+            var location = SubLocation(node.Location, raw, start, length < 0 ? 0 : length);
+            var message = CompilerErrorMessages.GetMessage(CompilerErrorCode.XVuecsUnknownCssModuleMember) +
+                "'" + accessor.TemplateName + "' has no member '" + member + "'.";
+            context.ReportError(new CompilerError(CompilerErrorCode.XVuecsUnknownCssModuleMember, message, location));
+        }
+    }
 
     // ---- reference collection ----
 

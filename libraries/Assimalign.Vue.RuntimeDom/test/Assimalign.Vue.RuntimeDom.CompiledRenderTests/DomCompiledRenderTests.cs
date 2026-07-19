@@ -136,6 +136,36 @@ public sealed class DomCompiledRenderTests
         "    }\n" +
         "}\n";
 
+    // [V01.01.05.04.01] A component whose template references the CSS module accessor `$style.box`: the
+    // render body must resolve it to the generated `Style` accessor class and compile against it end to end.
+    private const string CssModuleTemplateReferenceComponent =
+        "@template {\n" +
+        "<div :class=\"$style.box\">hi</div>\n" +
+        "}\n" +
+        "@style module {\n" +
+        ".box { color: red; }\n" +
+        "}\n";
+
+    [Fact]
+    public void CssModuleTemplateReference_ResolvesAccessor_AndCompiles()
+    {
+        // [V01.01.05.04.01] `:class="$style.box"` resolves to the generated `Style` accessor class (not a
+        // phantom `_ctx.box`), so the render body binds `Style.box` — a compile-time const of the emitted
+        // accessor — and compiles end to end against it. This is the loop [V01.01.06.06] left open: it emitted
+        // and compile-checked the accessor, but the template expression compiler had no $style binding source.
+        var generated = CompiledRenderSupport.Generate("StyleRefWidget", CssModuleTemplateReferenceComponent);
+
+        generated.ShouldContain("Style.box");
+        generated.ShouldContain("internal static class Style");
+        generated.ShouldNotContain("_ctx.box");
+
+        // The accessor is self-contained (a const class), so only an empty partial half is needed.
+        var assembly = CompiledRenderSupport.CompileToAssembly(
+            generated,
+            "#nullable enable\nnamespace Demo\n{\n    partial class StyleRefWidget\n    {\n    }\n}\n");
+        assembly.Length.ShouldBeGreaterThan(0);
+    }
+
     [Fact]
     public void CssModuleAndVBind_SeamsCompile_AgainstRuntimeDom()
     {
