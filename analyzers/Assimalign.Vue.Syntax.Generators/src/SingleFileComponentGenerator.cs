@@ -195,8 +195,16 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 IndentLevel = string.IsNullOrEmpty(file.Namespace) ? 2 : 3,
             });
 
+            // [V01.01.05.08] Inject #line span directives over the emitted render body so a C# error inside
+            // a template expression (an unresolved member under permissive metadata, for example) resolves
+            // to the offending .viu template line/column rather than to this generated file — the
+            // render-body analogue of the @script merge's #line map. The mapper reuses the same
+            // block-to-file composition the dispatched diagnostics use.
+            var body = RenderBodySourceMapper.Inject(
+                emitted.Code, emitted.SourceMappings, blockContentStart, file.FilePath);
+
             // The first @template block is the component's template (the descriptor carries one).
-            return (emitted.Code, emitted.CacheSlotCount);
+            return (body, emitted.CacheSlotCount);
         }
 
         return (null, 0);
