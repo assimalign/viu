@@ -110,9 +110,11 @@ Single-file component script parse information — an informational (or `Hidden`
 
 Single-file component style parse error — a recoverable error from the dispatched `@style` CSS parse
 ([V01.01.06.04]), a Vuecs-defined `CssErrorCode` following CSS Syntax Module Level 3 error recovery
-(e.g. an unterminated block, a stray `}`, or a declaration missing its `:`). The CSS parser never throws;
-the scaffold is still emitted, and the `CssErrorCode` (2000-based) rides on the message (e.g. `... (CSS code
-2006)`).
+(e.g. an unterminated block, a stray `}`, or a declaration missing its `:`). The CSS-Modules and `v-bind()`
+rewrites ([V01.01.06.06]) surface here too through the same style-origin envelope — a malformed
+`v-bind()` (an unterminated `v-bind(` or an empty `v-bind()`) reports `CssErrorCode` 2008/2009 on the
+offending declaration. The CSS parser and rewrites never throw; the scaffold is still emitted, and the
+`CssErrorCode` (2000-based) rides on the message (e.g. `... (CSS code 2006)`).
 
 ### VUECS1302
 
