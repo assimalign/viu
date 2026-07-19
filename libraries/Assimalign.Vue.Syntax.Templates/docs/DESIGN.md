@@ -155,44 +155,66 @@ snapshot test in `RenderFunctionEmitterTests`.
 ### The runtime helper name/signature contract
 
 The emitted code compiles against `global::Assimalign.Vue.RuntimeCore.RenderHelpers` (imported via
-`using static` by the generator) — a static surface the runtime area provides. Members carry the
-upstream-aliased names on purpose (a deliberate, generated-code-only deviation from the repository C#
-naming rule; the names ARE the upstream contract). What code generation requires of each member:
+`using static` by the generator) — a static surface the runtime area provides ([V01.01.03.22], issue
+#136). Members carry the upstream-aliased names on purpose (a deliberate, generated-code-only deviation
+from the repository C# naming rule; the names ARE the upstream contract). What code generation requires
+of each member:
 
-- `_openBlock(bool disableTracking = false)` — opens a block, returns an opaque block token; every
-  `_createBlock`/`_createElementBlock` takes it as the first argument (evaluation-order sequencing).
-- `_createElementBlock(token, object tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null)`
+- `_openBlock(bool disableTracking = false) : BlockToken` — opens a block, returns an opaque
+  `BlockToken`; every `_createBlock`/`_createElementBlock` takes it as the first argument
+  (evaluation-order sequencing).
+- `_createElementBlock(BlockToken block, object? tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null)`
   and `_createBlock(...)` (component form) — close the block (upstream `createElementBlock`/`createBlock`).
-- `_createElementVNode(object tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null)`
+  `tag` is `object?` (not `object`): `_resolveDynamicComponent` can return null, which resolves to a
+  comment placeholder.
+- `_createElementVNode(object? tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null)`
   and `_createVNode(...)` — plain vnodes (upstream `createElementVNode`/`createVNode`).
-- `_createTextVNode(object? text, int patchFlag = 0)`, `_createCommentVNode(string text, bool asBlock = false)`,
+- `_createTextVNode(object? text = null, int patchFlag = 0)`, `_createCommentVNode(string? text = "", bool asBlock = false)`,
   `_createStaticVNode(string content, int count)` — text/comment/static vnodes.
 - `_toDisplayString(object?) : string` — interpolation stringification.
-- `_renderList(source, iterator) : VirtualNode[]` — generic overloads whose type inference gives the
+- `_renderList(source, iterator) : VirtualNode?[]` — generic overloads whose type inference gives the
   emitted `(item)`, `(item, index)` lambdas their parameter types (list/count/object-entry sources).
-- `_renderSlot(slots, string name, object? props = null, Func<object?[]>? fallback = null)`.
-- `_withCtx(fn)` — slot-function wrapper; its delegate parameters type the emitted slot lambdas.
+- `_renderSlot(ComponentSlots? slots, string name, object? props = null, Func<object?[]?>? fallback = null)`.
+- `_withCtx(fn) : Slot` — slot-function wrapper (0- and 1-parameter overloads); its delegate parameters
+  type the emitted slot lambdas.
 - `_resolveComponent(string name)`, `_resolveDirective(string name)`, `_resolveDynamicComponent(object? value)`.
-- `_withDirectives(vnode, object?[][] directives)` — runtime directive application.
+- `_withDirectives(vnode, object?[] directives)` — runtime directive application. Each entry is itself an
+  `object?[]` tuple `[directive, value?, argument?, modifiers?]`; the outer array is `object?[]` (of
+  `object?[]`), which is the shape the emitter writes (`new object?[] { new object?[] { … } }`) —
+  **not** `object?[][]` (an earlier draft of this table said `object?[][]`; reconciled with the runtime
+  and the pinned emitter output in [V01.01.03.22]).
 - `_mergeProps(...)`, `_normalizeClass(...)`, `_normalizeStyle(...)`, `_normalizeProps(...)`,
   `_guardReactiveProps(...)`, `_toHandlers(...)`, `_camelize(string)`, `_capitalize(string)`,
   `_toHandlerKey(...) : string` — prop-normalization helpers (dynamic keys must be strings).
-- `_setBlockTracking(int value, bool inVOnce = false)` — returns a token accepted by `_setCache`.
-- Built-in tags as values: `_Fragment`, `_Teleport`, `_Suspense`, `_KeepAlive`, `_BaseTransition`,
-  `_Transition`, `_TransitionGroup`; runtime directive values `_vShow`, `_vModelText`,
-  `_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic`;
-  `_withModifiers(handler, string[] modifiers)` / `_withKeys(handler, string[] keys)` guard wrappers.
+- `_setBlockTracking(int value, bool inVOnce = false) : BlockToken` — returns a token accepted by `_setCache`.
+- Built-in tags as values (runtime-core): `_Fragment`, `_Teleport`, `_Suspense`, `_KeepAlive`,
+  `_BaseTransition`. `_Fragment` is fully realized; the component-like built-ins are surface markers
+  whose renderer support lands with their own work items.
+- `_unref(object?) : object?` / `_isRef(object?) : bool` — bridge to `Assimalign.Vue.Reactivity`
+  references (upstream `unref`/`isRef`).
 - Vuecs-defined (no upstream counterpart, per the divergence table): `_createProps(params (string, object?)[] entries)`,
-  `_withHandler(handler)`, `_setCache(int index, token, value)`, `_spreadCache(value)`.
+  `_withHandler(handler)` (delegate-typed overloads), `_setCache(int index, BlockToken tracking, object? value)`,
+  `_spreadCache(object?)`.
+
+**DOM-only helpers are a separate surface (layering).** The DOM directive values `_vShow`, `_vModelText`,
+`_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic`, the `_withModifiers(handler, string[])` /
+`_withKeys(handler, string[])` guard wrappers, and the DOM built-ins `_Transition` / `_TransitionGroup`
+are **not** members of `Assimalign.Vue.RuntimeCore.RenderHelpers`: their behavior lives in
+`Assimalign.Vue.RuntimeDom` (e.g. `VShow.Instance`, `BrowserEvents.WithModifiers`), which the
+platform-agnostic runtime-core layer must not reference. A DOM component binds them through a DOM-side
+helper surface the DOM generator path adds — a follow-up to [V01.01.03.22]; the current generator emits a
+single runtime-core `using static`, so templates using DOM directives are not yet end-to-end compilable.
 
 The generated render method itself is the generator's contract:
 `internal static object? Render(<ComponentClass> _ctx, object?[] _cache)` plus
 `internal const int RenderCacheSize` (C# arrays cannot grow on assignment, so the runtime sizes the
 per-instance cache from the constant). `RenderCacheSize` and `Render` are reserved member names in a
-`.viu` component's partial class. The runtime-side implementation of `RenderHelpers` and the end-to-end
-execution tests against the renderer are the runtime area's integration deliverable; until it lands, a
-project consuming `.viu` files does not compile the emitted render bodies, which is why the pinning here
-is snapshot + Roslyn parse-validity tests.
+`.viu` component's partial class. `Render` returns `object?`; the runtime normalizes it into a vnode
+through `RenderHelpers.NormalizeRoot(object?)` (the C# analogue of upstream `normalizeVNode` over the
+render result). The runtime-side implementation of `RenderHelpers` and the end-to-end execution tests
+against the renderer landed in [V01.01.03.22] (`Assimalign.Vue.RuntimeCore.CompiledRenderTests`), which
+compiles a generator-emitted render body with Roslyn and drives it through the in-memory renderer —
+delivering the integration criterion deferred from [V01.01.05.05].
 
 ### Render source mapping ([V01.01.05.08])
 
