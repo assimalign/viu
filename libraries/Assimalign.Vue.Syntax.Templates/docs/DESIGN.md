@@ -97,9 +97,21 @@ the common .NET base-class surface a template legitimately reaches (`Math`, `Con
 - **Inline-handler event parameter.** `$event` is not a legal C# identifier, so under prefixing an inline
   statement is parsed and emitted against the Vuecs spelling `__event`: `VOnTransform` substitutes
   `$event` → `__event` in the handler content before processing and names the wrapping lambda's parameter
-  `__event`, so `@input="save($event)"` emits `__event => (_ctx.save(__event))`. Template authors keep
+  `__event`, so `@input="save($event)"` emits `__event => { _ctx.save(__event); }`. Template authors keep
   Vue's `$event`; without prefixing the emitted wrapper keeps `$event` for upstream output parity. Pinned
   by `ExpressionBindingTests`.
+- **Single-statement call handlers are statement-block lambdas.** Upstream `transformOn` wraps every
+  single-statement inline handler as an expression arrow `$event => (expr)`; JavaScript has no `void`, so
+  the discarded result is harmless. C# has `void`, and a parenthesized void call binds no delegate, so a
+  single-statement handler whose expression is a **call** — a plain invocation `save($event)` or a
+  null-conditional invocation `model?.save()`, the only single-statement shape that can be void-typed —
+  emits as a statement-block lambda `__event => { save(__event); }` instead. Its `Action<…>` overload
+  binds both void and value calls (discarding any result, exactly as upstream's arrow function does).
+  Every other single-statement shape (an increment `count++`, an assignment `open = true`, a plain value
+  expression) yields a C# value and keeps the expression-lambda form, so it stays as close to upstream as
+  C# allows. Only the prefixed (C#-codegen) path diverges; non-prefixed output stays byte-for-byte
+  upstream parity. Pinned by `ExpressionBindingTests` and `RenderFunctionEmitterTests`
+  ([V01.01.05.05.01], issue #143).
 - **`asParams` validation is lenient.** Alias/prop declaration positions are registered for scope but not
   hard-validated as expressions, because C# deconstruction forms (`(a, b)`, `var (a, b)`) and JavaScript-style
   `{ a }` destructures do not all parse as C# expressions; a lenient identifier scan still contributes their
@@ -141,6 +153,7 @@ snapshot test in `RenderFunctionEmitterTests`.
 | `(setBlockTracking(-1, true), (_cache[0] = v).cacheIndex = 0, setBlockTracking(1), _cache[0])` | `_setCache(0, _setBlockTracking(-1, true), v)` | The comma sequence collapses into a helper: argument order pauses tracking before `v` is created; `_setCache` stamps the cache index, resumes tracking, and returns the value. |
 | `[...(cacheExpr)]` | `_spreadCache(cacheExpr)` | No spread operator; the helper clones the cached array. |
 | inline handler values (`$event => ...`, method refs) | wrapped in `_withHandler(...)` | A C# lambda or method group has no natural type in an object-typed position; the helper's delegate parameter supplies the target type. `_withModifiers`/`_withKeys` calls are not wrapped — their own contract signatures type the inner lambda. |
+| single-statement **call** handler (`$event => (call)`) | `__event => { call; }` (statement-block lambda) | JavaScript has no `void`; C# does, and a parenthesized void call binds no delegate. A call is the only single-statement shape that can be void, so it emits as a statement-block lambda (binds the `Action<…>` overload, discarding any value). Increments/assignments/value expressions yield a value and keep `__event => (expr)`. See the inline-handler divergence note above ([V01.01.05.05.01], issue #143). |
 | `$slots` / `$event` | `_ctx.__slots` / `__event` | `$` is not legal in C# identifiers; `__event` is the [V01.01.05.04] event-variable contract and `__slots` follows the same spelling rule. |
 | `undefined` / `void 0` | `null` | No `undefined` in C#. |
 | `{}` (renderSlot's empty-props placeholder) | `_createProps()` | Same object-literal rule as props. |
@@ -225,8 +238,10 @@ What code generation requires of each DOM member, mapped to the runtime machiner
   invoker registry understands) and forwarding to `BrowserEvents.WithModifiers` / `BrowserEvents.WithKeys`. The
   handler parameter is **overloaded**, not a single `Action` — this reconciles the earlier
   `_withModifiers(handler, string[])` pin: the emitter (`VOnTransform`) can write the handler as a value-returning
-  inline expression lambda (`__event => (expr)`), a void statement-block lambda (`__event => { … }`), or a
-  member/method-group reference (`_ctx.save`), and a parenthesized value expression cannot bind to `Action`. The
+  inline expression lambda (`__event => (expr)`), a statement-block lambda for a single-statement call
+  (`__event => { call; }`, the void-capable shape — see the single-statement call-handler divergence above) or a
+  multi-statement body, or a member/method-group reference (`_ctx.save`), and a parenthesized void call cannot
+  bind to `Func<BrowserEvent, object?>`. The
   overload set — `Func<BrowserEvent, object?>`, `Action<BrowserEvent>`, `Func<object?>`, `Action` (each with
   `params string[]`) — target-types every one of those, mirroring `_withHandler`'s multi-overload rationale.
   Because both return `Action<BrowserEvent>`, a stacked `@keyup.enter.prevent` nests cleanly as

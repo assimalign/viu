@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace Assimalign.Vue.Syntax.Templates;
 
 /// <summary>
@@ -145,10 +148,28 @@ internal static class VOnTransform
             handler = processedExpression;
             if (isInlineStatement || (shouldCache && isMemberExpression))
             {
-                handler = Ir.CompoundExpression(
-                    (isInlineStatement ? (context.PrefixIdentifiers ? "__event" : "$event") : "(...args)") + " => " + (hasMultipleStatements ? "{" : "("),
-                    processedExpression,
-                    hasMultipleStatements ? "}" : ")");
+                var parameter = isInlineStatement ? (context.PrefixIdentifiers ? "__event" : "$event") : "(...args)";
+
+                // A single-statement inline handler that is a call emits as a statement-block lambda
+                // (`__event => { call; }`) instead of the expression lambda (`__event => (call)`) that a
+                // value-returning handler uses: a void call — the most common handler shape — has no value
+                // to place in the parenthesized body, so only the block form binds (to the runtime's
+                // `Action<…>` handler overload; a value call binds there too, its result discarded exactly
+                // as upstream's arrow function discards it). Every other single-statement shape (increment,
+                // assignment, a plain value expression) yields a C# value and stays an expression lambda,
+                // matching upstream's uniform `$event => (expr)` as closely as C#'s void-expression rule
+                // allows. Only the prefixed (C#-codegen) path diverges; non-prefixed output stays byte-for-
+                // byte upstream parity. Multi-statement bodies were already brace blocks upstream.
+                // Upstream transformOn: vuejs/core v3.5 compiler-core transforms/vOn.ts.
+                var asStatementBlock = hasMultipleStatements ||
+                    (isInlineStatement && context.PrefixIdentifiers && IsCallExpression(expression.Content));
+
+                handler = asStatementBlock
+                    ? Ir.CompoundExpression(
+                        parameter + " => " + (hasMultipleStatements ? "{" : "{ "),
+                        processedExpression,
+                        hasMultipleStatements ? "}" : "; }")
+                    : Ir.CompoundExpression(parameter + " => (", processedExpression, ")");
             }
         }
 
@@ -173,6 +194,25 @@ internal static class VOnTransform
 
         return result with { Properties = marked };
     }
+
+    // Whether a single-statement inline-handler expression is a C# call — a plain invocation
+    // (`save($event)`) or a null-conditional invocation (`model?.save()`). A call is the only handler
+    // shape that can be void-typed, so it alone must emit as a statement-block lambda
+    // (`__event => { call; }`); the parenthesized expression lambda (`__event => (call)`) that
+    // value-returning handlers use cannot bind a void result. Parsed with the C# parser because this is a
+    // C# code-generation question with no upstream (JavaScript) counterpart — JavaScript has no `void`, so
+    // upstream `transformOn` emits `$event => (expr)` uniformly. Mirrors the ExpressionProcessor use of
+    // SyntaxFactory.ParseExpression; a parse that is not a call keeps the expression-lambda form.
+    private static bool IsCallExpression(string content) => IsCallShape(SyntaxFactory.ParseExpression(content));
+
+    private static bool IsCallShape(ExpressionSyntax expression) => expression switch
+    {
+        InvocationExpressionSyntax => true,
+        // A null-conditional chain (`a?.b()`) parses as a conditional access whose right-hand operand is
+        // the invocation; unwrap to the terminal access to classify the whole chain.
+        ConditionalAccessExpressionSyntax conditionalAccess => IsCallShape(conditionalAccess.WhenNotNull),
+        _ => false,
+    };
 
     private static ExpressionNode BuildEventName(ExpressionNode argument, ElementNode element, TransformContext context)
     {
