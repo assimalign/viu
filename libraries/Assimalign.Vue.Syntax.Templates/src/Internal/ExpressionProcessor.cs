@@ -95,9 +95,31 @@ internal static class ExpressionProcessor
 
         // Full parse: validates the whole text (consumeFullText) and yields a tree to walk.
         var prefixLength = asRawStatements ? 1 : 0;
-        Microsoft.CodeAnalysis.SyntaxNode parsed = asRawStatements
-            ? SyntaxFactory.ParseStatement("{" + raw + "}", 0, ParseOptions)
-            : SyntaxFactory.ParseExpression(raw, 0, ParseOptions);
+        Microsoft.CodeAnalysis.SyntaxNode parsed;
+        if (asRawStatements)
+        {
+            // A multi-statement inline handler is emitted into `__event => { <raw> }`. C# has no automatic
+            // semicolon insertion — JavaScript's ASI, which upstream's `$event => { ... }` handler wrapping
+            // relies on — so a body whose final statement omits its terminator (`foo(); bar()`) would emit
+            // invalid C#. Synthesize the terminator from the same statement-list parse that validates the
+            // body: if `{ raw }` does not parse clean but `{ raw; }` does, the only fault was the missing
+            // terminator, so append one and reuse the clean tree; a genuine syntax error leaves `raw`
+            // untouched and still surfaces as X_INVALID_EXPRESSION below. [V01.01.05.05.02], issue #150.
+            parsed = SyntaxFactory.ParseStatement("{" + raw + "}", 0, ParseOptions);
+            if (TryGetFirstError(parsed, out _, out _))
+            {
+                var terminated = SyntaxFactory.ParseStatement("{" + raw + ";}", 0, ParseOptions);
+                if (!TryGetFirstError(terminated, out _, out _))
+                {
+                    raw += ";";
+                    parsed = terminated;
+                }
+            }
+        }
+        else
+        {
+            parsed = SyntaxFactory.ParseExpression(raw, 0, ParseOptions);
+        }
 
         if (TryGetFirstError(parsed, out var errorSpan, out var errorMessage))
         {
@@ -114,7 +136,9 @@ internal static class ExpressionProcessor
         var references = CollectReferences(parsed, context, prefixLength);
         if (references.Count == 0)
         {
-            return node;
+            // No identifier needs rewriting, but a synthesized statement terminator (above) still must ride
+            // out on the content, or the emitted `__event => { ... }` stays unterminated.
+            return raw == node.Content ? node : node with { Content = raw };
         }
 
         return BuildCompound(node, raw, references, context);

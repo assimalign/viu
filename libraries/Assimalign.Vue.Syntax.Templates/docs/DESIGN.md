@@ -112,6 +112,17 @@ the common .NET base-class surface a template legitimately reaches (`Math`, `Con
   C# allows. Only the prefixed (C#-codegen) path diverges; non-prefixed output stays byte-for-byte
   upstream parity. Pinned by `ExpressionBindingTests` and `RenderFunctionEmitterTests`
   ([V01.01.05.05.01], issue #143).
+- **Multi-statement handlers get a synthesized statement terminator.** A multi-statement inline handler
+  (`@click="foo(); bar()"`) is emitted into `__event => { <body> }`. Upstream wraps it the same way and
+  relies on JavaScript's automatic semicolon insertion for the final statement; C# has no ASI, so a body
+  whose last statement omits its terminator would emit invalid C#. Under prefixing, `ExpressionProcessor`
+  decides with the same statement-list parse that validates the body (`asRawStatements`): if `{ body }`
+  does not parse clean but `{ body; }` does, the only fault was the missing terminator, so a `;` is
+  synthesized onto the rewritten content (a genuine syntax error is left untouched and still surfaces as
+  `X_INVALID_EXPRESSION`). The terminator rides out even when no identifier needs rewriting. An
+  author-supplied trailing `;` is never doubled. Only the prefixed path is affected; non-prefixed output
+  stays byte-for-byte upstream parity. Pinned by `ExpressionBindingTests` and `RenderFunctionEmitterTests`
+  ([V01.01.05.05.02], issue #150).
 - **`asParams` validation is lenient.** Alias/prop declaration positions are registered for scope but not
   hard-validated as expressions, because C# deconstruction forms (`(a, b)`, `var (a, b)`) and JavaScript-style
   `{ a }` destructures do not all parse as C# expressions; a lenient identifier scan still contributes their

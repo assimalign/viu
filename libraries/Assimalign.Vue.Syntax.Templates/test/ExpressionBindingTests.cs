@@ -175,6 +175,42 @@ public class ExpressionBindingTests
     }
 
     [Fact]
+    public void ProcessExpression_MultiStatementHandlerWithoutTrailingSemicolon_SynthesizesTerminator()
+    {
+        // A multi-statement inline handler is emitted into `__event => { <body> }`. C# has no automatic
+        // semicolon insertion — JavaScript's ASI, which upstream's `$event => { ... }` handler wrapping
+        // relies on — so a body whose final statement omits its terminator (`first(); second()`) must gain a
+        // synthesized `;` or the generated lambda is invalid C#; both statements are still rewritten.
+        // [V01.01.05.05.02], issue #150.
+        HandlerBody(
+                "<button @click=\"first(); second()\"></button>",
+                Bindings(("first", BindingType.Options), ("second", BindingType.Options)))
+            .ShouldBe("__event => {_ctx.first(); _ctx.second();}");
+    }
+
+    [Fact]
+    public void ProcessExpression_MultiStatementHandlerWithTrailingSemicolon_IsNotDoubleTerminated()
+    {
+        // An author-supplied trailing terminator is not duplicated: the synthesis is gated on the body not
+        // already parsing as a clean statement list, so a terminated body is emitted unchanged.
+        HandlerBody(
+                "<button @click=\"first(); second();\"></button>",
+                Bindings(("first", BindingType.Options), ("second", BindingType.Options)))
+            .ShouldBe("__event => {_ctx.first(); _ctx.second();}");
+    }
+
+    [Fact]
+    public void ProcessExpression_MultiStatementHandlerWithGlobalsOnly_StillSynthesizesTerminator()
+    {
+        // The terminator must ride out even when no identifier needs rewriting (both calls are allowed
+        // globals), so the no-reference fast path still carries the synthesized `;`.
+        HandlerBody(
+                "<button @click=\"Math.Abs(-1); Math.Abs(1)\"></button>",
+                Bindings())
+            .ShouldBe("__event => {Math.Abs(-1); Math.Abs(1);}");
+    }
+
+    [Fact]
     public void ProcessExpression_MethodHandler_ResolvesWithoutInlineWrapper()
     {
         // A bare member handler is a method reference, not an inline statement: no $event wrapper.
