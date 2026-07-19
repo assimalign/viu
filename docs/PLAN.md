@@ -24,14 +24,18 @@ What it validates: the adapter-injected renderer design (identical in spirit to 
 lacks: reactivity (the demo polls every 100 ms), a component model, a scheduler, keyed diffing with
 minimal moves, compiler-informed patching, and every ecosystem piece. The child reconciliation is
 index-based (no LIS), the diff/patch path is duplicated in two implementations, and naming was split
-between `Assimalign.Viu.*` and `Assimalign.Viu.*` (now standardized on `Assimalign.Viu.*`).
+between `Assimalign.Vue.*` and `Assimalign.Vuecs.*` (standardized on `Assimalign.Vue.*` 2026-07-16,
+then renamed to `Assimalign.Viu.*` with the product rename — see the architecture note below).
 
 ## Architecture: Vue 3 package → Viu library
 
 Package boundaries map 1:1 to .NET class libraries using the inverted layout
 `libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name is the assembly/package id, with no
-area wrapper folders (project decision, 2026-07-16). The product/repo name stays **Viu**; the
-package root is **`Assimalign.Viu.*`**:
+area wrapper folders (project decision, 2026-07-16). The product name is **Viu** and the package
+root is **`Assimalign.Viu.*`** (renamed from Vue/Vuecs 2026-07-19, `V01.01.12.18`/#173, aligning
+the brand with the `.viu` SFC extension; the GitHub repo slug remains `assimalign/vuecs`, and
+upstream Vue.js references — `@vue/*` names, vuejs.org links, the `vue:` template prefix — are
+deliberately untouched):
 
 | Area (WBS) | Viu library | Vue 3 counterpart |
 | --- | --- | --- |
@@ -88,12 +92,32 @@ These are deliberate, recorded divergences from upstream — everything else tra
    linker-unfriendly activation. Every area publishes a representative WASM consumer with trimming
    validation; size and startup budgets gate CI from W03.
 7. **Cohesion integration at MVP.** Viu will integrate with the Cohesion platform
-   (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process,
-   packaging aligned with Cohesion's SDK/shared-framework model (tracked as `V01.01.12.08`, #104).
-   Consequence now: hosting and server-rendering seams stay host-agnostic — [V01.01.07.04] ships
-   a server adaptor contract that any web framework implements as a thin downstream adapter
-   (Cohesion Web first; ASP.NET Core only if ever wanted), and no Assimalign.Viu.* library may
-   reference a web framework (decision reaffirmed and made binding 2026-07-17).
+   (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process
+   (tracked as `V01.01.12.08`, #104, now narrowed to the hosting integration — the packaging half
+   landed as decision 8). Consequence now: hosting and server-rendering seams stay host-agnostic —
+   [V01.01.07.04] ships a server adaptor contract that any web framework implements as a thin
+   downstream adapter (Cohesion Web first; ASP.NET Core only if ever wanted), and no
+   Assimalign.Viu.* library may reference a web framework (decision reaffirmed and made binding
+   2026-07-17).
+8. **SDK-first packaging on Cohesion's shared-framework model (landed 2026-07-19,
+   `V01.01.12.19`/#174).** Viu ships as an MSBuild project SDK — a consumer csproj is just
+   `<Project Sdk="Assimalign.Viu.Sdk">` — chaining `Microsoft.NET.Sdk.WebAssembly`, with the
+   framework delivered as the `Assimalign.Viu.App` shared framework: a `KnownFrameworkReference`
+   registration resolving to the `Assimalign.Viu.App.Ref` targeting pack (compile references +
+   `data/FrameworkList.xml`) and per-RID `Assimalign.Viu.App.Runtime.<rid>` runtime packs
+   (`browser-wasm` today) — the `Microsoft.AspNetCore.App.Ref`/`.Runtime.<rid>` shape, mirrored
+   from `assimalign/cohesion`'s `sdks/` + `frameworks/`. **Codegen placement decision:** the source
+   generators stay Roslyn incremental generators (moving them into MSBuild tasks would forfeit IDE
+   integration and incrementality) but are *delivered* through the Ref pack's `analyzers/dotnet/cs`
+   with `<File Type="Analyzer">` manifest entries, so SDK consumers get `[Reactive]` and `.viu`
+   compilation with zero wiring; the `ViuBundleCss` MSBuild task and the `.viu`
+   AdditionalFiles/CSS-bundling MSBuild logic ship inside the SDK package (`Tasks/` + `Targets/`,
+   packed from their in-repo sources so they cannot drift). The local loop is
+   `scripts/Install-Local.ps1` → `_out/packages` (see `sdks/README.md`). In-repo projects keep
+   dogfooding via `ViuProjectReference` — the SDK is the *external consumer* surface. This
+   re-scopes `V01.01.12.03` (#92: library packages + feed publishing on top of the pack loop) and
+   delivers `V01.01.12.12.02` (#168: the task now ships in the SDK rather than a standalone
+   package).
 
 ## Delivery model
 
@@ -266,6 +290,18 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.12.05` | Build the dev-loop experience | W05 | P005 |
 | `V01.01.12.06` | Establish WASM size and AOT budget gates | W03 | P003 |
 | `V01.01.12.07` | Build .viu editor support | W06 | P007 |
+| `V01.01.12.08` | Integrate Viu with the Cohesion platform (hosting; packaging landed via `.19`) | W05 | P004 |
+| `V01.01.12.09` | Modularize the library folder structure, whole-word naming | W03 | P002 |
+| `V01.01.12.10` | Scope the build-time utility-first CSS engine | W04 | P005 |
+| `V01.01.12.11` | CSS construction/emission surface in Assimalign.Viu.Syntax.Css | W04 | P004 |
+| `V01.01.12.12` | ViuBundleCss MSBuild task for CSS bundling | W04 | P004 |
+| `V01.01.12.13` | Utility-class candidate grammar and variant model | W05 | P005 |
+| `V01.01.12.14` | AOT-safe utility theme configuration model | W05 | P005 |
+| `V01.01.12.15` | Build-time utility candidate extraction pass | W05 | P005 |
+| `V01.01.12.16` | Utility-to-CSS resolver and incremental pipeline | W05 | P005 |
+| `V01.01.12.17` | @apply and utility composition inside @style | W06 | P006 |
+| `V01.01.12.18` | Rename product naming from Vue/Vuecs to Viu repo-wide | W04 | P002 |
+| `V01.01.12.19` | Adopt Cohesion SDK/shared-framework packaging (Assimalign.Viu.Sdk + Assimalign.Viu.App) | W05 | P003 |
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 

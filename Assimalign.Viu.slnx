@@ -53,6 +53,7 @@
 	</Folder>
 	<Folder Name="/viu/.github/workflows/">
 		<File Path=".github/workflows/area-generators.yml" />
+		<File Path=".github/workflows/area-packaging.yml" />
 		<File Path=".github/workflows/area-reactivity.yml" />
 		<File Path=".github/workflows/area-runtimecore.yml" />
 		<File Path=".github/workflows/area-runtimedom.yml" />
@@ -103,6 +104,7 @@
 	</Folder>
 	<Folder Name="/viu/docs/">
 		<File Path="docs/PLAN.md" />
+		<File Path="docs/UTILITY-CSS-DESIGN.md" />
 	</Folder>
 	<Folder Name="/viu/frameworks/">
 		<File Path="frameworks/Assimalign.Viu.App.props" />
