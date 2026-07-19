@@ -149,8 +149,13 @@ only the scope-id string.
   expression in metadata instead.
 - **Physical static-web-asset bundling.** A Roslyn source generator emits C#, not content files (and
   `System.IO` is off-limits under RS1035), so the extracted CSS surfaces as the generated `ExtractedStyles`
-  constant. Writing the CSS into `dotnet publish` output as a bundled stylesheet is an MSBuild-task
-  follow-up on the [V01.01.06.02] pipeline side.
+  constant. Writing the CSS into `dotnet publish` output as a bundled stylesheet was deferred to an
+  MSBuild-task follow-up on the [V01.01.06.02] pipeline side — **now landed as [V01.01.12.12]**: the
+  `VuecsBundleCss` MSBuild task (`analyzers/Assimalign.Vue.Tooling.Tasks`) re-runs the *same* deterministic
+  `@style` compilation — lifted into the shared `Assimalign.Vue.Tooling.Css` core, which the generator now
+  delegates to — over the same `.viu` inputs, so the physical bundle is byte-identical to `ExtractedStyles`;
+  it writes the bundle under `obj/…/vuecs/` and registers it as a `StaticWebAsset`. See that library's
+  `docs/DESIGN.md` and `docs/UTILITY-CSS-DESIGN.md` §2.4.
 - **Legacy deep combinators** `>>>` and `/deep/` — deprecated upstream in favor of `:deep()`; not
   supported.
 - **Deep inside `:is()`/`:where()`/`:not()`** — upstream's `splitSelectorForNestedDeep` and the

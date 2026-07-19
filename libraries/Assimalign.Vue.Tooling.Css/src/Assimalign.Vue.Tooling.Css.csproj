@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
+         per design decision: this is the shared build-time CSS composition core ([V01.01.12.12]). It runs
+         in TWO build-time hosts that are both netstandard2.0 — the Assimalign.Vue.Syntax.Generators Roslyn
+         source generator (analyzer sandbox) AND the VuecsBundleCss MSBuild task — so it targets the analyzer
+         TFM alias, the same central property the Assimalign.Vue.Syntax.* parsers use, never a hardcoded
+         string. Its net10.0 test project references it normally. -->
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Build-time-hosted code must target the stable analyzer surface: opt out of the repo-wide
+         preview-features switch (see build/Targets/Build.TargetFramework.props) so no
+         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the sibling parsers. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <!-- IsAotCompatible is intentionally not set: the AOT analyzers require net8.0+, so the central
+         libraries targets clear the inherited IsAotCompatible=true for this netstandard2.0 TFM. This
+         assembly is consumed at build time by the generator and the bundling task, never shipped into the
+         WASM app; the runtime AOT boundary is enforced on the generator's OUTPUT, which is ordinary net10.0
+         code. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The composition-root libraries this shared core reuses: the .viu block parser
+         ([V01.01.06.02]), the @template parser it dispatches ([V01.01.05.05]), and the CSS AST + scoped /
+         module / v-bind rewriters ([V01.01.06.04]/[V01.01.06.06]). Like the generator, this Tooling core is
+         the one place these language libraries meet — they never reference each other. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax.SingleFileComponent" />
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax.Templates" />
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax.Css" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Linked netstandard2.0 shims ([V01.01.05.09]): IsExternalInit and the required-member attributes
+         are authored once in Assimalign.Vue.Syntax and <Compile Include>'d here (still internal) because an
+         internal shim in a referenced assembly is not visible to this compilation — each netstandard2.0
+         assembly needs its own copy to light up `init`/`record`/`required`. -->
+    <Compile Include="..\..\Assimalign.Vue.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
+    <Compile Include="..\..\Assimalign.Vue.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
+  </ItemGroup>
+</Project>

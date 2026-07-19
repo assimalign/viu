@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- MSBuild tasks target the analyzer TFM (netstandard2.0) so the one assembly loads in both the
+         .NET (dotnet build) and .NET Framework (Visual Studio) MSBuild engines, mirroring the generator.
+         It runs OUTSIDE the Roslyn analyzer sandbox, so it may do I/O ([V01.01.12.12]) — that is the whole
+         reason the physical CSS bundle lives here and not in the source generator (RS1035). -->
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Build-task code must target the stable surface: opt out of the repo-wide preview-features switch
+         (see build/Targets/Build.TargetFramework.props) so no [RequiresPreviewFeatures] leaks into the
+         netstandard2.0 task assembly. Mirrors the generator. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <!-- The task assembly is loaded by MSBuild via UsingTask (see build/Targets/Build.Css.Bundling.targets);
+         it is not shipped as its own package. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The shared build-time CSS composition core ([V01.01.12.12]): the task re-runs the SAME deterministic
+         @style compilation the generator runs, over the same .viu inputs, so the physical bundle is
+         byte-identical to the generated ExtractedStyles constant. Its transitive parser closure
+         (Syntax / SingleFileComponent / Templates / Css) copies to the task output for MSBuild to load. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Tooling.Css" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- MSBuild task API. Centrally versioned with ExcludeAssets=all (see
+         build/Targets/Build.References.Packages.targets) — compile against them but never copy them to
+         output; the hosting MSBuild engine supplies these assemblies at run time. -->
+    <VuecsPackageReference Include="Microsoft.Build.Utilities.Core" />
+    <VuecsPackageReference Include="Microsoft.Build.Framework" />
+  </ItemGroup>
+</Project>

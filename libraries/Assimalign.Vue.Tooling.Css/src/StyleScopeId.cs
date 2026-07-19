@@ -1,6 +1,7 @@
 using System;
+using System.Globalization;
 
-namespace Assimalign.Vue.Syntax.Generators;
+namespace Assimalign.Vue.Tooling.Css;
 
 /// <summary>
 /// Derives a component's scoped-CSS scope id — the <c>data-v-&lt;hash&gt;</c> attribute the renderer stamps
@@ -12,14 +13,16 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// and produces identical output on every platform.
 /// </summary>
 /// <remarks>
-/// A path-based hash intentionally does not change when only the file's <em>content</em> changes — the
-/// scope id identifies the component, not a content revision. This matches Vue's non-production hashing
-/// (production additionally folds in the source for cache-busting); folding content in is a later
-/// optimization, tracked with the static-web-asset emission and out of scope for this item. When the file
-/// sits outside the project directory (a linked file whose relative path is unknown), the leaf file name
-/// is hashed instead so the id stays machine-independent.
+/// Lives in the Tooling core because both build-time hosts need the identical id ([V01.01.12.12]): the
+/// generator resolves it to emit the <c>ScopeId</c> constant and to salt the module/v-bind hashes, and the
+/// <c>VuecsBundleCss</c> task resolves it to reproduce the same scoped CSS byte-for-byte. A path-based hash
+/// intentionally does not change when only the file's <em>content</em> changes — the scope id identifies the
+/// component, not a content revision. This matches Vue's non-production hashing (production additionally
+/// folds in the source for cache-busting); folding content in is a later optimization, tracked with the
+/// static-web-asset emission. When the file sits outside the project directory (a linked file whose relative
+/// path is unknown), the leaf file name is hashed instead so the id stays machine-independent.
 /// </remarks>
-internal static class StyleScopeId
+public static class StyleScopeId
 {
     private const string Prefix = "data-v-";
 
@@ -60,7 +63,7 @@ internal static class StyleScopeId
                 hash = (hash ^ character) * 16777619u;
             }
 
-            return hash.ToString("x8", System.Globalization.CultureInfo.InvariantCulture);
+            return hash.ToString("x8", CultureInfo.InvariantCulture);
         }
     }
 }

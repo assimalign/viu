@@ -82,12 +82,17 @@
 	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Syntax.Generators/test/">
 		<Project Path="analyzers/Assimalign.Vue.Syntax.Generators/test/Assimalign.Vue.Syntax.Generators.Tests.csproj" />
 	</Folder>
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Tooling.Tasks/" />
+	<Folder Name="/vuecs/analyzers/Assimalign.Vue.Tooling.Tasks/src/">
+		<Project Path="analyzers/Assimalign.Vue.Tooling.Tasks/src/Assimalign.Vue.Tooling.Tasks.csproj" />
+	</Folder>
 	<Folder Name="/vuecs/build/">
 		<File Path="build/Build.props" />
 		<File Path="build/Build.targets" />
 	</Folder>
 	<Folder Name="/vuecs/build/Targets/">
 		<File Path="build/Targets/Build.Branding.props" />
+		<File Path="build/Targets/Build.Css.Bundling.targets" />
 		<File Path="build/Targets/Build.Global.props" />
 		<File Path="build/Targets/Build.References.Analyzers.targets" />
 		<File Path="build/Targets/Build.References.Packages.targets" />
@@ -161,6 +166,16 @@
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Syntax.SingleFileComponent/test/">
 		<Project Path="libraries/Assimalign.Vue.Syntax.SingleFileComponent/test/Assimalign.Vue.Syntax.SingleFileComponent.Tests.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Tooling.Css/" />
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Tooling.Css/docs/">
+		<File Path="libraries/Assimalign.Vue.Tooling.Css/docs/DESIGN.md" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Tooling.Css/src/">
+		<Project Path="libraries/Assimalign.Vue.Tooling.Css/src/Assimalign.Vue.Tooling.Css.csproj" />
+	</Folder>
+	<Folder Name="/vuecs/libraries/Assimalign.Vue.Tooling.Css/test/">
+		<Project Path="libraries/Assimalign.Vue.Tooling.Css/test/Assimalign.Vue.Tooling.Css.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/" />
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Reactivity/src/">
