@@ -42,6 +42,13 @@ internal sealed class BrowserDirectiveOperations
     /// <summary>Removes one inline style property — <c>v-show</c> uses it to restore an empty original <c>display</c>.</summary>
     public required Action<int, string> RemoveStyleProperty { get; init; }
 
+    /// <summary>
+    /// Batches setting several CSS custom properties (index-aligned name/value arrays, the names including
+    /// the leading <c>--</c>) on an element into a single interop crossing — the <c>UseCssVars</c>
+    /// application path ([V01.01.06.06]), which must never issue one interop call per property.
+    /// </summary>
+    public required Action<int, string[], string[]> SetCssVariables { get; init; }
+
     /// <summary>The ambient instance, or a thrown <see cref="InvalidOperationException"/> when none is installed.</summary>
     public static BrowserDirectiveOperations Require()
         => Current ?? throw new InvalidOperationException(

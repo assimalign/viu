@@ -21,6 +21,7 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
     private readonly TestSchedulerPump _pump;
     private readonly Renderer<int> _renderer;
     private int _nextHandle = 1;
+    private int _cssVariableCrossings;
 
     public BrowserDirectiveTestHarness()
     {
@@ -54,6 +55,17 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
             SetBooleanProperty = SetBooleanProperty,
             SetStyleProperty = (element, name, value, _) => Element(element).Style[name] = value,
             RemoveStyleProperty = (element, name) => Element(element).Style.Remove(name),
+            // One recorded crossing per UseCssVars pass: apply every custom property, and count the call so
+            // tests can pin the single-interop-crossing-per-pass batching AC ([V01.01.06.06]).
+            SetCssVariables = (element, names, values) =>
+            {
+                _cssVariableCrossings++;
+                var style = Element(element).Style;
+                for (var index = 0; index < names.Length; index++)
+                {
+                    style[names[index]] = values[index];
+                }
+            },
         };
 
         _renderer = RendererFactory.CreateRenderer(new RendererOptions<int>
@@ -131,6 +143,13 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
     /// <summary>The element's inline <c>display</c>, or null when there is no inline display.</summary>
     public string? Display(int handle)
         => Element(handle).Style.TryGetValue("display", out var display) ? display : null;
+
+    /// <summary>The element's applied CSS custom property (e.g. <c>--abc12345</c>), or null when unset.</summary>
+    public string? CssVariable(int handle, string name)
+        => Element(handle).Style.TryGetValue(name, out var value) ? value : null;
+
+    /// <summary>The number of batched <c>UseCssVars</c> interop crossings recorded (one per applied element per pass).</summary>
+    public int CssVariableCrossings => _cssVariableCrossings;
 
     // --- event firing (routes through the real registry: property + model channels) ------------
 
