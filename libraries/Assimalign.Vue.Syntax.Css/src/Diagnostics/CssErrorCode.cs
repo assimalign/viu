@@ -30,4 +30,10 @@ public enum CssErrorCode
 
     /// <summary>A qualified rule or at-rule reached end of file before its block opened.</summary>
     UnexpectedEndOfFile = 2007,
+
+    /// <summary>A <c>v-bind(</c> in a declaration value had no matching <c>)</c>; the usage was discarded.</summary>
+    UnterminatedCssBinding = 2008,
+
+    /// <summary>A <c>v-bind()</c> in a declaration value had an empty expression; the usage was discarded.</summary>
+    EmptyCssBinding = 2009,
 }

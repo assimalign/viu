@@ -285,6 +285,18 @@ internal static partial class BrowserDomBridge
         }
     }
 
+    internal static void SetCssVariables(int nodeHandle, string[] names, string[] values)
+    {
+        try
+        {
+            Imports.SetCssVariables(nodeHandle, names, values);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("setCssVars", nodeHandle, exception);
+        }
+    }
+
     internal static void AddEventListener(int nodeHandle, string eventName, bool once, bool capture, bool passive)
     {
         try
@@ -424,6 +436,12 @@ internal static partial class BrowserDomBridge
 
         [JSImport("dom.removeStyleProperty", ModuleName)]
         internal static partial void RemoveStyleProperty(int nodeHandle, string name);
+
+        [JSImport("dom.setCssVars", ModuleName)]
+        internal static partial void SetCssVariables(
+            int nodeHandle,
+            [JSMarshalAs<JSType.Array<JSType.String>>] string[] names,
+            [JSMarshalAs<JSType.Array<JSType.String>>] string[] values);
 
         [JSImport("dom.addEventListener", ModuleName)]
         internal static partial void AddEventListener(int nodeHandle, string eventName, bool once, bool capture, bool passive);

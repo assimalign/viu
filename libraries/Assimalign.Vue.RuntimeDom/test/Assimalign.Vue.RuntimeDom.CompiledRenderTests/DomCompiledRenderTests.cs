@@ -114,6 +114,45 @@ public sealed class DomCompiledRenderTests
         assembly.Length.ShouldBeGreaterThan(0);
     }
 
+    // A component that exercises both [V01.01.06.06] seams: a `module` block (the typed accessor) and a
+    // `v-bind()` block (the ApplyCssVariables call into UseCssVars). The hand-written half supplies the
+    // members the emitted v-bind getter evaluates.
+    private const string CssModuleAndVBindComponent =
+        "@template {\n" +
+        "<div class=\"box\">hi</div>\n" +
+        "}\n" +
+        "@style module {\n" +
+        ".box { color: v-bind(color); width: v-bind(size); }\n" +
+        "}\n";
+
+    private const string CssModuleHandWrittenHalf =
+        "#nullable enable\n" +
+        "namespace Demo\n" +
+        "{\n" +
+        "    partial class CssWidget\n" +
+        "    {\n" +
+        "        public string color => \"red\";\n" +
+        "        public int size => 10;\n" +
+        "    }\n" +
+        "}\n";
+
+    [Fact]
+    public void CssModuleAndVBind_SeamsCompile_AgainstRuntimeDom()
+    {
+        // The generated $style accessor and the ApplyCssVariables -> UseCssVars seam are real runtime C#:
+        // the accessor's const members compile, and the getter binds CssVariables.UseCssVars in RuntimeDom
+        // while its expressions resolve against the merged component members. This proves the [V01.01.06.06]
+        // metadata the runtime half consumes is well-formed, DOM-free.
+        var generated = CompiledRenderSupport.Generate("CssWidget", CssModuleAndVBindComponent);
+
+        generated.ShouldContain("internal static class Style");
+        generated.ShouldContain("internal void ApplyCssVariables()");
+        generated.ShouldContain("global::Assimalign.Vue.RuntimeDom.CssVariables.UseCssVars(");
+
+        var assembly = CompiledRenderSupport.CompileToAssembly(generated, CssModuleHandWrittenHalf);
+        assembly.Length.ShouldBeGreaterThan(0);
+    }
+
     [Fact]
     public void GeneratorCaching_ForTheDomDirectiveTemplate_StaysStrictlyCached()
     {

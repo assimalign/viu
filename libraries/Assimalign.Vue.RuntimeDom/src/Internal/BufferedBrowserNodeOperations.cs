@@ -183,6 +183,15 @@ internal sealed class BufferedBrowserNodeOperations
             SetBooleanProperty = _leaf.SetBooleanProperty,
             SetStyleProperty = _leaf.SetStyleProperty,
             RemoveStyleProperty = _leaf.RemoveStyleProperty,
+            // UseCssVars in buffered mode ([V01.01.06.06]): the per-property writes join the pending frame,
+            // which still commits in one boundary crossing per flush, so the batching AC holds.
+            SetCssVariables = (element, names, values) =>
+            {
+                for (var index = 0; index < names.Length; index++)
+                {
+                    _leaf.SetStyleProperty(element, names[index], values[index], false);
+                }
+            },
         };
     }
 

@@ -339,6 +339,16 @@ export const dom = {
         getNode('removeStyleProperty', nodeHandle).style.removeProperty(name)
     },
 
+    // Batches the v-bind() CSS custom properties for one root element into a single crossing
+    // ([V01.01.06.06]): the .NET UseCssVars runtime passes index-aligned name/value arrays (names include
+    // the leading '--') and this loops style.setProperty, matching upstream setVarsOnNode.
+    setCssVars: (nodeHandle, names, values) => {
+        const style = getNode('setCssVars', nodeHandle).style
+        for (let index = 0; index < names.length; index++) {
+            style.setProperty(names[index], values[index])
+        }
+    },
+
     // --- events (invoker pattern: one listener per (element, event, capture); handler
     // changes are .NET-side delegate swaps with no listener churn; the attach-timestamp guard
     // ignores events that fired before their listener was attached, matching Vue's

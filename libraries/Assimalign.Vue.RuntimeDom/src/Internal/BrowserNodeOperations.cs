@@ -55,6 +55,9 @@ internal static class BrowserNodeOperations
             SetBooleanProperty = LeafOperations.SetBooleanProperty,
             SetStyleProperty = LeafOperations.SetStyleProperty,
             RemoveStyleProperty = LeafOperations.RemoveStyleProperty,
+            // One interop crossing per post-flush UseCssVars pass ([V01.01.06.06]): the whole custom-property
+            // batch for a root element crosses the boundary once.
+            SetCssVariables = static (element, names, values) => BrowserDomBridge.SetCssVariables(element, names, values),
         };
     }
 

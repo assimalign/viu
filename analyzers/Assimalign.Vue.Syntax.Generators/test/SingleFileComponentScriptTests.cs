@@ -415,7 +415,9 @@ public sealed class SingleFileComponentScriptTests
             RenderBody: null,
             RenderCacheSize: 0,
             ScopeId: null,
-            ExtractedStyles: null);
+            ExtractedStyles: null,
+            ModuleClasses: EquatableArray<CssModuleClassEntry>.Empty,
+            CssVariableBindings: EquatableArray<CssVariableBindingEntry>.Empty);
 
         var metadata = model.ToBindingMetadata();
 
@@ -445,7 +447,9 @@ public sealed class SingleFileComponentScriptTests
             RenderBody: null,
             RenderCacheSize: 0,
             ScopeId: null,
-            ExtractedStyles: null);
+            ExtractedStyles: null,
+            ModuleClasses: EquatableArray<CssModuleClassEntry>.Empty,
+            CssVariableBindings: EquatableArray<CssVariableBindingEntry>.Empty);
 
         var metadata = model.ToBindingMetadata();
 
