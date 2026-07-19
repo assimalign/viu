@@ -208,6 +208,41 @@ namespace Demo
             reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    private const string StaticContentSource =
+        "@template {\n" +
+        "    <section><span>static</span></section>\n" +
+        "}\n";
+
+    [Fact]
+    public void StaticSubtree_CompilesToCachedRender_WithCacheSlot()
+    {
+        // [V01.01.05.07] end to end: a fully static nested subtree caches into a render cache slot, marked
+        // PatchFlags.Cached (-1), so the runtime diff skips it. The composition root enables HoistStatic.
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Static.viu", StaticContentSource, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Static.SingleFileComponent.g.cs");
+        generated.ShouldContain("internal const int RenderCacheSize = 1;");
+        generated.ShouldContain("(_cache[0] ??= _createElementVNode(\"span\", null, \"static\", -1 /* CACHED */))");
+    }
+
+    [Fact]
+    public void StaticCaching_DoesNotBreakIncrementalCache()
+    {
+        // The regression the work item guards: enabling static caching keeps the model step strictly Cached
+        // across identical runs (deterministic, value-equatable transform output).
+        var file = new InMemoryAdditionalText($"{ProjectDirectory}/Static.viu", StaticContentSource);
+        var compilation = GeneratorTestHarness.CreateCompilation();
+        var driver = GeneratorTestHarness.CreateDriver(
+            ImmutableArray.Create<AdditionalText>(file), RootNamespace, ProjectDirectory);
+
+        driver = driver.RunGenerators(compilation);
+        driver = driver.RunGenerators(compilation);
+
+        ModelStepReasons(driver).ShouldAllBe(
+            reason => reason == IncrementalStepRunReason.Cached);
+    }
+
     [Fact]
     public void UnrelatedCompilationEdit_DoesNotReRunGeneration()
     {
