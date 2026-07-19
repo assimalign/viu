@@ -33,9 +33,9 @@ Package boundaries map 1:1 to .NET class libraries using the inverted layout
 `libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name is the assembly/package id, with no
 area wrapper folders (project decision, 2026-07-16). The product name is **Viu** and the package
 root is **`Assimalign.Viu.*`** (renamed from Vue/Vuecs 2026-07-19, `V01.01.12.18`/#173, aligning
-the brand with the `.viu` SFC extension; the GitHub repo slug remains `assimalign/vuecs`, and
-upstream Vue.js references — `@vue/*` names, vuejs.org links, the `vue:` template prefix — are
-deliberately untouched):
+the brand with the `.viu` SFC extension; the GitHub repo slug is now `assimalign/viu` (renamed
+from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vuejs.org links, the
+`vue:` template prefix — are deliberately untouched):
 
 | Area (WBS) | Viu library | Vue 3 counterpart |
 | --- | --- | --- |
@@ -133,7 +133,7 @@ Work is tracked exactly like the sibling Cohesion repo:
   (`.claude/skills/viu-work-items/`) files discovered work as its own item with
   `Origin=DiscoveredTask|DiscoveredFeature` and the `scope-creep` label, so one PR closes everything
   it actually resolved and creep stays measurable.
-- Project #15 carries viu work only (`V`-prefixed WBS codes, repo `assimalign/vuecs`).
+- Project #15 carries viu work only (`V`-prefixed WBS codes, repo `assimalign/viu`).
 
 ### Wave narrative
 
