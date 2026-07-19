@@ -175,6 +175,42 @@ public class ExpressionBindingTests
     }
 
     [Fact]
+    public void ProcessExpression_MultiStatementHandlerWithoutTrailingSemicolon_SynthesizesTerminator()
+    {
+        // A multi-statement inline handler is emitted into `__event => { <body> }`. C# has no automatic
+        // semicolon insertion — JavaScript's ASI, which upstream's `$event => { ... }` handler wrapping
+        // relies on — so a body whose final statement omits its terminator (`first(); second()`) must gain a
+        // synthesized `;` or the generated lambda is invalid C#; both statements are still rewritten.
+        // [V01.01.05.05.02], issue #150.
+        HandlerBody(
+                "<button @click=\"first(); second()\"></button>",
+                Bindings(("first", BindingType.Options), ("second", BindingType.Options)))
+            .ShouldBe("__event => {_ctx.first(); _ctx.second();}");
+    }
+
+    [Fact]
+    public void ProcessExpression_MultiStatementHandlerWithTrailingSemicolon_IsNotDoubleTerminated()
+    {
+        // An author-supplied trailing terminator is not duplicated: the synthesis is gated on the body not
+        // already parsing as a clean statement list, so a terminated body is emitted unchanged.
+        HandlerBody(
+                "<button @click=\"first(); second();\"></button>",
+                Bindings(("first", BindingType.Options), ("second", BindingType.Options)))
+            .ShouldBe("__event => {_ctx.first(); _ctx.second();}");
+    }
+
+    [Fact]
+    public void ProcessExpression_MultiStatementHandlerWithGlobalsOnly_StillSynthesizesTerminator()
+    {
+        // The terminator must ride out even when no identifier needs rewriting (both calls are allowed
+        // globals), so the no-reference fast path still carries the synthesized `;`.
+        HandlerBody(
+                "<button @click=\"Math.Abs(-1); Math.Abs(1)\"></button>",
+                Bindings())
+            .ShouldBe("__event => {Math.Abs(-1); Math.Abs(1);}");
+    }
+
+    [Fact]
     public void ProcessExpression_MethodHandler_ResolvesWithoutInlineWrapper()
     {
         // A bare member handler is a method reference, not an inline statement: no $event wrapper.
@@ -207,6 +243,89 @@ public class ExpressionBindingTests
         var props = FlattenProps(result);
         props.ShouldContain("_ctx.key");
         props.ShouldContain("_ctx.value");
+    }
+
+    // ---- CSS Modules accessors ([V01.01.05.04.01]) ----
+
+    [Fact]
+    public void ProcessExpression_DefaultCssModuleAccessor_ResolvesToAccessorClass()
+    {
+        // `$style.box` resolves to the generated `Style` accessor class (the C# analogue of Vue's runtime
+        // `$style` object); `$` is not a legal C# identifier char, so it is parsed against the `_style`
+        // substitution and rewritten to the accessor class name.
+        var modules = Modules(strict: true, ("$style", "_style", "Style", "box"));
+        var result = TransformWithModules("<div :class=\"$style.box\"></div>", BindingMetadata.Empty, modules, out var errors);
+
+        errors.ShouldBeEmpty();
+        FlattenProps(result).ShouldContain("Style.box");
+    }
+
+    [Fact]
+    public void ProcessExpression_NamedCssModuleAccessor_ResolvesToPascalCasedClass()
+    {
+        // A named module `<style module="theme">` is referenced by its authored name `theme` (already
+        // C#-parseable, no substitution) and resolves to the pascal-cased `Theme` accessor class.
+        var modules = Modules(strict: true, ("theme", "theme", "Theme", "active"));
+        var result = TransformWithModules("<div :class=\"theme.active\"></div>", BindingMetadata.Empty, modules, out var errors);
+
+        errors.ShouldBeEmpty();
+        FlattenProps(result).ShouldContain("Theme.active");
+    }
+
+    [Fact]
+    public void ProcessExpression_CssModuleAccessor_ShadowsSameNamedComponentBinding()
+    {
+        // A module accessor takes precedence over a same-named component binding, matching Vue's render
+        // context exposing `$style`/named modules over component state.
+        var modules = Modules(strict: true, ("theme", "theme", "Theme", "active"));
+        var result = TransformWithModules(
+            "<div :class=\"theme.active\"></div>",
+            Bindings(("theme", BindingType.Data)),
+            modules,
+            out var errors);
+
+        errors.ShouldBeEmpty();
+        var props = FlattenProps(result);
+        props.ShouldContain("Theme.active");
+        props.ShouldNotContain("_ctx.theme");
+    }
+
+    [Fact]
+    public void ProcessExpression_UnknownCssModuleMember_ReportsMappedDiagnostic()
+    {
+        // The generator supplies the complete class map, so an access to an undeclared class is a compile-time
+        // error surfaced on the template coordinate (ReportsUnknownMembers). The offset is exact because the
+        // `$`->`_` substitution is length-preserving.
+        var modules = Modules(strict: true, ("$style", "_style", "Style", "box"));
+        var result = TransformWithModules("<div :class=\"$style.missing\"></div>", BindingMetadata.Empty, modules, out var errors);
+
+        var error = errors.ShouldHaveSingleItem();
+        error.Code.ShouldBe(CompilerErrorCode.XVuecsUnknownCssModuleMember);
+        error.Message.ShouldContain("'$style' has no member 'missing'.");
+        // The reported slice is the offending member, `missing`, at its exact template offset.
+        error.Location.Source.ShouldBe("missing");
+        // Recoverable: the accessor member access still emits (the C# compiler would also reject it).
+        FlattenProps(result).ShouldContain("Style.missing");
+    }
+
+    [Fact]
+    public void ProcessExpression_KnownCssModuleMember_ReportsNoDiagnostic_UnderStrictMap()
+    {
+        var modules = Modules(strict: true, ("$style", "_style", "Style", "box"));
+        TransformWithModules("<div :class=\"$style.box\"></div>", BindingMetadata.Empty, modules, out var errors);
+        errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ProcessExpression_UnknownCssModuleMember_IsSilent_WhenMapDoesNotReportUnknownMembers()
+    {
+        // Without ReportsUnknownMembers (a partial/non-generator map), an unknown member is not flagged; the
+        // access still rewrites to the accessor class and the C# compiler is the backstop.
+        var modules = Modules(strict: false, ("$style", "_style", "Style", "box"));
+        var result = TransformWithModules("<div :class=\"$style.missing\"></div>", BindingMetadata.Empty, modules, out var errors);
+
+        errors.ShouldBeEmpty();
+        FlattenProps(result).ShouldContain("Style.missing");
     }
 
     // ---- v-for / v-slot scope and shadowing ----
@@ -526,6 +645,33 @@ public class ExpressionBindingTests
         var result = TransformTestHelpers.Transform(source, options);
         errors = collected;
         return result;
+    }
+
+    private static TransformResult TransformWithModules(
+        string source,
+        BindingMetadata metadata,
+        CssModuleAccessors modules,
+        out List<CompilerError> errors)
+    {
+        var collected = new List<CompilerError>();
+        var options = TransformOptions.CreateDom();
+        options.PrefixIdentifiers = true;
+        options.BindingMetadata = metadata;
+        options.CssModules = modules;
+        options.OnError = collected.Add;
+        var result = TransformTestHelpers.Transform(source, options);
+        errors = collected;
+        return result;
+    }
+
+    private static CssModuleAccessors Modules(
+        bool strict,
+        params (string TemplateName, string ParseIdentifier, string Accessor, string Member)[] entries)
+    {
+        var accessors = entries
+            .Select(e => new CssModuleAccessor(e.TemplateName, e.ParseIdentifier, e.Accessor, new[] { e.Member }))
+            .ToArray();
+        return new CssModuleAccessors(accessors, strict);
     }
 
     private static List<string> Interpolations(string source, BindingMetadata metadata)

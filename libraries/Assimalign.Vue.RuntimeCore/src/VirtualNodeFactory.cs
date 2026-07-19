@@ -505,6 +505,9 @@ public static class VirtualNodeFactory
             DynamicChildren = node.DynamicChildren,
             HasOnce = node.HasOnce,
             Directives = node.Directives,
+            // Carry the transition hooks across a clone (upstream cloneVNode copies vnode.transition):
+            // a reused/normalized child keeps its enter/leave choreography.
+            Transition = node.Transition,
             AppContext = node.AppContext,
             El = node.El,
             Anchor = node.Anchor,

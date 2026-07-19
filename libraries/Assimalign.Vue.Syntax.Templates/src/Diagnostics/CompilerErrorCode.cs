@@ -250,4 +250,15 @@ public enum CompilerErrorCode
     /// +1 mapping scheme; the server-renderer area [V01.01.07] will claim them).
     /// </summary>
     XVuecsUnresolvedIdentifier = 1000,
+
+    /// <summary>
+    /// A template expression accessed a member that does not exist on a CSS Modules accessor (the
+    /// <c>$style</c>/named-module equivalent, [V01.01.05.04.01]) whose full class map the generator supplied
+    /// (<see cref="CssModuleAccessors.ReportsUnknownMembers"/>). Vuecs-specific; no upstream counterpart —
+    /// Vue's runtime <c>$style</c> is a plain object indexed at runtime, whereas the Vuecs accessor is a
+    /// compile-time class whose members are exactly the declared classes, so an unknown member is a
+    /// compile-time error the compiler surfaces on the template coordinate rather than a runtime
+    /// <see langword="undefined"/>.
+    /// </summary>
+    XVuecsUnknownCssModuleMember = 1001,
 }

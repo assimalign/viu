@@ -30,7 +30,8 @@ namespace Assimalign.Vue.Tooling.Css;
 /// </param>
 /// <param name="VariableBindings">
 /// The <c>v-bind()</c> CSS bindings ([V01.01.06.06]) — one entry per distinct <c>(hash, expression)</c>, in
-/// first-seen source order. Empty when no <c>@style</c> block uses <c>v-bind()</c>.
+/// first-seen source order, each paired with its block-content-start position so a host can compose
+/// per-binding diagnostics onto <c>.viu</c> coordinates. Empty when no <c>@style</c> block uses <c>v-bind()</c>.
 /// </param>
 /// <param name="Diagnostics">
 /// Recoverable diagnostics from the <c>@style</c> rewrites (malformed <c>v-bind()</c>), each paired with its
@@ -41,7 +42,7 @@ public sealed record SingleFileComponentStyleCompilation(
     string? ScopeId,
     string? ExtractedStyles,
     IReadOnlyList<SingleFileComponentStyleModuleClass> ModuleClasses,
-    IReadOnlyList<CssVariableBinding> VariableBindings,
+    IReadOnlyList<SingleFileComponentStyleVariableBinding> VariableBindings,
     IReadOnlyList<SingleFileComponentStyleDiagnostic> Diagnostics)
 {
     /// <summary>An empty compilation — no <c>@style</c> block was declared.</summary>
@@ -49,6 +50,6 @@ public sealed record SingleFileComponentStyleCompilation(
         ScopeId: null,
         ExtractedStyles: null,
         ModuleClasses: System.Array.Empty<SingleFileComponentStyleModuleClass>(),
-        VariableBindings: System.Array.Empty<CssVariableBinding>(),
+        VariableBindings: System.Array.Empty<SingleFileComponentStyleVariableBinding>(),
         Diagnostics: System.Array.Empty<SingleFileComponentStyleDiagnostic>());
 }

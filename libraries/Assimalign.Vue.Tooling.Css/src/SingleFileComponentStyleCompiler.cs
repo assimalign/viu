@@ -84,7 +84,7 @@ public static class SingleFileComponentStyleCompiler
         string? scopeId = null;
         StringBuilder? styles = null;
         List<SingleFileComponentStyleModuleClass>? moduleClasses = null;
-        List<CssVariableBinding>? variableBindings = null;
+        List<SingleFileComponentStyleVariableBinding>? variableBindings = null;
         List<SingleFileComponentStyleDiagnostic>? diagnostics = null;
 
         // The module/v-bind hashes are salted by the component's short scope id (the path hash without the
@@ -118,7 +118,7 @@ public static class SingleFileComponentStyleCompiler
                     foreach (var pair in moduleResult.Classes)
                     {
                         (moduleClasses ??= new List<SingleFileComponentStyleModuleClass>())
-                            .Add(new SingleFileComponentStyleModuleClass(accessor, pair.Key, pair.Value));
+                            .Add(new SingleFileComponentStyleModuleClass(accessor, pair.Key, pair.Value, styleBlock.ModuleName));
                     }
                 }
 
@@ -129,12 +129,13 @@ public static class SingleFileComponentStyleCompiler
                     var bindingResult = CssBindingRewriter.Rewrite(stylesheet, localHashSalt);
                     stylesheet = bindingResult.Stylesheet;
                     rewritten = rewritten || bindingResult.Bindings.Count > 0;
+                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
                     foreach (var binding in bindingResult.Bindings)
                     {
-                        (variableBindings ??= new List<CssVariableBinding>()).Add(binding);
+                        (variableBindings ??= new List<SingleFileComponentStyleVariableBinding>())
+                            .Add(new SingleFileComponentStyleVariableBinding(binding, blockContentStart));
                     }
 
-                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
                     foreach (var diagnostic in bindingResult.Diagnostics)
                     {
                         (diagnostics ??= new List<SingleFileComponentStyleDiagnostic>())
@@ -183,7 +184,7 @@ public static class SingleFileComponentStyleCompiler
             scopeId,
             styles.ToString(),
             (IReadOnlyList<SingleFileComponentStyleModuleClass>?)moduleClasses ?? Array.Empty<SingleFileComponentStyleModuleClass>(),
-            (IReadOnlyList<CssVariableBinding>?)variableBindings ?? Array.Empty<CssVariableBinding>(),
+            (IReadOnlyList<SingleFileComponentStyleVariableBinding>?)variableBindings ?? Array.Empty<SingleFileComponentStyleVariableBinding>(),
             (IReadOnlyList<SingleFileComponentStyleDiagnostic>?)diagnostics ?? Array.Empty<SingleFileComponentStyleDiagnostic>());
     }
 

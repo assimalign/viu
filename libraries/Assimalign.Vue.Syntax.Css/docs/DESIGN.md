@@ -98,13 +98,31 @@ the `.viu` parser wiring them in.
   parser non-goal below).
 - **`CssBindingRewriter`** ports `cssVars.ts`. It scans each declaration value for `v-bind(expr)` (a port
   of upstream's `lexBinding`: it skips string literals and `/* */` comments and balances nested parens),
-  replaces each with `var(--<hash>)`, and collects the distinct `(hash, expression)` bindings for the
-  `UseCssVars` runtime. `<hash>` is the FNV-1a of `<shortScopeId>-<expr>`, so the emitted CSS
-  `var(--<hash>)` and the runtime's `style.setProperty("--<hash>", …)` agree by construction. An
-  unterminated `v-bind(` or an empty `v-bind()` reports a recoverable 2000-band `CssError` on the
-  declaration and is left in place.
+  replaces each with `var(--<hash>)`, and collects the distinct `(hash, expression, location)` bindings for
+  the `UseCssVars` runtime. `<hash>` is the FNV-1a of `<shortScopeId>-<expr>`, so the emitted CSS
+  `var(--<hash>)` and the runtime's `style.setProperty("--<hash>", …)` agree by construction. Each binding
+  carries the block-relative source location of its expression so the composition root can map a
+  compile diagnostic back onto the exact `.viu` coordinate. An unterminated `v-bind(` or an empty
+  `v-bind()` reports a recoverable 2000-band `CssError` on the declaration and is left in place.
 
-Both are tree-to-tree, so they compose with `scoped` in any order — the scoped serializer reads the
+### The `v-bind()` expression rewriting path ([V01.01.06.06.01])
+
+`CssBindingRewriter` extracts the expression **text**; the C# rewriting is the template compiler's job, so the
+composition-root generator routes each extracted expression through
+`Assimalign.Vue.Syntax.Templates`' `TemplateExpressionCompiler.CompileInstanceExpression` with the component's
+binding metadata — the same binding-aware rewriting a render expression gets. This makes `v-bind(count)` unwrap
+a script `Reference<T>` member to `count.Value` automatically (matching upstream cssVars ergonomics), instead of
+forcing the author to write `v-bind(count.Value)`. The getter runs as an **instance member** of the component
+partial class (`ApplyCssVariables`), so the rewriting is instance-member mode: bindings read through the implicit
+`this` (no `_ctx.`), a definite `Reference<T>` unwraps to `.Value`, and every other binding reads bare — the
+generator only marks a binding a definite reference when its declared type is reactive, so no `unref` (and thus no
+runtime-helper import) is needed in the getter. A **malformed** expression surfaces its `X_INVALID_EXPRESSION`
+diagnostic on the exact `.viu` style coordinate through the same style-origin envelope (`VUECS1301`) the CSS parse
+diagnostics use; the recoverable original text still emits, so the reported error fails the build. Member
+existence is left to the C# compiler (the same permissive choice the render path makes, so a member declared in a
+hand-written sibling partial is not false-flagged). The runtime half is `UseCssVars` in `Assimalign.Vue.RuntimeDom`.
+
+Both rewrites are tree-to-tree, so they compose with `scoped` in any order — the scoped serializer reads the
 parsed selector parts and declaration values the rewrites already updated. A block that is `module`/`v-bind`
 but **not** `scoped` is serialized by **`CssStylesheetWriter`**, the plain (unscoped) sibling of
 `CssScopedRewriter` sharing its canonical two-space form; a non-scoped block with neither feature is still

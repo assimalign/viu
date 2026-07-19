@@ -150,6 +150,15 @@ public sealed class VirtualNode
     internal List<DirectiveBinding>? Directives { get; set; }
 
     /// <summary>
+    /// The resolved enter/leave transition hooks stamped by <see cref="BaseTransition"/> (upstream:
+    /// <c>vnode.transition</c>), or null when the vnode is not inside a <c>&lt;Transition&gt;</c> — the
+    /// common case, kept to a single null check on the mount/remove hot path. When present and not
+    /// <see cref="TransitionState"/>-persisted, the renderer runs <c>beforeEnter</c>/<c>enter</c> around
+    /// insertion and <c>leave</c> in place of a direct remove ([V01.01.04.07]).
+    /// </summary>
+    internal TransitionHooks? Transition { get; set; }
+
+    /// <summary>
     /// Looks up a <see cref="VirtualNodeHook"/> prop (e.g. <c>"onVnodeMounted"</c>), or null.
     /// </summary>
     /// <param name="name">The hook prop name.</param>

@@ -13,4 +13,5 @@ namespace Assimalign.Vue.Tooling.Css;
 /// <param name="Accessor">The generated accessor class name (default module → <c>Style</c>, <c>module="foo"</c> → <c>Foo</c>).</param>
 /// <param name="Original">The original class name exactly as authored (without the leading <c>.</c>).</param>
 /// <param name="Hashed">The locally-hashed class name the selector compiled to.</param>
-public sealed record SingleFileComponentStyleModuleClass(string Accessor, string Original, string Hashed);
+/// <param name="Module">The authored module name (<c>module="name"</c>), or <see langword="null"/> for the default module.</param>
+public sealed record SingleFileComponentStyleModuleClass(string Accessor, string Original, string Hashed, string? Module);

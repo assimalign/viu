@@ -112,6 +112,9 @@ internal static class CompilerErrorMessages
         [CompilerErrorCode.XVuecsUnresolvedIdentifier] =
             "Cannot resolve template identifier against any component binding, template scope variable, or " +
             "allowed global: ",
+
+        // The offending "'<module>' has no member '<member>'." detail is appended by the reporter ([V01.01.05.04.01]).
+        [CompilerErrorCode.XVuecsUnknownCssModuleMember] = "Unknown CSS module member: ",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>

@@ -52,6 +52,22 @@ public sealed class TransformOptions
     public BindingMetadata? BindingMetadata { get; set; }
 
     /// <summary>
+    /// The CSS Modules accessors ([V01.01.05.04.01]) expression classification resolves <c>$style</c> (and
+    /// named-module) references against — the Vuecs stand-in for Vue's runtime <c>$style</c> object, supplied by
+    /// the composition-root generator ([V01.01.06.06]). Defaults to <see cref="CssModuleAccessors.Empty"/> and is
+    /// only consulted when <see cref="PrefixIdentifiers"/> is set.
+    /// </summary>
+    public CssModuleAccessors? CssModules { get; set; }
+
+    /// <summary>
+    /// How a rewritten binding spells its receiver (upstream has no counterpart — one render context). Defaults to
+    /// <see cref="BindingRewriteMode.RenderContext"/> (the <c>_ctx.</c> render form); the composition-root
+    /// generator sets <see cref="BindingRewriteMode.InstanceMember"/> only for the standalone <c>v-bind()</c> CSS
+    /// getter compile ([V01.01.06.06.01]).
+    /// </summary>
+    public BindingRewriteMode BindingRewriteMode { get; set; } = BindingRewriteMode.RenderContext;
+
+    /// <summary>
     /// Whether static event handlers are cached so blocks are not invalidated (upstream <c>cacheHandlers</c>).
     /// Defaults to <see langword="false"/>.
     /// </summary>
