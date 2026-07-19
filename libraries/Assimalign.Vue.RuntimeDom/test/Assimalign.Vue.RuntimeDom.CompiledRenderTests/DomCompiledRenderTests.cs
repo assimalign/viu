@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 
 using Microsoft.CodeAnalysis;
@@ -113,6 +114,45 @@ public sealed class DomCompiledRenderTests
         assembly.Length.ShouldBeGreaterThan(0);
     }
 
+    // A component that exercises both [V01.01.06.06] seams: a `module` block (the typed accessor) and a
+    // `v-bind()` block (the ApplyCssVariables call into UseCssVars). The hand-written half supplies the
+    // members the emitted v-bind getter evaluates.
+    private const string CssModuleAndVBindComponent =
+        "@template {\n" +
+        "<div class=\"box\">hi</div>\n" +
+        "}\n" +
+        "@style module {\n" +
+        ".box { color: v-bind(color); width: v-bind(size); }\n" +
+        "}\n";
+
+    private const string CssModuleHandWrittenHalf =
+        "#nullable enable\n" +
+        "namespace Demo\n" +
+        "{\n" +
+        "    partial class CssWidget\n" +
+        "    {\n" +
+        "        public string color => \"red\";\n" +
+        "        public int size => 10;\n" +
+        "    }\n" +
+        "}\n";
+
+    [Fact]
+    public void CssModuleAndVBind_SeamsCompile_AgainstRuntimeDom()
+    {
+        // The generated $style accessor and the ApplyCssVariables -> UseCssVars seam are real runtime C#:
+        // the accessor's const members compile, and the getter binds CssVariables.UseCssVars in RuntimeDom
+        // while its expressions resolve against the merged component members. This proves the [V01.01.06.06]
+        // metadata the runtime half consumes is well-formed, DOM-free.
+        var generated = CompiledRenderSupport.Generate("CssWidget", CssModuleAndVBindComponent);
+
+        generated.ShouldContain("internal static class Style");
+        generated.ShouldContain("internal void ApplyCssVariables()");
+        generated.ShouldContain("global::Assimalign.Vue.RuntimeDom.CssVariables.UseCssVars(");
+
+        var assembly = CompiledRenderSupport.CompileToAssembly(generated, CssModuleHandWrittenHalf);
+        assembly.Length.ShouldBeGreaterThan(0);
+    }
+
     [Fact]
     public void GeneratorCaching_ForTheDomDirectiveTemplate_StaysStrictlyCached()
     {
@@ -134,6 +174,62 @@ public sealed class DomCompiledRenderTests
             .SelectMany(step => step.Outputs)
             .Select(output => output.Reason)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    [Fact]
+    public void VoidInlineHandlerWithModifier_CompilesAndExecutes_ThroughWithModifiersFacade()
+    {
+        // [V01.01.05.05.01] A void single-statement inline handler WITH a modifier emits as a statement-block
+        // lambda wrapped by the DOM guard: `_withModifiers(__event => { _ctx.record(__event); }, ["prevent"])`,
+        // binding DomRenderHelpers._withModifiers(Action<BrowserEvent>, params string[]). Before the fix the
+        // emitter wrote the parenthesized void call `__event => (_ctx.record(__event))`, which binds neither the
+        // Func<BrowserEvent, object?> nor the Action<BrowserEvent> overload — the generated render failed to
+        // compile. Here the generated render compiles AND, when the stored guarded onClick delegate is invoked,
+        // runs the void method and applies .prevent to the event (upstream compiler-dom transformOn's
+        // withModifiers wrapping: vuejs/core v3.5).
+        const string template = "@template {\n<button @click.prevent=\"record($event)\">go</button>\n}\n";
+        const string handWritten =
+            "#nullable enable\n" +
+            "using Assimalign.Vue.RuntimeDom;\n" +
+            "namespace Demo\n" +
+            "{\n" +
+            "    partial class VoidModifierHandler\n" +
+            "    {\n" +
+            "        public int RecordCount;\n" +
+            "        public BrowserEvent? LastEvent;\n" +
+            "        public void record(BrowserEvent browserEvent) { RecordCount++; LastEvent = browserEvent; }\n" +
+            "    }\n" +
+            "}\n";
+
+        var generated = CompiledRenderSupport.Generate("VoidModifierHandler", template);
+        // The void call emits as a statement-block lambda wrapped by the withModifiers guard.
+        generated.ShouldContain("_withModifiers(__event => { _ctx.record(__event); }, [\"prevent\"])");
+
+        var type = Assembly.Load(CompiledRenderSupport.CompileToAssembly(generated, handWritten))
+            .GetType("Demo.VoidModifierHandler")
+            ?? throw new InvalidOperationException("The compiled assembly did not contain Demo.VoidModifierHandler.");
+        var instance = Activator.CreateInstance(type, nonPublic: true)!;
+        var cacheSize = (int)type.GetField("RenderCacheSize", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetRawConstantValue()!;
+        var render = type.GetMethod("Render", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        var vnode = (VirtualNode)render.Invoke(null, new object?[] { instance, new object?[cacheSize] })!;
+        var handler = vnode.Properties!["onClick"].ShouldBeOfType<Action<BrowserEvent>>();
+
+        // BrowserEvent's constructor is internal and this compile-binding project has no InternalsVisibleTo
+        // grant, so the dispatch event is built through the internal constructor by reflection (the argument
+        // order matches Assimalign.Vue.RuntimeDom.Events.BrowserEvent).
+        var browserEvent = (BrowserEvent)Activator.CreateInstance(
+            typeof(BrowserEvent),
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            args: new object?[] { "click", 0.0, "", "", BrowserEventModifiers.None, -1, 0, 0.0, 0.0, 0, true, null, false, null },
+            culture: null)!;
+        handler(browserEvent);
+
+        type.GetField("RecordCount")!.GetValue(instance).ShouldBe(1);            // the void handler ran once
+        type.GetField("LastEvent")!.GetValue(instance).ShouldBeSameAs(browserEvent);
+        browserEvent.DefaultPrevented.ShouldBeTrue();                            // .prevent applied via the guard
     }
 }
 

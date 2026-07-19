@@ -58,6 +58,13 @@ internal sealed class DirectHandleDomWorld : IDisposable
             SetBooleanProperty = leaf.SetBooleanProperty,
             SetStyleProperty = leaf.SetStyleProperty,
             RemoveStyleProperty = leaf.RemoveStyleProperty,
+            SetCssVariables = (element, names, values) =>
+            {
+                for (var index = 0; index < names.Length; index++)
+                {
+                    leaf.SetStyleProperty(element, names[index], values[index], false);
+                }
+            },
         };
     }
 

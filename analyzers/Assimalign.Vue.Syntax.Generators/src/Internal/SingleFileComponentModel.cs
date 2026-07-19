@@ -50,6 +50,16 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// when the component declares no <c>@style</c> block. Emitted as a generated string constant; the
 /// physical static-web-asset bundling is the MSBuild-side follow-up.
 /// </param>
+/// <param name="ModuleClasses">
+/// The CSS Modules class map ([V01.01.06.06]) — one entry per <c>original → hashed</c> class, grouped by
+/// its accessor — emitted as the typed <c>$style</c>-equivalent nested class(es). Empty when no
+/// <c>@style module</c> block is declared.
+/// </param>
+/// <param name="CssVariableBindings">
+/// The <c>v-bind()</c> CSS bindings ([V01.01.06.06]) — one entry per distinct <c>(hash, expression)</c> —
+/// emitted as the <c>ApplyCssVariables</c> seam the <c>UseCssVars</c> runtime consumes. Empty when no
+/// <c>@style</c> block uses <c>v-bind()</c>.
+/// </param>
 internal readonly record struct SingleFileComponentModel(
     string? Namespace,
     string ClassName,
@@ -65,7 +75,9 @@ internal readonly record struct SingleFileComponentModel(
     string? RenderBody,
     int RenderCacheSize,
     string? ScopeId,
-    string? ExtractedStyles)
+    string? ExtractedStyles,
+    EquatableArray<CssModuleClassEntry> ModuleClasses,
+    EquatableArray<CssVariableBindingEntry> CssVariableBindings)
 {
     /// <summary>
     /// Materializes the template compiler's <see cref="BindingMetadata"/> from the classified

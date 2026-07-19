@@ -33,6 +33,10 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     private const string RootNamespaceProperty = "build_property.RootNamespace";
     private const string ProjectDirectoryProperty = "build_property.ProjectDir";
 
+    // The scope-id prefix ([V01.01.06.04] StyleScopeId), stripped to recover the short salt the
+    // module/v-bind hashes use ([V01.01.06.06]).
+    private const string ScopeIdPrefix = "data-v-";
+
     /// <summary>Pipeline step tracking name for the file-read transform (used by incremental-cache tests).</summary>
     public const string FileTrackingName = "SingleFileComponentFile";
 
@@ -128,10 +132,13 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             }
         }
 
-        // [V01.01.06.04] @style compilation: scoped blocks are rewritten with the component's scope id and
-        // non-scoped blocks pass through unmodified; the scope id surfaces in component metadata for the
-        // renderer to stamp, and the extracted CSS is emitted as a generated constant.
-        var (scopeId, extractedStyles) = CompileStyles(file, parse, cancellationToken);
+        // [V01.01.06.04]/[V01.01.06.06] @style compilation: scoped blocks are rewritten with the component's
+        // scope id, `module` blocks have their class names locally hashed, `v-bind()` usages become
+        // component-scoped custom properties, and non-scoped/non-module/non-v-bind blocks pass through
+        // unmodified. The scope id, extracted CSS, module class map, and v-bind bindings surface in the model.
+        var moduleClasses = new List<CssModuleClassEntry>();
+        var cssVariableBindings = new List<CssVariableBindingEntry>();
+        var (scopeId, extractedStyles) = CompileStyles(file, parse, diagnostics, moduleClasses, cssVariableBindings, cancellationToken);
 
         // [V01.01.06.03]/[V01.01.06.03.01] @script integration: when the component declares a script,
         // split it into a hoisted using region and a class-body member region, validate both, and extract
@@ -161,7 +168,13 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             RenderBody: null,
             RenderCacheSize: 0,
             ScopeId: scopeId,
-            ExtractedStyles: extractedStyles);
+            ExtractedStyles: extractedStyles,
+            ModuleClasses: moduleClasses.Count == 0
+                ? EquatableArray<CssModuleClassEntry>.Empty
+                : new EquatableArray<CssModuleClassEntry>(moduleClasses.ToArray()),
+            CssVariableBindings: cssVariableBindings.Count == 0
+                ? EquatableArray<CssVariableBindingEntry>.Empty
+                : new EquatableArray<CssVariableBindingEntry>(cssVariableBindings.ToArray()));
 
         // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the script's classified bindings drive the
         // template compiler's ref-unwrapping decisions, so a Reference<T> member reads as `.Value` in
@@ -237,19 +250,31 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Compiles the dispatched <c>@style</c> parses ([V01.01.06.04]): each <c>scoped</c> block's parsed
-    /// stylesheet is rewritten with the component's stable scope id via <see cref="CssScopedRewriter"/>,
-    /// each non-scoped block passes through unmodified, and the results concatenate in source order. The
-    /// scope id is returned only when the component actually declares a scoped block, so a component with
-    /// no scoped styles carries none.
+    /// Compiles the dispatched <c>@style</c> parses ([V01.01.06.04]/[V01.01.06.06]): each block is run
+    /// through the CSS-Modules class rename (<c>module</c> blocks, <see cref="CssModuleRewriter"/>), the
+    /// <c>v-bind()</c> custom-property rewrite (<see cref="CssBindingRewriter"/>), and then serialized —
+    /// scoped blocks via <see cref="CssScopedRewriter"/> with the component's stable scope id, rewritten
+    /// non-scoped blocks via <see cref="CssStylesheetWriter"/>, and untouched non-scoped blocks verbatim.
+    /// The module class map and <c>v-bind()</c> bindings accumulate into <paramref name="moduleClasses"/> /
+    /// <paramref name="cssVariableBindings"/> for the metadata seams, and malformed <c>v-bind()</c>
+    /// diagnostics compose onto the <c>.viu</c> style coordinates through the same style-origin envelope the
+    /// CSS parse diagnostics use. The scope id is returned only when a <c>scoped</c> block is declared.
     /// </summary>
     private static (string? ScopeId, string? ExtractedStyles) CompileStyles(
         SingleFileComponentFile file,
         SingleFileComponentSyntaxParserResult parse,
+        List<DiagnosticInfo> diagnostics,
+        List<CssModuleClassEntry> moduleClasses,
+        List<CssVariableBindingEntry> cssVariableBindings,
         System.Threading.CancellationToken cancellationToken)
     {
         string? scopeId = null;
         StringBuilder? styles = null;
+
+        // The module/v-bind hashes are salted by the component's short scope id (the path hash without the
+        // `data-v-` prefix), which the file always carries — so a `module`/`v-bind` block is component-scoped
+        // even when it is not `scoped` ([V01.01.06.06]).
+        var localHashSalt = ShortScopeId(file.ScopeId);
 
         foreach (var sourceResult in parse.SourceResults)
         {
@@ -262,17 +287,64 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             cancellationToken.ThrowIfCancellationRequested();
 
             string css;
-            if (styleBlock.Scoped &&
-                sourceResult.Result.Nodes.Count > 0 &&
-                sourceResult.Result.Nodes[0] is CssStylesheetNode stylesheet)
+            if (sourceResult.Result.Nodes.Count > 0 && sourceResult.Result.Nodes[0] is CssStylesheetNode parsed)
             {
-                // A scoped block is rewritten with the component's stable scope id.
-                scopeId ??= file.ScopeId;
-                css = CssScopedRewriter.Rewrite(stylesheet, scopeId);
+                var stylesheet = parsed;
+                var rewritten = false;
+
+                // `module`: rename local class selectors and record original -> hashed for the accessor.
+                if (styleBlock.IsModule)
+                {
+                    var moduleResult = CssModuleRewriter.Rewrite(stylesheet, localHashSalt);
+                    stylesheet = moduleResult.Stylesheet;
+                    rewritten = rewritten || moduleResult.Classes.Count > 0;
+                    var accessor = ModuleAccessorName(styleBlock.ModuleName);
+                    foreach (var pair in moduleResult.Classes)
+                    {
+                        moduleClasses.Add(new CssModuleClassEntry(accessor, pair.Key, pair.Value));
+                    }
+                }
+
+                // `v-bind()`: rewrite each usage to a custom property and record the (hash, expression)
+                // binding. The content guard skips the rewrite for the common no-binding block.
+                if (styleBlock.Content.IndexOf("v-bind", StringComparison.Ordinal) >= 0)
+                {
+                    var bindingResult = CssBindingRewriter.Rewrite(stylesheet, localHashSalt);
+                    stylesheet = bindingResult.Stylesheet;
+                    rewritten = rewritten || bindingResult.Bindings.Count > 0;
+                    foreach (var binding in bindingResult.Bindings)
+                    {
+                        cssVariableBindings.Add(new CssVariableBindingEntry(binding.Name, binding.Expression));
+                    }
+
+                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
+                    foreach (var diagnostic in bindingResult.Diagnostics)
+                    {
+                        diagnostics.Add(SingleFileComponentDiagnostics.CreateStyle(file.FilePath, diagnostic, blockContentStart));
+                    }
+                }
+
+                if (styleBlock.Scoped)
+                {
+                    // A scoped block is serialized with the component's stable scope id (module/v-bind
+                    // rewrites already updated the tree the scoped serializer reads).
+                    scopeId ??= file.ScopeId;
+                    css = CssScopedRewriter.Rewrite(stylesheet, scopeId);
+                }
+                else if (rewritten)
+                {
+                    // A rewritten non-scoped block is serialized canonically (its class names / values
+                    // changed, so the raw content no longer matches).
+                    css = CssStylesheetWriter.Write(stylesheet);
+                }
+                else
+                {
+                    // An untouched non-scoped block passes through verbatim (issue acceptance criterion).
+                    css = styleBlock.Content;
+                }
             }
             else
             {
-                // A non-scoped block passes through unmodified (issue acceptance criterion).
                 css = styleBlock.Content;
             }
 
@@ -285,6 +357,51 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         }
 
         return (scopeId, styles?.ToString());
+    }
+
+    // The component's short scope id — the `data-v-` scope id with its prefix stripped — used to salt the
+    // module/v-bind hashes so they are component-scoped and deterministic ([V01.01.06.06]).
+    private static string ShortScopeId(string scopeId)
+        => scopeId.StartsWith(ScopeIdPrefix, StringComparison.Ordinal)
+            ? scopeId.Substring(ScopeIdPrefix.Length)
+            : scopeId;
+
+    // The generated accessor class name for a `module` option: default (valueless `module`) maps to
+    // `Style` — the C# analogue of Vue's `$style`, which has no legal C# spelling — and `module="name"`
+    // maps to the pascal-cased name.
+    private static string ModuleAccessorName(string? moduleName)
+        => string.IsNullOrEmpty(moduleName) ? "Style" : PascalCase(moduleName!);
+
+    // Pascal-cases an authored identifier for use as a C# type/member name: word boundaries at '-'/'_'/' '
+    // start a new capitalized word, a leading digit is prefixed with '_', and non-identifier characters are
+    // dropped. Deterministic so the emitted accessor is stable.
+    private static string PascalCase(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        var capitalizeNext = true;
+        foreach (var character in value)
+        {
+            if (character == '-' || character == '_' || character == ' ')
+            {
+                capitalizeNext = true;
+                continue;
+            }
+
+            if (!char.IsLetterOrDigit(character))
+            {
+                continue;
+            }
+
+            if (builder.Length == 0 && char.IsDigit(character))
+            {
+                builder.Append('_');
+            }
+
+            builder.Append(capitalizeNext ? char.ToUpperInvariant(character) : character);
+            capitalizeNext = false;
+        }
+
+        return builder.Length == 0 ? "Style" : builder.ToString();
     }
 
     private static void Execute(SourceProductionContext context, SingleFileComponentGeneratorResult result)

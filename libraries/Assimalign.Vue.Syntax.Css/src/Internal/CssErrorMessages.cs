@@ -25,6 +25,10 @@ internal static class CssErrorMessages
             "Malformed declaration. Expected ':' between the property and its value; the declaration was discarded.",
         [CssErrorCode.UnexpectedEndOfFile] =
             "Unexpected end of file. Expected a '{' block or ';' to close the rule.",
+        [CssErrorCode.UnterminatedCssBinding] =
+            "Unterminated 'v-bind('. Expected a closing ')' for the CSS binding; the usage was discarded.",
+        [CssErrorCode.EmptyCssBinding] =
+            "Empty 'v-bind()'. A CSS binding must reference an expression; the usage was discarded.",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>

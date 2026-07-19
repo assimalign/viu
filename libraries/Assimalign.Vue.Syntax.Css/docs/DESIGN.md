@@ -2,7 +2,9 @@
 
 Why the CSS area is shaped the way it is, and its deliberate divergences from a full CSS engine. The
 scaffold that preceded this (a raw whole-source root node pinning the pipeline seam) was replaced by real
-rule-level parsing and the scoped-selector rewrite with scoped CSS **[V01.01.06.04]** (issue #60).
+rule-level parsing and the scoped-selector rewrite with scoped CSS **[V01.01.06.04]** (issue #60); CSS
+Modules and `v-bind()` in CSS were added with **[V01.01.06.06]** (issue #62), reusing the same tree and
+serializer machinery.
 
 ## Two-phase parse, context-directed, recoverable
 
@@ -80,6 +82,34 @@ production build additionally folds the source in for cache-busting, which is de
 static-web-asset emission below. A linked file outside the project directory falls back to hashing its
 leaf name so the id stays machine-independent.
 
+## CSS Modules and `v-bind()` — the [V01.01.06.06] rewrites
+
+Two more transforms sit alongside `CssScopedRewriter`, each a pure-.NET port of a `@vue/compiler-sfc`
+stage and each reached the same way — the composition-root generator runs them over the parsed tree, not
+the `.viu` parser wiring them in.
+
+- **`CssModuleRewriter`** ports `compileStyle()`'s CSS-Modules mode (`postcss-modules`). It renames every
+  local class selector `.foo` to `.foo_<hash>` and returns the original → hashed map for the generated
+  `$style` accessor. `<hash>` is the eight-hex-digit FNV-1a of `<shortScopeId>-foo` (`CssHash`, the same
+  FNV-1a as `StyleScopeId`), so it is deterministic, stable across rebuilds, and unique per component. The
+  rename touches only class selectors in normal compound position; class names inside functional-pseudo
+  arguments (`:not()`, `:deep()`, `:slotted()`, `:global()`) are left alone — `:deep`/`:global`
+  deliberately target external/un-hashed names, and non-reserved pseudo arguments are verbatim text (the
+  parser non-goal below).
+- **`CssBindingRewriter`** ports `cssVars.ts`. It scans each declaration value for `v-bind(expr)` (a port
+  of upstream's `lexBinding`: it skips string literals and `/* */` comments and balances nested parens),
+  replaces each with `var(--<hash>)`, and collects the distinct `(hash, expression)` bindings for the
+  `UseCssVars` runtime. `<hash>` is the FNV-1a of `<shortScopeId>-<expr>`, so the emitted CSS
+  `var(--<hash>)` and the runtime's `style.setProperty("--<hash>", …)` agree by construction. An
+  unterminated `v-bind(` or an empty `v-bind()` reports a recoverable 2000-band `CssError` on the
+  declaration and is left in place.
+
+Both are tree-to-tree, so they compose with `scoped` in any order — the scoped serializer reads the
+parsed selector parts and declaration values the rewrites already updated. A block that is `module`/`v-bind`
+but **not** `scoped` is serialized by **`CssStylesheetWriter`**, the plain (unscoped) sibling of
+`CssScopedRewriter` sharing its canonical two-space form; a non-scoped block with neither feature is still
+emitted verbatim and never reaches the writer, so only rewritten blocks lose their original whitespace.
+
 ## Composition boundary
 
 The library never wires itself into the `.viu` parser. The [V01.01.06.02] generator composition root
@@ -91,8 +121,14 @@ only the scope-id string.
 
 ## Non-goals (deliberate scope boundaries)
 
-- **CSS Modules and `v-bind()` in CSS** — [V01.01.06.06], not this item. The parser tree and kind catalog
-  are built to host them; the seams are left, not implemented.
+- **Class renaming inside functional-pseudo arguments** for CSS Modules — `.foo` inside `:not()`,
+  `:deep()`, `:slotted()`, `:global()` is not renamed (see the [V01.01.06.06] section). This follows the
+  verbatim-pseudo-argument non-goal below and, for `:deep`/`:global`, is the correct behavior (those target
+  external names).
+- **The production `hash(id + raw)` prod-mode `v-bind` name** — upstream's dev build uses a readable
+  `id-<escaped-expr>` custom property and its prod build a bare hash; Vuecs always uses the deterministic
+  component-scoped hash (`--<hash>`), which is unambiguous and needs no escaping, and records the readable
+  expression in metadata instead.
 - **Physical static-web-asset bundling.** A Roslyn source generator emits C#, not content files (and
   `System.IO` is off-limits under RS1035), so the extracted CSS surfaces as the generated `ExtractedStyles`
   constant. Writing the CSS into `dotnet publish` output as a bundled stylesheet is an MSBuild-task

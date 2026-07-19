@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
@@ -265,6 +267,146 @@ internal static class SingleFileComponentSourceEmitter
         builder.Append("/// </summary>\n");
         AppendIndent(builder, indent);
         builder.Append("internal const string ExtractedStyles = ").Append(Literal(styles)).Append(";\n");
+
+        AppendModuleAccessors(builder, indent, model);
+        AppendCssVariableSeam(builder, indent, model);
+    }
+
+    // [V01.01.06.06] The @style module accessor seam. Each `module` block's original -> hashed class map is
+    // emitted as a nested static class (the C# analogue of Vue's `$style` / useCssModule()) whose const
+    // members mirror the declared class names, so a reference to a class that does not exist is a compile
+    // error. Blocks that share an accessor (several `@style module` blocks, or `module="name"` repeated)
+    // merge into one class; a duplicate member is emitted once.
+    private static void AppendModuleAccessors(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        if (model.ModuleClasses.Count == 0)
+        {
+            return;
+        }
+
+        var accessors = new List<string>();
+        var membersByAccessor = new Dictionary<string, List<(string Member, string Hashed)>>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in model.ModuleClasses)
+        {
+            var member = MemberName(entry.Original);
+            if (!seen.Add(entry.Accessor + "." + member))
+            {
+                continue;
+            }
+
+            if (!membersByAccessor.TryGetValue(entry.Accessor, out var members))
+            {
+                members = new List<(string, string)>();
+                membersByAccessor[entry.Accessor] = members;
+                accessors.Add(entry.Accessor);
+            }
+
+            members.Add((member, entry.Hashed));
+        }
+
+        foreach (var accessor in accessors)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// The typed CSS Modules accessor for this component's <c>@style module</c> block — the C#\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// analogue of Vue 3.5's <c>$style</c> / <c>useCssModule()</c>. Each member is the locally-hashed\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// name of the like-named source class, so a reference to an undeclared class fails to compile.\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// </summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("internal static class ").Append(accessor).Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("{\n");
+            foreach (var (member, hashed) in membersByAccessor[accessor])
+            {
+                AppendIndent(builder, indent + 1);
+                builder.Append("public const string ").Append(member).Append(" = ").Append(Literal(hashed)).Append(";\n");
+            }
+
+            AppendIndent(builder, indent);
+            builder.Append("}\n");
+        }
+    }
+
+    // [V01.01.06.06] The v-bind() CSS custom-property seam. Each recorded (hash, expression) binding becomes
+    // an entry of the getter the ApplyCssVariables method hands to the UseCssVars runtime — which applies the
+    // evaluated values as custom properties on the component root and re-applies them reactively (post-flush)
+    // without re-rendering. The expressions are emitted verbatim inside an instance lambda, so an unqualified
+    // member name resolves against the merged @script members through the implicit `this`; the render/script
+    // seams stay untouched. A binding whose member is a Reference<T> is NOT auto-unwrapped here (upstream
+    // compiles v-bind expressions with binding-aware rewriting, which is the template compiler's job, out of
+    // this style seam's scope) — author `v-bind(count.Value)` for a ref. The component-runtime instantiation
+    // calls ApplyCssVariables during setup (that wiring lands with the .viu component runtime); the method is
+    // emitted here so the metadata exists for it.
+    private static void AppendCssVariableSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        if (model.CssVariableBindings.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// Registers this component's <c>v-bind()</c> CSS custom properties with the <c>UseCssVars</c>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// runtime ([V01.01.06.06]) — the C# analogue of the compiled <c>useCssVars(...)</c> call in Vue\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// 3.5's setup. Call once during the component's setup; the runtime applies the evaluated values as\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <c>--&lt;hash&gt;</c> custom properties on the root element(s) and re-applies them on the next flush\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// when a bound value changes, without re-rendering.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal void ApplyCssVariables()\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("=> global::Assimalign.Vue.RuntimeDom.CssVariables.UseCssVars(() =>\n");
+        AppendIndent(builder, indent + 2);
+        builder.Append("new global::System.Collections.Generic.Dictionary<string, string>(")
+            .Append(Count(model.CssVariableBindings.Count)).Append(")\n");
+        AppendIndent(builder, indent + 2);
+        builder.Append("{\n");
+        foreach (var binding in model.CssVariableBindings)
+        {
+            AppendIndent(builder, indent + 3);
+            builder.Append('[').Append(Literal(binding.Name)).Append("] = global::System.Convert.ToString((object?)(")
+                .Append(binding.Expression)
+                .Append("), global::System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,\n");
+        }
+
+        AppendIndent(builder, indent + 2);
+        builder.Append("});\n");
+    }
+
+    // Turns an authored class name into a valid C# member identifier: non-identifier characters become '_'
+    // and a leading digit is prefixed with '_'. Deterministic so the accessor is stable across rebuilds.
+    private static string MemberName(string original)
+    {
+        var builder = new StringBuilder(original.Length);
+        foreach (var character in original)
+        {
+            builder.Append(char.IsLetterOrDigit(character) || character == '_' ? character : '_');
+        }
+
+        if (builder.Length == 0)
+        {
+            return "_";
+        }
+
+        if (char.IsDigit(builder[0]))
+        {
+            builder.Insert(0, '_');
+        }
+
+        return builder.ToString();
     }
 
     // A valid C# string literal for arbitrary CSS text (quotes, backslashes, and newlines escaped).
