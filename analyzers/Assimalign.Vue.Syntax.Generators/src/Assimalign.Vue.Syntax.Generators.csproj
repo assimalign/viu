@@ -27,6 +27,10 @@
     <VuecsProjectReference Include="Assimalign.Vue.Syntax" />
     <VuecsProjectReference Include="Assimalign.Vue.Syntax.SingleFileComponent" />
     <VuecsProjectReference Include="Assimalign.Vue.Syntax.Templates" />
+    <!-- Scoped CSS ([V01.01.06.04]): the composition root registers the CSS parser for @style blocks and
+         runs the scoped rewrite. Like the other language libraries, the Css library is referenced only
+         here (the SingleFileComponent library never references it) and only at build time. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Syntax.Css" />
   </ItemGroup>
   <!-- Analyzer release tracking (RS2008): the shipped diagnostic IDs are recorded here. -->
   <ItemGroup>

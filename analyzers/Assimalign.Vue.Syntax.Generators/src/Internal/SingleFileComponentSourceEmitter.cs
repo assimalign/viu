@@ -13,7 +13,10 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// name/signature contract is documented in
 /// <c>libraries/Assimalign.Vue.Syntax.Templates/docs/DESIGN.md</c>) — and the <c>@script</c> block's C#
 /// ([V01.01.06.03]) is merged verbatim under a <c>#line</c> map so compiler errors and debugger stepping
-/// resolve to the <c>.viu</c> source. Beyond the reserved render members (<c>Render</c>,
+/// resolve to the <c>.viu</c> source. The script splits into two <c>#line</c>-mapped regions
+/// ([V01.01.06.03.01]): leading <c>using</c> directives are hoisted into the file's using region above the
+/// namespace, and the remaining members are merged into the class body (see <see cref="ScriptRegions"/>).
+/// Beyond the reserved render members (<c>Render</c>,
 /// <c>RenderCacheSize</c>), the scaffold emits no members of its own and the class stays
 /// <c>partial</c>, so a user-authored sibling <c>.cs</c> partial and the merged script coexist without
 /// collision.
@@ -57,6 +60,18 @@ internal static class SingleFileComponentSourceEmitter
             // against both.
             builder.Append("using static ").Append(RenderHelperSurface).Append(";\n");
             builder.Append("using static ").Append(DomRenderHelperSurface).Append(";\n\n");
+        }
+
+        // [V01.01.06.03.01] Hoisted @script using directives. Leading usings (plain, using static, and
+        // aliases) are lifted out of the class body into the file's using region above the namespace,
+        // under their own #line map so a malformed or unresolved using resolves to the .viu source. The
+        // remaining @script members stay in the class body (see AppendScriptSeam). C# permits using /
+        // using static / using-alias directives in any order, so these follow the render-helper preamble
+        // without reordering it.
+        if (model.Script.UsingRegion is { } usingRegion)
+        {
+            AppendLineMappedRegion(builder, model.FilePath, model.Script.UsingRegionStartLine, usingRegion);
+            builder.Append('\n');
         }
 
         var indent = 0;
@@ -132,6 +147,8 @@ internal static class SingleFileComponentSourceEmitter
 
         AppendScriptSeam(builder, bodyIndent, model);
 
+        AppendStyleSeam(builder, bodyIndent, model);
+
         AppendIndent(builder, indent);
         builder.Append("}\n");
 
@@ -143,17 +160,29 @@ internal static class SingleFileComponentSourceEmitter
         return builder.ToString();
     }
 
-    // [V01.01.06.03] The @script merge seam — the only seam this work item fills. When the component
-    // declares a script block, its C# body is merged into the partial class under a #line map; otherwise
-    // the seam is a documenting comment. The [V01.01.05.05] render seam above stays a placeholder.
+    // [V01.01.06.03]/[V01.01.06.03.01] The @script member seam. Leading using directives are hoisted
+    // above the namespace (see Emit); what remains — the class-body members — is merged into the partial
+    // class here under a #line map. A script block that contributes no members (all usings, or empty), or
+    // no @script block at all, degrades to a documenting comment. The [V01.01.05.05] render seam above
+    // stays a placeholder.
     private static void AppendScriptSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
-        if (model.ScriptContent is not { } scriptContent)
+        if (model.Script.MemberRegion is not { } memberRegion)
         {
             AppendIndent(builder, indent);
-            builder.Append("// [V01.01.06.03] Script merge seam. This component declares no @script block, so no C#\n");
-            AppendIndent(builder, indent);
-            builder.Append("// body is merged into the partial class.\n");
+            if (model.HasScript)
+            {
+                builder.Append("// [V01.01.06.03.01] The @script block contributes no class-body members; any leading\n");
+                AppendIndent(builder, indent);
+                builder.Append("// using directives are hoisted into the file's using region above the namespace.\n");
+            }
+            else
+            {
+                builder.Append("// [V01.01.06.03] Script merge seam. This component declares no @script block, so no C#\n");
+                AppendIndent(builder, indent);
+                builder.Append("// body is merged into the partial class.\n");
+            }
+
             return;
         }
 
@@ -163,16 +192,18 @@ internal static class SingleFileComponentSourceEmitter
         builder.Append("// #line directives that map every line back to the .viu source, so compiler errors and\n");
         AppendIndent(builder, indent);
         builder.Append("// debugger stepping land in the .viu file rather than this generated file.\n");
-        AppendScript(builder, model.FilePath, model.ScriptContentStartLine, scriptContent);
+        AppendLineMappedRegion(builder, model.FilePath, model.Script.MemberRegionStartLine, memberRegion);
     }
 
-    // Emits the @script body flush against column 0 (no scaffold indentation added). The C# #line
-    // directive remaps the LINE of the following text but takes each token's COLUMN verbatim from this
-    // generated file; because a .viu block's content begins at column 1 (docs/FORMAT.md §3), emitting each
-    // script line un-indented preserves its original column, so a reported (line, column) lands on the
-    // exact .viu coordinate — the same block-to-file mapping SingleFileComponentDiagnostics composes. The
-    // trailing #line default restores this generated file's own line mapping for the scaffold that follows.
-    private static void AppendScript(StringBuilder builder, string filePath, int startLine, string content)
+    // Emits a verbatim @script region flush against column 0 (no scaffold indentation added), wrapped in a
+    // #line map. The C# #line directive remaps the LINE of the following text but takes each token's COLUMN
+    // verbatim from this generated file; because a .viu block's content begins at column 1 (docs/FORMAT.md
+    // §3) and both regions split on a line boundary (column 1), emitting each region line un-indented
+    // preserves its original column, so a reported (line, column) lands on the exact .viu coordinate — the
+    // same block-to-file mapping SingleFileComponentDiagnostics composes. The trailing #line default
+    // restores this generated file's own line mapping for whatever follows (the namespace, or the class
+    // close). Shared by the hoisted using region (above the namespace) and the merged member region.
+    private static void AppendLineMappedRegion(StringBuilder builder, string filePath, int startLine, string content)
     {
         builder.Append("#line ").Append(startLine.ToString(CultureInfo.InvariantCulture))
             .Append(" \"").Append(filePath).Append("\"\n");
@@ -184,6 +215,61 @@ internal static class SingleFileComponentSourceEmitter
 
         builder.Append("#line default\n");
     }
+
+    // [V01.01.06.04] The @style seam — emitted at the tail of the class body so it never interleaves with
+    // the @script merge region. When the component declares @style blocks, their compiled CSS rides as an
+    // ExtractedStyles constant and, for scoped components, the ScopeId constant carries the data-v-<hash>
+    // the renderer stamps on elements (the C# analogue of Vue's component __scopeId). No @style block
+    // leaves the seam as a documenting comment, matching the render/script seams.
+    private static void AppendStyleSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        if (model.ExtractedStyles is not { } styles)
+        {
+            AppendIndent(builder, indent);
+            builder.Append("// [V01.01.06.04] Style seam. This component declares no @style block, so no scope id\n");
+            AppendIndent(builder, indent);
+            builder.Append("// or compiled CSS is emitted.\n");
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("// [V01.01.06.04] Compiled @style blocks: scoped blocks are rewritten with the component's\n");
+        AppendIndent(builder, indent);
+        builder.Append("// data-v-<hash> scope id and non-scoped blocks pass through unmodified. The renderer stamps\n");
+        AppendIndent(builder, indent);
+        builder.Append("// ScopeId on the component's elements; static-web-asset bundling is the MSBuild follow-up.\n");
+
+        if (model.ScopeId is { } scopeId)
+        {
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// The scoped-CSS scope id — the C# analogue of Vue 3.5's component <c>__scopeId</c>. The runtime\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// renderer stamps this <c>data-v-&lt;hash&gt;</c> attribute on the component's own elements.\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// </summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("internal const string ScopeId = ").Append(Literal(scopeId)).Append(";\n");
+            builder.Append('\n');
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// The component's compiled CSS — scoped <c>@style</c> blocks rewritten with <see cref=\"ScopeId\"/>,\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// non-scoped blocks verbatim — extracted at build time (the WASM runtime does zero CSS work).\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal const string ExtractedStyles = ").Append(Literal(styles)).Append(";\n");
+    }
+
+    // A valid C# string literal for arbitrary CSS text (quotes, backslashes, and newlines escaped).
+    private static string Literal(string value)
+        => Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(value, quote: true);
 
     private static string Present(bool present) => present ? "present" : "absent";
 

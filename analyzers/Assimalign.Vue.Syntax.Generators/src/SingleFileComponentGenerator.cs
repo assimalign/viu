@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 using Microsoft.CodeAnalysis;
 
+using Assimalign.Vue.Syntax.Css;
 using Assimalign.Vue.Syntax.SingleFileComponent;
 using Assimalign.Vue.Syntax.Templates;
 
@@ -76,13 +78,15 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         var text = additionalText.GetText(cancellationToken);
         var content = text?.ToString() ?? string.Empty;
         var names = SingleFileComponentNameResolver.Resolve(additionalText.Path, options.ProjectDirectory, options.RootNamespace);
+        var scopeId = StyleScopeId.Resolve(additionalText.Path, options.ProjectDirectory);
         return new SingleFileComponentFile(
             additionalText.Path,
             LeafFileName(additionalText.Path),
             content,
             names.Namespace,
             names.ClassName,
-            names.HintName);
+            names.HintName,
+            scopeId);
     }
 
     private static SingleFileComponentGeneratorResult BuildResult(
@@ -101,28 +105,45 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         }
 
         // Dispatched-block diagnostics: each registered parser reports positions relative to the block's
-        // content, so compose them with the block's content-start position to reach file coordinates.
+        // content, so compose them with the block's content-start position to reach file coordinates. The
+        // origin (template vs style) selects the diagnostic envelope so a CSS error lands under the style
+        // descriptors ([V01.01.06.04]).
         foreach (var sourceResult in parse.SourceResults)
         {
-            var fromTemplate = SingleFileComponentParserComposition.IsTemplateBlock(sourceResult.Source);
             var blockContentStart = sourceResult.Node.ContentLocation.Start;
+            if (SingleFileComponentParserComposition.IsStyleBlock(sourceResult.Source))
+            {
+                foreach (var diagnostic in sourceResult.Result.Diagnostics)
+                {
+                    diagnostics.Add(SingleFileComponentDiagnostics.CreateStyle(file.FilePath, diagnostic, blockContentStart));
+                }
+
+                continue;
+            }
+
+            var fromTemplate = SingleFileComponentParserComposition.IsTemplateBlock(sourceResult.Source);
             foreach (var diagnostic in sourceResult.Result.Diagnostics)
             {
                 diagnostics.Add(SingleFileComponentDiagnostics.Create(file.FilePath, diagnostic, fromTemplate, blockContentStart));
             }
         }
 
-        // [V01.01.06.03] @script integration: when the component declares a script, validate its C# and
-        // extract binding metadata (routing any Roslyn parse diagnostics onto the .viu file), and carry
-        // the verbatim body plus its content-start line so the emitter can merge it under a #line map.
-        string? scriptContent = null;
-        var scriptContentStartLine = 0;
+        // [V01.01.06.04] @style compilation: scoped blocks are rewritten with the component's scope id and
+        // non-scoped blocks pass through unmodified; the scope id surfaces in component metadata for the
+        // renderer to stamp, and the extracted CSS is emitted as a generated constant.
+        var (scopeId, extractedStyles) = CompileStyles(file, parse, cancellationToken);
+
+        // [V01.01.06.03]/[V01.01.06.03.01] @script integration: when the component declares a script,
+        // split it into a hoisted using region and a class-body member region, validate both, and extract
+        // binding metadata (routing any Roslyn parse diagnostics onto the .viu file). The regions carry
+        // their own #line anchors so the emitter maps each back to the .viu source.
+        var scriptRegions = ScriptRegions.None;
         var bindings = EquatableArray<ScriptBinding>.Empty;
         if (descriptor.Script is { } script)
         {
-            scriptContent = script.Content;
-            scriptContentStartLine = script.ContentLocation.Start.Line;
-            bindings = ScriptBlockAnalyzer.Analyze(file.FilePath, script, diagnostics);
+            var analysis = ScriptBlockAnalyzer.Analyze(file.FilePath, script, diagnostics);
+            scriptRegions = analysis.Regions;
+            bindings = analysis.Bindings;
         }
 
         var model = new SingleFileComponentModel(
@@ -135,11 +156,12 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             StyleCount: descriptor.Styles.Count,
             CustomBlockCount: descriptor.CustomBlocks.Count,
             FilePath: file.FilePath,
-            ScriptContent: scriptContent,
-            ScriptContentStartLine: scriptContentStartLine,
+            Script: scriptRegions,
             Bindings: bindings,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: scopeId,
+            ExtractedStyles: extractedStyles);
 
         // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the script's classified bindings drive the
         // template compiler's ref-unwrapping decisions, so a Reference<T> member reads as `.Value` in
@@ -212,6 +234,57 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         }
 
         return (null, 0);
+    }
+
+    /// <summary>
+    /// Compiles the dispatched <c>@style</c> parses ([V01.01.06.04]): each <c>scoped</c> block's parsed
+    /// stylesheet is rewritten with the component's stable scope id via <see cref="CssScopedRewriter"/>,
+    /// each non-scoped block passes through unmodified, and the results concatenate in source order. The
+    /// scope id is returned only when the component actually declares a scoped block, so a component with
+    /// no scoped styles carries none.
+    /// </summary>
+    private static (string? ScopeId, string? ExtractedStyles) CompileStyles(
+        SingleFileComponentFile file,
+        SingleFileComponentSyntaxParserResult parse,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        string? scopeId = null;
+        StringBuilder? styles = null;
+
+        foreach (var sourceResult in parse.SourceResults)
+        {
+            if (!SingleFileComponentParserComposition.IsStyleBlock(sourceResult.Source) ||
+                sourceResult.Node is not SingleFileComponentStyleBlock styleBlock)
+            {
+                continue;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string css;
+            if (styleBlock.Scoped &&
+                sourceResult.Result.Nodes.Count > 0 &&
+                sourceResult.Result.Nodes[0] is CssStylesheetNode stylesheet)
+            {
+                // A scoped block is rewritten with the component's stable scope id.
+                scopeId ??= file.ScopeId;
+                css = CssScopedRewriter.Rewrite(stylesheet, scopeId);
+            }
+            else
+            {
+                // A non-scoped block passes through unmodified (issue acceptance criterion).
+                css = styleBlock.Content;
+            }
+
+            styles ??= new StringBuilder();
+            styles.Append(css);
+            if (css.Length > 0 && css[css.Length - 1] != '\n')
+            {
+                styles.Append('\n');
+            }
+        }
+
+        return (scopeId, styles?.ToString());
     }
 
     private static void Execute(SourceProductionContext context, SingleFileComponentGeneratorResult result)

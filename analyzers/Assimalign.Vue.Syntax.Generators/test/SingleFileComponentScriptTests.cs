@@ -158,7 +158,7 @@ public sealed class SingleFileComponentScriptTests
             "    public int Compute() => 1;\n";
 
         var diagnostics = new List<DiagnosticInfo>();
-        var bindings = ScriptBlockAnalyzer.Analyze("C:/proj/Counter.viu", ScriptBlock(content), diagnostics);
+        var bindings = ScriptBlockAnalyzer.Analyze("C:/proj/Counter.viu", ScriptBlock(content), diagnostics).Bindings;
 
         diagnostics.ShouldBeEmpty(); // well-formed C# produces no script diagnostics
         var map = bindings.ToDictionary(binding => binding.Name, binding => binding.Type);
@@ -178,17 +178,163 @@ public sealed class SingleFileComponentScriptTests
     }
 
     [Fact]
-    public void UsingDirectiveInScript_IsReportedRecoverably_HoistingDeferred()
+    public void HoistedUsings_EmitAboveNamespace_WhileMembersStayInClassBody()
     {
-        // Interim contract: this iteration merges @script as a partial-class BODY (member declarations),
-        // so a leading `using` — legal in Vue's <script setup> and used by the design sample — is parsed
-        // in class-body context and surfaces as a recoverable script diagnostic on the .viu file rather
-        // than crashing. First-class using-directive hoisting is deferred to the remaining [V01.01.06.03]
-        // scope; when it lands this test is updated to assert the hoisted directive instead.
+        // [V01.01.06.03.01] The hoisted layout: a leading `using` in an @script block (legal in Vue's
+        // <script setup>, used by the design sample) is lifted into the generated file's using region
+        // ABOVE the namespace under its own #line map; the remaining members stay in the class body under
+        // their own #line map, anchored to the first member's line. This replaces the interim
+        // class-body-only merge that degraded a leading using to a recoverable VUECS1201.
+        const string source =
+            "@script {\n" +                       // line 1
+            "    using System.Text;\n" +           // line 2 — hoisted using region
+            "    public string Message = \"Hello\";\n" + // line 3 — class-body member region
+            "}\n";                                 // line 4
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Widget.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Widget.SingleFileComponent.g.cs");
+
+        // The using is hoisted above the namespace under a #line anchor at its .viu line (2).
+        generated.ShouldContain("#line 2 \"C:/proj/Widget.viu\"\n    using System.Text;\n#line default");
+        generated.IndexOf("using System.Text", StringComparison.Ordinal)
+            .ShouldBeLessThan(generated.IndexOf("namespace Demo", StringComparison.Ordinal));
+
+        // The member stays in the class body under a #line anchor at its own .viu line (3).
+        generated.ShouldContain("#line 3 \"C:/proj/Widget.viu\"\n    public string Message = \"Hello\";\n#line default");
+        generated.IndexOf("public string Message", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(generated.IndexOf("namespace Demo", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void HoistedUsingAndMember_ResolveToTheirViuLineAndColumn_WhenCompiled()
+    {
+        // [V01.01.06.03.01] Both regions carry their own #line anchor. A semantic error in the hoisted
+        // using region (an unresolved namespace) and one in the class-body member region (a bad
+        // conversion) are errors the generator's syntactic parse never sees; they surface only when the
+        // generated C# is compiled, and each emitted #line map must resolve its error — line AND column —
+        // to the offending token's own .viu coordinate, never the .g.cs. Mirrors the single-region
+        // ScriptTypeError_IsReportedOnTheViuFile_ViaLineDirective pattern, now across both regions.
+        const string source =
+            "@script {\n" +                          // line 1
+            "    using Nonexistent.Space;\n" +        // line 2 — hoisted using region
+            "    public int Bad = \"not an int\";\n" + // line 3 — class-body member region
+            "}\n";                                    // line 4
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Widget.viu", source, RootNamespace, ProjectDirectory);
+        outcome.Diagnostics.ShouldBeEmpty(); // both errors are semantic, so the generator itself reports nothing
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Widget.SingleFileComponent.g.cs");
+
+        var errors = CompileErrors(CompileGenerated(generated));
+
+        // The hoisted using's unresolved namespace maps to .viu line 2 (zero-based 1), at 'Nonexistent'.
+        var usingError = errors.Single(error => error.Id == "CS0246");
+        var usingSpan = usingError.Location.GetMappedLineSpan();
+        usingSpan.Path.ShouldEndWith("Widget.viu");
+        usingSpan.StartLinePosition.Line.ShouldBe(1);
+        usingSpan.StartLinePosition.Character.ShouldBe(10); // 'Nonexistent' after "    using "
+
+        // The member's bad conversion maps to .viu line 3 (zero-based 2), at the string literal.
+        var memberError = errors.Single(error => error.Id == "CS0029");
+        var memberSpan = memberError.Location.GetMappedLineSpan();
+        memberSpan.Path.ShouldEndWith("Widget.viu");
+        memberSpan.StartLinePosition.Line.ShouldBe(2);
+        memberSpan.StartLinePosition.Character.ShouldBe(21); // the "not an int" literal column
+    }
+
+    [Fact]
+    public void MixedUsingAndMemberBlock_CompilesCleanly_WhenHoistEnablesMemberType()
+    {
+        // [V01.01.06.03.01] Mixed block end to end: the hoisted using is what lets the class-body member's
+        // type resolve — StringBuilder needs System.Text. Under the pre-hoist class-body-only merge the
+        // using would sit illegally inside the class and this would not compile; hoisting + member merge
+        // produce a clean compile.
         const string source =
             "@script {\n" +
             "    using System.Text;\n" +
-            "    public string Name = \"x\";\n" +
+            "    public StringBuilder Builder = new();\n" +
+            "    public string Message = \"Hello\";\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Widget.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Widget.SingleFileComponent.g.cs");
+        CompileErrors(CompileGenerated(generated)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void HoistedUsings_CoexistWithRenderHelperPreamble_ProducingValidCSharp()
+    {
+        // Guards the [V01.01.06.03.01] + [V01.01.05.05] seam interaction: when a component has BOTH a
+        // @template (emitting the `using static` render-helper preamble) and an @script with leading
+        // usings, the hoisted usings follow the preamble in the file's using region and the whole file
+        // stays syntactically valid C#. Semantic binding to the runtime helper surface is the runtime-side
+        // deliverable, so this parses rather than compiles (cf. GeneratedRenderFile_ParsesAsValidCSharp).
+        const string source =
+            "@template {\n" +
+            "    <div>{{ message }}</div>\n" +
+            "}\n" +
+            "@script {\n" +
+            "    using System.Text;\n" +
+            "    public string message = \"Hello\";\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Widget.viu", source, RootNamespace, ProjectDirectory);
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Widget.SingleFileComponent.g.cs");
+
+        // The `using static` render-helper preamble precedes the hoisted using, which precedes the namespace.
+        generated.IndexOf("using static", StringComparison.Ordinal)
+            .ShouldBeLessThan(generated.IndexOf("using System.Text", StringComparison.Ordinal));
+        generated.IndexOf("using System.Text", StringComparison.Ordinal)
+            .ShouldBeLessThan(generated.IndexOf("namespace Demo", StringComparison.Ordinal));
+
+        var tree = GeneratorTestHarness.Parse(generated);
+        tree.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == RoslynDiagnosticSeverity.Error)
+            .ShouldBeEmpty(customMessage: generated);
+    }
+
+    [Fact]
+    public void Classification_IsUnaffectedByUsingHoist_ClassifiesOnlyMembers()
+    {
+        // [V01.01.06.03.01] The region split must not disturb binding metadata: leading usings are hoisted
+        // out and only the members are classified, exactly as if the usings were absent. The regions are
+        // split at the line boundary after the last using, so both carry their own .viu start line.
+        const string content =
+            "    using System.Text;\n" +                     // .viu line 1 of the block content
+            "    public Reference<int> Count = default!;\n" + // line 2
+            "    public int Mutable = 0;\n";                  // line 3
+
+        var diagnostics = new List<DiagnosticInfo>();
+        var analysis = ScriptBlockAnalyzer.Analyze("C:/proj/Counter.viu", ScriptBlock(content), diagnostics);
+
+        diagnostics.ShouldBeEmpty(); // well-formed usings + members produce no script diagnostics
+
+        analysis.Regions.UsingRegion.ShouldBe("    using System.Text;\n");
+        analysis.Regions.UsingRegionStartLine.ShouldBe(1);
+        analysis.Regions.MemberRegion.ShouldBe(
+            "    public Reference<int> Count = default!;\n    public int Mutable = 0;\n");
+        analysis.Regions.MemberRegionStartLine.ShouldBe(2);
+
+        var map = analysis.Bindings.ToDictionary(binding => binding.Name, binding => binding.Type);
+        map["Count"].ShouldBe(BindingType.SetupReference);
+        map["Mutable"].ShouldBe(BindingType.SetupLet);
+        map.ContainsKey("using").ShouldBeFalse(); // the hoisted using is never a binding
+    }
+
+    [Fact]
+    public void MalformedHoistedUsing_SurfacesRecoverableScriptDiagnostic_OnTheViuFile()
+    {
+        // [V01.01.06.03.01] Malformed content in the using region stays a mapped, recoverable diagnostic
+        // (the same guarantee the member region already had): a using missing its ';' surfaces a VUECS1201
+        // on the .viu file, and the scaffold is still produced.
+        const string source =
+            "@script {\n" +               // line 1
+            "    using System.Text\n" +    // line 2 — missing ';'
+            "    public int Value = 0;\n" + // line 3
             "}\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Widget.viu", source, RootNamespace, ProjectDirectory);
@@ -199,6 +345,37 @@ public sealed class SingleFileComponentScriptTests
     }
 
     [Fact]
+    public void DesignSampleScriptShape_CompilesThroughTheGenerator_WithoutDiagnostics()
+    {
+        // [V01.01.06.03.01] The .designing/SampleApp/App.viu sample's script shape: two leading usings
+        // (unqualified, at column 1) followed by blank lines, alongside an empty @template. It must
+        // compile through the generator with no diagnostics — the usings are hoisted and the whitespace
+        // member region is dropped.
+        const string source =
+            "@template {\n" +
+            "\n" +
+            "}\n" +
+            "\n" +
+            "@script {\n" +
+            "using Assimalign.Viu;\n" +
+            "using Assimalign.Viu.Routing;\n" +
+            "\n" +
+            "\n" +
+            "\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/App.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "App.SingleFileComponent.g.cs");
+        generated.ShouldContain("using Assimalign.Viu;");
+        generated.ShouldContain("using Assimalign.Viu.Routing;");
+        // Both hoisted usings sit above the namespace.
+        generated.IndexOf("using Assimalign.Viu.Routing;", StringComparison.Ordinal)
+            .ShouldBeLessThan(generated.IndexOf("namespace Demo", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Classification_ClassifiesEveryVariable_InAMultiDeclaratorField()
     {
         // A field can declare several variables; each is classified with the shared field type, so both
@@ -206,7 +383,7 @@ public sealed class SingleFileComponentScriptTests
         var bindings = ScriptBlockAnalyzer.Analyze(
             "C:/proj/Counter.viu",
             ScriptBlock("    public Reference<int> First = default!, Second = default!;\n"),
-            new List<DiagnosticInfo>());
+            new List<DiagnosticInfo>()).Bindings;
 
         var map = bindings.ToDictionary(binding => binding.Name, binding => binding.Type);
         map["First"].ShouldBe(BindingType.SetupReference);
@@ -233,11 +410,12 @@ public sealed class SingleFileComponentScriptTests
             StyleCount: 0,
             CustomBlockCount: 0,
             FilePath: "C:/proj/Counter.viu",
-            ScriptContent: "    public Reference<int> Count = default!;\n",
-            ScriptContentStartLine: 1,
+            Script: new ScriptRegions(null, 0, "    public Reference<int> Count = default!;\n", 1),
             Bindings: bindings,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: null,
+            ExtractedStyles: null);
 
         var metadata = model.ToBindingMetadata();
 
@@ -262,11 +440,12 @@ public sealed class SingleFileComponentScriptTests
             StyleCount: 0,
             CustomBlockCount: 0,
             FilePath: "C:/proj/Counter.viu",
-            ScriptContent: null,
-            ScriptContentStartLine: 0,
+            Script: ScriptRegions.None,
             Bindings: EquatableArray<ScriptBinding>.Empty,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: null,
+            ExtractedStyles: null);
 
         var metadata = model.ToBindingMetadata();
 
@@ -278,7 +457,7 @@ public sealed class SingleFileComponentScriptTests
     public void ScriptWithBindings_IdenticalInput_StaysStrictlyCached()
     {
         // Adding script parsing + classification inside the model step must not break incrementality:
-        // identical input re-runs to an equal model (equal ScriptContent, equal Bindings), so the step
+        // identical input re-runs to an equal model (equal Script regions, equal Bindings), so the step
         // is strictly Cached - not Unchanged, which would mean it re-executed and merely matched.
         const string source =
             "@script {\n" +

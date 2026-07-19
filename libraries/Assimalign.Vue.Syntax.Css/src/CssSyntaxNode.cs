@@ -7,11 +7,11 @@ namespace Assimalign.Vue.Syntax.Css;
 /// parser output model (https://www.w3.org/TR/css-syntax-3/#parsing).
 /// </summary>
 /// <remarks>
-/// Scaffold for the CSS language area: the tree currently carries only the raw
-/// <see cref="CssStylesheetNode"/> produced by <see cref="CssSyntaxParser"/>. Rule/declaration-level
-/// parsing arrives with the scoped-CSS ([V01.01.06.04]) and CSS Modules ([V01.01.06.06]) work, which
-/// this hierarchy exists to host — including build-embedded style tooling (e.g. utility-class
-/// generation) registered through the aggregate parser seam.
+/// Rule-level parsing landed with the scoped-CSS work ([V01.01.06.04]): the tree carries the
+/// <see cref="CssStylesheetNode"/> root, its qualified rules and at-rules, their declarations, and — for
+/// qualified rules — the parsed selector list the scoped rewrite reads. CSS Modules ([V01.01.06.06])
+/// extends the hierarchy further, as does build-embedded style tooling (e.g. utility-class generation)
+/// registered through the aggregate parser seam.
 /// </remarks>
 public abstract record CssSyntaxNode : SyntaxNode
 {

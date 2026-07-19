@@ -13,10 +13,12 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <param name="Namespace">The resolved containing namespace, or <see langword="null"/> for the global namespace.</param>
 /// <param name="ClassName">The resolved generated partial class name.</param>
 /// <param name="HintName">The resolved, unique <c>AddSource</c> hint name.</param>
+/// <param name="ScopeId">The resolved scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>), derived from the project-relative path ([V01.01.06.04]).</param>
 internal readonly record struct SingleFileComponentFile(
     string FilePath,
     string FileName,
     string Text,
     string? Namespace,
     string ClassName,
-    string HintName);
+    string HintName,
+    string ScopeId);

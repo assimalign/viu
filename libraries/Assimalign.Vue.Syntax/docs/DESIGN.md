@@ -66,6 +66,9 @@ scheduling cost and no parallelism worth having; `AnalyzerTimeout` bounds the pa
 
 - No shared kind or error-code enum across languages (see above).
 - No async parsing surface.
-- The Css/Html/JavaScript scaffolds intentionally parse to a raw whole-source root node until their
-  work items land (starting with scoped CSS [V01.01.06.04]) — the scaffolds exist to pin the
-  pipeline seam, project shape, and caching contract, not to promise parsing.
+- The Html/JavaScript scaffolds intentionally parse to a raw whole-source root node until their work
+  items land — the scaffolds exist to pin the pipeline seam, project shape, and caching contract, not
+  to promise parsing. The Css scaffold's raw root was replaced by real rule-level parsing and the
+  scoped-selector rewrite with scoped CSS [V01.01.06.04] (see
+  `libraries/Assimalign.Vue.Syntax.Css/docs/DESIGN.md`); it is the flagship consumer of the
+  registration seam — the generator composition root registers `CssSyntaxParser` for `@style` blocks.
