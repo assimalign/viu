@@ -196,14 +196,48 @@ of each member:
   `_withHandler(handler)` (delegate-typed overloads), `_setCache(int index, BlockToken tracking, object? value)`,
   `_spreadCache(object?)`.
 
-**DOM-only helpers are a separate surface (layering).** The DOM directive values `_vShow`, `_vModelText`,
-`_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic`, the `_withModifiers(handler, string[])` /
-`_withKeys(handler, string[])` guard wrappers, and the DOM built-ins `_Transition` / `_TransitionGroup`
-are **not** members of `Assimalign.Vue.RuntimeCore.RenderHelpers`: their behavior lives in
-`Assimalign.Vue.RuntimeDom` (e.g. `VShow.Instance`, `BrowserEvents.WithModifiers`), which the
-platform-agnostic runtime-core layer must not reference. A DOM component binds them through a DOM-side
-helper surface the DOM generator path adds — a follow-up to [V01.01.03.22]; the current generator emits a
-single runtime-core `using static`, so templates using DOM directives are not yet end-to-end compilable.
+### The DOM render-helper surface (`DomRenderHelpers`, [V01.01.04.09])
+
+The DOM-directive helpers are a **separate facade for layering**: `_vShow`, `_vModelText`, `_vModelCheckbox`,
+`_vModelRadio`, `_vModelSelect`, `_vModelDynamic`, the `_withModifiers` / `_withKeys` guard wrappers, and the
+DOM built-ins `_Transition` / `_TransitionGroup` are **not** members of
+`Assimalign.Vue.RuntimeCore.RenderHelpers` — their behavior lives in `Assimalign.Vue.RuntimeDom`, which the
+platform-agnostic runtime-core layer must not reference (keeping runtime-core DOM-free, and keeping a real DOM
+directive from ever mis-binding onto a runtime-core marker). They ship instead as
+`global::Assimalign.Vue.RuntimeDom.DomRenderHelpers`, and the composition-root generator ([V01.01.06.02])
+emits a **second** file-level `using static global::Assimalign.Vue.RuntimeDom.DomRenderHelpers;` alongside the
+runtime-core one whenever a render body is present. A browser `.viu` always has RuntimeDom available (it is the
+DOM renderer), so both imports are unconditional — DOM-directive templates (`v-show`, `v-model`,
+`@click.prevent`, `@keyup.enter`) are now end-to-end compilable. `DomRenderHelpers` references only RuntimeDom's
+own machinery and RuntimeCore's `IDirective`, never any `Assimalign.Vue.Syntax.*` assembly; the by-name contract
+still flows one way. Pinned by `Assimalign.Vue.RuntimeDom.CompiledRenderTests` (a `.viu` using every spelling
+below compiles against both facades) and `Assimalign.Vue.RuntimeDom.Tests.DomRenderHelpersTests` (facade
+mapping + v-show / `.prevent` execution through the in-memory adapter).
+
+What code generation requires of each DOM member, mapped to the runtime machinery it forwards to:
+
+- `_vShow`, `_vModelText`, `_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic` — the runtime
+  directive values, typed `IDirective`, mapped to `VShow.Instance` / `VModelText.Instance` / … . The emitter
+  writes each as a `withDirectives` tuple element (`new object?[] { new object?[] { _vShow, exp } }`), which
+  `RenderHelpers._withDirectives` binds through its `tuple[0] is IDirective` check.
+- `_withModifiers(...)` / `_withKeys(...)` — the `v-on` modifier / key guard wrappers (upstream
+  `withModifiers` / `withKeys`), each **returning `Action<BrowserEvent>`** (the dispatchable handler the event
+  invoker registry understands) and forwarding to `BrowserEvents.WithModifiers` / `BrowserEvents.WithKeys`. The
+  handler parameter is **overloaded**, not a single `Action` — this reconciles the earlier
+  `_withModifiers(handler, string[])` pin: the emitter (`VOnTransform`) can write the handler as a value-returning
+  inline expression lambda (`__event => (expr)`), a void statement-block lambda (`__event => { … }`), or a
+  member/method-group reference (`_ctx.save`), and a parenthesized value expression cannot bind to `Action`. The
+  overload set — `Func<BrowserEvent, object?>`, `Action<BrowserEvent>`, `Func<object?>`, `Action` (each with
+  `params string[]`) — target-types every one of those, mirroring `_withHandler`'s multi-overload rationale.
+  Because both return `Action<BrowserEvent>`, a stacked `@keyup.enter.prevent` nests cleanly as
+  `_withKeys(_withModifiers(handler, ["prevent"]), ["enter"])` (the outer call resolves the inner result through
+  the `Action<BrowserEvent>` arm). These are **not** wrapped in `_withHandler` — their own signatures type the
+  inner lambda.
+- `_Transition` / `_TransitionGroup` — the DOM built-ins, typed `object` markers. Renderer support is deferred to
+  [V01.01.04.07], so they are honest placeholders: the compiled render passes one as a vnode `tag`, and because
+  the marker is neither an element string, a component definition, nor a runtime-core built-in, the vnode
+  factory's tag dispatch throws a clear `NotSupportedException` at render time rather than silently rendering
+  nothing (documented, not inert) — the DOM analogue of how `_Teleport`/`_Suspense` fail today.
 
 The generated render method itself is the generator's contract:
 `internal static object? Render(<ComponentClass> _ctx, object?[] _cache)` plus
