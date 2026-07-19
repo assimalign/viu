@@ -611,8 +611,14 @@ public static class RenderHelpers
     /// <summary>The <c>KeepAlive</c> built-in marker (upstream: <c>KeepAlive</c>); renderer support is separate work.</summary>
     public static readonly object _KeepAlive = new BuiltInVirtualNodeType("KeepAlive", isFragment: false);
 
-    /// <summary>The <c>BaseTransition</c> built-in marker (upstream: <c>BaseTransition</c>); renderer support is separate work.</summary>
-    public static readonly object _BaseTransition = new BuiltInVirtualNodeType("BaseTransition", isFragment: false);
+    /// <summary>
+    /// The <c>BaseTransition</c> built-in (upstream: <c>BaseTransition</c>), resolved to the real
+    /// transition state-machine component <see cref="RuntimeCore.BaseTransition"/> ([V01.01.04.07]).
+    /// The compiled render passes it as a vnode <c>tag</c>; the vnode factory's component-definition arm
+    /// mounts it (the DOM <c>&lt;Transition&gt;</c>/<c>&lt;TransitionGroup&gt;</c> wrap it with resolved
+    /// class hooks).
+    /// </summary>
+    public static readonly object _BaseTransition = BaseTransition.Instance;
 
     // ==== Render-root normalization (upstream normalizeVNode over the render return) =============
 

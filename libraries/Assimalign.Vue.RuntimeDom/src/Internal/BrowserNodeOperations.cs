@@ -59,6 +59,30 @@ internal static class BrowserNodeOperations
             // batch for a root element crosses the boundary once.
             SetCssVariables = static (element, names, values) => BrowserDomBridge.SetCssVariables(element, names, values),
         };
+        // Installs the browser-backed transition operations the DOM <Transition>/<TransitionGroup>
+        // choreography writes through ([V01.01.04.07]). Class/timing/FLIP ops run direct (not through the
+        // command buffer): they are rAF-timed and read-then-write, and the JS side calls a single .NET
+        // resolve per completion. In buffered mode the same direct ops are used — full buffered-frame
+        // ordering of transition class writes is a documented follow-up (the deterministic test adapter
+        // pins the choreography here).
+        DomTransitionOperations.Current = new DomTransitionOperations
+        {
+            AddTransitionClass = static (element, cssClass) => BrowserDomBridge.AddTransitionClass(element, cssClass),
+            RemoveTransitionClass = static (element, cssClass) => BrowserDomBridge.RemoveTransitionClass(element, cssClass),
+            NextFrame = static callback => BrowserDomBridge.NextFrame(callback),
+            ForceReflow = static () => BrowserDomBridge.ForceReflow(),
+            WhenTransitionEnds = static (element, expectedType, explicitTimeout, resolve) =>
+                BrowserDomBridge.WhenTransitionEnds(element, expectedType, explicitTimeout, resolve),
+            MeasurePosition = static element =>
+            {
+                var position = BrowserDomBridge.MeasurePosition(element);
+                return new TransitionRectangle(position[0], position[1]);
+            },
+            SetMoveTransform = static (element, deltaX, deltaY) => BrowserDomBridge.SetMoveTransform(element, deltaX, deltaY),
+            ClearMoveStyles = static element => BrowserDomBridge.ClearMoveStyles(element),
+            HasCssTransform = static (element, root, moveClass) => BrowserDomBridge.HasCssTransform(element, root, moveClass),
+            WhenMoveEnds = static (element, resolve) => BrowserDomBridge.WhenMoveEnds(element, resolve),
+        };
     }
 
     internal static RendererOptions<int> Create() => new()

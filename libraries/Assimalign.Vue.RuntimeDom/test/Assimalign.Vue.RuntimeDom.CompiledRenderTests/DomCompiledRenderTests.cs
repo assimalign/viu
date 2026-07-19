@@ -114,6 +114,38 @@ public sealed class DomCompiledRenderTests
         assembly.Length.ShouldBeGreaterThan(0);
     }
 
+    // A template using the <Transition> built-in around a v-if element — the compiled-render proof for
+    // [V01.01.04.07]: the compiler resolves <Transition> to the _Transition helper (DomRenderHelpers), and
+    // the generated render binds and compiles against the real component.
+    private const string TransitionTemplate =
+        "@template {\n" +
+        "<Transition name=\"fade\">\n" +
+        "  <div v-if=\"show\">hi</div>\n" +
+        "</Transition>\n" +
+        "}\n";
+
+    private const string TransitionHandWrittenHalf =
+        "#nullable enable\n" +
+        "namespace Demo\n" +
+        "{\n" +
+        "    partial class TransitionWidget\n" +
+        "    {\n" +
+        "        public bool show => true;\n" +
+        "    }\n" +
+        "}\n";
+
+    [Fact]
+    public void TransitionTemplate_ResolvesTheTransitionHelper_AndCompiles()
+    {
+        // <Transition> resolves to the DOM _Transition helper (upstream compiler-dom built-in mapping), and
+        // the generated render binds it against DomRenderHelpers._Transition (the real component) and compiles.
+        var generated = CompiledRenderSupport.Generate("TransitionWidget", TransitionTemplate);
+        generated.ShouldContain("_Transition");
+
+        var assembly = CompiledRenderSupport.CompileToAssembly(generated, TransitionHandWrittenHalf);
+        assembly.Length.ShouldBeGreaterThan(0);
+    }
+
     // A component that exercises both [V01.01.06.06] seams: a `module` block (the typed accessor) and a
     // `v-bind()` block (the ApplyCssVariables call into UseCssVars). The hand-written half supplies the
     // members the emitted v-bind getter evaluates.

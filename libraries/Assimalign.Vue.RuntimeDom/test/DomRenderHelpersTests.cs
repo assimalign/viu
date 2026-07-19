@@ -39,14 +39,14 @@ public sealed class DomRenderHelpersTests : IDisposable
     }
 
     [Fact]
-    public void TransitionMarkers_FailClearlyAtRenderTime_NotSilentlyInert()
+    public void TransitionHelpers_ResolveToTheRealComponents_AndCreateComponentVnodes()
     {
-        // _Transition/_TransitionGroup are typed markers pending [V01.01.04.07]: rendering one as a vnode tag
-        // throws a clear NotSupportedException rather than silently rendering nothing (documented, not inert).
-        DomRenderHelpers._Transition.ShouldNotBeNull();
-        DomRenderHelpers._TransitionGroup.ShouldNotBeNull();
-        Should.Throw<NotSupportedException>(() => RenderHelpers._createVNode(DomRenderHelpers._Transition));
-        Should.Throw<NotSupportedException>(() => RenderHelpers._createVNode(DomRenderHelpers._TransitionGroup));
+        // [V01.01.04.07] resolved the markers to the real DOM transition components: passing one as a vnode
+        // tag now mounts a component (upstream Transition/TransitionGroup), never throws NotSupportedException.
+        DomRenderHelpers._Transition.ShouldBeSameAs(Transition.Instance);
+        DomRenderHelpers._TransitionGroup.ShouldBeSameAs(TransitionGroup.Instance);
+        RenderHelpers._createVNode(DomRenderHelpers._Transition).Type.ShouldBe(VirtualNodeType.Component);
+        RenderHelpers._createVNode(DomRenderHelpers._TransitionGroup).Type.ShouldBe(VirtualNodeType.Component);
     }
 
     // ---- modifier / key guard wiring (upstream withModifiers / withKeys) -----------------------
