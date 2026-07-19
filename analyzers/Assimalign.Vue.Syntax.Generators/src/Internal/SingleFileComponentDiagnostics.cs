@@ -27,6 +27,13 @@ internal static class SingleFileComponentDiagnostics
 {
     private const string Category = "Assimalign.Vue.Syntax.Generators";
 
+    // The stable per-id help-link target: the VUECS diagnostic catalog documents every descriptor's ID,
+    // origin, severity, and configuration ([V01.01.05.08]). Each descriptor links its own heading anchor.
+    private const string HelpLinkBase =
+        "https://github.com/assimalign/vuecs/blob/main/analyzers/Assimalign.Vue.Syntax.Generators/docs/DIAGNOSTICS.md";
+
+    private static string HelpLink(string id) => HelpLinkBase + "#" + id.ToLowerInvariant();
+
     /// <summary>A recoverable error reported by the <c>.viu</c> block-container parser.</summary>
     internal static readonly DiagnosticDescriptor SingleFileComponentError = new(
         id: "VUECS1001",
@@ -34,7 +41,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1001"));
 
     /// <summary>A warning reported by the <c>.viu</c> block-container parser.</summary>
     internal static readonly DiagnosticDescriptor SingleFileComponentWarning = new(
@@ -43,7 +51,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1002"));
 
     /// <summary>An informational message reported by the <c>.viu</c> block-container parser.</summary>
     internal static readonly DiagnosticDescriptor SingleFileComponentInformation = new(
@@ -52,7 +61,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1003"));
 
     /// <summary>A recoverable error reported by the dispatched <c>@template</c> parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateError = new(
@@ -61,7 +71,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1101"));
 
     /// <summary>A warning reported by the dispatched <c>@template</c> parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateWarning = new(
@@ -70,7 +81,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1102"));
 
     /// <summary>An informational message reported by the dispatched <c>@template</c> parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateInformation = new(
@@ -79,7 +91,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1103"));
 
     /// <summary>A recoverable error reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
     internal static readonly DiagnosticDescriptor ScriptError = new(
@@ -88,7 +101,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1201"));
 
     /// <summary>A warning reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
     internal static readonly DiagnosticDescriptor ScriptWarning = new(
@@ -97,7 +111,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1202"));
 
     /// <summary>An informational message reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
     internal static readonly DiagnosticDescriptor ScriptInformation = new(
@@ -106,7 +121,8 @@ internal static class SingleFileComponentDiagnostics
         messageFormat: "{0}",
         category: Category,
         defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true);
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1203"));
 
     /// <summary>
     /// Envelopes <paramref name="diagnostic"/> as a value-equatable <see cref="DiagnosticInfo"/> located
@@ -273,5 +289,21 @@ internal static class SingleFileComponentDiagnostics
             ? blockStart.Column + (relative.Column - 1)
             : relative.Column;
         return (line - 1, column - 1);
+    }
+
+    /// <summary>
+    /// Composes a block-content-relative template position into whole-<c>.viu</c>-file coordinates for a C#
+    /// <c>#line</c> span directive ([V01.01.05.08] render source mapping), reusing the <em>same</em>
+    /// <see cref="Compose"/> arithmetic the <c>@template</c>/<c>@script</c> diagnostic paths use so the
+    /// emitted <c>#line</c> map and the reported diagnostics agree exactly. Returns one-based line/column
+    /// (the <c>#line</c> directive convention), where <see cref="Compose"/> yields zero-based for Roslyn.
+    /// </summary>
+    /// <param name="blockContentStart">The file position where the block's content begins.</param>
+    /// <param name="relative">The block-content-relative template position.</param>
+    /// <returns>The one-based file line and column.</returns>
+    internal static (int Line, int Column) ComposeToFilePosition(Position blockContentStart, Position relative)
+    {
+        var (line, character) = Compose(blockContentStart, relative);
+        return (line + 1, character + 1);
     }
 }

@@ -19,6 +19,8 @@ internal static class CompilerDomKnowledge
     private static readonly HashSet<string> SvgTagSet = Build(DomKnowledgeData.SvgTags, StringComparer.Ordinal);
     private static readonly HashSet<string> MathTagSet = Build(DomKnowledgeData.MathTags, StringComparer.Ordinal);
     private static readonly HashSet<string> VoidTagSet = Build(DomKnowledgeData.VoidTags, StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> KnownHtmlAttributeSet = Build(DomKnowledgeData.KnownHtmlAttributes, StringComparer.Ordinal);
+    private static readonly HashSet<string> KnownSvgAttributeSet = Build(DomKnowledgeData.KnownSvgAttributes, StringComparer.Ordinal);
 
     /// <summary>Whether <paramref name="tag"/> is a known HTML element (upstream <c>isHTMLTag</c>).</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
@@ -39,6 +41,14 @@ internal static class CompilerDomKnowledge
     /// <summary>Whether <paramref name="tag"/> is a native HTML/SVG/MathML element (upstream <c>isNativeTag</c>).</summary>
     /// <param name="tag">The tag name.</param>
     public static bool IsNativeTag(string tag) => IsHtmlTag(tag) || IsSvgTag(tag) || IsMathMLTag(tag);
+
+    /// <summary>Whether <paramref name="attributeName"/> is a known HTML attribute (upstream <c>isKnownHtmlAttr</c>).</summary>
+    /// <param name="attributeName">The attribute name (matched case-sensitively, as upstream).</param>
+    public static bool IsKnownHtmlAttribute(string attributeName) => KnownHtmlAttributeSet.Contains(attributeName);
+
+    /// <summary>Whether <paramref name="attributeName"/> is a known SVG attribute (upstream <c>isKnownSvgAttr</c>).</summary>
+    /// <param name="attributeName">The attribute name (matched case-sensitively, as upstream).</param>
+    public static bool IsKnownSvgAttribute(string attributeName) => KnownSvgAttributeSet.Contains(attributeName);
 
     private static HashSet<string> Build(string list, StringComparer comparer)
     {

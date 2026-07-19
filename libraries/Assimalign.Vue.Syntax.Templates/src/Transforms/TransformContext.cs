@@ -28,6 +28,7 @@ public sealed class TransformContext
     private readonly HashSet<TemplateSyntaxNode> seenMemo = new(ReferenceComparer.Instance);
     private readonly Dictionary<TemplateSyntaxNode, RuntimeHelper> directiveRuntime = new(ReferenceComparer.Instance);
     private readonly Dictionary<string, int> identifiers = new();
+    private readonly Dictionary<TemplateSyntaxNode, ConstantType> constantCache = new(ReferenceComparer.Instance);
 
     internal TransformContext(
         RootNode root,
@@ -416,6 +417,11 @@ public sealed class TransformContext
     internal HashSet<TemplateSyntaxNode> SeenOnce => seenOnce;
 
     internal HashSet<TemplateSyntaxNode> SeenMemo => seenMemo;
+
+    // The memoization table for the static-caching pass's element constant analysis (upstream
+    // context.constantCache, @vue/compiler-core transforms/cacheStatic.ts). Keyed by node reference so a
+    // subtree's constant type is computed once; [V01.01.05.07] populates it.
+    internal Dictionary<TemplateSyntaxNode, ConstantType> ConstantCache => constantCache;
 
     // The C# analogue of upstream's directiveImportMap: records the runtime helper a directive transform
     // requested, so the element transform can emit a helper reference instead of a resolveDirective call.
