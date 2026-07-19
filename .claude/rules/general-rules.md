@@ -15,7 +15,7 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 
 - Inverted library layout: `libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name **is** the
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
-  folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug remains
+  folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
   `assimalign/viu`).
 - Examples live in `examples/`; repo planning docs in `docs/`; the consumer-facing MSBuild SDK in
   `sdks/` and the `Assimalign.Viu.App` shared-framework pack producers in `frameworks/` (see
