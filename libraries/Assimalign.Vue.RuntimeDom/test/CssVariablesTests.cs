@@ -62,6 +62,41 @@ public sealed class CssVariablesTests : IDisposable
     }
 
     [Fact]
+    public void UseCssVars_WithGeneratorEmittedReferenceGetter_UpdatesReactively_RunCountsPinned()
+    {
+        // [V01.01.06.06.01] The exact getter shape the generator emits for `v-bind(count)` where `count` is a
+        // script Reference<int>: `Convert.ToString((object?)(count.Value), InvariantCulture)`. Because the
+        // auto-unwrap reads the ref's .Value inside the getter, the getter tracks the ref and re-applies on the
+        // next flush when it changes — the run-count proof that v-bind(count) (not v-bind(count.Value)) is
+        // reactive end to end. The getter never ran before the unwrap read a plain object with no tracking.
+        var count = Reactive.Reference(1);
+        var getterRuns = 0;
+        _harness.Render(Component(() =>
+        {
+            getterRuns++;
+            return new Dictionary<string, string>
+            {
+                ["w"] = Convert.ToString((object?)count.Value, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            };
+        }));
+        _harness.RunUntilIdle();
+
+        var div = _harness.FindElement("div");
+        _harness.CssVariable(div, "--w").ShouldBe("1");
+        _harness.CssVariableCrossings.ShouldBe(1);
+        getterRuns.ShouldBe(1);
+
+        // The ref changes: the getter re-runs (it tracked count.Value) and the property re-applies — one more
+        // crossing, one more getter run, and no re-render.
+        count.Value = 42;
+        _harness.RunUntilIdle();
+
+        _harness.CssVariable(div, "--w").ShouldBe("42");
+        _harness.CssVariableCrossings.ShouldBe(2);
+        getterRuns.ShouldBe(2);
+    }
+
+    [Fact]
     public void UseCssVars_DoesNotReapply_WhenNoBoundValueChanged()
     {
         var color = Reactive.Reference("red");

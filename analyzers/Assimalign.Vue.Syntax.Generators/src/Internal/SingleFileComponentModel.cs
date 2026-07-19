@@ -87,20 +87,30 @@ internal readonly record struct SingleFileComponentModel(
     /// script, mirroring Vue's <c>__isScriptSetup</c> for a <c>&lt;script setup&gt;</c> block.
     /// </summary>
     /// <returns>The binding metadata, or <see cref="BindingMetadata.Empty"/> for a scriptless component.</returns>
-    public BindingMetadata ToBindingMetadata()
+    public BindingMetadata ToBindingMetadata() => BuildBindingMetadata(HasScript, Bindings);
+
+    /// <summary>
+    /// Builds the template compiler's <see cref="BindingMetadata"/> from the classified script bindings — the
+    /// standalone form the generator needs before the model exists (the <c>v-bind()</c> CSS compile
+    /// [V01.01.06.06.01] rewrites its expressions with the same metadata the render path uses).
+    /// </summary>
+    /// <param name="hasScript">Whether the component declares a script block.</param>
+    /// <param name="bindings">The classified script bindings.</param>
+    /// <returns>The binding metadata, or <see cref="BindingMetadata.Empty"/> for a scriptless component.</returns>
+    public static BindingMetadata BuildBindingMetadata(bool hasScript, EquatableArray<ScriptBinding> bindings)
     {
-        if (!HasScript)
+        if (!hasScript)
         {
             return BindingMetadata.Empty;
         }
 
-        if (Bindings.Count == 0)
+        if (bindings.Count == 0)
         {
             return new BindingMetadata(isScriptSetup: true);
         }
 
-        var map = new Dictionary<string, BindingType>(Bindings.Count, StringComparer.Ordinal);
-        foreach (var binding in Bindings)
+        var map = new Dictionary<string, BindingType>(bindings.Count, StringComparer.Ordinal);
+        foreach (var binding in bindings)
         {
             // A later declaration of the same name wins (e.g. method overloads share a name); an
             // illegal duplicate-member script is already surfaced as a script diagnostic.

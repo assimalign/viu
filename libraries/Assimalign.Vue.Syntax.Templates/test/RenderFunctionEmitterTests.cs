@@ -258,6 +258,20 @@ return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _wit
     }
 
     [Fact]
+    public void MultiStatementHandlerWithoutTrailingSemicolon_EmitsTerminatedStatementBlockLambda()
+    {
+        // A multi-statement inline handler emits into `__event => { <body> }`. C# has no automatic
+        // semicolon insertion (JavaScript's, which upstream's handler wrapping relies on), so a body whose
+        // final statement omits its terminator gains a synthesized `;`, keeping the generated lambda valid
+        // C# ([V01.01.05.05.02], issue #150).
+        EmitPrefixed("<button @click=\"first(); second()\">x</button>").Code.ShouldBeCode(
+"""
+return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withHandler(__event => {_ctx.first(); _ctx.second();}))), "x", 8 /* PROPS */, ["onClick"]);
+
+""");
+    }
+
+    [Fact]
     public void ModifierHandler_KeepsWithModifiersUnwrapped()
     {
         // withModifiers/withKeys already give the inner lambda its delegate target type through their

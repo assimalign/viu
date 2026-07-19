@@ -132,18 +132,11 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             }
         }
 
-        // [V01.01.06.04]/[V01.01.06.06] @style compilation: scoped blocks are rewritten with the component's
-        // scope id, `module` blocks have their class names locally hashed, `v-bind()` usages become
-        // component-scoped custom properties, and non-scoped/non-module/non-v-bind blocks pass through
-        // unmodified. The scope id, extracted CSS, module class map, and v-bind bindings surface in the model.
-        var moduleClasses = new List<CssModuleClassEntry>();
-        var cssVariableBindings = new List<CssVariableBindingEntry>();
-        var (scopeId, extractedStyles) = CompileStyles(file, parse, diagnostics, moduleClasses, cssVariableBindings, cancellationToken);
-
         // [V01.01.06.03]/[V01.01.06.03.01] @script integration: when the component declares a script,
         // split it into a hoisted using region and a class-body member region, validate both, and extract
         // binding metadata (routing any Roslyn parse diagnostics onto the .viu file). The regions carry
-        // their own #line anchors so the emitter maps each back to the .viu source.
+        // their own #line anchors so the emitter maps each back to the .viu source. This runs before @style
+        // compilation because the v-bind() CSS rewriting ([V01.01.06.06.01]) needs the same binding metadata.
         var scriptRegions = ScriptRegions.None;
         var bindings = EquatableArray<ScriptBinding>.Empty;
         if (descriptor.Script is { } script)
@@ -152,6 +145,19 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             scriptRegions = analysis.Regions;
             bindings = analysis.Bindings;
         }
+
+        var bindingMetadata = SingleFileComponentModel.BuildBindingMetadata(descriptor.Script is not null, bindings);
+
+        // [V01.01.06.04]/[V01.01.06.06] @style compilation: scoped blocks are rewritten with the component's
+        // scope id, `module` blocks have their class names locally hashed, `v-bind()` usages become
+        // component-scoped custom properties (with their expressions routed through the same binding-metadata
+        // rewriting the render path uses, [V01.01.06.06.01]), and non-scoped/non-module/non-v-bind blocks pass
+        // through unmodified. The scope id, extracted CSS, module class map, and v-bind bindings surface in the model.
+        var moduleClasses = new List<CssModuleClassEntry>();
+        var cssVariableBindings = new List<CssVariableBindingEntry>();
+        var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        var (scopeId, extractedStyles) = CompileStyles(
+            file, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken);
 
         var model = new SingleFileComponentModel(
             file.Namespace,
@@ -178,8 +184,11 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 
         // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the script's classified bindings drive the
         // template compiler's ref-unwrapping decisions, so a Reference<T> member reads as `.Value` in
-        // the emitted render body instead of falling back to `_ctx.`.
-        var render = CompileRenderFunction(file, parse, model.ToBindingMetadata(), diagnostics, cancellationToken);
+        // the emitted render body instead of falling back to `_ctx.`. The CSS module accessors
+        // ([V01.01.05.04.01] -> [V01.01.06.06]) let a `$style.<class>` template reference resolve to the
+        // emitted accessor class instead of a phantom `_ctx` member.
+        var cssModules = BuildCssModuleAccessors(moduleClasses, moduleTemplateNames);
+        var render = CompileRenderFunction(file, parse, bindingMetadata, cssModules, diagnostics, cancellationToken);
         model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
 
         var array = diagnostics.Count == 0
@@ -200,6 +209,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         SingleFileComponentFile file,
         SingleFileComponentSyntaxParserResult parse,
         BindingMetadata bindingMetadata,
+        CssModuleAccessors cssModules,
         List<DiagnosticInfo> diagnostics,
         System.Threading.CancellationToken cancellationToken)
     {
@@ -217,6 +227,10 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             var transformOptions = TransformOptions.CreateDom();
             transformOptions.PrefixIdentifiers = true;
             transformOptions.BindingMetadata = bindingMetadata;
+            // CSS Modules accessors ([V01.01.05.04.01]): resolve `$style.<class>` (and named-module) references
+            // against the emitted accessor class. The map is complete (every declared class), so an access to an
+            // undeclared member is reported on the .viu coordinate.
+            transformOptions.CssModules = cssModules;
             // Static caching and stringification ([V01.01.05.07]): fully static subtrees are cached and long
             // static runs collapse to innerHTML string inserts, cutting per-node JS-interop round-trips on
             // WASM. Deterministic and value-equatable, so the incremental-generator cache is preserved.
@@ -266,6 +280,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         List<DiagnosticInfo> diagnostics,
         List<CssModuleClassEntry> moduleClasses,
         List<CssVariableBindingEntry> cssVariableBindings,
+        Dictionary<string, string> moduleTemplateNames,
+        BindingMetadata bindingMetadata,
         System.Threading.CancellationToken cancellationToken)
     {
         string? scopeId = null;
@@ -299,6 +315,10 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                     stylesheet = moduleResult.Stylesheet;
                     rewritten = rewritten || moduleResult.Classes.Count > 0;
                     var accessor = ModuleAccessorName(styleBlock.ModuleName);
+                    // The template spelling ([V01.01.05.04.01]): the default (valueless `module`) is Vue's
+                    // `$style`, a named module is referenced by its authored name — recorded so the template
+                    // compiler maps the reference to this accessor class.
+                    moduleTemplateNames[accessor] = ModuleTemplateName(styleBlock.ModuleName);
                     foreach (var pair in moduleResult.Classes)
                     {
                         moduleClasses.Add(new CssModuleClassEntry(accessor, pair.Key, pair.Value));
@@ -312,12 +332,26 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                     var bindingResult = CssBindingRewriter.Rewrite(stylesheet, localHashSalt);
                     stylesheet = bindingResult.Stylesheet;
                     rewritten = rewritten || bindingResult.Bindings.Count > 0;
+                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
                     foreach (var binding in bindingResult.Bindings)
                     {
-                        cssVariableBindings.Add(new CssVariableBindingEntry(binding.Name, binding.Expression));
+                        // [V01.01.06.06.01] Route the extracted expression through the template compiler's
+                        // binding-metadata rewriting (instance-member mode), so `v-bind(count)` unwraps a script
+                        // Reference<T> member to `count.Value` automatically — matching upstream cssVars
+                        // ergonomics — instead of forcing `v-bind(count.Value)`. A malformed expression surfaces a
+                        // diagnostic on the exact .viu style coordinate through the same style-origin envelope the
+                        // CSS parse uses; the (recoverable) original text still emits, so the reported error fails
+                        // the build.
+                        var compiled = TemplateExpressionCompiler.CompileInstanceExpression(
+                            binding.Expression, bindingMetadata, binding.Location);
+                        foreach (var error in compiled.Diagnostics)
+                        {
+                            diagnostics.Add(SingleFileComponentDiagnostics.CreateStyle(file.FilePath, error, blockContentStart));
+                        }
+
+                        cssVariableBindings.Add(new CssVariableBindingEntry(binding.Name, compiled.Code));
                     }
 
-                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
                     foreach (var diagnostic in bindingResult.Diagnostics)
                     {
                         diagnostics.Add(SingleFileComponentDiagnostics.CreateStyle(file.FilePath, diagnostic, blockContentStart));
@@ -371,6 +405,66 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     // maps to the pascal-cased name.
     private static string ModuleAccessorName(string? moduleName)
         => string.IsNullOrEmpty(moduleName) ? "Style" : PascalCase(moduleName!);
+
+    // The template spelling of a `module` option ([V01.01.05.04.01]): the default (valueless `module`) is
+    // Vue's `$style`; a named module is referenced by its authored name (`<style module="theme">` -> `theme`),
+    // exactly as Vue's render context exposes it.
+    private static string ModuleTemplateName(string? moduleName)
+        => string.IsNullOrEmpty(moduleName) ? "$style" : moduleName!;
+
+    // Projects the collected CSS module class map into the CssModuleAccessors the template compiler consumes
+    // ([V01.01.05.04.01]): entries grouped by accessor class, each carrying its template spelling, its parse
+    // identifier (the `$`->`_` form of `$style`, length-preserving so expression offsets are unchanged), and
+    // the sanitized member names the emitter writes as consts. ReportsUnknownMembers is enabled because this
+    // map is complete — every declared class — so an access to an undeclared member is decidably wrong.
+    private static CssModuleAccessors BuildCssModuleAccessors(
+        List<CssModuleClassEntry> moduleClasses,
+        Dictionary<string, string> moduleTemplateNames)
+    {
+        if (moduleClasses.Count == 0)
+        {
+            return CssModuleAccessors.Empty;
+        }
+
+        var membersByAccessor = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var order = new List<string>();
+        foreach (var entry in moduleClasses)
+        {
+            if (!membersByAccessor.TryGetValue(entry.Accessor, out var members))
+            {
+                members = new List<string>();
+                membersByAccessor[entry.Accessor] = members;
+                order.Add(entry.Accessor);
+            }
+
+            var member = SingleFileComponentSourceEmitter.MemberName(entry.Original);
+            if (!members.Contains(member))
+            {
+                members.Add(member);
+            }
+        }
+
+        var accessors = new List<CssModuleAccessor>(order.Count);
+        foreach (var accessorClass in order)
+        {
+            var templateName = moduleTemplateNames.TryGetValue(accessorClass, out var name) ? name : accessorClass;
+            accessors.Add(new CssModuleAccessor(
+                templateName,
+                ModuleParseIdentifier(templateName),
+                accessorClass,
+                membersByAccessor[accessorClass]));
+        }
+
+        return new CssModuleAccessors(accessors, reportsUnknownMembers: true);
+    }
+
+    // The C#-parseable spelling of a template accessor name: `$style` -> `_style` (`$` is illegal in a C#
+    // identifier), every other name unchanged. Length-preserving so expression offsets — and remapped
+    // diagnostics — are not shifted.
+    private static string ModuleParseIdentifier(string templateName)
+        => templateName.Length > 0 && templateName[0] == '$'
+            ? "_" + templateName.Substring(1)
+            : templateName;
 
     // Pascal-cases an authored identifier for use as a C# type/member name: word boundaries at '-'/'_'/' '
     // start a new capitalized word, a leading digit is prefixed with '_', and non-identifier characters are
