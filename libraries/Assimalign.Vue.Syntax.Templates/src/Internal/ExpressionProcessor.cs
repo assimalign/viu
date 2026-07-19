@@ -81,6 +81,17 @@ internal static class ExpressionProcessor
             return node;
         }
 
+        // CSS Modules accessor spelling ([V01.01.05.04.01]): `$style` is not C#-parseable (`$` is an illegal
+        // identifier character), so rewrite it to its parse identifier (`$style`->`_style`) before the
+        // identifier fast-path and the Roslyn parse. The substitution is length-preserving, so every offset in
+        // the expression — and therefore every remapped diagnostic and member span — is unchanged. Named
+        // modules (`theme.box`) are already C#-parseable and pass through untouched. The classification and
+        // member validation below recognize the parse identifier through `context.CssModules`.
+        if (context.CssModules.Count > 0)
+        {
+            raw = context.CssModules.Substitute(raw);
+        }
+
         // Fast path: a lone identifier (upstream's isSimpleIdentifier branch).
         if (!asParams && CompilerText.IsSimpleIdentifier(raw))
         {
@@ -95,9 +106,31 @@ internal static class ExpressionProcessor
 
         // Full parse: validates the whole text (consumeFullText) and yields a tree to walk.
         var prefixLength = asRawStatements ? 1 : 0;
-        Microsoft.CodeAnalysis.SyntaxNode parsed = asRawStatements
-            ? SyntaxFactory.ParseStatement("{" + raw + "}", 0, ParseOptions)
-            : SyntaxFactory.ParseExpression(raw, 0, ParseOptions);
+        Microsoft.CodeAnalysis.SyntaxNode parsed;
+        if (asRawStatements)
+        {
+            // A multi-statement inline handler is emitted into `__event => { <raw> }`. C# has no automatic
+            // semicolon insertion — JavaScript's ASI, which upstream's `$event => { ... }` handler wrapping
+            // relies on — so a body whose final statement omits its terminator (`foo(); bar()`) would emit
+            // invalid C#. Synthesize the terminator from the same statement-list parse that validates the
+            // body: if `{ raw }` does not parse clean but `{ raw; }` does, the only fault was the missing
+            // terminator, so append one and reuse the clean tree; a genuine syntax error leaves `raw`
+            // untouched and still surfaces as X_INVALID_EXPRESSION below. [V01.01.05.05.02], issue #150.
+            parsed = SyntaxFactory.ParseStatement("{" + raw + "}", 0, ParseOptions);
+            if (TryGetFirstError(parsed, out _, out _))
+            {
+                var terminated = SyntaxFactory.ParseStatement("{" + raw + ";}", 0, ParseOptions);
+                if (!TryGetFirstError(terminated, out _, out _))
+                {
+                    raw += ";";
+                    parsed = terminated;
+                }
+            }
+        }
+        else
+        {
+            parsed = SyntaxFactory.ParseExpression(raw, 0, ParseOptions);
+        }
 
         if (TryGetFirstError(parsed, out var errorSpan, out var errorMessage))
         {
@@ -111,10 +144,21 @@ internal static class ExpressionProcessor
             return node;
         }
 
+        // CSS Modules member validation ([V01.01.05.04.01]): the generator supplies the complete class map, so a
+        // `$style.<member>` (or named-module) access to an undeclared class is decidably wrong and surfaces a
+        // mapped diagnostic on the exact template coordinate (the C# compiler would also reject the emitted
+        // accessor member, but this points at the .viu instead of the generated accessor class).
+        if (context.CssModules.ReportsUnknownMembers && context.CssModules.Count > 0)
+        {
+            ValidateModuleMembers(parsed, context, node, raw, prefixLength);
+        }
+
         var references = CollectReferences(parsed, context, prefixLength);
         if (references.Count == 0)
         {
-            return node;
+            // No identifier needs rewriting, but a synthesized statement terminator (above) still must ride
+            // out on the content, or the emitted `__event => { ... }` stays unterminated.
+            return raw == node.Content ? node : node with { Content = raw };
         }
 
         return BuildCompound(node, raw, references, context);
@@ -124,6 +168,14 @@ internal static class ExpressionProcessor
 
     private static string RewriteIdentifier(string raw, TransformContext context, bool isWriteTarget, SourceLocation location)
     {
+        // A CSS Modules accessor ([V01.01.05.04.01]) resolves to its generated accessor class, taking
+        // precedence over component bindings and the unresolved-identifier fallback — the compile-time analogue
+        // of Vue's render context exposing `$style`/named modules over same-named component state.
+        if (context.CssModules.Count > 0 && context.CssModules.TryResolve(raw, out var accessor))
+        {
+            return accessor.AccessorClass;
+        }
+
         if (context.BindingMetadata.TryGetBindingType(raw, out var type))
         {
             return RewriteBoundIdentifier(raw, type, isWriteTarget, context);
@@ -135,11 +187,30 @@ internal static class ExpressionProcessor
             context.ReportError(new CompilerError(CompilerErrorCode.XVuecsUnresolvedIdentifier, message, location));
         }
 
-        return "_ctx." + raw;
+        // Instance-member mode ([V01.01.06.06.01]): the expression runs as a member of the component partial
+        // class, so an unresolved identifier reads through the implicit `this` (bare) rather than `_ctx.`.
+        return context.BindingRewriteMode == BindingRewriteMode.InstanceMember ? raw : "_ctx." + raw;
     }
 
     private static string RewriteBoundIdentifier(string raw, BindingType type, bool isWriteTarget, TransformContext context)
-        => type switch
+    {
+        if (context.BindingRewriteMode == BindingRewriteMode.InstanceMember)
+        {
+            // The v-bind() CSS getter ([V01.01.06.06.01]) is an instance member: bindings read through the
+            // implicit `this` (no `_ctx.`), and only a definite reference unwraps (`.Value`). Every other
+            // classification the generator produces is provably non-reactive (SetupLet is a non-reference
+            // field/property; SetupConstant/LiteralConstant are constants), so it reads bare with no `unref`
+            // — the getter therefore needs no runtime-helper import. Mirrors the read column of the render
+            // contract table with the `_ctx.` receiver and the `unref` guard removed.
+            return type switch
+            {
+                BindingType.SetupReference => raw + ".Value",
+                BindingType.PropertyAliased => context.BindingMetadata.GetPropertyAlias(raw) ?? raw,
+                _ => raw,
+            };
+        }
+
+        return type switch
         {
             // Every setup binding routes through _ctx: the generated render function is a static
             // method receiving the component instance (the C# analogue of upstream's non-inline
@@ -176,6 +247,46 @@ internal static class ExpressionProcessor
             // Props, options-API members, and plain data are component-instance members reached through _ctx.
             _ => "_ctx." + raw,
         };
+    }
+
+    // ---- CSS Modules member validation ([V01.01.05.04.01]) ----
+
+    // Reports an XVuecsUnknownCssModuleMember diagnostic for each `<accessor>.<member>` whose member is not a
+    // declared class of the resolved CSS module accessor. The offending member span is remapped from the
+    // expression-relative offset back into template coordinates so the diagnostic lands on the exact .viu
+    // position (the same remapping X_INVALID_EXPRESSION uses). The substitution above is length-preserving, so
+    // the parsed span aligns with the original template text.
+    private static void ValidateModuleMembers(
+        Microsoft.CodeAnalysis.SyntaxNode root,
+        TransformContext context,
+        SimpleExpressionNode node,
+        string raw,
+        int prefixLength)
+    {
+        foreach (var descendant in root.DescendantNodesAndSelf())
+        {
+            if (descendant is not MemberAccessExpressionSyntax access ||
+                access.Expression is not IdentifierNameSyntax identifier ||
+                !context.CssModules.TryResolve(identifier.Identifier.ValueText, out var accessor))
+            {
+                continue;
+            }
+
+            var member = access.Name.Identifier.ValueText;
+            if (member.Length == 0 || accessor.HasMember(member))
+            {
+                continue;
+            }
+
+            var span = access.Name.Span;
+            var start = Clamp(span.Start - prefixLength, 0, raw.Length);
+            var length = start + span.Length > raw.Length ? raw.Length - start : span.Length;
+            var location = SubLocation(node.Location, raw, start, length < 0 ? 0 : length);
+            var message = CompilerErrorMessages.GetMessage(CompilerErrorCode.XVuecsUnknownCssModuleMember) +
+                "'" + accessor.TemplateName + "' has no member '" + member + "'.";
+            context.ReportError(new CompilerError(CompilerErrorCode.XVuecsUnknownCssModuleMember, message, location));
+        }
+    }
 
     // ---- reference collection ----
 

@@ -183,7 +183,8 @@ public static class CssBindingRewriter
 
                 builder ??= new StringBuilder(value.Length);
                 builder.Append(value, copiedThrough, index - copiedThrough);
-                builder.Append("var(--").Append(ResolveName(expression)).Append(')');
+                var expressionLocation = LocateExpression(location, value, argumentStart, close - argumentStart);
+                builder.Append("var(--").Append(ResolveName(expression, expressionLocation)).Append(')');
                 index = close + 1;
                 copiedThrough = index;
             }
@@ -198,8 +199,8 @@ public static class CssBindingRewriter
         }
 
         // Deduplicates by the normalized expression so a repeated v-bind(color) shares one hashed name and
-        // one recorded binding (upstream vars.includes check).
-        private string ResolveName(string expression)
+        // one recorded binding (upstream vars.includes check). The first occurrence's location is retained.
+        private string ResolveName(string expression, SourceLocation location)
         {
             if (_namesByExpression.TryGetValue(expression, out var name))
             {
@@ -208,9 +209,52 @@ public static class CssBindingRewriter
 
             name = CssHash.Compute(_salt + "-" + expression);
             _namesByExpression[expression] = name;
-            Bindings.Add(new CssVariableBinding(name, expression));
+            Bindings.Add(new CssVariableBinding(name, expression, location));
             return name;
         }
+    }
+
+    // Computes the block-relative location of the raw expression region [startInValue, startInValue+length)
+    // within a declaration value, so a consumer that compiles the expression ([V01.01.06.06.01]) can map a
+    // diagnostic onto the exact source coordinate. The value is a substring of the declaration slice, so the
+    // declaration's start position is advanced through the intervening text.
+    private static SourceLocation LocateExpression(SourceLocation declarationLocation, string value, int startInValue, int length)
+    {
+        var source = declarationLocation.Source;
+        var valueOffset = source.IndexOf(value, StringComparison.Ordinal);
+        if (valueOffset < 0)
+        {
+            // Defensive: the trimmed value should always be a slice of the declaration source; fall back to
+            // the whole declaration if it is not, so a diagnostic still lands on the declaration.
+            return declarationLocation;
+        }
+
+        var start = valueOffset + startInValue;
+        var end = start + length;
+        var startPosition = Advance(declarationLocation.Start, source, start);
+        var endPosition = Advance(declarationLocation.Start, source, end);
+        var slice = end <= source.Length ? source.Substring(start, length) : string.Empty;
+        return new SourceLocation(startPosition, endPosition, slice);
+    }
+
+    // Advances a start position forward through source[0..count) (mirrors the template compiler's position
+    // advance): columns add on the same line, and a newline resets the column to the distance past it.
+    private static Position Advance(Position from, string source, int count)
+    {
+        var line = from.Line;
+        var lastNewLine = -1;
+        var end = Math.Min(source.Length, count);
+        for (var index = 0; index < end; index++)
+        {
+            if (source[index] == '\n')
+            {
+                line++;
+                lastNewLine = index;
+            }
+        }
+
+        var column = lastNewLine == -1 ? from.Column + count : count - lastNewLine;
+        return new Position(from.Offset + count, line, column);
     }
 
     // Whether the literal keyword 'v-bind' sits at index; sets afterKeyword to the index just past it.
