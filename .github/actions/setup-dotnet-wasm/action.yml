@@ -5,11 +5,13 @@
 name: Set up .NET for Viu
 description: >-
   .NET 10 SDK (pinned by global.json), NuGet + workload-pack caching, and optionally the
-  wasm-tools workload for WebAssembly app builds.
+  wasm-tools workload for builds that target browser-wasm.
 
 inputs:
   install-wasm-tools:
-    description: Install the wasm-tools workload (needed only for WebAssembly app builds).
+    description: >-
+      Install the wasm-tools workload. Needed by any job that builds for the browser-wasm
+      runtime identifier: WebAssembly app builds and the Assimalign.Viu.App runtime pack.
     required: false
     default: 'false'
 
