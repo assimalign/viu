@@ -1,0 +1,34 @@
+<Project>
+    <PropertyGroup>
+        <_ViuSdk>true</_ViuSdk>
+
+        <!--
+            Single-file components on by default: <Project Sdk="Assimalign.Viu.Sdk">
+            plus App.viu files is a working app with zero wiring. Consumers can
+            set either property to false in their csproj body - property
+            evaluation is document-ordered, so the body assignment wins over
+            these defaults.
+        -->
+        <ViuUseSingleFileComponents Condition="'$(ViuUseSingleFileComponents)' == ''">true</ViuUseSingleFileComponents>
+
+        <!--
+            The ViuBundleCss MSBuild task ships inside this SDK package at
+            Tasks/ (with its parser dependency closure alongside). Presetting
+            the assembly path here keeps the packed Css.Bundling.targets'
+            in-repo default path (which needs $(ViuRepositoryDirectory))
+            dormant.
+        -->
+        <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Tooling.Tasks.dll</ViuBundleCssTaskAssembly>
+
+        <!--
+            The Assimalign.Viu.App framework libraries opt into runtime preview
+            APIs ([assembly: RequiresPreviewFeatures] - see the repo's
+            build/Targets/Build.TargetFramework.props). The attribute is viral,
+            so consumers referencing the framework must opt in too; default it
+            here (overridable in the consumer csproj body).
+        -->
+        <EnablePreviewFeatures Condition="'$(EnablePreviewFeatures)' == ''">true</EnablePreviewFeatures>
+        <LangVersion Condition="'$(LangVersion)' == ''">preview</LangVersion>
+        <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,288 @@
+<Project>
+    <!--
+        Assimalign.Viu.App framework build targets ([V01.01.12.19], #174 -
+        the Viu port of cohesion's frameworks/Assimalign.Cohesion.App.targets).
+
+        Imported by:
+          Assimalign.Viu.App.Runtime/src/...csproj  (per-RID runtime pack)
+          Assimalign.Viu.App.Refs/src/...csproj     (targeting pack)
+
+        Branches on the $(ViuFrameworkKind) property the consumer csproj sets:
+
+            Ref     -> produce ref/<tfm>/<dll> + data/FrameworkList.xml
+                       + analyzers/dotnet/cs/<generator closure>
+            Runtime -> produce runtimes/<rid>/lib/<tfm>/<dll> + data/RuntimeList.xml
+
+        Driven by the item lists declared in Assimalign.Viu.App.props
+        (sibling file). Distribution is via NuGet - these targets just
+        produce the .nupkg layouts the SDK's KnownFrameworkReference
+        machinery (ResolveTargetingPackAssets / ResolveRuntimePackAssets)
+        expects to find.
+    -->
+
+    <PropertyGroup>
+        <!--
+            Each framework family has its own Runtime project at
+            frameworks/<FrameworkName>.Runtime/src/. The Refs project for
+            the same framework reads bin/ from there to collect assemblies.
+            Computed from $(ViuFrameworkName) so the same targets file can
+            serve additional framework families without per-family branches.
+        -->
+        <_ViuRuntimeProjectDir>$(ViuRepositoryDirectory)frameworks\$(ViuFrameworkName).Runtime\src\</_ViuRuntimeProjectDir>
+
+        <!--
+            _ViuFrameworkSourceDir and the two manifest paths are computed
+            inside ViuCollectFrameworkPack below, NOT at file scope:
+            $(OutputPath) / $(IntermediateOutputPath) are defined by
+            Microsoft.NET.Sdk.targets, which imports AFTER this file.
+        -->
+
+        <!-- Hardcoded empty until the framework is strong-named; the
+             manifest writer uses it verbatim. -->
+        <ViuPublicKeyToken Condition="'$(ViuPublicKeyToken)' == ''"></ViuPublicKeyToken>
+
+        <!-- "net10.0" -> "10.0" for the manifest TargetFrameworkVersion. -->
+        <_ViuTargetFrameworkVersion>$(TargetFrameworkLatest.TrimStart('net'))</_ViuTargetFrameworkVersion>
+    </PropertyGroup>
+
+    <!-- Hook into NuGet's standard extension point for dynamic pack content. -->
+    <PropertyGroup>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);ViuCollectFrameworkPack</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <!--
+        Resolve <ViuFrameworkAnalyzer> items declared in App.props and add a
+        build-only ProjectReference for each. The Ref pack bundles each
+        resolved analyzer DLL (plus, for generators that opt into
+        ViuAnalyzerBundlesProjectReferenceOutputs, their parser dependency
+        closure) at analyzers/dotnet/cs/ inside the .nupkg, so SDK-path
+        consumers pick the generators up automatically via the .NET SDK's
+        ResolveTargetingPackAssets. By-name lookup against
+        analyzers/**/*.csproj, exactly like build/Targets/Build.References.Analyzers.targets.
+
+        Deviates from the repo central-build-system rule (raw <ProjectReference>)
+        per design decision: the reference needs ReferenceOutputAssembly=false +
+        UndefineProperties metadata that the ViuProjectReference transform does
+        not carry; it is a pure build-order edge, not a compile reference.
+    -->
+    <ItemGroup>
+        <_ViuFrameworkAnalyzerProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <_ViuFrameworkAnalyzerProject Update="@(_ViuFrameworkAnalyzerProject)"
+                                      ProjectId="%(_ViuFrameworkAnalyzerProject.Filename)"
+                                      ProjectPath="%(_ViuFrameworkAnalyzerProject.Identity)" />
+
+        <ViuFrameworkAnalyzer Update="@(_ViuFrameworkAnalyzerProject->'%(ProjectId)')"
+                              ProjectPath="%(_ViuFrameworkAnalyzerProject.ProjectPath)" />
+
+        <_ViuFrameworkAnalyzerResolved Include="@(ViuFrameworkAnalyzer->'%(ProjectPath)')" />
+
+        <ProjectReference Include="@(_ViuFrameworkAnalyzerResolved)"
+                          Condition="'$(ViuFrameworkKind)' == 'Ref'"
+                          ReferenceOutputAssembly="false"
+                          PrivateAssets="all"
+                          SkipGetTargetFrameworkProperties="true"
+                          UndefineProperties="TargetFramework;RuntimeIdentifier" />
+
+        <_ViuFrameworkAnalyzerProject Remove="@(_ViuFrameworkAnalyzerProject)" />
+    </ItemGroup>
+
+    <!--
+        Auto-extend each Runtime csproj's ViuProjectReference list with the
+        private-assembly bucket so individual Runtime csprojs never need to
+        know the private bucket exists.
+    -->
+    <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Runtime'">
+        <ViuProjectReference Include="@(ViuFrameworkPrivateAssembly)"
+                             Exclude="$(AssemblyName)" />
+    </ItemGroup>
+
+    <!--
+        Manifest writer. Takes the declarative assembly-name list and emits
+        FrameworkList.xml or RuntimeList.xml depending on RootElementName.
+        Version + PKT are uniform across the framework. No DLL inspection.
+    -->
+    <UsingTask TaskName="ViuWriteFrameworkList"
+               TaskFactory="RoslynCodeTaskFactory"
+               AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+        <ParameterGroup>
+            <AssemblyNames ParameterType="System.String[]" Required="true" />
+            <!--
+                Optional Roslyn analyzer DLL identities. Emitted as
+                <File Type="Analyzer" Path="analyzers/dotnet/cs/<name>.dll" ...>
+                entries so ResolveTargetingPackAssets surfaces them as
+                @(Analyzer) items in the consumer's compile. Only meaningful
+                for the Ref pack; pass empty for the Runtime pack.
+            -->
+            <AnalyzerNames ParameterType="System.String[]" Required="false" />
+            <FrameworkName Required="true" />
+            <FrameworkVersion Required="true" />
+            <TargetFrameworkVersion Required="true" />
+            <PublicKeyToken Required="false" />
+            <!--
+                Prefix prepended to each <File Path="..."> entry.
+                FrameworkList.xml (Ref pack): empty - ResolveTargetingPackAssets
+                knows the ref/<tfm>/ layout. RuntimeList.xml (Runtime pack):
+                "runtimes/<rid>/lib/<tfm>/" - ResolveRuntimePackAssets treats
+                Path as fully package-relative (MSB3030 without it).
+            -->
+            <PathPrefix Required="false" />
+            <RootElementName Required="true" />
+            <OutputPath Required="true" />
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System" />
+            <Using Namespace="System.IO" />
+            <Using Namespace="System.Linq" />
+            <Using Namespace="System.Text" />
+            <Code Type="Fragment" Language="cs"><![CDATA[
+                Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
+                // PE metadata AssemblyVersion is always 4 parts ("10.0.1" -> "10.0.1.0").
+                string asmVersion = FrameworkVersion;
+                if (asmVersion.Split('.').Length < 4) { asmVersion += ".0"; }
+                string fileVersion = asmVersion;
+                string pkt = PublicKeyToken ?? "";
+                string pathPrefix = PathPrefix ?? "";
+
+                var sb = new StringBuilder();
+                sb.Append("<").Append(RootElementName)
+                  .Append(" Name=\"").Append(FrameworkName).Append("\"")
+                  .Append(" TargetFrameworkIdentifier=\".NETCoreApp\"")
+                  .Append(" TargetFrameworkVersion=\"").Append(TargetFrameworkVersion).Append("\"")
+                  .Append(" FrameworkName=\"").Append(FrameworkName).Append("\">\r\n");
+
+                foreach (var name in AssemblyNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
+                {
+                    sb.Append("  <File Type=\"Managed\"")
+                      .Append(" Path=\"").Append(pathPrefix).Append(name).Append(".dll\"")
+                      .Append(" PublicKeyToken=\"").Append(pkt).Append("\"")
+                      .Append(" AssemblyName=\"").Append(name).Append("\"")
+                      .Append(" AssemblyVersion=\"").Append(asmVersion).Append("\"")
+                      .Append(" FileVersion=\"").Append(fileVersion).Append("\"")
+                      .Append(" />\r\n");
+                }
+
+                // Analyzer entries. Path matches where TfmSpecificPackageFile
+                // placed the DLLs: analyzers/dotnet/cs/.
+                var analyzerNames = AnalyzerNames ?? new string[0];
+                foreach (var name in analyzerNames.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
+                {
+                    sb.Append("  <File Type=\"Analyzer\"")
+                      .Append(" Path=\"analyzers/dotnet/cs/").Append(name).Append(".dll\"")
+                      .Append(" PublicKeyToken=\"").Append(pkt).Append("\"")
+                      .Append(" AssemblyName=\"").Append(name).Append("\"")
+                      .Append(" AssemblyVersion=\"").Append(asmVersion).Append("\"")
+                      .Append(" FileVersion=\"").Append(fileVersion).Append("\"")
+                      .Append(" />\r\n");
+                }
+
+                sb.Append("</").Append(RootElementName).Append(">\r\n");
+                File.WriteAllText(OutputPath, sb.ToString());
+            ]]></Code>
+        </Task>
+    </UsingTask>
+
+    <Target Name="ViuCollectFrameworkPack" DependsOnTargets="ResolveProjectReferences">
+
+        <!--
+            Resolve the source directory at execution time:
+              Ref kind     -> Runtime project's RID-less bin/ (built via the
+                              build-order ProjectReference from App.Refs).
+              Runtime kind -> this project's $(OutputPath), which is
+                              bin/<cfg>/<tfm>/<rid>/ when -p:RuntimeIdentifier
+                              is set on `dotnet pack`.
+        -->
+        <PropertyGroup>
+            <_ViuFrameworkSourceDir Condition="'$(ViuFrameworkKind)' == 'Ref'">$(_ViuRuntimeProjectDir)bin\$(Configuration)\$(TargetFrameworkLatest)\</_ViuFrameworkSourceDir>
+            <_ViuFrameworkSourceDir Condition="'$(ViuFrameworkKind)' == 'Runtime'">$(OutputPath)</_ViuFrameworkSourceDir>
+
+            <!-- Forward slashes for cross-platform safety (Linux CI). -->
+            <_ViuFrameworkListPath>$(IntermediateOutputPath)data/FrameworkList.xml</_ViuFrameworkListPath>
+            <_ViuRuntimeListPath>$(IntermediateOutputPath)data/RuntimeList.xml</_ViuRuntimeListPath>
+        </PropertyGroup>
+
+        <!-- ============ REF PACK ============ -->
+        <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref'">
+            <_ViuExpectedAssembly Include="@(ViuFrameworkAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll')" />
+        </ItemGroup>
+
+        <Error Condition="'$(ViuFrameworkKind)' == 'Ref' and !Exists('%(_ViuExpectedAssembly.Identity)')"
+               Text="Framework assembly declared in @(ViuFrameworkAssembly) but missing on disk: %(_ViuExpectedAssembly.Identity). Confirm the library has a project under libraries/ that ViuProjectReference can resolve, and that the Runtime project builds successfully." />
+
+        <!--
+            Analyzer DLLs are collected BEFORE the manifest writer runs so the
+            FrameworkList.xml can list every DLL that actually lands in
+            analyzers/dotnet/cs/ - the Syntax generator's GetTargetPath returns
+            its parser closure too (Roslyn resolves generator dependencies
+            exclusively among registered analyzer paths, so every closure DLL
+            must be a listed Analyzer entry, not just the generators).
+        -->
+        <MSBuild Condition="'$(ViuFrameworkKind)' == 'Ref' and '@(_ViuFrameworkAnalyzerResolved)' != ''"
+                 Projects="@(_ViuFrameworkAnalyzerResolved)"
+                 Targets="GetTargetPath"
+                 Properties="Configuration=$(Configuration)"
+                 RemoveProperties="OutDir;OutputPath;IntermediateOutputPath;TargetFramework;TargetFrameworks;RuntimeIdentifier">
+            <Output TaskParameter="TargetOutputs" ItemName="_ViuFrameworkAnalyzerDll" />
+        </MSBuild>
+        <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref' and '@(_ViuFrameworkAnalyzerDll)' != ''">
+            <!-- KeepDuplicates=false: multiple generators may share closure DLLs. -->
+            <_ViuFrameworkAnalyzerPackFile Include="@(_ViuFrameworkAnalyzerDll)" KeepDuplicates="false" />
+            <TfmSpecificPackageFile Include="@(_ViuFrameworkAnalyzerPackFile)">
+                <PackagePath>analyzers/dotnet/cs</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+
+        <!--
+            FrameworkVersion = $(ViuVersionPrefix), NOT $(ViuVersion):
+            ResolveTargetingPackAssets parses AssemblyVersion as System.Version,
+            which rejects semver suffixes.
+        -->
+        <ViuWriteFrameworkList Condition="'$(ViuFrameworkKind)' == 'Ref'"
+            AssemblyNames="@(ViuFrameworkAssembly)"
+            AnalyzerNames="@(_ViuFrameworkAnalyzerPackFile->'%(Filename)')"
+            FrameworkName="$(ViuFrameworkName)"
+            FrameworkVersion="$(ViuVersionPrefix)"
+            TargetFrameworkVersion="$(_ViuTargetFrameworkVersion)"
+            PublicKeyToken="$(ViuPublicKeyToken)"
+            PathPrefix=""
+            RootElementName="FileList"
+            OutputPath="$(_ViuFrameworkListPath)" />
+
+        <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref'">
+            <TfmSpecificPackageFile Include="@(_ViuExpectedAssembly)">
+                <PackagePath>ref/$(TargetFrameworkLatest)/%(Filename)%(Extension)</PackagePath>
+            </TfmSpecificPackageFile>
+            <TfmSpecificPackageFile Include="$(_ViuFrameworkListPath)">
+                <PackagePath>data/FrameworkList.xml</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+
+        <!-- ============ RUNTIME PACK ============ -->
+        <!-- Only when an RID is explicitly set; RID-less design-time builds
+             skip pack. Iterates the UNION of public + private assemblies. -->
+        <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != ''">
+            <_ViuExpectedAssembly Include="@(ViuFrameworkAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll');@(ViuFrameworkPrivateAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll')" />
+        </ItemGroup>
+
+        <Error Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != '' and !Exists('%(_ViuExpectedAssembly.Identity)')"
+               Text="Framework assembly declared in @(ViuFrameworkAssembly) or @(ViuFrameworkPrivateAssembly) but missing on disk: %(_ViuExpectedAssembly.Identity). Build must run before pack and every entry needs a ViuProjectReference that CopyLocals into bin." />
+
+        <ViuWriteFrameworkList Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != ''"
+            AssemblyNames="@(ViuFrameworkAssembly);@(ViuFrameworkPrivateAssembly)"
+            FrameworkName="$(ViuFrameworkName)"
+            FrameworkVersion="$(ViuVersionPrefix)"
+            TargetFrameworkVersion="$(_ViuTargetFrameworkVersion)"
+            PublicKeyToken="$(ViuPublicKeyToken)"
+            PathPrefix="runtimes/$(RuntimeIdentifier)/lib/$(TargetFrameworkLatest)/"
+            RootElementName="RuntimeList"
+            OutputPath="$(_ViuRuntimeListPath)" />
+
+        <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != ''">
+            <TfmSpecificPackageFile Include="@(_ViuExpectedAssembly)">
+                <PackagePath>runtimes/$(RuntimeIdentifier)/lib/$(TargetFrameworkLatest)/%(Filename)%(Extension)</PackagePath>
+            </TfmSpecificPackageFile>
+            <TfmSpecificPackageFile Include="$(_ViuRuntimeListPath)">
+                <PackagePath>data/RuntimeList.xml</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+</Project>

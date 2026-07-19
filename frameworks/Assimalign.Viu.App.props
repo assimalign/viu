@@ -1,0 +1,66 @@
+<Project>
+    <!--
+        Authoritative list of assemblies that ship in the Viu shared framework
+        (Assimalign.Viu.App), mirroring the sibling Cohesion repo's
+        frameworks/Assimalign.Cohesion.App.props model ([V01.01.12.19], #174).
+
+        Multiple consumers read this file:
+
+          1. frameworks/Assimalign.Viu.App.Runtime/src/...csproj
+             Generates <ViuProjectReference> items so each library is built
+             and CopyLocal'd into the Runtime project's bin folder.
+
+          2. frameworks/Assimalign.Viu.App.Refs/src/...csproj
+             (together with Assimalign.Viu.App.targets) drives
+             FrameworkList.xml and RuntimeList.xml generation - no DLL
+             inspection needed.
+
+        The ItemGroups below are conditioned on $(ViuFrameworkName), which
+        every Refs/Runtime csproj sets in its PropertyGroup BEFORE importing
+        this file, so additional framework families (e.g. a future
+        Assimalign.Viu.App.Server for SSR) can share this manifest file.
+
+        Two parallel item types are recognized per framework:
+
+          @(ViuFrameworkAssembly)        - PUBLIC. Listed in the Ref pack's
+                                           FrameworkList.xml AND shipped in
+                                           the Runtime pack. Visible to
+                                           consumers at compile time.
+
+          @(ViuFrameworkPrivateAssembly) - PRIVATE. NOT listed on the Ref
+                                           pack. Shipped in the Runtime pack
+                                           only and enumerated in
+                                           RuntimeList.xml so the host
+                                           resolves them. (Empty today.)
+
+        @(ViuFrameworkAnalyzer) entries name Roslyn source generators (by
+        analyzers/**/*.csproj filename) shipped INSIDE the Ref pack at
+        analyzers/dotnet/cs/. SDK-path consumers pick these up via the .NET
+        SDK's ResolveTargetingPackAssets, so `[Reactive]` classes and .viu
+        single-file components compile with zero per-project wiring. The
+        Syntax generator's parser closure travels with it (its GetTargetPath
+        is extended by build/Targets/Build.References.Analyzers.targets when
+        ViuAnalyzerBundlesProjectReferenceOutputs=true), and every collected
+        DLL is listed as an Analyzer entry so Roslyn can resolve the
+        generator's dependencies among the registered analyzer paths.
+    -->
+
+    <!-- ================================================================
+         Assimalign.Viu.App: the browser framework. Bundled with every Viu
+         app via Assimalign.Viu.Sdk. Compile-time-only libraries (the
+         Syntax.* parsers, Tooling.Css) are deliberately NOT framework
+         assemblies - they reach consumers only inside analyzers/dotnet/cs
+         of the Ref pack. Assimalign.Viu.Testing is a dev-time harness, not
+         a runtime framework member.
+         ================================================================ -->
+    <ItemGroup Condition="'$(ViuFrameworkName)' == 'Assimalign.Viu.App'">
+        <ViuFrameworkAssembly Include="Assimalign.Viu.App" />
+        <ViuFrameworkAssembly Include="Assimalign.Viu.Shared" />
+        <ViuFrameworkAssembly Include="Assimalign.Viu.Reactivity" />
+        <ViuFrameworkAssembly Include="Assimalign.Viu.RuntimeCore" />
+        <ViuFrameworkAssembly Include="Assimalign.Viu.RuntimeDom" />
+
+        <ViuFrameworkAnalyzer Include="Assimalign.Viu.Reactivity.Generators" />
+        <ViuFrameworkAnalyzer Include="Assimalign.Viu.Syntax.Generators" />
+    </ItemGroup>
+</Project>

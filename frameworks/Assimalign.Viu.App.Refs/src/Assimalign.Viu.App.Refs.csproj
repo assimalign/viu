@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+
+		<RootNamespace>Assimalign.Viu</RootNamespace>
+
+		<!--
+			This project produces the Assimalign.Viu.App targeting pack
+			(Assimalign.Viu.App.Ref.nupkg). It compiles nothing of its own:
+			frameworks/Assimalign.Viu.App.targets generates
+			data/FrameworkList.xml from the authoritative
+			@(ViuFrameworkAssembly) list (imported below) and packs the
+			matching assemblies from App.Runtime's bin folder, plus the
+			source-generator closure at analyzers/dotnet/cs/.
+		-->
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+
+		<PackageId>Assimalign.Viu.App.Ref</PackageId>
+		<IsPackable>true</IsPackable>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<!-- CS2008: this project deliberately compiles no sources - it only
+		     assembles the targeting pack from Runtime's bin. -->
+		<NoWarn>$(NoWarn);NU5128;NU5100;NU5131;CS2008</NoWarn>
+
+		<ViuFrameworkName>Assimalign.Viu.App</ViuFrameworkName>
+		<ViuFrameworkKind>Ref</ViuFrameworkKind>
+	</PropertyGroup>
+
+	<!--
+		Pure build dependency on App.Runtime. ReferenceOutputAssembly=false
+		because the targeting pack consumes Runtime's bin folder (where every
+		framework assembly CopyLocal'd in) via the collection target, not
+		Runtime's compiled assembly directly. UndefineProperties drops our
+		TargetFramework/RuntimeIdentifier so Runtime builds in its default
+		(RID-less) configuration - that's the bin/ path the collection target
+		reads from.
+		Deviates from the repo central-build-system rule (raw <ProjectReference>)
+		per design decision: build-order edge with UndefineProperties metadata
+		the ViuProjectReference transform does not carry.
+	-->
+	<ItemGroup>
+		<ProjectReference Include="..\..\Assimalign.Viu.App.Runtime\src\Assimalign.Viu.App.Runtime.csproj"
+			ReferenceOutputAssembly="false"
+			SkipGetTargetFrameworkProperties="true"
+			UndefineProperties="TargetFramework;RuntimeIdentifier" />
+	</ItemGroup>
+
+	<!-- Import the authoritative framework manifest so the manifest writer
+	     in Assimalign.Viu.App.targets can iterate it. -->
+	<Import Project="..\..\Assimalign.Viu.App.props" />
+
+	<Import Project="..\..\Assimalign.Viu.App.targets" />
+</Project>
