@@ -336,13 +336,13 @@ internal static class SingleFileComponentSourceEmitter
     // [V01.01.06.06] The v-bind() CSS custom-property seam. Each recorded (hash, expression) binding becomes
     // an entry of the getter the ApplyCssVariables method hands to the UseCssVars runtime — which applies the
     // evaluated values as custom properties on the component root and re-applies them reactively (post-flush)
-    // without re-rendering. The expressions are emitted verbatim inside an instance lambda, so an unqualified
-    // member name resolves against the merged @script members through the implicit `this`; the render/script
-    // seams stay untouched. A binding whose member is a Reference<T> is NOT auto-unwrapped here (upstream
-    // compiles v-bind expressions with binding-aware rewriting, which is the template compiler's job, out of
-    // this style seam's scope) — author `v-bind(count.Value)` for a ref. The component-runtime instantiation
-    // calls ApplyCssVariables during setup (that wiring lands with the .viu component runtime); the method is
-    // emitted here so the metadata exists for it.
+    // without re-rendering. The expressions arrive already rewritten by the template compiler's binding-metadata
+    // pass ([V01.01.06.06.01]) in instance-member mode: an unqualified member resolves against the merged @script
+    // members through the implicit `this`, and a Reference<T> member is auto-unwrapped to `.Value`, so
+    // `v-bind(count)` (not `v-bind(count.Value)`) updates reactively. This emitter writes them verbatim inside the
+    // instance lambda; the render/script seams stay untouched. The component-runtime instantiation calls
+    // ApplyCssVariables during setup (that wiring lands with the .viu component runtime); the method is emitted
+    // here so the metadata exists for it.
     private static void AppendCssVariableSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
         if (model.CssVariableBindings.Count == 0)

@@ -45,6 +45,7 @@ public sealed class TransformContext
         PrefixIdentifiers = options.PrefixIdentifiers;
         BindingMetadata = options.BindingMetadata ?? BindingMetadata.Empty;
         CssModules = options.CssModules ?? CssModuleAccessors.Empty;
+        BindingRewriteMode = options.BindingRewriteMode;
         InSSR = options.InSSR;
         Ssr = options.Ssr;
         Slotted = options.Slotted;
@@ -92,6 +93,9 @@ public sealed class TransformContext
     /// named-module) references against. Defaults to <see cref="CssModuleAccessors.Empty"/>.
     /// </summary>
     public CssModuleAccessors CssModules { get; }
+
+    /// <summary>How a rewritten binding spells its receiver. Defaults to <see cref="BindingRewriteMode.RenderContext"/>.</summary>
+    public BindingRewriteMode BindingRewriteMode { get; }
 
     /// <summary>Whether this is a nested SSR slot compilation.</summary>
     public bool InSSR { get; }

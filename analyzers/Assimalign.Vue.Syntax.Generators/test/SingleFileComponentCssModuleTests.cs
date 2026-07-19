@@ -126,6 +126,56 @@ public sealed class SingleFileComponentCssModuleTests
     }
 
     [Fact]
+    public void VBind_ReferenceMember_UnwrapsToValue_InGetter()
+    {
+        // [V01.01.06.06.01] `v-bind(count)` with a script Reference<T> member unwraps to `count.Value` in the
+        // ApplyCssVariables getter — instance-member mode, so no `_ctx.` receiver — matching upstream cssVars
+        // ergonomics instead of forcing `v-bind(count.Value)`.
+        const string source =
+            "@script {\n    public Reference<int> count;\n}\n" +
+            "@style {\n    .a { width: v-bind(count); }\n}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
+        generated.ShouldContain("(object?)(count.Value)");
+        generated.ShouldNotContain("count.Value.Value"); // not double-unwrapped
+    }
+
+    [Fact]
+    public void VBind_NonReferenceMember_StaysBare_InGetter()
+    {
+        // A non-reference @script member is provably non-reactive, so it is read bare (no `.Value`, no unref).
+        const string source =
+            "@script {\n    public string color = \"red\";\n}\n" +
+            "@style {\n    .a { color: v-bind(color); }\n}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
+        generated.ShouldContain("(object?)(color)");
+    }
+
+    [Fact]
+    public void VBind_MalformedExpression_SurfacesMappedStyleDiagnostic()
+    {
+        // [V01.01.06.06.01] A malformed C# v-bind expression is caught by the expression compile and surfaces a
+        // diagnostic on the .viu style coordinate (line 2), recoverable.
+        const string source =
+            "@style {\n    .a { width: v-bind(1 +); }\n}\n"; // line 2 — the malformed expression
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
+
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VUECS1301"); // the style-origin envelope
+        diagnostic.GetMessage().ShouldContain("Error parsing"); // the X_INVALID_EXPRESSION message prefix
+        diagnostic.Location.GetLineSpan().StartLinePosition.Line.ShouldBe(1); // .viu file line 2, zero-based
+        outcome.Sources.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public void ModuleAndVBind_ComposeWithScoped()
     {
         const string source =

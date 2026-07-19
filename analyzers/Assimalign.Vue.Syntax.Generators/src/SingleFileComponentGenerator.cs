@@ -132,19 +132,11 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             }
         }
 
-        // [V01.01.06.04]/[V01.01.06.06] @style compilation: scoped blocks are rewritten with the component's
-        // scope id, `module` blocks have their class names locally hashed, `v-bind()` usages become
-        // component-scoped custom properties, and non-scoped/non-module/non-v-bind blocks pass through
-        // unmodified. The scope id, extracted CSS, module class map, and v-bind bindings surface in the model.
-        var moduleClasses = new List<CssModuleClassEntry>();
-        var cssVariableBindings = new List<CssVariableBindingEntry>();
-        var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
-        var (scopeId, extractedStyles) = CompileStyles(file, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, cancellationToken);
-
         // [V01.01.06.03]/[V01.01.06.03.01] @script integration: when the component declares a script,
         // split it into a hoisted using region and a class-body member region, validate both, and extract
         // binding metadata (routing any Roslyn parse diagnostics onto the .viu file). The regions carry
-        // their own #line anchors so the emitter maps each back to the .viu source.
+        // their own #line anchors so the emitter maps each back to the .viu source. This runs before @style
+        // compilation because the v-bind() CSS rewriting ([V01.01.06.06.01]) needs the same binding metadata.
         var scriptRegions = ScriptRegions.None;
         var bindings = EquatableArray<ScriptBinding>.Empty;
         if (descriptor.Script is { } script)
@@ -153,6 +145,19 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             scriptRegions = analysis.Regions;
             bindings = analysis.Bindings;
         }
+
+        var bindingMetadata = SingleFileComponentModel.BuildBindingMetadata(descriptor.Script is not null, bindings);
+
+        // [V01.01.06.04]/[V01.01.06.06] @style compilation: scoped blocks are rewritten with the component's
+        // scope id, `module` blocks have their class names locally hashed, `v-bind()` usages become
+        // component-scoped custom properties (with their expressions routed through the same binding-metadata
+        // rewriting the render path uses, [V01.01.06.06.01]), and non-scoped/non-module/non-v-bind blocks pass
+        // through unmodified. The scope id, extracted CSS, module class map, and v-bind bindings surface in the model.
+        var moduleClasses = new List<CssModuleClassEntry>();
+        var cssVariableBindings = new List<CssVariableBindingEntry>();
+        var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        var (scopeId, extractedStyles) = CompileStyles(
+            file, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken);
 
         var model = new SingleFileComponentModel(
             file.Namespace,
@@ -183,7 +188,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         // ([V01.01.05.04.01] -> [V01.01.06.06]) let a `$style.<class>` template reference resolve to the
         // emitted accessor class instead of a phantom `_ctx` member.
         var cssModules = BuildCssModuleAccessors(moduleClasses, moduleTemplateNames);
-        var render = CompileRenderFunction(file, parse, model.ToBindingMetadata(), cssModules, diagnostics, cancellationToken);
+        var render = CompileRenderFunction(file, parse, bindingMetadata, cssModules, diagnostics, cancellationToken);
         model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
 
         var array = diagnostics.Count == 0
@@ -276,6 +281,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         List<CssModuleClassEntry> moduleClasses,
         List<CssVariableBindingEntry> cssVariableBindings,
         Dictionary<string, string> moduleTemplateNames,
+        BindingMetadata bindingMetadata,
         System.Threading.CancellationToken cancellationToken)
     {
         string? scopeId = null;
@@ -326,12 +332,26 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                     var bindingResult = CssBindingRewriter.Rewrite(stylesheet, localHashSalt);
                     stylesheet = bindingResult.Stylesheet;
                     rewritten = rewritten || bindingResult.Bindings.Count > 0;
+                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
                     foreach (var binding in bindingResult.Bindings)
                     {
-                        cssVariableBindings.Add(new CssVariableBindingEntry(binding.Name, binding.Expression));
+                        // [V01.01.06.06.01] Route the extracted expression through the template compiler's
+                        // binding-metadata rewriting (instance-member mode), so `v-bind(count)` unwraps a script
+                        // Reference<T> member to `count.Value` automatically — matching upstream cssVars
+                        // ergonomics — instead of forcing `v-bind(count.Value)`. A malformed expression surfaces a
+                        // diagnostic on the exact .viu style coordinate through the same style-origin envelope the
+                        // CSS parse uses; the (recoverable) original text still emits, so the reported error fails
+                        // the build.
+                        var compiled = TemplateExpressionCompiler.CompileInstanceExpression(
+                            binding.Expression, bindingMetadata, binding.Location);
+                        foreach (var error in compiled.Diagnostics)
+                        {
+                            diagnostics.Add(SingleFileComponentDiagnostics.CreateStyle(file.FilePath, error, blockContentStart));
+                        }
+
+                        cssVariableBindings.Add(new CssVariableBindingEntry(binding.Name, compiled.Code));
                     }
 
-                    var blockContentStart = sourceResult.Node.ContentLocation.Start;
                     foreach (var diagnostic in bindingResult.Diagnostics)
                     {
                         diagnostics.Add(SingleFileComponentDiagnostics.CreateStyle(file.FilePath, diagnostic, blockContentStart));

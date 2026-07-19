@@ -187,11 +187,30 @@ internal static class ExpressionProcessor
             context.ReportError(new CompilerError(CompilerErrorCode.XVuecsUnresolvedIdentifier, message, location));
         }
 
-        return "_ctx." + raw;
+        // Instance-member mode ([V01.01.06.06.01]): the expression runs as a member of the component partial
+        // class, so an unresolved identifier reads through the implicit `this` (bare) rather than `_ctx.`.
+        return context.BindingRewriteMode == BindingRewriteMode.InstanceMember ? raw : "_ctx." + raw;
     }
 
     private static string RewriteBoundIdentifier(string raw, BindingType type, bool isWriteTarget, TransformContext context)
-        => type switch
+    {
+        if (context.BindingRewriteMode == BindingRewriteMode.InstanceMember)
+        {
+            // The v-bind() CSS getter ([V01.01.06.06.01]) is an instance member: bindings read through the
+            // implicit `this` (no `_ctx.`), and only a definite reference unwraps (`.Value`). Every other
+            // classification the generator produces is provably non-reactive (SetupLet is a non-reference
+            // field/property; SetupConstant/LiteralConstant are constants), so it reads bare with no `unref`
+            // — the getter therefore needs no runtime-helper import. Mirrors the read column of the render
+            // contract table with the `_ctx.` receiver and the `unref` guard removed.
+            return type switch
+            {
+                BindingType.SetupReference => raw + ".Value",
+                BindingType.PropertyAliased => context.BindingMetadata.GetPropertyAlias(raw) ?? raw,
+                _ => raw,
+            };
+        }
+
+        return type switch
         {
             // Every setup binding routes through _ctx: the generated render function is a static
             // method receiving the component instance (the C# analogue of upstream's non-inline
@@ -228,6 +247,7 @@ internal static class ExpressionProcessor
             // Props, options-API members, and plain data are component-instance members reached through _ctx.
             _ => "_ctx." + raw,
         };
+    }
 
     // ---- CSS Modules member validation ([V01.01.05.04.01]) ----
 

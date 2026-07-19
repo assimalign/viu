@@ -183,6 +183,38 @@ public sealed class DomCompiledRenderTests
         assembly.Length.ShouldBeGreaterThan(0);
     }
 
+    // [V01.01.06.06.01] A v-bind() CSS expression referencing a script Reference<T> member: the generated
+    // ApplyCssVariables getter must unwrap it to `count.Value` and compile against the real Reference<int>.
+    private const string ReactiveVBindComponent =
+        "@script {\n" +
+        "using Assimalign.Vue.Reactivity;\n" +
+        "public Reference<int> count = Reactive.Reference(1);\n" +
+        "}\n" +
+        "@template {\n" +
+        "<div>hi</div>\n" +
+        "}\n" +
+        "@style {\n" +
+        ".box { width: v-bind(count); }\n" +
+        "}\n";
+
+    [Fact]
+    public void VBindReferenceMember_UnwrapsToValue_AndCompilesAgainstReactivity()
+    {
+        // The v-bind(count) expression, routed through the instance-mode binding rewriting, unwraps the script
+        // Reference<int> to `count.Value` in the getter and compiles end to end: `count.Value` is an int, so
+        // Convert.ToString((object?)(count.Value), ...) binds. Before the fix the getter emitted `count`, which
+        // stringified the Reference object (wrong) and never tracked reactively.
+        var generated = CompiledRenderSupport.Generate("ReactiveVBindWidget", ReactiveVBindComponent);
+
+        generated.ShouldContain("(object?)(count.Value)");
+        generated.ShouldContain("internal void ApplyCssVariables()");
+
+        var assembly = CompiledRenderSupport.CompileToAssembly(
+            generated,
+            "#nullable enable\nnamespace Demo\n{\n    partial class ReactiveVBindWidget\n    {\n    }\n}\n");
+        assembly.Length.ShouldBeGreaterThan(0);
+    }
+
     [Fact]
     public void GeneratorCaching_ForTheDomDirectiveTemplate_StaysStrictlyCached()
     {
@@ -374,6 +406,9 @@ internal static class CompiledRenderSupport
         Add(typeof(object).Assembly.Location);
         Add(typeof(RenderHelpers).Assembly.Location);
         Add(typeof(DomRenderHelpers).Assembly.Location);
+        // Reactivity: a @script Reference<T> member that a v-bind() getter unwraps ([V01.01.06.06.01]) binds
+        // Assimalign.Vue.Reactivity's Reference<T>/Reactive.
+        Add(typeof(Assimalign.Vue.Reactivity.Reactive).Assembly.Location);
         var shared = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, "Assimalign.Vue.Shared", StringComparison.Ordinal));
         Add(shared?.Location);
