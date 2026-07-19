@@ -31,6 +31,11 @@
          runs the scoped rewrite. Like the other language libraries, the Css library is referenced only
          here (the SingleFileComponent library never references it) and only at build time. -->
     <VuecsProjectReference Include="Assimalign.Vue.Syntax.Css" />
+    <!-- Shared build-time CSS composition core ([V01.01.12.12]): the .viu parser composition, the scope-id
+         hash, and the @style compilation (scoped/module/v-bind) were lifted here so the generator and the
+         VuecsBundleCss MSBuild task run ONE deterministic implementation — the generated ExtractedStyles
+         constant and the physical bundle are byte-identical because both hosts call this core. -->
+    <VuecsProjectReference Include="Assimalign.Vue.Tooling.Css" />
   </ItemGroup>
   <!-- Analyzer release tracking (RS2008): the shipped diagnostic IDs are recorded here. -->
   <ItemGroup>
