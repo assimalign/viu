@@ -163,6 +163,18 @@ public class ExpressionBindingTests
     }
 
     [Fact]
+    public void ProcessExpression_InlineCallHandler_EmitsStatementBlockLambda()
+    {
+        // A call may be void-typed; a void call has no value to place in an expression lambda's
+        // parenthesized body, so a single-statement inline call handler emits as a statement-block lambda
+        // (__event => { call; }) — the shape that binds the Action<...> handler overload — rather than the
+        // expression lambda the value-returning increment/assignment handlers above keep
+        // ([V01.01.05.05.01], issue #143).
+        HandlerBody("<button @click=\"save($event)\"></button>", Bindings(("save", BindingType.Options)))
+            .ShouldBe("__event => { _ctx.save(__event); }");
+    }
+
+    [Fact]
     public void ProcessExpression_MethodHandler_ResolvesWithoutInlineWrapper()
     {
         // A bare member handler is a method reference, not an inline statement: no $event wrapper.

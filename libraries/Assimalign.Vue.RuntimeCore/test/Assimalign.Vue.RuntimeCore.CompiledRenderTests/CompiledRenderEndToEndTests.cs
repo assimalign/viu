@@ -221,6 +221,51 @@ public sealed class CompiledRenderEndToEndTests : IClassFixture<CompiledRenderEn
         assembly.Length.ShouldBeGreaterThan(0);
     }
 
+    [Fact]
+    public void VoidInlineHandler_CompilesAndExecutes_ThroughWithHandlerFacade()
+    {
+        // [V01.01.05.05.01] A void single-statement inline handler with no modifiers emits as a
+        // statement-block lambda `__event => { _ctx.record(__event); }`, which binds the runtime-core
+        // RenderHelpers._withHandler(Action<object?>) overload. Before the fix the emitter wrote
+        // `__event => (_ctx.record(__event))`, and a parenthesized void call binds no _withHandler overload
+        // — the generated render failed to compile. Here the generated render compiles AND, when the stored
+        // onClick delegate is invoked, actually runs the void method (upstream transformOn wraps inline
+        // statements: vuejs/core v3.5 compiler-core transforms/vOn.ts).
+        const string template = "@template {\n<button @click=\"record($event)\">go</button>\n}\n";
+        const string handWritten =
+            "#nullable enable\n" +
+            "namespace Demo\n" +
+            "{\n" +
+            "    partial class VoidHandler\n" +
+            "    {\n" +
+            "        public int RecordCount;\n" +
+            "        public object? LastEvent;\n" +
+            "        public void record(object? browserEvent) { RecordCount++; LastEvent = browserEvent; }\n" +
+            "    }\n" +
+            "}\n";
+
+        var generated = CompiledRenderSupport.Generate("VoidHandler", template);
+        // The void call emits as the statement-block lambda (not the parenthesized expression lambda).
+        generated.ShouldContain("_withHandler(__event => { _ctx.record(__event); })");
+
+        var type = Assembly.Load(CompiledRenderSupport.CompileToAssembly(generated, handWritten))
+            .GetType("Demo.VoidHandler")
+            ?? throw new InvalidOperationException("The compiled assembly did not contain Demo.VoidHandler.");
+        var instance = Activator.CreateInstance(type, nonPublic: true)!;
+        var cacheSize = (int)type.GetField("RenderCacheSize", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetRawConstantValue()!;
+        var render = type.GetMethod("Render", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        var vnode = (VirtualNode)render.Invoke(null, new object?[] { instance, new object?[cacheSize] })!;
+        var handler = vnode.Properties!["onClick"].ShouldBeOfType<Action<object?>>();
+
+        var sentinel = new object();
+        handler(sentinel);
+
+        type.GetField("RecordCount")!.GetValue(instance).ShouldBe(1); // the void handler ran exactly once
+        type.GetField("LastEvent")!.GetValue(instance).ShouldBeSameAs(sentinel); // with the event argument
+    }
+
     // Wires the compiled component's static Render into a root render effect: the closure runs the generated
     // Render (reactive reads inside it are tracked) and normalizes the object? result to a vnode.
     private RenderEffect<TestNode> MountCounter(IRenderHarness counter, out StrongBox<int> renders)

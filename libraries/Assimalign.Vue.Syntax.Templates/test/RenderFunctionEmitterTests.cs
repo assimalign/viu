@@ -243,13 +243,31 @@ return _createElementBlock(_openBlock(), "button", _createProps(
     }
 
     [Fact]
+    public void VoidCallHandler_EmitsStatementBlockLambda()
+    {
+        // A single-statement inline call handler emits as a statement-block lambda (__event => { call; })
+        // rather than an expression lambda (__event => (call)): a void call has no value to parenthesize
+        // and would bind no _withHandler delegate overload, so the block form — which binds
+        // Action<object?> and discards any value like upstream's arrow function — is used
+        // ([V01.01.05.05.01], issue #143; upstream transformOn: vuejs/core v3.5 compiler-core vOn.ts).
+        EmitPrefixed("<button @click=\"save($event)\">x</button>").Code.ShouldBeCode(
+"""
+return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withHandler(__event => { _ctx.save(__event); }))), "x", 8 /* PROPS */, ["onClick"]);
+
+""");
+    }
+
+    [Fact]
     public void ModifierHandler_KeepsWithModifiersUnwrapped()
     {
         // withModifiers/withKeys already give the inner lambda its delegate target type through their
-        // own contract signature, so no extra _withHandler wrapper is added around them.
+        // own contract signature, so no extra _withHandler wrapper is added around them. The inline
+        // handler is a call, which may be void-typed, so it emits as a statement-block lambda
+        // (__event => { call; }) — the shape that binds withModifiers' Action<BrowserEvent> overload;
+        // a parenthesized void call binds no overload ([V01.01.05.05.01], issue #143).
         EmitPrefixed("<button @click.stop=\"save($event)\">x</button>").Code.ShouldBeCode(
 """
-return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withModifiers(__event => (_ctx.save(__event)), ["stop"]))), "x", 8 /* PROPS */, ["onClick"]);
+return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withModifiers(__event => { _ctx.save(__event); }, ["stop"]))), "x", 8 /* PROPS */, ["onClick"]);
 
 """);
     }
@@ -329,6 +347,7 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
     [InlineData("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>")]
     [InlineData("<div v-once><span>{{ frozen }}</span></div>")]
     [InlineData("<button @click=\"count++\" @submit=\"save\">Go</button>")]
+    [InlineData("<button @click=\"save($event)\">x</button>")]
     [InlineData("<button @click.stop=\"save($event)\">x</button>")]
     [InlineData("<input v-model=\"name\" />")]
     [InlineData("<div v-show=\"visible\">shown</div>")]
