@@ -20,9 +20,11 @@ namespace Assimalign.Vue.RuntimeDom;
 /// <para>
 /// The saved display is derived from the vnode's <c>style</c> prop rather than an interop read of
 /// <c>el.style.display</c> — equivalent for inline styles and one fewer boundary crossing. The
-/// <c>&lt;Transition&gt;</c> coordination clause of the acceptance criteria is a
-/// <b>documented-inert seam</b>: the hook shape is present, but there is no transition object to
-/// coordinate with until <c>&lt;Transition&gt;</c> lands ([V01.01.04.07]).
+/// <c>&lt;Transition&gt;</c> coordination clause of the acceptance criteria remains a
+/// <b>documented-inert seam</b>: the transition state machine now exists ([V01.01.04.07]) and the
+/// renderer honors a <see cref="TransitionState"/>-persisted transition, but <c>v-show</c> does not yet
+/// build that persisted transition object, so the hook shape is present and its coordination is a
+/// follow-up.
 /// </para>
 /// Stateless singleton (<see cref="Instance"/>); the saved display lives in
 /// <see cref="BrowserModelState.OriginalDisplay"/>.
@@ -54,17 +56,18 @@ public sealed class VShow : IDirective
         var handle = BrowserModelDirective.Handle(element);
         var original = OriginalDisplay(node);
         operations.GetState(handle).OriginalDisplay = original;
-        // Transition seam is inert until [V01.01.04.07]; upstream would defer to transition.beforeEnter
-        // when a transition and truthy value are present. beforeMount timing means an initially-falsy
-        // element is hidden before its first paint.
+        // Transition seam (still inert): upstream would defer to transition.beforeEnter when a transition
+        // and truthy value are present. The transition state machine now exists ([V01.01.04.07]) but
+        // v-show does not yet mark itself a persisted transition, so this stays a plain toggle. beforeMount
+        // timing means an initially-falsy element is hidden before its first paint.
         SetDisplay(operations, handle, StyleAndClassNormalization.IsTruthy(binding.Value), original);
     }
 
     private static void OnMounted(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
     {
         // Deferred-inert transition seam: upstream runs transition.enter here when a transition and
-        // truthy value are present ([V01.01.04.07]). No transition object exists yet, so this is a
-        // no-op placeholder that keeps the hook shape.
+        // truthy value are present. The transition system exists ([V01.01.04.07]); wiring v-show to build a
+        // persisted transition is a follow-up, so this is a no-op placeholder that keeps the hook shape.
     }
 
     private static void OnUpdated(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)

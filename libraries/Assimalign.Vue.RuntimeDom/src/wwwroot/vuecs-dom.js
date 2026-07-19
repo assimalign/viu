@@ -175,6 +175,62 @@ function readCommandStrings(bytes, view, offset) {
     return strings
 }
 
+// --- transition end-detection ([V01.01.04.07]) -----------------------------------------------------
+// Ported from @vue/runtime-dom Transition.ts getTransitionInfo/getTimeout/toMs: read getComputedStyle,
+// distinguish transition vs animation, pick the longer when both exist, and count transitioned
+// properties. Used by dom.whenTransitionEnds and dom.hasCssTransform.
+
+const TRANSITION = 'transition'
+const ANIMATION = 'animation'
+
+function toMs(s) {
+    if (s === 'auto') return 0
+    return Number(s.slice(0, -1).replace(',', '.')) * 1000
+}
+
+function getTimeout(delays, durations) {
+    while (delays.length < durations.length) {
+        delays = delays.concat(delays)
+    }
+    return Math.max(...durations.map((d, i) => toMs(d) + toMs(delays[i])))
+}
+
+function getTransitionInfo(el, expectedType) {
+    const styles = window.getComputedStyle(el)
+    const getStyleProperties = key => (styles[key] || '').split(', ')
+    const transitionDelays = getStyleProperties(TRANSITION + 'Delay')
+    const transitionDurations = getStyleProperties(TRANSITION + 'Duration')
+    const transitionTimeout = getTimeout(transitionDelays, transitionDurations)
+    const animationDelays = getStyleProperties(ANIMATION + 'Delay')
+    const animationDurations = getStyleProperties(ANIMATION + 'Duration')
+    const animationTimeout = getTimeout(animationDelays, animationDurations)
+
+    let type = null
+    let timeout = 0
+    let propCount = 0
+    if (expectedType === TRANSITION) {
+        if (transitionTimeout > 0) {
+            type = TRANSITION
+            timeout = transitionTimeout
+            propCount = transitionDurations.length
+        }
+    } else if (expectedType === ANIMATION) {
+        if (animationTimeout > 0) {
+            type = ANIMATION
+            timeout = animationTimeout
+            propCount = animationDurations.length
+        }
+    } else {
+        timeout = Math.max(transitionTimeout, animationTimeout)
+        type = timeout > 0 ? (transitionTimeout > animationTimeout ? TRANSITION : ANIMATION) : null
+        propCount = type ? (type === TRANSITION ? transitionDurations.length : animationDurations.length) : 0
+    }
+    const hasTransform =
+        type === TRANSITION &&
+        /\b(transform|all)(,|$)/.test(getStyleProperties(TRANSITION + 'Property').toString())
+    return { type, timeout, propCount, hasTransform }
+}
+
 export async function initialize() {
     // Bind the single .NET dispatch entry point ([V01.01.04.03]): one JSExport carries the
     // whole typed payload as primitives and returns stop/prevent flags for the live event.
@@ -438,6 +494,103 @@ export const dom = {
 
     // Registry sizes for leak assertions (the [V01.01.04.01] stress criterion): [nodes, listener maps].
     getRegistrySizes: () => [nodes.size, listeners.size],
+
+    // --- transitions ([V01.01.04.07]) -------------------------------------------------------
+    // The DOM-side contract of DomTransitionOperations: classList add/remove tracked in el.__vtc,
+    // the double-rAF next frame, the forced reflow, transitionend/animationend end-detection, and
+    // the FLIP getBoundingClientRect/transform ops. Class/timing ops run outside the command buffer
+    // (they are rAF-timed and read-then-write); the .NET resolve/callback fires once per completion.
+
+    addTransitionClass: (nodeHandle, cssClass) => {
+        const el = getNode('addTransitionClass', nodeHandle)
+        cssClass.split(/\s+/).forEach(c => c && el.classList.add(c))
+        ;(el.__vtc || (el.__vtc = new Set())).add(cssClass)
+    },
+
+    removeTransitionClass: (nodeHandle, cssClass) => {
+        const el = getNode('removeTransitionClass', nodeHandle)
+        cssClass.split(/\s+/).forEach(c => c && el.classList.remove(c))
+        if (el.__vtc) {
+            el.__vtc.delete(cssClass)
+            if (!el.__vtc.size) el.__vtc = undefined
+        }
+    },
+
+    // Wait for two animation frames so the from-class has painted before the to-class is applied
+    // (upstream nextFrame): the browser coalesces same-frame class add+remove otherwise.
+    nextFrame: callback => {
+        requestAnimationFrame(() => requestAnimationFrame(() => callback()))
+    },
+
+    forceReflow: () => document.body.offsetHeight,
+
+    // Resolve when the element's transition/animation ends, or after a fallback timeout (upstream
+    // whenTransitionEnds). A stale-guard (el.__endId) ignores a resolve superseded by a newer call.
+    whenTransitionEnds: (nodeHandle, expectedType, explicitTimeout, resolve) => {
+        const el = getNode('whenTransitionEnds', nodeHandle)
+        const id = (el.__endId = (el.__endId || 0) + 1)
+        const resolveIfNotStale = () => { if (id === el.__endId) resolve() }
+        if (explicitTimeout >= 0) {
+            setTimeout(resolveIfNotStale, explicitTimeout)
+            return
+        }
+        const info = getTransitionInfo(el, expectedType || undefined)
+        if (!info.type) { resolve(); return }
+        const endEvent = info.type + 'end'
+        let ended = 0
+        const end = () => { el.removeEventListener(endEvent, onEnd); resolveIfNotStale() }
+        const onEnd = e => { if (e.target === el && ++ended >= info.propCount) end() }
+        setTimeout(() => { if (ended < info.propCount) end() }, info.timeout + 1)
+        el.addEventListener(endEvent, onEnd)
+    },
+
+    measurePosition: nodeHandle => {
+        const rect = getNode('measurePosition', nodeHandle).getBoundingClientRect()
+        return [rect.left, rect.top]
+    },
+
+    setMoveTransform: (nodeHandle, deltaX, deltaY) => {
+        const style = getNode('setMoveTransform', nodeHandle).style
+        style.transform = style.webkitTransform = `translate(${deltaX}px,${deltaY}px)`
+        style.transitionDuration = '0s'
+    },
+
+    clearMoveStyles: nodeHandle => {
+        const style = getNode('clearMoveStyles', nodeHandle).style
+        style.transform = style.webkitTransform = style.transitionDuration = ''
+    },
+
+    // Clone the element (minus its live transition classes), add the move class, and read whether it
+    // gains a transform transition (upstream hasCSSTransform) — skips the FLIP when nothing animates.
+    hasCssTransform: (nodeHandle, rootHandle, moveClass) => {
+        const el = getNode('hasCssTransform', nodeHandle)
+        const clone = el.cloneNode()
+        if (el.__vtc) {
+            el.__vtc.forEach(cls => cls.split(/\s+/).forEach(c => c && clone.classList.remove(c)))
+        }
+        moveClass.split(/\s+/).forEach(c => c && clone.classList.add(c))
+        clone.style.display = 'none'
+        const root = getNode('hasCssTransform', rootHandle)
+        const container = root.nodeType === 1 ? root : root.parentNode
+        container.appendChild(clone)
+        const { hasTransform } = getTransitionInfo(clone)
+        container.removeChild(clone)
+        return hasTransform
+    },
+
+    // Resolve when the FLIP transform transition ends (upstream _moveCb): only a transform property
+    // (or a forced no-event finish) counts, so unrelated transitionend events are ignored.
+    whenMoveEnds: (nodeHandle, resolve) => {
+        const el = getNode('whenMoveEnds', nodeHandle)
+        const cb = e => {
+            if (e && e.target !== el) return
+            if (!e || /transform$/.test(e.propertyName)) {
+                el.removeEventListener('transitionend', cb)
+                resolve()
+            }
+        }
+        el.addEventListener('transitionend', cb)
+    },
 
     // Applies one batched command frame ([V01.01.04.05]) and returns the handles it released across
     // the whole batch (the batched analogue of remove/setElementText's per-op return). The void

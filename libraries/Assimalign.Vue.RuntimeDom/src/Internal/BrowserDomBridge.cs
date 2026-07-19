@@ -333,6 +333,133 @@ internal static partial class BrowserDomBridge
         }
     }
 
+    // --- transitions ([V01.01.04.07]) -----------------------------------------------------------
+    // classList add/remove, the double-rAF next frame, the forced reflow, transition-end detection,
+    // and the FLIP getBoundingClientRect/transform ops. The rAF/listener scheduling stays JS-side and
+    // calls a single .NET Action back per completion (never a per-property managed listener). These
+    // ops are inherently rAF-timed and read-then-write, so they use direct interop rather than the
+    // batched command buffer — the DOM-side contract the DomTransitionOperations abstraction requires.
+
+    internal static void AddTransitionClass(int nodeHandle, string cssClass)
+    {
+        try
+        {
+            Imports.AddTransitionClass(nodeHandle, cssClass);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("addTransitionClass", nodeHandle, exception);
+        }
+    }
+
+    internal static void RemoveTransitionClass(int nodeHandle, string cssClass)
+    {
+        try
+        {
+            Imports.RemoveTransitionClass(nodeHandle, cssClass);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("removeTransitionClass", nodeHandle, exception);
+        }
+    }
+
+    internal static void NextFrame(Action callback)
+    {
+        try
+        {
+            Imports.NextFrame(callback);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("nextFrame", 0, exception);
+        }
+    }
+
+    internal static void ForceReflow()
+    {
+        try
+        {
+            Imports.ForceReflow();
+        }
+        catch (JSException exception)
+        {
+            throw Translate("forceReflow", 0, exception);
+        }
+    }
+
+    internal static void WhenTransitionEnds(int nodeHandle, string? expectedType, int explicitTimeout, Action resolve)
+    {
+        try
+        {
+            Imports.WhenTransitionEnds(nodeHandle, expectedType, explicitTimeout, resolve);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("whenTransitionEnds", nodeHandle, exception);
+        }
+    }
+
+    internal static double[] MeasurePosition(int nodeHandle)
+    {
+        try
+        {
+            return Imports.MeasurePosition(nodeHandle);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("measurePosition", nodeHandle, exception);
+        }
+    }
+
+    internal static void SetMoveTransform(int nodeHandle, double deltaX, double deltaY)
+    {
+        try
+        {
+            Imports.SetMoveTransform(nodeHandle, deltaX, deltaY);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("setMoveTransform", nodeHandle, exception);
+        }
+    }
+
+    internal static void ClearMoveStyles(int nodeHandle)
+    {
+        try
+        {
+            Imports.ClearMoveStyles(nodeHandle);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("clearMoveStyles", nodeHandle, exception);
+        }
+    }
+
+    internal static bool HasCssTransform(int nodeHandle, int rootHandle, string moveClass)
+    {
+        try
+        {
+            return Imports.HasCssTransform(nodeHandle, rootHandle, moveClass);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("hasCssTransform", nodeHandle, exception);
+        }
+    }
+
+    internal static void WhenMoveEnds(int nodeHandle, Action resolve)
+    {
+        try
+        {
+            Imports.WhenMoveEnds(nodeHandle, resolve);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("whenMoveEnds", nodeHandle, exception);
+        }
+    }
+
     // The command-buffer apply ([V01.01.04.05]): the whole batched op frame crosses the boundary
     // once per flush as a MemoryView over WASM memory (no copy of the argument), and the applier
     // returns every handle it released while draining the batch so the .NET side purges its invoker
@@ -454,6 +581,41 @@ internal static partial class BrowserDomBridge
 
         [JSImport("dom.applyCommandBuffer", ModuleName)]
         internal static partial int[] ApplyCommandBuffer([JSMarshalAs<JSType.MemoryView>] Span<byte> buffer);
+
+        [JSImport("dom.addTransitionClass", ModuleName)]
+        internal static partial void AddTransitionClass(int nodeHandle, string cssClass);
+
+        [JSImport("dom.removeTransitionClass", ModuleName)]
+        internal static partial void RemoveTransitionClass(int nodeHandle, string cssClass);
+
+        [JSImport("dom.nextFrame", ModuleName)]
+        internal static partial void NextFrame([JSMarshalAs<JSType.Function>] Action callback);
+
+        [JSImport("dom.forceReflow", ModuleName)]
+        internal static partial void ForceReflow();
+
+        [JSImport("dom.whenTransitionEnds", ModuleName)]
+        internal static partial void WhenTransitionEnds(
+            int nodeHandle,
+            string? expectedType,
+            int explicitTimeout,
+            [JSMarshalAs<JSType.Function>] Action resolve);
+
+        [JSImport("dom.measurePosition", ModuleName)]
+        [return: JSMarshalAs<JSType.Array<JSType.Number>>]
+        internal static partial double[] MeasurePosition(int nodeHandle);
+
+        [JSImport("dom.setMoveTransform", ModuleName)]
+        internal static partial void SetMoveTransform(int nodeHandle, double deltaX, double deltaY);
+
+        [JSImport("dom.clearMoveStyles", ModuleName)]
+        internal static partial void ClearMoveStyles(int nodeHandle);
+
+        [JSImport("dom.hasCssTransform", ModuleName)]
+        internal static partial bool HasCssTransform(int nodeHandle, int rootHandle, string moveClass);
+
+        [JSImport("dom.whenMoveEnds", ModuleName)]
+        internal static partial void WhenMoveEnds(int nodeHandle, [JSMarshalAs<JSType.Function>] Action resolve);
 
         [JSImport("initialize", ModuleName)]
         [return: JSMarshalAs<JSType.Promise<JSType.Void>>]

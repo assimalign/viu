@@ -171,23 +171,20 @@ public static class DomRenderHelpers
         return BrowserEvents.WithKeys(_ => handler(), keys);
     }
 
-    // ==== DOM built-in component markers (upstream Transition / TransitionGroup) ==================
+    // ==== DOM built-in components (upstream Transition / TransitionGroup) ==========================
 
     /// <summary>
-    /// The <c>&lt;Transition&gt;</c> DOM built-in (upstream: <c>Transition</c>). A typed surface marker
-    /// pending the transition system ([V01.01.04.07]): the compiled render passes it as a vnode <c>tag</c>,
-    /// and because it is not a supported tag the vnode factory throws a clear
-    /// <see cref="System.NotSupportedException"/> at render time rather than rendering nothing — it is
-    /// deliberately <b>not</b> silently inert. Replaced by the real component definition when
-    /// [V01.01.04.07] lands.
+    /// The <c>&lt;Transition&gt;</c> DOM built-in (upstream: <c>Transition</c>), resolved to the real
+    /// <see cref="RuntimeDom.Transition"/> component ([V01.01.04.07]). The compiled render passes it as a
+    /// vnode <c>tag</c>; the vnode factory's component-definition arm mounts it, and it resolves the
+    /// CSS-class enter/leave hooks over <see cref="RuntimeCore.BaseTransition"/>.
     /// </summary>
-    public static readonly object _Transition = new DomBuiltInComponentMarker("Transition");
+    public static readonly object _Transition = Transition.Instance;
 
     /// <summary>
-    /// The <c>&lt;TransitionGroup&gt;</c> DOM built-in (upstream: <c>TransitionGroup</c>). A typed surface
-    /// marker pending the transition system ([V01.01.04.07]): rendering it throws a clear
-    /// <see cref="System.NotSupportedException"/> rather than silently doing nothing. Replaced by the real
-    /// component definition when [V01.01.04.07] lands.
+    /// The <c>&lt;TransitionGroup&gt;</c> DOM built-in (upstream: <c>TransitionGroup</c>), resolved to the
+    /// real <see cref="RuntimeDom.TransitionGroup"/> component ([V01.01.04.07]) — a keyed list with
+    /// FLIP-based <c>v-move</c> reordering.
     /// </summary>
-    public static readonly object _TransitionGroup = new DomBuiltInComponentMarker("TransitionGroup");
+    public static readonly object _TransitionGroup = TransitionGroup.Instance;
 }
