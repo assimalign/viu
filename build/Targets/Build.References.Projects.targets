@@ -10,7 +10,7 @@
 
         Two flavours:
 
-          VuecsProjectReference         - PUBLIC code reference. Resulting
+          ViuProjectReference         - PUBLIC code reference. Resulting
                                             <ProjectReference> has default
                                             semantics: compiled against,
                                             CopyLocal'd into bin/, AND appears
@@ -18,9 +18,9 @@
                                             .nupkg .nuspec (flows to consumers).
 
                                             Usage (by assembly name only):
-                                              <VuecsProjectReference Include="Assimalign.Vue.Shared" />
+                                              <ViuProjectReference Include="Assimalign.Viu.Shared" />
 
-          VuecsPrivateProjectReference  - PRIVATE code reference. Same compile
+          ViuPrivateProjectReference  - PRIVATE code reference. Same compile
                                             + CopyLocal behaviour, but the
                                             resulting <ProjectReference> carries
                                             PrivateAssets="all", which suppresses
@@ -34,22 +34,22 @@
     <ItemGroup>
         <!-- Index code projects ONCE. Analyzer/generator projects are indexed too so a test (or other
              code project) can take a normal compile reference to one by assembly name — the analyzer
-             SDK's OutputItemType="Analyzer" reference (VuecsAnalyzerReference) cannot be compiled
-             against, so a generator's own snapshot tests resolve it as a VuecsPrivateProjectReference. -->
-        <_VuecsProject Include="$(VuecsRepositoryDirectory)libraries\**\*.csproj" />
-        <_VuecsProject Include="$(VuecsRepositoryDirectory)analyzers\**\*.csproj" />
-        <_VuecsProject Update="@(_VuecsProject)" ProjectId="%(_VuecsProject.Filename)" ProjectPath="%(_VuecsProject.Identity)" />
+             SDK's OutputItemType="Analyzer" reference (ViuAnalyzerReference) cannot be compiled
+             against, so a generator's own snapshot tests resolve it as a ViuPrivateProjectReference. -->
+        <_ViuProject Include="$(ViuRepositoryDirectory)libraries\**\*.csproj" />
+        <_ViuProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <_ViuProject Update="@(_ViuProject)" ProjectId="%(_ViuProject.Filename)" ProjectPath="%(_ViuProject.Identity)" />
 
         <!-- Public refs -->
-        <VuecsProjectReference Update="@(_VuecsProject->'%(ProjectId)')" ProjectPath="%(_VuecsProject.ProjectPath)" />
-        <ProjectReference Include="@(VuecsProjectReference->'%(ProjectPath)')" />
-        <VuecsProjectReference Remove="@(VuecsProjectReference->HasMetadata('ProjectPath'))" />
+        <ViuProjectReference Update="@(_ViuProject->'%(ProjectId)')" ProjectPath="%(_ViuProject.ProjectPath)" />
+        <ProjectReference Include="@(ViuProjectReference->'%(ProjectPath)')" />
+        <ViuProjectReference Remove="@(ViuProjectReference->HasMetadata('ProjectPath'))" />
 
         <!-- Private refs: PrivateAssets='all' suppresses .nuspec <dependency> flow. -->
-        <VuecsPrivateProjectReference Update="@(_VuecsProject->'%(ProjectId)')" ProjectPath="%(_VuecsProject.ProjectPath)" />
-        <ProjectReference Include="@(VuecsPrivateProjectReference->'%(ProjectPath)')" PrivateAssets="all" />
-        <VuecsPrivateProjectReference Remove="@(VuecsPrivateProjectReference->HasMetadata('ProjectPath'))" />
+        <ViuPrivateProjectReference Update="@(_ViuProject->'%(ProjectId)')" ProjectPath="%(_ViuProject.ProjectPath)" />
+        <ProjectReference Include="@(ViuPrivateProjectReference->'%(ProjectPath)')" PrivateAssets="all" />
+        <ViuPrivateProjectReference Remove="@(ViuPrivateProjectReference->HasMetadata('ProjectPath'))" />
 
-        <_VuecsProject Remove="@(_VuecsProject)" />
+        <_ViuProject Remove="@(_ViuProject)" />
     </ItemGroup>
 </Project>

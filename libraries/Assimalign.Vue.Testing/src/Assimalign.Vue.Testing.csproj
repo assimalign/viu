@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
-    <IsAotCompatible>true</IsAotCompatible>
-  </PropertyGroup>
-  <ItemGroup>
-    <VuecsProjectReference Include="Assimalign.Vue.RuntimeCore" />
-  </ItemGroup>
-</Project>

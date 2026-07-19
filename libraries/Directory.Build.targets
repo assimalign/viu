@@ -2,7 +2,7 @@
     <Import Project="..\Directory.Build.targets" />
     <!--
         Directory.Build.props sets IsAotCompatible=true against the net10.0 default TFM, but the
-        netstandard2.0 analyzer-host libraries (the Assimalign.Vue.Syntax parsers and the Shared
+        netstandard2.0 analyzer-host libraries (the Assimalign.Viu.Syntax parsers and the Shared
         generator fixture) override their TargetFramework AFTER that props import. The AOT analyzers
         require net7.0+, so leaving the switch on emits NETSDK1210 (an error under -warnaserror). Now
         that the final TargetFramework is known, clear it for any TFM that cannot host the AOT analyzers,

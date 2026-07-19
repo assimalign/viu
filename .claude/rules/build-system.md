@@ -21,14 +21,14 @@ belongs in `build/`, never duplicated in individual csprojs** — this is the mo
 Never write a raw `<ProjectReference Include="..\..\...csproj" />` or `<PackageReference>` in a library,
 test, or example csproj. Use the by-name item groups the build system resolves:
 
-- **`<VuecsProjectReference Include="Assimalign.Vue.Shared" />`** — public project reference (flows as a
+- **`<ViuProjectReference Include="Assimalign.Viu.Shared" />`** — public project reference (flows as a
   `.nupkg` dependency). Resolved by assembly name against `libraries/**/*.csproj`.
-- **`<VuecsPrivateProjectReference Include="..." />`** — private reference (`PrivateAssets=all`; does not
+- **`<ViuPrivateProjectReference Include="..." />`** — private reference (`PrivateAssets=all`; does not
   flow to consumers).
-- **`<VuecsPackageReference Include="xunit" />`** — package reference with **no `Version` attribute**;
+- **`<ViuPackageReference Include="xunit" />`** — package reference with **no `Version` attribute**;
   versions are centralized in `build/Targets/Build.References.Packages.targets`. To add or bump a package,
   edit that central file.
-- **`<VuecsAnalyzerReference … />`** — for Roslyn analyzers / source generators (see
+- **`<ViuAnalyzerReference … />`** — for Roslyn analyzers / source generators (see
   `build/Targets/Build.References.Analyzers.targets`).
 
 ## Target framework and language
@@ -51,7 +51,7 @@ Shipping library (`src/`):
   </PropertyGroup>
   <!-- optional -->
   <ItemGroup>
-    <VuecsProjectReference Include="Assimalign.Vue.Shared" />
+    <ViuProjectReference Include="Assimalign.Viu.Shared" />
   </ItemGroup>
 </Project>
 ```
@@ -65,31 +65,31 @@ Test project (`test/`):
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <VuecsPackageReference Include="Microsoft.NET.Test.Sdk" />
-    <VuecsPackageReference Include="xunit" />
-    <VuecsPackageReference Include="xunit.runner.visualstudio" />
-    <VuecsPackageReference Include="Shouldly" />
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
   </ItemGroup>
   <ItemGroup>
-    <VuecsProjectReference Include="Assimalign.Vue.<Name>" />
+    <ViuProjectReference Include="Assimalign.Viu.<Name>" />
   </ItemGroup>
 </Project>
 ```
 
 Sample apps (`examples/`) keep their own SDK (e.g. `Microsoft.NET.Sdk.WebAssembly`), set
-`<TargetFramework>$(TargetFrameworkLatest)</TargetFramework>`, use `VuecsProjectReference`, and do **not**
+`<TargetFramework>$(TargetFrameworkLatest)</TargetFramework>`, use `ViuProjectReference`, and do **not**
 set `IsAotCompatible` (they are not shipping libraries).
 
 ## Versioning and packaging
 
-- The version is centralized in `build/Targets/Build.Version.props` (`$(VuecsVersion)` /
-  `VuecsVersionPrefix` / `VuecsVersionSuffix`). **No per-project `<Version>`** — set `VersionPrefix` /
+- The version is centralized in `build/Targets/Build.Version.props` (`$(ViuVersion)` /
+  `ViuVersionPrefix` / `ViuVersionSuffix`). **No per-project `<Version>`** — set `VersionPrefix` /
   `VersionSuffix` only through the central file.
-- Package output goes to `$(VuecsOutputPathForLibraries)` (`_out/packages`).
+- Package output goes to `$(ViuOutputPathForLibraries)` (`_out/packages`).
 
 ## Adding a new library
 
-1. `libraries/Assimalign.Vue.<Name>/{src,test}` with the two csproj shapes above.
-2. Add both csprojs to `Assimalign.Vuecs.slnx`.
+1. `libraries/Assimalign.Viu.<Name>/{src,test}` with the two csproj shapes above.
+2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.

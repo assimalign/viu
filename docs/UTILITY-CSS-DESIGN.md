@@ -12,7 +12,7 @@ at runtime** — the utility stylesheet is a build product, exactly like the com
 functions.
 
 This document is repo-level (per the [documentation rule](../.claude/rules/documentation.md)) because
-the engine deliberately spans three homes — `Assimalign.Vue.Syntax.Css` (CSS AST and emission), a
+the engine deliberately spans three homes — `Assimalign.Viu.Syntax.Css` (CSS AST and emission), a
 Tooling-owned composition root (extraction, resolution, generation), and the incremental generator /
 MSBuild pipeline — and no single library's `docs/DESIGN.md` owns the whole picture.
 
@@ -32,7 +32,7 @@ MSBuild pipeline — and no single library's `docs/DESIGN.md` owns the whole pic
 
 - Tailwind CSS docs — utility-first model, JIT content scanning, theme/variant system:
   <https://tailwindcss.com/docs>
-- CSS Syntax Module Level 3 — the `Assimalign.Vue.Syntax.Css` kind-enum and tokenizer pin:
+- CSS Syntax Module Level 3 — the `Assimalign.Viu.Syntax.Css` kind-enum and tokenizer pin:
   <https://www.w3.org/TR/css-syntax-3/>
 - Roslyn incremental source generators — the caching model the extraction pipeline honors:
   <https://learn.microsoft.com/dotnet/csharp/roslyn-sdk/source-generators-overview>
@@ -42,9 +42,9 @@ MSBuild pipeline — and no single library's `docs/DESIGN.md` owns the whole pic
   [build-system](../.claude/rules/build-system.md), [workflow](../.claude/rules/workflow.md),
   [documentation](../.claude/rules/documentation.md), [deviations](../.claude/rules/deviations.md)
 - Landed architecture this builds on:
-  [`Assimalign.Vue.Syntax` DESIGN](../libraries/Assimalign.Vue.Syntax/docs/DESIGN.md) (the
+  [`Assimalign.Viu.Syntax` DESIGN](../libraries/Assimalign.Viu.Syntax/docs/DESIGN.md) (the
   registration seam, [#127](https://github.com/assimalign/vuecs/issues/127)) and
-  [`Assimalign.Vue.Syntax.Css` DESIGN](../libraries/Assimalign.Vue.Syntax.Css/docs/DESIGN.md) (the
+  [`Assimalign.Viu.Syntax.Css` DESIGN](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) (the
   tokenizer/tree/selector parser/scoped rewriter,
   [#60](https://github.com/assimalign/vuecs/issues/60))
 
@@ -52,22 +52,22 @@ MSBuild pipeline — and no single library's `docs/DESIGN.md` owns the whole pic
 
 ## 1. Where the engine sits
 
-Vuecs already compiles `.viu` single-file components at build time through the
-`Assimalign.Vue.Syntax.*` cluster and the `SingleFileComponentGenerator`
+Viu already compiles `.viu` single-file components at build time through the
+`Assimalign.Viu.Syntax.*` cluster and the `SingleFileComponentGenerator`
 ([#58](https://github.com/assimalign/vuecs/issues/58)). The utility-first CSS engine is the **flagship
 second consumer** of the same machinery — the role a Tailwind Vite plugin plays alongside
 `@vitejs/plugin-vue` in a Vue build. It reuses three landed foundations:
 
-1. **The registration seam** ([`Assimalign.Vue.Syntax`](../libraries/Assimalign.Vue.Syntax/docs/DESIGN.md),
+1. **The registration seam** ([`Assimalign.Viu.Syntax`](../libraries/Assimalign.Viu.Syntax/docs/DESIGN.md),
    [#127](https://github.com/assimalign/vuecs/issues/127)). `AggregateSyntaxParserOptions<T>.RegisterParser(SyntaxSourcePredicate, SyntaxParser)`
    is the seam a composition root uses to attach a parser to a block name, `lang`, or file type
    without the container library referencing it. The utility engine registers its own extraction
    pass here — "language libraries never reference each other; the composition root constructs the
-   aggregate options and registers whatever parsers the build embeds — including Vuecs-owned tooling
+   aggregate options and registers whatever parsers the build embeds — including Viu-owned tooling
    like utility-class style generation" is already written into the base's design as the anticipated
    use.
 
-2. **The CSS AST and emitters** ([`Assimalign.Vue.Syntax.Css`](../libraries/Assimalign.Vue.Syntax.Css/docs/DESIGN.md),
+2. **The CSS AST and emitters** ([`Assimalign.Viu.Syntax.Css`](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md),
    [#60](https://github.com/assimalign/vuecs/issues/60)). The two-phase tokenizer (`CssTokenizer`) →
    context-directed rule parser (`CssParseEngine`), the record-graph tree (`CssStylesheetNode`,
    `CssQualifiedRuleNode`, `CssDeclarationNode`, …), the flat selector model, and the deterministic
@@ -100,14 +100,14 @@ second consumer** of the same machinery — the role a Tailwind Vite plugin play
         │                                                          │ UtilityCandidateSet (per file) │
         │                                              ┌───────────▼─────────────┐    │
         │      theme model ───────────────────────────►  utility resolver        │    │
-        │  (Assimalign.Vue.Syntax.Css emission) ◄──────┤  candidate → CSS rules   │    │
+        │  (Assimalign.Viu.Syntax.Css emission) ◄──────┤  candidate → CSS rules   │    │
         │                                              └───────────┬─────────────┘    │
         └──────────────────────────────────────────────────────────┼─────────────────┘
                                                                     │ one bundled stylesheet
                     ┌───────────────────────────────────────────────┼─────────────────┐
       generator host│ AddSource: constants + diagnostics (no I/O)   │  MSBuild task host│ writes .css
                     ▼                                                 ▼   as StaticWebAsset
-              generated C#                                     wwwroot/_content/…/vuecs-utilities.css
+              generated C#                                     wwwroot/_content/…/viu-utilities.css
 ```
 
 ---
@@ -123,7 +123,7 @@ compiler `AdditionalFiles`, so the engine never performs its own file discovery 
 | --- | --- | --- |
 | **`.viu` template class attributes** | Static `class="…"` attribute text on elements, and the static string operands of `:class` / `v-bind:class` bindings | The `@template` block is already dispatched to `TemplateSyntaxParser` by the SFC composition root; the extractor walks the resulting template AST (`ElementNode` → `AttributeNode` where `Name == "class"`, plus `DirectiveNode` class bindings) — see [§2.2](#22-candidate-extraction-through-the-seam) |
 | **`.viu` other blocks** | Custom blocks that opt in (a documented predicate, e.g. a `@markup`/raw block a host tool registers) | Registered on the seam by predicate, same as `@style`/`@template` |
-| **Host pages** | `class` attributes in static host HTML (`examples/Assimalign.Vue.WebApp/wwwroot/index.html` and equivalents) | Flow in as `AdditionalFiles` (`.html`/`.htm`); the utility scanner registers a `SyntaxSourcePredicate` matching them — nothing else in the cluster claims host HTML, so first-match-wins is uncontended here |
+| **Host pages** | `class` attributes in static host HTML (`examples/Assimalign.Viu.WebApp/wwwroot/index.html` and equivalents) | Flow in as `AdditionalFiles` (`.html`/`.htm`); the utility scanner registers a `SyntaxSourcePredicate` matching them — nothing else in the cluster claims host HTML, so first-match-wins is uncontended here |
 
 Only **statically determinable** class tokens are extractable — this is a deliberate, Tailwind-parity
 constraint (Tailwind scans raw text and cannot see runtime-computed strings). A class produced only by
@@ -167,7 +167,7 @@ UtilityCandidate               // record — the raw token exactly as written, e
 ```
 
 Extraction produces **raw tokens only** — it does not parse variants or resolve CSS. That keeps the
-extractor free of any theme or CSS dependency (it roots on `Assimalign.Vue.Syntax` alone) and keeps
+extractor free of any theme or CSS dependency (it roots on `Assimalign.Viu.Syntax` alone) and keeps
 the incremental cache key small and stable ([§6](#6-incrementality)).
 
 ### 2.3 Resolution and generation
@@ -210,9 +210,9 @@ Concretely:
 - The **generator host** continues to surface build-visible artifacts as C# where useful (e.g. a
   `UtilityStylesheet` constant for tests and IDE inspection, and diagnostics for malformed theme
   config), exactly as `ExtractedStyles`/`ScopeId` are surfaced today. No I/O.
-- The **MSBuild bundling task** (`VuecsBundleCss`) collects (a) the utility stylesheet and (b) the
+- The **MSBuild bundling task** (`ViuBundleCss`) collects (a) the utility stylesheet and (b) the
   per-component `ExtractedStyles` from scoped CSS, writes them under
-  `obj/…/vuecs/vuecs-utilities.css` (+ a scoped-styles bundle), and adds them to `@(StaticWebAsset)`
+  `obj/…/viu/viu-utilities.css` (+ a scoped-styles bundle), and adds them to `@(StaticWebAsset)`
   so the WASM SDK copies them into `wwwroot/_content/<package>/…` and `dotnet publish` fingerprints
   and serves them. MSBuild `Inputs`/`Outputs` incrementality means the task is skipped when no input
   changed. The task links the emitted stylesheet into the host page automatically (an injected
@@ -229,7 +229,7 @@ criterion the same way the compiled render functions satisfy "no runtime templat
 ## 3. The utility-class language specification
 
 The language **follows Tailwind CSS** structurally so authors carry their muscle memory over, and
-**diverges only where a Vuecs hard constraint forces it** — every divergence is recorded in
+**diverges only where a Viu hard constraint forces it** — every divergence is recorded in
 [§3.5](#35-followdiverge-decisions-against-tailwind) per the
 [deviations rule](../.claude/rules/deviations.md).
 
@@ -286,7 +286,7 @@ surfaces as a normal `CssError` rather than a bespoke diagnostic.
 
 ### 3.4 Theme configuration
 
-Tailwind configures the theme in **`tailwind.config.js` — executable JavaScript**. Vuecs **cannot**
+Tailwind configures the theme in **`tailwind.config.js` — executable JavaScript**. Viu **cannot**
 execute JS config (no `new Function`, no dynamic code, AOT/trimming-safe only — founding decision 6 in
 [PLAN.md](PLAN.md)). This is the engine's single largest, principled divergence:
 
@@ -336,16 +336,16 @@ implementation task in [§7](#7-work-item-breakdown).
 
 | Concern | Owning project | May reference |
 | --- | --- | --- |
-| CSS AST, parsing, **construction, and deterministic serialization** | `Assimalign.Vue.Syntax.Css` | `Assimalign.Vue.Syntax` (base) only |
-| Utility candidate grammar, variant model, theme model, resolver, generation | **Tooling-owned engine core** (a netstandard2.0 library in the analyzer layer — see OQ-2) | `Assimalign.Vue.Syntax` (base) **and** `Assimalign.Vue.Syntax.Css` (for emission) |
-| Candidate extraction scanner | Tooling-owned engine core | `Assimalign.Vue.Syntax` (base) only — no CSS or theme dependency |
-| Composition + incremental pipeline wiring, constants, diagnostics | `Assimalign.Vue.Syntax.Generators` (the composition root generator) | the engine core, `Assimalign.Vue.Syntax.Css`, the language parsers — as it already does |
-| Physical bundling to publish output | `VuecsBundleCss` MSBuild task (Tooling) | the engine core |
+| CSS AST, parsing, **construction, and deterministic serialization** | `Assimalign.Viu.Syntax.Css` | `Assimalign.Viu.Syntax` (base) only |
+| Utility candidate grammar, variant model, theme model, resolver, generation | **Tooling-owned engine core** (a netstandard2.0 library in the analyzer layer — see OQ-2) | `Assimalign.Viu.Syntax` (base) **and** `Assimalign.Viu.Syntax.Css` (for emission) |
+| Candidate extraction scanner | Tooling-owned engine core | `Assimalign.Viu.Syntax` (base) only — no CSS or theme dependency |
+| Composition + incremental pipeline wiring, constants, diagnostics | `Assimalign.Viu.Syntax.Generators` (the composition root generator) | the engine core, `Assimalign.Viu.Syntax.Css`, the language parsers — as it already does |
+| Physical bundling to publish output | `ViuBundleCss` MSBuild task (Tooling) | the engine core |
 
-**Invariant — no language library references another.** `Assimalign.Vue.Syntax.Css` stays a leaf: it
+**Invariant — no language library references another.** `Assimalign.Viu.Syntax.Css` stays a leaf: it
 gains a *construction* surface but never learns what a "utility" is. The utility engine core is
 **Tooling / composition-root code**, not a peer language library, precisely so it is *allowed* to
-reference `Assimalign.Vue.Syntax.Css` for emission — a peer language library would be forbidden from
+reference `Assimalign.Viu.Syntax.Css` for emission — a peer language library would be forbidden from
 doing so. The dependency arrows always point **toward** the base and Css, never sideways between
 language libraries. This is the same rule the SFC composition root already honors.
 
@@ -360,7 +360,7 @@ Roslyn analyzer hosts alongside the existing cluster. No `net10.0`-only APIs.
 
 The engine performs **no file or network I/O** in the analyzer sandbox. Every input — `.viu` files,
 host pages, the theme document — arrives as an `AdditionalText`. The **only** component that touches
-the filesystem is the `VuecsBundleCss` MSBuild task, which runs **outside** the analyzer sandbox where
+the filesystem is the `ViuBundleCss` MSBuild task, which runs **outside** the analyzer sandbox where
 I/O is permitted (see [§2.4](#24-reaching-publish-output-the-bundling-route)). This is how the engine
 respects RS1035 while still landing a physical stylesheet.
 
@@ -369,7 +369,7 @@ respects RS1035 while still landing a physical stylesheet.
 Utility tables, variant tables, and the default theme are **compiled static data** (hand-authored
 tables or source-generated), never reflection-scanned or loaded from executable config. The theme
 document is *parsed as data*, never *evaluated as code*. Parsing is recoverable — a malformed theme or
-class reports a Vuecs-defined diagnostic and never throws (the only expected exception is
+class reports a Viu-defined diagnostic and never throws (the only expected exception is
 `OperationCanceledException`), matching the cluster contract. The whole engine is trimming- and
 WASM/NativeAOT-safe by construction because none of it ships to the runtime at all.
 
@@ -385,10 +385,10 @@ Css library owns rule-level CSS parsing and serialization; each higher feature o
 
 | Layer | Owner | Shared by |
 | --- | --- | --- |
-| Tokenizer (`CssTokenizer`), rule parser (`CssParseEngine`), tree nodes, selector model | `Assimalign.Vue.Syntax.Css` | scoped CSS, CSS Modules, **utility engine** |
-| Canonical deterministic serializer | `Assimalign.Vue.Syntax.Css` | scoped CSS, **utility engine** |
-| **Programmatic rule construction** (new, [§7](#7-work-item-breakdown) V01.01.12.11) | `Assimalign.Vue.Syntax.Css` | **utility engine** (scoped CSS never needed it because it rewrites an existing tree) |
-| Scoped `[data-v-…]` selector rewrite (`CssScopedRewriter`) | `Assimalign.Vue.Syntax.Css` | scoped CSS; utility engine **only in optional scoped-utility mode** |
+| Tokenizer (`CssTokenizer`), rule parser (`CssParseEngine`), tree nodes, selector model | `Assimalign.Viu.Syntax.Css` | scoped CSS, CSS Modules, **utility engine** |
+| Canonical deterministic serializer | `Assimalign.Viu.Syntax.Css` | scoped CSS, **utility engine** |
+| **Programmatic rule construction** (new, [§7](#7-work-item-breakdown) V01.01.12.11) | `Assimalign.Viu.Syntax.Css` | **utility engine** (scoped CSS never needed it because it rewrites an existing tree) |
+| Scoped `[data-v-…]` selector rewrite (`CssScopedRewriter`) | `Assimalign.Viu.Syntax.Css` | scoped CSS; utility engine **only in optional scoped-utility mode** |
 | Candidate grammar + resolver | utility engine core | — (owned) |
 | Local module-class hashing + `v-bind()`→`var()` rewrite | CSS Modules ([#62](https://github.com/assimalign/vuecs/issues/62)) | — (owned) |
 
@@ -471,7 +471,7 @@ sets, keyed so it is skipped when no per-file set changed.
   utilities) this is sub-millisecond string work; the dominant cost is serialization, which is linear.
 - **Warm incremental edits** that don't change the class set cost **nothing** past stage 3 (cache
   hit). Edits that add a genuinely new utility re-run only stages 4–6 over the whole (small) set.
-- The **`VuecsBundleCss`** task is gated by MSBuild `Inputs`/`Outputs`, so a no-op build does no CSS
+- The **`ViuBundleCss`** task is gated by MSBuild `Inputs`/`Outputs`, so a no-op build does no CSS
   file work.
 - A **budget** to hold the line (validated by the [#95](https://github.com/assimalign/vuecs/issues/95)
   size/AOT gates, extended per V01.01.12.16): full generation for the reference sample stays within a
@@ -490,7 +490,7 @@ Proposed as **sibling features under area [V01.01.12] Framework - Tooling**
 `.10` = [#129](https://github.com/assimalign/vuecs/issues/129), this item), so the next free feature
 codes are **`.11`+**. Tasks under a feature take `<feature>.NN`. Codes and metadata are **proposals**
 for the orchestrator to validate against the live board before filing via the
-[`vuecs-work-items` skill](../.claude/skills/vuecs-work-items/SKILL.md); the skill computes the next
+[`viu-work-items` skill](../.claude/skills/viu-work-items/SKILL.md); the skill computes the next
 free code at creation time.
 
 **Wave/priority rationale.** Utility CSS is DX/ecosystem polish, off the W01–W03 rendering/compiler
@@ -505,8 +505,8 @@ scoped CSS (W04) also wants bundling and they unblock everything else. The engin
 
 | Code | Title | Wave | Priority | Depends on |
 | --- | --- | --- | --- | --- |
-| `V01.01.12.11` | Implement the CSS construction and deterministic emission surface in Assimalign.Vue.Syntax.Css | W04 | P004 | #60 |
-| `V01.01.12.12` | Implement the VuecsBundleCss MSBuild task for static-web-asset CSS bundling | W04 | P004 | #58, #60 |
+| `V01.01.12.11` | Implement the CSS construction and deterministic emission surface in Assimalign.Viu.Syntax.Css | W04 | P004 | #60 |
+| `V01.01.12.12` | Implement the ViuBundleCss MSBuild task for static-web-asset CSS bundling | W04 | P004 | #58, #60 |
 | `V01.01.12.13` | Implement the utility-class candidate grammar and variant model | W05 | P005 | #127, `.11` |
 | `V01.01.12.14` | Implement the AOT-safe utility theme configuration model | W05 | P005 | `.13` |
 | `V01.01.12.15` | Implement the build-time utility candidate extraction pass | W05 | P005 | #127, #51, `.13` |
@@ -520,14 +520,14 @@ Representative child tasks are listed for the two largest features (`.15`, `.16`
 
 ---
 
-### [V01.01.12.11] Implement the CSS construction and deterministic emission surface in Assimalign.Vue.Syntax.Css
+### [V01.01.12.11] Implement the CSS construction and deterministic emission surface in Assimalign.Viu.Syntax.Css
 
 **Wave** W04 · **Priority** P004 · **Parent** [V01.01.12] (#89) · **Depends on** #60
 
 ```markdown
 ## Summary
 
-Add a programmatic CSS *construction* surface to `Assimalign.Vue.Syntax.Css`: build
+Add a programmatic CSS *construction* surface to `Assimalign.Viu.Syntax.Css`: build
 `CssStylesheetNode`/`CssQualifiedRuleNode`/`CssDeclarationNode`/`CssAtRuleNode` graphs from code (not
 only by parsing text) and serialize them with the existing deterministic canonical serializer. The
 scoped-CSS work ([V01.01.06.04], #60) rewrites an already-parsed tree, so it never needed to *create*
@@ -553,12 +553,12 @@ in the cluster.
 
 - CSS Syntax Module Level 3: https://www.w3.org/TR/css-syntax-3/
 - Reuses the deterministic serializer documented in
-  `libraries/Assimalign.Vue.Syntax.Css/docs/DESIGN.md`.
+  `libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`.
 
 ### Architectural boundaries
 
-- Project: `Assimalign.Vue.Syntax.Css` (netstandard2.0, analyzer-host-safe). References only
-  `Assimalign.Vue.Syntax`. No I/O, no reflection, no dynamic codegen; recoverable, never throws except
+- Project: `Assimalign.Viu.Syntax.Css` (netstandard2.0, analyzer-host-safe). References only
+  `Assimalign.Viu.Syntax`. No I/O, no reflection, no dynamic codegen; recoverable, never throws except
   `OperationCanceledException`.
 - The surface must not reference any other language library, and must not introduce any
   utility/Tailwind concept into Css — it is generic CSS construction.
@@ -566,7 +566,7 @@ in the cluster.
 
 ---
 
-### [V01.01.12.12] Implement the VuecsBundleCss MSBuild task for static-web-asset CSS bundling
+### [V01.01.12.12] Implement the ViuBundleCss MSBuild task for static-web-asset CSS bundling
 
 **Wave** W04 · **Priority** P004 · **Parent** [V01.01.12] (#89) · **Depends on** #58, #60
 · *Shared bundling route with scoped CSS — discharges the deferred bundling non-goal in
@@ -577,17 +577,17 @@ in the cluster.
 
 Implement the MSBuild task that writes generated CSS into `dotnet publish` output as bundled
 `StaticWebAsset`s, resolving the RS1035 limitation that a Roslyn source generator emits C# and cannot
-perform `System.IO`. `Assimalign.Vue.Syntax.Css`'s DESIGN records this as an "MSBuild-task follow-up on
+perform `System.IO`. `Assimalign.Viu.Syntax.Css`'s DESIGN records this as an "MSBuild-task follow-up on
 the [V01.01.06.02] pipeline side"; this task is that follow-up and is **shared** by scoped CSS
 ([V01.01.06.04]) and the utility-first CSS engine ([V01.01.12.16]). The task runs outside the analyzer
 sandbox (I/O permitted), reuses the same netstandard2.0 generation core the incremental generator uses
 (so the physical file and the generated constant are byte-identical), collects the utility stylesheet
-plus per-component scoped `ExtractedStyles`, writes them under `obj/…/vuecs/`, and registers them as
+plus per-component scoped `ExtractedStyles`, writes them under `obj/…/viu/`, and registers them as
 static web assets so the WASM SDK serves and fingerprints them. Zero runtime CSS work.
 
 ## Acceptance Criteria
 
-- A `Microsoft.Build.Utilities.Task` (`VuecsBundleCss`) collects (a) the project's utility stylesheet
+- A `Microsoft.Build.Utilities.Task` (`ViuBundleCss`) collects (a) the project's utility stylesheet
   and (b) per-component scoped `ExtractedStyles`, and writes bundle file(s) under the intermediate
   output directory.
 - The bundle(s) are added to `@(StaticWebAsset)` so `dotnet build`/`publish` copy them to
@@ -607,7 +607,7 @@ static web assets so the WASM SDK serves and fingerprints them. Zero runtime CSS
 - RS1035 (banned analyzer APIs):
   https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/rs1035
 - ASP.NET Core / Blazor static web assets model (the SDK mechanism reused).
-- Reuses the emission documented in `libraries/Assimalign.Vue.Syntax.Css/docs/DESIGN.md` and the
+- Reuses the emission documented in `libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md` and the
   generator pipeline in [V01.01.06.02] (#58).
 
 ### Architectural boundaries
@@ -654,12 +654,12 @@ build-time core the extractor ([V01.01.12.15]) and resolver ([V01.01.12.16]) bot
 ### Standards and Compliance
 
 - Tailwind utility/variant syntax: https://tailwindcss.com/docs (pin representative cases in tests).
-- Value-equality/recoverability contract: `libraries/Assimalign.Vue.Syntax/docs/DESIGN.md`.
+- Value-equality/recoverability contract: `libraries/Assimalign.Viu.Syntax/docs/DESIGN.md`.
 
 ### Architectural boundaries
 
 - Project: the Tooling-owned engine core (netstandard2.0 analyzer-host library; exact packaging per
-  `docs/UTILITY-CSS-DESIGN.md` OQ-2). References `Assimalign.Vue.Syntax` (base) only at this layer — no
+  `docs/UTILITY-CSS-DESIGN.md` OQ-2). References `Assimalign.Viu.Syntax` (base) only at this layer — no
   CSS or theme dependency in the grammar itself.
 - Static tables only; no reflection, no dynamic codegen, no I/O.
 ```
@@ -675,7 +675,7 @@ build-time core the extractor ([V01.01.12.15]) and resolver ([V01.01.12.16]) bot
 
 Implement the theme model that supplies the scales the resolver indexes (screens, colors, spacing,
 fontSize, fontFamily, borderRadius, an `extend` merge block, `darkMode` strategy, and a `safelist`).
-Vuecs cannot execute a `tailwind.config.js` (no `new Function`, AOT/trimming-safe only), so the theme
+Viu cannot execute a `tailwind.config.js` (no `new Function`, AOT/trimming-safe only), so the theme
 is a **static declarative `AdditionalFile`** parsed as data — the engine's central, principled
 divergence from Tailwind (see `docs/UTILITY-CSS-DESIGN.md` §3.4/§3.5). A built-in default theme
 (Tailwind's default scale, transcribed once as a compiled table) applies when no config is present.
@@ -683,7 +683,7 @@ divergence from Tailwind (see `docs/UTILITY-CSS-DESIGN.md` §3.4/§3.5). A built
 ## Acceptance Criteria
 
 - The theme is parsed from an `AdditionalText` (no I/O beyond the additional file) into a
-  value-equatable `UtilityTheme` record; a malformed theme reports a Vuecs diagnostic and falls back to
+  value-equatable `UtilityTheme` record; a malformed theme reports a Viu diagnostic and falls back to
   the default (never throws, never fails hard).
 - A compiled default theme yields working output with no config file present.
 - `extend` merges onto the default (does not replace); `darkMode` selects class vs. media strategy;
@@ -701,7 +701,7 @@ divergence from Tailwind (see `docs/UTILITY-CSS-DESIGN.md` §3.4/§3.5). A built
 
 ### Architectural boundaries
 
-- Project: the Tooling-owned engine core (netstandard2.0). References `Assimalign.Vue.Syntax` (base).
+- Project: the Tooling-owned engine core (netstandard2.0). References `Assimalign.Viu.Syntax` (base).
 - Parsed as data, never evaluated as code. Static default tables only. No I/O outside `AdditionalFiles`.
 ```
 
@@ -738,13 +738,13 @@ determinable classes are extractable (Tailwind parity); dynamic classes use the 
 ### Standards and Compliance
 
 - Tailwind JIT content scanning: https://tailwindcss.com/docs/content-configuration.
-- Registration seam + value-equality: `libraries/Assimalign.Vue.Syntax/docs/DESIGN.md`; template AST:
+- Registration seam + value-equality: `libraries/Assimalign.Viu.Syntax/docs/DESIGN.md`; template AST:
   [V01.01.05.01] (#48)/[V01.01.05.04] (#51).
 
 ### Architectural boundaries
 
 - Project: the Tooling-owned engine core / composition root. The scanner is a `SyntaxParser` rooting on
-  `Assimalign.Vue.Syntax`; registration happens at the composition root, never in a language library.
+  `Assimalign.Viu.Syntax`; registration happens at the composition root, never in a language library.
 - No I/O outside `AdditionalFiles`; no reflection; value-equatable results only.
 
 ### Child tasks (proposed)
@@ -769,7 +769,7 @@ compiled utility tables and theme ([V01.01.12.14]), builds rules via the Css con
 ([V01.01.12.11]), de-duplicates and deterministically orders them into one stylesheet, and wires the
 whole thing into the `IIncrementalGenerator` pipeline with a `Collect()` fan-in over per-file candidate
 sets ([V01.01.12.15]). Emits the stylesheet as a build-visible constant/diagnostic in the generator and
-hands it to the `VuecsBundleCss` task ([V01.01.12.12]) for physical static-web-asset emission. Ships the
+hands it to the `ViuBundleCss` task ([V01.01.12.12]) for physical static-web-asset emission. Ships the
 core utility families first (spacing, color, typography, sizing, flex/grid, border, background), with
 the catalog extensible by table. Zero runtime CSS work.
 
@@ -783,7 +783,7 @@ the catalog extensible by table. Zero runtime CSS work.
 - Pipeline stages are value-equatable; a warm edit that does not change the project's distinct class
   set performs no work past extraction (pin with incremental tests); the `Collect()` fan-in recomputes
   only when the global set changes.
-- The generator surfaces the stylesheet (constant + diagnostics) with no I/O; `VuecsBundleCss` writes
+- The generator surfaces the stylesheet (constant + diagnostics) with no I/O; `ViuBundleCss` writes
   the physical asset; a WASM sample renders styled from the bundle with no runtime CSS generation.
 - Core utility families are covered with tests pinning representative classes against expected CSS
   (Tailwind-referenced); the build-time cost stays within the stated budget (validated by the
@@ -799,7 +799,7 @@ the catalog extensible by table. Zero runtime CSS work.
 ### Architectural boundaries
 
 - Project: resolver/generation in the Tooling-owned engine core; pipeline wiring in
-  `Assimalign.Vue.Syntax.Generators` (composition root). References `Assimalign.Vue.Syntax.Css` for
+  `Assimalign.Viu.Syntax.Generators` (composition root). References `Assimalign.Viu.Syntax.Css` for
   emission — allowed because it is the composition root, not a peer language library. Css never
   references back.
 - netstandard2.0; no I/O in the analyzer (bundling is [V01.01.12.12]'s task); no reflection; no dynamic
@@ -834,7 +834,7 @@ call the utility resolver ([V01.01.12.16]) mid-compile. Also the home for other 
 
 - `@apply <utilities>;` inside a `@style` block expands to the resolved declarations inline, composing
   with `scoped` rewriting and CSS Modules hashing on the same block (deterministic, tested).
-- Unknown utilities in `@apply` report a Vuecs diagnostic on the `.viu` coordinate.
+- Unknown utilities in `@apply` report a Viu diagnostic on the `.viu` coordinate.
 - Composition order with scoped/module transforms is defined and tested; hashes remain deterministic
   and consistent with the [V01.01.06.04] scheme.
 - Trimming/WASM/NativeAOT-safe; no runtime CSS work.
@@ -846,7 +846,7 @@ call the utility resolver ([V01.01.12.16]) mid-compile. Also the home for other 
 
 ### Architectural boundaries
 
-- CSS-side expansion reuses `Assimalign.Vue.Syntax.Css` + the utility resolver at the composition root;
+- CSS-side expansion reuses `Assimalign.Viu.Syntax.Css` + the utility resolver at the composition root;
   the `@style` pipeline calls the resolver — the resolver never calls the `@style` pipeline.
 - netstandard2.0; no I/O outside `AdditionalFiles`; no reflection; no dynamic codegen.
 ```
@@ -867,11 +867,11 @@ implementation is not blocked.
   run over the same compilation.
 
 - **OQ-2 — Engine-core packaging.** Fold the netstandard2.0 engine core into
-  `Assimalign.Vue.Syntax.Generators`, or ship it as a dedicated analyzer-layer library the generator
-  *and* the `VuecsBundleCss` task both reference? **Recommendation:** a dedicated library — the MSBuild
+  `Assimalign.Viu.Syntax.Generators`, or ship it as a dedicated analyzer-layer library the generator
+  *and* the `ViuBundleCss` task both reference? **Recommendation:** a dedicated library — the MSBuild
   task must reuse the core outside the analyzer sandbox, and a separate library gives clean test
   isolation and a single generation implementation. Confirm the exact assembly name/location with the
-  layout owner (it is Tooling/composition code, deliberately **not** a peer `Assimalign.Vue.Syntax.*`
+  layout owner (it is Tooling/composition code, deliberately **not** a peer `Assimalign.Viu.Syntax.*`
   language library, so it may reference Css).
 
 - **OQ-3 — Theme document format.** JSON (`utility.theme.json`) vs. a strongly-shaped C#
@@ -915,6 +915,6 @@ document satisfies it.
 | Feature/task breakdown with WBS, waves, priorities, dependency links, standalone bodies (filed on Project #15 by the orchestrator) | [§7](#7-work-item-breakdown) — file-ready bodies incl. the shared MSBuild bundling task ([V01.01.12.12]) |
 | Honest open questions | [§8](#8-open-questions) |
 
-The final #129 criterion — *filing* the breakdown on Project #15 via the `vuecs-work-items` skill — is
+The final #129 criterion — *filing* the breakdown on Project #15 via the `viu-work-items` skill — is
 handled by the orchestrating session at review time; [§7](#7-work-item-breakdown) is the complete,
 file-ready input for it.

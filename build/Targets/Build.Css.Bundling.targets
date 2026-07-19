@@ -1,26 +1,26 @@
 <Project>
   <!--
     Static-web-asset CSS bundling for .viu single-file components ([V01.01.12.12]) — the MSBuild half that
-    completes the RS1035 deferral recorded in libraries/Assimalign.Vue.Syntax.Css/docs/DESIGN.md (a source
+    completes the RS1035 deferral recorded in libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source
     generator emits C#, not content files; this task does the I/O a generator cannot).
 
     Imported LATE (via build/Build.targets -> Directory.Build.targets), after the consuming csproj has set
-    $(VuecsUseSingleFileComponents) — the same seam the generator's build props/targets rely on, so the
+    $(ViuUseSingleFileComponents) — the same seam the generator's build props/targets rely on, so the
     property is observable here (it is NOT in the early build/*.props).
 
-    Flow, gated on $(VuecsBundleSingleFileComponentCss) (defaults to $(VuecsUseSingleFileComponents)):
-      1. _VuecsResolveSingleFileComponentCssConfiguration — derive the intermediate bundle path/name.
-      2. _VuecsBundleSingleFileComponentCss — Inputs/Outputs-incremental; runs the VuecsBundleCss task,
+    Flow, gated on $(ViuBundleSingleFileComponentCss) (defaults to $(ViuUseSingleFileComponents)):
+      1. _ViuResolveSingleFileComponentCssConfiguration — derive the intermediate bundle path/name.
+      2. _ViuBundleSingleFileComponentCss — Inputs/Outputs-incremental; runs the ViuBundleCss task,
          which re-runs the shared deterministic core over the same **/*.viu inputs and writes the bundle
          (only when its content actually changed).
-      3. ResolveVuecsSingleFileComponentCssAssets — registers the bundle as a Computed StaticWebAsset (the
+      3. ResolveViuSingleFileComponentCssAssets — registers the bundle as a Computed StaticWebAsset (the
          same DefineStaticWebAssets path Blazor scoped CSS uses for <App>.styles.css), so build/publish copy
          and fingerprint it and the dev host serves it. Runs just before ResolveStaticWebAssetsInputs.
 
     LOAD THE BUNDLE: add, inside <head> of the host page (wwwroot/index.html),
-      <link rel="stylesheet" href="<AssemblyName>.vuecs.css" />
+      <link rel="stylesheet" href="<AssemblyName>.viu.css" />
     — the bundle's stable, unfingerprinted logical URL (the static-web-asset endpoint resolves it; a class
-    library's bundle is at _content/<PackageId>/<AssemblyName>.vuecs.css). Automatic <link> injection is a
+    library's bundle is at _content/<PackageId>/<AssemblyName>.viu.css). Automatic <link> injection is a
     deferred follow-up: rewriting the host page's static web asset in place desyncs the .NET SDK's
     compression/endpoint negotiation graph, so the explicit reference is the shipped, publish-safe path.
   -->
@@ -28,52 +28,52 @@
   <PropertyGroup>
     <!-- Master switch: bundle the .viu @style CSS into a static web asset. Defaults ON wherever single-file
          component generation is on, so the same one property opts a project into both. Set to false to keep
-         .viu compilation but skip physical bundling. Evaluated here (late) so $(VuecsUseSingleFileComponents)
+         .viu compilation but skip physical bundling. Evaluated here (late) so $(ViuUseSingleFileComponents)
          — set in the consuming csproj — is already known. -->
-    <VuecsBundleSingleFileComponentCss Condition="'$(VuecsBundleSingleFileComponentCss)' == '' and '$(VuecsUseSingleFileComponents)' == 'true'">true</VuecsBundleSingleFileComponentCss>
-    <VuecsBundleSingleFileComponentCss Condition="'$(VuecsBundleSingleFileComponentCss)' == ''">false</VuecsBundleSingleFileComponentCss>
+    <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == '' and '$(ViuUseSingleFileComponents)' == 'true'">true</ViuBundleSingleFileComponentCss>
+    <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == ''">false</ViuBundleSingleFileComponentCss>
 
-    <!-- The in-repo dogfood path to the built VuecsBundleCss task assembly. Packaged consumers override this
+    <!-- The in-repo dogfood path to the built ViuBundleCss task assembly. Packaged consumers override this
          to the task shipped in the package. Configuration-aware so a Debug or Release build resolves its
          matching task build. -->
-    <VuecsBundleCssTaskAssembly Condition="'$(VuecsBundleCssTaskAssembly)' == ''">$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Tooling.Tasks\src\bin\$(Configuration)\netstandard2.0\Assimalign.Vue.Tooling.Tasks.dll</VuecsBundleCssTaskAssembly>
+    <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\bin\$(Configuration)\netstandard2.0\Assimalign.Viu.Tooling.Tasks.dll</ViuBundleCssTaskAssembly>
   </PropertyGroup>
 
-  <!-- The task lives in analyzers/Assimalign.Vue.Tooling.Tasks; it re-runs the shared Tooling.Css core
+  <!-- The task lives in analyzers/Assimalign.Viu.Tooling.Tasks; it re-runs the shared Tooling.Css core
        OUTSIDE the analyzer sandbox so it may write files. Declared only when the built assembly is present,
        so a project that has not built the task (or disabled bundling) never fails to load the target. -->
-  <UsingTask TaskName="Assimalign.Vue.Tooling.Tasks.VuecsBundleCss"
-             AssemblyFile="$(VuecsBundleCssTaskAssembly)"
-             Condition="'$(VuecsBundleSingleFileComponentCss)' == 'true' and Exists('$(VuecsBundleCssTaskAssembly)')" />
+  <UsingTask TaskName="Assimalign.Viu.Tooling.Tasks.ViuBundleCss"
+             AssemblyFile="$(ViuBundleCssTaskAssembly)"
+             Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')" />
 
-  <Target Name="_VuecsResolveSingleFileComponentCssConfiguration"
-          Condition="'$(VuecsBundleSingleFileComponentCss)' == 'true'"
+  <Target Name="_ViuResolveSingleFileComponentCssConfiguration"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'"
           DependsOnTargets="ResolveStaticWebAssetsConfiguration">
     <PropertyGroup>
-      <!-- Logical file name of the bundle within the static-web-asset base path (e.g. WebApp.vuecs.css).
+      <!-- Logical file name of the bundle within the static-web-asset base path (e.g. WebApp.viu.css).
            Unfingerprinted so the explicit <link href> stays stable. -->
-      <VuecsSingleFileComponentCssBundleName Condition="'$(VuecsSingleFileComponentCssBundleName)' == ''">$(PackageId).vuecs.css</VuecsSingleFileComponentCssBundleName>
-      <_VuecsCssBundleContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)vuecs\'))</_VuecsCssBundleContentRoot>
-      <_VuecsCssBundlePath>$(_VuecsCssBundleContentRoot)$(VuecsSingleFileComponentCssBundleName)</_VuecsCssBundlePath>
+      <ViuSingleFileComponentCssBundleName Condition="'$(ViuSingleFileComponentCssBundleName)' == ''">$(PackageId).viu.css</ViuSingleFileComponentCssBundleName>
+      <_ViuCssBundleContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\'))</_ViuCssBundleContentRoot>
+      <_ViuCssBundlePath>$(_ViuCssBundleContentRoot)$(ViuSingleFileComponentCssBundleName)</_ViuCssBundlePath>
     </PropertyGroup>
   </Target>
 
   <!-- Run the task. Inputs/Outputs make a no-input-change rebuild a no-op at the MSBuild level; the task
        ALSO content-compares and skips the write when the bytes are unchanged, so the timestamp only moves on
        a real change. Both layers satisfy the incremental acceptance criterion. -->
-  <Target Name="_VuecsBundleSingleFileComponentCss"
-          Condition="'$(VuecsBundleSingleFileComponentCss)' == 'true' and Exists('$(VuecsBundleCssTaskAssembly)')"
-          DependsOnTargets="_VuecsResolveSingleFileComponentCssConfiguration"
-          Inputs="@(VuecsSingleFileComponent)"
-          Outputs="$(_VuecsCssBundlePath)">
-    <VuecsBundleCss SingleFileComponents="@(VuecsSingleFileComponent)"
+  <Target Name="_ViuBundleSingleFileComponentCss"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration"
+          Inputs="@(ViuSingleFileComponent)"
+          Outputs="$(_ViuCssBundlePath)">
+    <ViuBundleCss SingleFileComponents="@(ViuSingleFileComponent)"
                     ProjectDirectory="$(ProjectDir)"
-                    BundleOutputPath="$(_VuecsCssBundlePath)">
-      <Output TaskParameter="BundlePath" PropertyName="_VuecsCssBundleWrittenPath" />
-      <Output TaskParameter="BundleWritten" PropertyName="_VuecsCssBundleWasWritten" />
-    </VuecsBundleCss>
+                    BundleOutputPath="$(_ViuCssBundlePath)">
+      <Output TaskParameter="BundlePath" PropertyName="_ViuCssBundleWrittenPath" />
+      <Output TaskParameter="BundleWritten" PropertyName="_ViuCssBundleWasWritten" />
+    </ViuBundleCss>
     <ItemGroup>
-      <FileWrites Include="$(_VuecsCssBundlePath)" Condition="Exists('$(_VuecsCssBundlePath)')" />
+      <FileWrites Include="$(_ViuCssBundlePath)" Condition="Exists('$(_ViuCssBundlePath)')" />
     </ItemGroup>
   </Target>
 
@@ -82,39 +82,39 @@
        before the manifest is generated — robust against import ordering. Always runs (not Inputs/Outputs-gated)
        so the asset is registered on every build/publish even when the file itself was unchanged; only
        registers when the bundle exists. -->
-  <Target Name="ResolveVuecsSingleFileComponentCssAssets"
-          Condition="'$(VuecsBundleSingleFileComponentCss)' == 'true' and Exists('$(VuecsBundleCssTaskAssembly)')"
+  <Target Name="ResolveViuSingleFileComponentCssAssets"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
           BeforeTargets="ResolveStaticWebAssetsInputs"
-          DependsOnTargets="_VuecsBundleSingleFileComponentCss">
-    <ItemGroup Condition="Exists('$(_VuecsCssBundlePath)')">
-      <_VuecsCssBundleStaticWebAssetCandidate Include="$(_VuecsCssBundlePath)">
-        <RelativePath>$(VuecsSingleFileComponentCssBundleName)</RelativePath>
-      </_VuecsCssBundleStaticWebAssetCandidate>
+          DependsOnTargets="_ViuBundleSingleFileComponentCss">
+    <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
+      <_ViuCssBundleStaticWebAssetCandidate Include="$(_ViuCssBundlePath)">
+        <RelativePath>$(ViuSingleFileComponentCssBundleName)</RelativePath>
+      </_ViuCssBundleStaticWebAssetCandidate>
     </ItemGroup>
 
-    <DefineStaticWebAssets Condition="'@(_VuecsCssBundleStaticWebAssetCandidate)' != ''"
-                           CandidateAssets="@(_VuecsCssBundleStaticWebAssetCandidate)"
+    <DefineStaticWebAssets Condition="'@(_ViuCssBundleStaticWebAssetCandidate)' != ''"
+                           CandidateAssets="@(_ViuCssBundleStaticWebAssetCandidate)"
                            SourceType="Computed"
                            SourceId="$(PackageId)"
-                           ContentRoot="$(_VuecsCssBundleContentRoot)"
+                           ContentRoot="$(_ViuCssBundleContentRoot)"
                            BasePath="$(StaticWebAssetBasePath)"
                            AssetKind="All"
                            AssetMode="CurrentProject"
                            AssetRole="Primary"
                            CopyToOutputDirectory="Never"
                            CopyToPublishDirectory="PreserveNewest">
-      <Output TaskParameter="Assets" ItemName="_VuecsCssBundleStaticWebAsset" />
+      <Output TaskParameter="Assets" ItemName="_ViuCssBundleStaticWebAsset" />
     </DefineStaticWebAssets>
 
-    <DefineStaticWebAssetEndpoints Condition="'@(_VuecsCssBundleStaticWebAsset)' != ''"
-                                   CandidateAssets="@(_VuecsCssBundleStaticWebAsset)"
+    <DefineStaticWebAssetEndpoints Condition="'@(_ViuCssBundleStaticWebAsset)' != ''"
+                                   CandidateAssets="@(_ViuCssBundleStaticWebAsset)"
                                    ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
-      <Output TaskParameter="Endpoints" ItemName="_VuecsCssBundleStaticWebAssetEndpoint" />
+      <Output TaskParameter="Endpoints" ItemName="_ViuCssBundleStaticWebAssetEndpoint" />
     </DefineStaticWebAssetEndpoints>
 
     <ItemGroup>
-      <StaticWebAsset Include="@(_VuecsCssBundleStaticWebAsset)" />
-      <StaticWebAssetEndpoint Include="@(_VuecsCssBundleStaticWebAssetEndpoint)" />
+      <StaticWebAsset Include="@(_ViuCssBundleStaticWebAsset)" />
+      <StaticWebAssetEndpoint Include="@(_ViuCssBundleStaticWebAssetEndpoint)" />
     </ItemGroup>
   </Target>
 </Project>

@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <VuecsProjectReference Include="Assimalign.Vue.Shared" />
-    <VuecsProjectReference Include="Assimalign.Vue.Reactivity" />
-  </ItemGroup>
-</Project>

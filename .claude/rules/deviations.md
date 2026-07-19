@@ -22,7 +22,7 @@ silently complying or silently ignoring it:
 Rules that need especially explicit confirmation before deviating:
 
 - **AOT / trimming safety** — no reflection-based serialization, no dynamic code generation.
-- **The central build system** — `VuecsProjectReference` / `VuecsPackageReference` (no raw
+- **The central build system** — `ViuProjectReference` / `ViuPackageReference` (no raw
   `<ProjectReference>` / `<PackageReference>`), the `build/` props/targets, and centralized versioning.
 - **Upstream Vue 3 parity** — a behavioral divergence from vuejs/core v3.5 must be intentional, documented
   (in the type's XML docs and, where relevant, a `DESIGN.md` non-goal), and pinned by a test that asserts

@@ -2,7 +2,7 @@
 # composite instead of duplicating SDK/workload/cache steps, so wasm-tools version drift cannot
 # occur between areas. The repository checkout stays in each workflow — a local composite action
 # cannot run before the repository that contains it is checked out.
-name: Set up .NET for Vuecs
+name: Set up .NET for Viu
 description: >-
   .NET 10 SDK (pinned by global.json), NuGet + workload-pack caching, and optionally the
   wasm-tools workload for WebAssembly app builds.

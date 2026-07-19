@@ -1,12 +1,12 @@
 name: Feature (WBS)
-description: A feature under an area epic. Prefer New-VuecsWorkItem.ps1, which computes the WBS code and links the sub-issue automatically.
+description: A feature under an area epic. Prefer New-ViuWorkItem.ps1, which computes the WBS code and links the sub-issue automatically.
 title: "[V01.01.NN.MM] "
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        **Prefer the script** (`New-VuecsWorkItem.ps1 -As feature ...`) so the WBS code, the
+        **Prefer the script** (`New-ViuWorkItem.ps1 -As feature ...`) so the WBS code, the
         native sub-issue link, and the Project #15 fields (Kind=Feature, Area, Origin, Status) are
         set for you. Use this form only as a fallback — then replace `NN.MM` in the title with the
         next free code, set the parent area epic, and set the Project fields manually.
@@ -40,6 +40,6 @@ body:
     attributes:
       label: Standards and Compliance
       value: |
-        - <Vue 3 API parity reference (vuejs.org / vuejs/core), WHATWG/W3C spec for DOM behavior, or a note that it is a Vuecs runtime-contract concern>
+        - <Vue 3 API parity reference (vuejs.org / vuejs/core), WHATWG/W3C spec for DOM behavior, or a note that it is a Viu runtime-contract concern>
     validations:
       required: false

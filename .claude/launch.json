@@ -4,7 +4,7 @@
     {
       "name": "webapp",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "examples/Assimalign.Vue.WebApp", "--launch-profile", "Assimalign.Vuecs.WebApp"],
+      "runtimeArgs": ["run", "--project", "examples/Assimalign.Viu.WebApp", "--launch-profile", "Assimalign.Viu.WebApp"],
       "port": 5229
     }
   ]

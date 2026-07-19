@@ -1,8 +1,8 @@
 <Project>
     <PropertyGroup>
         <!-- Major version tracks the targeted .NET runtime release for simpler release management. -->
-        <VuecsMajorVersion>$([System.Version]::Parse('$(TargetFrameworkLatest.TrimStart('net'))').Major)</VuecsMajorVersion>
-        <VuecsMinorVersion>0</VuecsMinorVersion>
+        <ViuMajorVersion>$([System.Version]::Parse('$(TargetFrameworkLatest.TrimStart('net'))').Major)</ViuMajorVersion>
+        <ViuMinorVersion>0</ViuMinorVersion>
         <!--
             Patch may carry an optional semver prerelease tag after a single '-',
             e.g. "0", "2", "2-preview.1", "5-rc.3". Splitting it here lets the
@@ -10,18 +10,18 @@
             semver is welcome) while the numeric core feeds AssemblyVersion /
             FileVersion (where the C# compiler enforces numeric-only via CS7034).
         -->
-        <VuecsPatchVersion>1-preview.2</VuecsPatchVersion>
+        <ViuPatchVersion>1-preview.2</ViuPatchVersion>
 
         <!-- Numeric core. Suitable for AssemblyVersion / FileVersion. -->
-        <_VuecsPatchCore>$(VuecsPatchVersion.Split('-')[0])</_VuecsPatchCore>
-        <VuecsVersionPrefix>$(VuecsMajorVersion).$(VuecsMinorVersion).$(_VuecsPatchCore)</VuecsVersionPrefix>
+        <_ViuPatchCore>$(ViuPatchVersion.Split('-')[0])</_ViuPatchCore>
+        <ViuVersionPrefix>$(ViuMajorVersion).$(ViuMinorVersion).$(_ViuPatchCore)</ViuVersionPrefix>
 
         <!--
             Optional semver suffix. Single split on the first '-' matches semver
             convention (the suffix may contain dots, e.g. "preview.1", but not a
             second '-'). Empty for stable releases.
         -->
-        <VuecsVersionSuffix Condition="$(VuecsPatchVersion.Contains('-'))">$(VuecsPatchVersion.Split('-')[1])</VuecsVersionSuffix>
+        <ViuVersionSuffix Condition="$(ViuPatchVersion.Contains('-'))">$(ViuPatchVersion.Split('-')[1])</ViuVersionSuffix>
 
         <!--
             Full semver. "X.Y.Z" stable, "X.Y.Z-suffix" prerelease.
@@ -29,8 +29,8 @@
             consumed by Install-Local.ps1, the framework workflow's read-version
             step, and the .nupkg filenames.
         -->
-        <VuecsVersion Condition="'$(VuecsVersionSuffix)' != ''">$(VuecsVersionPrefix)-$(VuecsVersionSuffix)</VuecsVersion>
-        <VuecsVersion Condition="'$(VuecsVersionSuffix)' == ''">$(VuecsVersionPrefix)</VuecsVersion>
+        <ViuVersion Condition="'$(ViuVersionSuffix)' != ''">$(ViuVersionPrefix)-$(ViuVersionSuffix)</ViuVersion>
+        <ViuVersion Condition="'$(ViuVersionSuffix)' == ''">$(ViuVersionPrefix)</ViuVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(IsPackable)' != 'false'">
@@ -46,8 +46,8 @@
             the value is fed straight to [assembly: AssemblyVersion], which
             rejects the prerelease suffix.
         -->
-        <VersionPrefix Condition="'$(VersionPrefix)' == '' or '$(VersionPrefix)' == '1.0.0'">$(VuecsVersionPrefix)</VersionPrefix>
-        <VersionSuffix Condition="'$(VersionSuffix)' == '' and '$(VuecsVersionSuffix)' != ''">$(VuecsVersionSuffix)</VersionSuffix>
-        <PackageOutputPath Condition="'$(PackageOutputPath)' == ''">$(VuecsOutputPathForLibraries)</PackageOutputPath>
+        <VersionPrefix Condition="'$(VersionPrefix)' == '' or '$(VersionPrefix)' == '1.0.0'">$(ViuVersionPrefix)</VersionPrefix>
+        <VersionSuffix Condition="'$(VersionSuffix)' == '' and '$(ViuVersionSuffix)' != ''">$(ViuVersionSuffix)</VersionSuffix>
+        <PackageOutputPath Condition="'$(PackageOutputPath)' == ''">$(ViuOutputPathForLibraries)</PackageOutputPath>
     </PropertyGroup>
 </Project>

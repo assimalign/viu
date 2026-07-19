@@ -1,5 +1,5 @@
 name: Scope creep (discovered work)
-description: Out-of-scope work discovered while implementing something else. Prefer New-VuecsWorkItem.ps1, which tags Origin and links the sub-issue.
+description: Out-of-scope work discovered while implementing something else. Prefer New-ViuWorkItem.ps1, which tags Origin and links the sub-issue.
 title: "[V01.01.NN.MM(.PP)] "
 labels: [scope-creep]
 body:
@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Capture work that falls **outside** the item you are currently building, so a PR can close
-        it alongside the original. **Prefer the script**: `New-VuecsWorkItem.ps1 -As task|feature ...`
+        it alongside the original. **Prefer the script**: `New-ViuWorkItem.ps1 -As task|feature ...`
         auto-tags Origin, applies the `scope-creep` label, and links the sub-issue.
   - type: input
     id: discovered-while
