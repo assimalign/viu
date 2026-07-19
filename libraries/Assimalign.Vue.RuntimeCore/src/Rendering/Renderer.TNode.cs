@@ -339,8 +339,24 @@ public sealed class Renderer<TNode>
         }
         InvokeHook(node, null, "onVnodeBeforeMount");
         InvokeDirectiveHooks(node, null, DirectiveHookKind.BeforeMount);
+        // Transition beforeEnter fires immediately before insertion (upstream mountElement: needTransition
+        // && transition.beforeEnter(el)); a persisted (v-show) transition is skipped. node.El — not the
+        // local — is passed so beforeEnter/enter/leave share one boxed-node identity ([V01.01.04.07]).
+        var needTransition = node.Transition is { Persisted: false };
+        if (needTransition)
+        {
+            node.Transition!.BeforeEnter(node.El!);
+        }
         _options.Insert(element, container, anchor);
         QueuePostHook(node, null, "onVnodeMounted");
+        // Transition enter runs post-flush, after insertion (upstream: queuePostRenderEffect), ordered
+        // after onVnodeMounted and before the mounted directive hooks — matching upstream's single
+        // post-render callback (vnodeHook, then enter, then dirs mounted).
+        if (needTransition)
+        {
+            var transitionNode = node;
+            Scheduler.QueuePostFlushCallback(new SchedulerJob(() => transitionNode.Transition!.Enter(transitionNode.El!)));
+        }
         // Directive 'mounted' runs post-flush, after the subtree is in the host (upstream:
         // queuePostRenderEffect), so children fire child-first via the stable post-flush order.
         QueuePostDirectiveHooks(node, null, DirectiveHookKind.Mounted);
@@ -1357,11 +1373,9 @@ public sealed class Renderer<TNode>
                         break;
                     default:
                         // Element/Text/Comment: a single host removal takes the node and, for an
-                        // element, its descendants' platform nodes with it.
-                        if (node.El is not null)
-                        {
-                            _options.Remove((TNode)node.El);
-                        }
+                        // element, its descendants' platform nodes with it. An element inside a
+                        // <Transition> defers the removal behind its leave choreography.
+                        RemoveNode(node);
                         break;
                 }
             }
@@ -1370,6 +1384,46 @@ public sealed class Renderer<TNode>
         if (node.Type == VirtualNodeType.Element)
         {
             QueuePostDirectiveHooks(node, null, DirectiveHookKind.Unmounted);
+        }
+    }
+
+    private void RemoveNode(VirtualNode node)
+    {
+        // The C# port of the renderer's `remove` (renderer.ts): host-remove an Element/Text/Comment,
+        // but route an element inside a non-persisted <Transition> through its leave choreography so
+        // removal waits on the animation ([V01.01.04.07]). node.El is boxed once, so the leave hook,
+        // the enter hooks, and this remove share one node identity for the per-element callback tables.
+        if (node.El is null)
+        {
+            return;
+        }
+        var element = node.El;
+        var transition = node.Type == VirtualNodeType.Element ? node.Transition : null;
+        void PerformRemove()
+        {
+            _options.Remove((TNode)element);
+            // Upstream: afterLeave (the out-in re-render continuation) fires after host removal.
+            if (transition is { Persisted: false })
+            {
+                transition.AfterLeave?.Invoke();
+            }
+        }
+        if (transition is { Persisted: false })
+        {
+            void PerformLeave() => transition.Leave(element, PerformRemove);
+            if (transition.DelayLeave is not null)
+            {
+                // in-out mode: defer the leave until the incoming element has entered.
+                transition.DelayLeave(element, PerformRemove, PerformLeave);
+            }
+            else
+            {
+                PerformLeave();
+            }
+        }
+        else
+        {
+            PerformRemove();
         }
     }
 
