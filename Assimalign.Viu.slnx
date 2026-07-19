@@ -60,6 +60,7 @@
 		<File Path=".github/workflows/area-shared.yml" />
 		<File Path=".github/workflows/area-syntax.yml" />
 		<File Path=".github/workflows/area-testing.yml" />
+		<File Path=".github/workflows/budget-gates.yml" />
 		<File Path=".github/workflows/webapp.yml" />
 	</Folder>
 	<Folder Name="/viu/analyzers/" />
@@ -137,8 +138,17 @@
 	</Folder>
 	<Folder Name="/viu/scripts/">
 		<File Path="scripts/Install-Local.ps1" />
+		<File Path="scripts/Measure-PublishBudget.ps1" />
 	</Folder>
-	<Folder Name="/viu/examples/" />
+	<Folder Name="/viu/scripts/budgets/">
+		<File Path="scripts/budgets/PublishBudgets.json" />
+	</Folder>
+	<Folder Name="/viu/scripts/tests/Assimalign.Viu.PublishBudget.Tests/">
+		<Project Path="scripts/tests/Assimalign.Viu.PublishBudget.Tests/Assimalign.Viu.PublishBudget.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/examples/">
+		<File Path="examples/Directory.Build.props" />
+	</Folder>
 	<Folder Name="/viu/examples/Assimalign.Viu.WebApp/">
 		<Project Path="examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj" />
 	</Folder>
