@@ -182,6 +182,10 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             var transformOptions = TransformOptions.CreateDom();
             transformOptions.PrefixIdentifiers = true;
             transformOptions.BindingMetadata = bindingMetadata;
+            // Static caching and stringification ([V01.01.05.07]): fully static subtrees are cached and long
+            // static runs collapse to innerHTML string inserts, cutting per-node JS-interop round-trips on
+            // WASM. Deterministic and value-equatable, so the incremental-generator cache is preserved.
+            transformOptions.HoistStatic = true;
             // CacheHandlers stays off: the upstream cached member-expression wrapper `(...args) => ...`
             // has no C# spelling yet; handler caching is runtime-binding follow-up work. v-once caching
             // is independent of this switch and fully emitted.

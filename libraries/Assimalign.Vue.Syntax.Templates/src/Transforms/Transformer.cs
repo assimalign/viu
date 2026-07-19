@@ -30,7 +30,13 @@ public static class Transformer
         var context = new TransformContext(root, nodeTransforms, directiveTransforms, options);
 
         TransformTraversal.TraverseNode(root, context);
-        // The static-hoisting/caching pass ([V01.01.05.07]) would run here when options.HoistStatic is set.
+        if (options.HoistStatic)
+        {
+            // The static-caching/stringification pass ([V01.01.05.07]): cache fully static subtrees
+            // (marking them PatchFlags.Cached) and collapse contiguous static runs into stringified static
+            // vnodes, before the root code-generation node is built (upstream runs cacheStatic here).
+            StaticCache.Cache(root, context);
+        }
 
         var rootChildren = context.WorkingChildrenOf(root, root.Children);
         var codegenNode = CreateRootCodegen(context, rootChildren);
