@@ -38,6 +38,18 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// handlers); surfaced as a generated constant because C# arrays cannot grow on assignment the way
 /// upstream's JavaScript render cache does.
 /// </param>
+/// <param name="ScopeId">
+/// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
+/// <c>scoped</c> <c>@style</c> block, otherwise <see langword="null"/> ([V01.01.06.04]). Emitted as a
+/// generated constant so the renderer can stamp the matching <c>data-v-&lt;hash&gt;</c> attribute on the
+/// component's elements — the scope-id propagation contract the runtime side implements.
+/// </param>
+/// <param name="ExtractedStyles">
+/// The component's compiled CSS — scoped <c>@style</c> blocks rewritten with <see cref="ScopeId"/> and
+/// non-scoped blocks passed through unmodified, concatenated in source order — or <see langword="null"/>
+/// when the component declares no <c>@style</c> block. Emitted as a generated string constant; the
+/// physical static-web-asset bundling is the MSBuild-side follow-up.
+/// </param>
 internal readonly record struct SingleFileComponentModel(
     string? Namespace,
     string ClassName,
@@ -51,7 +63,9 @@ internal readonly record struct SingleFileComponentModel(
     ScriptRegions Script,
     EquatableArray<ScriptBinding> Bindings,
     string? RenderBody,
-    int RenderCacheSize)
+    int RenderCacheSize,
+    string? ScopeId,
+    string? ExtractedStyles)
 {
     /// <summary>
     /// Materializes the template compiler's <see cref="BindingMetadata"/> from the classified

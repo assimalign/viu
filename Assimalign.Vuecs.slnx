@@ -187,6 +187,7 @@
 		<Project Path="libraries/Assimalign.Vue.RuntimeDom/src/Assimalign.Vue.RuntimeDom.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.RuntimeDom/test/">
+		<Project Path="libraries/Assimalign.Vue.RuntimeDom/test/Assimalign.Vue.RuntimeDom.CompiledRenderTests/Assimalign.Vue.RuntimeDom.CompiledRenderTests.csproj" />
 		<Project Path="libraries/Assimalign.Vue.RuntimeDom/test/Assimalign.Vue.RuntimeDom.Tests.csproj" />
 	</Folder>
 	<Folder Name="/vuecs/libraries/Assimalign.Vue.Shared/" />

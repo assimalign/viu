@@ -158,6 +158,14 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
         return _registry.Dispatch(handle, capture: false, Event("change", targetValue: singleValue, selectedValues: selectedValues));
     }
 
+    /// <summary>
+    /// Dispatches a plain <c>click</c> to the element's property-channel handlers, returning the response
+    /// flags the bridge would apply to the live event (bit 0 <c>stopPropagation</c>, bit 1
+    /// <c>preventDefault</c>) — the seam a <c>@click.stop</c>/<c>.prevent</c> modifier handler records intents on.
+    /// </summary>
+    public int FireClick(int handle)
+        => _registry.Dispatch(handle, capture: false, Event("click"));
+
     public int FireCompositionStart(int handle)
         => _registry.Dispatch(handle, capture: false, Event("compositionstart"));
 

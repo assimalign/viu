@@ -124,6 +124,36 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VUECS1203"));
 
+    /// <summary>A recoverable error reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
+    internal static readonly DiagnosticDescriptor StyleError = new(
+        id: "VUECS1301",
+        title: "Single-file component style parse error",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1301"));
+
+    /// <summary>A warning reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
+    internal static readonly DiagnosticDescriptor StyleWarning = new(
+        id: "VUECS1302",
+        title: "Single-file component style parse warning",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1302"));
+
+    /// <summary>An informational message reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
+    internal static readonly DiagnosticDescriptor StyleInformation = new(
+        id: "VUECS1303",
+        title: "Single-file component style parse information",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VUECS1303"));
+
     /// <summary>
     /// Envelopes <paramref name="diagnostic"/> as a value-equatable <see cref="DiagnosticInfo"/> located
     /// on the <c>.viu</c> file at <paramref name="filePath"/>. When <paramref name="blockContentStart"/>
@@ -205,6 +235,42 @@ internal static class SingleFileComponentDiagnostics
             + ")";
         return new DiagnosticInfo(descriptor, location, message);
     }
+
+    /// <summary>
+    /// Envelopes a dispatched <c>@style</c> CSS parse <paramref name="diagnostic"/> ([V01.01.06.04]) as a
+    /// value-equatable <see cref="DiagnosticInfo"/> located on the <c>.viu</c> file. The CSS parser reports
+    /// positions relative to the <c>@style</c> block's content, so they are composed with
+    /// <paramref name="blockContentStart"/> into <c>.viu</c> coordinates through the <em>same</em>
+    /// <see cref="ComposeBlockLocation"/> arithmetic the <c>@template</c>/<c>@script</c> paths use, landing
+    /// a CSS error on the exact <c>.viu</c> style line/column.
+    /// </summary>
+    /// <param name="filePath">The originating <c>.viu</c> file path.</param>
+    /// <param name="diagnostic">The base CSS parser diagnostic to map.</param>
+    /// <param name="blockContentStart">The file position where the <c>@style</c> block's content begins.</param>
+    /// <returns>The value-equatable diagnostic located on the <c>.viu</c> file.</returns>
+    public static DiagnosticInfo CreateStyle(string filePath, SyntaxDiagnostic diagnostic, Position blockContentStart)
+    {
+        var descriptor = MapStyle(diagnostic.Severity);
+        var location = BuildLocation(filePath, diagnostic.Location, blockContentStart);
+
+        // Carry the Vuecs-defined CssErrorCode in the message, mirroring how the container/template/script
+        // paths surface their per-language catalog codes.
+        var message = diagnostic.Message
+            + " (CSS code "
+            + diagnostic.RawCode.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + ")";
+        return new DiagnosticInfo(descriptor, location, message);
+    }
+
+    private static DiagnosticDescriptor MapStyle(SyntaxDiagnosticSeverity severity)
+        // Info and Hidden collapse into the informational descriptor, matching the container/template
+        // mapping's treatment of the low end.
+        => severity switch
+        {
+            SyntaxDiagnosticSeverity.Error => StyleError,
+            SyntaxDiagnosticSeverity.Warning => StyleWarning,
+            _ => StyleInformation,
+        };
 
     private static DiagnosticDescriptor Map(bool fromTemplate, SyntaxDiagnosticSeverity severity)
     {

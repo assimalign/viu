@@ -413,7 +413,9 @@ public sealed class SingleFileComponentScriptTests
             Script: new ScriptRegions(null, 0, "    public Reference<int> Count = default!;\n", 1),
             Bindings: bindings,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: null,
+            ExtractedStyles: null);
 
         var metadata = model.ToBindingMetadata();
 
@@ -441,7 +443,9 @@ public sealed class SingleFileComponentScriptTests
             Script: ScriptRegions.None,
             Bindings: EquatableArray<ScriptBinding>.Empty,
             RenderBody: null,
-            RenderCacheSize: 0);
+            RenderCacheSize: 0,
+            ScopeId: null,
+            ExtractedStyles: null);
 
         var metadata = model.ToBindingMetadata();
 
