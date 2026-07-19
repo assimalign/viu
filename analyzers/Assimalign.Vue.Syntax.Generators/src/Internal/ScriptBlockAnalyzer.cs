@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using Assimalign.Vue.Syntax;
 using Assimalign.Vue.Syntax.SingleFileComponent;
 using Assimalign.Vue.Syntax.Templates;
 
@@ -16,12 +17,20 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// (the generator has no semantic model for code it is itself generating, and reflection is forbidden):
 /// <list type="number">
 /// <item>
-/// <b>Validation.</b> The raw block content is Roslyn-parsed <em>inside a synthetic partial class</em> —
-/// the exact syntactic context <see cref="SingleFileComponentSourceEmitter"/> emits it into — so member
-/// declarations are legal and any malformed C# surfaces as a recoverable, position-mapped diagnostic
-/// rather than a crash or a broken generated file. Positions are composed back to the <c>.viu</c> file by
-/// <see cref="SingleFileComponentDiagnostics.CreateScript"/>, agreeing with the block-to-file mapping used
-/// for dispatched-block diagnostics.
+/// <b>Region split ([V01.01.06.03.01]).</b> Leading <c>using</c> directives are separated from the class
+/// members: a raw compilation-unit parse locates the leading using run, and the block is cut at the line
+/// boundary after it into a hoisted <em>using region</em> and a class-body <em>member region</em>
+/// (<see cref="ScriptRegions"/>). Vue hoists a <c>&lt;script setup&gt;</c> block's imports out of the
+/// render scope the same way.
+/// </item>
+/// <item>
+/// <b>Validation.</b> Each region is Roslyn-parsed in the context the emitter places it — the using region
+/// bare (a compilation unit, where usings are legal), the member region <em>inside a synthetic partial
+/// class</em> (where members are legal) — so malformed C# in either surfaces as a recoverable,
+/// position-mapped diagnostic rather than a crash or a broken generated file. Positions are composed back
+/// to the <c>.viu</c> file by <see cref="SingleFileComponentDiagnostics.CreateScript"/> against each
+/// region's own content start, agreeing with the block-to-file mapping used for dispatched-block
+/// diagnostics and with the emitter's two <c>#line</c> anchors by construction.
 /// </item>
 /// <item>
 /// <b>Binding-metadata extraction.</b> Each top-level member is classified into a <see cref="BindingType"/>
@@ -29,10 +38,11 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <c>.Value</c>. Classification is conservative: only a field/property whose declared type is a known
 /// <c>Assimalign.Vue.Reactivity</c> reference type becomes <see cref="BindingType.SetupReference"/> (the
 /// only binding the template ever unwraps), so a misclassification can never ship a wrong <c>.Value</c>.
+/// It is unaffected by the region split — only members are classified, exactly as if the usings were absent.
 /// </item>
 /// </list>
 /// See https://vuejs.org/api/sfc-script-setup.html and <c>docs/FORMAT.md</c> (the <c>@script</c> content
-/// contract). Work item [V01.01.06.03].
+/// contract). Work items [V01.01.06.03] and [V01.01.06.03.01].
 /// </summary>
 internal static class ScriptBlockAnalyzer
 {
@@ -66,19 +76,93 @@ internal static class ScriptBlockAnalyzer
     };
 
     /// <summary>
-    /// Validates <paramref name="script"/> and extracts its binding metadata, appending any parse
-    /// diagnostics (mapped to <paramref name="filePath"/> coordinates) to <paramref name="diagnostics"/>.
+    /// Splits <paramref name="script"/> into its hoisted-using and class-body member regions, validates
+    /// each, and extracts its binding metadata, appending any parse diagnostics (mapped to
+    /// <paramref name="filePath"/> coordinates) to <paramref name="diagnostics"/>.
     /// </summary>
     /// <param name="filePath">The originating <c>.viu</c> file path (the diagnostic and <c>#line</c> anchor).</param>
     /// <param name="script">The parsed <c>@script</c> block.</param>
     /// <param name="diagnostics">The diagnostic accumulator the mapped script diagnostics are added to.</param>
-    /// <returns>The value-equatable classified bindings, empty when the block declares no members.</returns>
-    public static EquatableArray<ScriptBinding> Analyze(
+    /// <returns>The regions to emit and the value-equatable classified bindings (empty when the block declares no members).</returns>
+    public static ScriptAnalysis Analyze(
         string filePath,
         SingleFileComponentScriptBlock script,
         List<DiagnosticInfo> diagnostics)
     {
-        var tree = CSharpSyntaxTree.ParseText(ProbePrefix + script.Content + ProbeSuffix, ParseOptions);
+        var content = script.Content;
+        var contentStart = script.ContentLocation.Start;
+
+        // Parse the raw block content to locate the leading using run. In a compilation unit the usings are
+        // legal top-level nodes (they are illegal in the member-region probe below), so this parse serves
+        // only to find the split point; its member-region parse errors are validated by the member probe,
+        // not collected here.
+        var splitTree = CSharpSyntaxTree.ParseText(content, ParseOptions);
+        var leadingUsings = ((CompilationUnitSyntax)splitTree.GetRoot()).Usings;
+
+        string? usingRegion = null;
+        var usingRegionStartLine = 0;
+        var memberRegionText = content;
+        var memberRegionStartLine = contentStart.Line;
+        var memberRegionOffset = 0;
+
+        if (leadingUsings.Count > 0)
+        {
+            // Split at the START of the first line after the last leading using directive, so both regions
+            // begin at .viu column 1 and map cleanly under their own #line anchor. C# forbids members before
+            // usings, so CompilationUnitSyntax.Usings is exactly the leading run. A member sharing a line
+            // with the last using is a pathological, illegal case that stays in the using region; it still
+            // surfaces a recoverable diagnostic rather than crashing.
+            var lastUsing = leadingUsings[leadingUsings.Count - 1];
+            var lastUsingEndLine = lastUsing.GetLocation().GetLineSpan().EndLinePosition.Line;
+            var memberLineIndex = lastUsingEndLine + 1;
+            var lines = splitTree.GetText().Lines;
+            var splitOffset = memberLineIndex < lines.Count ? lines[memberLineIndex].Start : content.Length;
+
+            usingRegion = content.Substring(0, splitOffset);
+            usingRegionStartLine = contentStart.Line;
+            memberRegionText = content.Substring(splitOffset);
+            memberRegionStartLine = contentStart.Line + memberLineIndex;
+            memberRegionOffset = splitOffset;
+
+            // Validate the hoisted using region. Parsed bare (no probe wrapper), its Roslyn positions are
+            // already relative to the region's content start (= the script content start), so it composes
+            // there — the same CreateScript/ComposeBlockLocation arithmetic the member region uses, so a
+            // malformed hoisted using lands on the exact .viu coordinate.
+            ValidateUsingRegion(usingRegion, filePath, contentStart, diagnostics);
+        }
+
+        // A whitespace-only member region declares no members and contributes no class-body text worth
+        // emitting; treat it as absent so the emitter skips its #line block (and no probe parse runs).
+        var memberRegion = string.IsNullOrWhiteSpace(memberRegionText) ? null : memberRegionText;
+
+        var bindings = EquatableArray<ScriptBinding>.Empty;
+        if (memberRegion is not null)
+        {
+            // The member region begins at a .viu line boundary (column 1); compose diagnostics and the
+            // classification against that position through the synthetic partial-class probe.
+            var memberRegionStart = new Position(contentStart.Offset + memberRegionOffset, memberRegionStartLine, 1);
+            bindings = ClassifyMembers(memberRegion, filePath, memberRegionStart, diagnostics);
+        }
+
+        var regions = new ScriptRegions(
+            usingRegion,
+            usingRegionStartLine,
+            memberRegion,
+            memberRegion is null ? 0 : memberRegionStartLine);
+        return new ScriptAnalysis(regions, bindings);
+    }
+
+    // Parses the class-body member region inside the synthetic partial-class probe (so member declarations
+    // are legal), maps any parse diagnostics onto the .viu file against the member region's content start,
+    // and classifies each top-level member into its binding type. The probe wrapper is un-shifted by
+    // ProbePrefix.Length / ProbeLineOffset so a diagnostic composes to the member region's own coordinates.
+    private static EquatableArray<ScriptBinding> ClassifyMembers(
+        string memberRegion,
+        string filePath,
+        Position memberRegionStart,
+        List<DiagnosticInfo> diagnostics)
+    {
+        var tree = CSharpSyntaxTree.ParseText(ProbePrefix + memberRegion + ProbeSuffix, ParseOptions);
         var root = (CompilationUnitSyntax)tree.GetRoot();
 
         foreach (var diagnostic in tree.GetDiagnostics())
@@ -86,7 +170,7 @@ internal static class ScriptBlockAnalyzer
             diagnostics.Add(SingleFileComponentDiagnostics.CreateScript(
                 filePath,
                 diagnostic,
-                script.ContentLocation.Start,
+                memberRegionStart,
                 ProbePrefix.Length,
                 ProbeLineOffset));
         }
@@ -106,6 +190,28 @@ internal static class ScriptBlockAnalyzer
         return bindings.Count == 0
             ? EquatableArray<ScriptBinding>.Empty
             : new EquatableArray<ScriptBinding>(bindings.ToArray());
+    }
+
+    // Validates the hoisted using region as a bare compilation unit (usings are legal there) and maps any
+    // recoverable parse diagnostics onto the .viu file against the region's content start. Parsed without
+    // the probe wrapper, so the CreateScript un-shift offsets are zero — the same composition the member
+    // probe uses, so a malformed hoisted using resolves to the exact .viu coordinate.
+    private static void ValidateUsingRegion(
+        string usingRegion,
+        string filePath,
+        Position regionStart,
+        List<DiagnosticInfo> diagnostics)
+    {
+        var tree = CSharpSyntaxTree.ParseText(usingRegion, ParseOptions);
+        foreach (var diagnostic in tree.GetDiagnostics())
+        {
+            diagnostics.Add(SingleFileComponentDiagnostics.CreateScript(
+                filePath,
+                diagnostic,
+                regionStart,
+                probePrefixLength: 0,
+                probeLineOffset: 0));
+        }
     }
 
     // Locates the synthetic wrapper class. It is normally the sole top-level member; a search by name is

@@ -11,9 +11,9 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// caches on it: a <c>.viu</c> edit that re-parses to an equal descriptor shape re-emits nothing. The
 /// block-presence counts summarize the parsed <see cref="Assimalign.Vue.Syntax.SingleFileComponent.SingleFileComponentDescriptor"/>
 /// so the scaffold reflects what the composed parse produced; the render body itself is [V01.01.05.05]'s
-/// output. The merged <c>@script</c> C# ([V01.01.06.03]) rides here as its verbatim
-/// <see cref="ScriptContent"/> (emitted under a <c>#line</c> map anchored at
-/// <see cref="ScriptContentStartLine"/>) plus the classified <see cref="Bindings"/> the template compiler
+/// output. The merged <c>@script</c> C# ([V01.01.06.03]/[V01.01.06.03.01]) rides here as its
+/// <see cref="Script"/> regions — the hoisted using directives and the class-body members, each emitted
+/// under its own <c>#line</c> map — plus the classified <see cref="Bindings"/> the template compiler
 /// consumes for ref-unwrapping — all value-equatable, so an unchanged component still caches.
 /// </summary>
 /// <param name="Namespace">The containing namespace, or <see langword="null"/> for the global namespace.</param>
@@ -25,8 +25,7 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// <param name="StyleCount">The number of <c>@style</c> blocks.</param>
 /// <param name="CustomBlockCount">The number of custom blocks.</param>
 /// <param name="FilePath">The originating <c>.viu</c> file path — the <c>#line</c> directive target that lands script errors and debugger stepping in the source.</param>
-/// <param name="ScriptContent">The <c>@script</c> block's verbatim C# body to merge into the partial class, or <see langword="null"/> when the component declares no script.</param>
-/// <param name="ScriptContentStartLine">The one-based <c>.viu</c> line where the script content begins (the <c>#line</c> anchor); <c>0</c> when there is no script.</param>
+/// <param name="Script">The <c>@script</c> block's two emission regions — hoisted usings and class-body members, each with its <c>#line</c> anchor; <see cref="ScriptRegions.None"/> when the component declares no script.</param>
 /// <param name="Bindings">The classified top-level script members, for the template compiler's ref-unwrapping decisions.</param>
 /// <param name="RenderBody">
 /// The compiled <c>@template</c> render-method body emitted by the template compiler's
@@ -61,8 +60,7 @@ internal readonly record struct SingleFileComponentModel(
     int StyleCount,
     int CustomBlockCount,
     string FilePath,
-    string? ScriptContent,
-    int ScriptContentStartLine,
+    ScriptRegions Script,
     EquatableArray<ScriptBinding> Bindings,
     string? RenderBody,
     int RenderCacheSize,
