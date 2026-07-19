@@ -6,23 +6,23 @@ paths:
 
 # General rules (C#)
 
-These are the canonical coding conventions for Vuecs. They load automatically when a `.cs`/`.csproj`
-file is touched — do not re-derive conventions from scratch. Vuecs is a faithful re-implementation of
+These are the canonical coding conventions for Viu. They load automatically when a `.cs`/`.csproj`
+file is touched — do not re-derive conventions from scratch. Viu is a faithful re-implementation of
 Vue.js 3 in C#/.NET WebAssembly; where behavior mirrors Vue, **upstream vuejs/core (v3.5.x) semantics
 win** — link the reference in the code, test, or issue that pins the behavior.
 
 ## Project layout
 
-- Inverted library layout: `libraries/Assimalign.Vue.<Name>/{src|test}` — the folder name **is** the
+- Inverted library layout: `libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name **is** the
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
-  folders. Package root is `Assimalign.Vue.*` (the product/repo name stays "Vuecs").
+  folders. Package root is `Assimalign.Viu.*` (the product/repo name stays "Viu").
 - Examples live in `examples/`; repo planning docs in `docs/`.
 
 ## Namespaces
 
 - **File-scoped** namespace declarations (`namespace X;`).
-- **Namespace == assembly name**, flat. Every file in `Assimalign.Vue.Reactivity` declares
-  `namespace Assimalign.Vue.Reactivity;` regardless of subfolder. `Abstraction/` and `Internal/` are
+- **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.Reactivity` declares
+  `namespace Assimalign.Viu.Reactivity;` regardless of subfolder. `Abstraction/` and `Internal/` are
   **physical folders only** — they never appear in a namespace.
 
 ## Folders within `src/`
@@ -32,7 +32,7 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 - **Delegates** (public delegate declarations) → `src/Delegates/`.
 - **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
 - Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
-- Linked shared-source files (`PatchFlags.cs`, `SlotFlags.cs`, `Internal/DomKnowledgeData.cs` from `Assimalign.Vue.Shared`; `Shims/IsExternalInit.cs`, `Shims/RequiredMemberShims.cs` from `Assimalign.Vue.Syntax`) are `<Compile Include>` targets from netstandard2.0 projects — **their paths are frozen**; moving them requires updating every linking csproj in the same change.
+- Linked shared-source files (`PatchFlags.cs`, `SlotFlags.cs`, `Internal/DomKnowledgeData.cs` from `Assimalign.Viu.Shared`; `Shims/IsExternalInit.cs`, `Shims/RequiredMemberShims.cs` from `Assimalign.Viu.Syntax`) are `<Compile Include>` targets from netstandard2.0 projects — **their paths are frozen**; moving them requires updating every linking csproj in the same change.
 
 ## Files and types
 
@@ -49,7 +49,7 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 - **Well-known acronyms stay acronyms**: DOM, HTML, CSS, SSR, AOT, JSON, WASM (e.g. `IVirtualDomAdapter`,
   `HtmlRenderer`). The approved list is exactly those seven; nothing else is treated as an acronym.
   **SFC is _not_ on the list** — identifiers spell out `SingleFileComponent` (the
-  `Assimalign.Vue.Syntax.SingleFileComponent` area), never `Sfc`. Prose may still write "single-file
+  `Assimalign.Viu.Syntax.SingleFileComponent` area), never `Sfc`. Prose may still write "single-file
   component (SFC)".
 - Interfaces begin with `I` (editorconfig-enforced at **error** severity).
 
@@ -71,7 +71,7 @@ win** — link the reference in the code, test, or issue that pins the behavior.
   no property-getter dispatch); `seal` concrete leaf types so the JIT can devirtualize. When a public
   type must derive from an otherwise-internal base, make the base a `public abstract` class with
   `internal` members and a `private protected` constructor so it stays opaque and un-subclassable
-  externally (see `Assimalign.Vue.Reactivity`'s `Subscriber`).
+  externally (see `Assimalign.Viu.Reactivity`'s `Subscriber`).
 - **Single-threaded model**: the runtime targets the JS event loop. Ambient `static` state is acceptable,
   but any non-thread-safe type must say so in its XML docs.
 

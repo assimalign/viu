@@ -1,0 +1,5 @@
+<Solution>
+	<Project Path="src/Assimalign.Viu.RuntimeCore.csproj" />
+	<Project Path="test/Assimalign.Viu.RuntimeCore.Tests.csproj" />
+	<Project Path="test/Assimalign.Viu.RuntimeCore.CompiledRenderTests/Assimalign.Viu.RuntimeCore.CompiledRenderTests.csproj" />
+</Solution>

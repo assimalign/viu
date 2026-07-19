@@ -43,4 +43,4 @@ jobs:
           install-wasm-tools: 'true'
 
       - name: Build
-        run: dotnet build examples/Assimalign.Vue.WebApp/Assimalign.Vue.WebApp.csproj --configuration Release -warnaserror
+        run: dotnet build examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj --configuration Release -warnaserror

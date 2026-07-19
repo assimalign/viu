@@ -8,9 +8,9 @@ paths:
 
 - **xUnit v2 + Shouldly** are the sanctioned frameworks. Shouldly is the single assertion library — do not
   add FluentAssertions or lean on raw `Assert`. Package versions come centrally
-  ([build-system.md](build-system.md)); the test csproj declares them by name via `VuecsPackageReference`.
-- Each library has a sibling test project at `libraries/Assimalign.Vue.<Name>/test/`
-  (`Assimalign.Vue.<Name>.Tests`), `IsPackable=false`, referencing its `src` via `VuecsProjectReference`.
+  ([build-system.md](build-system.md)); the test csproj declares them by name via `ViuPackageReference`.
+- Each library has a sibling test project at `libraries/Assimalign.Viu.<Name>/test/`
+  (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`, referencing its `src` via `ViuProjectReference`.
 - Class `{Feature}Tests`; method names describe `Method_Scenario_ExpectedBehavior` (or an equally explicit
   phrase). Arrange / Act / Assert.
 
@@ -27,7 +27,7 @@ paths:
 ## DOM-free by default
 
 - Unit tests must not require a browser. Exercise the runtime through an in-memory adapter/renderer (the
-  RuntimeCore `FakeDomAdapter` today; the shipping `Assimalign.Vue.Testing` renderer once
+  RuntimeCore `FakeDomAdapter` today; the shipping `Assimalign.Viu.Testing` renderer once
   [V01.01.11.01] lands). Real-browser coverage is the separate e2e harness ([V01.01.11.03]).
 - Use `InternalsVisibleTo` (in `src/Properties/AssemblyInfo.cs`) for tests that probe internal engine
   state.

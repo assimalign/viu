@@ -1,6 +1,6 @@
-# Area build+test for the Assimalign.Vue.Syntax cluster ([V01.01.12.02]): the shared base
-# (Assimalign.Vue.Syntax) plus the language parsers that root on it (Assimalign.Vue.Syntax.Templates,
-# Assimalign.Vue.Syntax.SingleFileComponent, and the Css/Html/JavaScript scaffolds). They are one
+# Area build+test for the Assimalign.Viu.Syntax cluster ([V01.01.12.02]): the shared base
+# (Assimalign.Viu.Syntax) plus the language parsers that root on it (Assimalign.Viu.Syntax.Templates,
+# Assimalign.Viu.Syntax.SingleFileComponent, and the Css/Html/JavaScript scaffolds). They are one
 # dependency cluster, so a single workflow builds/tests them via the consolidated per-area slnx,
 # keeping CI and local builds in lockstep.
 # Path-filtered so a PR only runs the areas it touches; shared build files trigger every area.
@@ -10,12 +10,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'libraries/Assimalign.Vue.Syntax*/**'
+      - 'libraries/Assimalign.Viu.Syntax*/**'
       # The compiler links Shared's DOM knowledge data and the PatchFlags/SlotFlags contract as shared
       # source ([V01.01.01.03] seam), so a change to those authoritative files must re-run this cluster.
-      - 'libraries/Assimalign.Vue.Shared/src/Internal/DomKnowledgeData.cs'
-      - 'libraries/Assimalign.Vue.Shared/src/PatchFlags.cs'
-      - 'libraries/Assimalign.Vue.Shared/src/SlotFlags.cs'
+      - 'libraries/Assimalign.Viu.Shared/src/Internal/DomKnowledgeData.cs'
+      - 'libraries/Assimalign.Viu.Shared/src/PatchFlags.cs'
+      - 'libraries/Assimalign.Viu.Shared/src/SlotFlags.cs'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
@@ -26,12 +26,12 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'libraries/Assimalign.Vue.Syntax*/**'
+      - 'libraries/Assimalign.Viu.Syntax*/**'
       # The compiler links Shared's DOM knowledge data and the PatchFlags/SlotFlags contract as shared
       # source ([V01.01.01.03] seam), so a change to those authoritative files must re-run this cluster.
-      - 'libraries/Assimalign.Vue.Shared/src/Internal/DomKnowledgeData.cs'
-      - 'libraries/Assimalign.Vue.Shared/src/PatchFlags.cs'
-      - 'libraries/Assimalign.Vue.Shared/src/SlotFlags.cs'
+      - 'libraries/Assimalign.Viu.Shared/src/Internal/DomKnowledgeData.cs'
+      - 'libraries/Assimalign.Viu.Shared/src/PatchFlags.cs'
+      - 'libraries/Assimalign.Viu.Shared/src/SlotFlags.cs'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
@@ -52,7 +52,7 @@ jobs:
         uses: ./.github/actions/setup-dotnet-wasm
 
       - name: Build (warnings are errors)
-        run: dotnet build libraries/Assimalign.Vue.Syntax/Assimalign.Vue.Syntax.slnx --configuration Release -warnaserror
+        run: dotnet build libraries/Assimalign.Viu.Syntax/Assimalign.Viu.Syntax.slnx --configuration Release -warnaserror
 
       - name: Test
-        run: dotnet test libraries/Assimalign.Vue.Syntax/Assimalign.Vue.Syntax.slnx --configuration Release --no-build
+        run: dotnet test libraries/Assimalign.Viu.Syntax/Assimalign.Viu.Syntax.slnx --configuration Release --no-build

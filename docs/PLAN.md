@@ -1,9 +1,9 @@
-# Vuecs Delivery Plan
+# Viu Delivery Plan
 
-Vuecs is a faithful re-implementation of Vue.js 3 in C#/.NET, running in the browser through the
+Viu is a faithful re-implementation of Vue.js 3 in C#/.NET, running in the browser through the
 .NET WebAssembly build tools (`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). This
 document is the narrative companion to the executable backlog in the org GitHub Project
-[**#15 "Vuecs"**](https://github.com/orgs/assimalign/projects/15) — the board is the authoritative,
+[**#15 "Viu"**](https://github.com/orgs/assimalign/projects/15) — the board is the authoritative,
 living plan; this file records the architecture mapping, the founding design decisions, and the wave
 strategy behind it.
 
@@ -11,11 +11,11 @@ strategy behind it.
 
 The current code proves the rendering seam end to end and nothing more:
 
-- `Assimalign.Vue.CoreLib/VirtualDom` — an immutable VNode tree (`VElement`/`VText`/`VFragment`,
+- `Assimalign.Viu.CoreLib/VirtualDom` — an immutable VNode tree (`VElement`/`VText`/`VFragment`,
   keyed), a generic `VirtualDomRenderer<TNode>` over an `IVirtualDomAdapter<TNode>` (mount /
   in-place patch / unmount, fragments via comment markers), a standalone diff producing patch
   records, and an HTML string renderer.
-- `examples/Assimalign.Vue.WebApp` — a browser WASM app with a handle-based DOM bridge in
+- `examples/Assimalign.Viu.WebApp` — a browser WASM app with a handle-based DOM bridge in
   `main.js` (`JSImport` node ops, GUID-keyed event callbacks dispatched back through `JSExport`),
   rendering a stopwatch.
 
@@ -24,36 +24,36 @@ What it validates: the adapter-injected renderer design (identical in spirit to 
 lacks: reactivity (the demo polls every 100 ms), a component model, a scheduler, keyed diffing with
 minimal moves, compiler-informed patching, and every ecosystem piece. The child reconciliation is
 index-based (no LIS), the diff/patch path is duplicated in two implementations, and naming was split
-between `Assimalign.Vue.*` and `Assimalign.Vuecs.*` (now standardized on `Assimalign.Vue.*`).
+between `Assimalign.Viu.*` and `Assimalign.Viu.*` (now standardized on `Assimalign.Viu.*`).
 
-## Architecture: Vue 3 package → Vuecs library
+## Architecture: Vue 3 package → Viu library
 
 Package boundaries map 1:1 to .NET class libraries using the inverted layout
-`libraries/Assimalign.Vue.<Name>/{src|test}` — the folder name is the assembly/package id, with no
-area wrapper folders (project decision, 2026-07-16). The product/repo name stays **Vuecs**; the
-package root is **`Assimalign.Vue.*`**:
+`libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name is the assembly/package id, with no
+area wrapper folders (project decision, 2026-07-16). The product/repo name stays **Viu**; the
+package root is **`Assimalign.Viu.*`**:
 
-| Area (WBS) | Vuecs library | Vue 3 counterpart |
+| Area (WBS) | Viu library | Vue 3 counterpart |
 | --- | --- | --- |
-| Shared (`V01.01.01`) | `Assimalign.Vue.Shared` | `@vue/shared` — PatchFlags/ShapeFlags/SlotFlags, normalization, DOM tables |
-| Reactivity (`V01.01.02`) | `Assimalign.Vue.Reactivity` | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
-| RuntimeCore (`V01.01.03`) | `Assimalign.Vue.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
-| RuntimeDom (`V01.01.04`) | `Assimalign.Vue.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
-| Compiler (`V01.01.05`) | `Assimalign.Vue.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Vue.Syntax` base) |
-| SingleFileComponent (`V01.01.06`) | `Assimalign.Vue.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Vue.Syntax` base) |
-| ServerRenderer (`V01.01.07`) | `Assimalign.Vue.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
-| Router (`V01.01.08`) | `Assimalign.Vue.Router` | `vue-router` |
-| Store (`V01.01.09`) | `Assimalign.Vue.Store` | `pinia` |
-| DevTools (`V01.01.10`) | `Assimalign.Vue.DevTools` | `vue-devtools` protocol + UI |
-| Testing (`V01.01.11`) | `Assimalign.Vue.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
+| Shared (`V01.01.01`) | `Assimalign.Viu.Shared` | `@vue/shared` — PatchFlags/ShapeFlags/SlotFlags, normalization, DOM tables |
+| Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
+| RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
+| RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
+| Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
+| SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
+| ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
+| Router (`V01.01.08`) | `Assimalign.Viu.Router` | `vue-router` |
+| Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
+| DevTools (`V01.01.10`) | `Assimalign.Viu.DevTools` | `vue-devtools` protocol + UI |
+| Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
 | Tooling (`V01.01.12`) | build/CI/templates/dev loop | Vite + `create-vue` + monorepo infra |
 | Documentation (`V01.01.13`) | docs + samples | vuejs.org + examples |
 
-The parsing side of the map is the **`Assimalign.Vue.Syntax` cluster**: the shared base defines the
+The parsing side of the map is the **`Assimalign.Viu.Syntax` cluster**: the shared base defines the
 node/diagnostic primitives and a registration-based parser pipeline (`SyntaxParser`,
 `AggregateSyntaxParser` — the seam build tooling uses to attach a parser to a block name, `lang`
 option, or file type, the role Vite plugins play in a Vue build), and one library per language roots
-on it: `Assimalign.Vue.Syntax.Templates` (the Vue template language), `.SingleFileComponent` (the
+on it: `Assimalign.Viu.Syntax.Templates` (the Vue template language), `.SingleFileComponent` (the
 `.viu` container), and the browser-language scaffolds `.Css`, `.Html`, and `.JavaScript` (raw-root
 parsers today; rule/element/statement-level parsing lands with their work items, starting with scoped
 CSS [V01.01.06.04]).
@@ -87,12 +87,12 @@ These are deliberate, recorded divergences from upstream — everything else tra
 6. **Trimming/AOT-safe everywhere.** No reflection-based serialization, no dynamic codegen, no
    linker-unfriendly activation. Every area publishes a representative WASM consumer with trimming
    validation; size and startup budgets gate CI from W03.
-7. **Cohesion integration at MVP.** Vuecs will integrate with the Cohesion platform
+7. **Cohesion integration at MVP.** Viu will integrate with the Cohesion platform
    (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process,
    packaging aligned with Cohesion's SDK/shared-framework model (tracked as `V01.01.12.08`, #104).
    Consequence now: hosting and server-rendering seams stay host-agnostic — [V01.01.07.04] ships
    a server adaptor contract that any web framework implements as a thin downstream adapter
-   (Cohesion Web first; ASP.NET Core only if ever wanted), and no Assimalign.Vue.* library may
+   (Cohesion Web first; ASP.NET Core only if ever wanted), and no Assimalign.Viu.* library may
    reference a web framework (decision reaffirmed and made binding 2026-07-17).
 
 ## Delivery model
@@ -101,15 +101,15 @@ Work is tracked exactly like the sibling Cohesion repo:
 
 - **WBS-coded items** — `[V01.01.NN]` area epics → `[V01.01.NN.MM]` features → `[V01.01.NN.MM.PP]`
   tasks, held together by native GitHub sub-issue links, all on Project #15. Program root:
-  `[V01.01.00] Vuecs - Framework Libraries`.
+  `[V01.01.00] Viu - Framework Libraries`.
 - **Waves (W01–W06)** phase delivery; **Priority (P001–P007)** orders work within and across waves
   (lower = first). Tasks are created iteratively as features start — the feature list below is the
   planned scope; tasks are intentionally not pre-generated.
-- **Scope creep is captured, not absorbed**: the `vuecs-work-items` skill
-  (`.claude/skills/vuecs-work-items/`) files discovered work as its own item with
+- **Scope creep is captured, not absorbed**: the `viu-work-items` skill
+  (`.claude/skills/viu-work-items/`) files discovered work as its own item with
   `Origin=DiscoveredTask|DiscoveredFeature` and the `scope-creep` label, so one PR closes everything
   it actually resolved and creep stays measurable.
-- Project #15 carries vuecs work only (`V`-prefixed WBS codes, repo `assimalign/vuecs`).
+- Project #15 carries viu work only (`V`-prefixed WBS codes, repo `assimalign/vuecs`).
 
 ### Wave narrative
 
@@ -119,8 +119,8 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W02** | Component model — instance/setup, props, emits, slots, provide/inject, lifecycle, app API, directives, refs, dynamic components, watch, `[Reactive]` source-gen, reactive collections, LIS keyed diff, browser bootstrap, test utils | TodoMVC built from components with `h()` render functions |
 | **W03** | Compiler — template parser → transforms → C# codegen source generator, patch flags + block tree end-to-end, static hoisting, diagnostics, `.viu` SFC format + MSBuild, interop command buffer, v-model/v-show, size budgets | TodoMVC rewritten as `.viu` components; interop calls measurably collapse |
 | **W04** | Ecosystem — router, store, built-ins (Teleport/KeepAlive/Transition/async), scoped CSS + CSS modules, HackerNews sample, getting-started guide | HackerNews client: routed, stored, styled |
-| **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new vuecs-app` works from NuGet |
-| **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.viu` editor support | Docs site built by Vuecs itself |
+| **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new viu-app` works from NuGet |
+| **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.viu` editor support | Docs site built by Viu itself |
 
 ## The planned backlog
 
@@ -259,7 +259,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
-| `V01.01.12.01` | Restructure the solution to the Assimalign.Vuecs library layout | W01 | P001 |
+| `V01.01.12.01` | Restructure the solution to the Assimalign.Viu library layout | W01 | P001 |
 | `V01.01.12.02` | Set up CI workflows with per-area path filtering | W01 | P002 |
 | `V01.01.12.03` | Implement NuGet packaging and the release pipeline | W05 | P004 |
 | `V01.01.12.04` | Create dotnet new project templates | W05 | P005 |
@@ -280,8 +280,8 @@ Work is tracked exactly like the sibling Cohesion repo:
 
 ## Operating references
 
-- Work-item intake: [.claude/skills/vuecs-work-items/SKILL.md](../.claude/skills/vuecs-work-items/SKILL.md)
-- Project schema + manual recipes: [.claude/skills/vuecs-work-items/reference/project-schema.md](../.claude/skills/vuecs-work-items/reference/project-schema.md)
+- Work-item intake: [.claude/skills/viu-work-items/SKILL.md](../.claude/skills/viu-work-items/SKILL.md)
+- Project schema + manual recipes: [.claude/skills/viu-work-items/reference/project-schema.md](../.claude/skills/viu-work-items/reference/project-schema.md)
 - Working conventions: [.claude/rules/workflow.md](../.claude/rules/workflow.md)
 - Upstream reference: [vuejs/core](https://github.com/vuejs/core) (v3.5.x), [vuejs.org](https://vuejs.org)
 

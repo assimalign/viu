@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    Flow every .viu single-file component to the Assimalign.Viu.Syntax.Generators source generator as an
+    AdditionalFile ([V01.01.06.02]). This ItemGroup is evaluated at import time (after the consuming
+    project's own items and the SDK default excludes are known), so the files are visible to the compiler
+    without the consumer editing their csproj.
+
+    Opt a single file out by adding it to ViuSingleFileComponentExclude, e.g.:
+        <ItemGroup>
+          <ViuSingleFileComponentExclude Include="Experimental.viu" />
+        </ItemGroup>
+    Disable the whole feature with <EnableSingleFileComponentGeneration>false</EnableSingleFileComponentGeneration>.
+  -->
+  <ItemGroup Condition="'$(EnableSingleFileComponentGeneration)' == 'true'">
+    <ViuSingleFileComponent Include="**/*.viu"
+                              Exclude="@(ViuSingleFileComponentExclude);$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+    <!-- KeepDuplicates=false guards against a file also being added by hand: two AdditionalText entries
+         with the same path would produce duplicate generated hint names and fail the build. -->
+    <AdditionalFiles Include="@(ViuSingleFileComponent)" KeepDuplicates="false" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Source generators must target the stable analyzer surface: opt out of the repo-wide preview
+         features switch (see build/Targets/Build.TargetFramework.props) so no [RequiresPreviewFeatures]
+         leaks into the netstandard2.0 analyzer. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- The analyzer DLL is packed into consuming libraries' nupkgs by
+         build/Targets/Build.References.Analyzers.targets, never shipped as its own package. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <!-- Analyzer release tracking (RS2008): the shipped diagnostic IDs are recorded here. -->
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

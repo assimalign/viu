@@ -1,4 +1,0 @@
-<Solution>
-	<Project Path="src/Assimalign.Vue.Reactivity.csproj" />
-	<Project Path="test/Assimalign.Vue.Reactivity.Tests.csproj" />
-</Solution>

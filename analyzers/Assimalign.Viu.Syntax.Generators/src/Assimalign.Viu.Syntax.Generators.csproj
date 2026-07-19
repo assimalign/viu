@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- The generator's parser dependencies (Assimalign.Viu.Syntax + the two language libraries) must
+         load in the consumer's analyzer context; this flows their outputs through GetTargetPath (see
+         build/Targets/Build.References.Analyzers.targets). -->
+    <ViuAnalyzerBundlesProjectReferenceOutputs>true</ViuAnalyzerBundlesProjectReferenceOutputs>
+    <!-- Source generators must target the stable analyzer surface: opt out of the repo-wide preview
+         features switch (see build/Targets/Build.TargetFramework.props) so no [RequiresPreviewFeatures]
+         leaks into the netstandard2.0 analyzer. Mirrors the sibling Reactivity.Generators csproj. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- The analyzer DLL is packed into consuming libraries' nupkgs by
+         build/Targets/Build.References.Analyzers.targets, never shipped as its own package. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The composition root ([V01.01.06.02]): this is the ONLY place the Assimalign.Viu.Syntax.*
+         parsers meet. It constructs the .viu block parser and registers the template parser for
+         @template blocks on the aggregate registration seam ([V01.01.05.09]). Language libraries never
+         reference each other; the generator references all three. Compile-time only — never shipped into
+         the WASM payload. -->
+    <ViuProjectReference Include="Assimalign.Viu.Syntax" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.Templates" />
+    <!-- Scoped CSS ([V01.01.06.04]): the composition root registers the CSS parser for @style blocks and
+         runs the scoped rewrite. Like the other language libraries, the Css library is referenced only
+         here (the SingleFileComponent library never references it) and only at build time. -->
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.Css" />
+    <!-- Shared build-time CSS composition core ([V01.01.12.12]): the .viu parser composition, the scope-id
+         hash, and the @style compilation (scoped/module/v-bind) were lifted here so the generator and the
+         ViuBundleCss MSBuild task run ONE deterministic implementation — the generated ExtractedStyles
+         constant and the physical bundle are byte-identical because both hosts call this core. -->
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.Css" />
+  </ItemGroup>
+  <!-- Analyzer release tracking (RS2008): the shipped diagnostic IDs are recorded here. -->
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

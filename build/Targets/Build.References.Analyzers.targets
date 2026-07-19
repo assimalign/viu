@@ -1,7 +1,7 @@
 <Project>
     <!-- Analyzer Reference By Name Only
 
-        VuecsAnalyzerReference       - ROSLYN ANALYZER / SOURCE GENERATOR
+        ViuAnalyzerReference       - ROSLYN ANALYZER / SOURCE GENERATOR
                                             reference. Resolves against
                                             analyzers/**/*.csproj. Emits a
                                             <ProjectReference> with
@@ -17,8 +17,8 @@
     -->
     <ItemGroup>
         <!-- Index analyzer projects ONCE. -->
-        <_VuecsAnalyzerProject Include="$(VuecsRepositoryDirectory)analyzers\**\*.csproj" />
-        <_VuecsAnalyzerProject Update="@(_VuecsAnalyzerProject)" ProjectId="%(_VuecsAnalyzerProject.Filename)" ProjectPath="%(_VuecsAnalyzerProject.Identity)" />
+        <_ViuAnalyzerProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <_ViuAnalyzerProject Update="@(_ViuAnalyzerProject)" ProjectId="%(_ViuAnalyzerProject.Filename)" ProjectPath="%(_ViuAnalyzerProject.Identity)" />
 
         <!--
             Analyzer refs. OutputItemType=Analyzer + ReferenceOutputAssembly=false
@@ -27,22 +27,22 @@
             PrivateAssets=all keeps the analyzer csproj from leaking as a NuGet
             dependency of the consuming library.
         -->
-        <VuecsAnalyzerReference Update="@(_VuecsAnalyzerProject->'%(ProjectId)')" ProjectPath="%(_VuecsAnalyzerProject.ProjectPath)" />
-        <ProjectReference Include="@(VuecsAnalyzerReference->'%(ProjectPath)')"
+        <ViuAnalyzerReference Update="@(_ViuAnalyzerProject->'%(ProjectId)')" ProjectPath="%(_ViuAnalyzerProject.ProjectPath)" />
+        <ProjectReference Include="@(ViuAnalyzerReference->'%(ProjectPath)')"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false"
                           PrivateAssets="all" />
 
         <!--
             Capture the resolved analyzer csproj paths for the pack hook below.
-            We can't reuse @(VuecsAnalyzerReference) directly because it gets
+            We can't reuse @(ViuAnalyzerReference) directly because it gets
             consumed (Remove'd) immediately so MSBuild's incremental graph
             cleanup is happy.
         -->
-        <_VuecsAnalyzerResolved Include="@(VuecsAnalyzerReference->'%(ProjectPath)')" />
-        <VuecsAnalyzerReference Remove="@(VuecsAnalyzerReference->HasMetadata('ProjectPath'))" />
+        <_ViuAnalyzerResolved Include="@(ViuAnalyzerReference->'%(ProjectPath)')" />
+        <ViuAnalyzerReference Remove="@(ViuAnalyzerReference->HasMetadata('ProjectPath'))" />
 
-        <_VuecsAnalyzerProject Remove="@(_VuecsAnalyzerProject)" />
+        <_ViuAnalyzerProject Remove="@(_ViuAnalyzerProject)" />
     </ItemGroup>
 
     <!--
@@ -63,38 +63,38 @@
         execution to projects that actually declared an analyzer reference.
     -->
     <PropertyGroup>
-        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_CollectVuecsAnalyzersForPack</TargetsForTfmSpecificContentInPackage>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_CollectViuAnalyzersForPack</TargetsForTfmSpecificContentInPackage>
     </PropertyGroup>
 
-    <Target Name="_CollectVuecsAnalyzersForPack"
-            Condition="'@(_VuecsAnalyzerResolved)' != ''">
-        <MSBuild Projects="@(_VuecsAnalyzerResolved)"
+    <Target Name="_CollectViuAnalyzersForPack"
+            Condition="'@(_ViuAnalyzerResolved)' != ''">
+        <MSBuild Projects="@(_ViuAnalyzerResolved)"
                  Targets="GetTargetPath"
                  Properties="Configuration=$(Configuration)"
                  RemoveProperties="OutDir;OutputPath;IntermediateOutputPath;TargetFramework;TargetFrameworks;RuntimeIdentifier">
-            <Output TaskParameter="TargetOutputs" ItemName="_VuecsAnalyzerDll" />
+            <Output TaskParameter="TargetOutputs" ItemName="_ViuAnalyzerDll" />
         </MSBuild>
         <ItemGroup>
-            <TfmSpecificPackageFile Include="@(_VuecsAnalyzerDll)">
+            <TfmSpecificPackageFile Include="@(_ViuAnalyzerDll)">
                 <PackagePath>analyzers/dotnet/cs</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
 
         <!--
             An analyzer may ship consumer-facing MSBuild logic in a sibling build/ folder next to its src/
-            (e.g. Assimalign.Vue.Syntax.Generators flows .viu files in as AdditionalFiles). Pack those
+            (e.g. Assimalign.Viu.Syntax.Generators flows .viu files in as AdditionalFiles). Pack those
             props/targets into the consuming library's nupkg under buildTransitive/ so the packaged
             consumer picks them up. Dormant for analyzers with no build/ folder (the glob matches nothing).
         -->
         <ItemGroup>
-            <_VuecsAnalyzerBuildDirectory Include="@(_VuecsAnalyzerResolved->'%(RootDir)%(Directory)..\build')" />
+            <_ViuAnalyzerBuildDirectory Include="@(_ViuAnalyzerResolved->'%(RootDir)%(Directory)..\build')" />
         </ItemGroup>
         <ItemGroup>
-            <_VuecsAnalyzerBuildFile Include="%(_VuecsAnalyzerBuildDirectory.Identity)\**\*.props;%(_VuecsAnalyzerBuildDirectory.Identity)\**\*.targets" />
+            <_ViuAnalyzerBuildFile Include="%(_ViuAnalyzerBuildDirectory.Identity)\**\*.props;%(_ViuAnalyzerBuildDirectory.Identity)\**\*.targets" />
             <!-- NuGet auto-imports only buildTransitive/<PackageId>.props|targets, so the files are
                  packed under the CONSUMING package's id (also silencing NU5129), never under the
                  analyzer's own file name. -->
-            <TfmSpecificPackageFile Include="@(_VuecsAnalyzerBuildFile)">
+            <TfmSpecificPackageFile Include="@(_ViuAnalyzerBuildFile)">
                 <PackagePath>buildTransitive\$(PackageId)%(Extension)</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
@@ -104,13 +104,13 @@
         the consumer's compiler, but Roslyn resolves a generator's dependencies exclusively among the
         registered analyzer paths - so a generator with project-reference dependencies must append those
         outputs to its own GetTargetPath result for every consumer to load the full closure. Analyzer
-        csprojs opt in with <VuecsAnalyzerBundlesProjectReferenceOutputs>true</...>.
+        csprojs opt in with <ViuAnalyzerBundlesProjectReferenceOutputs>true</...>.
     -->
-    <PropertyGroup Condition="'$(VuecsAnalyzerBundlesProjectReferenceOutputs)' == 'true'">
-        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);_VuecsAppendAnalyzerProjectReferenceOutputs</GetTargetPathDependsOn>
+    <PropertyGroup Condition="'$(ViuAnalyzerBundlesProjectReferenceOutputs)' == 'true'">
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);_ViuAppendAnalyzerProjectReferenceOutputs</GetTargetPathDependsOn>
     </PropertyGroup>
-    <Target Name="_VuecsAppendAnalyzerProjectReferenceOutputs"
-            Condition="'$(VuecsAnalyzerBundlesProjectReferenceOutputs)' == 'true'"
+    <Target Name="_ViuAppendAnalyzerProjectReferenceOutputs"
+            Condition="'$(ViuAnalyzerBundlesProjectReferenceOutputs)' == 'true'"
             DependsOnTargets="ResolveProjectReferences">
         <ItemGroup>
             <TargetPathWithTargetPlatformMoniker Include="@(_ResolvedProjectReferencePaths)" IncludeRuntimeDependency="false" />
@@ -120,12 +120,12 @@
     <!--
         In-repo dogfooding seam for the .viu generator: packaged consumers receive its MSBuild wiring
         (the **/*.viu AdditionalFiles glob and CompilerVisibleProperty declarations) through
-        buildTransitive, but a VuecsAnalyzerReference inside this repo would not - imports evaluate
+        buildTransitive, but a ViuAnalyzerReference inside this repo would not - imports evaluate
         before items exist, so the wiring is opted into with a property instead of inferred from the
-        reference: set <VuecsUseSingleFileComponents>true</...> alongside the analyzer reference.
+        reference: set <ViuUseSingleFileComponents>true</...> alongside the analyzer reference.
     -->
-    <Import Project="$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.props"
-            Condition="'$(VuecsUseSingleFileComponents)' == 'true' and Exists('$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.props')" />
-    <Import Project="$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.targets"
-            Condition="'$(VuecsUseSingleFileComponents)' == 'true' and Exists('$(VuecsRepositoryDirectory)analyzers\Assimalign.Vue.Syntax.Generators\build\Assimalign.Vue.Syntax.Generators.targets')" />
+    <Import Project="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.props"
+            Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.props')" />
+    <Import Project="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.targets"
+            Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.targets')" />
 </Project>
