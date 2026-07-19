@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- This test project deliberately drives the source generator and Roslyn (Assembly.Load, Activator,
+         CSharpCompilation) to prove the compiled-render contract end to end. Those are AOT/trim-unfriendly
+         by nature, so opt this test-only project out of the libraries/ AOT default — it is not a shipping
+         library. -->
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <VuecsPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <VuecsPackageReference Include="xunit" />
+    <VuecsPackageReference Include="xunit.runner.visualstudio" />
+    <VuecsPackageReference Include="Shouldly" />
+    <!-- Compiles the generator-emitted render body in-process against the runtime helper surface. -->
+    <VuecsPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <VuecsProjectReference Include="Assimalign.Vue.RuntimeCore" />
+    <VuecsProjectReference Include="Assimalign.Vue.Testing" />
+    <VuecsProjectReference Include="Assimalign.Vue.Reactivity" />
+    <!-- The compiler/generator appear ONLY in this test project, never in runtime code. A private compile
+         reference so the test can instantiate and drive the generator; its transitive .viu-parser
+         references copy into the test bin so the composed parser runs in-process. -->
+    <VuecsPrivateProjectReference Include="Assimalign.Vue.Syntax.Generators" />
+  </ItemGroup>
+</Project>

@@ -42,6 +42,16 @@ internal sealed class RenderCodeWriter
     private readonly string indentText;
     private int indentLevel;
 
+    // Render source map ([V01.01.05.08]): each dynamic expression's original-template-text offset within
+    // the emitted output, paired with its template location. Converted to line/column against the finished
+    // code once (BuildSourceMappings), so the generator can emit #line span directives that land a C#
+    // compile error inside an emitted expression on the offending .viu template coordinate.
+    private readonly List<(int Offset, SourceLocation Location)> mappingSites = new();
+    private IReadOnlyList<RenderSourceMapping> sourceMappings = Array.Empty<RenderSourceMapping>();
+
+    /// <summary>The render source map produced by the most recent <see cref="EmitRenderBody"/> call.</summary>
+    public IReadOnlyList<RenderSourceMapping> SourceMappings => sourceMappings;
+
     /// <summary>Creates a writer for <paramref name="result"/> starting at <paramref name="indentLevel"/>.</summary>
     /// <param name="result">The transformed template whose code-generation tree is serialized.</param>
     /// <param name="indentLevel">The starting indentation level.</param>
@@ -119,7 +129,9 @@ internal sealed class RenderCodeWriter
 
         Push(";");
         builder.Append('\n');
-        return builder.ToString();
+        var code = builder.ToString();
+        sourceMappings = BuildSourceMappings(code);
+        return code;
     }
 
     // ---- genNode: the central dispatch (codegen.ts genNode). ----
@@ -334,7 +346,9 @@ internal sealed class RenderCodeWriter
                 Push(StringLiteral(staticKey.Content));
                 break;
             case SimpleExpressionNode dynamicKey:
-                Push(MapRawLiteral(dynamicKey.Content));
+                // A dynamic (computed) key is a template expression too; route it through EmitExpression so
+                // it participates in the render source map ([V01.01.05.08]) like any other dynamic access.
+                EmitExpression(dynamicKey);
                 break;
             default:
                 EmitNode(key);
@@ -620,7 +634,83 @@ internal sealed class RenderCodeWriter
     // ---- genExpression / genInterpolation / genCompoundExpression / genComment / block statements. ----
 
     private void EmitExpression(SimpleExpressionNode node)
-        => Push(node.IsStatic ? StringLiteral(node.Content) : MapRawLiteral(node.Content));
+    {
+        if (node.IsStatic)
+        {
+            Push(StringLiteral(node.Content));
+            return;
+        }
+
+        var text = MapRawLiteral(node.Content);
+        RecordSourceMapping(node.Location, text);
+        Push(text);
+    }
+
+    // ---- render source map ([V01.01.05.08]) ----
+
+    // Records a mapping site for a dynamic expression: the absolute offset of its original template text
+    // within the emitted output (past any inserted _ctx. prefix or unref(...) wrapper) paired with its
+    // template location. builder.Length is captured before the text is pushed, so it is the offset the
+    // emitted text will occupy. Synthetic nodes (empty-source stub location) and any emission whose
+    // original source is not a recognizable substring (a hoist placeholder such as `_hoisted_1`) are
+    // skipped — they have no faithful template span to point a #line directive at.
+    private void RecordSourceMapping(SourceLocation location, string emittedText)
+    {
+        var source = location.Source;
+        if (string.IsNullOrEmpty(source))
+        {
+            return;
+        }
+
+        var inner = emittedText.IndexOf(source, StringComparison.Ordinal);
+        if (inner < 0)
+        {
+            return;
+        }
+
+        mappingSites.Add((builder.Length + inner, location));
+    }
+
+    private IReadOnlyList<RenderSourceMapping> BuildSourceMappings(string code)
+    {
+        if (mappingSites.Count == 0)
+        {
+            return Array.Empty<RenderSourceMapping>();
+        }
+
+        var mappings = new List<RenderSourceMapping>(mappingSites.Count);
+        foreach (var (offset, location) in mappingSites)
+        {
+            var (line, column) = LineColumnAt(code, offset);
+            mappings.Add(new RenderSourceMapping
+            {
+                GeneratedLine = line,
+                GeneratedColumn = column,
+                TemplateLocation = location,
+            });
+        }
+
+        return mappings;
+    }
+
+    // The zero-based (line, column) of an absolute character offset within the emitted body, by counting
+    // the LF newlines the emitter deterministically writes.
+    private static (int Line, int Column) LineColumnAt(string text, int offset)
+    {
+        var line = 0;
+        var lineStart = 0;
+        var limit = offset < text.Length ? offset : text.Length;
+        for (var index = 0; index < limit; index++)
+        {
+            if (text[index] == '\n')
+            {
+                line++;
+                lineStart = index + 1;
+            }
+        }
+
+        return (line, offset - lineStart);
+    }
 
     private void EmitInterpolation(InterpolationNode node)
     {

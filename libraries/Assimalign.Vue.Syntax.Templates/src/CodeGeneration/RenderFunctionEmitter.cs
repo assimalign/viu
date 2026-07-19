@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Assimalign.Vue.Syntax.Templates;
 
@@ -49,10 +50,27 @@ public static class RenderFunctionEmitter
         }
 
         var writer = new RenderCodeWriter(result, options.IndentLevel, options.IndentText);
+        var code = writer.EmitRenderBody();
+        var mappings = writer.SourceMappings;
         return new RenderFunctionEmitterResult
         {
-            Code = writer.EmitRenderBody(),
+            Code = code,
             CacheSlotCount = result.Cached.Count,
+            // The render source map ([V01.01.05.08]) the composition root turns into #line span directives.
+            SourceMappings = mappings.Count == 0
+                ? SyntaxList<RenderSourceMapping>.Empty
+                : new SyntaxList<RenderSourceMapping>(ToArray(mappings)),
         };
+    }
+
+    private static RenderSourceMapping[] ToArray(IReadOnlyList<RenderSourceMapping> mappings)
+    {
+        var array = new RenderSourceMapping[mappings.Count];
+        for (var index = 0; index < mappings.Count; index++)
+        {
+            array[index] = mappings[index];
+        }
+
+        return array;
     }
 }
