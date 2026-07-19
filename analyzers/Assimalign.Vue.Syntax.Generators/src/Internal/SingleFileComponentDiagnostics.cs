@@ -6,6 +6,7 @@ using Assimalign.Vue.Syntax;
 // DiagnosticSeverity are ambient and shadow Roslyn's; alias both sides for unambiguous mapping.
 using SyntaxDiagnostic = Assimalign.Vue.Syntax.Diagnostic;
 using SyntaxDiagnosticSeverity = Assimalign.Vue.Syntax.DiagnosticSeverity;
+using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
 namespace Assimalign.Vue.Syntax.Generators;
@@ -16,10 +17,11 @@ namespace Assimalign.Vue.Syntax.Generators;
 /// code catalogs (the <c>.viu</c> container's <c>SingleFileComponentErrorCode</c> starting at 1000, the
 /// template compiler's upstream-pinned <c>CompilerErrorCode</c>); a generator cannot enumerate those
 /// unbounded catalogs into one descriptor each without mirroring them, so this composition root instead
-/// envelopes each diagnostic by its <em>origin</em> (the <c>.viu</c> block container vs a dispatched
-/// <c>@template</c> parse) and its <see cref="SyntaxDiagnosticSeverity"/>, and carries the parser's
-/// original message verbatim. The descriptor <c>defaultSeverity</c> follows the parser severity because
-/// <c>Diagnostic.Create(descriptor, location, args)</c> reports at the descriptor's severity.
+/// envelopes each diagnostic by its <em>origin</em> (the <c>.viu</c> block container, a dispatched
+/// <c>@template</c> parse, or the Roslyn parse of the <c>@script</c> block's C# — [V01.01.06.03]) and its
+/// severity, and carries the parser's original message verbatim. The descriptor <c>defaultSeverity</c>
+/// follows the parser severity because <c>Diagnostic.Create(descriptor, location, args)</c> reports at the
+/// descriptor's severity.
 /// </summary>
 internal static class SingleFileComponentDiagnostics
 {
@@ -79,6 +81,33 @@ internal static class SingleFileComponentDiagnostics
         defaultSeverity: RoslynDiagnosticSeverity.Info,
         isEnabledByDefault: true);
 
+    /// <summary>A recoverable error reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
+    internal static readonly DiagnosticDescriptor ScriptError = new(
+        id: "VUECS1201",
+        title: "Single-file component script parse error",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    /// <summary>A warning reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
+    internal static readonly DiagnosticDescriptor ScriptWarning = new(
+        id: "VUECS1202",
+        title: "Single-file component script parse warning",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    /// <summary>An informational message reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
+    internal static readonly DiagnosticDescriptor ScriptInformation = new(
+        id: "VUECS1203",
+        title: "Single-file component script parse information",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Info,
+        isEnabledByDefault: true);
+
     /// <summary>
     /// Envelopes <paramref name="diagnostic"/> as a value-equatable <see cref="DiagnosticInfo"/> located
     /// on the <c>.viu</c> file at <paramref name="filePath"/>. When <paramref name="blockContentStart"/>
@@ -110,6 +139,57 @@ internal static class SingleFileComponentDiagnostics
         return new DiagnosticInfo(descriptor, location, message);
     }
 
+    /// <summary>
+    /// Envelopes a Roslyn <paramref name="diagnostic"/> from the <c>@script</c> block's parse
+    /// ([V01.01.06.03]) as a value-equatable <see cref="DiagnosticInfo"/> located on the <c>.viu</c> file.
+    /// The diagnostic's position is relative to the synthetic probe wrapper
+    /// (<see cref="ScriptBlockAnalyzer"/>); it is un-shifted to the block content by
+    /// <paramref name="probePrefixLength"/>/<paramref name="probeLineOffset"/> and then composed with
+    /// <paramref name="blockContentStart"/> into file coordinates through the <em>same</em>
+    /// <see cref="Compose"/> arithmetic the dispatched-block path uses — so a script error lands on the
+    /// exact <c>.viu</c> line/column the emitted <c>#line</c> directive maps to.
+    /// </summary>
+    /// <param name="filePath">The originating <c>.viu</c> file path.</param>
+    /// <param name="diagnostic">The Roslyn parse diagnostic to map.</param>
+    /// <param name="blockContentStart">The file position where the <c>@script</c> block's content begins.</param>
+    /// <param name="probePrefixLength">The wrapper prefix length, to un-shift content-relative offsets.</param>
+    /// <param name="probeLineOffset">The wrapper's leading line count, to un-shift content-relative lines.</param>
+    /// <returns>The value-equatable diagnostic located on the <c>.viu</c> file.</returns>
+    public static DiagnosticInfo CreateScript(
+        string filePath,
+        RoslynDiagnostic diagnostic,
+        Position blockContentStart,
+        int probePrefixLength,
+        int probeLineOffset)
+    {
+        var descriptor = MapScript(diagnostic.Severity);
+        var lineSpan = diagnostic.Location.GetLineSpan();
+        var span = diagnostic.Location.SourceSpan;
+
+        // Wrapper-relative Roslyn positions (zero-based line/character) -> block-content-relative Position
+        // (the base cluster's one-based line/column convention), the input Compose expects. Offsets are
+        // clamped at zero so a diagnostic reported at the wrapper's own synthetic prefix (never expected —
+        // the prefix is a fixed well-formed string) can never compose a negative TextSpan bound and throw.
+        var relativeStart = new Position(
+            System.Math.Max(0, span.Start - probePrefixLength),
+            (lineSpan.StartLinePosition.Line - probeLineOffset) + 1,
+            lineSpan.StartLinePosition.Character + 1);
+        var relativeEnd = new Position(
+            System.Math.Max(0, span.End - probePrefixLength),
+            (lineSpan.EndLinePosition.Line - probeLineOffset) + 1,
+            lineSpan.EndLinePosition.Character + 1);
+
+        var location = ComposeBlockLocation(filePath, blockContentStart, relativeStart, relativeEnd);
+
+        // Carry the Roslyn error code (e.g. CS1525) in the message, mirroring how the container/template
+        // paths surface their per-language catalog codes.
+        var message = diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)
+            + " (C# script code "
+            + diagnostic.Id
+            + ")";
+        return new DiagnosticInfo(descriptor, location, message);
+    }
+
     private static DiagnosticDescriptor Map(bool fromTemplate, SyntaxDiagnosticSeverity severity)
     {
         // Hidden collapses into the informational descriptor: the generator surfaces it rather than
@@ -132,6 +212,16 @@ internal static class SingleFileComponentDiagnostics
         };
     }
 
+    private static DiagnosticDescriptor MapScript(RoslynDiagnosticSeverity severity)
+        // Info and Hidden collapse into the informational descriptor: the generator surfaces the message
+        // rather than dropping it, matching the container/template mapping's treatment of the low end.
+        => severity switch
+        {
+            RoslynDiagnosticSeverity.Error => ScriptError,
+            RoslynDiagnosticSeverity.Warning => ScriptWarning,
+            _ => ScriptInformation,
+        };
+
     private static LocationInfo BuildLocation(string filePath, SourceLocation location, Position? blockContentStart)
     {
         if (blockContentStart is not { } blockStart)
@@ -150,12 +240,24 @@ internal static class SingleFileComponentDiagnostics
         // Dispatched-block diagnostic: the position is relative to the block's content, so compose it
         // with the block's content-start position to land on the correct .viu file coordinate. This is
         // the same block-to-file coordinate mapping [V01.01.06.03] performs for #line directives.
-        var (startLine, startCharacter) = Compose(blockStart, location.Start);
-        var (endLine, endCharacter) = Compose(blockStart, location.End);
+        return ComposeBlockLocation(filePath, blockStart, location.Start, location.End);
+    }
+
+    // Composes a block-content-relative span (one-based positions plus content-relative offsets) with the
+    // block's content-start position into whole-.viu-file coordinates. Shared by the dispatched-block
+    // (@template) path and the @script path so both — and the emitted #line directives — agree exactly.
+    private static LocationInfo ComposeBlockLocation(
+        string filePath,
+        Position blockStart,
+        Position relativeStart,
+        Position relativeEnd)
+    {
+        var (startLine, startCharacter) = Compose(blockStart, relativeStart);
+        var (endLine, endCharacter) = Compose(blockStart, relativeEnd);
         return new LocationInfo(
             filePath,
-            blockStart.Offset + location.Start.Offset,
-            blockStart.Offset + location.End.Offset,
+            blockStart.Offset + relativeStart.Offset,
+            blockStart.Offset + relativeEnd.Offset,
             startLine,
             startCharacter,
             endLine,
