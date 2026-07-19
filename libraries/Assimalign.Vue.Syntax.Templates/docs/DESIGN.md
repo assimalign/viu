@@ -235,3 +235,80 @@ generated file, the standard generated-code practice.
   independent and fully emitted.
 - **v-slot destructuring and tuple v-for aliases** (`#item="{ label }"`, `(a, b) in pairs`) emit
   verbatim and are not valid C# lambda parameters; they are follow-up expression-binding work.
+
+## Static caching and stringification (`cacheStatic` / `stringifyStatic`)
+
+The C# port of Vue 3.5's static optimization ([V01.01.05.07], issue #54): `@vue/compiler-core`'s
+[`transforms/cacheStatic.ts`](https://github.com/vuejs/core/blob/v3.5.13/packages/compiler-core/src/transforms/cacheStatic.ts)
+(the successor to `hoistStatic`) and `@vue/compiler-dom`'s
+[`transforms/stringifyStatic.ts`](https://github.com/vuejs/core/blob/v3.5.13/packages/compiler-dom/src/transforms/stringifyStatic.ts).
+`StaticCache.Cache` runs from `Transformer.Transform` — after the traversal, before `CreateRootCodegen` —
+only when `TransformOptions.HoistStatic` is set (the composition-root generator sets it; the default
+pipeline stays unoptimized, which is the acceptance criteria's debugging opt-out). This matters more on
+WASM than upstream (PLAN.md founding decision #4): every vnode not created and every patch visit skipped is
+a `JSImport` marshaling round-trip avoided, so a stringified 20-node run replaces 20+ interop calls with one
+`insertStaticContent`.
+
+### The constant analysis (`getConstantType`)
+
+`ConstantAnalysis.GetConstantType(node, context)` is the full port of upstream `getConstantType`: an element
+is constant only when its generated props, every child, and every `v-bind` expression are constant, and it
+carries no patch flag and is not a block. `NOT_CONSTANT` from any of them poisons the ancestor, so refs
+(`NEED_PATCH`), runtime directives, dynamic keys (which force a block), and dynamic children/props are never
+static — exactly the eligibility the issue pins. Levels are memoized per element in
+`TransformContext.ConstantCache`. Because Vuecs keeps expression bodies opaque, an interpolation or dynamic
+`v-bind` value is never above `NOT_CONSTANT`; only static text, static attributes, and compiler-injected
+literal constants (`v-if` branch keys, `v-model` modifier objects) reach the higher levels. As upstream
+does, a fully static `svg`/`foreignObject`/`math` block is demoted back to a plain vnode as a side effect of
+the analysis. The context-free `GetConstantType(node)` overload (parser-stamped levels only) still backs the
+patch-flag pass, unchanged.
+
+### Caching and marking
+
+Each fully static (`>= CAN_CACHE`) subtree is marked `PatchFlags.Cached` (`-1`, the v3.5 `CACHED` spelling
+of the old `HOISTED`) so the runtime diff skips it, then wrapped in a render-cache slot via `context.Cache`
+(reusing the same `_cache[n]` seam and `??=` emission v-once already uses). An element whose subtree is
+dynamic but whose props are static gets its props cached the same way. **Clone-on-insert is the runtime's
+responsibility**: the compiler emits the `CACHED` marker and the `createStaticVNode` payload; the runtime's
+DOM adapter clones a cached/static vnode when inserting it into more than one tree (the runtime-area
+contract referenced by `createStaticVNode`/`insertStaticContent`).
+
+### Stringification (`stringifyStatic`)
+
+After the walk, `StaticStringifier.Run` scans a container's children for the largest contiguous run of
+cached, stringifiable siblings and — at or above the upstream thresholds — collapses it into a single
+`createStaticVNode(html, nodeCount)` whose serialized HTML the runtime applies via one `innerHTML`. The
+thresholds are pinned numerically to upstream `StringifyThresholds`:
+
+| Threshold | Value | Meaning |
+| --- | --- | --- |
+| `NODE_COUNT` | 20 | consecutive stringifiable nodes |
+| `ELEMENT_WITH_BINDING_COUNT` | 5 | consecutive elements carrying attribute bindings |
+
+Serialization reuses the compiler's existing HTML knowledge: `escapeHtml` (the `@vue/shared` port: `"`, `&`,
+`'`, `<`, `>`) so the string round-trips through `innerHTML` to the same DOM (WHATWG fragment serialization),
+`CompilerDomKnowledge.IsVoidTag` to omit end tags for void elements, and `IsKnownHtmlAttribute`/
+`IsKnownSvgAttribute` plus the `data-`/`aria-` rule for `isStringifiableAttr`. Table-section tags
+(`caption,thead,tr,th,tbody,td,tfoot,colgroup,col`) never stringify (innerHTML would reparent them).
+
+### JavaScript → C# / AOT divergences
+
+Each is deliberate, forced by the no-dynamic-codegen rule or the immutable-AST model, and pinned by
+`StaticCacheTests` (the *chosen* behavior, per the deviations rule).
+
+| Upstream behavior | Vuecs behavior | Why |
+| --- | --- | --- |
+| `context.cache` (vnode subtrees, per-instance `_cache`) **and** `context.hoist` (props objects, per-type module `_hoisted_N` consts) | both route through the per-instance `_cache` seam | the C# generator model owns the render method and has no module-const scope without a new emitter↔generator field contract; each value is still created once per instance and reused across all re-renders — the interop-reduction goal. `context.Hoist`/`result.Hoists` stay reserved for a future per-type static-field seam. |
+| constant interpolations / constant `v-bind` values evaluated with `new Function` | not evaluated; `AnalyzeNode` bails on any non-text/comment/element content and on any binding | dynamic code generation is forbidden (AOT). In the opaque-expression model no interpolation or `v-bind` is ever constant, so a stringifiable cached subtree only ever holds static text, comments, and static attributes — the eval branches are unreachable. |
+| whole-children-array cache (`cachedAsArray`) and `TEXT_CALL` caching | omitted; each eligible static sibling caches individually | a fully static text run is a single `TextNode` folded into its element's cached subtree, so `TEXT_CALL` caching is unreachable; skipping `cachedAsArray` avoids reconstructing frozen immutable children arrays and means only upstream's non-`isParentCached` stringify path is needed. |
+| `stringifyStatic` runs on every container (element, root, `v-for`/`v-if` bodies) | runs on a template root's children and a plain element's children | those are the two containers with clean immutable write-back; static descendants inside `v-if`/`v-for` bodies are still cached, just not stringified (a per-iteration run rarely reaches 20 nodes anyway). |
+| after merging, `context.cached` is spliced and trailing cache indices decremented | merged nodes' cache slots stay reserved-but-unused | `CacheExpression.Index` is immutable; leaving the slots reserved keeps the record immutable and the output deterministic, at the cost of a marginally larger `_cache`. |
+| `isKnownMathMLAttr` | MathML attributes are never stringifiable | the Vuecs shared DOM knowledge has no MathML known-attribute table; MathML static content still caches, it just does not fold into an innerHTML string. |
+
+### Non-goals ([V01.01.05.07])
+
+- Per-component-type static fields (the pre-3.5 `_hoisted_N` module consts). All static optimization routes
+  through per-instance `_cache`; a static-field emission seam through the generator is deferred.
+- Stringification of `v-for`/`v-if` body runs, and of runs interleaved with `TextCall` text (see above).
+- Constant-expression evaluation for stringifying constant interpolations / `:bind="1"` (needs an evaluator
+  Vuecs deliberately does not have).
