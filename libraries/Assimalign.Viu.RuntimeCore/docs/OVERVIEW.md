@@ -24,11 +24,14 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.RuntimeD
   `ComponentProperties` / `ComponentPropertyDefinition` (props declaration and validation),
   `ComponentAttributes` (attrs fallthrough), `ComponentEmitDefinition` (emits), `ComponentSlots`,
   `Lifecycle` (the hook registration facade, including `OnActivated`/`OnDeactivated`),
-  `DynamicComponents`, the `KeepAlive` caching built-in ([V01.01.03.18]), and the transition
-  scaffolding (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
+  `DynamicComponents`, the `KeepAlive` caching built-in ([V01.01.03.18]), `AsyncComponents`
+  (`DefineAsyncComponent`) with `AsyncComponentOptions` and the `AsyncComponentLoader` /
+  `AsyncComponentErrorHandler` delegates ([V01.01.03.16]), and the transition scaffolding
+  (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
 - **Application / plugins** — `Application<TNode>` (Vue's `createApp` shell: one root mounted into
   one container), `ApplicationConfiguration` (error/warn handlers, performance flag),
-  `IComponentDefinition`, `IPlugin<TNode>`.
+  `IComponentDefinition`, `IPlugin<TNode>`, and `ISuspenseBoundary` (the async-component / Suspense
+  registration seam completed by [V01.01.03.20]).
 - **Provide / inject** (`DependencyInjection/`) — `DependencyInjection` and the typed
   `InjectionKey<T>`.
 - **Directives** (`Directives/`) — `IDirective`, `Directive`, `Directives`, `DirectiveBinding`,

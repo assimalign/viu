@@ -41,6 +41,11 @@ public sealed class ComponentInstance
         // parent.provides). DependencyInjection.Provide forks a layered copy on this instance's
         // first own provide; until then the reference is shared with every non-providing ancestor.
         Provides = parent?.Provides;
+        // Inherit the enclosing Suspense boundary from the parent, or the ambient one a boundary
+        // sets while mounting its subtree (upstream: suspense = parent ? parent.suspense :
+        // vnode.suspense). Null until Suspense lands ([V01.01.03.20]); a suspensible async component
+        // reads it to register its pending load ([V01.01.03.16]).
+        SuspenseBoundary = parent?.SuspenseBoundary ?? SuspenseBoundaryContext.Current;
         Scope = new EffectScope(detached: true);
         Properties = new ComponentProperties(DisplayName);
         Attributes = new ComponentAttributes();
@@ -103,6 +108,14 @@ public sealed class ComponentInstance
     /// <c>Setup</c> runs; null on every non-KeepAlive instance ([V01.01.03.18]).
     /// </summary>
     internal KeepAliveContext? KeepAliveContext { get; set; }
+
+    /// <summary>
+    /// The enclosing <c>&lt;Suspense&gt;</c> boundary (upstream: <c>instance.suspense</c>), inherited
+    /// from the parent or the ambient <see cref="SuspenseBoundaryContext"/> at creation. A suspensible
+    /// async component registers its pending load with it ([V01.01.03.16]); the real boundary
+    /// implementation lands with Suspense ([V01.01.03.20]). Null when there is no enclosing boundary.
+    /// </summary>
+    internal ISuspenseBoundary? SuspenseBoundary { get; set; }
 
     /// <summary>
     /// The instance whose <c>Setup</c>, render, or lifecycle hook is executing — upstream's
