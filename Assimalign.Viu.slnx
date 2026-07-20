@@ -268,6 +268,17 @@
 		<Project Path="libraries/Assimalign.Viu.Shared/test/Assimalign.Viu.Shared.GeneratorFixture/Assimalign.Viu.Shared.GeneratorFixture.csproj" />
 		<Project Path="libraries/Assimalign.Viu.Shared/test/Assimalign.Viu.Shared.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Store/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Store/docs/">
+		<File Path="libraries/Assimalign.Viu.Store/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Store/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Store/src/">
+		<Project Path="libraries/Assimalign.Viu.Store/src/Assimalign.Viu.Store.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Store/test/">
+		<Project Path="libraries/Assimalign.Viu.Store/test/Assimalign.Viu.Store.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/src/">
 		<Project Path="libraries/Assimalign.Viu.Testing/src/Assimalign.Viu.Testing.csproj" />
