@@ -18,6 +18,14 @@ namespace Assimalign.Viu.RuntimeDom;
 /// </summary>
 public sealed class BrowserEvent
 {
+    // The live DOM event's arrival-time preventDefault state, kept apart from a handler's own
+    // PreventDefault request: the browser already applied the arrival one, so only handler-requested
+    // prevention re-crosses the boundary in the response flags. A guard still observes the combined
+    // state through DefaultPrevented, matching the DOM's event.defaultPrevented (upstream RouterLink
+    // guardEvent bails on it).
+    private readonly bool _defaultPreventedOnArrival;
+    private bool _preventDefaultRequested;
+
     internal BrowserEvent(
         string eventName,
         double timeStamp,
@@ -32,7 +40,8 @@ public sealed class BrowserEvent
         bool isSelfTarget,
         string? targetValue,
         bool targetChecked,
-        string[]? selectedValues = null)
+        string[]? selectedValues = null,
+        bool defaultPrevented = false)
     {
         EventName = eventName;
         TimeStamp = timeStamp;
@@ -48,6 +57,7 @@ public sealed class BrowserEvent
         TargetValue = targetValue;
         TargetChecked = targetChecked;
         SelectedValues = selectedValues;
+        _defaultPreventedOnArrival = defaultPrevented;
     }
 
     /// <summary>The DOM event type (e.g. <c>"click"</c>, <c>"keydown"</c>).</summary>
@@ -103,8 +113,14 @@ public sealed class BrowserEvent
     /// <summary>Whether <see cref="StopPropagation"/> was requested.</summary>
     public bool PropagationStopped { get; private set; }
 
-    /// <summary>Whether <see cref="PreventDefault"/> was requested.</summary>
-    public bool DefaultPrevented { get; private set; }
+    /// <summary>
+    /// Whether the browser default is prevented — true if the live event already arrived prevented
+    /// (an earlier listener called <c>preventDefault</c>) or a handler has since called
+    /// <see cref="PreventDefault"/>. Mirrors the DOM's <c>event.defaultPrevented</c>; a host event
+    /// bridge reads it to honor upstream RouterLink <c>guardEvent</c>, which never intercepts an
+    /// already-prevented click.
+    /// </summary>
+    public bool DefaultPrevented => _defaultPreventedOnArrival || _preventDefaultRequested;
 
     /// <summary>
     /// Requests <c>stopPropagation()</c> on the live event when this synchronous dispatch
@@ -116,8 +132,10 @@ public sealed class BrowserEvent
     /// Requests <c>preventDefault()</c> on the live event when this synchronous dispatch
     /// returns (Vue's <c>.prevent</c> modifier calls this).
     /// </summary>
-    public void PreventDefault() => DefaultPrevented = true;
+    public void PreventDefault() => _preventDefaultRequested = true;
 
+    // Only handler-requested prevention re-crosses the boundary: an event that arrived prevented was
+    // already suppressed by the browser, so re-signaling it would be redundant.
     internal int ToResponseFlags()
-        => (PropagationStopped ? 1 : 0) | (DefaultPrevented ? 2 : 0);
+        => (PropagationStopped ? 1 : 0) | (_preventDefaultRequested ? 2 : 0);
 }

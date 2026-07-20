@@ -31,8 +31,9 @@ public class BrowserEventInvokerRegistryTests
         string key = "",
         BrowserEventModifiers modifiers = BrowserEventModifiers.None,
         int button = 0,
-        bool isSelfTarget = true)
-        => new(eventName, 100, key, string.Empty, modifiers, button, 0, 0, 0, 1, isSelfTarget, null, false);
+        bool isSelfTarget = true,
+        bool defaultPrevented = false)
+        => new(eventName, 100, key, string.Empty, modifiers, button, 0, 0, 0, 1, isSelfTarget, null, false, null, defaultPrevented);
 
     [Fact]
     public void SwappingTheHandlerBetweenRenders_MakesZeroBridgeCalls()
@@ -118,6 +119,74 @@ public class BrowserEventInvokerRegistryTests
     [Fact]
     public void Dispatch_WithNoInvoker_ReturnsZero()
         => _registry.Dispatch(Element, capture: false, Event()).ShouldBe(0);
+
+    // --- renderer-agnostic object-payload handlers ([V01.01.08.03.01]: RouterLink and other
+    // components rendering through the node-ops abstraction attach an Action<object?> whose payload a
+    // host bridge synthesizes from the BrowserEvent; installed via BrowserObjectEvents.Invoker) ------
+
+    [Fact]
+    public void Dispatch_ObjectPayloadHandler_RoutesThroughTheInstalledInvoker()
+    {
+        object? seenPayload = null;
+        var payload = new object();
+        var previous = BrowserObjectEvents.Invoker;
+        try
+        {
+            BrowserObjectEvents.Invoker = (handler, browserEvent) =>
+            {
+                handler(payload);              // the bridge feeds a host-synthesized payload
+                browserEvent.PreventDefault(); // ...and applies the handler's decision back
+            };
+            _registry.SetListener(Element, "onClick", (Action<object?>)(value => seenPayload = value));
+
+            var flags = _registry.Dispatch(Element, capture: false, Event());
+
+            seenPayload.ShouldBeSameAs(payload);
+            flags.ShouldBe(2); // the invoker's PreventDefault re-crosses the boundary
+        }
+        finally
+        {
+            BrowserObjectEvents.Invoker = previous;
+        }
+    }
+
+    [Fact]
+    public void Dispatch_ObjectPayloadHandler_WithNoInvokerInstalled_RoutesToTheErrorSink()
+    {
+        Exception? sunk = null;
+        _registry.ErrorSink = exception => sunk = exception;
+        var previous = BrowserObjectEvents.Invoker;
+        try
+        {
+            BrowserObjectEvents.Invoker = null;
+            _registry.SetListener(Element, "onClick", (Action<object?>)(_ => { }));
+
+            var flags = -1;
+            Should.NotThrow(() => flags = _registry.Dispatch(Element, capture: false, Event()));
+
+            sunk.ShouldBeOfType<NotSupportedException>();
+            flags.ShouldBe(0); // no handler ran, so nothing re-crosses the boundary
+        }
+        finally
+        {
+            BrowserObjectEvents.Invoker = previous;
+        }
+    }
+
+    [Fact]
+    public void Dispatch_EventArrivingPrevented_ReportsDefaultPreventedWithoutResignaling()
+    {
+        // An event that arrived already prevented reads defaultPrevented (upstream guardEvent bails on
+        // it) but does not re-signal preventDefault — the browser already applied it.
+        bool? seenPrevented = null;
+        _registry.SetListener(Element, "onClick", (Action<BrowserEvent>)(browserEvent =>
+            seenPrevented = browserEvent.DefaultPrevented));
+
+        var flags = _registry.Dispatch(Element, capture: false, Event(defaultPrevented: true));
+
+        seenPrevented.ShouldBe(true);
+        flags.ShouldBe(0); // arrival-prevented alone re-crosses nothing
+    }
 
     [Fact]
     public void HandlerExceptions_RouteToTheErrorSink_NeverEscapeToTheListener()

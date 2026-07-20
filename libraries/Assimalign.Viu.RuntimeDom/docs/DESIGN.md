@@ -79,6 +79,31 @@ and `.WithKeys` port `withModifiers`/`withKeys` (guards run .NET-side over the p
 Handler exceptions route to the registry's error sink — a debug trace until the app
 error-handling pipeline ([V01.01.03.12]) replaces it — and never escape into the JS listener.
 
+### Renderer-agnostic handlers: the object-payload bridge ([V01.01.08.03.01])
+
+A component that renders through the node-ops abstraction rather than the DOM directly — so it also
+runs against the in-memory Testing renderer and SSR — attaches an `Action<object?>` handler that
+expects a *platform-free* payload, not a `BrowserEvent`. The Router's `RouterLink` is the first: its
+`onClick` reads a DOM-free `RouterLinkClickEvent` (button, system modifiers, `DefaultPrevented`), the
+stand-in for the `MouseEvent` vue-router's `guardEvent` inspects. The DOM runtime must not know that
+payload type (`Assimalign.Viu.Router` is an opt-in package, not a framework member, and must never be
+dragged into every app's closure), so the seam is inverted: the invoker registry recognizes the
+`Action<object?>` shape and routes it through an ambient `BrowserObjectEvents.Invoker`
+(`BrowserObjectEventInvoker`) that a *browser integration layer* installs. That invoker owns the
+whole conversion — synthesize the payload from the `BrowserEvent`, call the handler, and apply the
+handler's prevent/stop decision back to the `BrowserEvent` so it re-crosses the boundary in the same
+single dispatch return. With no invoker installed, dispatching such a handler surfaces a
+`NotSupportedException` to the error sink rather than silently dropping the event. This mirrors the
+Testing renderer's `Action<object?>` dispatch (`TestEventDispatcher`) — same handler shape, host-
+specific payload — and keeps the coupling to `RouterLinkClickEvent` in the dedicated
+`Assimalign.Viu.Router.RuntimeDom` bridge, never here.
+
+The dispatch payload carries the live event's arrival-time `event.defaultPrevented` (a new
+`[JSExport]` field) so the bridge honors `guardEvent`'s already-prevented bail. `BrowserEvent` keeps
+that arrival state apart from a handler's own `PreventDefault()` request: a guard sees the combined
+state through `DefaultPrevented` (matching the DOM), but only handler-requested prevention re-crosses
+the boundary in the response flags — the browser already applied the arrival one.
+
 ## Interop command-buffer batching ([V01.01.04.05])
 
 The boundary is the budget, so the batched mode collapses a whole scheduler flush's node-ops into
