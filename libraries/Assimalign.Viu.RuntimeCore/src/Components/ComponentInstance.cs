@@ -82,6 +82,29 @@ public sealed class ComponentInstance
     internal HashSet<string>? LastProvidedNames { get; set; }
 
     /// <summary>
+    /// Whether this instance runs the <see cref="KeepAlive"/> built-in (upstream: <c>isKeepAlive</c>,
+    /// the <c>__isKeepAlive</c> component flag). Read when registering
+    /// <see cref="Lifecycle.OnActivated"/>/<see cref="Lifecycle.OnDeactivated"/> so a descendant hook is
+    /// injected onto every ancestor KeepAlive-root instance ([V01.01.03.18]).
+    /// </summary>
+    internal bool IsKeepAlive => Definition is KeepAlive;
+
+    /// <summary>
+    /// Whether this instance's subtree currently lives in a <see cref="KeepAlive"/> storage container —
+    /// upstream's <c>instance.isDeactivated</c>. Set by the renderer's activate/deactivate operations
+    /// (only ever on a KeepAlive's direct child), and read by the activated/deactivated hook wrapper to
+    /// skip firing a hook whose owning branch is deactivated ([V01.01.03.18]).
+    /// </summary>
+    internal bool IsDeactivated { get; set; }
+
+    /// <summary>
+    /// The renderer internals for a mounted <see cref="KeepAlive"/> (upstream: <c>instance.ctx.renderer</c>
+    /// for a KeepAlive) — a storage container plus a real-unmount operation. The renderer sets it before
+    /// <c>Setup</c> runs; null on every non-KeepAlive instance ([V01.01.03.18]).
+    /// </summary>
+    internal KeepAliveContext? KeepAliveContext { get; set; }
+
+    /// <summary>
     /// The instance whose <c>Setup</c>, render, or lifecycle hook is executing — upstream's
     /// <c>getCurrentInstance()</c>. Null outside those windows.
     /// </summary>
@@ -179,6 +202,19 @@ public sealed class ComponentInstance
 
     internal void RegisterHook(LifecycleHookKind kind, Delegate hook)
         => (_hooks[(int)kind] ??= []).Add(hook);
+
+    /// <summary>
+    /// Prepends a hook so it runs before hooks already registered for the same kind — the C# port of
+    /// <c>injectHook(type, hook, target, /*prepend*/ true)</c>. KeepAlive uses this to aggregate a
+    /// descendant's activated/deactivated hook onto the KeepAlive-root instance ahead of the root's own,
+    /// yielding child-before-parent firing ([V01.01.03.18]).
+    /// </summary>
+    internal void PrependHook(LifecycleHookKind kind, Delegate hook)
+        => (_hooks[(int)kind] ??= []).Insert(0, hook);
+
+    /// <summary>Removes a previously registered hook (upstream: <c>remove(instance[type], hook)</c>).</summary>
+    internal void RemoveHook(LifecycleHookKind kind, Delegate hook)
+        => _hooks[(int)kind]?.Remove(hook);
 
     internal bool HasHooks(LifecycleHookKind kind) => _hooks[(int)kind] is { Count: > 0 };
 

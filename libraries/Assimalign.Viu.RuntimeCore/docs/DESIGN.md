@@ -76,6 +76,48 @@ Deliberate divergences from upstream `Teleport.ts`, each documented at its call 
   handle renderer (the browser's `0`) returning it means "not found", exactly as a null reference-type
   handle does — so a missing selector never teleports into node `0`.
 
+## KeepAlive is a component with renderer-internal reach
+
+`KeepAlive` ([V01.01.03.18], upstream `components/KeepAlive.ts`) is — unlike Teleport — a real
+`IComponentDefinition` (`KeepAlive.Instance`, the singleton `RenderHelpers._KeepAlive` resolves to). It
+wraps one dynamic child and, when the view switches, has the renderer **move the outgoing child's subtree
+into a hidden storage container instead of unmounting it** (`deactivate`) and move it home on return
+(`activate`), so the child's `Setup` runs once and all its state survives. The two paths are driven by
+`ShapeFlags.ComponentShouldKeepAlive` / `ComponentKeptAlive` (bit-for-bit with `@vue/shared`): the
+renderer's `processComponent` short-circuits a kept-alive vnode into `ActivateComponent` instead of a
+fresh mount, and its `unmount` short-circuits a should-keep-alive vnode into `DeactivateComponent`
+(move-to-storage) instead of teardown.
+
+Upstream injects the renderer internals onto `instance.ctx.renderer` in `mountComponent`; Viu mirrors the
+split without leaking `TNode` into the component. The renderer owns activate/deactivate and, at mount,
+attaches an internal `KeepAliveContext` (a node-op-created storage container plus a real-unmount delegate)
+to the KeepAlive instance **before** `Setup` runs. `KeepAlive` itself owns the cache and the render/prune
+logic: because `KeepAlive.Instance` is a shared singleton, every per-mount value (the cache, the
+least-recently-used key order, the current/pending keys) is **closure** state created fresh per `Setup`,
+never an instance field. The cache key is the child's vnode key when present, else the component
+definition reference — a typed key, never a reflected type name (AOT/trimming). `Max` caps the cache with
+LRU eviction (a `LinkedList<object>` orders keys oldest-first); `Include`/`Exclude` match the child's
+declared `IComponentDefinition.Name`, and a `flush: 'post'` watch prunes newly excluded entries when the
+props change.
+
+`Activated`/`Deactivated` hooks mirror upstream's `registerKeepAliveHook`: a KeepAlive activates only its
+*direct* child, so a nested descendant's hook is prepended onto every ancestor KeepAlive-root instance's
+hook list, and one `InvokeHooks` on that root fires the whole subtree child-before-parent. A
+deactivation-branch check (upstream's `__wdc`) skips a hook whose owning branch is already deactivated so
+nested KeepAlives do not double-fire.
+
+Deliberate divergences from upstream `KeepAlive.ts`, each documented at its call site:
+
+- **No Suspense unwrapping.** Upstream's `getInnerChild` unwraps a Suspense child; Viu treats the child as
+  its own inner child until Suspense lands ([V01.01.03.20]).
+- **No mount-invalidation of a pending activated/mounted hook.** Upstream 3.5 calls `invalidateMount` when
+  deactivating so a queued-but-unrun mounted/activated hook is cancelled; Viu's synchronous per-render
+  flush drains a newly-mounted subtree's post-flush hooks before any later render can deactivate it, so
+  `mounted` still fires exactly once and the guard is unnecessary for discrete render cycles.
+- **Aggregated hooks fire with the KeepAlive-root as the ambient instance.** Upstream's `invokeArrayFns`
+  sets no current instance; Viu fires the aggregated list through the root's `InvokeHooks`, so a
+  descendant hook that reads `ComponentInstance.Current` sees the root — a minor divergence pinned by test.
+
 ## Deltas from Vue 3
 
 - **DOM directives live one layer up.** `v-show` and `v-model` and the DOM transitions are *not*

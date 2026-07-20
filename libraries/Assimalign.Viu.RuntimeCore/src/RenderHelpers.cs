@@ -612,8 +612,13 @@ public static class RenderHelpers
     /// <summary>The <c>Suspense</c> built-in marker (upstream: <c>Suspense</c>); renderer support is separate work.</summary>
     public static readonly object _Suspense = new BuiltInVirtualNodeType("Suspense", isFragment: false);
 
-    /// <summary>The <c>KeepAlive</c> built-in marker (upstream: <c>KeepAlive</c>); renderer support is separate work.</summary>
-    public static readonly object _KeepAlive = new BuiltInVirtualNodeType("KeepAlive", isFragment: false);
+    /// <summary>
+    /// The <c>KeepAlive</c> built-in (upstream: <c>KeepAlive</c>), resolved to the real caching component
+    /// <see cref="RuntimeCore.KeepAlive"/> ([V01.01.03.18]). The compiled render passes it as a vnode
+    /// <c>tag</c>; <see cref="CreateBaseVNode"/>'s component arm mounts it, and the renderer's
+    /// activate/deactivate paths cache its child's subtree instead of unmounting it.
+    /// </summary>
+    public static readonly object _KeepAlive = KeepAlive.Instance;
 
     /// <summary>
     /// The <c>BaseTransition</c> built-in (upstream: <c>BaseTransition</c>), resolved to the real

@@ -53,13 +53,25 @@ public static class Lifecycle
     /// <param name="hook">The prefetch task factory.</param>
     public static void OnServerPrefetch(Func<Task> hook) => Register(LifecycleHookKind.ServerPrefetch, hook, nameof(OnServerPrefetch));
 
-    /// <summary>Stored for KeepAlive activation ([V01.01.03.18]); a no-op without a KeepAlive parent.</summary>
+    /// <summary>
+    /// Registers a hook that fires when a <c>&lt;KeepAlive&gt;</c> re-activates this component's cached
+    /// subtree (and on its initial mount inside a KeepAlive) — the C# port of <c>onActivated</c>
+    /// (<c>packages/runtime-core/src/components/KeepAlive.ts</c>,
+    /// https://vuejs.org/api/composition-api-lifecycle.html#onactivated). A no-op for a component with no
+    /// KeepAlive ancestor. Nested descendants' activated hooks fire child-before-parent (see
+    /// <see cref="OnDeactivated"/> for the mechanism).
+    /// </summary>
     /// <param name="hook">The hook.</param>
-    public static void OnActivated(Action hook) => Register(LifecycleHookKind.Activated, hook, nameof(OnActivated));
+    public static void OnActivated(Action hook) => RegisterKeepAliveHook(LifecycleHookKind.Activated, hook, nameof(OnActivated));
 
-    /// <summary>Stored for KeepAlive deactivation ([V01.01.03.18]); a no-op without a KeepAlive parent.</summary>
+    /// <summary>
+    /// Registers a hook that fires when a <c>&lt;KeepAlive&gt;</c> deactivates this component's subtree
+    /// (moves it to storage) — the C# port of <c>onDeactivated</c>
+    /// (https://vuejs.org/api/composition-api-lifecycle.html#ondeactivated). A no-op for a component with
+    /// no KeepAlive ancestor.
+    /// </summary>
     /// <param name="hook">The hook.</param>
-    public static void OnDeactivated(Action hook) => Register(LifecycleHookKind.Deactivated, hook, nameof(OnDeactivated));
+    public static void OnDeactivated(Action hook) => RegisterKeepAliveHook(LifecycleHookKind.Deactivated, hook, nameof(OnDeactivated));
 
     private static void Register(LifecycleHookKind kind, Delegate hook, string apiName)
     {
@@ -73,5 +85,52 @@ public static class Lifecycle
             return;
         }
         instance.RegisterHook(kind, hook);
+    }
+
+    private static void RegisterKeepAliveHook(LifecycleHookKind kind, Action hook, string apiName)
+    {
+        // The C# port of registerKeepAliveHook (KeepAlive.ts). A KeepAlive activates/deactivates only its
+        // direct child, so a nested descendant's hook is aggregated onto every ancestor KeepAlive-root
+        // instance; a single InvokeHooks on that root then fires the whole subtree child-before-parent.
+        ArgumentNullException.ThrowIfNull(hook);
+        var target = ComponentInstance.Current;
+        if (target is null)
+        {
+            RuntimeWarnings.Warn(
+                $"{apiName}() is called when there is no active component instance to be associated with. "
+                + "Lifecycle hooks can only be registered during Setup().");
+            return;
+        }
+        // Wrap with the deactivation-branch check (upstream __wdc): skip firing when the target or any
+        // ancestor is currently in a deactivated (stored) branch, so a nested KeepAlive does not
+        // double-fire an already-deactivated descendant.
+        Action wrapped = () =>
+        {
+            for (var node = target; node is not null; node = node.Parent)
+            {
+                if (node.IsDeactivated)
+                {
+                    return;
+                }
+            }
+            hook();
+        };
+        target.RegisterHook(kind, wrapped);
+        // Walk up and inject the wrapped hook onto every ancestor that is a KeepAlive-root direct child
+        // (its parent is a KeepAlive), prepending so deeper descendants fire before shallower ones.
+        var current = target.Parent;
+        while (current?.Parent is not null)
+        {
+            if (current.Parent.IsKeepAlive)
+            {
+                var keepAliveRoot = current;
+                keepAliveRoot.PrependHook(kind, wrapped);
+                // Remove the injected copy when the target unmounts (upstream: onUnmounted(remove, target)).
+                target.RegisterHook(
+                    LifecycleHookKind.Unmounted,
+                    (Action)(() => keepAliveRoot.RemoveHook(kind, wrapped)));
+            }
+            current = current.Parent;
+        }
     }
 }

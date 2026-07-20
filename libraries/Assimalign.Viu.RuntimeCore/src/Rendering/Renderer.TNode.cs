@@ -544,7 +544,16 @@ public sealed class Renderer<TNode>
     {
         if (current is null)
         {
-            MountComponent(next, container, anchor, elementNamespace, parentComponent);
+            if ((next.ShapeFlag & ShapeFlags.ComponentKeptAlive) != 0 && parentComponent is not null)
+            {
+                // A cached child re-entering a <KeepAlive>: reactivate its stored subtree instead of a
+                // fresh mount (upstream processComponent: (parentComponent.ctx).activate). [V01.01.03.18]
+                ActivateComponent(next, container, anchor, elementNamespace);
+            }
+            else
+            {
+                MountComponent(next, container, anchor, elementNamespace, parentComponent);
+            }
         }
         else
         {
@@ -563,6 +572,23 @@ public sealed class Renderer<TNode>
         }
         var instance = new ComponentInstance(definition, next, parentComponent);
         next.Component = instance;
+        // Inject the renderer internals a <KeepAlive> needs BEFORE its Setup runs (upstream
+        // mountComponent: if (isKeepAlive(vnode)) instance.ctx.renderer = internals). The storage
+        // container is created through the node-op so the mechanism works DOM-free ([V01.01.03.18]).
+        if (definition is KeepAlive)
+        {
+            instance.KeepAliveContext = new KeepAliveContext
+            {
+                StorageContainer = _options.CreateElement("div", elementNamespace),
+                Unmount = cached =>
+                {
+                    // Upstream KeepAlive.unmount: reset the keep-alive flags, then really tear it down
+                    // (host removal), routing errors through this KeepAlive instance.
+                    cached.ShapeFlag &= ~(ShapeFlags.ComponentShouldKeepAlive | ShapeFlags.ComponentKeptAlive);
+                    Unmount(cached, instance, doRemove: true);
+                },
+            };
+        }
         ComponentPropertyResolution.Resolve(instance, next);
         ResolveSlots(instance, next);
         SetupComponent(instance);
@@ -638,6 +664,14 @@ public sealed class Renderer<TNode>
             instance.VirtualNode.Anchor = subtree.Anchor;
             instance.IsMounted = true;
             QueueInstanceHooks(instance, LifecycleHookKind.Mounted);
+            // A component mounted for the first time inside a <KeepAlive> fires its activated hooks now
+            // too (upstream componentUpdateFn: instance.a && vnode.shapeFlag &
+            // COMPONENT_SHOULD_KEEP_ALIVE). The KeepAlive root's aggregated `a` list carries any nested
+            // descendants' hooks, so they fire child-before-parent ([V01.01.03.18]).
+            if ((instance.VirtualNode.ShapeFlag & ShapeFlags.ComponentShouldKeepAlive) != 0)
+            {
+                QueueInstanceHooks(instance, LifecycleHookKind.Activated);
+            }
         }
         else
         {
@@ -853,6 +887,41 @@ public sealed class Renderer<TNode>
         // Post-flush phase (upstream: queuePostRenderEffect); stable ordering keeps
         // child-before-parent for Mounted/Unmounted.
         Scheduler.QueuePostFlushCallback(new SchedulerJob(() => instance.InvokeHooks(kind)));
+    }
+
+    // --- keep-alive ([V01.01.03.18]) -----------------------------------------------------------
+
+    private void ActivateComponent(VirtualNode node, TNode container, TNode? anchor, string? elementNamespace)
+    {
+        // The C# port of KeepAlive's sharedContext.activate: move the cached subtree back into the live
+        // container, re-patch in case props changed while cached, then queue the activated hooks and the
+        // onVnodeMounted hook post-flush (upstream: queuePostRenderEffect). The child instance was never
+        // torn down, so its Setup does not re-run.
+        var instance = (ComponentInstance)node.Component!;
+        Move(node, container, anchor);
+        Patch(instance.VirtualNode, node, container, anchor, elementNamespace, instance);
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() =>
+        {
+            instance.IsDeactivated = false;
+            instance.InvokeHooks(LifecycleHookKind.Activated);
+            InvokeHook(node, null, "onVnodeMounted");
+        }));
+    }
+
+    private void DeactivateComponent(VirtualNode node, ComponentInstance keepAlive)
+    {
+        // The C# port of KeepAlive's sharedContext.deactivate: move the subtree into the KeepAlive's
+        // detached storage container (instead of unmounting it), then queue the deactivated hooks and the
+        // onVnodeUnmounted hook post-flush. The child instance and all its state are preserved.
+        var instance = (ComponentInstance)node.Component!;
+        var storageContainer = (TNode)keepAlive.KeepAliveContext!.StorageContainer;
+        Move(node, storageContainer, default);
+        Scheduler.QueuePostFlushCallback(new SchedulerJob(() =>
+        {
+            instance.InvokeHooks(LifecycleHookKind.Deactivated);
+            InvokeHook(node, null, "onVnodeUnmounted");
+            instance.IsDeactivated = true;
+        }));
     }
 
     // --- teleport ([V01.01.03.17]) -------------------------------------------------------------
@@ -1711,6 +1780,15 @@ public sealed class Renderer<TNode>
         if (node.Reference is { } reference)
         {
             SetReference(reference, oldReference: null, node, isUnmount: true, parentComponent);
+        }
+        // A <KeepAlive> child leaving the view deactivates (its subtree moves to storage) instead of
+        // unmounting, so its instance and state survive (upstream unmount:
+        // (parentComponent.ctx).deactivate(vnode); return). The KeepAlive is the owning parentComponent,
+        // so it holds the storage container ([V01.01.03.18]).
+        if ((node.ShapeFlag & ShapeFlags.ComponentShouldKeepAlive) != 0 && parentComponent?.KeepAliveContext is not null)
+        {
+            DeactivateComponent(node, parentComponent);
+            return;
         }
         // Cleanup order (upstream parity): hooks and child teardown run before node removal.
         InvokeHook(node, null, "onVnodeBeforeUnmount");
