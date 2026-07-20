@@ -1,9 +1,11 @@
 # Assimalign.Viu.Router — design
 
-Why the matcher is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md). Upstream
-counterpart: `vue-router` v4's matcher (`packages/router/src/matcher/` in
+Why the matcher and the history layer are shaped the way they are. What they are: see
+[OVERVIEW.md](OVERVIEW.md). Upstream counterpart: `vue-router` v4's matcher
+(`packages/router/src/matcher/`) and history (`packages/router/src/history/`, in
 https://github.com/vuejs/router). Matching-syntax reference:
-https://router.vuejs.org/guide/essentials/route-matching-syntax.html.
+https://router.vuejs.org/guide/essentials/route-matching-syntax.html; history-mode reference:
+https://router.vuejs.org/guide/essentials/history-mode.html.
 
 ## The matcher is a pure port
 
@@ -96,9 +98,70 @@ records by identity; parameters compare structurally and hash order-independentl
 keeps reference identity on purpose — the matched chain points at the exact record instances the
 consumer supplied.
 
+## History: the policy is split from the interop edge
+
+The web and hash histories (`[V01.01.08.02]`, the C# port of `packages/router/src/history/`) are
+split in two so the browser one is testable without a browser:
+
+- **`BrowserRouterHistory` is the policy** — base prepend/strip, the push/replace/`popstate` state
+  machine, listener bookkeeping — and touches no DOM. Every environment effect is delegated to an
+  injected **`IBrowserHistoryInterop`**. This mirrors `Assimalign.Viu.RuntimeDom`'s
+  `BrowserEventInvokerRegistry`, which takes its bridge calls as delegates so it is unit-testable
+  with recorded doubles. A `FakeBrowserHistoryInterop` records every crossing and can simulate a
+  `popstate`, so base handling, the state round-trip, delta/direction, listener teardown, and the
+  interop-call count are all pinned on a plain .NET host.
+- **`JavaScriptBrowserHistoryInterop` is the thin edge** — `[JSImport]` bindings to
+  `wwwroot/viu-history.js` — and does nothing but flatten the policy's URLs and states into
+  primitive interop calls. The JS module is a dumb applier: the only decision it makes is reading the
+  live `window.scrollX/Y` for the leaving entry (the one piece of state the DOM owns).
+
+`createWebHashHistory` is not a second implementation: as upstream, it only computes a `#`-carrying
+base and hands it to the same web policy (`RouterHistory.ResolveHashBase` → `BrowserRouterHistory`).
+
+## History state: one position counter, computed in C#
+
+`RouterHistoryState` is a flat, primitives-only payload (the port of upstream's `StateEntry`). The
+monotonic `Position` counter is assigned by `RouterHistoryStateBuilder` — `+1` per push, preserved
+across a replace, seeded from `history.length - 1` at bootstrap — **in C#**, not read from
+`window.history.length` per call, so the identical arithmetic runs in memory and in the browser and
+is unit-tested in isolation. A `popstate`'s signed distance is `arrived.Position - leaving.Position`,
+which yields the `NavigationDirection`. State crosses the boundary as primitives only: a null
+adjacency link and an absent scroll encode as an empty string / `false` flag, never a marshaled
+object graph (`BrowserHistorySnapshotMarshaller` pins the wire format).
+
+## History: batching and leak-free teardown
+
+- **Reads are one crossing.** `ReadSnapshot()` returns the raw `location` components *and* the current
+  entry's state together — no per-property getters. The policy caches location and state and never
+  re-reads them per navigation; a test asserts exactly one snapshot read across a push/replace/go/pop
+  sequence (the batched-read criterion).
+- **Writes are one crossing.** A push is two History-API operations (amend the leaving entry, then
+  push the new one), but the `Push` edge collapses them into a single interop call; a replace is one.
+- **`popstate` is one `[JSExport]`**, routed by a subscription id (`BrowserHistoryInteropDispatch`,
+  the history analogue of `BrowserEventDispatch`). The id lets many histories coexist and lets
+  `Destroy` unsubscribe the exact JS listener — no leak across instances, which matters because test
+  hosts create many.
+
+## History: deliberate divergences from vue-router
+
+- **Memory carries a full state per entry.** Upstream's memory history keeps `state = {}`; this port
+  stores a real `RouterHistoryState` on every memory entry so the position counter round-trips and
+  memory is a faithful reference model for the web state semantics — the `[V01.01.08.02]` requirement
+  that memory reproduce the same push/replace/go behavior. Memory still skips the browser's
+  amend-the-leaving-entry step (upstream memory does too), so a memory entry's `Forward` link is not
+  back-patched.
+- **Root-relative write URLs.** The browser edge writes `base + location` (web) or the `#…` slice
+  (hash) rather than upstream's absolute `location.protocol + '//' + location.host + base + to`.
+  `pushState` resolves the root-relative form identically and it keeps the write path DOM-free (no
+  protocol/host read). The dropped branch is upstream's `<base>`-element write-time special case
+  (`document.querySelector('base')`), an intentional simplification noted at the call site.
+- **Scroll is the one JS-owned field.** The leaving entry's scroll anchor is read from the live window
+  by the interop at apply time (the policy cannot read the DOM); every other field is C#-computed, and
+  memory — having no DOM — leaves scroll `null`. Scroll *restoration* (consuming the anchors) is
+  `[V01.01.08.05]`.
+
 ## Non-goals (sequenced work)
 
-- History integration (browser/hash/memory behind `IRouterHistory`) — `[V01.01.08.02]`.
 - `RouterView` / `RouterLink` components — `[V01.01.08.03]`.
 - Async navigation pipeline and guards (redirect, cancellation), plus `currentLocation` param
   inheritance and route removal — `[V01.01.08.04]`.
