@@ -108,6 +108,72 @@ public sealed class BufferedTransitionSequencingTests
         world.DirectReflowCount.ShouldBe(0);
     }
 
+    [Fact]
+    public void PersistedShow_AppliesEnterFromAndActiveInOneFrame_ThenSwapsToInADistinctFrame_WithoutUnmounting()
+    {
+        using var world = new BufferedTransitionWorld();
+        var show = Reactive.Reference(false);
+        world.Render(PersistedHost(show, ("name", "fade")));
+        var div = world.Dom.FindFirstElement("div");
+        world.Dom.IsMounted(div).ShouldBeTrue(); // v-show keeps the element mounted even while hidden
+
+        // Toggle show: the persisted v-show path drives the enter, so the from + active classes commit
+        // together in ONE buffered frame (one crossing), but NOT the to-class — same barrier as a v-if enter.
+        show.Value = true;
+        world.RunUntilIdle();
+        var enterFrame = world.FirstTransitionFrameContaining("add:fade-enter-from");
+        enterFrame.ShouldBe(["add:fade-enter-from", "add:fade-enter-active"]);
+        enterFrame.ShouldNotContain("add:fade-enter-to");
+        world.Dom.TransitionClasses(div).ShouldBe(["fade-enter-from", "fade-enter-active"], ignoreOrder: true);
+
+        // Next frame: the from -> to swap commits in its OWN distinct frame (never coalesced).
+        world.AdvanceFrame();
+        var swapFrame = world.FirstTransitionFrameContaining("add:fade-enter-to");
+        swapFrame.ShouldBe(["remove:fade-enter-from", "add:fade-enter-to"]);
+        world.FrameIndexOf(swapFrame).ShouldBeGreaterThan(world.FrameIndexOf(enterFrame));
+        world.Dom.TransitionClasses(div).ShouldBe(["fade-enter-active", "fade-enter-to"], ignoreOrder: true);
+
+        // The transition end removes the enter classes; the element was never unmounted.
+        world.FireTransitionEnd(div);
+        world.Dom.TransitionClasses(div).ShouldBeEmpty();
+        world.Dom.IsMounted(div).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void PersistedHide_LandsTheReflowBarrierBetweenFromAndActive_ThenHidesAfterTheLeave_WithoutUnmounting()
+    {
+        using var world = new BufferedTransitionWorld();
+        var show = Reactive.Reference(true);
+        world.Render(PersistedHost(show, ("name", "fade")));
+        var div = world.Dom.FindFirstElement("div");
+        world.Dom.ReflowCount.ShouldBe(0); // no appear -> the initial mount runs no choreography or reflow
+
+        // Toggle hide: within a SINGLE flush the buffered adaptor commits leave-from, a real reflow barrier
+        // (document.body.offsetHeight), then leave-active, in that order (upstream #2593) — one crossing. The
+        // element stays MOUNTED and visible; the removal path is never taken (v-show persists it).
+        show.Value = false;
+        world.RunUntilIdle();
+        var leaveFrame = world.FirstTransitionFrameContaining("add:fade-leave-from");
+        leaveFrame.ShouldBe(["add:fade-leave-from", "reflow", "add:fade-leave-active"]);
+        world.Dom.ReflowCount.ShouldBe(1);
+        world.Dom.TransitionClasses(div).ShouldBe(["fade-leave-from", "fade-leave-active"], ignoreOrder: true);
+        world.Dom.IsMounted(div).ShouldBeTrue();
+
+        // Next frame: the from -> to swap is a distinct later frame (never coalesced with from/active).
+        world.AdvanceFrame();
+        var swapFrame = world.FirstTransitionFrameContaining("add:fade-leave-to");
+        swapFrame.ShouldBe(["remove:fade-leave-from", "add:fade-leave-to"]);
+        world.FrameIndexOf(swapFrame).ShouldBeGreaterThan(world.FrameIndexOf(leaveFrame));
+        world.Dom.TransitionClasses(div).ShouldBe(["fade-leave-active", "fade-leave-to"], ignoreOrder: true);
+
+        // The transition end removes the leave classes and applies display:none — but the element stays
+        // MOUNTED (the v-show leave hides in place; it never host-removes like the v-if leave).
+        world.FireTransitionEnd(div);
+        world.Dom.TransitionClasses(div).ShouldBeEmpty();
+        world.Dom.IsMounted(div).ShouldBeTrue();
+        world.Dom.Serialize(div).ShouldContain("style.display=\"none\"");
+    }
+
     // A component rendering <Transition {props}> around a v-if div keyed "a" (mirrors TransitionTests.Host).
     private static RenderComponent Host(Reference<bool> show, params (string Name, object? Value)[] transitionProperties)
         => new((_, _) => () =>
@@ -117,6 +183,22 @@ public sealed class BufferedTransitionSequencingTests
                 ? [Element("div", Properties(("key", "a")), "A")]
                 : [Comment()];
             return Component(Transition.Instance, Properties(transitionProperties), slots);
+        });
+
+    // A component rendering <Transition {props} persisted> around a v-show div keyed "a" — the persisted
+    // path (#161). The persisted flag stands in for the compiler's transformTransition injection for a
+    // single v-show child, so the renderer skips its mount/remove enter/leave and v-show drives them.
+    private static RenderComponent PersistedHost(Reference<bool> show, params (string Name, object? Value)[] transitionProperties)
+        => new((_, _) => () =>
+        {
+            var slots = new ComponentSlots();
+            slots["default"] = _ =>
+            [
+                Directives.WithDirectives(Element("div", Properties(("key", "a")), "A"), VShow.Instance, show.Value),
+            ];
+            var properties = Properties(transitionProperties);
+            properties.Set("persisted", true);
+            return Component(Transition.Instance, properties, slots);
         });
 
     // A DOM-free buffered world: the real renderer over BufferedBrowserNodeOperations, an in-memory
