@@ -102,20 +102,27 @@ public class RouteMatcherResolveTests
     [UnconditionalSuppressMessage(
         "Trimming",
         "IL2026:RequiresUnreferencedCode",
-        Justification = "Test-only reflection over assembly references to assert the matcher's dependency boundary; the test project is never trimmed or AOT-published.")]
-    public void RouterAssembly_DependsOnNoOtherViuLibrary()
+        Justification = "Test-only reflection over assembly references to assert the Router dependency boundary; the test project is never trimmed or AOT-published.")]
+    public void RouterAssembly_DoesNotReferenceTheBrowserDomAdapter()
     {
-        // Acceptance criterion (matcher + memory history stay runnable in a plain .NET host): this
-        // assembly references no other Viu library and no Viu renderer/interop assembly. [V01.01.08.02]
-        // added a browser history edge over the framework's System.Runtime.InteropServices.JavaScript
-        // primitive (gated by [SupportedOSPlatform("browser")], exercised only through the injected
-        // seam off-browser); that framework reference is allowed — the forbidden coupling is to
-        // another Viu package, which would drag the DOM bridge / renderer in and break the pure host.
-        var referenced = typeof(RouteMatcher).Assembly
+        // [V01.01.08.03] (issue #72) places RouterView/RouterLink in this assembly, so it now
+        // references Assimalign.Viu.RuntimeCore and Assimalign.Viu.Reactivity — a deliberate,
+        // documented relaxation of the [V01.01.08.01]/[V01.01.08.02] "no other Viu library"
+        // assertion. Deviates from that prior boundary per issue #72's stated architecture (the
+        // Router area may reference Runtime Core / Reactivity). The matcher and memory-history code
+        // still uses neither reference, so it stays runnable in a plain .NET host; the forbidden
+        // coupling is now the browser DOM adapter (Assimalign.Viu.RuntimeDom), because the components
+        // must render through the injected node-ops abstraction to work against the in-memory test
+        // renderer and the SSR renderer, never the DOM directly. The framework's
+        // System.Runtime.InteropServices.JavaScript reference from the [V01.01.08.02] browser history
+        // edge stays allowed (gated by [SupportedOSPlatform("browser")]).
+        var referenced = typeof(RouterView).Assembly
             .GetReferencedAssemblies()
             .Select(assembly => assembly.Name ?? string.Empty)
             .ToArray();
 
-        referenced.ShouldNotContain(name => name.StartsWith("Assimalign.", StringComparison.Ordinal));
+        referenced.ShouldNotContain("Assimalign.Viu.RuntimeDom");
+        // Positive check: the component-model wiring the components depend on is actually in place.
+        referenced.ShouldContain("Assimalign.Viu.RuntimeCore");
     }
 }

@@ -10,10 +10,13 @@ https://router.vuejs.org/guide/essentials/history-mode.html.
 ## The matcher is a pure port
 
 vue-router's `createRouterMatcher` is deliberately independent of the browser so it can be
-unit-tested without a DOM — the same property the router epic (#69) calls out. This package keeps
-that property literal: it references no other Viu library and no interop assembly, so the whole
-table-build/resolve path runs in a plain .NET test host. The navigation pipeline, history, and
-components (#69, later features) will sit *on top of* this and supply the browser coupling.
+unit-tested without a DOM — the same property the router epic (#69) calls out. The matcher and memory
+history keep that property literal: their code references no other Viu library and no interop
+assembly, so the whole table-build/resolve path runs in a plain .NET test host. The
+`RouterView`/`RouterLink` components (`[V01.01.08.03]`) sit *on top of* this in the same assembly and
+do reference the runtime (see "Components: depth, reactivity, and click guards"), but never the
+browser DOM adapter — so the components stay renderer-agnostic and the matcher/history code stays
+framework-free.
 
 The port is faithful to upstream at three levels, each pinned by tests and code links:
 
@@ -48,11 +51,11 @@ default-view pattern.
 ## Deliberate divergences from vue-router
 
 - **Every record is currently matchable.** Upstream's `isMatchable` gates the insertion-ancestor
-  rule on a record having a name, components, or a redirect. Components and redirects are later
-  Router features, so there is nothing yet to gate on; treating every record as matchable is what
-  keeps the empty-path-child ordering working and is sufficient for every criterion in this ticket.
-  When components/redirect land, `RouteMatcher.IsMatchable` is the single place to reintroduce the
-  gate.
+  rule on a record having a name, components, or a redirect. `RouteRecord.Component` now exists
+  (`[V01.01.08.03]`), but the gate is intentionally *not* reintroduced: every criterion here is met
+  with all records matchable (the empty-path-child ordering depends on it), and redirects/aliases —
+  the rest of upstream's `isMatchable` — are still later features. When they land,
+  `RouteMatcher.IsMatchable` remains the single place to reintroduce the gate.
 - **No `currentLocation` parameter inheritance.** Upstream's named resolve can inherit params from
   the current location for relative navigation. That needs a "current route", which is a
   navigation-pipeline concern (`[V01.01.08.04]`). Named resolution here interpolates exactly the
@@ -160,11 +163,57 @@ object graph (`BrowserHistorySnapshotMarshaller` pins the wire format).
   memory — having no DOM — leaves scroll `null`. Scroll *restoration* (consuming the anchors) is
   `[V01.01.08.05]`.
 
+## Components: depth, reactivity, and click guards
+
+`RouterView`/`RouterLink` (`[V01.01.08.03]`, the C# port of `RouterView.ts`/`RouterLink.ts`) are
+ordinary `IComponentDefinition`s in this assembly. Issue #72 places them here and lets the Router area
+reference Runtime Core and Reactivity; the matcher/history code keeps its own purity (the assembly
+references no DOM adapter, pinned by `RouterAssembly_DoesNotReferenceTheBrowserDomAdapter`). Component
+wiring lands on `RouteRecord` itself — `Component` and `PropertiesResolver` — mirroring vue-router's
+`RouteRecordRaw.component`/`props`; the matcher never reads them, so its ranking/resolution is
+unchanged.
+
+**Depth flows through provide/inject.** Each `RouterView` injects `RouterInjectionKeys.ViewDepth`
+(default 0), renders `route.matched[depth].Component`, and provides `depth + 1` for any view nested in
+that component — the C# realization of upstream's `viewDepthKey`. Because setup runs
+parent-before-child and inject reads the parent chain, a nested `RouterView` mounted inside a matched
+component resolves the next depth automatically. (Upstream additionally *skips* component-less records
+in the depth walk; Viu renders every matched record's component and treats a component-less record as
+a comment placeholder — sufficient for nested layouts, noted as a simplification.)
+
+**The reactive route drives re-render; `shouldUpdateComponent` gates it.** A `RouterView`'s render
+reads `Router.CurrentRoute.Value` (a `shallowRef`), so every navigation re-runs every `RouterView`'s
+render — exactly as upstream reads `routeToDisplay.value`. The "only the affected view re-renders"
+contract is enforced one level down, at the *matched component*: the wrapper re-render produces
+`h(component, props)`, and the renderer's `shouldUpdateComponent` compares props by value, so a
+leaf-only change (the parent's component and props unchanged) leaves the parent's mounted component
+untouched, while a param-only change patches the same component with new props instead of remounting
+it. Pinned by run-count tests (`RouterView_LeafOnlyNavigation_ReRendersOnlyTheAffectedView`,
+`RouterView_ParameterOnlyNavigation_UpdatesPropsWithoutRemounting`).
+
+**Per-route props: three forms, one resolver.** `RouteComponentProperties.FromParameters()` maps the
+resolved params to props (`props: true`), `FromValues(...)` returns a shared static bag (object form),
+and a hand-written `RouteComponentPropertiesResolver` receives the whole `RouteLocation` (function
+form). The static bag is shared by identity across renders, so a static-props component never
+re-renders for a prop change.
+
+**`RouterLink` click guards are DOM-free.** The anchor's `onClick` receives a `RouterLinkClickEvent`
+(button, system modifiers, `DefaultPrevented`) — the platform-agnostic stand-in for the `MouseEvent`
+upstream's `guardEvent` reads. Navigation is intercepted only for an unmodified, primary-button,
+un-prevented click whose link is not `target="_blank"`; anything else falls through to the browser.
+Active/exact-active matching mirrors upstream: the link is *active* when its target's leaf record is in
+the current route's matched chain (an ancestor-or-self match) with the current params including the
+target's, and *exact-active* additionally when that record is the current leaf with equal params.
+Active classes are configurable per-link (the `activeClass`/`exactActiveClass` props) and globally
+(`Router.LinkActiveClass`/`LinkExactActiveClass`), the prop winning.
+
 ## Non-goals (sequenced work)
 
-- `RouterView` / `RouterLink` components — `[V01.01.08.03]`.
 - Async navigation pipeline and guards (redirect, cancellation), plus `currentLocation` param
-  inheritance and route removal — `[V01.01.08.04]`.
+  inheritance and route removal — `[V01.01.08.04]`. `Router.Push`/`Replace` navigate synchronously
+  today.
 - Lazy route components and scroll behavior — `[V01.01.08.05]`.
-- Components, redirects, aliases, and per-record `strict`/`sensitive` overrides on `RouteRecord`
-  (only global `PathMatchingOptions` today).
+- Named views (`RouterView name`), the `custom`/slot-only `RouterLink`, and a location-object `to`
+  — `RouterView` renders the single default component and `RouterLink` takes a string `to`.
+- Redirects, aliases, and per-record `strict`/`sensitive` overrides on `RouteRecord` (only global
+  `PathMatchingOptions` today).

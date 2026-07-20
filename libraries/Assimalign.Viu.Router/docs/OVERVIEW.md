@@ -1,7 +1,7 @@
 # Assimalign.Viu.Router — overview
 
 The client router for Viu — the role `vue-router` v4 plays for Vue 3
-(https://github.com/vuejs/router). Two features have landed:
+(https://github.com/vuejs/router). Three features have landed:
 
 - The **route table and matcher** (`[V01.01.08.01]`): the pure, DOM-free core that, given a set of
   route records and a location (a path or a named target), resolves an immutable `RouteLocation`
@@ -10,10 +10,14 @@ The client router for Viu — the role `vue-router` v4 plays for Vue 3
 - **History integration** (`[V01.01.08.02]`): the `IRouterHistory` abstraction with three modes —
   memory, web (HTML5 History API), and hash — behind the `RouterHistory` factory. The C# port of
   vue-router's `packages/router/src/history/`.
+- **`RouterView` / `RouterLink` components** (`[V01.01.08.03]`): the two built-in components plus the
+  minimal reactive `Router` facade they consume. `RouterView` renders the matched record's component
+  at its nesting depth; `RouterLink` renders a navigation-intercepting anchor with active-class
+  matching. The C# port of vue-router's `packages/router/src/RouterView.ts` and `RouterLink.ts`.
 
-`RouterView`/`RouterLink`, the async navigation pipeline with guards, and lazy routes are later
-features of the Router area (#69, `[V01.01.08.03]`–`[V01.01.08.05]`) and are not part of this package
-yet.
+The **async navigation pipeline with guards** (`[V01.01.08.04]`) and **lazy routes with scroll
+behavior** (`[V01.01.08.05]`) are the remaining Router features (#69) and are not part of this
+package yet — `Router.Push`/`Replace` navigate synchronously today, with no guard chain.
 
 ## What it contains
 
@@ -26,8 +30,10 @@ Public surface (all under namespace `Assimalign.Viu.Router`):
 - **`IRouteMatcher`** (`Abstraction/`): the resolve/add/query contract the later navigation pipeline
   depends on, implemented by `RouteMatcher`.
 - **`RouteRecord`**: an immutable route definition — `Path`, optional `Name`, nested `Children`,
-  and arbitrary `Meta`. A reference type with identity semantics (the same instance appears in every
-  matched chain it participates in). The C# port of vue-router's route record.
+  arbitrary `Meta`, and (for the components) the `Component` the route renders plus an optional
+  `PropertiesResolver`. A reference type with identity semantics (the same instance appears in every
+  matched chain it participates in). The C# port of vue-router's route record; the matcher ignores
+  `Component`/`PropertiesResolver`.
 - **`RouteLocation`**: the immutable resolution result — `Path`, `Name`, `Parameters`, the
   parent-to-child `Matched` record chain, merged `Meta`, and `IsMatched`. Value equality so a
   navigation layer can compare/snapshot cheaply. Mirrors the object returned by the matcher's
@@ -80,6 +86,37 @@ and `RouterHistoryStateBuilder` (the `buildState`/push/replace arithmetic), the 
 `BrowserHistoryInteropDispatch` (the single `[JSExport]` the `popstate` listener calls back into,
 routed by subscription id).
 
+## Components and router
+
+The two built-in components and the reactive router facade they consume (`[V01.01.08.03]`, all under
+namespace `Assimalign.Viu.Router`) — the C# port of vue-router's `RouterView`/`RouterLink` and the
+minimal slice of `createRouter` those components need:
+
+- **`Router`** (entry point): the minimal reactive router facade — `CurrentRoute` (a reactive
+  `shallowRef` over the resolved location), `Resolve`/`ResolveNamed`, `CreateHref`, and synchronous
+  `Push`/`Replace`, plus the global `LinkActiveClass`/`LinkExactActiveClass` defaults. Built over an
+  `IRouterHistory` and a matcher (or a route set), it listens to the history so browser back/forward
+  drives `CurrentRoute`. The C# stand-in for the object `createRouter` returns; the guarded async
+  pipeline is `[V01.01.08.04]`.
+- **`RouterView`** (`Components/`): the route outlet. It injects the `Router` and its own nesting
+  depth, renders `route.matched[depth].Component` with that record's resolved props, and provides
+  `depth + 1` to any `RouterView` nested inside the rendered component. The reactive current route it
+  reads re-renders it on navigation. The C# port of `RouterView.ts`.
+- **`RouterLink`** (`Components/`): the navigation anchor. It renders an `<a>` whose `href` resolves
+  through the `Router` (base included), applies the active / exact-active classes by matching its
+  target against the current route, and intercepts an unmodified primary-button click to navigate
+  client-side. Declared props: `to`, `replace`, `activeClass`, `exactActiveClass`. The C# port of
+  `RouterLink.ts`.
+- **`RouteComponentProperties`** (`Components/`) + **`RouteComponentPropertiesResolver`** (`Delegates/`):
+  the per-route `props` option (https://router.vuejs.org/guide/essentials/passing-props.html).
+  `FromParameters()` is `props: true` (params become props), `FromValues(...)` is the static-object
+  form, and a hand-written resolver is the function form.
+- **`RouterLinkClickEvent`** (`Components/`): the DOM-free click info `RouterLink`'s guard reads
+  (button, system modifiers, `DefaultPrevented`) — a host's event bridge builds it from the native
+  `MouseEvent`; tests construct it directly.
+- **`RouterInjectionKeys`**: the provide/inject keys wiring the router into the tree (`Router`
+  app-wide; the internal view-depth key threaded between nested views).
+
 ## Using it
 
 ```csharp
@@ -116,13 +153,32 @@ IRouterHistory web = RouterHistory.CreateWeb("/app/");   // base prepended on wr
 web.Listen((to, from, information) => { /* resolve `to` through the matcher */ });
 ```
 
+```csharp
+// Wire routes to components, build a router over a history, and provide it to the tree.
+var router = new Router(RouterHistory.CreateMemory(),
+[
+    new RouteRecord("/users/:id", component: new UserView(),
+        propertiesResolver: RouteComponentProperties.FromParameters()),   // props: true
+]);
+router.Push("/users/42");
+
+app.Provide(RouterInjectionKeys.Router, router);   // a host provides the router app-wide
+// <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
+// and a plain left-click on it calls router.Push instead of triggering a page load.
+```
+
 ## Boundaries
 
-- References **no other Viu library** — the matcher and the memory history run in a plain .NET test
-  host (a boundary the test suite asserts by reflection). `[V01.01.08.02]` added a browser history
-  edge over the framework's `System.Runtime.InteropServices.JavaScript` primitive, gated by
-  `[SupportedOSPlatform("browser")]`; the matcher and memory mode reference **no interop** and the
-  web/hash **policy** is exercised off-browser through an injected seam.
+- **Matcher and history stay framework-free; the components reference the runtime.** The matcher and
+  memory history run in a plain .NET test host, using no other Viu library. `[V01.01.08.03]` adds the
+  `RouterView`/`RouterLink` components, which consume the component model and reactivity, so the
+  assembly now references `Assimalign.Viu.RuntimeCore` and `Assimalign.Viu.Reactivity` (issue #72's
+  boundary). It still references **no browser DOM adapter** (`Assimalign.Viu.RuntimeDom`): the
+  components produce platform-agnostic `VirtualNode`s that render through the injected node-ops
+  abstraction — the in-memory test renderer and the SSR renderer alike — never the DOM directly (a
+  boundary the test suite asserts by reflection). `[V01.01.08.02]`'s browser history edge over the
+  framework's `System.Runtime.InteropServices.JavaScript` primitive stays gated by
+  `[SupportedOSPlatform("browser")]`.
 - Trimming- and NativeAOT-safe: no reflection-based serialization, no dynamic code generation. Path
   patterns compile to interpreted regular expressions; the one compile-time-constant pattern uses
   the `[GeneratedRegex]` source generator. History state marshals as a flat primitives-only payload.
