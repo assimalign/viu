@@ -7,6 +7,14 @@
   <link rel="preload" id="webassembly" />
   <script type="importmap"></script>
   <script type="module" src="main#[.{fingerprint}].js"></script>
+  <!-- The .viu single-file-component CSS bundle ([V01.01.12.12]), content-fingerprinted through the
+       static-web-assets pipeline ([V01.01.12.12.03]). This is the bundle's stable plain URL — the file a
+       static host serves. The build ALSO registers a content-fingerprinted route/endpoint
+       (Assimalign.Viu.WebApp.<hash>.viu.css, see obj/**/staticwebassets.*.endpoints.json) that an ASP.NET
+       Core host or CDN serves immutably; unlike main#[.{fingerprint}].js above, the SDK's HTML placeholder
+       resolution is ES-module-only and does not rewrite a CSS <link>, so the hashed URL is delivered by the
+       static-web-asset endpoint (and by automatic link injection, [V01.01.12.12.01]), not by this href. -->
+  <link rel="stylesheet" href="Assimalign.Viu.WebApp.viu.css" />
   <style>
     :root {
       color-scheme: light;

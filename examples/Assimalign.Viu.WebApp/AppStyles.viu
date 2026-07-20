@@ -1,0 +1,13 @@
+@style {
+    /* [V01.01.12.12.03] Dogfood fixture: compiled into the fingerprinted Assimalign.Viu.WebApp.viu.css bundle. */
+    .viu-css-bundle-probe {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.85rem;
+        border-radius: 999px;
+        background: #10243b;
+        color: #f2f4f7;
+        font-weight: 600;
+    }
+}

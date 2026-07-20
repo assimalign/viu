@@ -3,6 +3,11 @@
     <TargetFramework>$(TargetFrameworkLatest)</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- Dogfood the .viu single-file-component CSS pipeline ([V01.01.12.12]) and its static-web-asset
+         fingerprinting ([V01.01.12.12.03]): enabling this flows every **/*.viu to the generator AND turns on
+         $(ViuBundleSingleFileComponentCss), so the ViuBundleCss task emits AppStyles.viu's @style into the
+         fingerprinted Assimalign.Viu.WebApp.viu.css bundle that index.html references. -->
+    <ViuUseSingleFileComponents>true</ViuUseSingleFileComponents>
   </PropertyGroup>
 
   <ItemGroup>

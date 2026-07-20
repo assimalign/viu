@@ -38,7 +38,7 @@ dotnet CLI with no installer and no admin rights.
 | The framework libraries (`Assimalign.Viu.Shared`, `.Reactivity`, `.RuntimeCore`, `.RuntimeDom`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
 | The `[Reactive]` and `.viu` source generators | Shipped inside the `Assimalign.Viu.App.Ref` targeting pack at `analyzers/dotnet/cs/` and listed as `<File Type="Analyzer">` in its `data/FrameworkList.xml` |
 | `.viu` single-file component compilation | The generator's AdditionalFiles/CompilerVisibleProperty wiring, packed into the SDK's `Targets/` from its in-repo source |
-| `.viu` `@style` CSS bundling | The `ViuBundleCss` MSBuild task (+ parser closure) in the SDK package's `Tasks/`, driven by the packed `Assimalign.Viu.Sdk.Css.Bundling.targets` |
+| `.viu` `@style` CSS bundling | The `ViuBundleCss` MSBuild task (+ parser closure) in the SDK package's `Tasks/`, driven by the packed `Assimalign.Viu.Sdk.Css.Bundling.targets`. The bundle registers as a **content-fingerprinted** static web asset; reference it from `wwwroot/index.html` with `<link rel="stylesheet" href="<AssemblyName>.viu.css" />` — the stable plain URL a static host serves, with a hashed immutable route also registered for hosted/CDN scenarios ([V01.01.12.12.03]) |
 | `viu-dom.js` interop bridge | Packed under `assets/` and copied to the consumer's `wwwroot/_content/Assimalign.Viu.RuntimeDom/` at build |
 
 The framework reference resolves to two NuGet packages (the
