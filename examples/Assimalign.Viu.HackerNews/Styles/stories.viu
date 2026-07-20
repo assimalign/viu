@@ -1,0 +1,99 @@
+@style {
+    /* Story list, rows, pagination — and the TransitionGroup list choreography. The list is a
+       <TransitionGroup name="story">, so rows animate on enter/leave and FLIP-move on reorder using
+       the story-enter-*/story-leave-*/story-move classes below. */
+
+    .hn-stories {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .hn-story {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.4rem 0;
+        align-items: baseline;
+    }
+
+    .hn-rank {
+        color: var(--hn-muted);
+        min-width: 1.6rem;
+        text-align: right;
+    }
+
+    .hn-story-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .hn-story-title {
+        color: var(--hn-text);
+        font-size: 0.95rem;
+    }
+
+    .hn-story-host {
+        color: var(--hn-muted);
+        font-size: 0.8rem;
+    }
+
+    .hn-subtext {
+        color: var(--hn-muted);
+        font-size: 0.8rem;
+    }
+
+    .hn-subtext .hn-by,
+    .hn-subtext .hn-comments-link {
+        color: var(--hn-muted);
+    }
+
+    .hn-subtext .hn-by:hover,
+    .hn-subtext .hn-comments-link:hover {
+        color: var(--hn-orange);
+    }
+
+    .hn-pagination {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--hn-border);
+    }
+
+    .hn-page-link {
+        color: var(--hn-orange);
+        font-weight: 600;
+    }
+
+    .hn-page-link.hn-disabled {
+        color: var(--hn-border);
+        cursor: default;
+    }
+
+    .hn-page-info {
+        color: var(--hn-muted);
+        font-size: 0.85rem;
+    }
+
+    /* TransitionGroup: rows fade+slide on enter/leave, and slide (FLIP) on reorder. */
+    .story-enter-active,
+    .story-leave-active {
+        transition: all 0.4s ease;
+    }
+
+    .story-enter-from,
+    .story-leave-to {
+        opacity: 0;
+        transform: translateX(1.5rem);
+    }
+
+    .story-leave-active {
+        position: absolute;
+    }
+
+    .story-move {
+        transition: transform 0.4s ease;
+    }
+}

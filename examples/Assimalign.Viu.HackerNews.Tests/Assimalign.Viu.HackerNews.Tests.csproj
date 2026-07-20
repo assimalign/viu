@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <!-- The Testing renderer + memory-history router drive the sample's stores, route table, and views. -->
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Testing" />
+    <ViuProjectReference Include="Assimalign.Viu.Router" />
+    <ViuProjectReference Include="Assimalign.Viu.Store" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+  </ItemGroup>
+
+  <!--
+    The sample app under test. examples/ is deliberately OUTSIDE the ViuProjectReference index
+    (Build.References.Projects.targets indexes only libraries/ and analyzers/) because libraries must
+    never reference examples. A sample's own test project therefore has no by-name option and references
+    the app by path. Documented, narrowly-scoped deviation from the repo build-system rule (no raw
+    <ProjectReference>): it is a test -> example edge with no NuGet-dependency implications (IsPackable=false;
+    examples are not packed), which is exactly the case the by-name index intentionally excludes.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Assimalign.Viu.HackerNews\Assimalign.Viu.HackerNews.csproj" />
+  </ItemGroup>
+</Project>

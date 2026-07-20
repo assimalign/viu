@@ -20,13 +20,24 @@
     "",
     "Seed provenance: Assimalign.Viu.WebApp measured 2,097,190 bytes brotli (7,363,995 raw, 19 files) on",
     "2026-07-19 with .NET SDK 10.0.302 / wasm-tools 10.0.110. CI (ubuntu x64) is the authority; if its",
-    "measurement differs materially from this Windows seed, recalibrate via an explicit edit here."
+    "measurement differs materially from this Windows seed, recalibrate via an explicit edit here.",
+    "",
+    "Seed provenance: Assimalign.Viu.HackerNews measured 2,533,416 bytes brotli (8,576,012 raw, 34 files)",
+    "on 2026-07-20 with .NET SDK 10.0.302; budget 2,790,000 seeds ~10% headroom (9.2% of budget). It is",
+    "larger than the WebApp because it pulls in the Router, Store, and Router.RuntimeDom assemblies and",
+    "System.Text.Json (source-generated). CI (ubuntu x64) is the authority; recalibrate here if it differs."
   ],
   "samples": [
     {
       "name": "Assimalign.Viu.WebApp",
       "project": "examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj",
       "compressedPublishSizeBytes": 2310000,
+      "startupBudgetMilliseconds": 5000
+    },
+    {
+      "name": "Assimalign.Viu.HackerNews",
+      "project": "examples/Assimalign.Viu.HackerNews/Assimalign.Viu.HackerNews.csproj",
+      "compressedPublishSizeBytes": 2790000,
       "startupBudgetMilliseconds": 5000
     }
   ]
