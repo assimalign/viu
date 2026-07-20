@@ -14,16 +14,18 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.RuntimeD
   `VirtualNodeFactory` (including `Teleport`/`TeleportBlock`), `VirtualNodeProperties`.
 - **Renderer** (`Rendering/`) — `RendererFactory.CreateRenderer(options)` (Vue's `createRenderer`),
   `Renderer<TNode>` (the mount/patch/unmount pipeline, including the `Teleport` built-in as a special
-  vnode type in the patch/move/unmount paths — [V01.01.03.17]), `RendererOptions<TNode>` (the
-  injected platform node-ops, whose optional `QuerySelector` resolves a Teleport string target),
-  `RenderEffect<TNode>` (reactive re-render integration), and `BlockToken`.
+  vnode type in the patch/move/unmount paths — [V01.01.03.17], and the `KeepAlive` activate/deactivate
+  operations its `processComponent`/`unmount` shape-flag branches short-circuit into — [V01.01.03.18]),
+  `RendererOptions<TNode>` (the injected platform node-ops, whose optional `QuerySelector` resolves a
+  Teleport string target), `RenderEffect<TNode>` (reactive re-render integration), and `BlockToken`.
 - **Scheduler** (`Scheduling/`) — `Scheduler` (batched flush phases and `NextTick`) and
   `SchedulerJob`.
 - **Component model** (`Components/`) — `ComponentInstance`, `ComponentSetupContext`,
   `ComponentProperties` / `ComponentPropertyDefinition` (props declaration and validation),
   `ComponentAttributes` (attrs fallthrough), `ComponentEmitDefinition` (emits), `ComponentSlots`,
-  `Lifecycle` (the hook registration facade), `DynamicComponents`, and the transition scaffolding
-  (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
+  `Lifecycle` (the hook registration facade, including `OnActivated`/`OnDeactivated`),
+  `DynamicComponents`, the `KeepAlive` caching built-in ([V01.01.03.18]), and the transition
+  scaffolding (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
 - **Application / plugins** — `Application<TNode>` (Vue's `createApp` shell: one root mounted into
   one container), `ApplicationConfiguration` (error/warn handlers, performance flag),
   `IComponentDefinition`, `IPlugin<TNode>`.

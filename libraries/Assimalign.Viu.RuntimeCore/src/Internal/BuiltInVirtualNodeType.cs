@@ -6,11 +6,12 @@ namespace Assimalign.Viu.RuntimeCore;
 /// (<c>packages/runtime-core/src/vnode.ts</c> / <c>components/*</c>). The compiled render passes one of
 /// these as the <c>tag</c> argument to the vnode factories (e.g. <see cref="RenderHelpers._Fragment"/>);
 /// <see cref="RenderHelpers"/> dispatches on the marker identity. <see cref="IsFragment"/> and
-/// <see cref="IsTeleport"/> markers are fully realized ([V01.01.03.17] delivered Teleport), and
-/// <c>BaseTransition</c> is now a real component (<see cref="RenderHelpers._BaseTransition"/> resolves to
-/// <see cref="BaseTransition"/>, [V01.01.04.07]) rather than a marker of this type. The remaining
-/// component-like built-ins (Suspense, KeepAlive) are still surface markers whose renderer support is
-/// delivered by their own work items, so rendering one throws a clear
+/// <see cref="IsTeleport"/> markers are fully realized ([V01.01.03.17] delivered Teleport), and both
+/// <c>BaseTransition</c> ([V01.01.04.07]) and <c>KeepAlive</c> ([V01.01.03.18]) are now real components
+/// (<see cref="RenderHelpers._BaseTransition"/>/<see cref="RenderHelpers._KeepAlive"/> resolve to
+/// <see cref="BaseTransition"/>/<see cref="KeepAlive"/>) rather than markers of this type. The one
+/// remaining component-like built-in (Suspense) is still a surface marker whose renderer support is
+/// delivered by its own work item, so rendering it throws a clear
 /// <see cref="System.NotSupportedException"/> rather than silently mis-rendering.
 /// </summary>
 internal sealed class BuiltInVirtualNodeType
