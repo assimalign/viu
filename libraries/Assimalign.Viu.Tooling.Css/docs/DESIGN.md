@@ -82,10 +82,37 @@ blocks — matching the generator's constant exactly.
   route (`<AssemblyName>.viu.css`, the file a static WASM host serves) working while registering the
   fingerprinted route/endpoint (hash + `label` + integrity) that an ASP.NET Core host, a CDN, or the
   link-injection follow-up resolves for immutable caching.
-- **Host-page `<link>` injection ([V01.01.12.12.01], #167) — deferred.** Loading the bundle today is a
-  documented explicit `<link rel="stylesheet" href="<AssemblyName>.viu.css">` (the stable plain URL; the WASM
-  SDK's `#[.{fingerprint}]` host-page placeholder resolution is ES-module-only and does not rewrite a CSS
-  `<link>` to the hashed name). Automatic in-place rewrite of the host page's static web asset is deferred —
-  it desyncs the .NET SDK's static-web-asset compression/endpoint negotiation graph — so the injector must
-  resolve the fingerprinted endpoint this task already registers rather than editing the asset in place.
+- **Host-page `<link>` injection ([V01.01.12.12.01], #167) — implemented.** A consuming WASM app needs no
+  hand-authored link tag: `Build.Css.Bundling.targets` injects `<link rel="stylesheet"
+  href="<AssemblyName>.viu.css">` into the host page (`wwwroot/index.html`) via the `ViuInjectCssBundleLink`
+  MSBuild task (shipped in the same `Tooling.Tasks` assembly as `ViuBundleCss`). The injector is idempotent —
+  a hand-authored link, or a re-run, suppresses a second link — so keeping a manual `<link>` is a supported
+  opt-out (`ViuInjectSingleFileComponentCssLink=false` opts out entirely).
+
+  **Why the earlier in-place attempt broke compression, and how this does not.** #167 records that automatic
+  injection was first attempted as a static-web-asset transformation and it stopped the SDK serving the
+  compressed (gzip/brotli) variants. The .NET SDK computes each compressed variant from an asset's **content**
+  and binds it to that asset's identity + integrity (`Microsoft.NET.Sdk.StaticWebAssets.Compression.targets`:
+  `ResolveCompressedAssets` enumerates `@(StaticWebAsset)`; `ApplyCompressionNegotiation` keys the `.gz`/`.br`
+  endpoints to the primary's integrity). Rewriting the host page **after** that negotiation orphans its
+  compressed variants — the negotiation endpoint still points at the pre-rewrite integrity while the `.gz`/`.br`
+  hold pre-rewrite bytes, so the mismatched pair is dropped. The fix is to mirror the SDK's **own** host-page
+  rewriter (`OverrideHtmlAssetPlaceholders`, which resolves `main#[.{fingerprint}].js`): write the page to an
+  intermediate copy, **re-register** the asset + endpoint with recomputed integrity (`DefineStaticWebAssets`
+  after `RemoveMetadata Integrity;Fingerprint`), and do it **before** compression enumerates — the injector
+  runs `BeforeTargets` `Resolve{Build,Publish}CompressedStaticWebAssetsConfiguration` and, when the SDK's own
+  rewrite is active, `DependsOn` it so it is the last host-page transform. Compression therefore derives from
+  the injected content, and the CSS bundle asset itself is never touched, so its endpoints are undisturbed.
+  Verified against a published app: `dotnet publish` yields an `index.html` (and its `.gz`/`.br`) carrying the
+  link while the CSS bundle keeps identity + gzip + brotli endpoints.
+
+  **Why the plain route, not the fingerprinted one.** The `?` optional fingerprint ([V01.01.12.12.03]) ships
+  only the plain physical file; the fingerprinted route resolves to it **only** through the endpoint manifest
+  (a manifest-aware host — `dotnet run`, ASP.NET Core, a configured CDN). A statically hosted published WASM
+  app has no such middleware, so a hashed href would 404 — the injector therefore writes the plain route
+  `<AssemblyName>.viu.css`, which works everywhere and still revalidates via the endpoint's ETag/integrity. The
+  fingerprinted endpoint stays registered for hosted scenarios; `$(ViuSingleFileComponentCssBundleLinkHref)`
+  overrides the href for a manifest-aware deployment that wants the immutable URL. (Injecting the hashed href
+  by default — e.g. by switching the bundle to the `!` required form so the hashed file physically ships — is
+  the natural hosted-scenario follow-up.)
 ```
