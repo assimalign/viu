@@ -89,9 +89,18 @@ internal sealed class TransitionTestHarness : IDisposable
             NextSibling = NextSibling,
             PatchProperty = (element, _, propertyName, _, nextValue, _) =>
             {
-                if (string.Equals(propertyName, "class", StringComparison.Ordinal))
+                // Record every patched vnode prop (class/style/arbitrary attrs) so the fallthrough tests
+                // can read what landed on the wrapper element. This is the ELEMENT-prop channel — distinct
+                // from the transition-class channel (AddTransitionClass -> TransitionClasses), which proves
+                // the wrapper's fallthrough class never mixes with the children's choreography classes.
+                var properties = _nodes[element].BoundProperties;
+                if (nextValue is null)
                 {
-                    _nodes[element].BoundClass = nextValue as string ?? string.Empty;
+                    properties.Remove(propertyName);
+                }
+                else
+                {
+                    properties[propertyName] = nextValue;
                 }
             },
         });
@@ -202,6 +211,15 @@ internal sealed class TransitionTestHarness : IDisposable
         return node.TransitionClasses;
     }
 
+    /// <summary>
+    /// The current value of a patched vnode prop on an element (class/style/arbitrary attribute), or null
+    /// when unset — the fallthrough-attrs channel, distinct from the transition-class choreography.
+    /// </summary>
+    public object? BoundProperty(int element, string name)
+        => _nodes.TryGetValue(element, out var node) && node.BoundProperties.TryGetValue(name, out var value)
+            ? value
+            : null;
+
     /// <summary>The handle of the first recorded element with <paramref name="tag"/>, in creation order.</summary>
     public int FindElement(string tag)
     {
@@ -300,7 +318,7 @@ internal sealed class TransitionTestHarness : IDisposable
         public string Tag = string.Empty;
         public string Value = string.Empty;
         public int Parent;
-        public string BoundClass = string.Empty;
+        public readonly Dictionary<string, object?> BoundProperties = new(StringComparer.Ordinal);
         public readonly HashSet<string> TransitionClasses = new(StringComparer.Ordinal);
     }
 }
