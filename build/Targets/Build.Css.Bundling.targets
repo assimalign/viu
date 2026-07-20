@@ -38,15 +38,14 @@
     identity/endpoint, which is exactly what this task owns; delivering the hashed URL into the host page is
     [V01.01.12.12.01]'s job (build-time link injection off the endpoint this task registers).
 
-    LOAD THE BUNDLE: add, inside <head> of the host page (wwwroot/index.html),
-      <link rel="stylesheet" href="<AssemblyName>.viu.css" />
-    the bundle's stable logical URL — the plain-named physical file a static host serves, and (with the '?'
-    fingerprinted endpoint registered here) the same asset an ASP.NET Core host serves immutably via its
-    hashed route (a class library's bundle is at _content/<PackageId>/<AssemblyName>.viu.css). Automatic
-    <link> injection of the hashed URL is a deferred follow-up ([V01.01.12.12.01]): rewriting the host page's
-    static web asset in place desyncs the .NET SDK's compression/endpoint negotiation graph, so the explicit
-    reference is the shipped, publish-safe path. The injector resolves the fingerprinted endpoint (by its
-    `label`) this task registers.
+    LOAD THE BUNDLE: nothing to author — the LINK INJECTION section at the bottom of this file
+    ([V01.01.12.12.01]) splices <link rel="stylesheet" href="<AssemblyName>.viu.css" /> into the host page
+    (wwwroot/index.html) automatically. That href is the bundle's stable logical URL — the plain-named
+    physical file a static host serves, and (with the '?' fingerprinted endpoint registered here) the same
+    asset an ASP.NET Core host serves immutably via its hashed route (a class library's bundle is at
+    _content/<PackageId>/<AssemblyName>.viu.css). Injection is compression-safe (it re-registers the host page
+    before the SDK's compression pipeline; see the LINK INJECTION comment) and idempotent (a hand-authored
+    <link>, or $(ViuInjectSingleFileComponentCssLink)=false, opts out).
   -->
 
   <PropertyGroup>
@@ -61,6 +60,15 @@
          to the task shipped in the package. Configuration-aware so a Debug or Release build resolves its
          matching task build. -->
     <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\bin\$(Configuration)\netstandard2.0\Assimalign.Viu.Tooling.Tasks.dll</ViuBundleCssTaskAssembly>
+
+    <!-- LINK INJECTION master switch ([V01.01.12.12.01], #167): auto-inject the bundle's <link
+         rel="stylesheet"> into the WASM host page (wwwroot/index.html) so a consuming app needs no
+         hand-authored link tag. Defaults ON wherever bundling is on. Set to false to keep bundling but author
+         the <link> by hand (the injector is idempotent, so a hand-authored link is also a working opt-out —
+         it simply suppresses injection). The ViuInjectCssBundleLink task ships in the same Tooling.Tasks
+         assembly as ViuBundleCss, so it resolves through $(ViuBundleCssTaskAssembly) with no extra wiring. -->
+    <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == '' and '$(ViuBundleSingleFileComponentCss)' == 'true'">true</ViuInjectSingleFileComponentCssLink>
+    <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == ''">false</ViuInjectSingleFileComponentCssLink>
   </PropertyGroup>
 
   <!-- The task lives in analyzers/Assimalign.Viu.Tooling.Tasks; it re-runs the shared Tooling.Css core
@@ -76,6 +84,14 @@
   <UsingTask TaskName="Assimalign.Viu.Tooling.Tasks.ViuBundleCss"
              AssemblyFile="$(ViuBundleCssTaskAssembly)"
              Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'" />
+
+  <!-- The host-page <link> injector ([V01.01.12.12.01]) ships in the same Tooling.Tasks assembly. Declared
+       unconditionally-of-Exists for the same reason ViuBundleCss is (see above): a UsingTask AssemblyFile is
+       resolved lazily on first invocation, and the invoking targets keep their own Exists gate, so the
+       in-repo build-order edge is what guarantees the DLL is present by the time the injector runs. -->
+  <UsingTask TaskName="Assimalign.Viu.Tooling.Tasks.ViuInjectCssBundleLink"
+             AssemblyFile="$(ViuBundleCssTaskAssembly)"
+             Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'" />
 
   <!-- In-repo dogfooding build-order edge ([V01.01.12.12.03]): a consuming project loads ViuBundleCss via
        <UsingTask AssemblyFile=...>, which is NOT a project reference, so the solution/dependency scheduler
@@ -191,6 +207,187 @@
     <ItemGroup>
       <StaticWebAsset Include="@(_ViuCssBundleStaticWebAsset)" />
       <StaticWebAssetEndpoint Include="@(_ViuCssBundleStaticWebAssetEndpoint)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    ============================================================================================
+    HOST-PAGE <link> INJECTION ([V01.01.12.12.01], #167)
+    ============================================================================================
+    Splice <link rel="stylesheet" href="<PackageId>.viu.css"> into the WASM host page so a consuming app
+    needs no hand-authored link tag, WITHOUT desyncing the SDK's compression negotiation.
+
+    WHY THE EARLIER ATTEMPT BROKE COMPRESSION, AND HOW THIS AVOIDS IT.
+    The SDK computes gzip/brotli variants from an asset's CONTENT and binds each compressed variant to its
+    primary asset's identity + integrity (Microsoft.NET.Sdk.StaticWebAssets.Compression.targets:
+    ResolveCompressedAssets enumerates @(StaticWebAsset); ApplyCompressionNegotiation keys the .gz/.br
+    endpoints to the primary's integrity). Rewriting the host page's static web asset AFTER that negotiation
+    ran orphans its compressed variants — the negotiation endpoint still points at the pre-rewrite integrity,
+    the .gz/.br carry pre-rewrite bytes, and the mismatched pair is dropped: compressed variants stop being
+    served. That is exactly the failure #167 records from the first (in-place) attempt.
+
+    The SDK's OWN host-page rewriter (OverrideHtmlAssetPlaceholders, which resolves main#[.{fingerprint}].js)
+    avoids this by rewriting the page into an intermediate copy, RE-REGISTERING the asset+endpoint with fresh
+    integrity, and doing so BEFORE compression — it explicitly injects its rewrite target into
+    Resolve*CompressedStaticWebAssets*DependsOn. We mirror that contract exactly: write a copy with the link
+    spliced in, re-register (RemoveMetadata Integrity;Fingerprint so DefineStaticWebAssets recomputes them),
+    and run BEFORE Resolve{Build,Publish}CompressedStaticWebAssetsConfiguration so compression derives from
+    the injected content. The CSS bundle asset itself is never touched here, so its gzip/brotli endpoints
+    (registered in ResolveViuSingleFileComponentCssAssets, well before compression) are wholly undisturbed.
+
+    WHY THIS RE-USES THE SDK REWRITE RATHER THAN RACES IT: when OverrideHtmlAssetPlaceholders is on, the
+    injector DependsOn the SDK's rewrite target so it runs strictly AFTER it (reading the placeholder-resolved
+    page and adding the link on top); when it is off, the dependency is empty and the injector transforms the
+    discovered page directly. Either way the injector is the LAST host-page transform before compression.
+
+    WHY THE PLAIN ROUTE, NOT THE FINGERPRINTED ONE: the bundle registers with the '?' optional fingerprint
+    ([V01.01.12.12.03]), so a standalone `dotnet publish` ships only the plain physical file
+    (<PackageId>.viu.css) — the fingerprinted route resolves to that same file ONLY through the endpoint
+    manifest (a manifest-aware host: `dotnet run`, ASP.NET Core, a configured CDN). A statically hosted
+    published WASM app has no such middleware, so a hashed href would 404. The plain route works everywhere
+    and still revalidates via the endpoint's ETag/integrity; the fingerprinted endpoint remains registered for
+    hosted scenarios. See libraries/Assimalign.Viu.Tooling.Css/docs/DESIGN.md. Override the href with
+    $(ViuSingleFileComponentCssBundleLinkHref) for a manifest-aware deployment that wants the immutable URL.
+  -->
+
+  <Target Name="_ViuResolveSingleFileComponentCssLinkConfiguration"
+          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration">
+    <PropertyGroup>
+      <!-- The href written into the host page. Defaults to the bundle's stable plain route (the file a static
+           host serves); a manifest-aware deployment can point it at the fingerprinted route for immutable
+           caching. -->
+      <ViuSingleFileComponentCssBundleLinkHref Condition="'$(ViuSingleFileComponentCssBundleLinkHref)' == ''">$(ViuSingleFileComponentCssBundleName)</ViuSingleFileComponentCssBundleLinkHref>
+      <!-- Intermediate roots for the injected host-page copies. The physical page under wwwroot/ is never
+           edited in place — each build/publish copy is written here and re-registered from it. -->
+      <_ViuCssLinkBuildContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\htmllink\build\'))</_ViuCssLinkBuildContentRoot>
+      <_ViuCssLinkPublishContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\htmllink\publish\'))</_ViuCssLinkPublishContentRoot>
+      <!-- Order the injector strictly after the SDK's host-page rewrite when that rewrite is active, so the
+           link is added to the placeholder-resolved page (and never lost to a stale rewrite snapshot). Empty
+           when OverrideHtmlAssetPlaceholders is off, so the injector then transforms the discovered page. -->
+      <_ViuCssLinkBuildRewriteDependency Condition="'$(OverrideHtmlAssetPlaceholders)' == 'true'">ResolveHtmlAssetPlaceholdersBuildStaticWebAssets</_ViuCssLinkBuildRewriteDependency>
+      <_ViuCssLinkPublishRewriteDependency Condition="'$(OverrideHtmlAssetPlaceholders)' == 'true'">ResolveHtmlAssetPlaceholdersPublishStaticWebAssets</_ViuCssLinkPublishRewriteDependency>
+    </PropertyGroup>
+  </Target>
+
+  <!-- BUILD: inject into the build-kind host page before build compression enumerates assets. Mirrors the
+       SDK's ResolveHtmlAssetPlaceholdersBuildStaticWebAssets (AssetKind != Publish → recompute as Build). -->
+  <Target Name="_ViuInjectSingleFileComponentCssLinkBuild"
+          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
+          BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkBuildRewriteDependency)">
+    <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
+      <_ViuCssLinkHostPageBuild Include="@(StaticWebAsset)"
+                                Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Publish'" />
+    </ItemGroup>
+
+    <!-- Write the copy under the physical FILE NAME (index.html), NOT %(RelativePath): a fingerprinted asset's
+         RelativePath is the URL template (e.g. index#[.{fingerprint}]?.html) and is not a legal file path. The
+         original RelativePath is preserved on the re-registered candidate below, so the served route (and its
+         optional fingerprint) is unchanged; only the physical intermediate file is named plainly. -->
+    <ViuInjectCssBundleLink Condition="'@(_ViuCssLinkHostPageBuild)' != ''"
+                            HostPagePath="%(_ViuCssLinkHostPageBuild.FullPath)"
+                            OutputPath="$(_ViuCssLinkBuildContentRoot)%(_ViuCssLinkHostPageBuild.FileName)%(_ViuCssLinkHostPageBuild.Extension)"
+                            LinkHref="$(ViuSingleFileComponentCssBundleLinkHref)"
+                            BundleFileName="$(ViuSingleFileComponentCssBundleName)" />
+
+    <ItemGroup Condition="'@(_ViuCssLinkHostPageBuild)' != ''">
+      <!-- Re-point the candidates at the injected copies (identity = the written file) and drop the
+           computed-per-content metadata so DefineStaticWebAssets recomputes integrity/fingerprint from the new
+           content and the preserved RelativePath token. OriginalItemSpec MUST be reset to the injected file:
+           it is the path the SDK's ResolveCompressedAssets reads as the compression source, and the item
+           transform inherits the pre-injection file's OriginalItemSpec — leaving it stale would compress the
+           un-injected page (the link would be missing from the .gz/.br while present in the identity page). -->
+      <_ViuCssLinkUpdatedHostPageBuildCandidate Include="@(_ViuCssLinkHostPageBuild->'$(_ViuCssLinkBuildContentRoot)%(FileName)%(Extension)')"
+                                                RemoveMetadata="SourceType;AssetKind;Integrity;Fingerprint" />
+      <_ViuCssLinkUpdatedHostPageBuildCandidate ContentRoot="$(_ViuCssLinkBuildContentRoot)"
+                                                OriginalItemSpec="%(_ViuCssLinkUpdatedHostPageBuildCandidate.Identity)" />
+    </ItemGroup>
+
+    <DefineStaticWebAssets Condition="'@(_ViuCssLinkUpdatedHostPageBuildCandidate)' != ''"
+                           CandidateAssets="@(_ViuCssLinkUpdatedHostPageBuildCandidate)"
+                           SourceType="Computed"
+                           AssetKind="Build">
+      <Output TaskParameter="Assets" ItemName="_ViuCssLinkUpdatedHostPageBuild" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints Condition="'@(_ViuCssLinkUpdatedHostPageBuild)' != ''"
+                                   CandidateAssets="@(_ViuCssLinkUpdatedHostPageBuild)"
+                                   ExistingEndpoints="@(StaticWebAssetEndpoint)"
+                                   ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_ViuCssLinkUpdatedHostPageBuildEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <FilterStaticWebAssetEndpoints Condition="'@(_ViuCssLinkHostPageBuild)' != ''"
+                                   Endpoints="@(StaticWebAssetEndpoint)"
+                                   Assets="@(_ViuCssLinkHostPageBuild)"
+                                   Filters="">
+      <Output TaskParameter="FilteredEndpoints" ItemName="_ViuCssLinkOldHostPageBuildEndpoint" />
+    </FilterStaticWebAssetEndpoints>
+
+    <ItemGroup Condition="'@(_ViuCssLinkUpdatedHostPageBuild)' != ''">
+      <StaticWebAsset Remove="@(_ViuCssLinkHostPageBuild)" />
+      <StaticWebAsset Include="@(_ViuCssLinkUpdatedHostPageBuild)" />
+      <StaticWebAssetEndpoint Remove="@(_ViuCssLinkOldHostPageBuildEndpoint)" />
+      <StaticWebAssetEndpoint Include="@(_ViuCssLinkUpdatedHostPageBuildEndpoint)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- PUBLISH: inject into the publish-kind host page before publish compression enumerates assets. Mirrors
+       the SDK's ResolveHtmlAssetPlaceholdersPublishStaticWebAssets (AssetKind != Build → recompute as
+       Publish). This is the path #167's acceptance criterion verifies against a published app. -->
+  <Target Name="_ViuInjectSingleFileComponentCssLinkPublish"
+          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
+          BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkPublishRewriteDependency)">
+    <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
+      <_ViuCssLinkHostPagePublish Include="@(StaticWebAsset)"
+                                  Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Build'" />
+    </ItemGroup>
+
+    <!-- Physical FILE NAME, not %(RelativePath) — see the build target above for why the URL template is not a
+         legal path; the preserved RelativePath keeps the served route unchanged. -->
+    <ViuInjectCssBundleLink Condition="'@(_ViuCssLinkHostPagePublish)' != ''"
+                            HostPagePath="%(_ViuCssLinkHostPagePublish.FullPath)"
+                            OutputPath="$(_ViuCssLinkPublishContentRoot)%(_ViuCssLinkHostPagePublish.FileName)%(_ViuCssLinkHostPagePublish.Extension)"
+                            LinkHref="$(ViuSingleFileComponentCssBundleLinkHref)"
+                            BundleFileName="$(ViuSingleFileComponentCssBundleName)" />
+
+    <ItemGroup Condition="'@(_ViuCssLinkHostPagePublish)' != ''">
+      <!-- OriginalItemSpec reset to the injected file — see the build target above; it is the compression
+           source path, and a stale value would compress the un-injected page. -->
+      <_ViuCssLinkUpdatedHostPagePublishCandidate Include="@(_ViuCssLinkHostPagePublish->'$(_ViuCssLinkPublishContentRoot)%(FileName)%(Extension)')"
+                                                  RemoveMetadata="SourceType;AssetKind;Integrity;Fingerprint" />
+      <_ViuCssLinkUpdatedHostPagePublishCandidate ContentRoot="$(_ViuCssLinkPublishContentRoot)"
+                                                  OriginalItemSpec="%(_ViuCssLinkUpdatedHostPagePublishCandidate.Identity)" />
+    </ItemGroup>
+
+    <DefineStaticWebAssets Condition="'@(_ViuCssLinkUpdatedHostPagePublishCandidate)' != ''"
+                           CandidateAssets="@(_ViuCssLinkUpdatedHostPagePublishCandidate)"
+                           SourceType="Computed"
+                           AssetKind="Publish">
+      <Output TaskParameter="Assets" ItemName="_ViuCssLinkUpdatedHostPagePublish" />
+    </DefineStaticWebAssets>
+
+    <DefineStaticWebAssetEndpoints Condition="'@(_ViuCssLinkUpdatedHostPagePublish)' != ''"
+                                   CandidateAssets="@(_ViuCssLinkUpdatedHostPagePublish)"
+                                   ExistingEndpoints="@(StaticWebAssetEndpoint)"
+                                   ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+      <Output TaskParameter="Endpoints" ItemName="_ViuCssLinkUpdatedHostPagePublishEndpoint" />
+    </DefineStaticWebAssetEndpoints>
+
+    <FilterStaticWebAssetEndpoints Condition="'@(_ViuCssLinkHostPagePublish)' != ''"
+                                   Endpoints="@(StaticWebAssetEndpoint)"
+                                   Assets="@(_ViuCssLinkHostPagePublish)"
+                                   Filters="">
+      <Output TaskParameter="FilteredEndpoints" ItemName="_ViuCssLinkOldHostPagePublishEndpoint" />
+    </FilterStaticWebAssetEndpoints>
+
+    <ItemGroup Condition="'@(_ViuCssLinkUpdatedHostPagePublish)' != ''">
+      <StaticWebAsset Remove="@(_ViuCssLinkHostPagePublish)" />
+      <StaticWebAsset Include="@(_ViuCssLinkUpdatedHostPagePublish)" />
+      <StaticWebAssetEndpoint Remove="@(_ViuCssLinkOldHostPagePublishEndpoint)" />
+      <StaticWebAssetEndpoint Include="@(_ViuCssLinkUpdatedHostPagePublishEndpoint)" />
     </ItemGroup>
   </Target>
 </Project>
