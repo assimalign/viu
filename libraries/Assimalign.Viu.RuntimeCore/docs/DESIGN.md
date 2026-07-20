@@ -118,6 +118,83 @@ Deliberate divergences from upstream `KeepAlive.ts`, each documented at its call
   sets no current instance; Viu fires the aggregated list through the root's `InvokeHooks`, so a
   descendant hook that reads `ComponentInstance.Current` sees the root — a minor divergence pinned by test.
 
+## Async components define the runtime contract, not lazy download
+
+`AsyncComponents.DefineAsyncComponent` ([V01.01.03.16], upstream `apiAsyncComponent.ts`,
+https://vuejs.org/guide/components/async.html) returns an internal `AsyncComponentWrapper`
+(`IComponentDefinition`): a loader (`Func<Task<IComponentDefinition>>`) resolves the real component
+asynchronously; a loading component shows after `Delay`, an error component on failure or `Timeout`,
+and the resolved component renders in place. Unlike `KeepAlive` (one shared singleton whose per-mount
+state must be closure-local), each `DefineAsyncComponent` call yields a *fresh* wrapper, so the
+**load state** — the in-flight request, the cached resolved definition, the retry count — lives as
+wrapper **instance fields** shared across every mount of that async component (upstream's
+`pendingRequest`/`resolvedComp` module-closure). The **per-mount UI state** (the reactive
+`loaded`/`error`/`delayed` refs and the timers) is closure-local to each `Setup`, so two simultaneous
+mounts each show their own loading UI while sharing one load. A resolved wrapper's later mounts take a
+fast path that renders the cached inner component without re-invoking the loader; concurrent mounts
+share one in-flight `Load()` (deduplicated on `pendingRequest`).
+
+This ticket is the **runtime contract only**. The loader holds a static reference to (or awaits) the
+real definition; there is no reflection or assembly-download machinery — true lazy-download of
+component assemblies is a WASM lazy-loading concern layered on top later. The Router's guard pipeline
+([V01.01.08.04]) left an async-component-resolution no-op seam for lazy routes; that is
+[V01.01.08.05]'s concern and is deliberately **not** wired here — nothing in this design precludes it.
+
+Resolution drives a reactive re-render, never a poll: settling flips the `loaded`/`error` refs (and
+the delay/timeout timers flip `delayed`/`error`), which the render function reads, so the component's
+render effect re-runs through the scheduler. Unmounting before resolution disposes the timers and
+stops the render effect's scope, so a late resolution or a late timer touches nothing (the pending
+render is discarded cleanly).
+
+### Timers flow through an injected delay seam
+
+Vue schedules the `delay` and `timeout` with `setTimeout`; the Viu `Scheduler` is a *microtask* queue
+with no macrotask timer to reuse, so async components schedule through `AsyncComponentDelay` — the
+injected clock/delay seam the ticket calls for. Its default runs a real `Task.Delay` whose
+continuation resumes on the captured single-threaded synchronization context (the WASM main thread),
+never off-context; a `FlushDispatcher`-style test seam lets a manual controller drive virtual time so
+"the loading component appears only after `Delay`" and the timeout path are pinned deterministically,
+with no wall-clock waits.
+
+Task continuations follow the same rule as upstream (issue #32): they resume on the single-threaded
+WASM `SynchronizationContext` — no `ConfigureAwait(false)` off-context resumption into render code.
+Production always has that context; a plain xUnit host has none, so the tests install a single-threaded
+`SynchronizationContext` that runs continuations inline on the test thread (mirroring WASM) — otherwise
+a shared load with multiple awaiters could hop a continuation to the thread pool non-deterministically.
+
+### KeepAlive interplay and the Suspense seam
+
+A kept-alive async component that resolves forces its `KeepAlive` parent to re-render (upstream:
+mark the parent dirty and `queueJob(parent.update)`) so the parent caches the now-resolved subtree.
+Because `KeepAlive` preserves the *wrapper instance* itself (cached by the child vnode's key / the
+wrapper definition reference), the wrapper's cached `resolvedComp` and `loaded` ref survive a
+deactivate/activate cycle — the resolved inner component keeps its state and the loader never re-runs,
+mirroring upstream and pinned by test.
+
+`Suspensible` (default true, upstream parity) is exposed with a **boundary-registration hook
+contract**: when the flag is set and an enclosing boundary is present (`ComponentInstance.SuspenseBoundary`,
+inherited from the parent or the ambient `SuspenseBoundaryContext` a future Suspense sets while
+mounting its subtree), the async component hands the boundary its in-flight load through
+`ISuspenseBoundary.RegisterAsyncDependency` instead of rendering its own loading UI. The real
+enclosing-Suspense integration completes in [V01.01.03.20] (W06); the contract exists now and is
+validated against a fake boundary in tests. With no boundary present (the case until Suspense lands)
+the flag has no effect and the component renders its own loading/error UI.
+
+Deliberate divergences from upstream `apiAsyncComponent.ts`, each documented at its call site:
+
+- **A synchronously-completing loader resolves on the first render** (no forced placeholder frame).
+  Upstream's loader is always a promise, so it renders the placeholder once before the microtask
+  resolves; a C# `Task` may already be complete, in which case `loaded` flips during `Setup` and the
+  first render is the resolved component. Tests that need the placeholder frame use a
+  `TaskCompletionSource` resolved after mount.
+- **Loader-error routing gates the crash-loudly default on the error component.** Upstream's
+  `handleError` always runs the capture chain and only differs on dev throwing; Viu routes the error
+  through the capture chain / app handler and rethrows to the host only when there is *no* error
+  component to display it (`ComponentErrorHandling.Handle(..., rethrowIfUnhandled: ErrorComponent is
+  null)`), so an async component with an error component never aborts the flush.
+- **The `useId` `markAsyncBoundary` id-stability hook is omitted** — it belongs to SSR id generation,
+  not this client-only runtime contract.
+
 ## Deltas from Vue 3
 
 - **DOM directives live one layer up.** `v-show` and `v-model` and the DOM transitions are *not*

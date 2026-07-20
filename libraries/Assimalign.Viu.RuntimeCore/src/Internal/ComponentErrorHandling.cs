@@ -13,7 +13,23 @@ namespace Assimalign.Viu.RuntimeCore;
 /// </summary>
 internal static class ComponentErrorHandling
 {
-    internal static void Handle(Exception exception, ComponentInstance? instance, string info)
+    /// <summary>
+    /// Routes <paramref name="exception"/> up <paramref name="instance"/>'s capture chain.
+    /// </summary>
+    /// <param name="exception">The error to route.</param>
+    /// <param name="instance">The erroring instance whose ancestors capture, or null.</param>
+    /// <param name="info">The error-source description (upstream error-code text).</param>
+    /// <param name="rethrowIfUnhandled">
+    /// Whether an error no capture hook and no app-level handler consumed rethrows to the host
+    /// (upstream: <c>handleError</c>'s <c>throwInDev</c>). True is the crash-loudly default; an async
+    /// component with an error component to display the failure passes false so the failure surfaces
+    /// in the UI instead of aborting the flush ([V01.01.03.16]).
+    /// </param>
+    internal static void Handle(
+        Exception exception,
+        ComponentInstance? instance,
+        string info,
+        bool rethrowIfUnhandled = true)
     {
         for (var ancestor = instance?.Parent; ancestor is not null; ancestor = ancestor.Parent)
         {
@@ -47,7 +63,12 @@ internal static class ComponentErrorHandling
             }
             return;
         }
-        // No handler configured: surface the failure with its original stack intact.
-        ExceptionDispatchInfo.Capture(exception).Throw();
+        // No handler configured: surface the failure with its original stack intact — unless the
+        // caller will display the error itself (an async component with an error component), in which
+        // case swallow it here so the flush is not aborted.
+        if (rethrowIfUnhandled)
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
     }
 }
