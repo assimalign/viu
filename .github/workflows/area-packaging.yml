@@ -43,8 +43,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up .NET
+      # The runtime pack builds the framework closure with -p:RuntimeIdentifier=browser-wasm,
+      # which requires the wasm-tools workload (NETSDK1147 without it) — same as the app build.
+      - name: Set up .NET (with wasm-tools)
         uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
 
       - name: Pack SDK, runtime pack, and ref pack
         shell: pwsh
