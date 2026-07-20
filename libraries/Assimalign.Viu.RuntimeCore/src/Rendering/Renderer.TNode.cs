@@ -269,6 +269,18 @@ public sealed class Renderer<TNode>
                 && current.DynamicChildren is not null)
             {
                 PatchBlockChildren(current.DynamicChildren, next.DynamicChildren, container, elementNamespace, parentComponent);
+                // A keyed stable fragment (#2080 — a <template v-for> item) or a component-root fragment
+                // (#2134) can be relocated by a later patch, and Move/RemoveFragment walk its root-level
+                // children by their host node. PatchBlockChildren only touched the dynamic descendants, so
+                // the static (non-dynamic) children are still fresh vnodes with a null El — carry the old
+                // host pointer forward for exactly those movable cases, mirroring upstream processFragment's
+                // guard on the shallow traverseStaticChildren (the __DEV__ HMR arm, an unconditional deep
+                // copy, has no Viu counterpart). Omitting this NREs when Move reads a static child's null El.
+                if (next.Key is not null
+                    || (parentComponent is not null && ReferenceEquals(next, parentComponent.Subtree)))
+                {
+                    TraverseStaticChildren(current, next);
+                }
             }
             else
             {
@@ -1256,8 +1268,10 @@ public sealed class Renderer<TNode>
     {
         // The C# port of traverseStaticChildren(n1, n2, shallow: true) — the production shallow form.
         // After a block-only patch the static (non-dynamic) children are fresh vnodes without host
-        // pointers; copy the old host node forward so MoveTeleport (which relocates every child) can find
-        // them. A freshly rendered static child is not yet mounted (El null), so no clone is needed.
+        // pointers; copy the old host node forward so a later relocation that walks every root-level child
+        // can find them — MoveTeleport for a Teleport, or Move/RemoveFragment for a movable (keyed or
+        // component-root) stable fragment. A freshly rendered static child is not yet mounted (El null),
+        // so no clone is needed.
         var oldChildren = current.ArrayChildren;
         var newChildren = next.ArrayChildren;
         if (oldChildren is null || newChildren is null)

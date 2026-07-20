@@ -74,6 +74,7 @@ runtime template compilation. They never ship in the runtime assemblies.
 | [`Assimalign.Viu.WebApp`](examples/Assimalign.Viu.WebApp) | A browser WASM app: a stopwatch rendered from C# through the handle-based DOM bridge. Its `?diagnostics=1` mode runs the interop marshaling benchmark behind [RuntimeDom ADR-0001](libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md). |
 | [`Assimalign.Viu.TodoMvc`](examples/Assimalign.Viu.TodoMvc) | The canonical [TodoMVC](https://github.com/tastejs/todomvc/blob/master/app-spec.md) app built from components: `[Reactive]` source-generated state, a `ReactiveList<T>` with computed filtered/remaining views, keyed list rendering, and typed provide/inject. DOM-free tests in [`Assimalign.Viu.TodoMvc.Tests`](examples/Assimalign.Viu.TodoMvc.Tests). |
 | [`Assimalign.Viu.Forms`](examples/Assimalign.Viu.Forms) | A registration form exercising every implemented `v-model` flavor (text, number, checkbox, checkbox-list, radio, single/multiple `<select>`, textarea) and the `.trim`/`.number`/`.lazy` modifiers, with a `ref`-per-field composition model and a live preview. DOM-free tests in [`Assimalign.Viu.Forms.Tests`](examples/Assimalign.Viu.Forms.Tests). |
+| [`Assimalign.Viu.HackerNews`](examples/Assimalign.Viu.HackerNews) | The Wave-4 exit demo — a routed, stored HackerNews client. Composes the router (+ the browser click bridge), a Pinia-style store, async route views, keyed `TransitionGroup` story lists, source-generated `System.Text.Json` over the HackerNews API, and the auto-injected `.viu` CSS bundle. See its [README](examples/Assimalign.Viu.HackerNews/README.md). |
 
 ### Packaging (`sdks/`, `frameworks/`)
 
@@ -134,6 +135,8 @@ dotnet run --project examples/Assimalign.Viu.WebApp
 - [Architecture decisions](docs/adr/) — the append-only decision log (founding C#/WASM divergences).
 - [Documentation conventions](docs/CONTRIBUTING.md) — where `OVERVIEW.md`, `DESIGN.md`, and ADRs
   live, what belongs in each, and when they must be updated.
+- [Getting started guide](docs/guide/getting-started.md) — build, run, and publish a Viu app with the
+  packaged `Assimalign.Viu.Sdk` (prerequisites → first component → reactivity → publish).
 - [Project board](https://github.com/orgs/assimalign/projects/15) — the authoritative backlog
   (`[V01.01.*]` WBS items: program → area epics → features → tasks).
 - Work-item intake: [`.claude/skills/viu-work-items`](.claude/skills/viu-work-items/SKILL.md).

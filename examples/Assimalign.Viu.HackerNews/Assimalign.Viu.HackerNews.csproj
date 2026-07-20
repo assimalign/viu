@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkLatest)</TargetFramework>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- Dogfood the .viu single-file-component CSS pipeline ([V01.01.12.12]) and its auto-injected
+         <link> ([V01.01.12.12.01], #167): enabling this flows every **/*.viu to the generator AND turns on
+         $(ViuBundleSingleFileComponentCss), so the ViuBundleCss task emits the Styles/*.viu @style blocks into
+         the fingerprinted Assimalign.Viu.HackerNews.viu.css bundle that the build splices into index.html — no
+         manual <link> tag. This sample authors component styling in .viu @style blocks (the logic-bearing
+         components are C# render functions; see README.md "Why .viu is CSS-only today"). -->
+    <ViuUseSingleFileComponents>true</ViuUseSingleFileComponents>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+
+  <!-- The full Wave-4 surface this capstone exercises: the DOM runtime, the router + its browser click
+       bridge (RouterLinkDomBridge, installed at bootstrap), and the Pinia-style store. RuntimeCore,
+       Reactivity, and Shared flow transitively. Libraries never reference examples (one-way edge). -->
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Router" />
+    <ViuProjectReference Include="Assimalign.Viu.Router.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Store" />
+  </ItemGroup>
+
+  <!-- The store state classes are [Reactive] partial classes the Reactivity source generator expands.
+       In-repo the generator attaches only through a direct analyzer reference (it is not transitive via
+       ViuProjectReference); packaged consumers instead get it from the Reactivity nupkg's analyzers/. -->
+  <ItemGroup>
+    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+  </ItemGroup>
+</Project>

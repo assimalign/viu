@@ -164,6 +164,12 @@
 	<Folder Name="/viu/examples/Assimalign.Viu.Forms.Tests/">
 		<Project Path="examples/Assimalign.Viu.Forms.Tests/Assimalign.Viu.Forms.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/examples/Assimalign.Viu.HackerNews/">
+		<Project Path="examples/Assimalign.Viu.HackerNews/Assimalign.Viu.HackerNews.csproj" />
+	</Folder>
+	<Folder Name="/viu/examples/Assimalign.Viu.HackerNews.Tests/">
+		<Project Path="examples/Assimalign.Viu.HackerNews.Tests/Assimalign.Viu.HackerNews.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/">
 		<File Path="libraries/Directory.Build.props" />
 		<File Path="libraries/Directory.Build.targets" />
