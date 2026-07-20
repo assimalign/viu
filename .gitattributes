@@ -1,0 +1,7 @@
+# .viu single-file components must check out LF on every platform. The ViuBundleCss task
+# ([V01.01.12.12]) emits a component's non-scoped @style block as verbatim pass-through, so
+# source line endings flow into the bundle bytes. The static-web-asset content fingerprint
+# ([V01.01.12.12.03]) is a SHA-256 hash of those bytes, so a CRLF checkout (autocrlf on
+# Windows) would otherwise yield a different fingerprint than a LF checkout (Linux/CI) for
+# identical source — breaking the bundler's byte-stable-across-machines contract. Pin LF.
+*.viu text eol=lf
