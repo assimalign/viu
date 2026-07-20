@@ -369,7 +369,9 @@ The published `bin/Release/net10.0/publish/wwwroot` contains:
 
 - your compiled component and the Viu framework assemblies, fingerprinted and trimmed, under
   `_framework/` (e.g. `HelloViu.<hash>.wasm`, `Assimalign.Viu.RuntimeCore.<hash>.wasm`, …);
-- the fingerprinted CSS bundle `HelloViu.viu.css` with its `.gz` and `.br` variants;
+- the CSS bundle `HelloViu.viu.css` — registered as a content-fingerprinted static web asset, though
+  a standalone publish ships the stable plain-named file that any static host can serve — with its
+  `.gz` and `.br` variants;
 - `index.html` with the injected `<link rel="stylesheet" href="HelloViu.viu.css" />` (carried into the
   compressed `index.html.gz` / `index.html.br` too);
 - the `viu-dom.js` interop bridge under `_content/Assimalign.Viu.RuntimeDom/`.
