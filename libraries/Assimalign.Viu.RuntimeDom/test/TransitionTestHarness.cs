@@ -45,12 +45,22 @@ internal sealed class TransitionTestHarness : IDisposable
             NextFrame = callback => _nextFrameQueue.Add(callback),
             ForceReflow = () => ReflowCount++,
             WhenTransitionEnds = (element, _, _, resolve) => _endResolvers[element] = resolve,
-            MeasurePosition = element =>
+            MeasurePositions = handles =>
             {
-                MeasureLog.Add(element);
-                return _positions.TryGetValue(element, out var queue) && queue.Count > 0
-                    ? (queue.Count > 1 ? queue.Dequeue() : queue.Peek())
-                    : default;
+                // One batched read crossing per FLIP pass ([V01.01.04.07.03]); the interop-call-count
+                // criterion counts these — a reorder of N children must not cost N crossings.
+                MeasurePositionsCallCount++;
+                MeasuredBatchSizes.Add(handles.Length);
+                var result = new TransitionRectangle[handles.Length];
+                for (var index = 0; index < handles.Length; index++)
+                {
+                    var element = handles[index];
+                    MeasureLog.Add(element);
+                    result[index] = _positions.TryGetValue(element, out var queue) && queue.Count > 0
+                        ? (queue.Count > 1 ? queue.Dequeue() : queue.Peek())
+                        : default;
+                }
+                return result;
             },
             SetMoveTransform = (element, deltaX, deltaY) =>
             {
@@ -103,6 +113,15 @@ internal sealed class TransitionTestHarness : IDisposable
 
     /// <summary>The element handles measured, in order (diagnostics).</summary>
     public List<int> MeasureLog { get; } = [];
+
+    /// <summary>
+    /// The number of batched <see cref="DomTransitionOperations.MeasurePositions"/> crossings — one per
+    /// FLIP pass (pre-patch snapshot + post-patch read), independent of child count ([V01.01.04.07.03]).
+    /// </summary>
+    public int MeasurePositionsCallCount { get; private set; }
+
+    /// <summary>The child count of each batched read crossing, in order — proves the whole pass rode one call.</summary>
+    public List<int> MeasuredBatchSizes { get; } = [];
 
     /// <summary>Whether the fake reports that the move class adds a CSS transform (drives the FLIP gate).</summary>
     public bool HasCssTransform { get; set; } = true;

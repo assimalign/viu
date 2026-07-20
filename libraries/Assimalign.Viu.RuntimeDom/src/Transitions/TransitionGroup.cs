@@ -16,9 +16,12 @@ namespace Assimalign.Viu.RuntimeDom;
 /// on <c>transitionend</c>.
 /// <para>
 /// The position snapshots and the transform writes go through <see cref="DomTransitionOperations"/> in
-/// the exact three-phase order upstream uses (finish pending callbacks, read all positions, then write
-/// all transforms) so the read pass and the write pass never interleave — the documented synchronous
-/// layout seam the bridge-backed implementation fulfils. Referenced by the compiled render through
+/// the exact order upstream uses (finish pending callbacks, read all positions, then write all
+/// transforms) so the read pass and the write pass never interleave — the documented synchronous layout
+/// seam the bridge-backed implementation fulfils. Because a handle platform crosses the interop boundary
+/// per read, the read pass is <b>batched</b>: <see cref="DomTransitionOperations.MeasurePositions"/> reads
+/// every child's rectangle in one crossing, so a reorder of N children costs one crossing per pass, not N
+/// ([V01.01.04.07.03]). Referenced by the compiled render through
 /// <see cref="DomRenderHelpers._TransitionGroup"/>. Not thread-safe (single-threaded JS event-loop model).
 /// </para>
 /// </summary>
@@ -73,19 +76,29 @@ public sealed class TransitionGroup : IComponentDefinition
             }
 
             // Snapshot the outgoing children's pre-patch positions and refresh their hooks (upstream:
-            // the prevChildren loop recording positionMap). The FLIP delta reads these in onUpdated.
+            // the prevChildren loop recording positionMap). The FLIP delta reads these in onUpdated. The
+            // whole snapshot is one batched read crossing rather than one per child ([V01.01.04.07.03]).
             if (previousChildren is not null)
             {
                 positionMap.Clear();
                 var operations = DomTransitionOperations.Current;
+                var measured = new List<VirtualNode>(previousChildren.Count);
                 foreach (var child in previousChildren)
                 {
                     BaseTransition.SetTransitionHooks(
                         child,
                         BaseTransition.ResolveTransitionHooks(child, resolved, state, instance, null));
-                    if (operations is not null && child.El is { } element)
+                    if (operations is not null && child.El is not null)
                     {
-                        positionMap[child] = operations.MeasurePosition((int)element);
+                        measured.Add(child);
+                    }
+                }
+                if (operations is not null && measured.Count > 0)
+                {
+                    var rectangles = operations.MeasurePositions(HandlesOf(measured));
+                    for (var index = 0; index < measured.Count; index++)
+                    {
+                        positionMap[measured[index]] = rectangles[index];
                     }
                 }
             }
@@ -125,27 +138,32 @@ public sealed class TransitionGroup : IComponentDefinition
             return;
         }
 
-        // Three passes, no interleaving of reads and writes (upstream comment: prevent layout thrashing).
+        // No interleaving of reads and writes (upstream comment: prevent layout thrashing), and the reads
+        // and the whole write frame are each one interop crossing ([V01.01.04.07.03]).
         // 1. finish any pending move/enter callbacks so a re-triggered FLIP measures settled positions.
         foreach (var child in previousChildren)
         {
             CallPendingCallbacks(state, moveCallbacks, child);
         }
-        // 2. read every new position.
-        var newPositions = new TransitionRectangle[previousChildren.Count];
-        for (var index = 0; index < previousChildren.Count; index++)
+        // 2. read every new position in ONE batched crossing (upstream: recordPosition per child, in a
+        //    same-process JS loop; here the whole pass is a single boundary crossing).
+        var measured = new List<VirtualNode>(previousChildren.Count);
+        foreach (var child in previousChildren)
         {
-            if (previousChildren[index].El is { } element)
+            if (child.El is not null)
             {
-                newPositions[index] = operations.MeasurePosition((int)element);
+                measured.Add(child);
             }
         }
-        // 3. write the inverting transforms for the children that moved.
+        var newPositions = measured.Count > 0
+            ? operations.MeasurePositions(HandlesOf(measured))
+            : [];
+        // 3. write the inverting transforms for the children that moved (upstream applyTranslation).
         var moved = new List<VirtualNode>();
-        for (var index = 0; index < previousChildren.Count; index++)
+        for (var index = 0; index < measured.Count; index++)
         {
-            var child = previousChildren[index];
-            if (child.El is not { } element || !positionMap.TryGetValue(child, out var oldPosition))
+            var child = measured[index];
+            if (!positionMap.TryGetValue(child, out var oldPosition))
             {
                 continue;
             }
@@ -154,18 +172,26 @@ public sealed class TransitionGroup : IComponentDefinition
             var deltaY = oldPosition.Top - newPosition.Top;
             if (deltaX != 0 || deltaY != 0)
             {
-                operations.SetMoveTransform((int)element, deltaX, deltaY);
+                operations.SetMoveTransform((int)child.El!, deltaX, deltaY);
                 moved.Add(child);
             }
         }
 
-        // Force everything into position, then run the move class with the inverse transform cleared.
+        // 4. force everything into position (upstream forceReflow, once), then add the move class and clear
+        //    the inverse transform so each moved child animates home. In buffered mode steps 3-4 are one
+        //    command-buffer frame: transforms, the reflow barrier, then move class + clear, in this order.
         operations.ForceReflow();
         foreach (var child in moved)
         {
             var element = (int)child.El!;
             operations.AddTransitionClass(element, moveClass);
             operations.ClearMoveStyles(element);
+        }
+        // 5. register the move-end cleanup AFTER the write frame — the buffered WhenMoveEnds flushes the
+        //    frame committed in steps 3-4 as one crossing, then attaches the transitionend listener.
+        foreach (var child in moved)
+        {
+            var element = (int)child.El!;
             void MoveDone()
             {
                 if (!moveCallbacks.Remove(element))
@@ -177,6 +203,17 @@ public sealed class TransitionGroup : IComponentDefinition
             moveCallbacks[element] = MoveDone;
             operations.WhenMoveEnds(element, MoveDone);
         }
+    }
+
+    // Projects a child list to the int element handles the batched read/FLIP ops address them by.
+    private static int[] HandlesOf(List<VirtualNode> children)
+    {
+        var handles = new int[children.Count];
+        for (var index = 0; index < children.Count; index++)
+        {
+            handles[index] = (int)children[index].El!;
+        }
+        return handles;
     }
 
     // Upstream callPendingCbs: force-finish an in-flight move (moveCbKey) and enter (enterCbKey) so the

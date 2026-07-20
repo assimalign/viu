@@ -9,10 +9,19 @@ and [`@vue/test-utils`](https://test-utils.vuejs.org).
 `Assimalign.Viu.RuntimeCore`'s renderer is platform-agnostic: it drives whatever
 `RendererOptions<TNode>` it is given (see
 [`Assimalign.Viu.RuntimeCore/docs/DESIGN.md`](../../Assimalign.Viu.RuntimeCore/docs/DESIGN.md)).
-`TestNodeOperations.Create(log)` supplies node-ops over a plain in-memory tree
+`TestNodeOperations.Create(log, teleportTargetRoots?)` supplies node-ops over a plain in-memory tree
 (`TestElement`/`TestText`/`TestComment`), so component behavior is exercised through the *same*
 mount/patch/unmount pipeline the browser uses — just with no DOM and no interop. This is exactly
 `@vue/runtime-test`'s role, and it is why a component tested here behaves as it will in the browser.
+
+The one platform op the browser has that a bare in-memory tree lacks is `querySelector` — which the
+renderer uses only to resolve a `<Teleport>` string target ([V01.01.03.17]). The test adapter supplies
+it as a search over the registered *target roots* (each render container is auto-registered;
+`TestRenderer.RegisterQueryRoot` adds a detached target container), matching against the same CSS subset
+`@vue/test-utils` accepts (tag/`#id`/`.class`/`[attr]`). This keeps Teleport exercised DOM-free — a
+selector target rendered later in the same tree resolves through the ordinary tree walk, so `defer`
+behaves as it does in the browser. A renderer built without target roots simply declares no
+`querySelector`, so a string Teleport target then warns as unsupported (as an SSR string renderer would).
 
 ## The op log is the assertion surface
 

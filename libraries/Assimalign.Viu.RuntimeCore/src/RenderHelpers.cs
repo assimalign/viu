@@ -602,14 +602,23 @@ public static class RenderHelpers
     /// <summary>The <c>Fragment</c> block type (upstream: <c>Fragment</c>).</summary>
     public static readonly object _Fragment = new BuiltInVirtualNodeType("Fragment", isFragment: true);
 
-    /// <summary>The <c>Teleport</c> built-in marker (upstream: <c>Teleport</c>); renderer support is separate work.</summary>
-    public static readonly object _Teleport = new BuiltInVirtualNodeType("Teleport", isFragment: false);
+    /// <summary>
+    /// The <c>Teleport</c> built-in (upstream: <c>Teleport</c>), realized by the renderer's Teleport
+    /// patch/move/unmount paths ([V01.01.03.17]). The compiled render passes it as a vnode <c>tag</c>;
+    /// <see cref="CreateBaseVNode"/> routes it to <see cref="VirtualNodeFactory.Teleport"/>.
+    /// </summary>
+    public static readonly object _Teleport = new BuiltInVirtualNodeType("Teleport", isFragment: false, isTeleport: true);
 
     /// <summary>The <c>Suspense</c> built-in marker (upstream: <c>Suspense</c>); renderer support is separate work.</summary>
     public static readonly object _Suspense = new BuiltInVirtualNodeType("Suspense", isFragment: false);
 
-    /// <summary>The <c>KeepAlive</c> built-in marker (upstream: <c>KeepAlive</c>); renderer support is separate work.</summary>
-    public static readonly object _KeepAlive = new BuiltInVirtualNodeType("KeepAlive", isFragment: false);
+    /// <summary>
+    /// The <c>KeepAlive</c> built-in (upstream: <c>KeepAlive</c>), resolved to the real caching component
+    /// <see cref="RuntimeCore.KeepAlive"/> ([V01.01.03.18]). The compiled render passes it as a vnode
+    /// <c>tag</c>; <see cref="CreateBaseVNode"/>'s component arm mounts it, and the renderer's
+    /// activate/deactivate paths cache its child's subtree instead of unmounting it.
+    /// </summary>
+    public static readonly object _KeepAlive = KeepAlive.Instance;
 
     /// <summary>
     /// The <c>BaseTransition</c> built-in (upstream: <c>BaseTransition</c>), resolved to the real
@@ -664,6 +673,13 @@ public static class RenderHelpers
                 return asBlock
                     ? VirtualNodeFactory.FragmentBlock(fragmentChildren, key, flag)
                     : VirtualNodeFactory.Fragment(fragmentChildren, key, flag);
+            case BuiltInVirtualNodeType { IsTeleport: true }:
+                // Teleport children are always an array (never built as slots — TransformElement excludes
+                // Teleport from the single-child collapse and the slot build), so coerce to the vnode array.
+                var teleportChildren = CoerceChildren(children);
+                return asBlock
+                    ? VirtualNodeFactory.TeleportBlock(bag, teleportChildren, flag, dynamicProperties)
+                    : VirtualNodeFactory.Teleport(bag, teleportChildren, flag, dynamicProperties);
             case IComponentDefinition definition:
                 var slots = CoerceSlots(children);
                 return asBlock

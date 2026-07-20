@@ -456,6 +456,69 @@ public static class VirtualNodeFactory
             PatchFlag = patchFlag,
         };
 
+    /// <summary>
+    /// Creates a <c>&lt;Teleport&gt;</c> vnode (upstream: <c>createVNode(Teleport, props, children)</c>).
+    /// A Teleport renders its children into the container named by its <c>"to"</c> prop (a selector
+    /// resolved through the renderer's <c>querySelector</c> node-op, or a direct platform-node target),
+    /// leaving an anchor pair at its own tree position; the <c>"disabled"</c> prop renders the children
+    /// in place, and <c>"defer"</c> resolves the target after the surrounding tree mounts. Teleport
+    /// children are always an array (upstream enforces this in the compiler and vnode normalization).
+    /// See <c>packages/runtime-core/src/components/Teleport.ts</c> and
+    /// https://vuejs.org/guide/built-ins/teleport.html. [V01.01.03.17]
+    /// </summary>
+    /// <param name="properties">The props — carries <c>"to"</c>, <c>"disabled"</c>, and <c>"defer"</c> — or null.</param>
+    /// <param name="children">The children to teleport; null entries become comment placeholders.</param>
+    /// <param name="patchFlag">The compiler patch hint (e.g. <see cref="PatchFlags.Props"/> when <c>to</c>/<c>disabled</c> are dynamic).</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode Teleport(
+        VirtualNodeProperties? properties,
+        VirtualNode?[]? children,
+        PatchFlags patchFlag = default,
+        string[]? dynamicProperties = null)
+    {
+        var vnode = BuildTeleport(properties, children, patchFlag, dynamicProperties);
+        // A Teleport with a dynamic patch flag is collected into the enclosing block so a parent
+        // re-render revisits it (upstream createBaseVNode tracking condition; a static Teleport is not
+        // collected, matching upstream which tracks only patchFlag > 0 / component vnodes).
+        BlockStack.TrackDynamicChild(vnode);
+        return vnode;
+    }
+
+    /// <summary>
+    /// Creates a block <c>&lt;Teleport&gt;</c> vnode whose <see cref="VirtualNode.DynamicChildren"/> are
+    /// the dynamic descendants collected since <see cref="OpenBlock"/> (upstream: <c>createBlock</c> over
+    /// the <c>Teleport</c> type). This is the block form the compiled render emits, so a Teleport update
+    /// patches only its dynamic children positionally.
+    /// </summary>
+    /// <param name="properties">The props — carries <c>"to"</c>, <c>"disabled"</c>, and <c>"defer"</c> — or null.</param>
+    /// <param name="children">The children to teleport; null entries become comment placeholders.</param>
+    /// <param name="patchFlag">The compiler patch hint.</param>
+    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
+    public static VirtualNode TeleportBlock(
+        VirtualNodeProperties? properties,
+        VirtualNode?[]? children,
+        PatchFlags patchFlag = default,
+        string[]? dynamicProperties = null)
+        => BlockStack.CloseBlockAndSetup(BuildTeleport(properties, children, patchFlag, dynamicProperties));
+
+    private static VirtualNode BuildTeleport(
+        VirtualNodeProperties? properties,
+        VirtualNode?[]? children,
+        PatchFlags patchFlag,
+        string[]? dynamicProperties)
+        => new(VirtualNodeType.Teleport)
+        {
+            Properties = properties,
+            Key = ExtractKey(properties),
+            Reference = ExtractReference(properties),
+            // Teleport always carries array children (upstream: normalizeChildren forces ARRAY_CHILDREN);
+            // an empty teleport keeps an empty array so the renderer's array-children paths apply.
+            ArrayChildren = NormalizeArrayChildren(children) ?? [],
+            ShapeFlag = ShapeFlags.Teleport | ShapeFlags.ArrayChildren,
+            PatchFlag = patchFlag,
+            DynamicProperties = dynamicProperties,
+        };
+
     /// <summary>Builds a property bag from name/value tuples, pre-sized exactly.</summary>
     /// <param name="entries">The property entries.</param>
     /// <exception cref="ArgumentException">An entry name is null or empty.</exception>
@@ -508,6 +571,9 @@ public static class VirtualNodeFactory
             // Carry the transition hooks across a clone (upstream cloneVNode copies vnode.transition):
             // a reused/normalized child keeps its enter/leave choreography.
             Transition = node.Transition,
+            // Carry the Teleport target-side state across a clone so a reused/normalized Teleport keeps
+            // its resolved target and anchors (parity with cloneVNode copying vnode.target/anchors).
+            TeleportState = node.TeleportState,
             AppContext = node.AppContext,
             El = node.El,
             Anchor = node.Anchor,

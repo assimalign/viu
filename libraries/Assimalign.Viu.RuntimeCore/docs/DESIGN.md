@@ -44,6 +44,80 @@ typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`
 (`IPlugin<TNode>`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
 `app.config.globalProperties` bag.
 
+## Teleport is a special vnode type, not a component
+
+`Teleport` ([V01.01.03.17], upstream `components/Teleport.ts`) mirrors upstream by being a distinct
+`VirtualNodeType.Teleport` (carrying `ShapeFlags.Teleport`) that the renderer branches on in
+*patch / move / unmount* — **not** an `IComponentDefinition` like `BaseTransition`. It cannot be an
+ordinary component: it frames its own tree position with a main-tree anchor pair (reusing the vnode's
+`El`/`Anchor`) while mounting its children into a *different* container, and it moves those children
+between containers when `disabled`/`to` change — behavior with no place in the component render model.
+Target-side state (the resolved target and its anchor pair, plus the deferred-mount job) hangs off a
+single internal `TeleportState` reference so a non-Teleport vnode pays only one null field.
+
+Target lookup is the one new platform seam: the `to` prop is either a direct platform-node target or a
+selector resolved through `RendererOptions<TNode>.QuerySelector` — the browser adapter's DOM
+`querySelector`, the test adapter's registered-root search. The renderer never touches a node except
+through node-ops, so no DOM/JS access leaks in. `defer` resolves the target in a post-flush job
+(so a Teleport can target an element rendered later in the same tree); toggling `disabled` and changing
+`to` relocate the existing nodes with `insert` (no unmount), preserving subtree state.
+
+Deliberate divergences from upstream `Teleport.ts`, each documented at its call site:
+
+- **No SVG/MathML target-namespace sniff.** Upstream inspects the resolved target's `namespaceURI` to
+  switch the children's namespace; Viu's node-ops expose no element-namespace query, so the ambient
+  compiled namespace is threaded through instead.
+- **Target anchors are created only when the target resolves.** Upstream's `prepareAnchor` always
+  creates the `targetStart`/`targetAnchor` pair (for its hydration path) and inserts them only when a
+  target exists; Viu creates none for an unresolved target, so a missing/disabled Teleport never leaks
+  two never-inserted platform-node handles. The `TeleportEndKey` sibling-skip property is likewise
+  hydration-only and omitted.
+- **`default(TNode)` is honored as the "no node" sentinel** when resolving a string target: a value-type
+  handle renderer (the browser's `0`) returning it means "not found", exactly as a null reference-type
+  handle does — so a missing selector never teleports into node `0`.
+
+## KeepAlive is a component with renderer-internal reach
+
+`KeepAlive` ([V01.01.03.18], upstream `components/KeepAlive.ts`) is — unlike Teleport — a real
+`IComponentDefinition` (`KeepAlive.Instance`, the singleton `RenderHelpers._KeepAlive` resolves to). It
+wraps one dynamic child and, when the view switches, has the renderer **move the outgoing child's subtree
+into a hidden storage container instead of unmounting it** (`deactivate`) and move it home on return
+(`activate`), so the child's `Setup` runs once and all its state survives. The two paths are driven by
+`ShapeFlags.ComponentShouldKeepAlive` / `ComponentKeptAlive` (bit-for-bit with `@vue/shared`): the
+renderer's `processComponent` short-circuits a kept-alive vnode into `ActivateComponent` instead of a
+fresh mount, and its `unmount` short-circuits a should-keep-alive vnode into `DeactivateComponent`
+(move-to-storage) instead of teardown.
+
+Upstream injects the renderer internals onto `instance.ctx.renderer` in `mountComponent`; Viu mirrors the
+split without leaking `TNode` into the component. The renderer owns activate/deactivate and, at mount,
+attaches an internal `KeepAliveContext` (a node-op-created storage container plus a real-unmount delegate)
+to the KeepAlive instance **before** `Setup` runs. `KeepAlive` itself owns the cache and the render/prune
+logic: because `KeepAlive.Instance` is a shared singleton, every per-mount value (the cache, the
+least-recently-used key order, the current/pending keys) is **closure** state created fresh per `Setup`,
+never an instance field. The cache key is the child's vnode key when present, else the component
+definition reference — a typed key, never a reflected type name (AOT/trimming). `Max` caps the cache with
+LRU eviction (a `LinkedList<object>` orders keys oldest-first); `Include`/`Exclude` match the child's
+declared `IComponentDefinition.Name`, and a `flush: 'post'` watch prunes newly excluded entries when the
+props change.
+
+`Activated`/`Deactivated` hooks mirror upstream's `registerKeepAliveHook`: a KeepAlive activates only its
+*direct* child, so a nested descendant's hook is prepended onto every ancestor KeepAlive-root instance's
+hook list, and one `InvokeHooks` on that root fires the whole subtree child-before-parent. A
+deactivation-branch check (upstream's `__wdc`) skips a hook whose owning branch is already deactivated so
+nested KeepAlives do not double-fire.
+
+Deliberate divergences from upstream `KeepAlive.ts`, each documented at its call site:
+
+- **No Suspense unwrapping.** Upstream's `getInnerChild` unwraps a Suspense child; Viu treats the child as
+  its own inner child until Suspense lands ([V01.01.03.20]).
+- **No mount-invalidation of a pending activated/mounted hook.** Upstream 3.5 calls `invalidateMount` when
+  deactivating so a queued-but-unrun mounted/activated hook is cancelled; Viu's synchronous per-render
+  flush drains a newly-mounted subtree's post-flush hooks before any later render can deactivate it, so
+  `mounted` still fires exactly once and the guard is unnecessary for discrete render cycles.
+- **Aggregated hooks fire with the KeepAlive-root as the ambient instance.** Upstream's `invokeArrayFns`
+  sets no current instance; Viu fires the aggregated list through the root's `InvokeHooks`, so a
+  descendant hook that reads `ComponentInstance.Current` sees the root — a minor divergence pinned by test.
+
 ## Deltas from Vue 3
 
 - **DOM directives live one layer up.** `v-show` and `v-model` and the DOM transitions are *not*

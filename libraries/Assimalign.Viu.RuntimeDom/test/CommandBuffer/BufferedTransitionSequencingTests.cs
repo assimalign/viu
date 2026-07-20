@@ -239,8 +239,9 @@ public sealed class BufferedTransitionSequencingTests
             // The rAF scheduling and end-detection stay direct (the buffered wrapper flushes around them).
             NextFrame = _nextFrameQueue.Add,
             WhenTransitionEnds = (element, _, _, resolve) => _endResolvers[element] = resolve,
-            // FLIP ops are unused by <Transition>; stub them (their batching is #163).
-            MeasurePosition = _ => default,
+            // FLIP ops are unused by <Transition>; stub them (their own batched coverage is in the
+            // TransitionGroup adapter and command-buffer tests, [V01.01.04.07.03]).
+            MeasurePositions = handles => new TransitionRectangle[handles.Length],
             SetMoveTransform = (_, _, _) => { },
             ClearMoveStyles = _ => { },
             HasCssTransform = (_, _, _) => false,

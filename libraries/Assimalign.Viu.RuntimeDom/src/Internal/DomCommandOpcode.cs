@@ -95,4 +95,21 @@ internal enum DomCommandOpcode : byte
     /// the interop boundary exactly once ([V01.01.04.07.02]).
     /// </summary>
     ForceReflow = 23,
+
+    /// <summary>
+    /// Apply a FLIP inverting transform: <c>[handle][deltaX:float64][deltaY:float64]</c> (upstream
+    /// <c>applyTranslation</c>'s <c>style.transform = translate(dx,dy); style.transitionDuration = '0s'</c>
+    /// — <c>packages/runtime-dom/src/components/TransitionGroup.ts</c>). Buffered so the whole FLIP write
+    /// pass — every element's transform, the <see cref="ForceReflow"/> barrier, then the move class and
+    /// the transform clear — rides one frame in upstream order, one interop crossing ([V01.01.04.07.03]).
+    /// The <c>float64</c> deltas are the first non-int32/bool operands in the wire format.
+    /// </summary>
+    SetMoveTransform = 24,
+
+    /// <summary>
+    /// Clear the FLIP transform and zero transition-duration so the move class animates the element back
+    /// to its settled spot: <c>[handle]</c> (upstream <c>style.transform = style.transitionDuration = ''</c>).
+    /// Buffered after the reflow barrier and the move class in the same FLIP write frame ([V01.01.04.07.03]).
+    /// </summary>
+    ClearMoveStyles = 25,
 }

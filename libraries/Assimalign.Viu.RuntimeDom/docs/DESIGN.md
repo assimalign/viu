@@ -79,6 +79,31 @@ and `.WithKeys` port `withModifiers`/`withKeys` (guards run .NET-side over the p
 Handler exceptions route to the registry's error sink — a debug trace until the app
 error-handling pipeline ([V01.01.03.12]) replaces it — and never escape into the JS listener.
 
+### Renderer-agnostic handlers: the object-payload bridge ([V01.01.08.03.01])
+
+A component that renders through the node-ops abstraction rather than the DOM directly — so it also
+runs against the in-memory Testing renderer and SSR — attaches an `Action<object?>` handler that
+expects a *platform-free* payload, not a `BrowserEvent`. The Router's `RouterLink` is the first: its
+`onClick` reads a DOM-free `RouterLinkClickEvent` (button, system modifiers, `DefaultPrevented`), the
+stand-in for the `MouseEvent` vue-router's `guardEvent` inspects. The DOM runtime must not know that
+payload type (`Assimalign.Viu.Router` is an opt-in package, not a framework member, and must never be
+dragged into every app's closure), so the seam is inverted: the invoker registry recognizes the
+`Action<object?>` shape and routes it through an ambient `BrowserObjectEvents.Invoker`
+(`BrowserObjectEventInvoker`) that a *browser integration layer* installs. That invoker owns the
+whole conversion — synthesize the payload from the `BrowserEvent`, call the handler, and apply the
+handler's prevent/stop decision back to the `BrowserEvent` so it re-crosses the boundary in the same
+single dispatch return. With no invoker installed, dispatching such a handler surfaces a
+`NotSupportedException` to the error sink rather than silently dropping the event. This mirrors the
+Testing renderer's `Action<object?>` dispatch (`TestEventDispatcher`) — same handler shape, host-
+specific payload — and keeps the coupling to `RouterLinkClickEvent` in the dedicated
+`Assimalign.Viu.Router.RuntimeDom` bridge, never here.
+
+The dispatch payload carries the live event's arrival-time `event.defaultPrevented` (a new
+`[JSExport]` field) so the bridge honors `guardEvent`'s already-prevented bail. `BrowserEvent` keeps
+that arrival state apart from a handler's own `PreventDefault()` request: a guard sees the combined
+state through `DefaultPrevented` (matching the DOM), but only handler-requested prevention re-crosses
+the boundary in the response flags — the browser already applied the arrival one.
+
 ## Interop command-buffer batching ([V01.01.04.05])
 
 The boundary is the budget, so the batched mode collapses a whole scheduler flush's node-ops into
@@ -117,9 +142,11 @@ buffered is opt-in for this delivery.
 - **Differential proof**: the full renderer scenario battery runs through direct and buffered modes
   and asserts byte-identical serialized DOM; an instrumented apply counter proves one boundary
   crossing per flush over hundreds of mutations. Full 10k-row benchmarks belong to [V01.01.11.04].
-- **Transition sequencing barrier**: three opcodes (`AddTransitionClass`, `RemoveTransitionClass`,
+- **Transition sequencing barrier**: opcodes 21/22/23 (`AddTransitionClass`, `RemoveTransitionClass`,
   `ForceReflow`) let the CSS-transition choreography ride the buffer without coalescing away the
-  browser's transition trigger — see the next section ([V01.01.04.07.02]).
+  browser's transition trigger ([V01.01.04.07.02]); opcodes 24/25 (`SetMoveTransform`,
+  `ClearMoveStyles`) extend the same model to the FLIP move write frame, and add the wire format's first
+  `float64` operands ([V01.01.04.07.03]) — see the next two sections.
 
 ## Transition class sequencing under batching ([V01.01.04.07.02])
 
@@ -140,14 +167,52 @@ batching everywhere else (one interop crossing per flush is unchanged):
 - **Frame boundary — the `nextFrame` continuation.** The `*-to` swap is scheduled through the real
   double-`requestAnimationFrame`; the buffered adaptor applies the continuation's writes when it runs,
   two frames after the from/active frame committed, so the two class states land in distinct browser
-  frames and can never coalesce. `whenTransitionEnds`/`measurePosition`/`hasCssTransform` and the FLIP
-  ops force a flush and hit the live bridge (so `getComputedStyle`/`getBoundingClientRect` observe the
+  frames and can never coalesce. `whenTransitionEnds`/`measurePositions`/`hasCssTransform`/`whenMoveEnds`
+  force a flush and hit the live bridge (so `getComputedStyle`/`getBoundingClientRect` observe the
   committed classes/layout); their resolve callbacks flush the finishing class removals.
 - **Proof.** `BufferedTransitionSequencingTests` drives the real renderer + real `<Transition>` through
   the buffered applier and asserts, per flush, that from/active land in one frame, the to-swap in a
   distinct later frame, and the leave reflow op lands *between* the from- and active-class writes.
-- FLIP *move* batching (one read pass, one reflow for N elements) is the separate #163; buffered FLIP
-  reads are correct here (forced flush) but not yet batched. `v-show` transition coalescing is #161.
+- FLIP *move* batching (the `<TransitionGroup>` reorder pass) is the next section ([V01.01.04.07.03]);
+  `v-show` transition coalescing is #161.
+
+## Transition FLIP move batching ([V01.01.04.07.03])
+
+`<TransitionGroup>` animates keyed reorders with a FLIP (First-Last-Invert-Play): snapshot each child's
+position before the patch, read it again after, apply an inverting `transform` to every child that
+moved, force one reflow, then add the resolved `*-move` class and clear the transform so each child
+animates from its old spot to its new one — cleaning up on `transitionend` (upstream
+`TransitionGroup.ts` `recordPosition`/`applyTranslation`/`forceReflow`, gated by the `hasCSSTransform`
+clone probe). Upstream reads `getBoundingClientRect` per child inside a same-process JS loop; on a
+handle platform every read is a boundary crossing, so a naive port costs N crossings per pass. Two
+design choices keep policy in .NET (the "decision logic lives in .NET; JS stays a dumb applier" split)
+while collapsing the FLIP to a constant number of crossings:
+
+- **Batched read pass — one crossing per snapshot.** `DomTransitionOperations.MeasurePositions` takes an
+  array of handles and returns the flat `[left, top, …]` rectangles in a single crossing (the
+  `dom.measurePositions` read op, mirroring the history bridge's `readSnapshot` flat-primitives pattern).
+  Which children moved and their inverting deltas are computed .NET-side; JS only reads rectangles. A
+  reorder of N children costs exactly two read crossings — the pre-patch snapshot and the post-patch
+  read — regardless of N. In buffered mode the read forces the pending patch to commit first, so
+  `getBoundingClientRect` observes the settled post-reorder layout, then reads all N in one call.
+- **Batched write frame — one crossing for the move.** The FLIP transform writes join the command
+  buffer: `SetMoveTransform` (opcode 24, carrying `float64` deltas) and `ClearMoveStyles` (opcode 25)
+  sit alongside `AddTransitionClass` (21) and the `ForceReflow` barrier (23). `TransitionGroup` emits
+  the whole write pass — every child's transform, then the reflow barrier, then each child's move class
+  and transform clear — before registering any `whenMoveEnds` listener, so the buffered adaptor commits
+  the entire frame in one crossing in exact upstream order. (`whenMoveEnds` stays a direct per-element
+  `transitionend` registration, like `addEventListener`; it is a listener attach, not a read, and its
+  resolve flushes the finishing move-class removal.) An interrupted reorder force-finishes the in-flight
+  move first (upstream `callPendingCbs`) so the re-measure sees settled positions.
+- **Wire version.** These opcodes and the `float64` operand bumped the frame version `0x02` → `0x03`
+  on both `DomCommandBuffer.cs` and `viu-dom.js`; the test-side `CommandBufferDecoder` (the DOM-free
+  oracle for the JS applier) decodes them identically.
+- **Proof.** `TransitionGroupTests` pins, through the recording adapter, the move class + inverting
+  transform applied only to moved children and removed on `transitionend`, the `hasCSSTransform` gate,
+  an interrupted reorder converging with no residue, cleanup leaving none — and, run-count-pinned, that
+  each position pass is exactly one batched read crossing carrying the full child batch regardless of
+  child count. `DomCommandBufferTests` round-trips the FLIP opcodes through the buffer and decoder,
+  asserting the `float64` deltas survive and the transform/reflow/class/clear order is preserved.
 
 ## Non-goals (sequenced work)
 

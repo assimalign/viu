@@ -74,10 +74,16 @@ internal static class BrowserNodeOperations
             ForceReflow = static () => BrowserDomBridge.ForceReflow(),
             WhenTransitionEnds = static (element, expectedType, explicitTimeout, resolve) =>
                 BrowserDomBridge.WhenTransitionEnds(element, expectedType, explicitTimeout, resolve),
-            MeasurePosition = static element =>
+            MeasurePositions = static handles =>
             {
-                var position = BrowserDomBridge.MeasurePosition(element);
-                return new TransitionRectangle(position[0], position[1]);
+                // One crossing reads all rectangles; decode the flat [left, top, ...] pairs .NET-side.
+                var flat = BrowserDomBridge.MeasurePositions(handles);
+                var rectangles = new TransitionRectangle[handles.Length];
+                for (var index = 0; index < handles.Length; index++)
+                {
+                    rectangles[index] = new TransitionRectangle(flat[index * 2], flat[index * 2 + 1]);
+                }
+                return rectangles;
             },
             SetMoveTransform = static (element, deltaX, deltaY) => BrowserDomBridge.SetMoveTransform(element, deltaX, deltaY),
             ClearMoveStyles = static element => BrowserDomBridge.ClearMoveStyles(element),

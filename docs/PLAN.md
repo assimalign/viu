@@ -46,7 +46,7 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
 | SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
-| Router (`V01.01.08`) | `Assimalign.Viu.Router` | `vue-router` |
+| Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Router.RuntimeDom`, the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
 | DevTools (`V01.01.10`) | `Assimalign.Viu.DevTools` | `vue-devtools` protocol + UI |
 | Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
