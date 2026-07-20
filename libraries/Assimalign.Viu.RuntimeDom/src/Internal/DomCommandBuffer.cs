@@ -44,8 +44,11 @@ internal sealed class DomCommandBuffer
     /// <summary>The frame's leading byte — a sanity marker the applier validates.</summary>
     internal const byte Magic = 0xB6;
 
-    /// <summary>The frame format version — bump on any layout or opcode change so drift fails loudly.</summary>
-    internal const byte Version = 0x01;
+    /// <summary>
+    /// The frame format version — bump on any layout or opcode change so drift fails loudly. 0x02 added
+    /// the transition class/reflow-barrier opcodes ([V01.01.04.07.02]).
+    /// </summary>
+    internal const byte Version = 0x02;
 
     /// <summary>Header size: magic + version + opCount + nextHandle + stringTableOffset.</summary>
     internal const int HeaderSize = 2 + 4 + 4 + 4;
@@ -260,6 +263,27 @@ internal sealed class DomCommandBuffer
         WriteStringReference(eventName);
         WriteBoolean(capture);
     }
+
+    internal void WriteAddTransitionClass(int handle, string cssClass)
+    {
+        WriteOpcode(DomCommandOpcode.AddTransitionClass);
+        WriteInt32(handle);
+        WriteStringReference(cssClass);
+    }
+
+    internal void WriteRemoveTransitionClass(int handle, string cssClass)
+    {
+        WriteOpcode(DomCommandOpcode.RemoveTransitionClass);
+        WriteInt32(handle);
+        WriteStringReference(cssClass);
+    }
+
+    /// <summary>
+    /// Writes the operand-less reflow barrier (<see cref="DomCommandOpcode.ForceReflow"/>): the applier
+    /// performs a real synchronous reflow at this point in the frame drain so class writes before it
+    /// commit to their own style recalc before the writes after it ([V01.01.04.07.02]).
+    /// </summary>
+    internal void WriteForceReflow() => WriteOpcode(DomCommandOpcode.ForceReflow);
 
     // --- primitives ------------------------------------------------------------------------------
 
