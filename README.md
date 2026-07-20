@@ -132,6 +132,8 @@ dotnet run --project examples/Assimalign.Viu.WebApp
 - [Architecture decisions](docs/adr/) — the append-only decision log (founding C#/WASM divergences).
 - [Documentation conventions](docs/CONTRIBUTING.md) — where `OVERVIEW.md`, `DESIGN.md`, and ADRs
   live, what belongs in each, and when they must be updated.
+- [Getting started guide](docs/guide/getting-started.md) — build, run, and publish a Viu app with the
+  packaged `Assimalign.Viu.Sdk` (prerequisites → first component → reactivity → publish).
 - [Project board](https://github.com/orgs/assimalign/projects/15) — the authoritative backlog
   (`[V01.01.*]` WBS items: program → area epics → features → tasks).
 - Work-item intake: [`.claude/skills/viu-work-items`](.claude/skills/viu-work-items/SKILL.md).
