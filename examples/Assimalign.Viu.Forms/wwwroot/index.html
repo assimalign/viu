@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Viu Forms &amp; v-model</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preload" id="webassembly" />
+  <script type="importmap"></script>
+  <script type="module" src="main#[.{fingerprint}].js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(180deg, #f7f8fa 0%, #eef1f4 100%);
+      color: #1c2531;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 3rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    #app { width: min(100%, 56rem); }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 44rem) {
+      .shell { grid-template-columns: 1fr; }
+    }
+
+    .form {
+      background: #ffffff;
+      border-radius: 1rem;
+      padding: 1.75rem;
+      box-shadow: 0 1rem 3rem rgba(24, 35, 52, 0.1);
+      display: grid;
+      gap: 1.1rem;
+    }
+
+    .form h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+
+    .field { display: grid; gap: 0.35rem; }
+    .field-inline { grid-auto-flow: column; justify-content: start; align-items: center; gap: 0.5rem; }
+
+    .field > label { font-size: 0.85rem; font-weight: 600; color: #46536a; }
+
+    .control {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      font: inherit;
+      border: 1px solid rgba(16, 36, 59, 0.16);
+      border-radius: 0.55rem;
+      background: #fbfcfd;
+    }
+    .control:focus { outline: 2px solid #3d7dfc; outline-offset: 1px; }
+
+    textarea.control { resize: vertical; }
+
+    .options { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; }
+    .option { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.95rem; }
+
+    .preview {
+      position: sticky;
+      top: 1rem;
+      background: #10233b;
+      color: #e7eefb;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 1rem 3rem rgba(16, 35, 59, 0.24);
+    }
+    .preview h2 { margin: 0 0 0.75rem; font-size: 1.05rem; letter-spacing: 0.02em; }
+
+    .status {
+      display: inline-block;
+      margin: 0 0 0.9rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .status.is-ready { background: #2fae7a; color: #06231a; }
+
+    .summary {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-family: "Cascadia Code", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #b9cdec;
+    }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+</body>
+</html>

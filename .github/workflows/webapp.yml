@@ -1,6 +1,11 @@
 # WebAssembly example-app build ([V01.01.12.02]): proves the wasm-tools toolchain and the
-# static-web-asset flow stay healthy. Runs when the example, any library, or shared build
-# files change (the app references every area transitively).
+# static-web-asset flow stay healthy across the sample gallery ([V01.01.13.02]). Runs when any
+# example, any library, or the shared build files change (the apps reference every area transitively).
+#
+# The build lane is a matrix over the sample apps rather than one hard-coded project: the gallery is a
+# set (the publish-size manifest already treats it as one — scripts/budgets/PublishBudgets.json), so
+# adding a sample is one matrix entry instead of a duplicated job. The test lane runs the samples'
+# DOM-free test projects (the in-memory Assimalign.Viu.Testing renderer — no browser, no wasm-tools).
 name: webapp
 
 on:
@@ -31,8 +36,15 @@ on:
 
 jobs:
   build:
-    name: build WASM example
+    name: build WASM example (${{ matrix.sample }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sample:
+          - Assimalign.Viu.WebApp
+          - Assimalign.Viu.TodoMvc
+          - Assimalign.Viu.Forms
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,4 +55,22 @@ jobs:
           install-wasm-tools: 'true'
 
       - name: Build
-        run: dotnet build examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj --configuration Release -warnaserror
+        run: dotnet build examples/${{ matrix.sample }}/${{ matrix.sample }}.csproj --configuration Release -warnaserror
+
+  test:
+    name: sample tests (DOM-free)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The example test projects target net10.0 and drive the in-memory renderer, so they need no
+      # wasm-tools workload.
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Test TodoMVC sample
+        run: dotnet test examples/Assimalign.Viu.TodoMvc.Tests/Assimalign.Viu.TodoMvc.Tests.csproj --configuration Release -warnaserror
+
+      - name: Test forms sample
+        run: dotnet test examples/Assimalign.Viu.Forms.Tests/Assimalign.Viu.Forms.Tests.csproj --configuration Release -warnaserror
