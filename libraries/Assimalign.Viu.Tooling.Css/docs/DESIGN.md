@@ -72,8 +72,20 @@ blocks — matching the generator's constant exactly.
   opaque CSS strings for the same `ViuBundleCss` task. The bundler already bundles opaque compiled-CSS text
   with no utility-specific knowledge, so the utility stylesheet plugs in without changing this contract. The
   seam is left; the engine is not built here.
-- **Host-page `<link>` injection.** The task registers the bundle as a static web asset with a stable logical
-  URL; loading it is a documented explicit `<link rel="stylesheet" href="<AssemblyName>.viu.css">`.
-  Automatic in-place rewrite of the host page's static web asset is deferred — it desyncs the .NET SDK's
-  static-web-asset compression/endpoint negotiation graph, so the explicit reference is the shipped path.
+- **Static-web-asset fingerprinting ([V01.01.12.12.03], #169) — implemented.** `Build.Css.Bundling.targets`
+  registers the bundle with a content fingerprint through the SDK's `DefineStaticWebAssets` path (the
+  `$(PackageId)#[.{fingerprint}]?.viu.css` RelativePath, the same optional-token form Blazor's scoped-CSS
+  application bundle uses). The SDK derives the fingerprint from a SHA-256 hash of the bundle **content**, so
+  its determinism rides directly on this library's byte-stable output (LF-only, ordinal ordering): identical
+  styles reproduce the same hash across builds, changed styles get a new one, and the `ViuBundleCss` task's
+  no-op-rewrite skip means an unchanged rebuild never perturbs the bytes or the hash. The `?` keeps the plain
+  route (`<AssemblyName>.viu.css`, the file a static WASM host serves) working while registering the
+  fingerprinted route/endpoint (hash + `label` + integrity) that an ASP.NET Core host, a CDN, or the
+  link-injection follow-up resolves for immutable caching.
+- **Host-page `<link>` injection ([V01.01.12.12.01], #167) — deferred.** Loading the bundle today is a
+  documented explicit `<link rel="stylesheet" href="<AssemblyName>.viu.css">` (the stable plain URL; the WASM
+  SDK's `#[.{fingerprint}]` host-page placeholder resolution is ES-module-only and does not rewrite a CSS
+  `<link>` to the hashed name). Automatic in-place rewrite of the host page's static web asset is deferred —
+  it desyncs the .NET SDK's static-web-asset compression/endpoint negotiation graph — so the injector must
+  resolve the fingerprinted endpoint this task already registers rather than editing the asset in place.
 ```

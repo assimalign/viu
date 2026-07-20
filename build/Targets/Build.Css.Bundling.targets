@@ -17,12 +17,36 @@
          same DefineStaticWebAssets path Blazor scoped CSS uses for <App>.styles.css), so build/publish copy
          and fingerprint it and the dev host serves it. Runs just before ResolveStaticWebAssetsInputs.
 
+    FINGERPRINTING ([V01.01.12.12.03]): when the SDK's static-web-asset fingerprinting is on (the WASM /
+    Blazor default, $(StaticWebAssetFingerprintingEnabled) == 'true') the bundle's logical URL carries the
+    #[.{fingerprint}] token, via the same DefineStaticWebAssets path Blazor's scoped-CSS application bundle
+    uses ($(PackageId)#[.{fingerprint}]?.styles.css). The SDK computes the token from a SHA-256 hash of the
+    bundle's CONTENT (no timestamps), so the fingerprint is deterministic: identical styles across rebuilds
+    keep the same hash, changed styles get a new one — the browser cache-busts only on real change. We use
+    the OPTIONAL form ('?'): the SDK emits BOTH a fingerprinted route (WebApp.<hash>.viu.css, served
+    immutable) and the stable plain route (WebApp.viu.css). Each fingerprinted endpoint carries a `label`
+    equal to the plain route, plus the content hash and integrity — that endpoint is the resolution mechanism
+    an ASP.NET Core host, a CDN, or the future auto-injection ([V01.01.12.12.01]) uses to serve the immutable
+    URL. In a statically hosted WASM app the plain-named physical file is the one that ships, so the demo's
+    explicit <link> keeps resolving.
+
+    Why not the '!' (required) form the WASM SDK uses for main#[.{fingerprint}]!.js: the host-page
+    #[.{fingerprint}] placeholder resolution (OverrideHtmlAssetPlaceholders) is scoped to JS ES modules /
+    the import map; it does NOT rewrite a CSS <link> href to the hashed name (it strips the token to the
+    plain name). '!' would therefore ship ONLY the hashed physical file while the demo's static <link>
+    resolved to the plain name — a 404. '?' keeps the plain file serving AND registers the fingerprinted
+    identity/endpoint, which is exactly what this task owns; delivering the hashed URL into the host page is
+    [V01.01.12.12.01]'s job (build-time link injection off the endpoint this task registers).
+
     LOAD THE BUNDLE: add, inside <head> of the host page (wwwroot/index.html),
       <link rel="stylesheet" href="<AssemblyName>.viu.css" />
-    — the bundle's stable, unfingerprinted logical URL (the static-web-asset endpoint resolves it; a class
-    library's bundle is at _content/<PackageId>/<AssemblyName>.viu.css). Automatic <link> injection is a
-    deferred follow-up: rewriting the host page's static web asset in place desyncs the .NET SDK's
-    compression/endpoint negotiation graph, so the explicit reference is the shipped, publish-safe path.
+    the bundle's stable logical URL — the plain-named physical file a static host serves, and (with the '?'
+    fingerprinted endpoint registered here) the same asset an ASP.NET Core host serves immutably via its
+    hashed route (a class library's bundle is at _content/<PackageId>/<AssemblyName>.viu.css). Automatic
+    <link> injection of the hashed URL is a deferred follow-up ([V01.01.12.12.01]): rewriting the host page's
+    static web asset in place desyncs the .NET SDK's compression/endpoint negotiation graph, so the explicit
+    reference is the shipped, publish-safe path. The injector resolves the fingerprinted endpoint (by its
+    `label`) this task registers.
   -->
 
   <PropertyGroup>
@@ -40,19 +64,65 @@
   </PropertyGroup>
 
   <!-- The task lives in analyzers/Assimalign.Viu.Tooling.Tasks; it re-runs the shared Tooling.Css core
-       OUTSIDE the analyzer sandbox so it may write files. Declared only when the built assembly is present,
-       so a project that has not built the task (or disabled bundling) never fails to load the target. -->
+       OUTSIDE the analyzer sandbox so it may write files. Declared whenever bundling is on — NOT gated on
+       Exists($(ViuBundleCssTaskAssembly)). A UsingTask condition is evaluated at static import time, which
+       for the in-repo dogfood path can precede the Tooling.Tasks build (the assembly is loaded through
+       AssemblyFile, not a ProjectReference, so nothing ordered its build first). Gating on Exists there
+       raced the build: the target could run after the DLL appeared while the UsingTask, evaluated earlier
+       against a not-yet-built DLL, was never declared — MSB4036 "task not found". UsingTask resolves its
+       AssemblyFile lazily (only when the task is first invoked), and the invoking target keeps its own
+       Exists gate, so declaring it unconditionally is safe when the task is genuinely absent. The in-repo
+       build-order edge below guarantees the DLL exists by the time the target runs. -->
   <UsingTask TaskName="Assimalign.Viu.Tooling.Tasks.ViuBundleCss"
              AssemblyFile="$(ViuBundleCssTaskAssembly)"
-             Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')" />
+             Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'" />
+
+  <!-- In-repo dogfooding build-order edge ([V01.01.12.12.03]): a consuming project loads ViuBundleCss via
+       <UsingTask AssemblyFile=...>, which is NOT a project reference, so the solution/dependency scheduler
+       has no reason to build Tooling.Tasks before this project. A WASM sample (the first in-repo consumer of
+       CSS bundling) therefore raced the task build and failed with MSB4036 on a clean build. This
+       reference-output-free edge forces Tooling.Tasks to build first. Guarded to the in-repo path
+       ($(ViuRepositoryDirectory) set); the packaged SDK ships the task inside the package (Sdk.Common.props
+       presets $(ViuBundleCssTaskAssembly) to the packaged copy), so an external consumer never takes this
+       edge and never sees a raw ProjectReference.
+       Deviates from the repo build-system rule (no raw <ProjectReference>) per design decision: a build-order
+       edge the ViuProjectReference transform cannot express — a netstandard2.0 task referenced with
+       ReferenceOutputAssembly=false and UndefineProperties to cross the app's TFM/RID boundary, mirroring
+       frameworks/Assimalign.Viu.App.Refs. -->
+  <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\Assimalign.Viu.Tooling.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\Assimalign.Viu.Tooling.Tasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      PrivateAssets="all"
+                      UndefineProperties="TargetFramework;RuntimeIdentifier" />
+  </ItemGroup>
 
   <Target Name="_ViuResolveSingleFileComponentCssConfiguration"
           Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'"
           DependsOnTargets="ResolveStaticWebAssetsConfiguration">
     <PropertyGroup>
-      <!-- Logical file name of the bundle within the static-web-asset base path (e.g. WebApp.viu.css).
-           Unfingerprinted so the explicit <link href> stays stable. -->
-      <ViuSingleFileComponentCssBundleName Condition="'$(ViuSingleFileComponentCssBundleName)' == ''">$(PackageId).viu.css</ViuSingleFileComponentCssBundleName>
+      <!-- The bundle's stable logical name split into base (no extension) and extension primitives, so the
+           plain and fingerprinted relative paths derive from the same pieces and can never drift. Override a
+           primitive to rename the bundle; a consumer overriding the composed $(ViuSingleFileComponentCssBundleName)
+           or $(ViuSingleFileComponentCssBundleFingerprintExpression) directly should override both to keep
+           the two routes in lock-step. -->
+      <ViuSingleFileComponentCssBundleBaseName Condition="'$(ViuSingleFileComponentCssBundleBaseName)' == ''">$(PackageId)</ViuSingleFileComponentCssBundleBaseName>
+      <ViuSingleFileComponentCssBundleExtension Condition="'$(ViuSingleFileComponentCssBundleExtension)' == ''">.viu.css</ViuSingleFileComponentCssBundleExtension>
+      <!-- Stable, unfingerprinted logical file name (e.g. WebApp.viu.css). Also the physical file name under
+           obj/…/viu/ — the on-disk bundle is never renamed; only the served URL gains the content hash. -->
+      <ViuSingleFileComponentCssBundleName Condition="'$(ViuSingleFileComponentCssBundleName)' == ''">$(ViuSingleFileComponentCssBundleBaseName)$(ViuSingleFileComponentCssBundleExtension)</ViuSingleFileComponentCssBundleName>
+      <!-- Fingerprinted logical file name pattern (e.g. WebApp#[.{fingerprint}]?.viu.css). DefineStaticWebAssets
+           substitutes a SHA-256 content hash into the #[.{fingerprint}] token. The trailing '?' makes the
+           fingerprint OPTIONAL — the same token Blazor's scoped-CSS application bundle uses
+           ($(PackageId)#[.{fingerprint}]?.styles.css): the SDK emits BOTH a fingerprinted route
+           (WebApp.<hash>.viu.css, immutable) and the stable plain route (WebApp.viu.css), and in a statically
+           hosted WASM app the plain-named physical file is what ships, so the demo's <link> keeps resolving.
+           The fingerprinted route/endpoint (carrying `label` = the plain route + the content hash + integrity)
+           is what an ASP.NET Core host, a CDN, or the future auto-injection ([V01.01.12.12.01]) resolves for
+           cache-busting. ('!' — required — would instead ship ONLY the hashed physical file; the WASM SDK's
+           #[.{fingerprint}] host-page placeholder resolution is ES-module-only and does not rewrite a CSS
+           <link> href to the hashed name, so '!' would 404 the demo's static link.) -->
+      <ViuSingleFileComponentCssBundleFingerprintExpression Condition="'$(ViuSingleFileComponentCssBundleFingerprintExpression)' == ''">$(ViuSingleFileComponentCssBundleBaseName)#[.{fingerprint}]?$(ViuSingleFileComponentCssBundleExtension)</ViuSingleFileComponentCssBundleFingerprintExpression>
       <_ViuCssBundleContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\'))</_ViuCssBundleContentRoot>
       <_ViuCssBundlePath>$(_ViuCssBundleContentRoot)$(ViuSingleFileComponentCssBundleName)</_ViuCssBundlePath>
     </PropertyGroup>
@@ -88,7 +158,13 @@
           DependsOnTargets="_ViuBundleSingleFileComponentCss">
     <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
       <_ViuCssBundleStaticWebAssetCandidate Include="$(_ViuCssBundlePath)">
-        <RelativePath>$(ViuSingleFileComponentCssBundleName)</RelativePath>
+        <!-- Fingerprint the served URL when the SDK's static-web-asset fingerprinting is on (the WASM/Blazor
+             default). DefineStaticWebAssets replaces the #[.{fingerprint}] token with a deterministic content
+             hash and (for the '?' optional form) registers both the fingerprinted and the stable plain route.
+             Falls back to the plain name when fingerprinting is disabled. Same DefineStaticWebAssets path as
+             Microsoft.NET.Sdk.StaticWebAssets.ScopedCss ResolveBundledCssAssets. -->
+        <RelativePath Condition="'$(StaticWebAssetFingerprintingEnabled)' == 'true'">$(ViuSingleFileComponentCssBundleFingerprintExpression)</RelativePath>
+        <RelativePath Condition="'$(StaticWebAssetFingerprintingEnabled)' != 'true'">$(ViuSingleFileComponentCssBundleName)</RelativePath>
       </_ViuCssBundleStaticWebAssetCandidate>
     </ItemGroup>
 
