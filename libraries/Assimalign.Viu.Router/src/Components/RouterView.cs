@@ -36,10 +36,17 @@ public sealed class RouterView : IComponentDefinition
         var depth = DependencyInjection.Inject(RouterInjectionKeys.ViewDepth, 0);
         DependencyInjection.Provide(RouterInjectionKeys.ViewDepth, depth + 1);
 
+        // Provide a mutable holder for this depth's matched record (upstream: provide(matchedRouteKey,
+        // ...)). The render updates it before creating the child vnode, so the child's in-component
+        // guard composables read the record they are rendered for even when a reused view swaps leaves.
+        var recordScope = new MatchedRecordScope();
+        DependencyInjection.Provide(RouterInjectionKeys.MatchedRecord, recordScope);
+
         return () =>
         {
             if (router is null)
             {
+                recordScope.Record = null;
                 return null;
             }
             // Tracked read: the render effect re-runs on every completed navigation.
@@ -47,9 +54,11 @@ public sealed class RouterView : IComponentDefinition
             var matched = route.Matched;
             if (depth >= matched.Count)
             {
+                recordScope.Record = null;
                 return null;
             }
             var record = matched[depth];
+            recordScope.Record = record;
             if (record.Component is not { } component)
             {
                 return null;

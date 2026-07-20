@@ -1,7 +1,7 @@
 # Assimalign.Viu.Router — overview
 
 The client router for Viu — the role `vue-router` v4 plays for Vue 3
-(https://github.com/vuejs/router). Three features have landed:
+(https://github.com/vuejs/router). Four features have landed:
 
 - The **route table and matcher** (`[V01.01.08.01]`): the pure, DOM-free core that, given a set of
   route records and a location (a path or a named target), resolves an immutable `RouteLocation`
@@ -11,13 +11,18 @@ The client router for Viu — the role `vue-router` v4 plays for Vue 3
   memory, web (HTML5 History API), and hash — behind the `RouterHistory` factory. The C# port of
   vue-router's `packages/router/src/history/`.
 - **`RouterView` / `RouterLink` components** (`[V01.01.08.03]`): the two built-in components plus the
-  minimal reactive `Router` facade they consume. `RouterView` renders the matched record's component
+  reactive `Router` facade they consume. `RouterView` renders the matched record's component
   at its nesting depth; `RouterLink` renders a navigation-intercepting anchor with active-class
   matching. The C# port of vue-router's `packages/router/src/RouterView.ts` and `RouterLink.ts`.
+- **Navigation guards and async navigation flows** (`[V01.01.08.04]`): the awaitable, cancellable
+  guard pipeline behind `Router.Push`/`Replace` — global `BeforeEach`/`BeforeResolve`/`AfterEach`,
+  per-route `RouteRecord.BeforeEnter`, and in-component `beforeRouteLeave`/`beforeRouteUpdate`
+  (`RouterGuards`) / `beforeRouteEnter` (`IRouteEnterGuard`) guards — with redirects, cancellation of
+  superseded navigations, and `NavigationFailure` results. The C# port of vue-router's
+  `packages/router/src/router.ts` `navigate()` and `navigationGuards.ts`.
 
-The **async navigation pipeline with guards** (`[V01.01.08.04]`) and **lazy routes with scroll
-behavior** (`[V01.01.08.05]`) are the remaining Router features (#69) and are not part of this
-package yet — `Router.Push`/`Replace` navigate synchronously today, with no guard chain.
+**Lazy routes with scroll behavior** (`[V01.01.08.05]`) is the remaining Router feature (#69) and is
+not part of this package yet — every route component resolves eagerly today.
 
 ## What it contains
 
@@ -92,12 +97,14 @@ The two built-in components and the reactive router facade they consume (`[V01.0
 namespace `Assimalign.Viu.Router`) — the C# port of vue-router's `RouterView`/`RouterLink` and the
 minimal slice of `createRouter` those components need:
 
-- **`Router`** (entry point): the minimal reactive router facade — `CurrentRoute` (a reactive
-  `shallowRef` over the resolved location), `Resolve`/`ResolveNamed`, `CreateHref`, and synchronous
-  `Push`/`Replace`, plus the global `LinkActiveClass`/`LinkExactActiveClass` defaults. Built over an
-  `IRouterHistory` and a matcher (or a route set), it listens to the history so browser back/forward
-  drives `CurrentRoute`. The C# stand-in for the object `createRouter` returns; the guarded async
-  pipeline is `[V01.01.08.04]`.
+- **`Router`** (entry point): the reactive router facade — `CurrentRoute` (a reactive
+  `shallowRef` over the resolved location), `Resolve`/`ResolveNamed`, `CreateHref`, the global
+  `LinkActiveClass`/`LinkExactActiveClass` defaults, and the awaitable, guarded
+  `Push`/`Replace`/`Go`/`Back`/`Forward` navigation surface. Global guards register through
+  `BeforeEach`/`BeforeResolve`/`AfterEach`/`OnError` (each returning an unregister delegate). Built
+  over an `IRouterHistory` and a matcher (or a route set), it listens to the history so browser
+  back/forward drives `CurrentRoute` through the same guard pipeline. The C# stand-in for the object
+  `createRouter` returns.
 - **`RouterView`** (`Components/`): the route outlet. It injects the `Router` and its own nesting
   depth, renders `route.matched[depth].Component` with that record's resolved props, and provides
   `depth + 1` to any `RouterView` nested inside the rendered component. The reactive current route it
@@ -116,6 +123,31 @@ minimal slice of `createRouter` those components need:
   `MouseEvent`; tests construct it directly.
 - **`RouterInjectionKeys`**: the provide/inject keys wiring the router into the tree (`Router`
   app-wide; the internal view-depth key threaded between nested views).
+
+## Navigation guards
+
+The awaitable, cancellable navigation pipeline (`[V01.01.08.04]`, all under namespace
+`Assimalign.Viu.Router`) — the C# port of vue-router's `navigate()`/`navigationGuards.ts`:
+
+- **`NavigationGuard`** (`Delegates/`): the guard signature `Task<NavigationGuardResult> (to, from,
+  cancellationToken)`. Guards **return** a decision instead of calling `next()` (the return-value form
+  vue-router v4 prefers).
+- **`NavigationGuardResult`**: a guard's decision — the `Allow`/`Abort` singletons and
+  `RedirectTo(path)`/`RedirectToName(name, params)` for redirects.
+- **`NavigationFailure`** + **`NavigationFailureType`**: the result of a navigation that did not
+  complete (`Aborted`/`Cancelled`/`Duplicated`), returned from `Push`/`Replace` and passed to every
+  `AfterNavigationHook`. Ports of vue-router's `NavigationFailure`/`NavigationFailureType`.
+- **`AfterNavigationHook`** / **`NavigationErrorHandler`** (`Delegates/`): the `AfterEach` and
+  `OnError` signatures.
+- **`RouteRecord.BeforeEnter`**: the per-route enter guard (upstream `beforeEnter`).
+- **`RouterGuards`**: the `OnBeforeRouteLeave`/`OnBeforeRouteUpdate` composables, called during a route
+  component's `Setup` and bound to the component's lifecycle (upstream's in-component leave/update
+  guards).
+- **`IRouteEnterGuard`** (`Abstraction/`): implemented by a route component to contribute a
+  `beforeRouteEnter` guard (interface-based discovery, no reflection — the instance does not yet
+  exist when it runs).
+- **`NavigationRedirectException`**: thrown when a guard-redirect chain exceeds the safety cap
+  (upstream's infinite-redirect detection).
 
 ## Using it
 
@@ -160,11 +192,28 @@ var router = new Router(RouterHistory.CreateMemory(),
     new RouteRecord("/users/:id", component: new UserView(),
         propertiesResolver: RouteComponentProperties.FromParameters()),   // props: true
 ]);
-router.Push("/users/42");
+NavigationFailure? failure = await router.Push("/users/42");   // awaitable; null on success
 
 app.Provide(RouterInjectionKeys.Router, router);   // a host provides the router app-wide
 // <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
 // and a plain left-click on it calls router.Push instead of triggering a page load.
+```
+
+```csharp
+// Guards run in vue-router's documented order and either allow, abort, or redirect.
+Action removeAuthGuard = router.BeforeEach((to, from, cancellationToken) =>
+    Task.FromResult(to.Meta.ContainsKey("requiresAuth") && !IsSignedIn
+        ? NavigationGuardResult.RedirectTo("/login")
+        : NavigationGuardResult.Allow));
+
+router.AfterEach((to, from, failure) => { /* failure is null on success */ });
+router.OnError((error, to, from) => { /* an unexpected guard exception */ });
+
+// In a route component's Setup: block leaving with unsaved changes.
+RouterGuards.OnBeforeRouteLeave((to, from, cancellationToken) =>
+    Task.FromResult(hasUnsavedChanges ? NavigationGuardResult.Abort : NavigationGuardResult.Allow));
+
+removeAuthGuard();   // registration handles unregister the guard
 ```
 
 ## Boundaries

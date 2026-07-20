@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.RuntimeCore;
 
@@ -70,14 +72,11 @@ public sealed class RouterLink : IComponentDefinition
             {
                 return;
             }
-            if (properties.Get<bool>("replace"))
-            {
-                router.Replace(to);
-            }
-            else
-            {
-                router.Push(to);
-            }
+            // Push/Replace are awaitable, but a click handler is fire-and-forget; observe the returned
+            // task so an unexpected guard exception (already routed to Router.OnError) never surfaces
+            // as an unobserved task fault.
+            var navigation = properties.Get<bool>("replace") ? router.Replace(to) : router.Push(to);
+            ObserveNavigation(navigation);
         }
 
         return () =>
@@ -168,4 +167,11 @@ public sealed class RouterLink : IComponentDefinition
     private static bool IsBlankTarget(ComponentAttributes attributes)
         => attributes["target"] is string target
             && target.Contains("_blank", StringComparison.OrdinalIgnoreCase);
+
+    private static void ObserveNavigation(Task<NavigationFailure?> navigation)
+        => navigation.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 }

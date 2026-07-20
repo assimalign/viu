@@ -28,13 +28,13 @@ public class RouterViewTests
                 new RouteRecord("/a", component: viewA),
                 new RouteRecord("/b", component: viewB),
             ]);
-        router.Push("/a");
+        _ = router.Push("/a");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<div class=\"a\">a</div>");
         viewA.RenderCount.ShouldBe(1);
 
-        router.Push("/b");
+        _ = router.Push("/b");
         await wrapper.NextTickAsync();
 
         wrapper.Html().ShouldBe("<div class=\"b\">b</div>");
@@ -58,7 +58,7 @@ public class RouterViewTests
                     new RouteRecord(":id", component: detail),
                 ]),
             ]);
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<div class=\"layout\"><div class=\"detail\">detail</div></div>");
@@ -82,7 +82,7 @@ public class RouterViewTests
                     new RouteRecord("settings", component: settings),
                 ]),
             ]);
-        router.Push("/users/profile");
+        _ = router.Push("/users/profile");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<div class=\"layout\"><div class=\"profile\">profile</div></div>");
@@ -90,7 +90,7 @@ public class RouterViewTests
         layout.RenderCount.ShouldBe(1);
         var layoutInstance = layout.Instance;
 
-        router.Push("/users/settings");
+        _ = router.Push("/users/settings");
         await wrapper.NextTickAsync();
 
         wrapper.Html().ShouldBe("<div class=\"layout\"><div class=\"settings\">settings</div></div>");
@@ -115,7 +115,7 @@ public class RouterViewTests
             [
                 new RouteRecord("/users/:id", component: view, propertiesResolver: RouteComponentProperties.FromParameters()),
             ]);
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<span class=\"value\">1</span>");
@@ -123,7 +123,7 @@ public class RouterViewTests
         view.RenderCount.ShouldBe(1);
         var instance = view.Instance;
 
-        router.Push("/users/2");
+        _ = router.Push("/users/2");
         await wrapper.NextTickAsync();
 
         wrapper.Html().ShouldBe("<span class=\"value\">2</span>");
@@ -141,7 +141,7 @@ public class RouterViewTests
             [
                 new RouteRecord("/users/:id", component: view, propertiesResolver: RouteComponentProperties.FromParameters()),
             ]);
-        router.Push("/users/42");
+        _ = router.Push("/users/42");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<span class=\"value\">42</span>");
@@ -156,7 +156,7 @@ public class RouterViewTests
             [
                 new RouteRecord("/admin", component: view, propertiesResolver: RouteComponentProperties.FromValues(("role", "admin"))),
             ]);
-        router.Push("/admin");
+        _ = router.Push("/admin");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<span class=\"value\">admin</span>");
@@ -173,7 +173,7 @@ public class RouterViewTests
             [
                 new RouteRecord("/users/:id", component: view, propertiesResolver: resolver),
             ]);
-        router.Push("/users/7");
+        _ = router.Push("/users/7");
         using var wrapper = MountView(router);
 
         wrapper.Html().ShouldBe("<span class=\"value\">7</span>");
@@ -187,7 +187,7 @@ public class RouterViewTests
             [
                 new RouteRecord("/a", component: LabelView("a")),
             ]);
-        router.Push("/nowhere");
+        _ = router.Push("/nowhere");
         using var wrapper = MountView(router);
 
         router.CurrentRoute.Value.IsMatched.ShouldBeFalse();
