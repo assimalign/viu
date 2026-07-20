@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 using Shouldly;
 using Xunit;
@@ -206,6 +207,122 @@ public sealed class TransitionGroupTests : IDisposable
         _harness.MoveTransforms.ShouldBeEmpty();
     }
 
+    // --- attribute fallthrough ([V01.01.04.07.04]) ----------------------------------------------
+    // Upstream TransitionGroup renders createVNode(tag, null, children) and does nothing special for
+    // attrs: the standard single-root fallthrough (packages/runtime-core/src/componentAttrs.ts, applied
+    // by renderComponentRoot) lands class/style/arbitrary attributes on that tag element, while the
+    // declared props (tag/moveClass + the transition props) are consumed. In fragment mode there is no
+    // element root, so the attrs have no target and are dropped with no warning.
+
+    [Fact]
+    public void Tag_FallsThroughClassStyleAndArbitraryAttributes_OntoTheWrapperElement()
+    {
+        _harness.Render(GroupWith(
+            () => ["1", "2"],
+            () => VirtualNodeFactory.Properties(
+                ("tag", "ul"),
+                ("name", "fade"),
+                ("class", "list-wrapper"),
+                ("style", "color:red"),
+                ("id", "grp"),
+                ("data-role", "list"))));
+
+        var wrapper = _harness.FindElement("ul");
+        // class/style/arbitrary attributes fall through onto the rendered tag element.
+        _harness.BoundProperty(wrapper, "class").ShouldBe("list-wrapper");
+        _harness.BoundProperty(wrapper, "style").ShouldBe("color:red");
+        _harness.BoundProperty(wrapper, "id").ShouldBe("grp");
+        _harness.BoundProperty(wrapper, "data-role").ShouldBe("list");
+        // Declared props are consumed — tag/name never leak onto the wrapper as literal attributes.
+        _harness.BoundProperty(wrapper, "tag").ShouldBeNull();
+        _harness.BoundProperty(wrapper, "name").ShouldBeNull();
+    }
+
+    [Fact]
+    public void Fragment_NoTag_HasNoFallthroughTarget_AndEmitsNoWarning()
+    {
+        var warnings = new List<string>();
+        var previousSink = RuntimeWarnings.Sink;
+        RuntimeWarnings.Sink = warnings.Add;
+        try
+        {
+            _harness.Render(GroupWith(
+                () => ["1", "2"],
+                () => VirtualNodeFactory.Properties(("class", "orphan"), ("id", "no-target"))));
+
+            // No tag -> a fragment root -> no single element to inherit onto: the only elements are the
+            // children, and the group's class/id land on none of them.
+            foreach (var span in _harness.FindElements("span"))
+            {
+                _harness.BoundProperty(span, "class").ShouldBeNull();
+                _harness.BoundProperty(span, "id").ShouldBeNull();
+            }
+            // The target-less fallthrough is silent — no "extraneous attributes" warning (AC).
+            warnings.ShouldBeEmpty();
+        }
+        finally
+        {
+            RuntimeWarnings.Sink = previousSink;
+        }
+    }
+
+    [Fact]
+    public void FallthroughClass_LandsOnWrapper_WithoutContaminatingChildMoveClasses()
+    {
+        var list = Reactive.Reference<string[]>(["1", "2", "3"]);
+        _harness.Render(GroupWith(
+            () => list.Value,
+            () => VirtualNodeFactory.Properties(("tag", "ul"), ("class", "list-wrapper"))));
+
+        var wrapper = _harness.FindElement("ul");
+        var spans = _harness.FindElements("span");
+        int one = spans[0], three = spans[2];
+
+        // The wrapper carries the fallthrough class (element-prop channel) and no choreography class.
+        _harness.BoundProperty(wrapper, "class").ShouldBe("list-wrapper");
+        _harness.Classes(wrapper).ShouldNotContain("v-move");
+
+        // Reorder so items 1 and 3 change pixel position (item 2 stays) and gain the move class.
+        _harness.EnqueuePosition(one, 0, 0);
+        _harness.EnqueuePosition(one, 0, 100);
+        _harness.EnqueuePosition(spans[1], 0, 50);
+        _harness.EnqueuePosition(spans[1], 0, 50);
+        _harness.EnqueuePosition(three, 0, 100);
+        _harness.EnqueuePosition(three, 0, 0);
+        list.Value = ["3", "1", "2"];
+        _harness.RunUntilIdle();
+
+        // Children get the v-move choreography class (transition-class channel); the wrapper never does,
+        // and its fallthrough class is untouched — the two channels never cross-contaminate.
+        _harness.Classes(one).ShouldContain("v-move");
+        _harness.Classes(three).ShouldContain("v-move");
+        _harness.Classes(wrapper).ShouldNotContain("v-move");
+        _harness.BoundProperty(wrapper, "class").ShouldBe("list-wrapper");
+        // The wrapper's fallthrough class never leaks onto a child element.
+        _harness.BoundProperty(one, "class").ShouldBeNull();
+        _harness.BoundProperty(three, "class").ShouldBeNull();
+    }
+
+    [Fact]
+    public void FallthroughAttributeUpdate_PatchesTheWrapper_OnReRender()
+    {
+        var cssClass = Reactive.Reference("wrapper-a");
+        _harness.Render(GroupWith(
+            () => ["1", "2"],
+            () => VirtualNodeFactory.Properties(("tag", "ul"), ("class", cssClass.Value))));
+
+        var wrapper = _harness.FindElement("ul");
+        _harness.BoundProperty(wrapper, "class").ShouldBe("wrapper-a");
+
+        // A reactive change to the fallthrough attr re-renders the group; renderComponentRoot re-merges
+        // the live attrs and the patch updates the same wrapper element in place.
+        cssClass.Value = "wrapper-b";
+        _harness.RunUntilIdle();
+
+        _harness.FindElement("ul").ShouldBe(wrapper);
+        _harness.BoundProperty(wrapper, "class").ShouldBe("wrapper-b");
+    }
+
     // A component rendering <TransitionGroup tag="div"> over a keyed list of <span>s.
     private static RenderComponent Group(Reference<string[]> list)
         => new((_, _) => () =>
@@ -228,5 +345,28 @@ public sealed class TransitionGroupTests : IDisposable
                 TransitionGroup.Instance,
                 VirtualNodeFactory.Properties(("tag", "div")),
                 slots);
+        });
+
+    // A component rendering a <TransitionGroup> (props from the factory, re-read each render so reactive
+    // values retrigger) over a keyed list of <span>s. Props with no "tag" entry render the fragment form;
+    // props beyond the declared set (class/style/arbitrary) exercise attribute fallthrough.
+    private static RenderComponent GroupWith(Func<string[]> items, Func<VirtualNodeProperties> properties)
+        => new((_, _) => () =>
+        {
+            var slots = new ComponentSlots { Flag = SlotFlags.Dynamic };
+            slots["default"] = _ =>
+            {
+                var current = items();
+                var children = new VirtualNode?[current.Length];
+                for (var index = 0; index < current.Length; index++)
+                {
+                    children[index] = VirtualNodeFactory.Element(
+                        "span",
+                        VirtualNodeFactory.Properties(("key", current[index])),
+                        current[index]);
+                }
+                return children;
+            };
+            return VirtualNodeFactory.Component(TransitionGroup.Instance, properties(), slots);
         });
 }

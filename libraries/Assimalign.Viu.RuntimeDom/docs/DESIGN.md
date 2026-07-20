@@ -264,6 +264,42 @@ shared `TransitionState`, keyed by the once-boxed `node.El` identity that surviv
   persisted show/hide path, asserting the same one-frame from/active, distinct-frame to-swap, and
   leave reflow barrier — and that the element stays mounted (display:none, never host-removed).
 
+## TransitionGroup attribute fallthrough ([V01.01.04.07.04])
+
+`<TransitionGroup tag="ul" class="list">` must land `class`/`style`/arbitrary attributes on the
+rendered `<ul>` wrapper, exactly as any single-root component inherits its non-prop attrs. Upstream
+`TransitionGroup.ts` does nothing special for this: it returns `createVNode(tag, null, children)` and
+the standard `renderComponentRoot` + `mergeProps` fallthrough
+(`packages/runtime-core/src/componentAttrs.ts`) merges the instance's fallthrough attrs onto that root.
+The initial DOM port instead set `inheritAttrs: false` and read `tag`/`moveClass`/the transition props
+straight off the raw vnode — a blunt switch that killed *all* fallthrough, including the class/style a
+consumer puts on the group.
+
+The fix is to participate in the same standard mechanism rather than hand-copy attributes:
+
+- **Declare the props, drop the override.** `TransitionGroup.Properties` now declares the full upstream
+  set — `tag`, `moveClass`, and `TransitionPropsValidators` (`BaseTransitionPropsValidators` +
+  `DOMTransitionPropsValidators`). `ComponentPropertyResolution` routes every declared name into
+  `instance.Properties` and leaves only the undeclared attributes (`class`/`style`/`id`/`data-*`/…) in
+  `instance.Attributes`. With `InheritAttributes` back at its default (`true`, unlike `Transition`/
+  `KeepAlive`, because the group owns a real root element), `renderComponentRoot` clones the wrapper
+  vnode with `mergeProps(root.props, attrs)` — the identical path RouterLink and every ordinary
+  component use. The component still *reads* `tag`/`moveClass`/`name`/hooks from the raw vnode
+  (`ResolveTransitionProperties` is unchanged); declaring props only redirects those names away from the
+  fallthrough set, so nothing about the FLIP or class choreography moves.
+- **Two class channels, no cross-contamination.** The wrapper's fallthrough `class` travels the element
+  prop channel (`patchProp` on the tag), while the children's `*-enter`/`*-leave`/`*-move` classes
+  travel the transition-class channel (`AddTransitionClass` on each child element). They target
+  different elements and different code paths, so the wrapper never picks up a move class and the
+  children never pick up the wrapper's class.
+- **Fragment mode is target-less and silent.** With no `tag` the root is a fragment, and
+  `renderComponentRoot` only inherits onto an element root, so the undeclared attrs are dropped. Viu
+  emits no "extraneous attributes" warning for this (a deliberate simplification, pinned by test).
+- **Proof.** `TransitionGroupTests` pins class/style/arbitrary fallthrough onto the `tag` element with
+  the declared `tag`/`name` consumed (not leaked), fragment mode dropping the attrs with no warning
+  (captured `RuntimeWarnings` sink), the wrapper/children class channels staying separate across a FLIP
+  reorder, and a reactive fallthrough-attr change patching the same wrapper element in place.
+
 ## Non-goals (sequenced work)
 
 - App bootstrap (`CreateApp`-equivalent, container clearing) — [V01.01.04.04] (#42).

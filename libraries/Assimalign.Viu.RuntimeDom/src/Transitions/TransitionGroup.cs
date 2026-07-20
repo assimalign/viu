@@ -24,11 +24,68 @@ namespace Assimalign.Viu.RuntimeDom;
 /// ([V01.01.04.07.03]). Referenced by the compiled render through
 /// <see cref="DomRenderHelpers._TransitionGroup"/>. Not thread-safe (single-threaded JS event-loop model).
 /// </para>
+/// <para>
+/// Attribute fallthrough rides the standard single-root mechanism, not a parallel one ([V01.01.04.07.04]):
+/// <see cref="Properties"/> declares <c>tag</c>/<c>moveClass</c> and every transition prop, so those are
+/// consumed rather than emitted onto the wrapper, while <c>class</c>/<c>style</c>/arbitrary attributes —
+/// everything undeclared — fall through onto the rendered <c>tag</c> element through
+/// <c>renderComponentRoot</c>'s <c>mergeProps</c> (upstream
+/// <c>packages/runtime-core/src/componentAttrs.ts</c>, as applied by <c>TransitionGroup.ts</c>'s
+/// <c>createVNode(tag, null, children)</c>). The wrapper's fallthrough <c>class</c> and the children's
+/// enter/leave/<c>*-move</c> choreography classes land on separate elements, so neither contaminates the
+/// other. In fragment mode (no <c>tag</c>) the root is not an element, so there is no fallthrough target —
+/// the undeclared attributes are silently dropped with no warning, exactly as the shared mechanism treats
+/// any fragment/text root.
+/// </para>
 /// </summary>
 public sealed class TransitionGroup : IComponentDefinition
 {
     /// <summary>The shared component instance the compiled render references via <see cref="DomRenderHelpers._TransitionGroup"/>.</summary>
     public static readonly TransitionGroup Instance = new();
+
+    // The declared props — upstream TransitionGroup's props are TransitionPropsValidators plus tag and
+    // moveClass (packages/runtime-dom/src/components/TransitionGroup.ts). Declaring the full set is what
+    // makes class/style/arbitrary attributes — everything NOT here — fall through onto the rendered tag
+    // element via the standard single-root attrs merge (renderComponentRoot + mergeProps), while
+    // tag/moveClass and every transition prop are consumed and never leak onto the wrapper. This is
+    // BaseTransitionPropsValidators + DOMTransitionPropsValidators (the same set Transition consumes,
+    // read from the raw vnode by ResolveTransitionProperties) plus the two group props.
+    private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
+    [
+        // Group wrapper props (upstream: { tag: String, moveClass: String }).
+        new ComponentPropertyDefinition("tag"),
+        new ComponentPropertyDefinition("moveClass"),
+        // BaseTransition props (upstream BaseTransitionPropsValidators).
+        new ComponentPropertyDefinition("mode"),
+        new ComponentPropertyDefinition("appear"),
+        new ComponentPropertyDefinition("persisted"),
+        new ComponentPropertyDefinition("onBeforeEnter"),
+        new ComponentPropertyDefinition("onEnter"),
+        new ComponentPropertyDefinition("onAfterEnter"),
+        new ComponentPropertyDefinition("onEnterCancelled"),
+        new ComponentPropertyDefinition("onBeforeLeave"),
+        new ComponentPropertyDefinition("onLeave"),
+        new ComponentPropertyDefinition("onAfterLeave"),
+        new ComponentPropertyDefinition("onLeaveCancelled"),
+        new ComponentPropertyDefinition("onBeforeAppear"),
+        new ComponentPropertyDefinition("onAppear"),
+        new ComponentPropertyDefinition("onAfterAppear"),
+        new ComponentPropertyDefinition("onAppearCancelled"),
+        // DOM transition props (upstream DOMTransitionPropsValidators).
+        new ComponentPropertyDefinition("name"),
+        new ComponentPropertyDefinition("type"),
+        new ComponentPropertyDefinition("css"),
+        new ComponentPropertyDefinition("duration"),
+        new ComponentPropertyDefinition("enterFromClass"),
+        new ComponentPropertyDefinition("enterActiveClass"),
+        new ComponentPropertyDefinition("enterToClass"),
+        new ComponentPropertyDefinition("appearFromClass"),
+        new ComponentPropertyDefinition("appearActiveClass"),
+        new ComponentPropertyDefinition("appearToClass"),
+        new ComponentPropertyDefinition("leaveFromClass"),
+        new ComponentPropertyDefinition("leaveActiveClass"),
+        new ComponentPropertyDefinition("leaveToClass"),
+    ];
 
     private TransitionGroup()
     {
@@ -37,9 +94,17 @@ public sealed class TransitionGroup : IComponentDefinition
     /// <inheritdoc/>
     public string? Name => "TransitionGroup";
 
-    /// <inheritdoc/>
-    // tag/moveClass and the transition props must not fall through as attributes onto the group tag.
-    public bool InheritAttributes => false;
+    /// <summary>
+    /// The declared props — <c>tag</c>/<c>moveClass</c> and the full transition prop set (upstream:
+    /// <c>extend({}, TransitionPropsValidators, { tag, moveClass })</c> in
+    /// <c>packages/runtime-dom/src/components/TransitionGroup.ts</c>). Declaring them keeps every one out
+    /// of the fallthrough attrs, so only <c>class</c>/<c>style</c>/arbitrary attributes fall through onto
+    /// the rendered <c>tag</c> element. <see cref="IComponentDefinition.InheritAttributes"/> stays at its
+    /// default (true) — unlike <c>Transition</c>/<c>KeepAlive</c>, the group owns a real root element to
+    /// inherit onto — so the standard single-root merge lands them (upstream never sets
+    /// <c>inheritAttrs: false</c> on TransitionGroup).
+    /// </summary>
+    public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
 
     /// <inheritdoc/>
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
