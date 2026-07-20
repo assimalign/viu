@@ -152,6 +152,18 @@
 	<Folder Name="/viu/examples/Assimalign.Viu.WebApp/">
 		<Project Path="examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj" />
 	</Folder>
+	<Folder Name="/viu/examples/Assimalign.Viu.TodoMvc/">
+		<Project Path="examples/Assimalign.Viu.TodoMvc/Assimalign.Viu.TodoMvc.csproj" />
+	</Folder>
+	<Folder Name="/viu/examples/Assimalign.Viu.TodoMvc.Tests/">
+		<Project Path="examples/Assimalign.Viu.TodoMvc.Tests/Assimalign.Viu.TodoMvc.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/examples/Assimalign.Viu.Forms/">
+		<Project Path="examples/Assimalign.Viu.Forms/Assimalign.Viu.Forms.csproj" />
+	</Folder>
+	<Folder Name="/viu/examples/Assimalign.Viu.Forms.Tests/">
+		<Project Path="examples/Assimalign.Viu.Forms.Tests/Assimalign.Viu.Forms.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/examples/Assimalign.Viu.HackerNews/">
 		<Project Path="examples/Assimalign.Viu.HackerNews/Assimalign.Viu.HackerNews.csproj" />
 	</Folder>

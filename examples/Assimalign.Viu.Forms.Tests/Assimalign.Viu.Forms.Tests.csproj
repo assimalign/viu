@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    Example projects are not resolvable through ViuProjectReference (it indexes libraries/ and
+    analyzers/ only), and the sample is a Microsoft.NET.Sdk.WebAssembly executable, so this test
+    compiles the sample's platform-neutral source directly (Program.cs and FormsBootstrap.cs, the
+    browser-only files, are excluded). The reactive model and the preview component are exercised
+    DOM-free; the v-model DOM directives are a browser concern covered by the RuntimeDom tests.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Assimalign.Viu.Forms\Composition\**\*.cs" LinkBase="Sample\Composition" />
+    <Compile Include="..\Assimalign.Viu.Forms\Components\**\*.cs" LinkBase="Sample\Components" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Testing" />
+  </ItemGroup>
+</Project>

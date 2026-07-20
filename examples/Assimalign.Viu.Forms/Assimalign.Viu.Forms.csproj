@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkLatest)</TargetFramework>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+  </ItemGroup>
+</Project>

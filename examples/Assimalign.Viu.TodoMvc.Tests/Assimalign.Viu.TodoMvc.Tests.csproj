@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    Example projects are not resolvable through ViuProjectReference (it indexes libraries/ and
+    analyzers/ only), and the sample is a Microsoft.NET.Sdk.WebAssembly executable, so this test
+    compiles the sample's platform-neutral source directly. Program.cs and TodoMvcBootstrap.cs (the
+    only browser-only files) are deliberately excluded, so the exact store and component code the app
+    ships is exercised DOM-free through the Assimalign.Viu.Testing in-memory renderer.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Assimalign.Viu.TodoMvc\Todos\**\*.cs" LinkBase="Sample\Todos" />
+    <Compile Include="..\Assimalign.Viu.TodoMvc\Components\**\*.cs" LinkBase="Sample\Components" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Testing" />
+    <!-- The linked TodoItem is a [Reactive] partial class, so the reactivity generator must run here
+         too (the PrivateAssets=all analyzer does not flow through a project reference). -->
+    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+  </ItemGroup>
+</Project>
