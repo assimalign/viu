@@ -7,10 +7,11 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// An immutable route definition: a path, an optional name, optional nested children, optional
-/// metadata, and the component (with its props resolver) the route renders. The C# port of
-/// vue-router's route record (the <c>RouteRecordRaw</c> input and the normalized <c>RouteRecord</c>;
-/// see https://router.vuejs.org and <c>packages/router/src/types/index.ts</c>). Redirects, aliases,
-/// and per-record guards belong to later router features and are intentionally not modeled here.
+/// metadata, the component (with its props resolver) the route renders, and an optional per-record
+/// <see cref="BeforeEnter"/> navigation guard. The C# port of vue-router's route record (the
+/// <c>RouteRecordRaw</c> input and the normalized <c>RouteRecord</c>; see https://router.vuejs.org and
+/// <c>packages/router/src/types/index.ts</c>). Redirects and aliases belong to later router features
+/// and are intentionally not modeled here.
 /// </summary>
 /// <remarks>
 /// A reference type with identity semantics: the same instance appears in every resolved
@@ -42,6 +43,12 @@ public sealed class RouteRecord
     /// <see cref="RouteComponentProperties.FromValues"/> for static props, or a hand-written resolver
     /// for the function form. <see langword="null"/> passes no props.
     /// </param>
+    /// <param name="beforeEnter">
+    /// An optional guard run when this record is entered (upstream <c>beforeEnter</c>): the pipeline
+    /// invokes it, after the global <c>beforeEach</c> and reused-record <c>beforeRouteUpdate</c> guards
+    /// and before any in-component <see cref="IRouteEnterGuard"/>, only for a navigation in which this
+    /// record is newly matched. <see langword="null"/> registers no per-record enter guard.
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
     public RouteRecord(
         string path,
@@ -49,7 +56,8 @@ public sealed class RouteRecord
         IReadOnlyList<RouteRecord>? children = null,
         IReadOnlyDictionary<string, object?>? meta = null,
         IComponentDefinition? component = null,
-        RouteComponentPropertiesResolver? propertiesResolver = null)
+        RouteComponentPropertiesResolver? propertiesResolver = null,
+        NavigationGuard? beforeEnter = null)
     {
         ArgumentNullException.ThrowIfNull(path);
         Path = path;
@@ -58,6 +66,7 @@ public sealed class RouteRecord
         Meta = meta ?? EmptyMeta;
         Component = component;
         PropertiesResolver = propertiesResolver;
+        BeforeEnter = beforeEnter;
     }
 
     /// <summary>The route path as declared (before parent joining). Upstream <c>path</c>.</summary>
@@ -85,4 +94,12 @@ public sealed class RouteRecord
     /// <see cref="RouteComponentProperties"/> for the <c>props: true</c> and static-object forms.
     /// </summary>
     public RouteComponentPropertiesResolver? PropertiesResolver { get; }
+
+    /// <summary>
+    /// The per-record guard run when this record is entered (upstream <c>beforeEnter</c>,
+    /// https://router.vuejs.org/guide/advanced/navigation-guards.html#Per-Route-Guard), or
+    /// <see langword="null"/>. It fires only for a navigation in which this record is newly matched
+    /// (not reused), consistent with vue-router.
+    /// </summary>
+    public NavigationGuard? BeforeEnter { get; }
 }

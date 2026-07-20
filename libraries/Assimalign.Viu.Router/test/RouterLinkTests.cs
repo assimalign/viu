@@ -51,7 +51,7 @@ public class RouterLinkTests
     public void RouterLink_AppliesActiveClass_OnInclusivePrefixMatch()
     {
         var router = LinkRouter();
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users")), TextSlot("Users"));
 
         // /users is an ancestor of the current /users/1 -> active, but not the exact current route.
@@ -62,7 +62,7 @@ public class RouterLinkTests
     public void RouterLink_AppliesExactActiveClass_OnExactMatch()
     {
         var router = LinkRouter();
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
 
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active router-link-exact-active");
@@ -72,7 +72,7 @@ public class RouterLinkTests
     public void RouterLink_AppliesNoActiveClass_WhenNotMatched()
     {
         var router = LinkRouter();
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/")), TextSlot("Home"));
 
         wrapper.Get("a").Attribute("class").ShouldBeNull();
@@ -84,7 +84,7 @@ public class RouterLinkTests
         var router = LinkRouter();
         router.LinkActiveClass = "is-active";
         router.LinkExactActiveClass = "is-exact";
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
 
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("is-active is-exact");
@@ -94,7 +94,7 @@ public class RouterLinkTests
     public void RouterLink_PerLinkClassProps_OverrideTheGlobalDefaults()
     {
         var router = LinkRouter();
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         var properties = VirtualNodeFactory.Properties(
             ("to", "/users/1"),
             ("activeClass", "link-on"),
@@ -108,13 +108,13 @@ public class RouterLinkTests
     public async Task RouterLink_ActiveClass_UpdatesReactivelyOnNavigation()
     {
         var router = LinkRouter();
-        router.Push("/users/1");
+        _ = router.Push("/users/1");
         using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active router-link-exact-active");
 
         // A different param than the link's target: the reactive route drives a re-render that drops
         // the active classes.
-        router.Push("/users/2");
+        _ = router.Push("/users/2");
         await wrapper.NextTickAsync();
 
         wrapper.Find(".router-link-active").ShouldBeNull();

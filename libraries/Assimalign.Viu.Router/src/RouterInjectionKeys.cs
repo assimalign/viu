@@ -24,4 +24,12 @@ public static class RouterInjectionKeys
     /// that depth, and provides depth + 1 for the next view down.
     /// </summary>
     internal static readonly InjectionKey<int> ViewDepth = new("viu-router-view-depth");
+
+    /// <summary>
+    /// The key carrying the matched <see cref="RouteRecord"/> a <see cref="RouterView"/> renders to the
+    /// component it renders (upstream: <c>matchedRouteKey</c>). The in-component guard composables
+    /// (<see cref="RouterGuards.OnBeforeRouteLeave"/>/<see cref="RouterGuards.OnBeforeRouteUpdate"/>)
+    /// inject it to bind a guard to its record; an implementation detail carried by a mutable holder.
+    /// </summary>
+    internal static readonly InjectionKey<MatchedRecordScope> MatchedRecord = new("viu-router-matched-record");
 }

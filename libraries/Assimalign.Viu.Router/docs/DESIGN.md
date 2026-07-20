@@ -57,9 +57,9 @@ default-view pattern.
   the rest of upstream's `isMatchable` — are still later features. When they land,
   `RouteMatcher.IsMatchable` remains the single place to reintroduce the gate.
 - **No `currentLocation` parameter inheritance.** Upstream's named resolve can inherit params from
-  the current location for relative navigation. That needs a "current route", which is a
-  navigation-pipeline concern (`[V01.01.08.04]`). Named resolution here interpolates exactly the
-  parameters passed in (projected to the route's declared keys) and raises
+  the current location for relative navigation. Although the navigation pipeline (`[V01.01.08.04]`)
+  now owns a current route, that inheritance is intentionally still not wired: named resolution
+  interpolates exactly the parameters passed in (projected to the route's declared keys) and raises
   `MissingRequiredParameter` otherwise.
 - **Path only.** The matcher resolves the path portion. Query strings and fragments are normalized
   and merged at the router level, not here.
@@ -207,12 +207,84 @@ target's, and *exact-active* additionally when that record is the current leaf w
 Active classes are configurable per-link (the `activeClass`/`exactActiveClass` props) and globally
 (`Router.LinkActiveClass`/`LinkExactActiveClass`), the prop winning.
 
+## Navigation guards: the async pipeline
+
+`Router.Push`/`Replace` are the C# port of vue-router's `pushWithRedirect`/`navigate`
+(`packages/router/src/router.ts`). The pipeline runs the guard phases in upstream's documented order
+— `beforeRouteLeave` (deepest child first) → global `beforeEach` → reused-record `beforeRouteUpdate`
+→ per-record `beforeEnter` → (async component resolution, a no-op seam until `[V01.01.08.05]`) →
+in-component `beforeRouteEnter` → global `beforeResolve` → confirm → `afterEach` — pinned by an
+ordering test that mounts a real view tree and records every hook.
+
+- **Return-value guards, no `next()`.** A `NavigationGuard` returns `Task<NavigationGuardResult>`
+  (`Allow`/`Abort`/redirect) instead of juggling a `next` callback. vue-router v4 itself documents the
+  return-value form as preferred, so this is a faithful-in-spirit divergence rather than a reinvention,
+  and it maps cleanly onto C# `Task`. A guard's own long-running work can observe the threaded
+  `CancellationToken`.
+- **Changing-record classification is by identity.** `extractChangingRecords` (leaving = in `from`
+  not `to`, updating = in both, entering = in `to` not `from`) compares `RouteRecord`s by reference —
+  the same identity semantics the matched chain already relies on. Leaving guards run deepest-child
+  first (the reversed `from.matched`).
+- **Supersession is cooperative cancellation.** Each navigation opens a `CancellationTokenSource`;
+  starting a newer one cancels the previous. The pipeline re-checks the token at the head of every
+  phase, after each guard, and once more before finalize, so a superseded chain runs no further guards
+  and reports a `Cancelled` failure — it never mutates router state after being superseded (the
+  interleaving tests pin this with a gated guard). On the single-threaded event loop there are no
+  locks; the only ordering that matters is "no state write after the token is cancelled", enforced by
+  those checkpoints and by finalize being synchronous (no `await` between the final check and the
+  commit).
+- **Redirects re-enter the pipeline.** A redirect result resolves its target through the matcher and
+  recurses into `PushWithRedirect` (carrying `redirectedFrom`), exactly as upstream turns a
+  guard-returned location into a fresh `pushWithRedirect`. `afterEach` fires only for the final
+  confirmed navigation, not the intermediate redirected one. A fixed redirect-depth cap throws
+  `NavigationRedirectException` — a deliberate divergence from upstream's dev-only same-location
+  warning, so the loop protection is active in every configuration.
+- **Confirm order matches Vue's microtask semantics.** `finalizeNavigation` writes history (for an
+  application push/replace) and then sets `CurrentRoute` — a single `shallowRef` trigger that *queues*
+  the render flush without running it. `afterEach` runs synchronously immediately after, so it observes
+  the committed route before the render-phase flush, matching upstream's ordering. Pinned by tests that
+  assert the mounted view's post-flush `mounted` hook lands after `afterEach`.
+- **Failures are returned; exceptions fault.** Abort/cancel/duplicate resolve as a
+  `NavigationFailure` value (so `Push` never throws for them, mirroring upstream's resolved
+  `NavigationFailure`), while an unexpected guard exception (or the redirect-loop cap) is routed to the
+  `OnError` handlers and faults the returned task — upstream's `triggerError` + promise rejection.
+  `RouterLink` observes its fire-and-forget navigation so a fault never strands unobserved.
+
+### In-component guards hook the component lifecycle, never reflection
+
+`beforeRouteLeave`/`beforeRouteUpdate` need per-instance state, so they are **registration-based**
+(`RouterGuards.OnBeforeRouteLeave`/`OnBeforeRouteUpdate`, the port of upstream's `onBeforeRouteLeave`/
+`onBeforeRouteUpdate` composables). Each `RouterView` provides a mutable `MatchedRecordScope` holding
+the record it renders (the port of upstream's `matchedRouteKey`) and updates it in its render *before*
+creating the child vnode, so a component reading it during its own `Setup` — which runs while that
+vnode mounts — always sees the record it is being rendered for, even when a reused view swaps leaves.
+The composable injects that record and registers the guard in a `RouteRecord`-keyed side-table on the
+router, with teardown bound to `Lifecycle.OnUnmounted` so a guard never outlives its instance. Because
+the join is registration through the runtime's lifecycle (not reflection over user types), a trimmer
+cannot strip a guard.
+
+`beforeRouteEnter` has no instance (the component is not yet mounted), so it is **interface-based**:
+a route component implements `IRouteEnterGuard` and the pipeline tests `record.Component is
+IRouteEnterGuard` for entering records. This mirrors upstream reading `beforeRouteEnter` off the
+component options, again with no reflection. Upstream's `next(vm => ...)` instance callback is not
+modelled — the same no-`next` divergence as the rest of the guard API.
+
+### popstate runs the same pipeline
+
+Browser back/forward (and memory `Go`) drive the identical guard pipeline through the history
+listener. Because the URL has already moved when the listener fires, a failure restores it with a
+compensating `history.go(-delta, triggerListeners: false)` — upstream's popstate revert — and the
+confirm step for a pop only updates `CurrentRoute` (no history write, since the entry already exists).
+A redirect during a pop restores the popped URL and then re-navigates the redirect target as a push.
+All of this is exercised DOM-free through memory history, whose `Go` reproduces the same
+listener/delta semantics as the browser edge.
+
 ## Non-goals (sequenced work)
 
-- Async navigation pipeline and guards (redirect, cancellation), plus `currentLocation` param
-  inheritance and route removal — `[V01.01.08.04]`. `Router.Push`/`Replace` navigate synchronously
-  today.
-- Lazy route components and scroll behavior — `[V01.01.08.05]`.
+- `currentLocation` param inheritance for relative named navigation and route removal — deferred from
+  `[V01.01.08.04]` (the guarded async pipeline itself landed; see "Navigation guards" below).
+- Lazy route components and scroll behavior — `[V01.01.08.05]`. Route components resolve eagerly, so
+  the pipeline's async-component-resolution stage is currently a documented no-op seam.
 - Named views (`RouterView name`), the `custom`/slot-only `RouterLink`, and a location-object `to`
   — `RouterView` renders the single default component and `RouterLink` takes a string `to`.
 - Redirects, aliases, and per-record `strict`/`sensitive` overrides on `RouteRecord` (only global
