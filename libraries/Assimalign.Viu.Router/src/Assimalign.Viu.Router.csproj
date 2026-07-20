@@ -2,5 +2,9 @@
   <PropertyGroup>
     <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Required by the [JSImport]/[JSExport] interop source generator (SYSLIB1074) for the
+         browser history edge (Internal/JavaScriptBrowserHistoryInterop, BrowserHistoryInteropDispatch);
+         the memory history and the whole matcher stay interop-free. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 </Project>
