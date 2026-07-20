@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.RuntimeCore;
@@ -46,4 +47,84 @@ internal sealed class SetupComponent : IComponentDefinition
 
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
         => SetupFunction();
+}
+
+/// <summary>
+/// The source-generated reactive state for the <see cref="Store{TState}"/> test stores: per-member
+/// track/trigger (the Roslyn <c>[Reactive]</c> generator) so a getter over one member is unaffected by
+/// a change to another. Upstream parity: https://pinia.vuejs.org/core-concepts/state.html.
+/// </summary>
+[Reactive]
+internal partial class CounterState
+{
+    /// <summary>The counter value (a Pinia state member).</summary>
+    public partial int Count { get; set; }
+
+    /// <summary>The increment step (a second, independently tracked state member).</summary>
+    public partial int Step { get; set; }
+}
+
+/// <summary>
+/// A setup-style store built on <see cref="Store{TState}"/>: a computed getter over one state member
+/// (with a run counter to pin caching), actions routed through <c>RunAction</c> so <c>OnAction</c>
+/// observes them, and the factory/applier constructor so <c>Reset</c> and object-form <c>Patch</c>
+/// work. Upstream parity: Pinia setup stores (https://pinia.vuejs.org/core-concepts/).
+/// </summary>
+internal sealed class ModelCounterStore : Store<CounterState>
+{
+    public ModelCounterStore()
+        : base(
+            "model-counter",
+            static () => new CounterState { Count = 0, Step = 1 },
+            static (target, source) => { target.Count = source.Count; target.Step = source.Step; })
+    {
+        Doubled = Reactive.Computed(() =>
+        {
+            DoubledRuns++;
+            return State.Count * 2;
+        });
+    }
+
+    /// <summary>A computed getter over <see cref="CounterState.Count"/> only (a Pinia getter).</summary>
+    public Computed<int> Doubled { get; }
+
+    /// <summary>How many times the <see cref="Doubled"/> getter body ran (pins computed caching).</summary>
+    public int DoubledRuns { get; private set; }
+
+    /// <summary>Increments <see cref="CounterState.Count"/> by <see cref="CounterState.Step"/> (an action).</summary>
+    public void Increment() => RunAction(nameof(Increment), () => State.Count += State.Step);
+
+    /// <summary>A value-returning action: increments and returns the new count.</summary>
+    public int IncrementBy(int amount) => RunAction(nameof(IncrementBy), () =>
+    {
+        State.Count += amount;
+        return State.Count;
+    });
+
+    /// <summary>An asynchronous value-returning action: awaits, increments, returns the new count.</summary>
+    public Task<int> IncrementByAsync(int amount) => RunActionAsync(nameof(IncrementByAsync), async () =>
+    {
+        await Task.Yield();
+        State.Count += amount;
+        return State.Count;
+    });
+
+    /// <summary>An action that always throws, to exercise the <c>OnError</c> hook.</summary>
+    public void Explode() => RunAction(nameof(Explode), () => throw new InvalidOperationException("boom"));
+}
+
+/// <summary>
+/// A store built with the state-only constructor (no factory/applier), so <see cref="Store{TState}.Reset"/>
+/// and object-form <see cref="Store{TState}.Patch(CounterState)"/> are unsupported and throw — parity
+/// with a Pinia setup store that does not implement <c>$reset</c>.
+/// </summary>
+internal sealed class NoResetStore : Store<CounterState>
+{
+    public NoResetStore()
+        : base("no-reset", new CounterState { Count = 0, Step = 1 })
+    {
+    }
+
+    /// <summary>Increments via the mutator-form patch (the only patch form available without an applier).</summary>
+    public void Increment() => Patch(state => state.Count += state.Step);
 }

@@ -14,4 +14,8 @@
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
     <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The [Reactive] state objects the Store<TState> tests define are expanded by the generator. -->
+    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+  </ItemGroup>
 </Project>
