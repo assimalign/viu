@@ -239,6 +239,17 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/test/">
 		<Project Path="libraries/Assimalign.Viu.Router/test/Assimalign.Viu.Router.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/docs/">
+		<File Path="libraries/Assimalign.Viu.Router.RuntimeDom/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Router.RuntimeDom/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/src/">
+		<Project Path="libraries/Assimalign.Viu.Router.RuntimeDom/src/Assimalign.Viu.Router.RuntimeDom.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/test/">
+		<Project Path="libraries/Assimalign.Viu.Router.RuntimeDom/test/Assimalign.Viu.Router.RuntimeDom.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeCore/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeCore/src/">
 		<Project Path="libraries/Assimalign.Viu.RuntimeCore/src/Assimalign.Viu.RuntimeCore.csproj" />

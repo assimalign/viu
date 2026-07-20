@@ -138,9 +138,33 @@ internal sealed class BrowserEventInvokerRegistry
         try
         {
             // Reflection-free dispatch; a multicast delegate of either shape invokes every
-            // merged target natively (MergeProperties chains same-typed handlers).
+            // merged target natively (MergeProperties chains same-typed handlers). The
+            // Action<object?> case MUST precede Action<BrowserEvent>: Action<T> is contravariant, so
+            // Action<object?> is a *subtype* of Action<BrowserEvent> (an object-taking handler can
+            // stand in for a BrowserEvent-taking one) — ordering it after would make it unreachable
+            // and silently feed RouterLink the BrowserEvent instead of its RouterLinkClickEvent.
             switch (handler)
             {
+                case Action<object?> objectHandler:
+                    // A renderer-agnostic handler (e.g. RouterLink's onClick) expects a host-synthesized
+                    // payload, not the BrowserEvent. The installed bridge builds that payload, invokes
+                    // the handler, and applies its prevent/stop decision back to browserEvent (whose
+                    // response flags re-cross the boundary). With no bridge installed the handler cannot
+                    // be serviced, so surface it — upstream has no equivalent, since JS handlers always
+                    // receive the DOM event.
+                    if (BrowserObjectEvents.Invoker is { } objectInvoker)
+                    {
+                        objectInvoker(objectHandler, browserEvent);
+                    }
+                    else
+                    {
+                        throw new NotSupportedException(
+                            $"Event handler for '{browserEvent.EventName}' is an Action<object?> but no "
+                            + $"{nameof(BrowserObjectEvents)}.{nameof(BrowserObjectEvents.Invoker)} is "
+                            + "installed; install the Router DOM bridge to dispatch renderer-agnostic "
+                            + "component events.");
+                    }
+                    break;
                 case Action<BrowserEvent> typedHandler:
                     typedHandler(browserEvent);
                     break;
@@ -150,7 +174,8 @@ internal sealed class BrowserEventInvokerRegistry
                 default:
                     throw new NotSupportedException(
                         $"Event handler for '{browserEvent.EventName}' is a "
-                        + $"{handler.GetType().Name}; handlers must be Action or Action<BrowserEvent>.");
+                        + $"{handler.GetType().Name}; handlers must be Action, Action<BrowserEvent>, "
+                        + "or Action<object?>.");
             }
         }
         catch (Exception exception)

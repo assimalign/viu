@@ -459,6 +459,9 @@ export const dom = {
                 target === event.currentTarget,
                 hasValue ? String(target.value) : null,
                 !!(target && target.checked),
+                // The live event's arrival-time preventDefault: a host bridge honors upstream
+                // RouterLink guardEvent's already-prevented bail ([V01.01.08.03.01]).
+                event.defaultPrevented,
                 selectedValues)
             if (flags & 1) {
                 event.stopPropagation()

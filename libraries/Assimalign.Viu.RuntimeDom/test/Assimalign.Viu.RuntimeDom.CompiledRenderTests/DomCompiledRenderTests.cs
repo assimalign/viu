@@ -317,7 +317,7 @@ public sealed class DomCompiledRenderTests
             typeof(BrowserEvent),
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
-            args: new object?[] { "click", 0.0, "", "", BrowserEventModifiers.None, -1, 0, 0.0, 0.0, 0, true, null, false, null },
+            args: new object?[] { "click", 0.0, "", "", BrowserEventModifiers.None, -1, 0, 0.0, 0.0, 0, true, null, false, null, false },
             culture: null)!;
         handler(browserEvent);
 

@@ -1,0 +1,4 @@
+<Solution>
+	<Project Path="src/Assimalign.Viu.Router.RuntimeDom.csproj" />
+	<Project Path="test/Assimalign.Viu.Router.RuntimeDom.Tests.csproj" />
+</Solution>
