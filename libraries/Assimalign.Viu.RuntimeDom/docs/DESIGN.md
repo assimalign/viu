@@ -174,7 +174,8 @@ batching everywhere else (one interop crossing per flush is unchanged):
   the buffered applier and asserts, per flush, that from/active land in one frame, the to-swap in a
   distinct later frame, and the leave reflow op lands *between* the from- and active-class writes.
 - FLIP *move* batching (the `<TransitionGroup>` reorder pass) is the next section ([V01.01.04.07.03]);
-  `v-show` transition coalescing is #161.
+  persisted `v-show` transitions (the same barriers on show/hide toggling) are the
+  [V01.01.04.07.01] section below.
 
 ## Transition FLIP move batching ([V01.01.04.07.03])
 
@@ -214,7 +215,59 @@ while collapsing the FLIP to a constant number of crossings:
   child count. `DomCommandBufferTests` round-trips the FLIP opcodes through the buffer and decoder,
   asserting the `float64` deltas survive and the transform/reflow/class/clear order is preserved.
 
+## Persisted v-show transitions ([V01.01.04.07.01])
+
+A `<Transition>` wrapping a `v-show` element must run the enter/leave choreography on the binding
+*toggling* — the element stays mounted and only its visibility changes — where a `<Transition>`
+around a `v-if` runs it on mount/remove. Upstream calls this *persisted* mode (`Transition.ts`
+`persisted` + `directives/vShow.ts`). The pivotal upstream insight is that the `persisted` flag
+changes **who** calls the transition hooks, not the hook contract: the renderer's mount/insert and
+remove paths skip a persisted transition (`needTransition` = `transition && !transition.persisted`),
+and the `v-show` directive drives `beforeEnter`/`enter`/`leave` itself from its `beforeMount`/
+`mounted`/`updated` hooks. `BaseTransition`'s state machine (`Assimalign.Viu.RuntimeCore`) is
+untouched — the enter/leave cancellation that converges an interrupted toggle already lives on the
+shared `TransitionState`, keyed by the once-boxed `node.El` identity that survives every re-render
+(`next.El = current.El`), so the directive just has to call the same hooks with that element.
+
+- **The seam.** `v-show` reads `node.Transition` (the hooks `BaseTransition` stamped on the vnode) and
+  keys on the resolved `Persisted` flag — the exact complement of the renderer's persisted skip
+  (`VirtualNode.Transition is { Persisted: false }`). When persisted: `beforeEnter` (then
+  `setDisplay(true)`, then `enter`) reveals on show; `leave(el, () => setDisplay(false))` hides on
+  hide — the element is hidden only once the leave *completes*, in the leave's `done` callback. This
+  is Viu's explicit form of upstream's coupling, which relies on the compiler injecting `persisted`
+  whenever a `<Transition>` wraps a `v-show` child (the `transformTransition` compiler-dom transform —
+  a separate `Assimalign.Viu.Syntax.Templates` follow-up; the runtime honors a `persisted` flag from
+  any source). Keying on `Persisted` rather than upstream's raw `transition`-truthiness means the
+  directive drives the hooks *exactly* when the renderer does not, so the two never both fire even
+  without that compiler guarantee.
+- **Original-display lifecycle.** The element's original inline `display` is captured **once**, in
+  `beforeMount`, into `BrowserModelState.OriginalDisplay` (derived from the vnode `style` prop, not an
+  interop read — upstream `vShowOriginalDisplay`). Every later reveal restores it (an empty original
+  removes the inline `display` so a stylesheet value wins); every hide sets `display:none` after the
+  leave. The saved value is never overwritten by a toggle, so it survives arbitrarily many cycles. An
+  interrupted toggle converges to the final visibility with the saved display intact: a show
+  interrupting a leave cancels the leave (its `done` writes a transient `display:none`) and then the
+  reveal immediately overwrites it visible; a hide interrupting an enter cancels the enter (no display
+  write) and the leave's completion hides it.
+- **Buffered mode.** The persisted path needs no new command-buffer machinery: the enter/leave class
+  ops ride the same opcodes 21/22/23 with the same reflow + `nextFrame` barriers as a `v-if`
+  transition, and the `setDisplay` writes ride the buffered `SetStyleProperty`/`RemoveStyleProperty`
+  leaves. Because the `v-show` `updated` hook is a post-flush callback, the flush boundary applies the
+  reveal's `beforeEnter` classes and its display write together in one crossing, and the `nextFrame`
+  continuation commits the `*-to` swap in a distinct later frame — the from/active-vs-to barrier holds,
+  and the leave's reflow still lands between `*-leave-from` and `*-leave-active` in a single frame.
+- **Proof.** `VShowTransitionTests` drives the real renderer + real `<Transition>` + real `v-show`
+  through a merged recording adapter (class choreography + display toggles) and pins, run-count-exact,
+  the enter/leave class sequence on toggle without unmounting, the capture-once/restore-across-cycles
+  display lifecycle, and both interruption directions converging with the right visibility and no
+  orphaned classes. `BufferedTransitionSequencingTests` extends the batched-mode battery with the
+  persisted show/hide path, asserting the same one-frame from/active, distinct-frame to-swap, and
+  leave reflow barrier — and that the element stays mounted (display:none, never host-removed).
+
 ## Non-goals (sequenced work)
 
 - App bootstrap (`CreateApp`-equivalent, container clearing) — [V01.01.04.04] (#42).
 - `v-model` runtime — [V01.01.04.06].
+- Compiler `persisted` injection (`transformTransition`: mark a `<Transition>` persisted when its
+  single child carries `v-show`) — a `Assimalign.Viu.Syntax.Templates` follow-up; the runtime already
+  honors the `persisted` flag ([V01.01.04.07.01]).

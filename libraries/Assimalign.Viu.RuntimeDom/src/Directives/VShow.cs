@@ -19,12 +19,26 @@ namespace Assimalign.Viu.RuntimeDom;
 /// follows JavaScript coercion (<see cref="StyleAndClassNormalization.IsTruthy(object?)"/>).
 /// <para>
 /// The saved display is derived from the vnode's <c>style</c> prop rather than an interop read of
-/// <c>el.style.display</c> — equivalent for inline styles and one fewer boundary crossing. The
-/// <c>&lt;Transition&gt;</c> coordination clause of the acceptance criteria remains a
-/// <b>documented-inert seam</b>: the transition state machine now exists ([V01.01.04.07]) and the
-/// renderer honors a <see cref="TransitionState"/>-persisted transition, but <c>v-show</c> does not yet
-/// build that persisted transition object, so the hook shape is present and its coordination is a
-/// follow-up.
+/// <c>el.style.display</c> — equivalent for inline styles and one fewer boundary crossing.
+/// </para>
+/// <para>
+/// <b>Persisted transitions</b> — a <c>&lt;Transition&gt;</c> wrapping a <c>v-show</c> element
+/// (upstream <c>vShow.ts</c> persisted handling + <c>components/Transition.ts</c>,
+/// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/components/Transition.ts). When
+/// the vnode carries a <see cref="VirtualNode.Transition"/> resolved as
+/// <see cref="BaseTransitionProperties.Persisted"/>, the element stays mounted and the enter/leave
+/// choreography runs on <em>show/hide</em> instead of mount/unmount: the renderer skips its own
+/// enter/leave for a persisted transition, so this directive drives <c>beforeEnter</c>/<c>enter</c>
+/// on reveal and <c>leave</c> on hide (upstream's <c>persisted</c> flag changes <em>who</em> calls
+/// the hooks, not the hook contract). On reveal, <c>beforeEnter</c> and <see cref="SetDisplay"/> make
+/// the element visible before the enter frame; on hide, the element is hidden only once the leave
+/// transition completes — the leave <c>done</c> callback runs <see cref="SetDisplay"/>. The
+/// transition's own enter/leave cancellation (upstream <c>el[enterCbKey]</c>/<c>el[leaveCbKey]</c>)
+/// converges an interrupted toggle to the final visibility with the saved display value intact and no
+/// orphaned transition classes. Keying on the resolved <c>Persisted</c> flag — the exact complement
+/// of the renderer's persisted skip — is Viu's explicit form of upstream's coupling, which relies on
+/// the compiler injecting <c>persisted</c> whenever a <c>&lt;Transition&gt;</c> wraps a <c>v-show</c>
+/// child.
 /// </para>
 /// Stateless singleton (<see cref="Instance"/>); the saved display lives in
 /// <see cref="BrowserModelState.OriginalDisplay"/>.
@@ -55,19 +69,30 @@ public sealed class VShow : IDirective
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
         var original = OriginalDisplay(node);
+        // Captured once, here, and preserved across every later toggle (upstream vShowOriginalDisplay).
         operations.GetState(handle).OriginalDisplay = original;
-        // Transition seam (still inert): upstream would defer to transition.beforeEnter when a transition
-        // and truthy value are present. The transition state machine now exists ([V01.01.04.07]) but
-        // v-show does not yet mark itself a persisted transition, so this stays a plain toggle. beforeMount
-        // timing means an initially-falsy element is hidden before its first paint.
-        SetDisplay(operations, handle, StyleAndClassNormalization.IsTruthy(binding.Value), original);
+        var value = StyleAndClassNormalization.IsTruthy(binding.Value);
+        // Upstream vShow.beforeMount: with a persisted transition present and a truthy value, defer the
+        // reveal to transition.beforeEnter (the enter choreography drives display); otherwise toggle
+        // display directly. beforeMount timing hides an initially-falsy element before its first paint.
+        if (value && PersistedTransition(node) is { } transition)
+        {
+            transition.BeforeEnter(element!);
+        }
+        else
+        {
+            SetDisplay(operations, handle, value, original);
+        }
     }
 
     private static void OnMounted(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
     {
-        // Deferred-inert transition seam: upstream runs transition.enter here when a transition and
-        // truthy value are present. The transition system exists ([V01.01.04.07]); wiring v-show to build a
-        // persisted transition is a follow-up, so this is a no-op placeholder that keeps the hook shape.
+        // Upstream vShow.mounted: run transition.enter for a truthy persisted-transition element. On the
+        // first mount the transition state is not yet mounted, so enter is a no-op unless `appear` is set.
+        if (StyleAndClassNormalization.IsTruthy(binding.Value) && PersistedTransition(node) is { } transition)
+        {
+            transition.Enter(element!);
+        }
     }
 
     private static void OnUpdated(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
@@ -80,8 +105,28 @@ public sealed class VShow : IDirective
         }
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
-        // Deferred-inert transition seam ([V01.01.04.07]); upstream coordinates enter/leave here.
-        SetDisplay(operations, handle, value, operations.GetState(handle).OriginalDisplay ?? string.Empty);
+        var original = operations.GetState(handle).OriginalDisplay ?? string.Empty;
+        if (PersistedTransition(node) is { } transition)
+        {
+            // Upstream vShow.updated: show -> beforeEnter, setDisplay(true), enter; hide -> leave, then
+            // setDisplay(false) once the leave completes. beforeEnter/leave cancel any in-flight leave/enter
+            // on the same element first, so an interrupted toggle converges to the final visibility with the
+            // saved display intact and no orphaned transition classes.
+            if (value)
+            {
+                transition.BeforeEnter(element!);
+                SetDisplay(operations, handle, true, original);
+                transition.Enter(element!);
+            }
+            else
+            {
+                transition.Leave(element!, () => SetDisplay(operations, handle, false, original));
+            }
+        }
+        else
+        {
+            SetDisplay(operations, handle, value, original);
+        }
     }
 
     private static void OnBeforeUnmount(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
@@ -92,6 +137,15 @@ public sealed class VShow : IDirective
         SetDisplay(operations, handle, StyleAndClassNormalization.IsTruthy(binding.Value), operations.GetState(handle).OriginalDisplay ?? string.Empty);
         operations.ReleaseState(handle);
     }
+
+    // The resolved persisted transition hooks stamped onto the vnode by an enclosing <Transition>
+    // (upstream: vnode.transition), or null when the element is not a persisted-transition child. Keying
+    // on Persisted — the exact complement of the renderer's persisted skip (VirtualNode.Transition is
+    // { Persisted: false }) — means v-show drives the enter/leave choreography exactly when the renderer
+    // does not, so the two never both fire (upstream couples them through the compiler's guaranteed
+    // `persisted` injection when a <Transition> wraps a v-show child).
+    private static TransitionHooks? PersistedTransition(VirtualNode node)
+        => node.Transition is { Persisted: true } transition ? transition : null;
 
     // Upstream setDisplay: el.style.display = value ? original : 'none'. An empty original removes
     // the inline property so a stylesheet-supplied display is not clobbered.
