@@ -10,11 +10,13 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.RuntimeD
 ## Public surface
 
 - **Virtual DOM model** (`src/` root) — `VirtualNode` (the unified vnode: element / component /
-  text / comment / static / fragment via `VirtualNodeType` + a shape-flag bitmask),
-  `VirtualNodeFactory`, `VirtualNodeProperties`.
+  text / comment / static / fragment / teleport via `VirtualNodeType` + a shape-flag bitmask),
+  `VirtualNodeFactory` (including `Teleport`/`TeleportBlock`), `VirtualNodeProperties`.
 - **Renderer** (`Rendering/`) — `RendererFactory.CreateRenderer(options)` (Vue's `createRenderer`),
-  `Renderer<TNode>` (the mount/patch/unmount pipeline), `RendererOptions<TNode>` (the injected
-  platform node-ops), `RenderEffect<TNode>` (reactive re-render integration), and `BlockToken`.
+  `Renderer<TNode>` (the mount/patch/unmount pipeline, including the `Teleport` built-in as a special
+  vnode type in the patch/move/unmount paths — [V01.01.03.17]), `RendererOptions<TNode>` (the
+  injected platform node-ops, whose optional `QuerySelector` resolves a Teleport string target),
+  `RenderEffect<TNode>` (reactive re-render integration), and `BlockToken`.
 - **Scheduler** (`Scheduling/`) — `Scheduler` (batched flush phases and `NextTick`) and
   `SchedulerJob`.
 - **Component model** (`Components/`) — `ComponentInstance`, `ComponentSetupContext`,

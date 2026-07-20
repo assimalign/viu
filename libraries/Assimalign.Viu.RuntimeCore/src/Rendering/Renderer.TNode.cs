@@ -154,6 +154,9 @@ public sealed class Renderer<TNode>
             case VirtualNodeType.Component:
                 ProcessComponent(current, next, container, anchor, elementNamespace, parentComponent);
                 break;
+            case VirtualNodeType.Teleport:
+                ProcessTeleport(current, next, container, anchor, elementNamespace, parentComponent);
+                break;
             default:
                 throw new InvalidOperationException($"Unknown vnode type: {next.Type}.");
         }
@@ -469,8 +472,8 @@ public sealed class Renderer<TNode>
         // block collected, never the static ones — so a tree of N static nodes with K dynamic
         // bindings costs O(K) patch visits. Each pair resolves its container the way upstream does:
         // the real host parent when the child may insert or move nodes (a fragment, a replaced type,
-        // or a component), otherwise the block element itself — which the patch never reads for an
-        // in-place prop/text update, so the parentNode call is skipped.
+        // a component, or a teleport), otherwise the block element itself — which the patch never
+        // reads for an in-place prop/text update, so the parentNode call is skipped.
         for (var index = 0; index < newChildren.Count; index++)
         {
             var oldChild = oldChildren[index];
@@ -479,7 +482,8 @@ public sealed class Renderer<TNode>
                 oldChild.El is not null
                 && (oldChild.Type == VirtualNodeType.Fragment
                     || !IsSameVirtualNodeType(oldChild, newChild)
-                    || oldChild.Type == VirtualNodeType.Component)
+                    || oldChild.Type == VirtualNodeType.Component
+                    || oldChild.Type == VirtualNodeType.Teleport)
                     ? _options.ParentNode((TNode)oldChild.El)!
                     : fallbackContainer;
             Patch(oldChild, newChild, container, default, elementNamespace, parentComponent);
@@ -851,6 +855,390 @@ public sealed class Renderer<TNode>
         Scheduler.QueuePostFlushCallback(new SchedulerJob(() => instance.InvokeHooks(kind)));
     }
 
+    // --- teleport ([V01.01.03.17]) -------------------------------------------------------------
+
+    private void ProcessTeleport(
+        VirtualNode? current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        string? elementNamespace,
+        ComponentInstance? parentComponent)
+    {
+        // The C# port of TeleportImpl.process (components/Teleport.ts,
+        // https://vuejs.org/guide/built-ins/teleport.html). A Teleport is a special vnode type, not a
+        // component: it frames its original tree position with a main-tree anchor pair (El start /
+        // Anchor end) and mounts its children into a resolved target container — or in place when
+        // disabled. Target lookup goes exclusively through the injected querySelector node-op (a
+        // selector string) or a direct platform-node `to`; there is no DOM/JS access in this layer.
+        var disabled = IsTeleportDisabled(next);
+        if (current is null)
+        {
+            var mainStart = _options.CreateText(string.Empty);
+            var mainEnd = _options.CreateText(string.Empty);
+            next.El = mainStart;
+            next.Anchor = mainEnd;
+            _options.Insert(mainStart, container, anchor);
+            _options.Insert(mainEnd, container, anchor);
+            next.TeleportState = new TeleportState();
+
+            if (IsTeleportDeferred(next))
+            {
+                // defer: resolve the target and mount after the surrounding tree mounts (upstream:
+                // queuePendingMount) — this is what lets a Teleport target an element rendered later in
+                // the same tree. Both the disabled in-place mount and the target mount are deferred.
+                QueuePendingMount(next, container, elementNamespace, parentComponent);
+                return;
+            }
+            if (disabled)
+            {
+                // Disabled: render the children in place, between the main-tree anchors.
+                MountTeleportChildren(next, container, AsHostNode(next.Anchor), elementNamespace, parentComponent);
+            }
+            // Always resolve the target and frame it with the target-side anchor pair; the children
+            // mount there only when enabled (upstream: mountToTarget runs regardless of `disabled`).
+            MountTeleportToTarget(next, disabled, elementNamespace, parentComponent);
+        }
+        else
+        {
+            next.El = current.El;
+            next.Anchor = current.Anchor;
+            var state = current.TeleportState!;
+            next.TeleportState = state;
+
+            // A still-pending deferred mount from the previous vnode (the post-flush job has not run):
+            // dispose it and re-queue for the new vnode, deferring this update's work too (upstream: the
+            // pendingMount branch, which returns early).
+            if (state.PendingMount is { } stalePending)
+            {
+                stalePending.IsDisposed = true;
+                state.PendingMount = null;
+                QueuePendingMount(next, container, elementNamespace, parentComponent);
+                return;
+            }
+
+            var wasDisabled = IsTeleportDisabled(current);
+            // The children currently live in the main container (disabled) or in the resolved target
+            // (enabled); patch them where they are (upstream: currentContainer / currentAnchor).
+            TNode currentContainer;
+            TNode? currentAnchor;
+            if (!wasDisabled && state.Target is TNode resolvedTarget)
+            {
+                currentContainer = resolvedTarget;
+                currentAnchor = AsHostNode(state.TargetAnchor);
+            }
+            else
+            {
+                currentContainer = container;
+                currentAnchor = AsHostNode(next.Anchor);
+            }
+
+            if (next.DynamicChildren is not null && current.DynamicChildren is not null)
+            {
+                // Block Teleport: patch only the collected dynamic descendants, then copy the static
+                // children's host pointers forward so a later toggle/target-change move can relocate them.
+                PatchBlockChildren(current.DynamicChildren, next.DynamicChildren, currentContainer, elementNamespace, parentComponent);
+                TraverseStaticChildren(current, next);
+            }
+            else
+            {
+                PatchChildren(current, next, currentContainer, currentAnchor, elementNamespace, parentComponent);
+            }
+
+            if (disabled)
+            {
+                if (!wasDisabled)
+                {
+                    // enabled -> disabled: move the existing children back to the main-tree position
+                    // without unmounting, so their subtree state is preserved.
+                    MoveTeleport(next, container, AsHostNode(next.Anchor), TeleportMoveType.Toggle);
+                }
+            }
+            else
+            {
+                var newTarget = GetToProperty(next);
+                var oldTarget = GetToProperty(current);
+                if (!Equals(newTarget, oldTarget))
+                {
+                    // `to` changed: resolve the new target and move the children into it.
+                    var resolved = ResolveTarget(next);
+                    if (resolved is TNode nextTarget)
+                    {
+                        state.Target = resolved;
+                        MoveTeleport(next, nextTarget, default, TeleportMoveType.TargetChange);
+                    }
+                    else
+                    {
+                        RuntimeWarnings.Warn($"Invalid Teleport target on update: {newTarget}.");
+                    }
+                }
+                else if (wasDisabled && state.Target is TNode enabledTarget)
+                {
+                    // disabled -> enabled: move the children into the (unchanged) target.
+                    MoveTeleport(next, enabledTarget, AsHostNode(state.TargetAnchor), TeleportMoveType.Toggle);
+                }
+            }
+        }
+    }
+
+    private void MountTeleportChildren(VirtualNode vnode, TNode mountContainer, TNode? mountAnchor, string? elementNamespace, ComponentInstance? parentComponent)
+    {
+        // Upstream: the Teleport's local `mount` closure. A Teleport always carries array children.
+        if ((vnode.ShapeFlag & ShapeFlags.ArrayChildren) != 0)
+        {
+            MountChildren(vnode.ArrayChildren ?? [], mountContainer, mountAnchor, elementNamespace, parentComponent);
+        }
+    }
+
+    private void MountTeleportToTarget(VirtualNode vnode, bool disabled, string? elementNamespace, ComponentInstance? parentComponent)
+    {
+        // Upstream mountToTarget: resolve the target, frame it with the target-side anchor pair, and —
+        // when enabled — mount the children into it before the target end anchor. The SVG/MathML
+        // target-namespace sniff upstream performs is omitted: Viu's node-ops expose no element-namespace
+        // query, so the ambient compiled namespace is threaded through instead (documented divergence).
+        var state = vnode.TeleportState!;
+        var target = ResolveTarget(vnode);
+        state.Target = target;
+        var targetAnchor = PrepareTargetAnchors(vnode, target);
+        if (target is TNode targetContainer && !disabled)
+        {
+            MountTeleportChildren(vnode, targetContainer, targetAnchor, elementNamespace, parentComponent);
+        }
+    }
+
+    private TNode? PrepareTargetAnchors(VirtualNode vnode, object? target)
+    {
+        // Upstream prepareAnchor: create a start/end anchor pair framing the teleported content and
+        // insert both into the target. When the target is unresolved Viu creates NO anchors — a
+        // documented divergence from upstream, which always creates them for its hydration path (Viu has
+        // no hydration and would otherwise leak two never-inserted platform-node handles). The upstream
+        // TeleportEndKey sibling-skip property is likewise hydration-only and omitted.
+        if (target is not TNode targetContainer)
+        {
+            return default;
+        }
+        var state = vnode.TeleportState!;
+        var targetStart = _options.CreateText(string.Empty);
+        var targetEnd = _options.CreateText(string.Empty);
+        state.TargetStart = targetStart;
+        state.TargetAnchor = targetEnd;
+        _options.Insert(targetStart, targetContainer, default);
+        _options.Insert(targetEnd, targetContainer, default);
+        return targetEnd;
+    }
+
+    private void QueuePendingMount(VirtualNode vnode, TNode container, string? elementNamespace, ComponentInstance? parentComponent)
+    {
+        // Upstream queuePendingMount: a deferred Teleport resolves its target and mounts in a post-flush
+        // job, so a target rendered later in the same tree is available by the time it runs. The job
+        // self-guards: it no-ops if it was superseded (an update replaced it) or the Teleport unmounted.
+        var state = vnode.TeleportState!;
+        SchedulerJob job = null!;
+        job = new SchedulerJob(() =>
+        {
+            if (!ReferenceEquals(state.PendingMount, job))
+            {
+                return;
+            }
+            state.PendingMount = null;
+            var disabled = IsTeleportDisabled(vnode);
+            if (disabled)
+            {
+                // Re-read the live parent of the main start anchor (the tree may have moved since queuing).
+                var mountContainer = vnode.El is not null ? _options.ParentNode((TNode)vnode.El) ?? container : container;
+                MountTeleportChildren(vnode, mountContainer, AsHostNode(vnode.Anchor), elementNamespace, parentComponent);
+            }
+            MountTeleportToTarget(vnode, disabled, elementNamespace, parentComponent);
+        });
+        state.PendingMount = job;
+        Scheduler.QueuePostFlushCallback(job);
+    }
+
+    private void MoveTeleport(VirtualNode vnode, TNode container, TNode? parentAnchor, TeleportMoveType moveType)
+    {
+        // The C# port of moveTeleport (components/Teleport.ts).
+        var state = vnode.TeleportState!;
+        if (moveType == TeleportMoveType.TargetChange && state.TargetAnchor is TNode movingTargetAnchor)
+        {
+            // On a target change only the end anchor relocates (upstream); the start anchor is left in the
+            // old target and cleaned up on unmount.
+            _options.Insert(movingTargetAnchor, container, parentAnchor);
+        }
+        var isReorder = moveType == TeleportMoveType.Reorder;
+        if (isReorder && vnode.El is not null)
+        {
+            _options.Insert((TNode)vnode.El, container, parentAnchor);
+        }
+        // Move the children only when this is NOT a reorder, or the Teleport is disabled: an enabled
+        // Teleport's children live in the target and must stay put across a main-tree reorder. A pending
+        // (not-yet-run deferred) Teleport has no mounted children to move.
+        if (state.PendingMount is null && (!isReorder || IsTeleportDisabled(vnode)))
+        {
+            if ((vnode.ShapeFlag & ShapeFlags.ArrayChildren) != 0 && vnode.ArrayChildren is { } children)
+            {
+                for (var index = 0; index < children.Length; index++)
+                {
+                    Move(children[index], container, parentAnchor);
+                }
+            }
+        }
+        if (isReorder && vnode.Anchor is not null)
+        {
+            _options.Insert((TNode)vnode.Anchor, container, parentAnchor);
+        }
+    }
+
+    private void UnmountTeleport(VirtualNode node, ComponentInstance? parentComponent, bool doRemove)
+    {
+        // The C# port of TeleportImpl.remove: tear down the target-side anchor pair, the children (with
+        // their normal unmount lifecycles/directive hooks), and — when the whole Teleport is host-removed
+        // — the main-tree anchor pair. Upstream splits main-start removal into the generic remove(); Viu
+        // removes both main anchors here for one cohesive teardown.
+        var state = node.TeleportState;
+        var disabled = IsTeleportDisabled(node);
+        var hadPendingMount = state?.PendingMount is not null;
+        if (state?.PendingMount is { } pending)
+        {
+            pending.IsDisposed = true;
+            state.PendingMount = null;
+        }
+        if (state?.Target is not null)
+        {
+            if (state.TargetStart is not null)
+            {
+                _options.Remove((TNode)state.TargetStart);
+            }
+            if (state.TargetAnchor is not null)
+            {
+                _options.Remove((TNode)state.TargetAnchor);
+            }
+        }
+        if (doRemove)
+        {
+            if (node.El is not null)
+            {
+                _options.Remove((TNode)node.El);
+            }
+            if (node.Anchor is not null)
+            {
+                _options.Remove((TNode)node.Anchor);
+            }
+        }
+        // Children are removed when the whole Teleport is removed, or whenever they live in the target
+        // (enabled) — upstream shouldRemove = doRemove || !disabled. A never-mounted deferred Teleport,
+        // and an enabled Teleport whose target never resolved, have no children to unmount.
+        if (!hadPendingMount
+            && (disabled || state?.Target is not null)
+            && (node.ShapeFlag & ShapeFlags.ArrayChildren) != 0
+            && node.ArrayChildren is { } children)
+        {
+            var shouldRemove = doRemove || !disabled;
+            for (var index = 0; index < children.Length; index++)
+            {
+                var child = children[index];
+                Unmount(child, parentComponent, shouldRemove, optimized: child.DynamicChildren is not null);
+            }
+        }
+    }
+
+    private object? ResolveTarget(VirtualNode node)
+    {
+        // The C# port of resolveTarget: a string `to` resolves through the querySelector node-op; any
+        // other non-null `to` is a direct platform-node target used as-is. Returns the boxed target node,
+        // or null (with the upstream dev warnings) when it cannot be resolved. The renderer never touches
+        // a platform node except through node-ops, so target lookup goes only through querySelector here.
+        // A value-type TNode uses default(TNode) as its "no node" sentinel (the browser's 0 handle), so a
+        // resolved value equal to it means "not found" just as a null reference-type handle does.
+        var to = GetToProperty(node);
+        if (to is string selector)
+        {
+            if (_options.QuerySelector is null)
+            {
+                RuntimeWarnings.Warn(
+                    "Current renderer does not support string target for Teleports. "
+                    + "(missing querySelector renderer option)");
+                return null;
+            }
+            var resolved = _options.QuerySelector(selector);
+            if (resolved is TNode target && !NodeComparer.Equals(target, default!))
+            {
+                return target;
+            }
+            if (!IsTeleportDisabled(node))
+            {
+                RuntimeWarnings.Warn(
+                    $"Failed to locate Teleport target with selector \"{selector}\". "
+                    + "Note the target element must exist before the component is mounted.");
+            }
+            return null;
+        }
+        if (to is TNode directTarget && !NodeComparer.Equals(directTarget, default!))
+        {
+            return directTarget;
+        }
+        if (!IsTeleportDisabled(node))
+        {
+            RuntimeWarnings.Warn($"Invalid Teleport target: {to}.");
+        }
+        return null;
+    }
+
+    private static void TraverseStaticChildren(VirtualNode current, VirtualNode next)
+    {
+        // The C# port of traverseStaticChildren(n1, n2, shallow: true) — the production shallow form.
+        // After a block-only patch the static (non-dynamic) children are fresh vnodes without host
+        // pointers; copy the old host node forward so MoveTeleport (which relocates every child) can find
+        // them. A freshly rendered static child is not yet mounted (El null), so no clone is needed.
+        var oldChildren = current.ArrayChildren;
+        var newChildren = next.ArrayChildren;
+        if (oldChildren is null || newChildren is null)
+        {
+            return;
+        }
+        var count = Math.Min(oldChildren.Length, newChildren.Length);
+        for (var index = 0; index < count; index++)
+        {
+            var oldChild = oldChildren[index];
+            var newChild = newChildren[index];
+            if ((newChild.ShapeFlag & ShapeFlags.Element) != 0
+                && newChild.DynamicChildren is null
+                && newChild.El is null
+                && ((int)newChild.PatchFlag <= 0 || newChild.PatchFlag == PatchFlags.NeedHydration))
+            {
+                newChild.El = oldChild.El;
+            }
+            else if (newChild.Type == VirtualNodeType.Comment && newChild.El is null)
+            {
+                newChild.El = oldChild.El;
+            }
+        }
+    }
+
+    private static bool IsTeleportDisabled(VirtualNode node) => IsTeleportFlag(node, "disabled");
+
+    private static bool IsTeleportDeferred(VirtualNode node) => IsTeleportFlag(node, "defer");
+
+    private static bool IsTeleportFlag(VirtualNode node, string name)
+    {
+        // Upstream: props && (props[name] || props[name] === ''). A boolean is used directly; any string
+        // (including the empty string a bare attribute produces) is truthy; a missing/false/null prop is
+        // off.
+        if (node.Properties is null || !node.Properties.TryGetValue(name, out var value))
+        {
+            return false;
+        }
+        return value switch
+        {
+            bool flag => flag,
+            string => true,
+            null => false,
+            _ => true,
+        };
+    }
+
+    private static object? GetToProperty(VirtualNode node)
+        => node.Properties is not null && node.Properties.TryGetValue("to", out var to) ? to : null;
+
     // --- children ------------------------------------------------------------------------------
 
     private void PatchChildren(
@@ -1166,12 +1554,15 @@ public sealed class Renderer<TNode>
     {
         // The C# port of move() in renderer.ts: relocate an already-mounted vnode's host node(s)
         // before `anchor`. Components move their subtree; fragments and static nodes move their
-        // whole owned range; element/text/comment nodes move as a single host node (descendants
-        // travel with them).
+        // whole owned range; a teleport moves its own anchors (and, when disabled, its children);
+        // element/text/comment nodes move as a single host node (descendants travel with them).
         switch (node.Type)
         {
             case VirtualNodeType.Component:
                 Move(((ComponentInstance)node.Component!).Subtree!, container, anchor);
+                return;
+            case VirtualNodeType.Teleport:
+                MoveTeleport(node, container, anchor, TeleportMoveType.Reorder);
                 return;
             case VirtualNodeType.Fragment:
                 _options.Insert((TNode)node.El!, container, anchor);
@@ -1333,6 +1724,13 @@ public sealed class Renderer<TNode>
         {
             UnmountComponent(node, doRemove);
         }
+        else if (node.Type == VirtualNodeType.Teleport)
+        {
+            // Teleport is a special vnode type: its children live in the target (enabled) or in place
+            // (disabled), and it owns anchors in two containers — so its teardown is bespoke, not the
+            // generic block/array-children walk below.
+            UnmountTeleport(node, parentComponent, doRemove);
+        }
         else
         {
             var dynamicChildren = node.DynamicChildren;
@@ -1462,8 +1860,10 @@ public sealed class Renderer<TNode>
             var instance = (ComponentInstance)node.Component!;
             return instance.Subtree is null ? default : GetNextHostNode(instance.Subtree);
         }
-        if (node.Type is VirtualNodeType.Fragment or VirtualNodeType.Static)
+        if (node.Type is VirtualNodeType.Fragment or VirtualNodeType.Static or VirtualNodeType.Teleport)
         {
+            // A Teleport's main-tree footprint is [El start .. Anchor end]; its next host node follows
+            // the end anchor (its teleported children live in another container and are not siblings here).
             return node.Anchor is null ? default : _options.NextSibling((TNode)node.Anchor);
         }
         return node.El is null ? default : _options.NextSibling((TNode)node.El);

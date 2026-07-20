@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using Assimalign.Viu.RuntimeCore;
 
 namespace Assimalign.Viu.Testing;
@@ -11,11 +13,15 @@ namespace Assimalign.Viu.Testing;
 /// </summary>
 public sealed class TestRenderer
 {
+    // The live roots the querySelector node-op searches to resolve a <Teleport> string target; every
+    // render container is auto-registered, and RegisterQueryRoot adds detached target containers.
+    private readonly List<TestElement> _teleportTargetRoots = [];
+
     /// <summary>Creates a renderer over a fresh op log.</summary>
     public TestRenderer()
     {
         OperationLog = new TestNodeOperationLog();
-        Renderer = RendererFactory.CreateRenderer(TestNodeOperations.Create(OperationLog));
+        Renderer = RendererFactory.CreateRenderer(TestNodeOperations.Create(OperationLog, _teleportTargetRoots));
     }
 
     /// <summary>The underlying platform-agnostic renderer.</summary>
@@ -31,8 +37,30 @@ public sealed class TestRenderer
     /// <param name="tag">The container tag.</param>
     public TestElement CreateContainer(string tag = "root") => new(tag, null);
 
+    /// <summary>
+    /// Registers <paramref name="root"/> (and its subtree) as searchable by a <c>&lt;Teleport&gt;</c>
+    /// string <c>to</c> target — the in-memory analogue of an element being present in the document the
+    /// browser's <c>querySelector</c> searches. Render containers are registered automatically; use this
+    /// for a detached target container that a Teleport selects by <c>#id</c>/<c>.class</c>/tag rather than
+    /// by a direct node reference ([V01.01.03.17]).
+    /// </summary>
+    /// <param name="root">The element to make findable.</param>
+    public void RegisterQueryRoot(TestElement root)
+    {
+        if (!_teleportTargetRoots.Contains(root))
+        {
+            _teleportTargetRoots.Add(root);
+        }
+    }
+
     /// <summary>Renders <paramref name="node"/> into <paramref name="container"/> (null unmounts).</summary>
     /// <param name="node">The tree to render, or null to unmount.</param>
     /// <param name="container">The container element.</param>
-    public void Render(VirtualNode? node, TestElement container) => Renderer.Render(node, container);
+    public void Render(VirtualNode? node, TestElement container)
+    {
+        // A render container is a queryable root for Teleport string targets (an in-tree #id/.class/tag
+        // resolves against the tree the renderer just built).
+        RegisterQueryRoot(container);
+        Renderer.Render(node, container);
+    }
 }

@@ -159,6 +159,16 @@ public sealed class VirtualNode
     internal TransitionHooks? Transition { get; set; }
 
     /// <summary>
+    /// The target-side runtime state of a <see cref="VirtualNodeType.Teleport"/> vnode — the resolved
+    /// target container, the target-side anchor pair, and the deferred-mount job (upstream:
+    /// <c>vnode.target</c>/<c>targetStart</c>/<c>targetAnchor</c>). Null for every non-Teleport vnode —
+    /// the common case, kept to a single null check on the hot path; allocated by the renderer when a
+    /// Teleport mounts. The main-tree anchor pair reuses <see cref="El"/> and <see cref="Anchor"/>
+    /// ([V01.01.03.17]).
+    /// </summary>
+    internal TeleportState? TeleportState { get; set; }
+
+    /// <summary>
     /// Looks up a <see cref="VirtualNodeHook"/> prop (e.g. <c>"onVnodeMounted"</c>), or null.
     /// </summary>
     /// <param name="name">The hook prop name.</param>
