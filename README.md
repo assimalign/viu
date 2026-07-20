@@ -22,9 +22,10 @@ founding decisions, and wave strategy live in [`docs/PLAN.md`](docs/PLAN.md).
 Early, active development, delivered in waves (see [`docs/PLAN.md`](docs/PLAN.md) and the
 [project board](https://github.com/orgs/assimalign/projects/15) for the authoritative status). The
 reactive core, the platform-agnostic renderer with scheduler and component model, the browser DOM
-bridge, the template compiler front end, the `.viu` single-file-component pipeline, and the
-router's DOM-free route table and matcher are all in the tree at varying maturity; each library's
-`docs/OVERVIEW.md` states what it currently provides.
+bridge, the template compiler front end, the `.viu` single-file-component pipeline, the router's
+DOM-free route table and matcher, and the store's setup-style `defineStore`/`createPinia` definition
+API are all in the tree at varying maturity; each library's `docs/OVERVIEW.md` states what it
+currently provides.
 The demo is a reactively re-rendering stopwatch in
 [`examples/Assimalign.Viu.WebApp`](examples/Assimalign.Viu.WebApp).
 
@@ -44,6 +45,7 @@ carries a `docs/OVERVIEW.md` (what it is, its public surface, its Vue 3 counterp
 | [`Assimalign.Viu.RuntimeCore`](libraries/Assimalign.Viu.RuntimeCore) | [`@vue/runtime-core`](https://github.com/vuejs/core/tree/main/packages/runtime-core) — vnodes, renderer, scheduler, component model, built-ins | [OVERVIEW](libraries/Assimalign.Viu.RuntimeCore/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.RuntimeCore/docs/DESIGN.md) |
 | [`Assimalign.Viu.RuntimeDom`](libraries/Assimalign.Viu.RuntimeDom) | [`@vue/runtime-dom`](https://github.com/vuejs/core/tree/main/packages/runtime-dom) — JS-interop DOM bridge, patchProp, events, v-model/v-show | [OVERVIEW](libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.RuntimeDom/docs/DESIGN.md) |
 | [`Assimalign.Viu.Router`](libraries/Assimalign.Viu.Router) | [`vue-router`](https://github.com/vuejs/router) — the DOM-free route table and path matcher today; history, RouterView/RouterLink, and guards follow ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Router/docs/DESIGN.md) |
+| [`Assimalign.Viu.Store`](libraries/Assimalign.Viu.Store) | [`pinia`](https://github.com/vuejs/pinia) — the setup-style `defineStore`/`createPinia` definition API on `EffectScope` today; state/getters/actions, SSR, and plugins follow ([V01.01.09]) | [OVERVIEW](libraries/Assimalign.Viu.Store/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Store/docs/DESIGN.md) |
 | [`Assimalign.Viu.Syntax`](libraries/Assimalign.Viu.Syntax) | (shared base) — the located node/diagnostic primitives and registration-based parser pipeline every language library roots on | [OVERVIEW](libraries/Assimalign.Viu.Syntax/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax/docs/DESIGN.md) |
 | [`Assimalign.Viu.Syntax.Templates`](libraries/Assimalign.Viu.Syntax.Templates) | [`@vue/compiler-core`](https://github.com/vuejs/core/tree/main/packages/compiler-core) + [`compiler-dom`](https://github.com/vuejs/core/tree/main/packages/compiler-dom) — the Vue template language front end and C# render-function codegen | [OVERVIEW](libraries/Assimalign.Viu.Syntax.Templates/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md) |
 | [`Assimalign.Viu.Syntax.SingleFileComponent`](libraries/Assimalign.Viu.Syntax.SingleFileComponent) | [`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/main/packages/compiler-sfc) — the `.viu` `@`-block container parser | [OVERVIEW](libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md) · [FORMAT](libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md) |
