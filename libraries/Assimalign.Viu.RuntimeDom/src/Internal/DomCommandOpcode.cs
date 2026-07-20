@@ -75,4 +75,24 @@ internal enum DomCommandOpcode : byte
 
     /// <summary>Detach a listener: <c>[handle][event][capture:1]</c>.</summary>
     RemoveEventListener = 20,
+
+    /// <summary>
+    /// Add one transition CSS class: <c>[handle][class]</c> (upstream <c>addTransitionClass</c> —
+    /// <c>packages/runtime-dom/src/components/Transition.ts</c>). Buffered so the enter/leave class
+    /// choreography is ordered with the node create/insert ops in the same frame ([V01.01.04.07.02]).
+    /// </summary>
+    AddTransitionClass = 21,
+
+    /// <summary>Remove one transition CSS class: <c>[handle][class]</c> (upstream <c>removeTransitionClass</c>).</summary>
+    RemoveTransitionClass = 22,
+
+    /// <summary>
+    /// The reflow barrier — no operands. When the applier reaches it while draining a frame it performs
+    /// a real synchronous reflow (upstream <c>forceReflow</c>'s <c>document.body.offsetHeight</c> read),
+    /// committing every class write <em>before</em> it in the frame to its own style recalc before the
+    /// writes after it. This is what keeps a buffered leave's <c>*-leave-from</c> class from coalescing
+    /// with <c>*-leave-active</c> (upstream #2593) without splitting the flush — the frame still crosses
+    /// the interop boundary exactly once ([V01.01.04.07.02]).
+    /// </summary>
+    ForceReflow = 23,
 }

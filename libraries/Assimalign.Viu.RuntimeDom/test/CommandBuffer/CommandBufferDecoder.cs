@@ -97,6 +97,16 @@ internal static class CommandBufferDecoder
                 case DomCommandOpcode.RemoveEventListener:
                     dom.RemoveEventListener(ReadInt(span, ref cursor), Str(strings, ReadInt(span, ref cursor))!, ReadBool(span, ref cursor));
                     break;
+                case DomCommandOpcode.AddTransitionClass:
+                    dom.AddTransitionClass(ReadInt(span, ref cursor), Str(strings, ReadInt(span, ref cursor))!);
+                    break;
+                case DomCommandOpcode.RemoveTransitionClass:
+                    dom.RemoveTransitionClass(ReadInt(span, ref cursor), Str(strings, ReadInt(span, ref cursor))!);
+                    break;
+                case DomCommandOpcode.ForceReflow:
+                    // The reflow barrier carries no operands; the real applier reads document.body.offsetHeight.
+                    dom.ForceReflow();
+                    break;
                 default:
                     throw new InvalidOperationException($"Unknown command-buffer opcode {(byte)opcode}.");
             }
