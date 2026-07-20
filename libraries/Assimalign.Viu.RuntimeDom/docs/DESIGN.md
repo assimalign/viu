@@ -117,6 +117,37 @@ buffered is opt-in for this delivery.
 - **Differential proof**: the full renderer scenario battery runs through direct and buffered modes
   and asserts byte-identical serialized DOM; an instrumented apply counter proves one boundary
   crossing per flush over hundreds of mutations. Full 10k-row benchmarks belong to [V01.01.11.04].
+- **Transition sequencing barrier**: three opcodes (`AddTransitionClass`, `RemoveTransitionClass`,
+  `ForceReflow`) let the CSS-transition choreography ride the buffer without coalescing away the
+  browser's transition trigger — see the next section ([V01.01.04.07.02]).
+
+## Transition class sequencing under batching ([V01.01.04.07.02])
+
+A CSS transition is *sequencing*, not just final state: add `*-enter-from`/`*-enter-active`, force a
+reflow, then swap `*-from` → `*-to` on the next frame (upstream `Transition.ts` `forceReflow` +
+double-`requestAnimationFrame` `nextFrame`). Naive batching would coalesce a whole flush's writes into
+one style recalc — from- and to-classes applied together, the transition never triggered — and, worse,
+routing the class writes *direct to the bridge* while the node create/insert stay buffered references a
+handle the applier has not registered yet. The buffered `DomTransitionOperations`
+(`BufferedBrowserNodeOperations.Activate`) resolves both with two barrier kinds, and preserves
+batching everywhere else (one interop crossing per flush is unchanged):
+
+- **Reflow barrier — an in-drain command-buffer op.** `ForceReflow` encodes as opcode 23 (no
+  operands). Class writes stay buffered and ordered with the node ops; while draining the *single*
+  frame the applier performs a real `document.body.offsetHeight` read at the barrier's position, so a
+  leave's `*-leave-from` commits to its own style recalc before `*-leave-active` (upstream #2593). The
+  frame still crosses the boundary exactly once — the batching AC holds.
+- **Frame boundary — the `nextFrame` continuation.** The `*-to` swap is scheduled through the real
+  double-`requestAnimationFrame`; the buffered adaptor applies the continuation's writes when it runs,
+  two frames after the from/active frame committed, so the two class states land in distinct browser
+  frames and can never coalesce. `whenTransitionEnds`/`measurePosition`/`hasCssTransform` and the FLIP
+  ops force a flush and hit the live bridge (so `getComputedStyle`/`getBoundingClientRect` observe the
+  committed classes/layout); their resolve callbacks flush the finishing class removals.
+- **Proof.** `BufferedTransitionSequencingTests` drives the real renderer + real `<Transition>` through
+  the buffered applier and asserts, per flush, that from/active land in one frame, the to-swap in a
+  distinct later frame, and the leave reflow op lands *between* the from- and active-class writes.
+- FLIP *move* batching (one read pass, one reflow for N elements) is the separate #163; buffered FLIP
+  reads are correct here (forced flush) but not yet batched. `v-show` transition coalescing is #161.
 
 ## Non-goals (sequenced work)
 

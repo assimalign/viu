@@ -27,9 +27,35 @@ namespace Assimalign.Viu.RuntimeDom;
 /// apply call, which purges the invoker registry once — the same
 /// <see cref="BrowserEventInvokerRegistry.PurgeReleasedHandles"/> path the direct mode drives per op.
 /// </para>
-/// Ambient by activation: <see cref="Activate"/> points the flush seam, the event dispatcher, and the
-/// directive operations at this instance; <see cref="Deactivate"/> restores them. Single active
-/// buffered renderer per process (single-threaded JS event-loop model) — NOT thread-safe.
+/// <para>
+/// <b>Transition class sequencing</b> ([V01.01.04.07.02]). CSS transitions are browser-observable
+/// <em>sequencing</em>: add <c>*-enter-from</c>/<c>*-enter-active</c>, force a reflow, then swap
+/// <c>*-from</c> → <c>*-to</c> on the next frame — so the class writes cannot coalesce into one style
+/// recalc or the browser never fires the transition (upstream <c>Transition.ts</c> <c>forceReflow</c> +
+/// double-<c>requestAnimationFrame</c> <c>nextFrame</c>). <see cref="Activate"/> therefore installs a
+/// buffered <see cref="DomTransitionOperations"/> that preserves the ordering across two barrier kinds
+/// rather than regressing batching to synchronous per-op flushes:
+/// <list type="bullet">
+/// <item><b>The reflow barrier</b> is a first-class command-buffer op
+/// (<see cref="DomCommandOpcode.ForceReflow"/>, written by <see cref="DomCommandBuffer.WriteForceReflow"/>):
+/// class writes stay buffered and ordered with the node ops, and the applier performs a real reflow at
+/// the barrier's position while draining the <em>single</em> frame — so the frame still crosses the
+/// boundary exactly once and batching is untouched.</item>
+/// <item><b>The frame boundary</b> is <c>NextFrame</c>: its continuation (the <c>*-to</c> swap) is
+/// scheduled through the real double-<c>requestAnimationFrame</c> and its buffered writes are applied
+/// when it runs, two frames after the from/active frame committed — so the two land in distinct browser
+/// frames and can never coalesce.</item>
+/// </list>
+/// Transition reads and listener registrations (<c>NextFrame</c>'s scheduling, <c>WhenTransitionEnds</c>,
+/// <c>MeasurePosition</c>, <c>HasCssTransform</c>, the FLIP ops) force a flush and then hit the live
+/// bridge, so <c>getComputedStyle</c>/<c>getBoundingClientRect</c> observe the committed classes/layout;
+/// their resolve callbacks flush the finishing class removals. (FLIP <em>move</em> batching — reading all
+/// positions in one pass — is the separate #163.)
+/// </para>
+/// Ambient by activation: <see cref="Activate"/> points the flush seam, the event dispatcher, the
+/// directive operations, and the transition operations at this instance; <see cref="Deactivate"/>
+/// restores them. Single active buffered renderer per process (single-threaded JS event-loop model) —
+/// NOT thread-safe.
 /// </summary>
 [SupportedOSPlatform("browser")]
 internal sealed class BufferedBrowserNodeOperations
@@ -46,6 +72,7 @@ internal sealed class BufferedBrowserNodeOperations
     private Action? _previousFlushBoundary;
     private Func<int, bool, BrowserEvent, int>? _previousDispatcher;
     private BrowserDirectiveOperations? _previousDirectiveOperations;
+    private DomTransitionOperations? _previousTransitionOperations;
     private bool _isActive;
     private int _interopCallCount;
 
@@ -162,7 +189,7 @@ internal sealed class BufferedBrowserNodeOperations
     /// <param name="handle">The externally issued handle.</param>
     internal void ObserveForeignHandle(int handle) => _buffer.ObserveForeignHandle(handle);
 
-    /// <summary>Points the flush seam, event dispatch, and directive ops at this instance.</summary>
+    /// <summary>Points the flush seam, event dispatch, directive ops, and transition ops at this instance.</summary>
     internal void Activate()
     {
         if (_isActive)
@@ -173,8 +200,18 @@ internal sealed class BufferedBrowserNodeOperations
         _previousFlushBoundary = Scheduler.FlushBoundaryCallback;
         _previousDispatcher = BrowserNodeOperations.OverrideDispatcher;
         _previousDirectiveOperations = BrowserDirectiveOperations.Current;
+        _previousTransitionOperations = DomTransitionOperations.Current;
         Scheduler.FlushBoundaryCallback = ApplyPending;
         BrowserNodeOperations.OverrideDispatcher = _invokers.Dispatch;
+        // <Transition>/<TransitionGroup> class choreography writes through the buffered channel so the
+        // enter/leave class sequence stays ordered with the node ops and honors the reflow + next-frame
+        // barriers ([V01.01.04.07.02]). Reads/rAF/listener ops delegate to the direct (bridge-backed)
+        // operations captured above, forcing a flush first so they observe committed classes/layout.
+        DomTransitionOperations.Current = BuildBufferedTransitionOperations(
+            _previousTransitionOperations ?? throw new InvalidOperationException(
+                "No DomTransitionOperations installed to delegate reads/timing to. BrowserRuntime installs "
+                + "the browser-backed transition operations before a buffered app renders; a test must install "
+                + "one (recording) before Activate."));
         // v-model / v-show write through the same buffered leaf/invoker channels as the patch engine.
         BrowserDirectiveOperations.Current = new BrowserDirectiveOperations
         {
@@ -206,7 +243,69 @@ internal sealed class BufferedBrowserNodeOperations
         Scheduler.FlushBoundaryCallback = _previousFlushBoundary;
         BrowserNodeOperations.OverrideDispatcher = _previousDispatcher;
         BrowserDirectiveOperations.Current = _previousDirectiveOperations;
+        DomTransitionOperations.Current = _previousTransitionOperations;
     }
+
+    // Wraps the direct (bridge-backed) transition operations for buffered mode. Class writes and the
+    // reflow barrier encode into the command buffer (ordered with the node ops, applied in one frame);
+    // rAF scheduling, reads, and listener registrations delegate to <paramref name="direct"/> but force
+    // the pending frame to commit first so they observe the classes/layout already written, and their
+    // continuations/resolves flush the writes they produce. See the class remarks ([V01.01.04.07.02]).
+    private DomTransitionOperations BuildBufferedTransitionOperations(DomTransitionOperations direct) => new()
+    {
+        AddTransitionClass = (element, cssClass) => _buffer.WriteAddTransitionClass(element, cssClass),
+        RemoveTransitionClass = (element, cssClass) => _buffer.WriteRemoveTransitionClass(element, cssClass),
+        ForceReflow = () => _buffer.WriteForceReflow(),
+        // The double-rAF stays real; the continuation's buffered *-to swap commits when it runs — two
+        // frames after the from/active frame — so the two class states land in distinct browser frames.
+        NextFrame = callback => direct.NextFrame(() =>
+        {
+            callback();
+            ApplyPending();
+        }),
+        // getComputedStyle must read the *-to class the continuation just wrote: flush first, then the
+        // resolve's finishing class removals (finishEnter/finishLeave) commit when the end event fires.
+        WhenTransitionEnds = (element, expectedType, explicitTimeout, resolve) =>
+        {
+            FlushPending();
+            direct.WhenTransitionEnds(element, expectedType, explicitTimeout, () =>
+            {
+                resolve();
+                ApplyPending();
+            });
+        },
+        // FLIP reads/writes force a flush so getBoundingClientRect and the clone read see committed DOM;
+        // batching the FLIP position pass into one read/write phase is the separate #163.
+        MeasurePosition = element =>
+        {
+            FlushPending();
+            return direct.MeasurePosition(element);
+        },
+        SetMoveTransform = (element, deltaX, deltaY) =>
+        {
+            FlushPending();
+            direct.SetMoveTransform(element, deltaX, deltaY);
+        },
+        ClearMoveStyles = element =>
+        {
+            FlushPending();
+            direct.ClearMoveStyles(element);
+        },
+        HasCssTransform = (element, root, moveClass) =>
+        {
+            FlushPending();
+            return direct.HasCssTransform(element, root, moveClass);
+        },
+        WhenMoveEnds = (element, resolve) =>
+        {
+            FlushPending();
+            direct.WhenMoveEnds(element, () =>
+            {
+                resolve();
+                ApplyPending();
+            });
+        },
+    };
 
     /// <summary>
     /// Creates the production instance over the real bridge and activates it. Reads force a flush and

@@ -60,11 +60,12 @@ internal static class BrowserNodeOperations
             SetCssVariables = static (element, names, values) => BrowserDomBridge.SetCssVariables(element, names, values),
         };
         // Installs the browser-backed transition operations the DOM <Transition>/<TransitionGroup>
-        // choreography writes through ([V01.01.04.07]). Class/timing/FLIP ops run direct (not through the
-        // command buffer): they are rAF-timed and read-then-write, and the JS side calls a single .NET
-        // resolve per completion. In buffered mode the same direct ops are used — full buffered-frame
-        // ordering of transition class writes is a documented follow-up (the deterministic test adapter
-        // pins the choreography here).
+        // choreography writes through ([V01.01.04.07]). This is the DIRECT-mode instance: each class/
+        // timing/FLIP op crosses the boundary immediately, and the JS side calls a single .NET resolve per
+        // completion. Buffered mode ([V01.01.04.07.02]) does NOT reuse these directly — it wraps this
+        // instance (BufferedBrowserNodeOperations.Activate) so class writes and the reflow ride the command
+        // buffer (ordered with the node ops, honoring the reflow + next-frame barriers) while the rAF/read/
+        // listener ops delegate here behind a forced flush.
         DomTransitionOperations.Current = new DomTransitionOperations
         {
             AddTransitionClass = static (element, cssClass) => BrowserDomBridge.AddTransitionClass(element, cssClass),

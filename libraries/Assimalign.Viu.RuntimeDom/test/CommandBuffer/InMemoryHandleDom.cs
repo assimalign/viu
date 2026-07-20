@@ -152,6 +152,66 @@ internal sealed class InMemoryHandleDom
     internal void RemoveEventListener(int handle, string eventName, bool capture)
         => Get(handle).Listeners.Remove(capture ? eventName + "|capture" : eventName);
 
+    // --- transition class choreography ([V01.01.04.07.02]) ---------------------------------------
+    // Mirrors viu-dom.js addTransitionClass/removeTransitionClass (each whitespace-separated token joins
+    // el.classList, tracked in the el.__vtc-style set) and forceReflow (document.body.offsetHeight). The
+    // reflow read is counted so a sequencing test can assert the barrier fired between class writes.
+
+    internal int ReflowCount { get; private set; }
+
+    /// <summary>
+    /// The ordered <c>add:</c>/<c>remove:</c>/<c>reflow</c> log the decoder appends as it replays a frame,
+    /// in exact op order — the browser-observable class/reflow sequence a sequencing test slices per apply.
+    /// </summary>
+    internal List<string> TransitionLog { get; } = [];
+
+    internal void AddTransitionClass(int handle, string cssClass)
+    {
+        TransitionLog.Add("add:" + cssClass);
+        var classes = Get(handle).TransitionClasses;
+        foreach (var token in cssClass.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            classes.Add(token);
+        }
+    }
+
+    internal void RemoveTransitionClass(int handle, string cssClass)
+    {
+        TransitionLog.Add("remove:" + cssClass);
+        var classes = Get(handle).TransitionClasses;
+        foreach (var token in cssClass.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            classes.Remove(token);
+        }
+    }
+
+    /// <summary>The reflow barrier: counts a real synchronous reflow so tests can pin the barrier's position.</summary>
+    internal void ForceReflow()
+    {
+        TransitionLog.Add("reflow");
+        ReflowCount++;
+    }
+
+    /// <summary>The transition classes currently on an element (upstream <c>el.__vtc</c>/<c>classList</c>).</summary>
+    internal IReadOnlyCollection<string> TransitionClasses(int handle) => Get(handle).TransitionClasses;
+
+    /// <summary>Whether the handle is still registered (not yet released by a remove/setElementText).</summary>
+    internal bool IsMounted(int handle) => _nodes.ContainsKey(handle);
+
+    /// <summary>The handle of the first live element with <paramref name="tag"/> in creation order, or 0.</summary>
+    internal int FindFirstElement(string tag)
+    {
+        for (var handle = 1; handle < _nextHandle; handle++)
+        {
+            if (_nodes.TryGetValue(handle, out var node) && node.Kind == NodeKind.Element
+                && string.Equals(node.Tag, tag, StringComparison.Ordinal))
+            {
+                return handle;
+            }
+        }
+        return 0;
+    }
+
     // --- serialization (deterministic total fingerprint) -----------------------------------------
 
     internal string Serialize(int handle)
@@ -291,5 +351,9 @@ internal sealed class InMemoryHandleDom
         internal Dictionary<string, string> Styles { get; } = new(StringComparer.Ordinal);
 
         internal Dictionary<string, string> Listeners { get; } = new(StringComparer.Ordinal);
+
+        // Transition classes are tracked apart from the bound `class` attribute (upstream el.__vtc), so
+        // they stay out of the structural Serialize() fingerprint the differential test compares.
+        internal HashSet<string> TransitionClasses { get; } = new(StringComparer.Ordinal);
     }
 }

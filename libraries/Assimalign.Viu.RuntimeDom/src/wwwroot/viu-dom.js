@@ -117,7 +117,7 @@ function applyRemove(childHandle, released) {
 // (the void ops below reuse the exact same dom.* leaves).
 
 const COMMAND_MAGIC = 0xB6
-const COMMAND_VERSION = 0x01
+const COMMAND_VERSION = 0x02 // 0x02 added the transition class / reflow-barrier opcodes ([V01.01.04.07.02])
 const textDecoder = new TextDecoder()
 
 // Register a node AS a handle the .NET side pre-allocated (a one-way buffered create cannot return
@@ -498,8 +498,12 @@ export const dom = {
     // --- transitions ([V01.01.04.07]) -------------------------------------------------------
     // The DOM-side contract of DomTransitionOperations: classList add/remove tracked in el.__vtc,
     // the double-rAF next frame, the forced reflow, transitionend/animationend end-detection, and
-    // the FLIP getBoundingClientRect/transform ops. Class/timing ops run outside the command buffer
-    // (they are rAF-timed and read-then-write); the .NET resolve/callback fires once per completion.
+    // the FLIP getBoundingClientRect/transform ops. In direct mode these are called one op per crossing;
+    // in buffered mode ([V01.01.04.07.02]) addTransitionClass/removeTransitionClass/forceReflow are also
+    // reached through the command-buffer opcodes (21/22/23) so the class sequence stays ordered with the
+    // node ops and the reflow barrier lands between the from- and to-class writes. rAF timing and the
+    // read/listener ops (nextFrame, whenTransitionEnds, measurePosition, the FLIP ops) stay direct — the
+    // buffered adaptor forces a flush before each so they observe committed classes/layout.
 
     addTransitionClass: (nodeHandle, cssClass) => {
         const el = getNode('addTransitionClass', nodeHandle)
@@ -643,6 +647,12 @@ export const dom = {
                 case 18: dom.removeStyleProperty(int(), str()); break
                 case 19: dom.addEventListener(int(), str(), flag(), flag(), flag()); break
                 case 20: dom.removeEventListener(int(), str(), flag()); break
+                // Transition class choreography ([V01.01.04.07.02]): class writes are ordered with the
+                // node ops, and the reflow barrier (23, no operands) does a real synchronous reflow mid-drain
+                // so a leave's *-leave-from commits before *-leave-active in the same single-crossing frame.
+                case 21: dom.addTransitionClass(int(), str()); break
+                case 22: dom.removeTransitionClass(int(), str()); break
+                case 23: dom.forceReflow(); break
                 default: fail('applyCommandBuffer', 0, `unknown opcode ${opcode}`)
             }
         }
