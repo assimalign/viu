@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: Viu work-item helper (preferred)
-    url: https://github.com/assimalign/vuecs/blob/main/.claude/skills/viu-work-items/SKILL.md
+    url: https://github.com/assimalign/viu/blob/main/.claude/skills/viu-work-items/SKILL.md
     about: >-
       Prefer New-ViuWorkItem.ps1 — it computes the next WBS code, links the native
       sub-issue, adds the item to Project #15, and tags its Origin. Use the forms below only

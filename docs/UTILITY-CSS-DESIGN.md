@@ -1,7 +1,7 @@
 # Build-time utility-first CSS engine — design
 
 Scoping deliverable for **[V01.01.12.10] Scope the build-time utility-first CSS engine**
-([#129](https://github.com/assimalign/vuecs/issues/129)). This is a design document plus a proposed
+([#129](https://github.com/assimalign/viu/issues/129)). This is a design document plus a proposed
 work-item breakdown, **not** an implementation — no engine code ships on this branch.
 
 The engine is an in-house, Tailwind-style utility-first CSS system built entirely at **build time**:
@@ -43,10 +43,10 @@ MSBuild pipeline — and no single library's `docs/DESIGN.md` owns the whole pic
   [documentation](../.claude/rules/documentation.md), [deviations](../.claude/rules/deviations.md)
 - Landed architecture this builds on:
   [`Assimalign.Viu.Syntax` DESIGN](../libraries/Assimalign.Viu.Syntax/docs/DESIGN.md) (the
-  registration seam, [#127](https://github.com/assimalign/vuecs/issues/127)) and
+  registration seam, [#127](https://github.com/assimalign/viu/issues/127)) and
   [`Assimalign.Viu.Syntax.Css` DESIGN](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md) (the
   tokenizer/tree/selector parser/scoped rewriter,
-  [#60](https://github.com/assimalign/vuecs/issues/60))
+  [#60](https://github.com/assimalign/viu/issues/60))
 
 ---
 
@@ -54,12 +54,12 @@ MSBuild pipeline — and no single library's `docs/DESIGN.md` owns the whole pic
 
 Viu already compiles `.viu` single-file components at build time through the
 `Assimalign.Viu.Syntax.*` cluster and the `SingleFileComponentGenerator`
-([#58](https://github.com/assimalign/vuecs/issues/58)). The utility-first CSS engine is the **flagship
+([#58](https://github.com/assimalign/viu/issues/58)). The utility-first CSS engine is the **flagship
 second consumer** of the same machinery — the role a Tailwind Vite plugin plays alongside
 `@vitejs/plugin-vue` in a Vue build. It reuses three landed foundations:
 
 1. **The registration seam** ([`Assimalign.Viu.Syntax`](../libraries/Assimalign.Viu.Syntax/docs/DESIGN.md),
-   [#127](https://github.com/assimalign/vuecs/issues/127)). `AggregateSyntaxParserOptions<T>.RegisterParser(SyntaxSourcePredicate, SyntaxParser)`
+   [#127](https://github.com/assimalign/viu/issues/127)). `AggregateSyntaxParserOptions<T>.RegisterParser(SyntaxSourcePredicate, SyntaxParser)`
    is the seam a composition root uses to attach a parser to a block name, `lang`, or file type
    without the container library referencing it. The utility engine registers its own extraction
    pass here — "language libraries never reference each other; the composition root constructs the
@@ -68,7 +68,7 @@ second consumer** of the same machinery — the role a Tailwind Vite plugin play
    use.
 
 2. **The CSS AST and emitters** ([`Assimalign.Viu.Syntax.Css`](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md),
-   [#60](https://github.com/assimalign/vuecs/issues/60)). The two-phase tokenizer (`CssTokenizer`) →
+   [#60](https://github.com/assimalign/viu/issues/60)). The two-phase tokenizer (`CssTokenizer`) →
    context-directed rule parser (`CssParseEngine`), the record-graph tree (`CssStylesheetNode`,
    `CssQualifiedRuleNode`, `CssDeclarationNode`, …), the flat selector model, and the deterministic
    canonical serializer behind `CssScopedRewriter` are all reusable. The Css DESIGN already names
@@ -79,7 +79,7 @@ second consumer** of the same machinery — the role a Tailwind Vite plugin play
 
 3. **The incremental generator pipeline and its MSBuild integration**
    (`SingleFileComponentGenerator`, `.props`/`.targets`,
-   [#58](https://github.com/assimalign/vuecs/issues/58)). `.viu` files already flow in as
+   [#58](https://github.com/assimalign/viu/issues/58)). `.viu` files already flow in as
    `AdditionalFiles`; every pipeline stage is a value-equatable record; the RS1035 content-file
    limitation (a source generator emits C#, not files, and `System.IO` is banned in the analyzer
    sandbox) is already documented, with the extracted CSS surfacing as the generated `ExtractedStyles`
@@ -390,12 +390,12 @@ Css library owns rule-level CSS parsing and serialization; each higher feature o
 | **Programmatic rule construction** (new, [§7](#7-work-item-breakdown) V01.01.12.11) | `Assimalign.Viu.Syntax.Css` | **utility engine** (scoped CSS never needed it because it rewrites an existing tree) |
 | Scoped `[data-v-…]` selector rewrite (`CssScopedRewriter`) | `Assimalign.Viu.Syntax.Css` | scoped CSS; utility engine **only in optional scoped-utility mode** |
 | Candidate grammar + resolver | utility engine core | — (owned) |
-| Local module-class hashing + `v-bind()`→`var()` rewrite | CSS Modules ([#62](https://github.com/assimalign/vuecs/issues/62)) | — (owned) |
+| Local module-class hashing + `v-bind()`→`var()` rewrite | CSS Modules ([#62](https://github.com/assimalign/viu/issues/62)) | — (owned) |
 
 The utility engine **reuses** the tokenizer/tree/serializer and **adds** a construction surface; it
 does not modify or fork the parser.
 
-### 5.2 Composition with scoped CSS ([#60](https://github.com/assimalign/vuecs/issues/60), landed)
+### 5.2 Composition with scoped CSS ([#60](https://github.com/assimalign/viu/issues/60), landed)
 
 Tailwind utilities are **global by design** — `bg-blue-500` means the same thing everywhere. So the
 utility stylesheet is emitted **once, globally, un-scoped** — it is *not* rewritten with any
@@ -407,7 +407,7 @@ scoped-utility mode** (per-component utilities that *are* rewritten with the com
 reuse `CssScopedRewriter` unchanged — this is the "for its own scoping, `CssScopedRewriter`" reuse the
 Css DESIGN anticipates — but it is off by default and deferred (OQ-6).
 
-### 5.3 Composition with CSS Modules and `v-bind()` ([#62](https://github.com/assimalign/vuecs/issues/62), in flight)
+### 5.3 Composition with CSS Modules and `v-bind()` ([#62](https://github.com/assimalign/viu/issues/62), in flight)
 
 Designed against #62's **issue contract**, not its in-progress code:
 
@@ -423,7 +423,7 @@ Designed against #62's **issue contract**, not its in-progress code:
   (`bg-[var(--brand)]`) — which just works, because the arbitrary value is emitted verbatim.
 - Hash determinism: where the utility engine ever needs a component-scoped hash (scoped-utility mode,
   OQ-6), it uses the **same FNV-1a-over-project-relative-path scheme** as `StyleScopeId`
-  ([#60](https://github.com/assimalign/vuecs/issues/60)), so all three features agree on hashing.
+  ([#60](https://github.com/assimalign/viu/issues/60)), so all three features agree on hashing.
 
 ### 5.4 `@apply`
 
@@ -473,7 +473,7 @@ sets, keyed so it is skipped when no per-file set changed.
   hit). Edits that add a genuinely new utility re-run only stages 4–6 over the whole (small) set.
 - The **`ViuBundleCss`** task is gated by MSBuild `Inputs`/`Outputs`, so a no-op build does no CSS
   file work.
-- A **budget** to hold the line (validated by the [#95](https://github.com/assimalign/vuecs/issues/95)
+- A **budget** to hold the line (validated by the [#95](https://github.com/assimalign/viu/issues/95)
   size/AOT gates, extended per V01.01.12.16): full generation for the reference sample stays within a
   low-tens-of-milliseconds share of the build, and the runtime WASM payload gains **zero** bytes of
   CSS-generation code (only the static `.css` asset, which is not in the WASM module).
@@ -483,11 +483,11 @@ sets, keyed so it is skipped when no per-file set changed.
 ## 7. Work-item breakdown
 
 Proposed as **sibling features under area [V01.01.12] Framework - Tooling**
-([#89](https://github.com/assimalign/vuecs/issues/89)) — the parent area of this scoping feature
+([#89](https://github.com/assimalign/viu/issues/89)) — the parent area of this scoping feature
 [V01.01.12.10]. The existing Tooling features run `.01`–`.10`
-(`.08` = [#104](https://github.com/assimalign/vuecs/issues/104),
-`.09` = [#125](https://github.com/assimalign/vuecs/issues/125),
-`.10` = [#129](https://github.com/assimalign/vuecs/issues/129), this item), so the next free feature
+(`.08` = [#104](https://github.com/assimalign/viu/issues/104),
+`.09` = [#125](https://github.com/assimalign/viu/issues/125),
+`.10` = [#129](https://github.com/assimalign/viu/issues/129), this item), so the next free feature
 codes are **`.11`+**. Tasks under a feature take `<feature>.NN`. Codes and metadata are **proposals**
 for the orchestrator to validate against the live board before filing via the
 [`viu-work-items` skill](../.claude/skills/viu-work-items/SKILL.md); the skill computes the next
@@ -515,7 +515,7 @@ scoped CSS (W04) also wants bundling and they unblock everything else. The engin
 
 Each feature body below is **file-ready** (repo issue-body standard: `## Summary` →
 `## Acceptance Criteria` → `### Standards and Compliance` → `### Architectural boundaries`, per
-[#62](https://github.com/assimalign/vuecs/issues/62)/[#129](https://github.com/assimalign/vuecs/issues/129)).
+[#62](https://github.com/assimalign/viu/issues/62)/[#129](https://github.com/assimalign/viu/issues/129)).
 Representative child tasks are listed for the two largest features (`.15`, `.16`).
 
 ---
@@ -902,7 +902,7 @@ implementation is not blocked.
 
 ## 9. Acceptance-criteria traceability
 
-Mapping each [#129](https://github.com/assimalign/vuecs/issues/129) acceptance criterion to where this
+Mapping each [#129](https://github.com/assimalign/viu/issues/129) acceptance criterion to where this
 document satisfies it.
 
 | #129 criterion | Satisfied in |

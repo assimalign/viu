@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Create a GitHub work item (feature / task) in the assimalign/vuecs Project #15,
+    Create a GitHub work item (feature / task) in the assimalign/viu Project #15,
     following the V01.01.NN WBS scheme, native parent/sub-issue links, and the
     Summary / Acceptance Criteria body template — classifying scope creep and reusing
     existing items instead of creating duplicates.
@@ -120,7 +120,7 @@ Set-StrictMode -Version Latest
 
 # --- Constants -------------------------------------------------------------------------------
 $Owner       = 'assimalign'
-$Repo        = 'assimalign/vuecs'
+$Repo        = 'assimalign/viu'
 $ProjectNum  = 15
 $WbsPattern  = 'V\d{2}(?:\.\d{2})+'      # viu WBS codes are V-prefixed
 $AreaPattern = 'Framework - (.+)$'       # area-epic title convention
