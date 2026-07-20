@@ -1,0 +1,58 @@
+# HackerNews sample build+test ([V01.01.13.06], #103): the Wave-4 exit demo composing the router,
+# store, async components, transitions, and the .viu CSS bundle. Mirrors webapp.yml (a warnings-as-
+# errors WASM build) and adds a test lane (Testing renderer + memory-history router). The trimmed
+# publish + size/trimming gate for this sample runs in budget-gates.yml (it is in the budget manifest).
+# The sample references every runtime area transitively, so a change to any library or the build
+# system re-runs this workflow.
+name: hackernews
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/Assimalign.Viu.HackerNews/**'
+      - 'examples/Assimalign.Viu.HackerNews.Tests/**'
+      - 'examples/Directory.Build.props'
+      - 'libraries/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/hackernews.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/Assimalign.Viu.HackerNews/**'
+      - 'examples/Assimalign.Viu.HackerNews.Tests/**'
+      - 'examples/Directory.Build.props'
+      - 'libraries/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/hackernews.yml'
+
+jobs:
+  build-test:
+    name: build+test HackerNews sample
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The test project references the WebAssembly sample project, whose build pulls the browser-wasm
+      # runtime pack, so the wasm-tools workload is required for both the build and the test lanes.
+      - name: Set up .NET (with wasm-tools)
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      - name: Build the sample (warnings are errors)
+        run: dotnet build examples/Assimalign.Viu.HackerNews/Assimalign.Viu.HackerNews.csproj --configuration Release -warnaserror
+
+      - name: Build + test (Testing renderer + memory-history router)
+        run: dotnet test examples/Assimalign.Viu.HackerNews.Tests/Assimalign.Viu.HackerNews.Tests.csproj --configuration Release -warnaserror

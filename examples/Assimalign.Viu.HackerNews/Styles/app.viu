@@ -1,0 +1,136 @@
+@style {
+    /* App chrome, view frame, loading/error, and user page. Authored as .viu @style blocks so the
+       ViuBundleCss task compiles every **/*.viu into the fingerprinted
+       Assimalign.Viu.HackerNews.viu.css bundle, whose <link> the build auto-injects into index.html
+       (no manual stylesheet tag). These are global (unscoped) selectors matched by class name, because
+       the logic-bearing components are C# render functions rather than generated .viu components —
+       see README.md "Why .viu is CSS-only today". */
+
+    .hn-app {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    .hn-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        padding: 0.5rem 1rem;
+        background: var(--hn-header);
+    }
+
+    .hn-logo {
+        font-weight: 700;
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .hn-logo:hover {
+        text-decoration: none;
+    }
+
+    .hn-logo-mark {
+        display: inline-grid;
+        place-items: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 1px solid #ffffff;
+        color: #ffffff;
+        font-size: 0.85rem;
+        line-height: 1;
+    }
+
+    .hn-tabs {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .hn-tab {
+        color: #ffffff;
+        font-weight: 600;
+        opacity: 0.9;
+    }
+
+    .hn-tab.router-link-active {
+        text-decoration: underline;
+        opacity: 1;
+    }
+
+    .hn-main {
+        flex: 1;
+        padding: 1rem;
+    }
+
+    .hn-footer {
+        display: block;
+        padding: 1rem;
+        border-top: 1px solid var(--hn-border);
+        color: var(--hn-muted);
+        font-size: 0.8rem;
+        text-align: center;
+    }
+
+    .hn-view-title {
+        font-size: 1.1rem;
+        margin: 0 0 1rem;
+    }
+
+    .hn-empty {
+        color: var(--hn-muted);
+    }
+
+    .hn-back-link {
+        color: var(--hn-orange);
+        font-weight: 600;
+    }
+
+    .hn-loading {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 2rem 0;
+        color: var(--hn-muted);
+    }
+
+    .hn-spinner {
+        width: 1.1rem;
+        height: 1.1rem;
+        border: 2px solid var(--hn-border);
+        border-top-color: var(--hn-orange);
+        border-radius: 50%;
+        animation: hn-spin 0.8s linear infinite;
+    }
+
+    @keyframes hn-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .hn-error {
+        padding: 1rem;
+        border: 1px solid #f0c0a8;
+        background: #fff3ec;
+        color: #a8340a;
+        border-radius: 4px;
+    }
+
+    .hn-user-meta {
+        color: var(--hn-muted);
+        margin-bottom: 1rem;
+    }
+
+    .hn-user-about {
+        margin-bottom: 1rem;
+    }
+
+    .hn-external-profile {
+        color: var(--hn-orange);
+        font-weight: 600;
+    }
+}

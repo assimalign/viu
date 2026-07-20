@@ -1,0 +1,82 @@
+@style {
+    /* Item detail header and the recursive comment tree. */
+
+    .hn-item-header {
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--hn-border);
+        margin-bottom: 1rem;
+    }
+
+    .hn-item-head {
+        margin: 0 0 0.25rem;
+        font-size: 1.15rem;
+    }
+
+    .hn-item-title {
+        color: var(--hn-text);
+    }
+
+    .hn-item-meta {
+        color: var(--hn-muted);
+        font-size: 0.85rem;
+    }
+
+    .hn-item-text {
+        margin-top: 0.75rem;
+        color: var(--hn-text);
+    }
+
+    .hn-comments-heading {
+        font-size: 1rem;
+        margin: 0 0 0.75rem;
+    }
+
+    .hn-comments,
+    .hn-replies {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .hn-comment {
+        padding: 0.6rem 0;
+        border-top: 1px solid var(--hn-border);
+    }
+
+    .hn-comment-meta {
+        color: var(--hn-muted);
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .hn-comment-meta .hn-by {
+        color: var(--hn-muted);
+        font-weight: 600;
+    }
+
+    .hn-comment-text {
+        font-size: 0.9rem;
+    }
+
+    .hn-comment-text p {
+        margin: 0 0 0.5rem;
+    }
+
+    .hn-comment-empty {
+        color: var(--hn-muted);
+        font-style: italic;
+    }
+
+    .hn-replies {
+        margin-left: 1rem;
+        padding-left: 0.75rem;
+        border-left: 2px solid var(--hn-border);
+    }
+
+    .hn-more-replies {
+        display: inline-block;
+        margin-top: 0.35rem;
+        color: var(--hn-orange);
+        font-size: 0.8rem;
+    }
+}

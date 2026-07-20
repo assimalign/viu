@@ -1,0 +1,61 @@
+using System;
+using System.Net.Http;
+using System.Runtime.Versioning;
+using System.Threading;
+using System.Threading.Tasks;
+
+using Assimalign.Viu.Router;
+using Assimalign.Viu.Router.RuntimeDom;
+using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Store;
+
+namespace Assimalign.Viu.HackerNews;
+
+/// <summary>
+/// The browser bootstrap — the one place that touches browser-only interop, so it (and only it) is
+/// marked <see cref="SupportedOSPlatformAttribute">browser</see>. Every other type in the app stays
+/// platform-neutral and testable. Bootstrap composes the whole Wave-4 surface: the DOM runtime, the
+/// router with its click bridge (<see cref="RouterLinkDomBridge"/>), the Pinia-style store registry,
+/// and the injectable data client.
+/// </summary>
+internal static class Program
+{
+    [SupportedOSPlatform("browser")]
+    internal static async Task Main()
+    {
+        // Initialize the DOM bridge and the router's browser history, then enable client-side
+        // navigation (maps real DOM clicks on RouterLinks into router.Push, suppressing full reloads).
+        await BrowserRuntime.InitializeAsync();
+        await RouterHistory.InitializeAsync();
+        RouterLinkDomBridge.Install();
+
+        // The injectable data seam, bound to the live HackerNews Firebase API (fetch-backed in WASM).
+        var httpClient = new HttpClient { BaseAddress = HackerNewsClient.BaseAddress };
+        var stores = new HackerNewsStores(new HackerNewsClient(httpClient));
+
+        // Web history = clean deep-link URLs (/item/8863). Route table + root redirect are shared with tests.
+        var history = RouterHistory.CreateWeb();
+        // Fully qualified: the simple name Router binds to the Assimalign.Viu.Router namespace here.
+        var router = new Assimalign.Viu.Router.Router(history, AppRoutes.Create());
+        router.BeforeEach(AppRoutes.RedirectRoot);
+
+        // Resolve the initial URL before mounting. The router resolves its initial location eagerly and
+        // without running guards (no vue-router START sentinel — [V01.01.08.07], #219), so the BeforeEach
+        // root redirect cannot fire for a page loaded directly at "/". Map it to the top feed here; the
+        // guard still handles in-session navigations to "/" (e.g. the logo).
+        var initialLocation = history.Location is "/" or "" ? "/top" : history.Location;
+        await router.Replace(initialLocation);
+
+        // A per-app store registry, provided app-wide so UseStore() resolves through component context;
+        // the store-definitions container and the router are provided under their injection keys.
+        var registry = new StoreRegistry();
+        BrowserRuntime.CreateApp(AppShell.Instance)
+            .Use(registry.AsPlugin<int>())
+            .Provide(HackerNewsStores.InjectionKey, stores)
+            .Provide(RouterInjectionKeys.Router, router)
+            .Mount("#app");
+
+        // Keep the WASM main loop alive; rendering is reactive from here.
+        await Task.Delay(Timeout.Infinite);
+    }
+}
