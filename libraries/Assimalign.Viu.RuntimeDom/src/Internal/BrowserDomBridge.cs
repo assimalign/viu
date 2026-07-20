@@ -400,15 +400,15 @@ internal static partial class BrowserDomBridge
         }
     }
 
-    internal static double[] MeasurePosition(int nodeHandle)
+    internal static double[] MeasurePositions(int[] nodeHandles)
     {
         try
         {
-            return Imports.MeasurePosition(nodeHandle);
+            return Imports.MeasurePositions(nodeHandles);
         }
         catch (JSException exception)
         {
-            throw Translate("measurePosition", nodeHandle, exception);
+            throw Translate("measurePositions", nodeHandles.Length > 0 ? nodeHandles[0] : 0, exception);
         }
     }
 
@@ -601,9 +601,13 @@ internal static partial class BrowserDomBridge
             int explicitTimeout,
             [JSMarshalAs<JSType.Function>] Action resolve);
 
-        [JSImport("dom.measurePosition", ModuleName)]
+        // Batched FLIP snapshot read ([V01.01.04.07.03]): the handle array crosses in one call and the
+        // flat [left, top, ...] result returns in one call, mirroring the history bridge's readSnapshot
+        // flat-primitives pattern — N children cost one crossing, not N.
+        [JSImport("dom.measurePositions", ModuleName)]
         [return: JSMarshalAs<JSType.Array<JSType.Number>>]
-        internal static partial double[] MeasurePosition(int nodeHandle);
+        internal static partial double[] MeasurePositions(
+            [JSMarshalAs<JSType.Array<JSType.Number>>] int[] nodeHandles);
 
         [JSImport("dom.setMoveTransform", ModuleName)]
         internal static partial void SetMoveTransform(int nodeHandle, double deltaX, double deltaY);

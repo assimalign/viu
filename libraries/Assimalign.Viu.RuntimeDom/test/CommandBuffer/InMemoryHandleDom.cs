@@ -192,6 +192,27 @@ internal sealed class InMemoryHandleDom
         ReflowCount++;
     }
 
+    // FLIP move ops ([V01.01.04.07.03]): mirror viu-dom.js setMoveTransform (inline transform +
+    // transitionDuration:0s) and clearMoveStyles. Kept out of the structural Serialize() fingerprint like
+    // the transition classes; the ordered log lets a sequencing test pin transforms -> reflow -> class -> clear.
+
+    /// <summary>Records the FLIP inverting transform for an element (upstream <c>applyTranslation</c>).</summary>
+    internal void SetMoveTransform(int handle, double deltaX, double deltaY)
+    {
+        TransitionLog.Add(string.Create(CultureInfo.InvariantCulture, $"transform:{handle}:{deltaX},{deltaY}"));
+        Get(handle).MoveTransform = (deltaX, deltaY);
+    }
+
+    /// <summary>Clears the FLIP transform so the move class animates the element home (upstream <c>clearMoveStyles</c>).</summary>
+    internal void ClearMoveStyles(int handle)
+    {
+        TransitionLog.Add(string.Create(CultureInfo.InvariantCulture, $"clear:{handle}"));
+        Get(handle).MoveTransform = null;
+    }
+
+    /// <summary>The FLIP inverting transform currently applied to an element, or null once cleared.</summary>
+    internal (double DeltaX, double DeltaY)? MoveTransform(int handle) => Get(handle).MoveTransform;
+
     /// <summary>The transition classes currently on an element (upstream <c>el.__vtc</c>/<c>classList</c>).</summary>
     internal IReadOnlyCollection<string> TransitionClasses(int handle) => Get(handle).TransitionClasses;
 
@@ -355,5 +376,8 @@ internal sealed class InMemoryHandleDom
         // Transition classes are tracked apart from the bound `class` attribute (upstream el.__vtc), so
         // they stay out of the structural Serialize() fingerprint the differential test compares.
         internal HashSet<string> TransitionClasses { get; } = new(StringComparer.Ordinal);
+
+        // The FLIP inverting transform (upstream el.style.transform), likewise out of the fingerprint.
+        internal (double DeltaX, double DeltaY)? MoveTransform { get; set; }
     }
 }
