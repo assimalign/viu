@@ -72,6 +72,8 @@ runtime template compilation. They never ship in the runtime assemblies.
 | Sample | What it shows |
 | --- | --- |
 | [`Assimalign.Viu.WebApp`](examples/Assimalign.Viu.WebApp) | A browser WASM app: a stopwatch rendered from C# through the handle-based DOM bridge. Its `?diagnostics=1` mode runs the interop marshaling benchmark behind [RuntimeDom ADR-0001](libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md). |
+| [`Assimalign.Viu.TodoMvc`](examples/Assimalign.Viu.TodoMvc) | The canonical [TodoMVC](https://github.com/tastejs/todomvc/blob/master/app-spec.md) app built from components: `[Reactive]` source-generated state, a `ReactiveList<T>` with computed filtered/remaining views, keyed list rendering, and typed provide/inject. DOM-free tests in [`Assimalign.Viu.TodoMvc.Tests`](examples/Assimalign.Viu.TodoMvc.Tests). |
+| [`Assimalign.Viu.Forms`](examples/Assimalign.Viu.Forms) | A registration form exercising every implemented `v-model` flavor (text, number, checkbox, checkbox-list, radio, single/multiple `<select>`, textarea) and the `.trim`/`.number`/`.lazy` modifiers, with a `ref`-per-field composition model and a live preview. DOM-free tests in [`Assimalign.Viu.Forms.Tests`](examples/Assimalign.Viu.Forms.Tests). |
 
 ### Packaging (`sdks/`, `frameworks/`)
 
