@@ -44,6 +44,38 @@ typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`
 (`IPlugin<TNode>`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
 `app.config.globalProperties` bag.
 
+## Teleport is a special vnode type, not a component
+
+`Teleport` ([V01.01.03.17], upstream `components/Teleport.ts`) mirrors upstream by being a distinct
+`VirtualNodeType.Teleport` (carrying `ShapeFlags.Teleport`) that the renderer branches on in
+*patch / move / unmount* — **not** an `IComponentDefinition` like `BaseTransition`. It cannot be an
+ordinary component: it frames its own tree position with a main-tree anchor pair (reusing the vnode's
+`El`/`Anchor`) while mounting its children into a *different* container, and it moves those children
+between containers when `disabled`/`to` change — behavior with no place in the component render model.
+Target-side state (the resolved target and its anchor pair, plus the deferred-mount job) hangs off a
+single internal `TeleportState` reference so a non-Teleport vnode pays only one null field.
+
+Target lookup is the one new platform seam: the `to` prop is either a direct platform-node target or a
+selector resolved through `RendererOptions<TNode>.QuerySelector` — the browser adapter's DOM
+`querySelector`, the test adapter's registered-root search. The renderer never touches a node except
+through node-ops, so no DOM/JS access leaks in. `defer` resolves the target in a post-flush job
+(so a Teleport can target an element rendered later in the same tree); toggling `disabled` and changing
+`to` relocate the existing nodes with `insert` (no unmount), preserving subtree state.
+
+Deliberate divergences from upstream `Teleport.ts`, each documented at its call site:
+
+- **No SVG/MathML target-namespace sniff.** Upstream inspects the resolved target's `namespaceURI` to
+  switch the children's namespace; Viu's node-ops expose no element-namespace query, so the ambient
+  compiled namespace is threaded through instead.
+- **Target anchors are created only when the target resolves.** Upstream's `prepareAnchor` always
+  creates the `targetStart`/`targetAnchor` pair (for its hydration path) and inserts them only when a
+  target exists; Viu creates none for an unresolved target, so a missing/disabled Teleport never leaks
+  two never-inserted platform-node handles. The `TeleportEndKey` sibling-skip property is likewise
+  hydration-only and omitted.
+- **`default(TNode)` is honored as the "no node" sentinel** when resolving a string target: a value-type
+  handle renderer (the browser's `0`) returning it means "not found", exactly as a null reference-type
+  handle does — so a missing selector never teleports into node `0`.
+
 ## Deltas from Vue 3
 
 - **DOM directives live one layer up.** `v-show` and `v-model` and the DOM transitions are *not*

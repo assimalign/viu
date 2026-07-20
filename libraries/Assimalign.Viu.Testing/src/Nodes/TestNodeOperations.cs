@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 using Assimalign.Viu.RuntimeCore;
 
@@ -15,8 +16,18 @@ public static class TestNodeOperations
 {
     /// <summary>Creates the node-ops set, recording into <paramref name="log"/>.</summary>
     /// <param name="log">The op log to record into.</param>
+    /// <param name="teleportTargetRoots">
+    /// The live set of roots the <c>querySelector</c> node-op searches to resolve a <c>&lt;Teleport&gt;</c>
+    /// string target (each root and its subtree, using the <c>@vue/test-utils</c> selector subset —
+    /// tag/<c>#id</c>/<c>.class</c>/<c>[attr]</c>). Null leaves the renderer without a <c>querySelector</c>
+    /// option, so a string Teleport target warns as unsupported — matching a renderer that declares none.
+    /// The browser adapter resolves targets through the real DOM <c>querySelector</c>; this registered-root
+    /// search is the in-memory stand-in ([V01.01.03.17]).
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="log"/> is null.</exception>
-    public static RendererOptions<TestNode> Create(TestNodeOperationLog log)
+    public static RendererOptions<TestNode> Create(
+        TestNodeOperationLog log,
+        IReadOnlyList<TestElement>? teleportTargetRoots = null)
     {
         ArgumentNullException.ThrowIfNull(log);
         return new RendererOptions<TestNode>
@@ -136,7 +147,33 @@ public static class TestNodeOperations
                     TestNodeOperationType.InsertStaticContent, staticNode, parentElement, anchor, Text: content));
                 return (staticNode, staticNode);
             },
+            // The in-memory stand-in for the DOM querySelector node-op (upstream nodeOps.querySelector):
+            // the first element in the registered roots' subtrees matching the selector, or null. Only
+            // wired when target roots are supplied, so a renderer built without them behaves like one
+            // that declares no querySelector option (a string Teleport target then warns as unsupported).
+            QuerySelector = teleportTargetRoots is null ? null : selector => ResolveTarget(teleportTargetRoots, selector),
         };
+    }
+
+    private static TestNode? ResolveTarget(IReadOnlyList<TestElement> roots, string selector)
+    {
+        foreach (var root in roots)
+        {
+            // A registered root is itself a candidate (a detached target container), then its subtree
+            // (an in-tree target such as a rendered <div id="modal">), in document order.
+            if (TestQuery.Matches(root, selector))
+            {
+                return root;
+            }
+            foreach (var descendant in TestQuery.DescendantElementsOf(root))
+            {
+                if (TestQuery.Matches(descendant, selector))
+                {
+                    return descendant;
+                }
+            }
+        }
+        return null;
     }
 
     private static void Detach(TestNode node)

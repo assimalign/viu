@@ -12,8 +12,10 @@ toolchain, no JS interop. Area: `V01.01.11`.
   component against the in-memory renderer and returns a `ComponentWrapper`. The caller supplies the
   component instance (source-generated factories, never reflection activation).
 - **`TestRenderer`** — the ready-to-use in-memory renderer (`@vue/runtime-test`'s `render` + `nodeOps`
-  pair): `Render`, `CreateContainer`, the underlying `Renderer<TestNode>`, and the `OperationLog`
-  every node operation is recorded into.
+  pair): `Render`, `CreateContainer`, `RegisterQueryRoot` (makes an element findable by a
+  `<Teleport>` string target — the in-memory stand-in for the DOM `querySelector`; render containers
+  are auto-registered), the underlying `Renderer<TestNode>`, and the `OperationLog` every node
+  operation is recorded into.
 - **The in-memory node tree** (`Nodes/`) — `TestNode` (abstract), `TestElement`, `TestText`,
   `TestComment`; `TestNodeOperations` (the `RendererOptions<TestNode>` factory); the op log
   (`TestNodeOperationLog`, `TestNodeOperation`, `TestNodeOperationType`); `TestNodeSerializer`

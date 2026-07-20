@@ -28,4 +28,14 @@ public enum VirtualNodeType
 
     /// <summary>A keyless wrapper for multiple root nodes (upstream: the <c>Fragment</c> symbol).</summary>
     Fragment,
+
+    /// <summary>
+    /// A <c>&lt;Teleport&gt;</c> built-in that renders its children into a different container than its
+    /// own tree position (upstream: the <c>Teleport</c> symbol; the vnode also carries
+    /// <see cref="Shared.ShapeFlags.Teleport"/>). Treated as a special vnode type in the
+    /// patch/move/unmount paths — not an ordinary component
+    /// (<c>packages/runtime-core/src/components/Teleport.ts</c>,
+    /// https://vuejs.org/guide/built-ins/teleport.html). [V01.01.03.17]
+    /// </summary>
+    Teleport,
 }
