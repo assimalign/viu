@@ -107,6 +107,13 @@ internal static class CommandBufferDecoder
                     // The reflow barrier carries no operands; the real applier reads document.body.offsetHeight.
                     dom.ForceReflow();
                     break;
+                case DomCommandOpcode.SetMoveTransform:
+                    // The first float64 operands in the wire format: the FLIP inverting delta ([V01.01.04.07.03]).
+                    dom.SetMoveTransform(ReadInt(span, ref cursor), ReadDouble(span, ref cursor), ReadDouble(span, ref cursor));
+                    break;
+                case DomCommandOpcode.ClearMoveStyles:
+                    dom.ClearMoveStyles(ReadInt(span, ref cursor));
+                    break;
                 default:
                     throw new InvalidOperationException($"Unknown command-buffer opcode {(byte)opcode}.");
             }
@@ -139,4 +146,11 @@ internal static class CommandBufferDecoder
     }
 
     private static bool ReadBool(ReadOnlySpan<byte> span, ref int cursor) => span[cursor++] != 0;
+
+    private static double ReadDouble(ReadOnlySpan<byte> span, ref int cursor)
+    {
+        var value = BinaryPrimitives.ReadDoubleLittleEndian(span[cursor..]);
+        cursor += 8;
+        return value;
+    }
 }

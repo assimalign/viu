@@ -47,10 +47,12 @@ namespace Assimalign.Viu.RuntimeDom;
 /// frames and can never coalesce.</item>
 /// </list>
 /// Transition reads and listener registrations (<c>NextFrame</c>'s scheduling, <c>WhenTransitionEnds</c>,
-/// <c>MeasurePosition</c>, <c>HasCssTransform</c>, the FLIP ops) force a flush and then hit the live
+/// <c>MeasurePositions</c>, <c>HasCssTransform</c>, <c>WhenMoveEnds</c>) force a flush and then hit the live
 /// bridge, so <c>getComputedStyle</c>/<c>getBoundingClientRect</c> observe the committed classes/layout;
-/// their resolve callbacks flush the finishing class removals. (FLIP <em>move</em> batching — reading all
-/// positions in one pass — is the separate #163.)
+/// their resolve callbacks flush the finishing class removals. The FLIP <em>move</em> pass is batched
+/// ([V01.01.04.07.03]): <c>MeasurePositions</c> reads every child's rectangle in one crossing, and the
+/// FLIP transform writes (<c>SetMoveTransform</c>/<c>ClearMoveStyles</c>, opcodes 24/25) ride the command
+/// buffer with the reflow barrier so the whole move write frame commits in one crossing.
 /// </para>
 /// Ambient by activation: <see cref="Activate"/> points the flush seam, the event dispatcher, the
 /// directive operations, and the transition operations at this instance; <see cref="Deactivate"/>
@@ -274,23 +276,19 @@ internal sealed class BufferedBrowserNodeOperations
                 ApplyPending();
             });
         },
-        // FLIP reads/writes force a flush so getBoundingClientRect and the clone read see committed DOM;
-        // batching the FLIP position pass into one read/write phase is the separate #163.
-        MeasurePosition = element =>
+        // FLIP move batching ([V01.01.04.07.03]). The read pass is one crossing: flush the pending patch
+        // so getBoundingClientRect sees the committed post-reorder layout, then read every child's rect in
+        // one batched call. The write pass (per-element transform, the reflow barrier, the move class, and
+        // the transform clear) rides the command buffer — opcodes 24/25 join 21/23 — so the whole FLIP
+        // frame commits in one crossing in upstream order, never one per moved child.
+        MeasurePositions = handles =>
         {
             FlushPending();
-            return direct.MeasurePosition(element);
+            return direct.MeasurePositions(handles);
         },
-        SetMoveTransform = (element, deltaX, deltaY) =>
-        {
-            FlushPending();
-            direct.SetMoveTransform(element, deltaX, deltaY);
-        },
-        ClearMoveStyles = element =>
-        {
-            FlushPending();
-            direct.ClearMoveStyles(element);
-        },
+        SetMoveTransform = (element, deltaX, deltaY) => _buffer.WriteSetMoveTransform(element, deltaX, deltaY),
+        ClearMoveStyles = element => _buffer.WriteClearMoveStyles(element),
+        // The clone read must see committed classes/layout: flush the pending frame, then read directly.
         HasCssTransform = (element, root, moveClass) =>
         {
             FlushPending();

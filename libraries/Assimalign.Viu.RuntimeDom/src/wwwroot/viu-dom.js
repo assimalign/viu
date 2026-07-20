@@ -117,7 +117,9 @@ function applyRemove(childHandle, released) {
 // (the void ops below reuse the exact same dom.* leaves).
 
 const COMMAND_MAGIC = 0xB6
-const COMMAND_VERSION = 0x02 // 0x02 added the transition class / reflow-barrier opcodes ([V01.01.04.07.02])
+// 0x02 added the transition class / reflow-barrier opcodes ([V01.01.04.07.02]); 0x03 added the FLIP move
+// opcodes (24/25) and, with the move deltas, the first float64 operands ([V01.01.04.07.03]).
+const COMMAND_VERSION = 0x03
 const textDecoder = new TextDecoder()
 
 // Register a node AS a handle the .NET side pre-allocated (a one-way buffered create cannot return
@@ -499,11 +501,13 @@ export const dom = {
     // The DOM-side contract of DomTransitionOperations: classList add/remove tracked in el.__vtc,
     // the double-rAF next frame, the forced reflow, transitionend/animationend end-detection, and
     // the FLIP getBoundingClientRect/transform ops. In direct mode these are called one op per crossing;
-    // in buffered mode ([V01.01.04.07.02]) addTransitionClass/removeTransitionClass/forceReflow are also
-    // reached through the command-buffer opcodes (21/22/23) so the class sequence stays ordered with the
-    // node ops and the reflow barrier lands between the from- and to-class writes. rAF timing and the
-    // read/listener ops (nextFrame, whenTransitionEnds, measurePosition, the FLIP ops) stay direct — the
-    // buffered adaptor forces a flush before each so they observe committed classes/layout.
+    // in buffered mode addTransitionClass/removeTransitionClass/forceReflow ([V01.01.04.07.02], opcodes
+    // 21/22/23) and setMoveTransform/clearMoveStyles ([V01.01.04.07.03], opcodes 24/25) are reached
+    // through the command buffer so the class + FLIP-transform sequence stays ordered with the node ops
+    // and the reflow barrier lands between them. The batched FLIP read (measurePositions) and the rAF/
+    // listener ops (nextFrame, whenTransitionEnds, whenMoveEnds, hasCssTransform) stay direct — the
+    // buffered adaptor forces a flush before each so they observe committed classes/layout, and
+    // measurePositions reads every child's rect in one crossing rather than one per child.
 
     addTransitionClass: (nodeHandle, cssClass) => {
         const el = getNode('addTransitionClass', nodeHandle)
@@ -548,9 +552,17 @@ export const dom = {
         el.addEventListener(endEvent, onEnd)
     },
 
-    measurePosition: nodeHandle => {
-        const rect = getNode('measurePosition', nodeHandle).getBoundingClientRect()
-        return [rect.left, rect.top]
+    // Batched FLIP snapshot read ([V01.01.04.07.03]): N element handles cross the boundary once and the
+    // flat [left0, top0, left1, top1, ...] result returns once, so reordering N children costs a single
+    // interop crossing per pass rather than one per child. Decision logic (deltas, who moved) stays .NET-side.
+    measurePositions: handles => {
+        const result = new Array(handles.length * 2)
+        for (let index = 0; index < handles.length; index++) {
+            const rect = getNode('measurePositions', handles[index]).getBoundingClientRect()
+            result[index * 2] = rect.left
+            result[index * 2 + 1] = rect.top
+        }
+        return result
     },
 
     setMoveTransform: (nodeHandle, deltaX, deltaY) => {
@@ -620,6 +632,11 @@ export const dom = {
             return value
         }
         const flag = () => bytes[cursor++] !== 0
+        const num = () => {
+            const value = view.getFloat64(cursor, true)
+            cursor += 8
+            return value
+        }
         const str = () => {
             const index = int()
             return index < 0 ? null : strings[index]
@@ -653,6 +670,11 @@ export const dom = {
                 case 21: dom.addTransitionClass(int(), str()); break
                 case 22: dom.removeTransitionClass(int(), str()); break
                 case 23: dom.forceReflow(); break
+                // FLIP move write pass ([V01.01.04.07.03]): every reordered child's inverting transform,
+                // then the reflow barrier (23), then the move class (21) + transform clear (25) ride one
+                // frame in upstream order, so N moved children commit in a single interop crossing.
+                case 24: dom.setMoveTransform(int(), num(), num()); break
+                case 25: dom.clearMoveStyles(int()); break
                 default: fail('applyCommandBuffer', 0, `unknown opcode ${opcode}`)
             }
         }

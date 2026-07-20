@@ -53,8 +53,16 @@ internal sealed class DomTransitionOperations
     /// </summary>
     public required Action<int, string?, int, Action> WhenTransitionEnds { get; init; }
 
-    /// <summary>Reads an element's top-left position for a FLIP snapshot (upstream: <c>getBoundingClientRect</c>).</summary>
-    public required Func<int, TransitionRectangle> MeasurePosition { get; init; }
+    /// <summary>
+    /// Reads the top-left positions of a whole batch of elements for a FLIP snapshot in <b>one</b>
+    /// interop crossing (upstream reads <c>getBoundingClientRect</c> per child inside a same-process JS
+    /// loop; a handle platform pays a boundary crossing per read, so the FLIP pass is batched — N
+    /// children cost one crossing, not N — [V01.01.04.07.03]). Returns one
+    /// <see cref="TransitionRectangle"/> per handle, index-aligned with <paramref name="handles"/>.
+    /// Decision logic (which children moved, the inverting delta) stays in .NET; the applier only reads
+    /// rectangles, preserving the "policy in C#, dumb applier in JS" split the bridge documents.
+    /// </summary>
+    public required Func<int[], TransitionRectangle[]> MeasurePositions { get; init; }
 
     /// <summary>
     /// Applies a FLIP inverting transform and a zero transition-duration to an element (upstream:

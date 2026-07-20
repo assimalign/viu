@@ -179,6 +179,46 @@ public sealed class DomCommandBufferTests
     }
 
     [Fact]
+    public void FlipMoveOpcodes_RoundTripAsFloat64_InUpstreamWriteOrder()
+    {
+        var dom = new InMemoryHandleDom();
+        var buffer = new DomCommandBuffer();
+        var one = buffer.AllocateHandle();
+        var two = buffer.AllocateHandle();
+        buffer.WriteCreateElement(one, "li", null);
+        buffer.WriteCreateElement(two, "li", null);
+
+        // The FLIP write frame ([V01.01.04.07.03]): invert every moved child, one reflow barrier, then the
+        // move class + transform clear — the exact upstream applyTranslation/forceReflow/moveClass order.
+        buffer.WriteSetMoveTransform(one, 12.5, -7.25); // fractional deltas prove the float64 operand fidelity
+        buffer.WriteSetMoveTransform(two, 0, 40);
+        buffer.WriteForceReflow();
+        buffer.WriteAddTransitionClass(one, "v-move");
+        buffer.WriteClearMoveStyles(one);
+        buffer.WriteAddTransitionClass(two, "v-move");
+        buffer.WriteClearMoveStyles(two);
+
+        CommandBufferDecoder.Apply(buffer.BackingArray, buffer.FinalizeFrame(), dom);
+
+        // The single frame replays in order: transforms (float64 deltas intact), the reflow, then per child
+        // the move class and the transform clear.
+        dom.TransitionLog.ShouldBe(
+        [
+            $"transform:{one}:12.5,-7.25",
+            $"transform:{two}:0,40",
+            "reflow",
+            "add:v-move",
+            $"clear:{one}",
+            "add:v-move",
+            $"clear:{two}",
+        ]);
+        dom.ReflowCount.ShouldBe(1);
+        // The move class stuck and the inverting transform was cleared so the element animates home.
+        dom.TransitionClasses(one).ShouldContain("v-move");
+        dom.MoveTransform(one).ShouldBeNull();
+    }
+
+    [Fact]
     public void Decoder_RejectsAFrameWithAMismatchedVersion()
     {
         var buffer = new DomCommandBuffer();

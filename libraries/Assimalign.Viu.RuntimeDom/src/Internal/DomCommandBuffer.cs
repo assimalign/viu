@@ -28,7 +28,7 @@ namespace Assimalign.Viu.RuntimeDom;
 /// [2..6)     opCount           (int32)
 /// [6..10)    nextHandle        (int32)  -- the .NET counter after this batch; JS adopts max(its, this)
 /// [10..14)   stringTableOffset (int32)  -- absolute byte offset where the string table begins
-/// [14..)     ops: each = [opcode:byte] then operands (int32 handles/indices, 1-byte bools)
+/// [14..)     ops: each = [opcode:byte] then operands (int32 handles/indices, 1-byte bools, float64 FLIP deltas)
 /// [offset]   stringCount(int32), then per string: [utf8ByteLength:int32][utf8 bytes]
 /// </code>
 /// Strings (tags, prop/event names, values) are interned per flush and referenced by int32 index; a
@@ -46,9 +46,11 @@ internal sealed class DomCommandBuffer
 
     /// <summary>
     /// The frame format version — bump on any layout or opcode change so drift fails loudly. 0x02 added
-    /// the transition class/reflow-barrier opcodes ([V01.01.04.07.02]).
+    /// the transition class/reflow-barrier opcodes ([V01.01.04.07.02]); 0x03 added the FLIP move
+    /// opcodes (<see cref="DomCommandOpcode.SetMoveTransform"/>/<see cref="DomCommandOpcode.ClearMoveStyles"/>)
+    /// and, with the move deltas, the first <c>float64</c> operands ([V01.01.04.07.03]).
     /// </summary>
-    internal const byte Version = 0x02;
+    internal const byte Version = 0x03;
 
     /// <summary>Header size: magic + version + opCount + nextHandle + stringTableOffset.</summary>
     internal const int HeaderSize = 2 + 4 + 4 + 4;
@@ -285,6 +287,28 @@ internal sealed class DomCommandBuffer
     /// </summary>
     internal void WriteForceReflow() => WriteOpcode(DomCommandOpcode.ForceReflow);
 
+    /// <summary>
+    /// Writes a FLIP inverting transform op (<see cref="DomCommandOpcode.SetMoveTransform"/>): the whole
+    /// move write pass rides one frame so N reordered children cost one interop crossing ([V01.01.04.07.03]).
+    /// </summary>
+    internal void WriteSetMoveTransform(int handle, double deltaX, double deltaY)
+    {
+        WriteOpcode(DomCommandOpcode.SetMoveTransform);
+        WriteInt32(handle);
+        WriteDouble(deltaX);
+        WriteDouble(deltaY);
+    }
+
+    /// <summary>
+    /// Writes a FLIP transform-clear op (<see cref="DomCommandOpcode.ClearMoveStyles"/>) so the move
+    /// class animates the element back to its settled position ([V01.01.04.07.03]).
+    /// </summary>
+    internal void WriteClearMoveStyles(int handle)
+    {
+        WriteOpcode(DomCommandOpcode.ClearMoveStyles);
+        WriteInt32(handle);
+    }
+
     // --- primitives ------------------------------------------------------------------------------
 
     private void WriteHandleName(DomCommandOpcode opcode, int handle, string name)
@@ -319,6 +343,13 @@ internal sealed class DomCommandBuffer
     {
         BinaryPrimitives.WriteInt32LittleEndian(_buffer.AsSpan(_position, 4), value);
         _position += 4;
+    }
+
+    private void WriteDouble(double value)
+    {
+        EnsureCapacity(8);
+        BinaryPrimitives.WriteDoubleLittleEndian(_buffer.AsSpan(_position, 8), value);
+        _position += 8;
     }
 
     private void WriteBoolean(bool value)
