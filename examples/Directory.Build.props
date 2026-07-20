@@ -1,0 +1,34 @@
+<Project>
+    <Import Project="..\Directory.Build.props" />
+
+    <!--
+        Sample WASM apps are the measurement subjects for the publish-size and
+        trimming budget gates ([V01.01.12.06], #95). Trimming is enabled here, not
+        on the gate's `dotnet publish` command line, so it stays scoped to the app
+        publish: a global -p:PublishTrimmed=true flows to the netstandard2.0
+        generator projects in the build graph and fails with NETSDK1124 (trimming
+        requires .NET Core 3.0+). TrimmerSingleWarn=false makes each ILLink /
+        trim-analyzer warning individually actionable, and the gate publishes with
+        -warnaserror so any trim warning fails the build across the sample and every
+        shipping library in its closure. Trimming only engages on publish, so an
+        ordinary `dotnet build` or `dotnet run` of the samples is unaffected.
+    -->
+    <PropertyGroup>
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimmerSingleWarn>false</TrimmerSingleWarn>
+        <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    </PropertyGroup>
+
+    <!--
+        Optional AOT-compilation lane ([V01.01.12.06], #95). RunAOTCompilation is
+        opt-in per sample publish, driven by -p:ViuRunAotCompilation=true so the
+        AOT relink is scoped to the sample apps: like PublishTrimmed, a bare global
+        -p:RunAOTCompilation=true would flow into the netstandard2.0 generator
+        projects. The AOT lane publishes with -warnaserror, so any AOT compiler
+        warning fails the build; the lane is optional on PRs and can be marked a
+        required check on release branches.
+    -->
+    <PropertyGroup Condition="'$(ViuRunAotCompilation)' == 'true'">
+        <RunAOTCompilation>true</RunAOTCompilation>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,173 @@
+# WASM size, trimming, and AOT budget gates ([V01.01.12.06], #95): the Viu analog of
+# vuejs/core's size-check job (https://github.com/vuejs/core/blob/main/.github/workflows/size-data.yml).
+# Every published byte is network payload and every retained type is trimmer input, so these
+# gates enforce the framework's source-generator-first, reflection-free cost profile. Path-filtered
+# like the other area workflows; because the sample app pulls in every runtime area transitively, a
+# change to any library, the build system, or the gate's own files re-runs the gates.
+name: budget-gates
+
+on:
+  push:
+    branches: [main, 'release/**']
+    paths:
+      - 'examples/**'
+      - 'libraries/**'
+      - 'frameworks/**'
+      - 'sdks/**'
+      - 'analyzers/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - 'scripts/Measure-PublishBudget.ps1'
+      - 'scripts/budgets/**'
+      - 'scripts/tests/**'
+      - '.github/actions/**'
+      - '.github/workflows/budget-gates.yml'
+  pull_request:
+    branches: [main, 'release/**']
+    paths:
+      - 'examples/**'
+      - 'libraries/**'
+      - 'frameworks/**'
+      - 'sdks/**'
+      - 'analyzers/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - 'scripts/Measure-PublishBudget.ps1'
+      - 'scripts/budgets/**'
+      - 'scripts/tests/**'
+      - '.github/actions/**'
+      - '.github/workflows/budget-gates.yml'
+
+jobs:
+  gate-tests:
+    name: budget gate tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      # Fast, hermetic coverage of the gate's measurement/exclusion/gating/delta logic.
+      # No publish here, so this lane needs no wasm-tools workload.
+      - name: Build + test the budget gate
+        run: dotnet test scripts/tests/Assimalign.Viu.PublishBudget.Tests/Assimalign.Viu.PublishBudget.Tests.csproj --configuration Release -warnaserror
+
+  size:
+    name: publish-size + trimming gate
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Base-branch checkout is measured with the head script + head manifest so the delta is
+      # apples-to-apples. Informational only (best-effort): the head-vs-manifest budget below is
+      # the authoritative gate.
+      - name: Checkout base branch (for size delta)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-tree
+
+      - name: Set up .NET (with wasm-tools)
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      - name: Measure base branch (informational delta)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: pwsh
+        run: >-
+          ./scripts/Measure-PublishBudget.ps1
+          -RepositoryRoot base-tree
+          -NoGate
+          -ResultsPath _out/budgets/base-results.json
+
+      # Publishes each sample trimmed and measures the brotli-compressed wwwroot payload against
+      # the manifest. This step is BOTH the size gate (fails on any exceedance) and the trimming
+      # gate: the samples publish with PublishTrimmed=true + TrimmerSingleWarn=false
+      # (examples/Directory.Build.props) and the script publishes with -warnaserror, so any
+      # ILLink/trim-analyzer warning across the sample and every shipping library in its closure
+      # fails the build. Budgets change only through an explicit edit to
+      # scripts/budgets/PublishBudgets.json (no silent ratcheting).
+      - name: Publish (trimmed), measure size, enforce budget
+        shell: pwsh
+        run: >-
+          ./scripts/Measure-PublishBudget.ps1
+          -ResultsPath _out/budgets/head-results.json
+          -BaselineResultsPath _out/budgets/base-results.json
+
+      - name: Upload measurement results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-budget-results
+          path: _out/budgets/*-results.json
+          if-no-files-found: ignore
+
+  aot:
+    name: AOT compilation lane (optional)
+    # Optional cost-control lane. Runs on pushes to main and release branches (where branch
+    # protection can mark it a REQUIRED check), and on pull requests only when labelled
+    # 'aot-gate'. AOT relink is minutes-long, so it is not run on every PR by default.
+    if: >-
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.labels.*.name, 'aot-gate')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET (with wasm-tools)
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      # RunAOTCompilation is enabled via the scoped -p:ViuRunAotCompilation=true property
+      # (examples/Directory.Build.props) so it does not flow to the netstandard2.0 generators.
+      # -warnaserror fails the build on any AOT compiler error or warning.
+      - name: Publish sample with AOT compilation
+        run: >-
+          dotnet publish examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj
+          --configuration Release
+          -p:ViuRunAotCompilation=true
+          -warnaserror
+          --output _out/budgets/aot
+
+  startup:
+    name: startup-time gate (deferred, #87)
+    # WIRED-BUT-SKIPPED. The startup budget (time-to-first-render in a real headless browser) is
+    # a genuine gate requirement of [V01.01.12.06], but it depends on the Playwright end-to-end
+    # harness [V01.01.11.03] (#87), which is not built yet. A pure .NET timing harness is NOT an
+    # acceptable substitute (JS-interop initialization cost is part of what is budgeted), so no
+    # measurement is faked here. The job is skipped by default and turns on once the harness lands
+    # by setting the repository variable ENABLE_STARTUP_GATE=true.
+    #
+    # TODO([V01.01.11.03], #87): replace the placeholder step below with the real lane:
+    #   1. publish the sample trimmed (as the size job does);
+    #   2. serve wwwroot from a static file server;
+    #   3. drive it in headless Chromium/Firefox/WebKit via Microsoft.Playwright, measuring
+    #      time-to-first-render (navigation start -> first mounted DOM node) over enough
+    #      repetitions to be stable (e.g. median of >= 10 runs after a warm-up);
+    #   4. compare the median against startupBudgetMilliseconds in scripts/budgets/PublishBudgets.json
+    #      and fail on exceedance, mirroring the size gate's report + base-branch delta.
+    if: ${{ vars.ENABLE_STARTUP_GATE == 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Startup gate placeholder
+        shell: pwsh
+        run: |
+          Write-Host 'Startup-time gate is deferred pending the Playwright e2e harness ([V01.01.11.03], #87).'
+          Write-Host 'Enable by setting repository variable ENABLE_STARTUP_GATE=true once the harness lands.'

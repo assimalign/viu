@@ -1,0 +1,33 @@
+{
+  "note": [
+    "Per-sample budget manifest for the Viu WASM size and startup gates ([V01.01.12.06], #95).",
+    "The Viu analog of vuejs/core's size-check job (https://github.com/vuejs/core/blob/main/.github/workflows/size-data.yml).",
+    "",
+    "compressedPublishSizeBytes: the brotli-compressed sum of the published wwwroot payload (post-trim,",
+    "Release), as measured by scripts/Measure-PublishBudget.ps1. Pre-compressed *.br/*.gz duplicates and",
+    "*.map files are excluded so nothing is double counted; every other published byte (the _framework",
+    "runtime + trimmed assemblies, ICU data, index.html, JS glue, and _content assets) is included.",
+    "",
+    "No silent ratcheting: CI never rewrites this file. A budget change is an explicit, reviewed edit in",
+    "the pull request, so payload growth is always a deliberate decision. Budgets are seeded from the",
+    "measured actual plus ~10% headroom; when a sample legitimately grows, raise its budget here.",
+    "",
+    "startupBudgetMilliseconds: the time-to-first-render ceiling for the headless-browser startup lane.",
+    "This value is PROVISIONAL and NOT YET ENFORCED -- it is not a measured number. The startup lane is",
+    "wired-but-skipped in .github/workflows/budget-gates.yml pending the Playwright e2e harness",
+    "([V01.01.11.03], #87), which owns real-browser measurement. Calibrate this from repeated headless",
+    "runs when that lane activates.",
+    "",
+    "Seed provenance: Assimalign.Viu.WebApp measured 2,097,190 bytes brotli (7,363,995 raw, 19 files) on",
+    "2026-07-19 with .NET SDK 10.0.302 / wasm-tools 10.0.110. CI (ubuntu x64) is the authority; if its",
+    "measurement differs materially from this Windows seed, recalibrate via an explicit edit here."
+  ],
+  "samples": [
+    {
+      "name": "Assimalign.Viu.WebApp",
+      "project": "examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj",
+      "compressedPublishSizeBytes": 2310000,
+      "startupBudgetMilliseconds": 5000
+    }
+  ]
+}

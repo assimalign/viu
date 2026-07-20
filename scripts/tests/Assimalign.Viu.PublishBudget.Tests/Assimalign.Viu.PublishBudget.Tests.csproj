@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Tests for the publish-size budget gate ([V01.01.12.06], #95). The gate is a
+    cross-platform PowerShell script (scripts/Measure-PublishBudget.ps1); these
+    tests drive it over deterministic on-disk fixtures via pwsh and assert the
+    measurement, exclusion, gating, delta, and exit-code behavior. They never run
+    a real `dotnet publish`, so they stay fast and hermetic; the publish path is
+    covered by the budget-gates CI workflow itself. No project reference is needed
+    (the artifact under test is a script), so this project stays clear of the
+    ViuProjectReference name-resolution that only indexes libraries/ and analyzers/.
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+</Project>
