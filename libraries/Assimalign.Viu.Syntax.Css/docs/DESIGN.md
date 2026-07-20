@@ -128,6 +128,61 @@ but **not** `scoped` is serialized by **`CssStylesheetWriter`**, the plain (unsc
 `CssScopedRewriter` sharing its canonical two-space form; a non-scoped block with neither feature is still
 emitted verbatim and never reaches the writer, so only rewritten blocks lose their original whitespace.
 
+## Programmatic construction — the [V01.01.12.11] surface
+
+The parser turns CSS *text* into the record graph; `CssSyntaxFactory` (and the fluent
+`CssStylesheetBuilder`) build the **same** graph from code, so a build-time generator can synthesize rules
+from scratch and hand them to the same canonical serializer. Scoped CSS ([V01.01.06.04]) and the module /
+`v-bind()` rewrites all transform an *already-parsed* tree, so none of them ever needed to *create* a rule;
+the utility-first CSS engine ([V01.01.12.16]) generates rules from scratch and does. The surface is
+deliberately **language-agnostic generic CSS construction** — it knows nothing about utilities, variants, or
+themes — so `Assimalign.Viu.Syntax.Css` stays a leaf in the cluster (the utility grammar/theme/resolver live
+in Tooling, which may reference Css; Css never references back). `CssSyntaxFactory.QualifiedRule`,
+`Declaration`, `Media`/`ConditionalGroupAtRule`, `Stylesheet`, and the selector builders
+(`SimpleSelector`/`Combinator`/`Pseudo`/`ComplexSelector`/`SelectorList`) mint the existing node types; a
+constructed rule renders its `Prelude` from its parts (via the internal `CssSelectorWriter`) so the node is
+self-consistent, though the serializers read the parts, never the prelude.
+
+### The synthetic-location divergence
+
+Every parser-produced node upholds the exact-slice `SourceLocation` invariant (`Location.Source ==
+source.Substring(Start.Offset, End.Offset - Start.Offset)`), pinned by `CssSyntaxParserTests`. A
+constructed node has **no source string**, so that invariant cannot and does not apply — it is scoped to
+parser output, and construction is a distinct path. Rather than fabricate a span into a non-existent
+source, a constructed node carries a **synthetic** location (`CssSyntheticLocation`): both ends are the
+sentinel `Position` with `Offset == -1` (a value no real, zero-based parse position takes), and its `Source`
+carries only the exact text the node contributes where the serializer reads text back — a pseudo's
+`:hover`, a simple selector's `.foo` — and the empty string for the container and declaration nodes the
+serializer composes from typed properties. `CssSyntheticLocation.IsSynthetic` classifies a node off the
+sentinel offset, so the check is exact and total. This is the one deliberate, **tested** divergence from
+the invariant (`CssConstructionTests` walks a constructed graph asserting every node is synthetic, and
+re-asserts a parsed graph is *not*). Because the sentinel is constant and the carried `Source` is derived
+deterministically from the node's inputs, synthetic locations preserve record value-equality: two graphs
+built from equal inputs are equal and equally hashed (the incremental-cache contract), and a synthetic node
+never compares equal to a parsed node with the same text, because their offsets differ (`-1` versus a real
+position).
+
+### Deterministic serialization order
+
+The canonical serializer (`CssStylesheetWriter`, and `CssScopedRewriter` for scoped output) emits **in
+exact graph order and never reorders**:
+
+- **Property/declaration order within a rule** — declarations serialize in the order they appear in
+  `CssQualifiedRuleNode.Declarations` (and `CssKeyframeRuleNode.Declarations`).
+- **Rule and media order across a stylesheet** — top-level rules serialize in `CssStylesheetNode.Rules`
+  order; rules nested in a conditional-group at-rule in `CssAtRuleNode.Body` order (recursively, so a
+  nested `@media` inside a `@media` is faithful — pinned by `CssConstructionTests`).
+- Grouped selectors serialize in `CssSelectorListNode.Selectors` order; a complex selector's parts in
+  `CssComplexSelectorNode.Parts` order.
+
+Determinism is therefore a property of **construction**: identical node lists serialize byte-for-byte
+identically, and construction converges on the same canonical text as parsing the equivalent source
+(pinned against a parsed graph in `CssConstructionTests`). The construction surface preserves the order it
+is given and applies no canonicalization of its own — so a consumer that needs a canonical ordering (e.g.
+the utility engine de-duplicating and ordering utilities for a byte-stable bundle) sorts **before**
+constructing. Keeping ordering policy in the consumer is exactly what lets Css stay language-agnostic: it
+holds no opinion on how utilities, media queries, or properties "should" be ordered.
+
 ## Composition boundary
 
 The library never wires itself into the `.viu` parser. The [V01.01.06.02] generator composition root
@@ -164,5 +219,12 @@ only the scope-id string.
   compound/complex/grouped scoping are covered.
 - **Comment preservation in scoped output.** Comments are tokenized (for exact spans) but dropped by the
   canonical serializer; scoped CSS is machine-generated.
-- **Tailwind / utility-class generation** — [#129] is a separate consumer of this parser. It reuses the
-  tokenizer, tree, and (for its own scoping) `CssScopedRewriter`; it does not need changes here.
+- **Tailwind / utility-class generation** — [#129] is a separate consumer of this library. It reuses the
+  tokenizer, tree, (for its own scoping) `CssScopedRewriter`, and the programmatic construction surface
+  added by [V01.01.12.11]; the utility grammar, theme, and resolver stay in Tooling, never here.
+- **Reserved functional pseudos, `@keyframes`, and statement at-rules are not *constructed*.** The
+  [V01.01.12.11] factory builds ordinary selectors, declarations, qualified rules, and conditional-group
+  at-rules — what a utility generator needs. `:deep()`/`:slotted()`/`:global()` are *consumed* by the
+  scoped rewrite, not built from code (utilities emit unscoped global CSS); `@keyframes`/keyframe-rule and
+  `;`-terminated statement at-rules have no construction entry point yet. All are additive if a later
+  consumer needs them, and the parser still produces every one of them.
