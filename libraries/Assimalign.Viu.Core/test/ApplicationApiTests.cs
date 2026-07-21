@@ -222,11 +222,11 @@ public class ApplicationApiTests : IDisposable
     }
 
     // A plugin that registers a component and an app-level provide, counting its installs.
-    private sealed class RecordingPlugin(InjectionKey<string> key) : IPlugin<TestNode>
+    private sealed class RecordingPlugin(InjectionKey<string> key) : IPlugin
     {
         public int InstallCount { get; private set; }
 
-        public void Install(Application<TestNode> application, object? options)
+        public void Install(IApplication application, object? options)
         {
             InstallCount++;
             application.Component("plugin-widget", new TestComponent
