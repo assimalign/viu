@@ -120,7 +120,7 @@ runtime-helper import) is needed in the getter. A **malformed** expression surfa
 diagnostic on the exact `.viu` style coordinate through the same style-origin envelope (`VIU1301`) the CSS parse
 diagnostics use; the recoverable original text still emits, so the reported error fails the build. Member
 existence is left to the C# compiler (the same permissive choice the render path makes, so a member declared in a
-hand-written sibling partial is not false-flagged). The runtime half is `UseCssVars` in `Assimalign.Viu.RuntimeDom`.
+hand-written sibling partial is not false-flagged). The runtime half is `UseCssVars` in `Assimalign.Viu.Browser`.
 
 Both rewrites are tree-to-tree, so they compose with `scoped` in any order — the scoped serializer reads the
 parsed selector parts and declaration values the rewrites already updated. A block that is `module`/`v-bind`

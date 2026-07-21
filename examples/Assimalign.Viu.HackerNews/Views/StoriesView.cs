@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Router;
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.HackerNews;

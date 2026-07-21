@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 
 namespace Assimalign.Viu.TodoMvc.Components;
 

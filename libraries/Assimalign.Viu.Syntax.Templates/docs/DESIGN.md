@@ -260,17 +260,17 @@ of each member:
 The DOM-directive helpers are a **separate facade for layering**: `_vShow`, `_vModelText`, `_vModelCheckbox`,
 `_vModelRadio`, `_vModelSelect`, `_vModelDynamic`, the `_withModifiers` / `_withKeys` guard wrappers, and the
 DOM built-ins `_Transition` / `_TransitionGroup` are **not** members of
-`Assimalign.Viu.Core.RenderHelpers` — their behavior lives in `Assimalign.Viu.RuntimeDom`, which the
+`Assimalign.Viu.Core.RenderHelpers` — their behavior lives in `Assimalign.Viu.Browser`, which the
 platform-agnostic runtime-core layer must not reference (keeping runtime-core DOM-free, and keeping a real DOM
 directive from ever mis-binding onto a runtime-core marker). They ship instead as
-`global::Assimalign.Viu.RuntimeDom.DomRenderHelpers`, and the composition-root generator ([V01.01.06.02])
-emits a **second** file-level `using static global::Assimalign.Viu.RuntimeDom.DomRenderHelpers;` alongside the
-runtime-core one whenever a render body is present. A browser `.viu` always has RuntimeDom available (it is the
+`global::Assimalign.Viu.Browser.DomRenderHelpers`, and the composition-root generator ([V01.01.06.02])
+emits a **second** file-level `using static global::Assimalign.Viu.Browser.DomRenderHelpers;` alongside the
+runtime-core one whenever a render body is present. A browser `.viu` always has Browser available (it is the
 DOM renderer), so both imports are unconditional — DOM-directive templates (`v-show`, `v-model`,
-`@click.prevent`, `@keyup.enter`) are now end-to-end compilable. `DomRenderHelpers` references only RuntimeDom's
+`@click.prevent`, `@keyup.enter`) are now end-to-end compilable. `DomRenderHelpers` references only Browser's
 own machinery and Core's `IDirective`, never any `Assimalign.Viu.Syntax.*` assembly; the by-name contract
-still flows one way. Pinned by `Assimalign.Viu.RuntimeDom.CompiledRenderTests` (a `.viu` using every spelling
-below compiles against both facades) and `Assimalign.Viu.RuntimeDom.Tests.DomRenderHelpersTests` (facade
+still flows one way. Pinned by `Assimalign.Viu.Browser.CompiledRenderTests` (a `.viu` using every spelling
+below compiles against both facades) and `Assimalign.Viu.Browser.Tests.DomRenderHelpersTests` (facade
 mapping + v-show / `.prevent` execution through the in-memory adapter).
 
 What code generation requires of each DOM member, mapped to the runtime machinery it forwards to:

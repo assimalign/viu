@@ -9,7 +9,7 @@ Upstream counterpart: [`@vue/runtime-core`](https://github.com/vuejs/core/tree/m
 mount/patch/unmount pipeline over an injected `RendererOptions<TNode>` — the platform node-ops
 (create/insert/remove/text, `patchProp`, static-content insert). **The core never performs interop
 itself.** `TNode` is the platform node type: `int` handles for the browser
-(`Assimalign.Viu.RuntimeDom`), `TestNode` for the in-memory renderer (`Assimalign.Viu.Testing`).
+(`Assimalign.Viu.Browser`), `TestNode` for the in-memory renderer (`Assimalign.Viu.Testing`).
 This single seam is what lets the browser and the DOM-free test host share one renderer, and it is
 the exact shape upstream's `createRenderer` takes.
 
@@ -250,9 +250,9 @@ adoption seam is in place, but the concrete triggers are not.
 ## Deltas from Vue 3
 
 - **DOM directives live one layer up.** `v-show` and `v-model` and the DOM transitions are *not*
-  members of `RenderHelpers`; they ship as `DomRenderHelpers` in `Assimalign.Viu.RuntimeDom`, so
+  members of `RenderHelpers`; they ship as `DomRenderHelpers` in `Assimalign.Viu.Browser`, so
   runtime-core stays DOM-free and a real DOM directive can never mis-bind onto a runtime-core marker
-  (see [`Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md`](../../Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md)).
+  (see [`Assimalign.Viu.Browser/docs/OVERVIEW.md`](../../Assimalign.Viu.Browser/docs/OVERVIEW.md)).
 - **`RenderHelpers` uses upstream-aliased member names** in generated code — a documented,
   generated-code-only naming deviation.
 - **Hot-path dispatch** favors sealed types and abstract bases over interfaces where the JIT's
@@ -262,13 +262,13 @@ adoption seam is in place, but the concrete triggers are not.
 ## Non-goals (sequenced work)
 
 - `Suspense` — [V01.01.03.20] (W06).
-- DOM `Transition`/`TransitionGroup` and custom elements — `Assimalign.Viu.RuntimeDom`.
+- DOM `Transition`/`TransitionGroup` and custom elements — `Assimalign.Viu.Browser`.
 - Server-side rendering (the string/stream renderer) — `Assimalign.Viu.ServerRenderer`. Client
   **hydration** of that output lives here (above, [V01.01.07.03]); only the SSR renderer itself is out.
 - **Lazy hydration strategies** (`hydrateOnIdle`/`hydrateOnVisible`/`hydrateOnMediaQuery`/
   `hydrateOnInteraction`) — a browser-API-bound follow-up ([V01.01.07.03.01]): they need
   `requestIdleCallback`/`IntersectionObserver`/`matchMedia`/interaction listeners in
-  `Assimalign.Viu.RuntimeDom` and cannot be exercised by the DOM-free suite. The walker already routes
+  `Assimalign.Viu.Browser` and cannot be exercised by the DOM-free suite. The walker already routes
   async-component subtrees through the scheduler's post-flush queue, which is where the triggers will hook.
 
 ---

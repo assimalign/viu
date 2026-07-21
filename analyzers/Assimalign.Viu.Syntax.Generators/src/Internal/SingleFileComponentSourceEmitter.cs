@@ -38,11 +38,11 @@ internal static class SingleFileComponentSourceEmitter
     /// helpers against (<c>_vShow</c>, the <c>_vModel*</c> directives, <c>_withModifiers</c>/<c>_withKeys</c>,
     /// <c>_Transition</c>/<c>_TransitionGroup</c>) — the DOM sibling of <see cref="RenderHelperSurface"/>. It
     /// is emitted alongside the runtime-core import so a <c>.viu</c> using DOM directives compiles end to end;
-    /// the DOM surface ships with <c>Assimalign.Viu.RuntimeDom</c> ([V01.01.04.09]) and the generator only ever
-    /// names it. A browser <c>.viu</c> always has RuntimeDom available (it is the DOM renderer), so both
+    /// the DOM surface ships with <c>Assimalign.Viu.Browser</c> ([V01.01.04.09]) and the generator only ever
+    /// names it. A browser <c>.viu</c> always has Browser available (it is the DOM renderer), so both
     /// imports are unconditional whenever a render body is present.
     /// </summary>
-    private const string DomRenderHelperSurface = "global::Assimalign.Viu.RuntimeDom.DomRenderHelpers";
+    private const string DomRenderHelperSurface = "global::Assimalign.Viu.Browser.DomRenderHelpers";
 
     /// <summary>
     /// The fully qualified runtime-core namespace the generated <c>IComponentDefinition</c> bridge
@@ -521,7 +521,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("internal void ApplyCssVariables()\n");
         AppendIndent(builder, indent + 1);
-        builder.Append("=> global::Assimalign.Viu.RuntimeDom.CssVariables.UseCssVars(() =>\n");
+        builder.Append("=> global::Assimalign.Viu.Browser.CssVariables.UseCssVars(() =>\n");
         AppendIndent(builder, indent + 2);
         builder.Append("new global::System.Collections.Generic.Dictionary<string, string>(")
             .Append(Count(model.CssVariableBindings.Count)).Append(")\n");

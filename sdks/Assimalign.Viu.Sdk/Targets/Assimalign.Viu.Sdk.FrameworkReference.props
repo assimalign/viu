@@ -6,7 +6,7 @@
 
         One framework is registered: Assimalign.Viu.App. The SDK auto-includes
         <FrameworkReference Include="Assimalign.Viu.App" /> so a consumer
-        compiles against the whole framework (Shared, Core, RuntimeDom + the
+        compiles against the whole framework (Shared, Core, Browser + the
         umbrella) and picks up the [Reactive]/.viu source generators from the
         Ref pack's analyzers/dotnet/cs - with a single
         one-line SDK reference and no PackageReferences.

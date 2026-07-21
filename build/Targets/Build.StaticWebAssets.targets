@@ -2,13 +2,13 @@
     <!--
         Static web assets for project-referenced Viu libraries.
 
-        Libraries that ship a JavaScript half (Assimalign.Viu.RuntimeDom's interop bridge)
+        Libraries that ship a JavaScript half (Assimalign.Viu.Browser's interop bridge)
         own it under src/wwwroot/ and stay on the plain Microsoft.NET.Sdk: the WebAssembly
         dev host (WasmAppHost, the non-Blazor "WebAssembly Browser App" host) cannot serve a
         referenced Razor-SDK class library's _content assets - measured on .NET SDK 10.0.10,
         it stops serving the app entirely when such a reference exists, and its only dev
         serving pattern maps the app's SOURCE wwwroot ([V01.01.04.01] decision, see
-        libraries/Assimalign.Viu.RuntimeDom/docs/DESIGN.md).
+        libraries/Assimalign.Viu.Browser/docs/DESIGN.md).
 
         This target therefore copies every direct project-referenced library's wwwroot/**
         into the consuming WebAssembly app's SOURCE wwwroot under _content/<AssemblyName>/...
@@ -18,7 +18,7 @@
         NuGet packaging later ships the same files as real static web assets.
 
         Limitation: only DIRECT ProjectReference entries flow (the example app references
-        Assimalign.Viu.RuntimeDom directly); extend to transitive references if a library
+        Assimalign.Viu.Browser directly); extend to transitive references if a library
         ever consumes another library's assets.
     -->
     <Target Name="ViuFlowReferencedLibraryWebAssets"

@@ -222,7 +222,7 @@ removeAuthGuard();   // registration handles unregister the guard
   memory history run in a plain .NET test host, using no other Viu library. `[V01.01.08.03]` adds the
   `RouterView`/`RouterLink` components, which consume the component model and reactivity, so the
   assembly now references `Assimalign.Viu.Core` (issue #72's
-  boundary). It still references **no browser DOM adapter** (`Assimalign.Viu.RuntimeDom`): the
+  boundary). It still references **no browser DOM adapter** (`Assimalign.Viu.Browser`): the
   components produce platform-agnostic `VirtualNode`s that render through the injected node-ops
   abstraction — the in-memory test renderer and the SSR renderer alike — never the DOM directly (a
   boundary the test suite asserts by reflection). `[V01.01.08.02]`'s browser history edge over the

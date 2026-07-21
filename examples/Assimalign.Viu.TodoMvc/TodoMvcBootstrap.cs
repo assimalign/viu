@@ -1,7 +1,7 @@
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 using Assimalign.Viu.TodoMvc.Components;
 
 namespace Assimalign.Viu.TodoMvc;

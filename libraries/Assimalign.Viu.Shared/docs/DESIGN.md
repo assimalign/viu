@@ -39,4 +39,4 @@ everything depend on it without a cycle, and what keeps it trivially AOT/trimmin
 
 - No runtime types (vnodes, components, effects) — those are `Core`.
 - No platform/DOM interop — `DomKnowledge` is static knowledge only; the live DOM bridge is
-  `Assimalign.Viu.RuntimeDom`.
+  `Assimalign.Viu.Browser`.

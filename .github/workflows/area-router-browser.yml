@@ -1,0 +1,51 @@
+# Area build+test for Assimalign.Viu.Router.Browser ([V01.01.12.02], area added by
+# [V01.01.08.03.01]): path-filtered so a PR only runs the areas it touches; shared build files
+# trigger every area. The build scope is the per-area slnx, keeping CI and local builds in lockstep.
+# This area is the Router<->DOM click bridge, so its slnx pulls in both Assimalign.Viu.Router and
+# Assimalign.Viu.Browser by project reference; a change to either re-verifies the bridge here.
+name: area-router-browser
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'libraries/Assimalign.Viu.Router.Browser/**'
+      - 'libraries/Assimalign.Viu.Router/**'
+      - 'libraries/Assimalign.Viu.Browser/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-router-browser.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'libraries/Assimalign.Viu.Router.Browser/**'
+      - 'libraries/Assimalign.Viu.Router/**'
+      - 'libraries/Assimalign.Viu.Browser/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-router-browser.yml'
+
+jobs:
+  build-test:
+    name: build+test Router.Browser
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build (warnings are errors)
+        run: dotnet build libraries/Assimalign.Viu.Router.Browser/Assimalign.Viu.Router.Browser.slnx --configuration Release -warnaserror
+
+      - name: Test
+        run: dotnet test libraries/Assimalign.Viu.Router.Browser/Assimalign.Viu.Router.Browser.slnx --configuration Release --no-build

@@ -511,10 +511,10 @@ internal static class CompiledRenderSupport
         }
         Add(typeof(object).Assembly.Location);
         Add(typeof(RenderHelpers).Assembly.Location);
-        // The generator emits `using static ...RuntimeDom.DomRenderHelpers;` in every render-bearing .viu
+        // The generator emits `using static ...Browser.DomRenderHelpers;` in every render-bearing .viu
         // ([V01.01.04.09]), so the DOM helper surface must be referenced for the generated body to bind —
         // even though these runtime-core templates use no DOM directive.
-        Add(typeof(Assimalign.Viu.RuntimeDom.DomRenderHelpers).Assembly.Location);
+        Add(typeof(Assimalign.Viu.Browser.DomRenderHelpers).Assembly.Location);
         Add(typeof(Reactive).Assembly.Location);
         Add(typeof(IRenderHarness).Assembly.Location);
         var shared = AppDomain.CurrentDomain.GetAssemblies()

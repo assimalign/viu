@@ -57,7 +57,7 @@ public sealed class SingleFileComponentGeneratorTests
 #nullable enable
 
 using static global::Assimalign.Viu.RenderHelpers;
-using static global::Assimalign.Viu.RuntimeDom.DomRenderHelpers;
+using static global::Assimalign.Viu.Browser.DomRenderHelpers;
 
 namespace Demo
 {

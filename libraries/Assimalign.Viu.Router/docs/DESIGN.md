@@ -108,7 +108,7 @@ split in two so the browser one is testable without a browser:
 
 - **`BrowserRouterHistory` is the policy** — base prepend/strip, the push/replace/`popstate` state
   machine, listener bookkeeping — and touches no DOM. Every environment effect is delegated to an
-  injected **`IBrowserHistoryInterop`**. This mirrors `Assimalign.Viu.RuntimeDom`'s
+  injected **`IBrowserHistoryInterop`**. This mirrors `Assimalign.Viu.Browser`'s
   `BrowserEventInvokerRegistry`, which takes its bridge calls as delegates so it is unit-testable
   with recorded doubles. A `FakeBrowserHistoryInterop` records every crossing and can simulate a
   `popstate`, so base handling, the state round-trip, delta/direction, listener teardown, and the

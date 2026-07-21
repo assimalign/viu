@@ -9,6 +9,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
   </ItemGroup>
 </Project>

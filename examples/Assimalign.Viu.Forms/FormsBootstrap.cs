@@ -2,7 +2,7 @@ using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Forms.Components;
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 
 namespace Assimalign.Viu.Forms;
 

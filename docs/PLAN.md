@@ -42,11 +42,11 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | Shared (`V01.01.01`) | `Assimalign.Viu.Shared` | `@vue/shared` — PatchFlags/ShapeFlags/SlotFlags, normalization, DOM tables |
 | Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` → merged into `Assimalign.Viu.Core` ([V01.01.12.21]) | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
 | RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` → renamed `Assimalign.Viu.Core`, root namespace `Assimalign.Viu` ([V01.01.12.21]) | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
-| RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
+| RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` → renamed `Assimalign.Viu.Browser` ([V01.01.12.22]) | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
 | Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
 | SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
-| Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Router.RuntimeDom`, the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
+| Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Router.Browser`, formerly `Assimalign.Viu.Router.RuntimeDom` — renamed [V01.01.12.22] — the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
 | DevTools (`V01.01.10`) | `Assimalign.Viu.DevTools` | `vue-devtools` protocol + UI |
 | Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
@@ -203,6 +203,10 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.03.21` | Implement dynamic component resolution | W02 | P002 |
 
 ### [V01.01.04] Framework - RuntimeDom (W01, P001)
+
+> Renamed to `Assimalign.Viu.Browser` by the .NET reshape (R3, [V01.01.12.22], `docs/NET-RESHAPE-PLAN.md`);
+> the consequence bridge `Assimalign.Viu.Router.RuntimeDom` became `Assimalign.Viu.Router.Browser`. The epic
+> and its feature history stay; the shipping code now lives in the browser library.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |

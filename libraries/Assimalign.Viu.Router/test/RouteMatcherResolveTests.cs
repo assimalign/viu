@@ -111,7 +111,7 @@ public class RouteMatcherResolveTests
         // assertion. Deviates from that prior boundary per issue #72's stated architecture (the
         // Router area may reference Runtime Core / Reactivity). The matcher and memory-history code
         // still uses neither reference, so it stays runnable in a plain .NET host; the forbidden
-        // coupling is now the browser DOM adapter (Assimalign.Viu.RuntimeDom), because the components
+        // coupling is now the browser DOM adapter (Assimalign.Viu.Browser), because the components
         // must render through the injected node-ops abstraction to work against the in-memory test
         // renderer and the SSR renderer, never the DOM directly. The framework's
         // System.Runtime.InteropServices.JavaScript reference from the [V01.01.08.02] browser history
@@ -121,7 +121,7 @@ public class RouteMatcherResolveTests
             .Select(assembly => assembly.Name ?? string.Empty)
             .ToArray();
 
-        referenced.ShouldNotContain("Assimalign.Viu.RuntimeDom");
+        referenced.ShouldNotContain("Assimalign.Viu.Browser");
         // Positive check: the component-model wiring the components depend on is actually in place.
         referenced.ShouldContain("Assimalign.Viu.Core");
     }

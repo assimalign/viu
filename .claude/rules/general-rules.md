@@ -24,8 +24,8 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 ## Namespaces
 
 - **File-scoped** namespace declarations (`namespace X;`).
-- **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.RuntimeDom` declares
-  `namespace Assimalign.Viu.RuntimeDom;` regardless of subfolder. `Abstraction/` and `Internal/` are
+- **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.Browser` declares
+  `namespace Assimalign.Viu.Browser;` regardless of subfolder. `Abstraction/` and `Internal/` are
   **physical folders only** — they never appear in a namespace.
 - **Recorded exception ([V01.01.12.21], `docs/NET-RESHAPE-PLAN.md` R2):** `Assimalign.Viu.Core` — the
   consolidated runtime core + reactivity — roots every type at the **`Assimalign.Viu`** namespace (set via

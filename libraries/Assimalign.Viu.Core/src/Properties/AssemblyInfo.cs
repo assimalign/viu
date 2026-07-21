@@ -14,12 +14,12 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Assimalign.Viu.ServerRenderer")]
 // The browser package arms Scheduler.FlushBoundaryCallback — the interop command-buffer flush
 // seam ([V01.01.04.05]) — which is an internal static hook, not public API surface.
-[assembly: InternalsVisibleTo("Assimalign.Viu.RuntimeDom")]
-// The RuntimeDom directive tests drive the Core scheduler directly (v-model/v-show run
+[assembly: InternalsVisibleTo("Assimalign.Viu.Browser")]
+// The Browser directive tests drive the Core scheduler directly (v-model/v-show run
 // through the real renderer + post-flush pipeline), so they reset it between tests just as the
 // Testing library does per mount ([V01.01.04.06]).
-[assembly: InternalsVisibleTo("Assimalign.Viu.RuntimeDom.Tests")]
+[assembly: InternalsVisibleTo("Assimalign.Viu.Browser.Tests")]
 // The SSR->hydration round-trip tests ([V01.01.07.03]) render with the server renderer, then hydrate the
 // parsed output through the real renderer + scheduler, resetting it between tests exactly as the sibling
-// suites do — the same scheduler-reset grant reason as the RuntimeDom tests above.
+// suites do — the same scheduler-reset grant reason as the Browser tests above.
 [assembly: InternalsVisibleTo("Assimalign.Viu.ServerRenderer.Tests")]

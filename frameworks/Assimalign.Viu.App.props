@@ -57,7 +57,7 @@
         <ViuFrameworkAssembly Include="Assimalign.Viu.App" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Shared" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Core" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.RuntimeDom" />
+        <ViuFrameworkAssembly Include="Assimalign.Viu.Browser" />
 
         <ViuFrameworkAnalyzer Include="Assimalign.Viu.Core.Generators" />
         <ViuFrameworkAnalyzer Include="Assimalign.Viu.Syntax.Generators" />

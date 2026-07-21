@@ -44,7 +44,7 @@ public static class Scheduler
     internal static Action<Action>? FlushDispatcher;
 
     /// <summary>
-    /// Platform seam for <c>Assimalign.Viu.RuntimeDom</c>'s interop command buffer ([V01.01.04.05]):
+    /// Platform seam for <c>Assimalign.Viu.Browser</c>'s interop command buffer ([V01.01.04.05]):
     /// buffered node-ops accumulate DOM mutations and this seam is where the single batched interop
     /// call commits them. It fires at two boundaries within a flush, so it must be idempotent — a
     /// no-op when nothing is buffered:

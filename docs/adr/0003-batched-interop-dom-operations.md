@@ -36,7 +36,8 @@ crossings as possible and keep each one cheap.**
 
 - Node identity crosses the boundary as **int handles**, not `JSObject` proxies — the measured,
   RuntimeDom-local realization of this budget, recorded in
-  [`Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md`](../../libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md).
+  [`Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`](../../libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md)
+  (the library was renamed from `Assimalign.Viu.RuntimeDom` in [V01.01.12.22]).
 - The command buffer requires primitive-typed ops (opcode + int + string), which int handles
   satisfy and proxies would not.
 - The compiler carries static hoisting and stringification passes (`cacheStatic` / `stringifyStatic`)
@@ -56,7 +57,7 @@ crossings as possible and keep each one cheap.**
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decisions 1 and 4.
-- [`Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md`](../../libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md),
-  [`DESIGN.md`](../../libraries/Assimalign.Viu.RuntimeDom/docs/DESIGN.md), and its
-  [ADR-0001](../../libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md).
+- [`Assimalign.Viu.Browser/docs/OVERVIEW.md`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md),
+  [`DESIGN.md`](../../libraries/Assimalign.Viu.Browser/docs/DESIGN.md), and its
+  [ADR-0001](../../libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md).
 - Vue 3: [rendering mechanism](https://vuejs.org/guide/extras/rendering-mechanism.html).
