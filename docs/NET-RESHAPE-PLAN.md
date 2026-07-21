@@ -258,7 +258,7 @@ Branch stacked on R7.
 | Unit | Work item | Branch | State |
 | --- | --- | --- | --- |
 | Sketch base | — | `draft/core-abstraction-sketch` | captured + pushed |
-| R6 | not yet filed (`V01.01.03.25`) | `feature/V01.01.03.25-reactive-class-model` | not started |
+| R6 | #241 (`V01.01.03.25`) | `feature/V01.01.03.25-reactive-class-model` | implemented — reactive slice compiles + isolated-benchmark gate PASS (ComputedChainRecompute +6.5%, 0 alloc); full solution/suites/budget/interop gates remain blocked by the sketch's unbuilt R7/R8 portions (by design), so they run at R7/R8; awaiting main-session review |
 | R7 | not yet filed (`V01.01.03.26`) | `feature/V01.01.03.26-component-class-model` | not started |
 | R8 | not yet filed (`V01.01.03.27`) | `feature/V01.01.03.27-application-services-model` | not started |
 

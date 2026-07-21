@@ -79,15 +79,20 @@ objects. It is Ref-first — there is no JavaScript `Proxy` (see
   `PauseTracking`/`ResetTracking`, and `StartBatch`/`EndBatch`.
 - **References** — `Reference<T>` (Vue's `ref()`), `ShallowReference<T>` (`shallowRef()`),
   `CustomReference<T>` (`customRef()`), and `Computed<T>` (`computed()`, lazy versioned caching).
-  All expose a settable `Value` and implement `IReference` / `IReference<T>`.
+  All are `sealed` subclasses of the abstract `ReactiveValue<T>` (itself `: ReactiveValue`), which
+  carries the settable typed `Value`, the boxing `BoxedValue`, the never-tracking `Dependency`
+  property, and the `IsReadOnly` flag. Writing a read-only ref/computed warns and is a no-op (Vue
+  parity), never throwing.
 - **Effects and scopes** — `ReactiveEffect` (the effect runner with scheduler injection),
   `EffectScope` (hierarchical disposal, `effectScope()`), `Dependency` (the tracked-dependency
   primitive), and `Subscriber` (the opaque `public abstract` base for effect-like subscribers,
-  exposing its dependency chain read-only via `FirstDependency`).
+  exposing its dependency chain read-only via `FirstDependency`). `Computed<T>` composes an internal
+  `ComputedSubscriber : Subscriber` rather than deriving from `Subscriber`, so it can be a
+  `ReactiveValue<T>`.
 - **Dependency-graph inspection** — `SubscriberLink` (the read-only edge node between a `Dependency`
-  and a `Subscriber`; walk it from `Subscriber.FirstDependency`) and `ITrackedReference` (reaches the
-  `Dependency` behind a ref/computed). The whole graph is publicly readable but only the engine can
-  mutate it.
+  and a `Subscriber`; walk it from `Subscriber.FirstDependency`) and `ReactiveValue.Dependency`
+  (reaches the `Dependency` behind a ref/computed). The whole graph is publicly readable but only the
+  engine can mutate it.
 - **Watch** — `WatchOptions`, `WatchHandle`, `WatchJob`, `WatchFlushMode`, the `WatchCallback<T>` and
   `OnCleanup` delegates, and the `IWatchScheduler` seam a host (the runtime scheduler) plugs into.
 - **Source-generated reactive objects** — the `[Reactive]` / `[ShallowReactive]` attributes
@@ -95,8 +100,9 @@ objects. It is Ref-first — there is no JavaScript `Proxy` (see
   reactive property wrappers for the annotated partial class (Vue's `reactive()`).
 - **Reactive collections** — `ReactiveList<T>`, `ReactiveDictionary<TKey,TValue>`, `ReactiveSet<T>`
   (dedicated reactive types implementing the BCL collection interfaces).
-- **Traversal and introspection** — `ReactiveTraversal`, `IReactiveTraversable`, `IReactiveObject`,
-  `IReadonlyReactive`.
+- **Traversal and introspection** — `ReactiveTraversal`, `IReactiveTraversable`, and `IReactiveObject`
+  (which carries the readonly flag via `IsReadOnly`; refs/computeds report readonly via
+  `ReactiveValue.IsReadOnly`).
 
 ## Boundaries
 

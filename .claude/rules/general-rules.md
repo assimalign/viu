@@ -46,8 +46,9 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 ## Files and types
 
 - **One public type per file**; the filename is the type name.
-- Generic types use `{T}` in the filename: `IReference<T>` → `IReference{T}.cs`. Do **not** use `OfT`
-  or similar suffixes in type names or filenames.
+- Generic types use `{T}` in the filename: `Store<TState>` → `Store{TState}.cs`. Do **not** use `OfT`
+  or similar suffixes in type names or filenames. (A root+generic split family may instead use the
+  dotted `.T.cs` form, e.g. `ReactiveValue.cs` + `ReactiveValue.T.cs`, matching its siblings.)
 - Group a variant family root-first when splitting (`VirtualDomPatch.cs` + one file per record).
 
 ## Naming — spell out whole words

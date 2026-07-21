@@ -315,6 +315,48 @@ and trigger on write — Vue 3.5's own ref internals port directly. `reactive(ob
 `[Reactive]` partial class whose property wrappers a source generator emits, and reactive collections
 are dedicated types rather than proxied BCL collections.
 
+## The reactive value class model ([V01.01.03.25], reshape arc 2 R6)
+
+The ref family is an **abstract class hierarchy**, not a set of interfaces. `public abstract class
+ReactiveValue` owns a single `Dependency` cell inline (a `private protected` field surfaced through a
+public, never-tracking `Dependency` property) plus an abstract `object? BoxedValue` (reading tracks)
+and a virtual `bool IsReadOnly => false`; `public abstract class ReactiveValue<T> : ReactiveValue`
+adds the typed `T Value { get; set; }` and seals `BoxedValue => Value`. `Reference<T>`,
+`ShallowReference<T>`, `CustomReference<T>` (and the internal `AccessorReference<T>` behind `ToRef`)
+are `sealed` leaves over `ReactiveValue<T>`.
+
+A class, not an interface, for three reasons that all trace to the repo's *dispatch-on-hot-paths*
+rule: the `is`-a-ref / `unref` introspection collapses to an O(1), reflection-free `is ReactiveValue`
+type test; the shared dependency cell is a **field on the base** (a direct load, no interface-property
+stub); and a `private protected` constructor closes the reactive-value set to external subclassing.
+This subsumes the arc-1 `IReference`/`IReference<T>`/`IDependencyReference`/`IReadonlyReactive`
+interfaces, which are deleted — `Reactive.TriggerReference(ReactiveValue)` force-notifies through the
+inherited `Dependency` with no silent no-op branch, and `IsRef`/`Unref`/`IsReadonly` pattern-match the
+class.
+
+**`Computed<T>` is composition, not inheritance** (ratified arc-2 decision 1). A computed is *both* a
+`Dependency` to its readers and a `Subscriber` to its sources; since it must now be a `ReactiveValue<T>`
+it can no longer *be* a `Subscriber`, so it **owns** an internal `sealed ComputedSubscriber : Subscriber`
+(a nested type, reaching the owner's private getter/value/version state without widening it). The
+readers-facing `Dependency` (inherited from `ReactiveValue`) points its `Computed` back-reference at
+the `ComputedSubscriber` so the computed still does not self-track. The `refreshComputed` hot path is
+carried over verbatim onto the nested subscriber; the composition is gated by `ReactivityBenchmarks`
+(`ComputedChainRecompute`/`DependencyTrackTrigger` stay within noise of the pre-change baseline, zero
+new allocation).
+
+**Read-only writes warn, never throw** (Vue 3.5 parity, `packages/reactivity/src/computed.ts`):
+writing a getter-only `Computed<T>` or a setter-less projected ref routes through the runtime warning
+sink (`RuntimeWarnings`) and leaves the value unchanged. This aligns `Computed<T>` from its earlier
+`NotSupportedException` to the upstream warn-and-no-op behavior.
+
+**Recorded exception — `IReactiveObject` stays an interface.** Unlike the ref family, the source-generated
+`[Reactive]` contract is an interface, because `[Reactive]` partials attach to *user* classes that
+already have their own base types — a base class is structurally impossible there. The readonly flag
+that the deleted `IReadonlyReactive` carried folds into `IReactiveObject` as a default-interface member
+(`bool IsReadOnly => false`) that a readonly variant overrides to `true`. This is the reactive-area
+analogue of the general-rules **namespace-vs-assembly exception** recorded for R2: a deliberate,
+scoped deviation from the otherwise class-based ref surface.
+
 ## The dependency engine
 
 The engine ports Vue 3.5's **version-counter + doubly-linked-list** design: a `Dependency` holds
@@ -332,11 +374,13 @@ Concrete leaves (`ReactiveEffect`, `Computed<T>`) are `sealed` so the JIT can de
 ## Public engine surface (read-only)
 
 The dependency graph is part of the public API — but only for *reading*. `SubscriberLink` (the port
-of Vue's `Link`), `Subscriber.FirstDependency`, the already-public `Dependency`, and
-`ITrackedReference` let a .NET developer inspect what depends on what: walk a subscriber's
-`FirstDependency` → `NextDependency` chain, reach the `Dependency` behind a ref via
-`ITrackedReference`, and read each edge's observed `Version`. This mirrors how .NET developers expect
-to introspect a framework's object graph, and Vue itself keeps the same structures in `dep.ts`.
+of Vue's `Link`), `Subscriber.FirstDependency`, and the public, never-tracking `ReactiveValue.Dependency`
+property let a .NET developer inspect what depends on what: walk a subscriber's
+`FirstDependency` → `NextDependency` chain, reach the `Dependency` behind a ref via its
+`Dependency` property, and read each edge's observed `Version`. This mirrors how .NET developers expect
+to introspect a framework's object graph, and Vue itself keeps the same structures in `dep.ts`. The
+`Dependency` property has no public setter and the cell's own mutating members stay `internal`, so a
+reactive value's dependency wiring cannot be swapped or corrupted through the public surface.
 
 Every state-mutating member — link construction, list splicing, version bookkeeping, the flags word —
 stays `internal`, so external code can observe the graph but cannot desynchronize the engine. Two
