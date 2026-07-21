@@ -1,6 +1,9 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
-**Status: arc implementation complete — R1, R2, R3, R4, and R5 all implemented (awaiting main-session
+**Status: ARC 1 MERGED (train #235-#240, 2026-07-21). ARC 2 (below, §Arc 2) is ACTIVE — base:
+`draft/core-abstraction-sketch`.** Original arc-1 status follows.
+
+**Arc-1 status: arc implementation complete — R1, R2, R3, R4, and R5 all implemented (awaiting main-session
 review); the hold is LIFTED (2026-07-21): the stacked train is PUBLISHED as the bottom-up PR series
 #235 (hydration) → #236 (R1) → #237 (R2) → #238 (R3) → #239 (R4) → #240 (R5) — merge strictly in
 that order.** This
@@ -169,3 +172,95 @@ until reviewed.
    lifts the hold**.
 4. R2 is the point of no return for parallel work: while R2+ are in flight, file new non-reshape
    work items instead of starting branches off `main` (they would collide with the renames).
+
+
+---
+
+# Arc 2 — classes over interfaces, container over builder (direction set 2026-07-21)
+
+Chase's in-flight Core sketch (captured verbatim on `draft/core-abstraction-sketch` — it does not
+build, by design) plus the main-session design review produced this arc. Three decisions are
+RATIFIED by Chase and not up for relitigation by implementing agents:
+
+1. **`Computed<T>` becomes composition** — `Computed<T> : ReactiveValue<T>` owning an internal
+   `sealed ComputedSubscriber : Subscriber`. Gate: `ReactivityBenchmarks` short-run before/after
+   (`ComputedChainRecompute` baseline ~63 ns / 0 alloc); regression beyond noise = STOP and report
+   to the main session, do not silently fall back.
+2. **`IServiceContainer` keeps its name**, deliberately shadowing the legacy
+   `System.ComponentModel.Design.IServiceContainer` (record in Core DESIGN.md as a shadowing
+   decision; designer-era interface, effectively absent from modern app code).
+3. **Lifecycle methods come OFF `IComponentDescriptor` for v1** — the descriptor is
+   definition-time metadata only (props/emits); lifecycle stays in `Setup` per ADR-0004
+   (composition-only). Definition-level hooks would need their own ADR later.
+
+## R6 — the reactive class model (`V01.01.03.25` intended, Core epic #16)
+
+Branch `feature/V01.01.03.25-reactive-class-model` stacked on `draft/core-abstraction-sketch`.
+
+- New in `src/Reactive/`: `public abstract class ReactiveValue` — owns its `Dependency` inline
+  (`_dependency` field + public never-tracking `Dependency` property), `public abstract object?
+  BoxedValue { get; }` (reading tracks), `public virtual bool IsReadOnly => false`. And
+  `public abstract class ReactiveValue<T> : ReactiveValue` — `public abstract T Value { get; set; }`
+  (readonly implementations' setter warns per Vue parity, never throws), sealed `BoxedValue => Value`.
+- `Reference<T>`, `ShallowReference<T>`, `CustomReference<T>` extend `ReactiveValue<T>` (all stay
+  `sealed`). `Computed<T>` per ratified decision 1 (composition + benchmark gate).
+- DELETE: `IReference`, `IReference<T>`, `IDependencyReference`, `IDependencyReference<T>`
+  (the sketch's `IReference.Dependency*.cs` files), `IReadOnlyReactive` (subsumed by `IsReadOnly`).
+  `Reactive` facade retargets: `TriggerReference(ReactiveValue)` (no more pattern-match no-op),
+  `Unref`/is-ref checks pattern-match the class.
+- **Recorded exception**: `IReactiveObject` STAYS an interface — source-generated `[Reactive]`
+  partials attach to user classes with their own base types; a base class is structurally
+  impossible there. Record beside the R2 namespace exception (Core DESIGN.md + general-rules if
+  it names reactive interfaces).
+- Ripple to full green (the established bar): Watch sources, ServerRenderer, Store, Router,
+  Browser, Testing, generators/snapshots, benchmarks — full solution 0/0, every suite, budget
+  gate, interop gate +0, run-count pins untouched.
+
+## R7 — the component class model (`V01.01.03.26` intended)
+
+Branch stacked on R6.
+
+- `IComponentDefinition` → **`IComponent`** with default-interface-member metadata
+  (`Name`/`InheritAttributes`/`Emits`/`Properties` defaulted) + the `ComponentSetup` delegate as
+  the render-function type (both already sketched). Cascade the rename through the entire solution
+  including the SFC generator's emitted `global::Assimalign.Viu.IComponentDefinition` bridge and
+  its snapshots, Router (`RouteRecord.Component`, RouterView), KeepAlive, async components,
+  Testing, samples.
+- `Component` abstract base per the sketch, refined: **lazy `Configure`** (runs on first
+  `Properties`/`Emits` access, single-threaded, no ctor virtual call), descriptor typo fixed
+  (`ComponentDescirptor`), lifecycle methods REMOVED from `IComponentDescriptor` (ratified
+  decision 3), protected `Reference/ShallowReference/CustomReference/Computed/Effect/EffectScope`
+  factory helpers kept.
+- `src/Dom/` → `src/VirtualDom/` (Core is DOM-free; the vnode family is platform-neutral).
+- Full-green bar as R6.
+
+## R8 — application context, async plugins, service container (`V01.01.03.27` intended)
+
+Branch stacked on R7.
+
+- `IApplicationPlugin` (async `ValueTask InstallAsync(IApplication)`, options via plugin
+  constructor state) replaces `IPlugin`; installs are awaited inside `MountAsync` during the R4
+  init phase — documented order: **services frozen → plugins install → platform init → render**.
+  `Build()` stays synchronous. Install-once + dedup-with-warning parity kept.
+- `IApplicationContext` consolidation per sketch: configuration + `ServicesProvider` + error/warn
+  handlers + performance flag; RUNTIME state (`IsMounted`, `RootInstance`) stays on
+  `IApplication`. Fill the sketch's empty XML doc stubs.
+- `IServiceContainer` (ratified decision 2): `Add(ServiceRegistration)` fluent + `Build()`;
+  `ServiceProviderBuilder` → `ServiceContainer` (default impl); `AddSingleton/AddScoped/AddTransient`
+  extensions retarget and chain; `UseServiceProviderBuilder` dies — BYO = supply your own
+  `IServiceContainer` to the builder; freeze semantics (`Add` after `Build` throws; `Build` called
+  exactly once by `ApplicationBuilder.Build()`); provider lands on `IApplicationContext.ServicesProvider`.
+- Cascade: Browser/ServerRenderer builders, Router/Store `AddRouter`/`AddStore`, samples, guide.
+- Full-green bar as R6.
+
+## Arc 2 State (update in the same commit as any progress)
+
+| Unit | Work item | Branch | State |
+| --- | --- | --- | --- |
+| Sketch base | — | `draft/core-abstraction-sketch` | captured + pushed |
+| R6 | not yet filed (`V01.01.03.25`) | `feature/V01.01.03.25-reactive-class-model` | not started |
+| R7 | not yet filed (`V01.01.03.26`) | `feature/V01.01.03.26-component-class-model` | not started |
+| R8 | not yet filed (`V01.01.03.27`) | `feature/V01.01.03.27-application-services-model` | not started |
+
+Same train discipline as arc 1: Opus worktree agents, work item filed first, local commits,
+main-session review, push after review, PRs only when Chase says publish.
