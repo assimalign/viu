@@ -26,6 +26,14 @@
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" Version="1.1.4" />
     </ItemGroup>
 
+    <!-- Benchmark Dependencies -->
+    <ItemGroup>
+        <!-- BenchmarkDotNet hosts the DOM-free micro/meso benchmarks ([V01.01.11.04], #88): reactivity
+             track/trigger and renderer diff/patch on the in-memory test adapter, on CoreCLR. It never
+             ships and is not trimmed/AOT'd (bench project, like the tests). Restored from dotnet-public. -->
+        <_ViuPackage Include="BenchmarkDotNet" Version="0.15.8" />
+    </ItemGroup>
+
     <!-- XUnit Test Dependencies-->
     <ItemGroup>
         <_ViuPackage Include="Shouldly" Version="4.3.0" />

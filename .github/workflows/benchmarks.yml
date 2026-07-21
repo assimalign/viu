@@ -1,0 +1,147 @@
+# Performance benchmark suite ([V01.01.11.04], #88). Three lanes with deliberately different cost
+# profiles, mirroring the budget-gates workflow:
+#   - harness-tests + interop-gate: fast, deterministic, run on every PR/push (path-filtered). The gate
+#     compares each scenario's interop-crossing count to the reviewed baseline
+#     (benchmarks/baselines/InteropCounts.json) and fails a regression. Counts are machine-independent, so
+#     this is a real gate, not a noisy timing. libraries/** is watched because a renderer change there can
+#     change crossings.
+#   - timings: BenchmarkDotNet wall-clock numbers are environment-relative and noisy, so this lane is
+#     opt-in (workflow_dispatch or the 'benchmark-run' label), never a gate — the AOT-lane cost-control
+#     pattern. It publishes results as artifacts.
+#   - browser: WIRED-BUT-SKIPPED. Real-browser wall-clock, live command-buffer crossings, and per-assembly
+#     payload size need the Playwright e2e harness ([V01.01.11.03], #87); enabled by the repository
+#     variable ENABLE_BROWSER_BENCHMARKS once it lands (never faked).
+name: benchmarks
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'release/**']
+    paths:
+      - 'benchmarks/**'
+      - 'libraries/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/benchmarks.yml'
+  pull_request:
+    branches: [main, 'release/**']
+    paths:
+      - 'benchmarks/**'
+      - 'libraries/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/benchmarks.yml'
+
+jobs:
+  harness-tests:
+    name: benchmark harness tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pure CoreCLR: the suite never touches the browser-wasm runtime, so no wasm-tools workload.
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build (warnings are errors)
+        run: dotnet build benchmarks/Assimalign.Viu.Testing.Benchmarks.Tests/Assimalign.Viu.Testing.Benchmarks.Tests.csproj --configuration Release -warnaserror
+
+      - name: Test
+        run: dotnet test benchmarks/Assimalign.Viu.Testing.Benchmarks.Tests/Assimalign.Viu.Testing.Benchmarks.Tests.csproj --configuration Release --no-build
+
+  interop-gate:
+    name: interop-count regression gate
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build benchmark app (warnings are errors)
+        run: dotnet build benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj --configuration Release -warnaserror
+
+      # Deterministic gate: runs every scenario through the in-memory adapter, counts node operations (the
+      # interop-crossing proxy), and fails when any scenario exceeds its reviewed ceiling. The ceiling is
+      # raised only by an explicit edit to benchmarks/baselines/InteropCounts.json (no silent ratcheting).
+      - name: Interop-count gate
+        run: >-
+          dotnet run --project benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj
+          --configuration Release --no-build
+          -- interop --gate --results _out/benchmarks/interop-results.json
+
+      - name: Upload interop-count results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interop-count-results
+          path: _out/benchmarks/interop-results.json
+          if-no-files-found: ignore
+
+  timings:
+    name: wall-clock timings (opt-in)
+    # Cost control (the AOT-lane pattern): BenchmarkDotNet timings are noisy and environment-relative, so
+    # they never gate and do not run on every PR. Trigger manually (workflow_dispatch) or with the
+    # 'benchmark-run' label. Numbers are published as artifacts for inspection.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark-run'))
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build benchmark app (Release)
+        run: dotnet build benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj --configuration Release
+
+      # A short run keeps CI time bounded; drop --smoke for full statistical passes when investigating.
+      - name: Run benchmarks (short)
+        run: >-
+          dotnet run --project benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj
+          --configuration Release --no-build
+          -- benchmarks --smoke --filter *
+          --artifacts _out/benchmarks/artifacts
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-timings
+          path: _out/benchmarks/artifacts/**
+          if-no-files-found: ignore
+
+  browser:
+    name: real-browser benchmarks (deferred, #87)
+    # WIRED-BUT-SKIPPED. The real-browser axes (wall-clock incl. interop init, live command-buffer
+    # boundary-crossing counts, per-assembly published payload size) depend on the Playwright e2e harness
+    # ([V01.01.11.03], #87). No measurement is faked; the lane turns on once that harness lands by setting
+    # the repository variable ENABLE_BROWSER_BENCHMARKS=true (the startup-gate pattern from budget-gates.yml).
+    # TODO([V01.01.11.03], #87): publish the benchmark app trimmed, serve wwwroot, drive it headless in
+    # Chromium/Firefox/WebKit measuring per-scenario time + command-buffer crossings + payload size.
+    if: ${{ vars.ENABLE_BROWSER_BENCHMARKS == 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Browser benchmarks placeholder
+        run: >-
+          dotnet run --project benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj
+          --configuration Release
+          -- browser

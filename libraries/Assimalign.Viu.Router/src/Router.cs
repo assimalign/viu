@@ -28,6 +28,16 @@ namespace Assimalign.Viu.Router;
 /// in-flight one through a cooperative <see cref="CancellationToken"/>.
 /// </para>
 /// <para>
+/// <b>The initial navigation</b> mirrors upstream's START-location semantics: <see cref="CurrentRoute"/>
+/// begins at <see cref="RouteLocation.Start"/> (empty matched chain), not the eagerly resolved initial
+/// location. <see cref="ReadyAsync"/> runs the first navigation to the history location through the
+/// same full pipeline with <c>from</c> = the START sentinel — so a global <see cref="BeforeEach"/>
+/// redirect fires for a direct page load — and its confirm step replaces (never pushes) the current
+/// history entry, exactly as upstream forces a replace when <c>from === START_LOCATION_NORMALIZED</c>.
+/// The same-location dedup is skipped whenever <c>from</c> has an empty matched chain, so START never
+/// short-circuits the initial pass while in-session duplicates still do.
+/// </para>
+/// <para>
 /// <b>Deliberate C# divergences from vue-router</b> (see <c>docs/DESIGN.md</c>): guards return a
 /// <see cref="NavigationGuardResult"/> instead of calling <c>next()</c>; <see cref="Push"/> resolves
 /// with a <see cref="NavigationFailure"/> for abort/cancel/duplicate and faults only on genuinely
@@ -56,6 +66,7 @@ public sealed class Router : IDisposable
     private readonly Dictionary<RouteRecord, List<NavigationGuard>> _leaveGuards = [];
     private readonly Dictionary<RouteRecord, List<NavigationGuard>> _updateGuards = [];
     private CancellationTokenSource? _pendingNavigation;
+    private Task<NavigationFailure?>? _initialNavigation;
     private bool _disposed;
 
     /// <summary>Creates a router over an existing matcher and history.</summary>
@@ -68,7 +79,11 @@ public sealed class Router : IDisposable
         ArgumentNullException.ThrowIfNull(matcher);
         _history = history;
         _matcher = matcher;
-        _currentRoute = Reactive.ShallowReference(matcher.Resolve(history.Location));
+        // Seed the current route with the START sentinel (empty matched chain), not the eagerly
+        // resolved initial location, so the first navigation runs the full guard pipeline instead of
+        // being deduplicated against a pre-resolved route (upstream: currentRoute starts at
+        // START_LOCATION_NORMALIZED; the initial navigation is a real push from START — [V01.01.08.07]).
+        _currentRoute = Reactive.ShallowReference(RouteLocation.Start);
         _unlisten = history.Listen(OnHistoryNavigation);
     }
 
@@ -211,6 +226,32 @@ public sealed class Router : IDisposable
     public Task<NavigationFailure?> Replace(string location) => Navigate(location, replace: true);
 
     /// <summary>
+    /// Runs the initial navigation and resolves when it settles — the C# port of vue-router's
+    /// <c>router.isReady()</c> combined with the install-time initial push
+    /// (<c>packages/router/src/router.ts</c>, https://router.vuejs.org/api/#isReady). The first call
+    /// navigates to the current history location through the <b>full</b> guard pipeline with
+    /// <c>from</c> = <see cref="RouteLocation.Start"/>, so a global <see cref="BeforeEach"/> redirect
+    /// (the classic <c>/</c> → <c>/x</c>) fires even for a page loaded directly at that URL; the
+    /// confirm step replaces the current history entry rather than pushing a new one. Idempotent —
+    /// every call returns the same task, so the initial navigation runs exactly once.
+    /// </summary>
+    /// <remarks>
+    /// A Viu bootstrap awaits this before mounting so the first render already reflects the resolved
+    /// (or redirected) route. The returned task resolves with the initial navigation's
+    /// <see cref="NavigationFailure"/> (or <see langword="null"/> on success) and faults only on an
+    /// unexpected guard exception. Because there is no <c>app.use(router)</c> install hook in Viu, this
+    /// single method folds upstream's separate install-time trigger and <c>isReady()</c> await; unlike
+    /// upstream's <c>isReady()</c>, it always settles (never hangs) for an aborted initial navigation.
+    /// </remarks>
+    /// <returns>The initial navigation outcome, settling when it completes.</returns>
+    /// <exception cref="ObjectDisposedException">The router has been disposed.</exception>
+    public Task<NavigationFailure?> ReadyAsync()
+    {
+        ThrowIfDisposed();
+        return _initialNavigation ??= Navigate(_history.Location, replace: false);
+    }
+
+    /// <summary>
     /// Moves through the history stack by <paramref name="delta"/> entries, driving the same guard
     /// pipeline as a browser back/forward (upstream: <c>router.go</c>). The resulting navigation runs
     /// asynchronously through the history listener.
@@ -307,7 +348,10 @@ public sealed class Router : IDisposable
         var token = BeginNavigation();
         var from = _currentRoute.Value;
         NavigationFailure? failure;
-        if (IsSameLocation(from, to))
+        // Dedup only when `from` already has a matched chain (upstream gates on `from.matched.length`):
+        // the START sentinel has an empty chain, so the initial navigation is never deduplicated and
+        // always runs the full pipeline, while in-session same-location navigations still short-circuit.
+        if (from.Matched.Count > 0 && IsSameLocation(from, to))
         {
             // Duplicated: skip the pipeline entirely but still notify afterEach (upstream parity).
             failure = new NavigationFailure(NavigationFailureType.Duplicated, to, from);
@@ -341,7 +385,13 @@ public sealed class Router : IDisposable
                     }
                     else
                     {
-                        FinalizeNavigation(to, isPush: true, replace);
+                        // The first navigation (from the START sentinel) replaces the current history
+                        // entry rather than pushing a new one, so the app's entry URL is not left as a
+                        // stale back-target (upstream: isFirstNavigation forces a replace in
+                        // finalizeNavigation). ReferenceEquals stays true through a redirect chain
+                        // because nothing is committed until this confirm.
+                        var isFirstNavigation = ReferenceEquals(from, RouteLocation.Start);
+                        FinalizeNavigation(to, isPush: true, replace || isFirstNavigation);
                         failure = null;
                     }
                     break;

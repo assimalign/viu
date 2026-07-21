@@ -291,8 +291,10 @@ schedules a re-render — no reflection, fully trimming- and AOT-safe.
 
 Viu's single-file component is the `.viu` file — the counterpart of Vue's `.vue`, using
 `@template`/`@script`/`@style` `@`-blocks instead of HTML-like tags (the exact grammar is in
-[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)). Its
-production-ready role today is **scoped, bundled CSS**. Add a `.viu` file with a `@style` block:
+[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)). A `.viu` with
+an `@template`/`@script` compiles to a **mountable component** (see the note below,
+[#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **scoped, bundled CSS**
+unit. Add a `.viu` file with a `@style` block:
 
 **`AppStyles.viu`**:
 
@@ -334,12 +336,31 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 [`sdks/README.md`](../../sdks/README.md) and the injection mechanism is
 [V01.01.12.12.01](https://github.com/assimalign/viu/issues/167).
 
-> **`.viu` `@template`/`@script` today.** The `@template` (standard Vue template markup) and `@script`
-> (C#) blocks already **compile** at build time — the generator emits a render function and merges the
-> script into a partial class. What is still in progress is the runtime bridge that turns that
-> generated partial into a **mountable** component; until it lands
-> ([#216](https://github.com/assimalign/viu/issues/216)), author your components in C# with
-> `IComponentDefinition` (as above) and use `.viu` for `@style`.
+> **`.viu` `@template`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
+> A `.viu` with an `@template` (standard Vue template markup) and an `@script` (C#) block now compiles to a
+> **mountable component**: the generator emits the render function, merges the script into the partial
+> class, **and** generates the `IComponentDefinition` bridge (a `Setup` that returns the render delegate),
+> so you mount it exactly like a hand-written component — `BrowserRuntime.CreateApp(new Greeting()).Mount("#app")`
+> or `VirtualNodeFactory.Component(new Greeting(), props)` — with no manual wiring beyond the package
+> reference. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive re-render, and a
+> template event handler (`@click="Increment"`) calls the like-named `@script` method:
+>
+> ```
+> @template {
+>     <button class="counter" @click="Increment">{{ Count }}</button>
+> }
+> @script {
+>     using Assimalign.Viu.Reactivity;
+>     public readonly Reference<int> Count = Reactive.Reference(0);
+>     public void Increment() => Count.Value++;
+> }
+> ```
+>
+> Still in progress ([#227](https://github.com/assimalign/viu/issues/227)): declared props/emits (the
+> `defineProps`/`defineEmits` analogues) and lifecycle hooks authored inside `@script`. Until those land,
+> undeclared attributes fall through to the component's root element, and a parent composes a child `.viu`
+> by explicit instantiation (`new Greeting()`). Hand-authored `IComponentDefinition` components (as above)
+> remain fully supported.
 
 ## Run and publish
 
@@ -400,8 +421,10 @@ This guide is intentionally scoped to what a consumer can build and publish toda
 
 - **A `dotnet new` project template** — [V01.01.12.04] (W05); until then, create the project by hand as
   above.
-- **Mountable `.viu` single-file components** — [#216](https://github.com/assimalign/viu/issues/216);
-  today `.viu` provides `@style` bundling and compiles `@template`/`@script`.
+- **Declared props/emits and lifecycle hooks in a `.viu` `@script`** — the `defineProps`/`defineEmits`
+  analogues and `@script`-authored lifecycle, still in progress
+  ([#227](https://github.com/assimalign/viu/issues/227)). Mountable `.viu` `@template`/`@script` components
+  themselves already work ([#216](https://github.com/assimalign/viu/issues/216), see the note above).
 - **A template-syntax reference and the API reference site** — the Documentation area
   [V01.01.13](https://github.com/assimalign/viu/issues/97).
 

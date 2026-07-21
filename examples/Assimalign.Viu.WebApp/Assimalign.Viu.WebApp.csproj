@@ -16,5 +16,12 @@
 
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <!-- Run the .viu single-file-component source generator ([V01.01.06.02]/[V01.01.06.07]) so ViuBadge.viu
+         compiles to a mountable IComponentDefinition component (StopwatchApplication mounts it via
+         VirtualNodeFactory.Component). In-repo this must be referenced directly alongside
+         $(ViuUseSingleFileComponents) above (the buildTransitive analyzer wiring only flows to packaged
+         consumers); packaged consumers get it from the Viu SDK's shared framework. This makes the WASM
+         sample the trimmed + AOT canary for the generated component bridge (budget-gates.yml). -->
+    <ViuAnalyzerReference Include="Assimalign.Viu.Syntax.Generators" />
   </ItemGroup>
 </Project>

@@ -38,6 +38,10 @@
              against, so a generator's own snapshot tests resolve it as a ViuPrivateProjectReference. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)libraries\**\*.csproj" />
         <_ViuProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <!-- Benchmarks are a first-class non-shipping code area ([V01.01.11.04], #88), like analyzers:
+             indexing them lets the benchmark test project take a by-name compile reference to the
+             benchmark app, and lets both resolve the runtime libraries they measure. -->
+        <_ViuProject Include="$(ViuRepositoryDirectory)benchmarks\**\*.csproj" />
         <_ViuProject Update="@(_ViuProject)" ProjectId="%(_ViuProject.Filename)" ProjectPath="%(_ViuProject.Identity)" />
 
         <!-- Public refs -->
