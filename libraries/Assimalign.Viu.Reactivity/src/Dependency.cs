@@ -4,7 +4,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// A single reactive dependency cell — the C# port of Vue 3.5's <c>Dep</c>. Maintains a version
-/// counter and an intrusive doubly-linked list of subscriber <see cref="Link"/>s.
+/// counter and an intrusive doubly-linked list of subscriber <see cref="SubscriberLink"/>s.
 /// <see cref="Track"/> links the ambient active subscriber (deduplicating via link versions);
 /// <see cref="Trigger"/> bumps this dependency's version plus the global version and notifies
 /// subscribers. Not thread-safe: designed for the single-threaded JS event-loop model.
@@ -18,10 +18,10 @@ public sealed class Dependency
     /// The link between this dependency and the current active subscriber, if any — lets a re-read
     /// within the same run reuse the existing link with zero allocation.
     /// </summary>
-    internal Link? ActiveLink;
+    internal SubscriberLink? ActiveLink;
 
     /// <summary>Tail of the subscriber list (notification iterates tail-to-head, Vue parity).</summary>
-    internal Link? Subscribers;
+    internal SubscriberLink? Subscribers;
 
     /// <summary>Set when this dependency is owned by a computed (dual dependency/subscriber role).</summary>
     internal Subscriber? Computed;
@@ -43,7 +43,7 @@ public sealed class Dependency
     public void Track() => TrackLink();
 
     /// <summary>Core of <see cref="Track"/>; returns the (new or reused) link for computed reads.</summary>
-    internal Link? TrackLink()
+    internal SubscriberLink? TrackLink()
     {
         var subscriber = ReactivityState.ActiveSubscriber;
         if (subscriber is null || !ReactivityState.ShouldTrack || ReferenceEquals(subscriber, Computed))
@@ -53,7 +53,7 @@ public sealed class Dependency
         var link = ActiveLink;
         if (link is null || !ReferenceEquals(link.Subscriber, subscriber))
         {
-            link = ActiveLink = new Link(subscriber, this);
+            link = ActiveLink = new SubscriberLink(subscriber, this);
 
             // Append to the subscriber's dependency list tail.
             if (subscriber.Dependencies is null)

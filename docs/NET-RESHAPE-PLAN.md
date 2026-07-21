@@ -1,9 +1,9 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
-**Status: planned — execution not started.** This document is the session-independent source of
-truth for the reshape arc. Any session (human or agent) resuming this work reads this file first,
-checks the *State* table, and continues from the first incomplete unit. Update the State table in
-the same commit as any unit's progress.
+**Status: in progress — R1 implemented (awaiting main-session review); R2+ not started.** This
+document is the session-independent source of truth for the reshape arc. Any session (human or agent)
+resuming this work reads this file first, checks the *State* table, and continues from the first
+incomplete unit. Update the State table in the same commit as any unit's progress.
 
 ## Motivation (recorded 2026-07-20, direction set by Chase)
 
@@ -144,8 +144,8 @@ until reviewed.
 
 | Unit | Work item | Branch | State |
 | --- | --- | --- | --- |
-| Train base | #66 hydration + review fixes | `feature/V01.01.07.03-hydration-walker` | fixes in progress (agent); PR HELD by user request |
-| R1 | not yet filed (`V01.01.02.10`) | `feature/V01.01.02.10-reactivity-public-surface` | not started |
+| Train base | #66 hydration + review fixes | `feature/V01.01.07.03-hydration-walker` | fixes done (c530119), restacked on main, branch pushed, PR held |
+| R1 | #230 (`V01.01.02.10`) | `feature/V01.01.02.10-reactivity-public-surface` | implemented, awaiting main-session review |
 | R2 | not yet filed (`V01.01.12.21`) | `feature/V01.01.12.21-core-consolidation` | not started — unblocked (prerequisite 1 satisfied 2026-07-20: #223/#224/#226/#228 all merged) |
 | R3 | not yet filed (`V01.01.12.22`) | `feature/V01.01.12.22-browser-rename` | not started |
 | R4 | not yet filed (`V01.01.03.23`) | `feature/V01.01.03.23-application-model` | not started |

@@ -11,7 +11,7 @@ internal static class SubscriberOperations
     /// Adds a link to its dependency's subscriber list. When the dependency belongs to a computed
     /// gaining its first subscriber, the computed lazily (re-)subscribes to its own sources.
     /// </summary>
-    internal static void AddSubscriber(Link link)
+    internal static void AddSubscriber(SubscriberLink link)
     {
         link.Dependency.SubscriberCount++;
         if ((link.Subscriber.Flags & SubscriberFlags.Tracking) != 0)
@@ -45,7 +45,7 @@ internal static class SubscriberOperations
     /// notifications. A fully unsubscribed dependency removes itself from its owning object-keyed
     /// map.
     /// </summary>
-    internal static void RemoveSubscriber(Link link, bool soft = false)
+    internal static void RemoveSubscriber(SubscriberLink link, bool soft = false)
     {
         var dependency = link.Dependency;
         var previousSubscriber = link.PreviousSubscriber;
@@ -97,7 +97,7 @@ internal static class SubscriberOperations
     /// </summary>
     internal static void CleanupDependencies(Subscriber subscriber)
     {
-        Link? head = null;
+        SubscriberLink? head = null;
         var tail = subscriber.DependenciesTail;
         var link = tail;
         while (link is not null)
@@ -149,7 +149,7 @@ internal static class SubscriberOperations
         return false;
     }
 
-    private static void RemoveDependency(Link link)
+    private static void RemoveDependency(SubscriberLink link)
     {
         var previousDependency = link.PreviousDependency;
         var nextDependency = link.NextDependency;

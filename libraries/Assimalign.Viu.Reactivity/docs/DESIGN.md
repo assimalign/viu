@@ -15,7 +15,7 @@ are dedicated types rather than proxied BCL collections.
 ## The dependency engine
 
 The engine ports Vue 3.5's **version-counter + doubly-linked-list** design: a `Dependency` holds
-subscribers, a `Subscriber` holds its dependencies, and the `Link` nodes between them (internal) are
+subscribers, a `Subscriber` holds its dependencies, and the `SubscriberLink` nodes between them are
 reused across runs so a stable dependency set allocates nothing on re-track. Batching
 (`StartBatch`/`EndBatch`) coalesces triggers so multiple writes produce at most one run per effect;
 `PauseTracking`/`ResetTracking` gate collection.
@@ -25,6 +25,24 @@ constructor** — opaque and un-subclassable externally, but a real base so the 
 (per-trigger notification) dispatches through a vtable virtual call rather than interface dispatch,
 which is measurably costlier on mono-wasm / NativeAOT (the repo's "dispatch on hot paths" rule).
 Concrete leaves (`ReactiveEffect`, `Computed<T>`) are `sealed` so the JIT can devirtualize.
+
+## Public engine surface (read-only)
+
+The dependency graph is part of the public API — but only for *reading*. `SubscriberLink` (the port
+of Vue's `Link`), `Subscriber.FirstDependency`, the already-public `Dependency`, and
+`ITrackedReference` let a .NET developer inspect what depends on what: walk a subscriber's
+`FirstDependency` → `NextDependency` chain, reach the `Dependency` behind a ref via
+`ITrackedReference`, and read each edge's observed `Version`. This mirrors how .NET developers expect
+to introspect a framework's object graph, and Vue itself keeps the same structures in `dep.ts`.
+
+Every state-mutating member — link construction, list splicing, version bookkeeping, the flags word —
+stays `internal`, so external code can observe the graph but cannot desynchronize the engine. Two
+consequences of the hot-path rule shape *how* the surface is exposed: `SubscriberLink` is a `sealed`
+class whose observable fields become `{ get; internal set; }` auto-properties (the JIT inlines them to
+direct field access), while `Subscriber` — the `private protected` vtable base — keeps its list
+head/tail and flags as **internal fields** and surfaces only the head through a separate read-only
+`FirstDependency` property, so the per-trigger hot path never pays property-getter dispatch on the
+base. The public accessors are for cold inspection only.
 
 ## The compiler contract
 
@@ -50,5 +68,6 @@ is pinned to it — a change to `Value` requires a matching change there.
 
 - No deep implicit reactivity without `[Reactive]` or a reactive collection — reactivity is opted
   into explicitly.
-- Reactivity escape hatches and introspection beyond the current surface are sequenced work
-  ([V01.01.02.09]).
+- Deeper reactivity escape hatches beyond the current surface remain sequenced work. The public
+  dependency-graph surface ([V01.01.02.10]) is deliberately **read-only** — writable graph
+  manipulation from outside the engine is a non-goal.
