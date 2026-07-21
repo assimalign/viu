@@ -29,6 +29,18 @@ function fail(operation, handle, message) {
     throw new Error(`viu-dom|${operation}|${handle}|${message}`)
 }
 
+// Hydration snapshot serializers ([V01.01.07.03]): ints are space-terminated decimals; strings are
+// length-prefixed (`<len>:<chars> `) so arbitrary content needs no escaping. The length is a UTF-16
+// code-unit count, matching .NET string.Length, so the reader takes exactly that many chars.
+function writeSnapshotInt(parts, value) {
+    parts.push(value + ' ')
+}
+
+function writeSnapshotString(parts, value) {
+    const text = value == null ? '' : String(value)
+    parts.push(text.length + ':' + text + ' ')
+}
+
 function registerNode(node) {
     const existingHandle = nodeHandles.get(node)
     if (existingHandle !== undefined) {
@@ -308,6 +320,56 @@ export const dom = {
     nextSibling: nodeHandle => {
         const sibling = getNode('nextSibling', nodeHandle).nextSibling
         return sibling ? registerNode(sibling) : 0
+    },
+
+    // Hydration snapshot ([V01.01.07.03]): ONE batched interop crossing walks the whole subtree rooted at
+    // the container, registers a handle for every node, and returns a compact serialization the .NET
+    // BrowserHydrationReader answers all subsequent structure/kind/data/attribute reads from — so the
+    // client-side hydration walk crosses the boundary once per root (and once per teleport target) instead
+    // of a marshaled call per firstChild/nextSibling/getAttribute. Per node the wire format is
+    //   handle parent firstChild nextSibling kind  (five space-terminated ints; kind 0/1/2/3)
+    // then, for an element, `tag attrCount [name value]*`, else `data` — every string written length-
+    // prefixed as `<len>:<chars> ` so arbitrary text/attribute content needs no escaping. Reads are
+    // idempotent (registerNode dedups), so re-snapshotting a target that overlaps the root is harmless.
+    snapshotHydration: containerHandle => {
+        const container = getNode('snapshotHydration', containerHandle)
+        const nodes = [container]
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_ALL)
+        let current = walker.nextNode()
+        while (current) {
+            nodes.push(current)
+            current = walker.nextNode()
+        }
+        const parts = []
+        writeSnapshotInt(parts, nodes.length)
+        for (let index = 0; index < nodes.length; index++) {
+            const node = nodes[index]
+            const isRoot = node === container
+            writeSnapshotInt(parts, registerNode(node))
+            writeSnapshotInt(parts, isRoot || !node.parentNode ? 0 : registerNode(node.parentNode))
+            writeSnapshotInt(parts, node.firstChild ? registerNode(node.firstChild) : 0)
+            writeSnapshotInt(parts, isRoot || !node.nextSibling ? 0 : registerNode(node.nextSibling))
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                writeSnapshotInt(parts, 0)
+                writeSnapshotString(parts, node.tagName)
+                const attributes = node.attributes
+                writeSnapshotInt(parts, attributes.length)
+                for (let a = 0; a < attributes.length; a++) {
+                    writeSnapshotString(parts, attributes[a].name)
+                    writeSnapshotString(parts, attributes[a].value)
+                }
+            } else if (node.nodeType === Node.TEXT_NODE) {
+                writeSnapshotInt(parts, 1)
+                writeSnapshotString(parts, node.data)
+            } else if (node.nodeType === Node.COMMENT_NODE) {
+                writeSnapshotInt(parts, 2)
+                writeSnapshotString(parts, node.data)
+            } else {
+                writeSnapshotInt(parts, 3)
+                writeSnapshotString(parts, node.data || '')
+            }
+        }
+        return parts.join('')
     },
 
     // Inserts a multi-node static HTML chunk in ONE interop call via a detached <template>,

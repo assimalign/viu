@@ -77,6 +77,30 @@ public static class BrowserRuntime
         return new BrowserApplication(renderer.CreateApplication(rootComponent, rootProperties));
     }
 
+    /// <summary>
+    /// Creates a browser application that <b>hydrates</b> existing server-rendered markup rather than
+    /// mounting fresh — the C# port of <c>createSSRApp(rootComponent)</c> in <c>@vue/runtime-dom</c>
+    /// (https://vuejs.org/guide/scaling-up/ssr.html#client-hydration). Its
+    /// <see cref="BrowserApplication.Mount(string)"/> adopts the container's server DOM (attaching event
+    /// listeners and component instances, reconciling only dynamic bindings) instead of clearing and
+    /// recreating it; a server/client mismatch recovers per subtree without crashing. The container must
+    /// already hold the markup the server renderer produced for the same root component.
+    /// </summary>
+    /// <param name="rootComponent">The root component definition (the same one rendered on the server).</param>
+    /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <returns>The hydrating app; mount it by selector or handle over the server-rendered container.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
+    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
+    public static BrowserApplication CreateSsrApp(
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootComponent);
+        EnsureInitialized();
+        var renderer = RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
+        return new BrowserApplication(renderer.CreateApplication(rootComponent, rootProperties), hydrate: true);
+    }
+
     /// <summary>Clears a container's content in one interop call, releasing registered child handles.</summary>
     /// <param name="containerHandle">The container's node handle.</param>
     internal static void ClearContainer(int containerHandle)

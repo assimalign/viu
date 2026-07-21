@@ -18,6 +18,7 @@ namespace Assimalign.Viu.RuntimeCore;
 /// </summary>
 /// <typeparam name="TNode">The platform node type.</typeparam>
 public sealed class RendererOptions<TNode>
+    where TNode : notnull
 {
     /// <summary>
     /// Inserts <c>child</c> into <c>parent</c> before <c>anchor</c>, appending when the anchor
@@ -79,4 +80,20 @@ public sealed class RendererOptions<TNode>
     /// vnodes.
     /// </summary>
     public InsertStaticContentDelegate<TNode>? InsertStaticContent { get; init; }
+
+    /// <summary>
+    /// Optional: opens a read-only view over the existing server-rendered subtree rooted at the
+    /// given node so the renderer can hydrate it instead of mounting fresh (upstream: the
+    /// <c>nodeOps</c> reads <c>createHydrationFunctions</c> closes over —
+    /// <c>packages/runtime-core/src/hydration.ts</c>). Required to hydrate through
+    /// <c>Renderer.Hydrate</c> / <c>CreateSSRApp</c>; a renderer without it can only mount.
+    /// <para>
+    /// The factory is where the interop-cost discipline lives: the browser adapter returns a reader
+    /// backed by a single batched snapshot of the whole subtree (one boundary crossing), so the walk
+    /// reads structure and node data without a marshaled call per node; the in-memory test adapter
+    /// reads the live tree directly. Called once per hydration root — and once per teleport target,
+    /// which lies outside the root's subtree — never per node.
+    /// </para>
+    /// </summary>
+    public Func<TNode, HydrationNodeReader<TNode>>? CreateHydrationReader { get; init; }
 }

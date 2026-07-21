@@ -18,10 +18,17 @@ public sealed class TestRenderer
     private readonly List<TestElement> _teleportTargetRoots = [];
 
     /// <summary>Creates a renderer over a fresh op log.</summary>
-    public TestRenderer()
+    /// <param name="snapshotSemantics">
+    /// When true, hydration reads use an immutable <see cref="FrozenTestHydrationReader"/> and a double-remove
+    /// throws — mirroring the browser's batched snapshot reader so a hydration walk that re-reads structure
+    /// after mutating fails loudly (the snapshot-safety regression mode, [V01.01.07.03]). Default false
+    /// (live-tree reads).
+    /// </param>
+    public TestRenderer(bool snapshotSemantics = false)
     {
         OperationLog = new TestNodeOperationLog();
-        Renderer = RendererFactory.CreateRenderer(TestNodeOperations.Create(OperationLog, _teleportTargetRoots));
+        Renderer = RendererFactory.CreateRenderer(
+            TestNodeOperations.Create(OperationLog, _teleportTargetRoots, snapshotSemantics));
     }
 
     /// <summary>The underlying platform-agnostic renderer.</summary>
@@ -62,5 +69,21 @@ public sealed class TestRenderer
         // resolves against the tree the renderer just built).
         RegisterQueryRoot(container);
         Renderer.Render(node, container);
+    }
+
+    /// <summary>
+    /// Hydrates <paramref name="node"/> against the existing server-rendered children already present in
+    /// <paramref name="container"/> — the DOM-free counterpart of a browser <c>CreateSSRApp(...).Mount</c>
+    /// (upstream: <c>createSSRApp</c>'s hydrating mount, https://vuejs.org/guide/scaling-up/ssr.html#client-hydration).
+    /// Populate <paramref name="container"/> with the server tree first (by hand or by parsing SSR output),
+    /// then hydrate: matching nodes are adopted with zero structural mutations, and a mismatch recovers per
+    /// subtree ([V01.01.07.03]).
+    /// </summary>
+    /// <param name="node">The client vnode tree to hydrate onto the server nodes.</param>
+    /// <param name="container">The container holding the pre-rendered server tree.</param>
+    public void Hydrate(VirtualNode node, TestElement container)
+    {
+        RegisterQueryRoot(container);
+        Renderer.Hydrate(node, container);
     }
 }

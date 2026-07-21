@@ -111,6 +111,9 @@ internal static class BrowserNodeOperations
             var span = BrowserDomBridge.InsertStaticContent(content, parent, anchor, elementNamespace);
             return (span[0], span[1]);
         },
+        // Hydration reads are answered from a single batched snapshot of the container subtree (one interop
+        // crossing), not per-node bridge calls ([V01.01.07.03]); see the package DESIGN.md.
+        CreateHydrationReader = static container => new BrowserHydrationReader(BrowserDomBridge.SnapshotHydration(container)),
     };
 
     /// <summary>

@@ -300,6 +300,35 @@ The fix is to participate in the same standard mechanism rather than hand-copy a
   (captured `RuntimeWarnings` sink), the wrapper/children class channels staying separate across a FLIP
   reorder, and a reactive fallthrough-attr change patching the same wrapper element in place.
 
+## Hydration reads: one batched snapshot per root ([V01.01.07.03])
+
+Client hydration (the walker lives in `Assimalign.Viu.RuntimeCore`) reads the existing server DOM to
+decide what to adopt: node kind, tag, text/comment data, first-child/next-sibling structure, and a few
+attributes. Answering each of those with a `JSImport` call per node would make hydration the chattiest
+path in the framework — the opposite of "the boundary is the budget". So the browser answers them the
+same way it answers a FLIP measure or a history read: **one crossing that returns a flat snapshot**.
+
+- **`dom.snapshotHydration(container)`** walks the container's subtree once (`createTreeWalker`),
+  registers a bridge handle for every node (so an adopted node's `int` flows straight into the write-side
+  `patchProp`/`insert`/`remove`), and returns a compact serialization — per node: `handle parent firstChild
+  nextSibling kind`, then `tag attrCount [name value]*` for an element or `data` for text/comment. Strings
+  are length-prefixed (`<len>:<chars>`) so arbitrary content needs no escaping; the length is a UTF-16
+  code-unit count, matching `.NET` `string.Length`.
+- **`BrowserHydrationReader`** parses that once into a handle→node map and answers every
+  `HydrationNodeReader` read locally — **zero** further crossings for the whole walk. A teleport target
+  lies outside the root's subtree, so it takes one additional snapshot (teleports are rare); `registerNode`
+  dedups, so an overlapping re-snapshot is harmless.
+- **Buffered mode** treats the snapshot as a read: it commits any pending command-buffer frame first (so
+  the walk sees committed DOM), then snapshots — the same "reads force a flush" rule `parentNode`/
+  `nextSibling`/`querySelector` follow. `CreateSSRApp` uses the direct path; the buffered wrapper carries a
+  snapshot source too so a buffered renderer is not left mount-only.
+- **`BrowserRuntime.CreateSsrApp(...).Mount(...)`** does **not** clear the container (unlike a client
+  `CreateApp` mount) — the server content is precisely what hydration reuses.
+
+Over-registration is deliberate and bounded: a text node deep inside an adopted element gets a handle even
+though no vnode points at it, but the whole subtree's handles are released together when the element is
+removed (`releaseSubtree`), so a mount/unmount cycle still returns the registries to baseline.
+
 ## Non-goals (sequenced work)
 
 - App bootstrap (`CreateApp`-equivalent, container clearing) — [V01.01.04.04] (#42).
