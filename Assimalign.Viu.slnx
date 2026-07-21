@@ -289,6 +289,17 @@
 		<Project Path="libraries/Assimalign.Viu.RuntimeDom/test/Assimalign.Viu.RuntimeDom.CompiledRenderTests/Assimalign.Viu.RuntimeDom.CompiledRenderTests.csproj" />
 		<Project Path="libraries/Assimalign.Viu.RuntimeDom/test/Assimalign.Viu.RuntimeDom.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/docs/">
+		<File Path="libraries/Assimalign.Viu.ServerRenderer/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.ServerRenderer/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/src/">
+		<Project Path="libraries/Assimalign.Viu.ServerRenderer/src/Assimalign.Viu.ServerRenderer.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/test/">
+		<Project Path="libraries/Assimalign.Viu.ServerRenderer/test/Assimalign.Viu.ServerRenderer.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Shared/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Shared/src/">
 		<Project Path="libraries/Assimalign.Viu.Shared/src/Assimalign.Viu.Shared.csproj" />
