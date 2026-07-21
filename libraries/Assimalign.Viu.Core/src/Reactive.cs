@@ -103,13 +103,13 @@ public static class Reactive
     /// </summary>
     /// <param name="reference">The ref to force-trigger.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
-    public static void TriggerReference(IReference reference)
+    public static void TriggerReference(ReactiveValue reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
-        if (reference is ITrackedReference tracked)
-        {
-            tracked.Dependency.Trigger();
-        }
+
+        // Every ReactiveValue owns a dependency, so there is no silent no-op branch: a non-null ref
+        // always force-notifies its subscribers (a projected ref's own dependency simply has none).
+        reference.Dependency.Trigger();
     }
 
     /// <summary>Pauses dependency tracking (Vue's <c>pauseTracking()</c>); pair with <see cref="ResetTracking"/>.</summary>
@@ -140,7 +140,7 @@ public static class Reactive
     /// <param name="options">Immediate/once/deep/flush options.</param>
     /// <returns>A handle to stop or pause the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch<T>(IReference<T> source, WatchCallback<T> callback, WatchOptions? options = null)
+    public static WatchHandle Watch<T>(ReactiveValue<T> source, WatchCallback<T> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(callback);
@@ -217,14 +217,14 @@ public static class Reactive
     /// <param name="options">Immediate/once/deep/flush options.</param>
     /// <returns>A handle to stop or pause the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sources"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch(IReference[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
+    public static WatchHandle Watch(ReactiveValue[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         var getters = new Func<object?>[sources.Length];
         for (var index = 0; index < sources.Length; index++)
         {
             var reference = sources[index] ?? throw new ArgumentNullException(nameof(sources));
-            getters[index] = () => reference.Value;
+            getters[index] = () => reference.BoxedValue;
         }
         return Watch(getters, callback, options);
     }
@@ -303,13 +303,13 @@ public static class Reactive
     // interface/type-check based so it stays O(1), reflection-free, and trim/AOT-safe.
 
     /// <summary>
-    /// Whether <paramref name="value"/> is a ref (any <see cref="IReference"/>: a plain, shallow, custom,
+    /// Whether <paramref name="value"/> is a ref (any <see cref="ReactiveValue"/>: a plain, shallow, custom,
     /// or computed ref, or a <see cref="ToRef{T}(Func{T}, Action{T})"/>/<c>ToReferences()</c> projection)
     /// — the C# port of Vue 3.5's <c>isRef()</c> (https://vuejs.org/api/reactivity-utilities.html#isref).
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> is a ref.</returns>
-    public static bool IsRef(object? value) => value is IReference;
+    public static bool IsRef(object? value) => value is ReactiveValue;
 
     /// <summary>
     /// Whether <paramref name="value"/> is a reactive object — a source-generated
@@ -329,50 +329,56 @@ public static class Reactive
     /// Whether <paramref name="value"/> is a read-only reactive view — a getter-only
     /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(Readonly = true)]</c>/
     /// <c>[ShallowReactive(Readonly = true)]</c> object — the C# port of Vue 3.5's <c>isReadonly()</c>
-    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly). Keys on <see cref="IReadonlyReactive"/>.
+    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly). Keys on
+    /// <see cref="ReactiveValue.IsReadOnly"/> for refs/computeds and <see cref="IReactiveObject.IsReadOnly"/>
+    /// for reactive objects.
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> rejects writes.</returns>
-    public static bool IsReadonly(object? value)
-        => value is IReadonlyReactive readonlyReactive && readonlyReactive.IsReadonly;
+    public static bool IsReadonly(object? value) => value switch
+    {
+        ReactiveValue reactiveValue => reactiveValue.IsReadOnly,
+        IReactiveObject reactiveObject => reactiveObject.IsReadOnly,
+        _ => false,
+    };
 
     /// <summary>
     /// Returns the value inside a ref, or the argument itself when it is not a ref — the C# port of Vue
     /// 3.5's <c>unref()</c> (https://vuejs.org/api/reactivity-utilities.html#unref). This overload unwraps
-    /// any <see cref="IReference{T}"/> without boxing <typeparamref name="T"/>.
+    /// any <see cref="ReactiveValue{T}"/> without boxing <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="reference">The ref to unwrap.</param>
     /// <returns>The ref's current value (a tracked read).</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
-    public static T Unref<T>(IReference<T> reference)
+    public static T Unref<T>(ReactiveValue<T> reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
         return reference.Value;
     }
 
-    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    /// <inheritdoc cref="Unref{T}(ReactiveValue{T})"/>
     public static T Unref<T>(Reference<T> reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
         return reference.Value;
     }
 
-    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    /// <inheritdoc cref="Unref{T}(ReactiveValue{T})"/>
     public static T Unref<T>(ShallowReference<T> reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
         return reference.Value;
     }
 
-    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    /// <inheritdoc cref="Unref{T}(ReactiveValue{T})"/>
     public static T Unref<T>(CustomReference<T> reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
         return reference.Value;
     }
 
-    /// <inheritdoc cref="Unref{T}(IReference{T})"/>
+    /// <inheritdoc cref="Unref{T}(ReactiveValue{T})"/>
     public static T Unref<T>(Computed<T> reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
@@ -383,7 +389,7 @@ public static class Reactive
     /// Returns <paramref name="value"/> unchanged — the non-ref branch of <c>unref()</c>. The concrete-ref
     /// overloads take precedence for ref arguments, so a struct value flows through this overload without
     /// boxing. (A ref whose static type is only <see cref="object"/> is opaque to overload resolution and
-    /// is returned as-is; unwrap it through <see cref="Unref{T}(IReference{T})"/> instead.)
+    /// is returned as-is; unwrap it through <see cref="Unref{T}(ReactiveValue{T})"/> instead.)
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The value to pass through.</param>
@@ -405,7 +411,7 @@ public static class Reactive
     /// <param name="setter">Invoked on write, or <see langword="null"/> for a read-only ref.</param>
     /// <returns>A ref backed by the delegates.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="getter"/> is null.</exception>
-    public static IReference<T> ToRef<T>(Func<T> getter, Action<T>? setter = null)
+    public static ReactiveValue<T> ToRef<T>(Func<T> getter, Action<T>? setter = null)
     {
         ArgumentNullException.ThrowIfNull(getter);
         return new AccessorReference<T>(getter, setter);

@@ -107,7 +107,7 @@ public sealed partial class Renderer<TNode>
     /// <param name="rootProperties">Props for the root component, or null.</param>
     /// <returns>The app; mount it into a container.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    public Application<TNode> CreateApplication(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    public Application<TNode> CreateApplication(IComponent rootComponent, VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         return new Application<TNode>(this, rootComponent, rootProperties);
@@ -574,7 +574,7 @@ public sealed partial class Renderer<TNode>
 
     private void MountComponent(VirtualNode next, TNode container, TNode? anchor, string? elementNamespace, ComponentInstance? parentComponent)
     {
-        var definition = (IComponentDefinition)next.ComponentType!;
+        var definition = (IComponent)next.ComponentType!;
         // Test-utilities stubbing ([V01.01.11.02]): a registered stub replaces the real child
         // definition here, so the stub's placeholder renders instead. Inert in production.
         if (parentComponent?.AppContext?.ResolveStub(definition) is { } stub)

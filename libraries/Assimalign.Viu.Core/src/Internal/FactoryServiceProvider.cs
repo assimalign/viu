@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The default <see cref="IServiceProvider"/> produced by <see cref="ServiceProviderBuilder.Build"/> —
+/// The default <see cref="IServiceProvider"/> produced by <see cref="ServiceContainer.Build"/> —
 /// an AOT-safe, factory-delegate registry. It has no reflection activation, no constructor discovery,
 /// and no dependency on <c>Microsoft.Extensions.DependencyInjection</c>: every service is created by a
 /// user-supplied <see cref="ServiceRegistration.Factory"/>, so it is trimming- and WASM/NativeAOT-safe.

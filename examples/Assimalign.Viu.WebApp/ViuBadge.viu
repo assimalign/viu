@@ -11,7 +11,7 @@
     using Assimalign.Viu;
 
     // A self-contained .viu single-file component ([V01.01.06.07]): the @script holds the reactive
-    // state and the click handler, the generator emits the IComponentDefinition bridge, and the parent
+    // state and the click handler, the generator emits the IComponent bridge, and the parent
     // mounts it with VirtualNodeFactory.Component — no hand-written wiring. This is the WASM sample's
     // proof that a compiled .viu component publishes trimmed + AOT (the budget-gates canary).
     public readonly Reference<int> Count = Reactive.Reference(0);

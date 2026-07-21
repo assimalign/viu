@@ -146,7 +146,7 @@ internal sealed class TransitionTestHarness : IDisposable
     }
 
     /// <summary>Renders a component's tree into the container and drains scheduled flushes.</summary>
-    public void Render(IComponentDefinition component)
+    public void Render(IComponent component)
     {
         _renderer.Render(VirtualNodeFactory.Component(component), Container);
         _pump.RunUntilIdle();

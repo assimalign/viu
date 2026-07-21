@@ -183,11 +183,28 @@ public sealed class ComputedTests
     }
 
     [Fact]
-    public void ReadonlyComputedThrowsOnWrite()
+    public void ReadonlyComputedWarnsOnWrite_AndDoesNotThrow()
     {
-        var c = Reactive.Computed(() => 1);
-        c.IsWritable.ShouldBeFalse();
-        Should.Throw<NotSupportedException>(() => c.Value = 5);
+        // Upstream parity (packages/reactivity/src/computed.ts): writing a getter-only computed warns
+        // in dev and is a no-op — it never throws (R6 aligned this from the previous NotSupportedException).
+        var captured = new List<string>();
+        var previousSink = RuntimeWarnings.Sink;
+        RuntimeWarnings.Sink = captured.Add;
+        try
+        {
+            var c = Reactive.Computed(() => 1);
+            c.IsWritable.ShouldBeFalse();
+            c.IsReadOnly.ShouldBeTrue();
+
+            Should.NotThrow(() => c.Value = 5);
+
+            c.Value.ShouldBe(1); // unchanged
+            captured.ShouldContain(message => message.Contains("readonly"));
+        }
+        finally
+        {
+            RuntimeWarnings.Sink = previousSink;
+        }
     }
 
     [Fact]

@@ -19,4 +19,4 @@ namespace Assimalign.Viu;
 /// </para>
 /// </summary>
 /// <returns>A task producing the resolved component definition.</returns>
-public delegate Task<IComponentDefinition> AsyncComponentLoader();
+public delegate Task<IComponent> AsyncComponentLoader();

@@ -265,7 +265,7 @@ public sealed class BufferedTransitionSequencingTests
         /// <summary>The in-memory DOM the applier replays each frame onto.</summary>
         public InMemoryHandleDom Dom => _dom;
 
-        public void Render(IComponentDefinition component)
+        public void Render(IComponent component)
         {
             _renderer.Render(Component(component), _container);
             _pump.RunUntilIdle();

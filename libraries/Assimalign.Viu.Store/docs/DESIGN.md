@@ -81,7 +81,7 @@ argument-less `UseStore()` outside a component; server code passes the registry 
 
 ## Integration with the App API
 
-`App.Use` installs an `IPlugin`. The plugin contract is platform-neutral (it extends the
+`App.Use` installs an `IApplicationPlugin`. The plugin contract is platform-neutral (it extends the
 node-type-agnostic `IApplication`), so `StoreRegistry.AsPlugin()` wraps the registry in an internal
 `StorePlugin` — the same plugin installs on a browser app or a server app. On install the plugin:
 

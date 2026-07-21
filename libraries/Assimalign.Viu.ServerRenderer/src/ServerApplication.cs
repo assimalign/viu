@@ -15,13 +15,15 @@ namespace Assimalign.Viu.ServerRenderer;
 /// inseparable from a DOM renderer (it is generic over the platform node and owns a
 /// <c>Renderer&lt;TNode&gt;</c>), whereas founding decision 7 requires the server renderer to run on a
 /// plain .NET host with no DOM/interop dependency. So the SSR app carries the same
-/// component/directive/provide/plugin surface over the shared <see cref="ApplicationContext"/> without
+/// component/directive/provide/plugin surface over the shared <see cref="IApplicationContext"/> without
 /// the renderer, implementing the platform-neutral <see cref="IApplication"/> so plugins and the
 /// builder work against it uniformly. It never mounts (SSR renders to a string per request), so
 /// <see cref="IsMounted"/> is always false, <see cref="RootInstance"/> null, and <see cref="Unmount"/>
-/// a no-op. Per-request discipline is the caller's: construct a fresh <see cref="ServerApplication"/>
-/// per request (see <see cref="CreateBuilder"/>) so no reactive state crosses requests (the host DI
-/// wiring is the server adaptor's concern, [V01.01.07.04]).
+/// a no-op. Because there is no mount path to defer to, a plugin recorded with
+/// <see cref="Use(IApplicationPlugin)"/> installs immediately and must complete synchronously.
+/// Per-request discipline is the caller's: construct a fresh <see cref="ServerApplication"/> per request
+/// (see <see cref="CreateBuilder"/>) so no reactive state crosses requests (the host DI wiring is the
+/// server adaptor's concern, [V01.01.07.04]).
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
@@ -35,11 +37,13 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <param name="rootComponent">The root component definition (upstream: <c>createSSRApp</c>'s argument).</param>
     /// <param name="rootProperties">The props passed to the root component, or null.</param>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    public ServerApplication(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    public ServerApplication(IComponent rootComponent, VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         RootComponent = rootComponent;
         RootProperties = rootProperties;
+        _context.RootComponent = rootComponent;
+        _context.RootProperties = rootProperties;
     }
 
     /// <summary>
@@ -54,7 +58,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <returns>A builder whose <see cref="ServerApplicationBuilder.Build"/> produces the app.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
     public static ServerApplicationBuilder CreateBuilder(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
@@ -68,29 +72,16 @@ public sealed class ServerApplication : IApplication, IDisposable
     public ComponentInstance? RootInstance => null;
 
     /// <summary>The root component definition.</summary>
-    public IComponentDefinition RootComponent { get; }
+    public IComponent RootComponent { get; }
 
     /// <summary>The root component's props, or null.</summary>
     public VirtualNodeProperties? RootProperties { get; }
 
-    /// <summary>
-    /// The app-level configuration (upstream: <c>app.config</c>) — the error and warn handlers the SSR
-    /// error path consults. Configure it before rendering.
-    /// </summary>
-    public ApplicationConfiguration Config => _context.Config;
-
-    /// <summary>
-    /// The application's dependency-injection provider ([V01.01.03.24]) — the
-    /// <see cref="IServiceProvider"/> the <see cref="ServerApplicationBuilder"/> built and attached,
-    /// reachable from component <c>Setup</c> during render through <see cref="ComponentInstance.Services"/>.
-    /// Null when the app was constructed directly (<c>new ServerApplication(...)</c>) without a builder.
-    /// Build a fresh app (and provider) per request so no service state crosses requests; dispose it
-    /// (<see cref="Dispose"/>) to release owned disposable services.
-    /// </summary>
-    public IServiceProvider? Services => _context.Services;
-
-    /// <summary>The shared application context threaded onto the root vnode at render.</summary>
+    /// <summary>The shared application context threaded onto the root vnode at render (internal concrete seam).</summary>
     internal ApplicationContext Context => _context;
+
+    /// <inheritdoc/>
+    IApplicationContext IApplication.Context => _context;
 
     /// <summary>
     /// Registers a component under <paramref name="name"/> so descendants resolve it by name, including
@@ -102,7 +93,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
-    public ServerApplication Component(string name, IComponentDefinition definition)
+    public ServerApplication Component(string name, IComponent definition)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(definition);
@@ -117,7 +108,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <param name="name">The registered name.</param>
     /// <returns>The registered definition, or null.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public IComponentDefinition? Component(string name)
+    public IComponent? Component(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         return _context.Components.TryGetValue(name, out var definition) ? definition : null;
@@ -187,22 +178,39 @@ public sealed class ServerApplication : IApplication, IDisposable
     }
 
     /// <summary>
-    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>),
-    /// so app-level plugins (a Pinia-style store registry, for example) register their provides into
-    /// the shared context before rendering. A repeat <c>Use</c> of the same instance is deduplicated.
+    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin)</c>), so app-level
+    /// plugins (a Pinia-style store registry, for example) register their provides into the shared
+    /// context before rendering. A repeat <c>Use</c> of the same instance is deduplicated. Because SSR
+    /// never mounts, the plugin's <see cref="IApplicationPlugin.InstallAsync"/> is awaited immediately and
+    /// must complete synchronously (install any asynchronous prerequisites before building the app).
     /// Returns the app for chaining.
     /// </summary>
     /// <param name="plugin">The plugin to install.</param>
-    /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public ServerApplication Use(IPlugin plugin, object? options = null)
+    /// <exception cref="InvalidOperationException"><paramref name="plugin"/>'s install did not complete synchronously.</exception>
+    public ServerApplication Use(IApplicationPlugin plugin)
     {
         ArgumentNullException.ThrowIfNull(plugin);
         _installedPlugins ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
         if (_installedPlugins.Add(plugin))
         {
-            plugin.Install(this, options);
+            var install = plugin.InstallAsync(this);
+            if (!install.IsCompleted)
+            {
+                throw new InvalidOperationException(
+                    $"Plugin \"{plugin.GetType()}\" did not finish installing synchronously. A server "
+                    + "application renders to a string per request and never mounts, so plugin installation "
+                    + "must complete synchronously; install asynchronous prerequisites before building the app.");
+            }
+            // Observe the result so a synchronously-faulted install rethrows here.
+            install.GetAwaiter().GetResult();
+        }
+        else
+        {
+            // Upstream parity (installedPlugins.has(plugin)) and Application<TNode>.Use symmetry:
+            // a repeated registration is a silent no-op only in prod; dev surfaces it.
+            RuntimeWarnings.Warn("Plugin has already been applied to target app.");
         }
         return this;
     }
@@ -217,10 +225,10 @@ public sealed class ServerApplication : IApplication, IDisposable
     }
 
     /// <summary>
-    /// Disposes the owned <see cref="Services"/> provider if it is <see cref="IDisposable"/>, cascading
-    /// to its owned disposable singleton/scoped services ([V01.01.03.24]) — the per-request cleanup a
-    /// server host runs after rendering. Idempotent. There is nothing else to tear down (SSR never
-    /// mounts), so this is the whole disposal surface.
+    /// Disposes the owned <see cref="IApplicationContext.ServicesProvider"/> if it is
+    /// <see cref="IDisposable"/>, cascading to its owned disposable singleton/scoped services
+    /// ([V01.01.03.24]) — the per-request cleanup a server host runs after rendering. Idempotent. There
+    /// is nothing else to tear down (SSR never mounts), so this is the whole disposal surface.
     /// </summary>
     public void Dispose()
     {
@@ -229,10 +237,10 @@ public sealed class ServerApplication : IApplication, IDisposable
             return;
         }
         _servicesDisposed = true;
-        (_context.Services as IDisposable)?.Dispose();
+        (_context.ServicesProvider as IDisposable)?.Dispose();
     }
 
-    IApplication IApplication.Component(string name, IComponentDefinition definition) => Component(name, definition);
+    IApplication IApplication.Component(string name, IComponent definition) => Component(name, definition);
 
     IApplication IApplication.Directive(string name, IDirective directive) => Directive(name, directive);
 
@@ -240,5 +248,5 @@ public sealed class ServerApplication : IApplication, IDisposable
 
     IApplication IApplication.Provide(string key, object? value) => Provide(key, value);
 
-    IApplication IApplication.Use(IPlugin plugin, object? options) => Use(plugin, options);
+    IApplication IApplication.Use(IApplicationPlugin plugin) => Use(plugin);
 }

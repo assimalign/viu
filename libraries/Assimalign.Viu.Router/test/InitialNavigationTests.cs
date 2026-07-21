@@ -222,7 +222,7 @@ public class InitialNavigationTests
 
     // A route component that contributes a beforeRouteEnter guard (interface-based, no reflection) and
     // logs when the pipeline invokes it. Never mounted here, so Setup is unused.
-    private sealed class EnterGuardComponent : IComponentDefinition, IRouteEnterGuard
+    private sealed class EnterGuardComponent : IComponent, IRouteEnterGuard
     {
         private readonly List<string> _log;
 
@@ -236,7 +236,7 @@ public class InitialNavigationTests
             return Task.FromResult(NavigationGuardResult.Allow);
         }
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
             => () => null;
     }
 }

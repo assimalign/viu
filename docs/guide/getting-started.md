@@ -160,7 +160,7 @@ await runMain()
 
 ## Your first component
 
-A Viu component is a plain C# object implementing `IComponentDefinition`. Its `Setup` method — the C#
+A Viu component is a plain C# object implementing `IComponent`. Its `Setup` method — the C#
 port of Vue's [`setup()`](https://vuejs.org/api/composition-api-setup.html) — runs **once** per
 instance, closes over the reactive state, and returns a **render function** that re-runs whenever the
 state it read changes. Because C# has no `Proxy`, that closure *is* the proxy-free realization of Vue's
@@ -208,7 +208,7 @@ await builder.Build().MountAsync("#app");
 
 ```csharp
 // inside a component's Setup:
-var api = DependencyInjection.GetRequiredService<ApiClient>();      // resolves from IApplication.Services
+var api = DependencyInjection.GetRequiredService<ApiClient>();      // resolves from the app service provider
 ```
 
 The default provider is **AOT-safe**: every service is created by a factory delegate — there is no
@@ -216,8 +216,8 @@ reflection, no constructor discovery, and no `Microsoft.Extensions.DependencyInj
 supports `Singleton`, `Scoped` (per application — the app is the root scope), and `Transient`
 lifetimes; two applications get isolated providers, and disposing an application disposes its owned
 singleton/scoped services. To use a full container (`Microsoft.Extensions.DependencyInjection`,
-Autofac, …), implement the small `IServiceProviderBuilder` over it and pass it to
-`builder.UseServiceProviderBuilder(...)`.
+Autofac, …), implement the small `IServiceContainer` over it and pass it to
+`builder.UseServiceContainer(...)`.
 
 This is **app-level** DI. It sits beside — it does not replace — Vue's component-tree
 [provide/inject](https://vuejs.org/guide/components/provide-inject.html) (`DependencyInjection.Provide`/
@@ -233,11 +233,11 @@ using Assimalign.Viu;
 
 namespace HelloViu;
 
-internal sealed class Counter : IComponentDefinition
+internal sealed class Counter : IComponent
 {
     public string? Name => "Counter";
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         // ref() -> Reactive.Reference: a reactive box read and written through .Value.
         var count = Reactive.Reference(0);
@@ -270,7 +270,7 @@ The render function builds a **virtual node** tree with `VirtualNodeFactory`; th
 applies only the changed nodes to the real DOM. This matters more on WASM than in JavaScript: **every
 DOM mutation crosses the JS-interop boundary**, so idiomatic Viu leans on the compiled render function
 and the renderer's batched updates rather than imperative DOM access
-([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNodeFactory`, `IComponentDefinition`,
+([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNodeFactory`, `IComponent`,
 `ComponentProperties`, and `ComponentSetupContext` all live in
 [`Assimalign.Viu.Core`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md); the
 browser entry point `BrowserApplication` lives in
@@ -376,7 +376,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > **`.viu` `@template`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
 > A `.viu` with an `@template` (standard Vue template markup) and an `@script` (C#) block now compiles to a
 > **mountable component**: the generator emits the render function, merges the script into the partial
-> class, **and** generates the `IComponentDefinition` bridge (a `Setup` that returns the render delegate),
+> class, **and** generates the `IComponent` bridge (a `Setup` that returns the render delegate),
 > so you mount it exactly like a hand-written component — `BrowserApplication.CreateBuilder(new Greeting()).Build().MountAsync("#app")`
 > or `VirtualNodeFactory.Component(new Greeting(), props)` — with no manual wiring beyond the package
 > reference. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive re-render, and a
@@ -396,7 +396,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > Still in progress ([#227](https://github.com/assimalign/viu/issues/227)): declared props/emits (the
 > `defineProps`/`defineEmits` analogues) and lifecycle hooks authored inside `@script`. Until those land,
 > undeclared attributes fall through to the component's root element, and a parent composes a child `.viu`
-> by explicit instantiation (`new Greeting()`). Hand-authored `IComponentDefinition` components (as above)
+> by explicit instantiation (`new Greeting()`). Hand-authored `IComponent` components (as above)
 > remain fully supported.
 
 ## Run and publish

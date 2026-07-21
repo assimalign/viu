@@ -25,7 +25,7 @@ public sealed class ComponentInstance
     private readonly Dictionary<string, ComponentEmitDefinition>? _declaredEmits;
     private HashSet<string>? _emittedOnceEvents;
 
-    internal ComponentInstance(IComponentDefinition definition, VirtualNode virtualNode, ComponentInstance? parent)
+    internal ComponentInstance(IComponent definition, VirtualNode virtualNode, ComponentInstance? parent)
     {
         Uid = _nextUid++;
         Definition = definition;
@@ -74,7 +74,7 @@ public sealed class ComponentInstance
     /// <summary>
     /// The application context this instance belongs to (upstream: <c>instance.appContext</c>),
     /// inherited from the parent or the root vnode. Carries app-level provides (the final inject
-    /// fallback), the component registry, and <see cref="ApplicationConfiguration"/>. Null for a
+    /// fallback), the component registry, and <see cref="IApplicationContext"/>. Null for a
     /// tree rendered without an application ([V01.01.03.12]).
     /// </summary>
     internal ApplicationContext? AppContext { get; }
@@ -89,7 +89,7 @@ public sealed class ComponentInstance
     /// you. This is app-level DI, distinct from the Vue-semantic component-tree
     /// <see cref="DependencyInjection.Inject{T}(InjectionKey{T})"/> chain.
     /// </summary>
-    public IServiceProvider? Services => AppContext?.Services;
+    public IServiceProvider? Services => AppContext?.ServicesProvider;
 
     /// <summary>Declared-prop lookup by camelCase AND kebab-case name; null when none declared.</summary>
     internal Dictionary<string, ComponentPropertyDefinition>? DeclaredProperties { get; }
@@ -139,7 +139,7 @@ public sealed class ComponentInstance
     public int Uid { get; }
 
     /// <summary>The component definition this instance runs.</summary>
-    public IComponentDefinition Definition { get; }
+    public IComponent Definition { get; }
 
     /// <summary>The parent instance, or null at the root.</summary>
     public ComponentInstance? Parent { get; }
@@ -186,7 +186,7 @@ public sealed class ComponentInstance
     /// </summary>
     internal Dictionary<object, object?>? Provides { get; set; }
 
-    internal Func<VirtualNode?>? RenderFunction { get; set; }
+    internal ComponentSetup? RenderFunction { get; set; }
 
     internal ReactiveEffect? Effect { get; set; }
 

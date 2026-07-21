@@ -20,18 +20,18 @@ namespace Assimalign.Viu.HackerNews;
 /// </summary>
 internal static class AppRoutes
 {
-    private static readonly IComponentDefinition ItemRouteComponent = AsyncComponents.DefineAsyncComponent(
+    private static readonly IComponent ItemRouteComponent = AsyncComponents.DefineAsyncComponent(
         new AsyncComponentOptions
         {
-            Loader = () => Task.FromResult<IComponentDefinition>(ItemView.Instance),
+            Loader = () => Task.FromResult<IComponent>(ItemView.Instance),
             LoadingComponent = LoadingView.Instance,
             ErrorComponent = ErrorView.Instance,
         });
 
-    private static readonly IComponentDefinition UserRouteComponent = AsyncComponents.DefineAsyncComponent(
+    private static readonly IComponent UserRouteComponent = AsyncComponents.DefineAsyncComponent(
         new AsyncComponentOptions
         {
-            Loader = () => Task.FromResult<IComponentDefinition>(UserView.Instance),
+            Loader = () => Task.FromResult<IComponent>(UserView.Instance),
             LoadingComponent = LoadingView.Instance,
             ErrorComponent = ErrorView.Instance,
         });

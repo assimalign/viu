@@ -20,7 +20,7 @@ public static class AsyncComponents
     /// <param name="loader">The loader producing the real component definition.</param>
     /// <returns>The async component wrapper definition; mount it like any other component.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="loader"/> is null.</exception>
-    public static IComponentDefinition DefineAsyncComponent(AsyncComponentLoader loader)
+    public static IComponent DefineAsyncComponent(AsyncComponentLoader loader)
     {
         ArgumentNullException.ThrowIfNull(loader);
         return new AsyncComponentWrapper(new AsyncComponentOptions { Loader = loader });
@@ -33,7 +33,7 @@ public static class AsyncComponents
     /// <param name="options">The loader plus the loading/error/delay/timeout/suspensible policy.</param>
     /// <returns>The async component wrapper definition; mount it like any other component.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> or its loader is null.</exception>
-    public static IComponentDefinition DefineAsyncComponent(AsyncComponentOptions options)
+    public static IComponent DefineAsyncComponent(AsyncComponentOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(options.Loader);

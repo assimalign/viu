@@ -7,7 +7,7 @@ namespace Assimalign.Viu;
 /// <c>ServiceProviderServiceExtensions.GetService&lt;T&gt;/GetRequiredService&lt;T&gt;</c>
 /// (https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.serviceproviderserviceextensions),
 /// carried by our own type so Core takes no dependency on that package. Use them on any provider you
-/// hold — an <see cref="IApplication.Services"/>, a <see cref="ComponentInstance.Services"/>, or a
+/// hold — an <see cref="IApplicationContext.ServicesProvider"/>, a <see cref="ComponentInstance.Services"/>, or a
 /// bring-your-own provider. Inside component <c>Setup</c>, prefer the
 /// <see cref="DependencyInjection.GetService{T}()"/> composition functions, which resolve from the
 /// current component's application provider for you.

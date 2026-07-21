@@ -20,7 +20,12 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`
   Teleport string target), `RenderEffect<TNode>` (reactive re-render integration), and `BlockToken`.
 - **Scheduler** (`Scheduling/`) — `Scheduler` (batched flush phases and `NextTick`) and
   `SchedulerJob`.
-- **Component model** (`Components/`) — `ComponentInstance`, `ComponentSetupContext`,
+- **Component model** (`Components/`) — the `IComponent` contract (Vue's component options + the
+  Composition API `setup()`: default-interface-member metadata `Name`/`InheritAttributes`/`Properties`/
+  `Emits` plus `Setup`), the `ComponentSetup` render-function delegate `Setup` returns, and the optional
+  `Component` abstract authoring base (protected `Reference`/`Computed`/`Effect`/… factory helpers and a
+  lazy `Configure(IComponentDescriptor)` seam for declaring props/emits — run once on first metadata
+  access, never from the constructor); `ComponentInstance`, `ComponentSetupContext`,
   `ComponentProperties` / `ComponentPropertyDefinition` (props declaration and validation),
   `ComponentAttributes` (attrs fallthrough), `ComponentEmitDefinition` (emits), `ComponentSlots`,
   `Lifecycle` (the hook registration facade, including `OnActivated`/`OnDeactivated`),
@@ -30,20 +35,21 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`
   (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
 - **Application / plugins / builder** — `Application<TNode>` (Vue's `createApp` shell: one root
   mounted into one container), the `IApplication` contract, `IApplicationBuilder` +
-  `ApplicationBuilder` (the `WebApplication`-style bootstrap seam), `ApplicationConfiguration`
-  (error/warn handlers, performance flag), `IComponentDefinition`, `IPlugin`, and `ISuspenseBoundary`
+  `ApplicationBuilder` (the `WebApplication`-style bootstrap seam), `IApplicationContext`
+  (root component/props, service provider, error/warn handlers, performance flag), `IComponent`,
+  `IApplicationPlugin` (async `InstallAsync`, installed during the mount path), and `ISuspenseBoundary`
   (the async-component / Suspense registration seam completed by [V01.01.03.20]).
 - **Provide / inject** (`DependencyInjection/`) — `DependencyInjection` and the typed
   `InjectionKey<T>` (the C# port of Vue's component-tree provide/inject).
 - **Dependency injection over `System.IServiceProvider`** (`DependencyInjection/`, [V01.01.03.24]) —
-  bring-your-own app-level DI: the `IServiceProviderBuilder` bridge (implement over any container),
-  the default AOT-safe factory-delegate `ServiceProviderBuilder` (Singleton / Scoped-per-app /
+  bring-your-own app-level DI: the `IServiceContainer` bridge (implement over any container),
+  the default AOT-safe factory-delegate `ServiceContainer` (Singleton / Scoped-per-app /
   Transient, no reflection, no `Microsoft.Extensions.DependencyInjection` dependency), the
   `ServiceLifetime`/`ServiceRegistration` descriptors, the `AddSingleton`/`AddScoped`/`AddTransient`
   and `GetService<T>`/`GetRequiredService<T>` extensions, and the `DependencyInjection.GetService<T>()`
-  composition functions. The built provider hangs off `IApplication.Services` and is reachable from
-  `Setup` via `ComponentInstance.Services`. This is **app-level** wiring — distinct from, and layered
-  beside, the Vue-semantic provide/inject above.
+  composition functions. The built provider hangs off `IApplicationContext.ServicesProvider` and is
+  reachable from `Setup` via `ComponentInstance.Services`. This is **app-level** wiring — distinct from,
+  and layered beside, the Vue-semantic provide/inject above.
 - **Directives** (`Directives/`) — `IDirective`, `Directive`, `Directives`, `DirectiveBinding`,
   `DirectiveArgument`, plus the `DirectiveHook` delegate.
 - **Watch** (`Watch/`) — `ViuWatch`, the runtime-scheduler-integrated `watch`/`watchEffect` over the
@@ -79,15 +85,20 @@ objects. It is Ref-first — there is no JavaScript `Proxy` (see
   `PauseTracking`/`ResetTracking`, and `StartBatch`/`EndBatch`.
 - **References** — `Reference<T>` (Vue's `ref()`), `ShallowReference<T>` (`shallowRef()`),
   `CustomReference<T>` (`customRef()`), and `Computed<T>` (`computed()`, lazy versioned caching).
-  All expose a settable `Value` and implement `IReference` / `IReference<T>`.
+  All are `sealed` subclasses of the abstract `ReactiveValue<T>` (itself `: ReactiveValue`), which
+  carries the settable typed `Value`, the boxing `BoxedValue`, the never-tracking `Dependency`
+  property, and the `IsReadOnly` flag. Writing a read-only ref/computed warns and is a no-op (Vue
+  parity), never throwing.
 - **Effects and scopes** — `ReactiveEffect` (the effect runner with scheduler injection),
   `EffectScope` (hierarchical disposal, `effectScope()`), `Dependency` (the tracked-dependency
   primitive), and `Subscriber` (the opaque `public abstract` base for effect-like subscribers,
-  exposing its dependency chain read-only via `FirstDependency`).
+  exposing its dependency chain read-only via `FirstDependency`). `Computed<T>` composes an internal
+  `ComputedSubscriber : Subscriber` rather than deriving from `Subscriber`, so it can be a
+  `ReactiveValue<T>`.
 - **Dependency-graph inspection** — `SubscriberLink` (the read-only edge node between a `Dependency`
-  and a `Subscriber`; walk it from `Subscriber.FirstDependency`) and `ITrackedReference` (reaches the
-  `Dependency` behind a ref/computed). The whole graph is publicly readable but only the engine can
-  mutate it.
+  and a `Subscriber`; walk it from `Subscriber.FirstDependency`) and `ReactiveValue.Dependency`
+  (reaches the `Dependency` behind a ref/computed). The whole graph is publicly readable but only the
+  engine can mutate it.
 - **Watch** — `WatchOptions`, `WatchHandle`, `WatchJob`, `WatchFlushMode`, the `WatchCallback<T>` and
   `OnCleanup` delegates, and the `IWatchScheduler` seam a host (the runtime scheduler) plugs into.
 - **Source-generated reactive objects** — the `[Reactive]` / `[ShallowReactive]` attributes
@@ -95,8 +106,9 @@ objects. It is Ref-first — there is no JavaScript `Proxy` (see
   reactive property wrappers for the annotated partial class (Vue's `reactive()`).
 - **Reactive collections** — `ReactiveList<T>`, `ReactiveDictionary<TKey,TValue>`, `ReactiveSet<T>`
   (dedicated reactive types implementing the BCL collection interfaces).
-- **Traversal and introspection** — `ReactiveTraversal`, `IReactiveTraversable`, `IReactiveObject`,
-  `IReadonlyReactive`.
+- **Traversal and introspection** — `ReactiveTraversal`, `IReactiveTraversable`, and `IReactiveObject`
+  (which carries the readonly flag via `IsReadOnly`; refs/computeds report readonly via
+  `ReactiveValue.IsReadOnly`).
 
 ## Boundaries
 

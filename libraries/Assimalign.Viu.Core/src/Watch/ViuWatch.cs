@@ -12,7 +12,7 @@ namespace Assimalign.Viu;
 /// timing on the runtime scheduler (batched into, and running ahead of, the render flush —
 /// upstream's default), and a callback, effect-body, or getter exception routes through the
 /// component <c>OnErrorCaptured</c> chain to the app-level
-/// <see cref="ApplicationConfiguration.ErrorHandler"/> instead of tearing down the flush
+/// <see cref="IApplicationContext.ErrorHandler"/> instead of tearing down the flush
 /// ([V01.01.03.12], issue #28). Call during <c>Setup</c> so the watcher joins the component's
 /// effect scope and stops automatically on unmount. Omitted <paramref name="options"/> mean
 /// <see cref="WatchFlushMode.Pre"/>; pass <see cref="WatchOptions"/> with an explicit
@@ -29,7 +29,7 @@ public static class ViuWatch
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
     /// <returns>The handle that stops, pauses, or resumes the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch<T>(IReference<T> source, WatchCallback<T> callback, WatchOptions? options = null)
+    public static WatchHandle Watch<T>(ReactiveValue<T> source, WatchCallback<T> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(callback);
@@ -77,7 +77,7 @@ public static class ViuWatch
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
     /// <returns>The handle that stops, pauses, or resumes the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sources"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch(IReference[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
+    public static WatchHandle Watch(ReactiveValue[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(callback);

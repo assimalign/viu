@@ -55,7 +55,7 @@ public sealed class RouteRecord
         string? name = null,
         IReadOnlyList<RouteRecord>? children = null,
         IReadOnlyDictionary<string, object?>? meta = null,
-        IComponentDefinition? component = null,
+        IComponent? component = null,
         RouteComponentPropertiesResolver? propertiesResolver = null,
         NavigationGuard? beforeEnter = null)
     {
@@ -86,7 +86,7 @@ public sealed class RouteRecord
     /// (upstream <c>component</c>), or <see langword="null"/> for a component-less grouping path. The
     /// matcher ignores this field — it is consumed only by the view components.
     /// </summary>
-    public IComponentDefinition? Component { get; }
+    public IComponent? Component { get; }
 
     /// <summary>
     /// Resolves the props passed to <see cref="Component"/> from the resolved location (upstream

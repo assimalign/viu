@@ -132,7 +132,7 @@ public sealed class ViuWatchTests : IDisposable
             },
         };
         var application = _renderer.Renderer.CreateApplication(root);
-        application.Config.ErrorHandler = (exception, _, info) => captured.Add((exception.Message, info));
+        application.Context.ErrorHandler = (exception, _, info) => captured.Add((exception.Message, info));
         application.Mount(_container);
 
         state.Value = 1;

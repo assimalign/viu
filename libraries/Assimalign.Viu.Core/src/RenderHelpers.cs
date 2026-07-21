@@ -91,7 +91,7 @@ public static class RenderHelpers
 
     /// <summary>
     /// Closes the open block onto a component, dynamic-component, or built-in vnode (upstream:
-    /// <c>createBlock</c>). Dispatches on <paramref name="tag"/>: an <see cref="IComponentDefinition"/> is a
+    /// <c>createBlock</c>). Dispatches on <paramref name="tag"/>: an <see cref="IComponent"/> is a
     /// component, a string is an element (dynamic-component element fallback), <see cref="_Fragment"/> is a
     /// fragment, and null renders a comment placeholder.
     /// </summary>
@@ -356,7 +356,7 @@ public static class RenderHelpers
     /// when unregistered, matching upstream's <c>resolveAsset</c> fallback.
     /// </summary>
     /// <param name="name">The component name.</param>
-    /// <returns>The resolved <see cref="IComponentDefinition"/>, or the name for element/late fallback.</returns>
+    /// <returns>The resolved <see cref="IComponent"/>, or the name for element/late fallback.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     public static object? _resolveComponent(string name)
     {
@@ -518,7 +518,7 @@ public static class RenderHelpers
     /// <c>Assimalign.Viu</c> (upstream: <c>unref</c>). Reading a ref's value tracks it.
     /// </summary>
     /// <param name="value">The value that may be a ref.</param>
-    public static object? _unref(object? value) => value is IReference reference ? reference.Value : value;
+    public static object? _unref(object? value) => value is ReactiveValue reference ? reference.BoxedValue : value;
 
     /// <summary>Whether a value is a ref (upstream: <c>isRef</c>).</summary>
     /// <param name="value">The value to test.</param>
@@ -679,7 +679,7 @@ public static class RenderHelpers
                 return asBlock
                     ? VirtualNodeFactory.TeleportBlock(bag, teleportChildren, flag, dynamicProperties)
                     : VirtualNodeFactory.Teleport(bag, teleportChildren, flag, dynamicProperties);
-            case IComponentDefinition definition:
+            case IComponent definition:
                 var slots = CoerceSlots(children);
                 return asBlock
                     ? VirtualNodeFactory.ComponentBlock(definition, bag, slots, flag, dynamicProperties)

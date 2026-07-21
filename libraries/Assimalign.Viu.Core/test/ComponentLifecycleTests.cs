@@ -32,7 +32,7 @@ public class ComponentLifecycleTests : IDisposable
         _pump.Dispose();
     }
 
-    private TestComponent HookedComponent(string name, Func<VirtualNode?> render, TestComponent? childToRender = null)
+    private TestComponent HookedComponent(string name, ComponentSetup render, TestComponent? childToRender = null)
         => new()
         {
             Name = name,

@@ -277,7 +277,7 @@ public static partial class ServerRender
     /// <param name="parent">The rendering (parent) instance.</param>
     public static Task SsrRenderComponentAsync(
         SsrRenderState state,
-        IComponentDefinition definition,
+        IComponent definition,
         VirtualNodeProperties? properties = null,
         ComponentSlots? slots = null,
         ComponentInstance? parent = null)

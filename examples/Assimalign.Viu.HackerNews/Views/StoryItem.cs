@@ -12,7 +12,7 @@ namespace Assimalign.Viu.HackerNews;
 /// interop, leaving room for list virtualization later (#103). Its props are declared so the story
 /// object and rank never fall through as DOM attributes.
 /// </summary>
-internal sealed class StoryItem : IComponentDefinition
+internal sealed class StoryItem : IComponent
 {
     /// <summary>The shared row definition instance.</summary>
     public static readonly StoryItem Instance = new();
@@ -32,7 +32,7 @@ internal sealed class StoryItem : IComponentDefinition
     ];
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () =>
         {
             var story = properties.Get<HackerNewsItem>("story");

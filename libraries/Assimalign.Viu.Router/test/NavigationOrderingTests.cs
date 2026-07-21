@@ -119,7 +119,7 @@ public class NavigationOrderingTests
     }
 
     // A layout rendering <div class="layout"><outlet/></div> that registers a beforeRouteUpdate guard.
-    private sealed class UpdateGuardLayout : IComponentDefinition
+    private sealed class UpdateGuardLayout : IComponent
     {
         private readonly List<string> _log;
         private readonly RouterView _outlet;
@@ -132,7 +132,7 @@ public class NavigationOrderingTests
 
         public string? Name => "layout";
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             RouterGuards.OnBeforeRouteUpdate((_, _, _) =>
             {
@@ -147,7 +147,7 @@ public class NavigationOrderingTests
     }
 
     // A leaf view that registers a beforeRouteLeave guard.
-    private sealed class LeaveGuardView : IComponentDefinition
+    private sealed class LeaveGuardView : IComponent
     {
         private readonly List<string> _log;
         private readonly string _label;
@@ -160,7 +160,7 @@ public class NavigationOrderingTests
 
         public string? Name => _label;
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             RouterGuards.OnBeforeRouteLeave((_, _, _) =>
             {
@@ -175,7 +175,7 @@ public class NavigationOrderingTests
     }
 
     // A leaf view that contributes a beforeRouteEnter guard (interface-based) and logs when mounted.
-    private sealed class EnterGuardView : IComponentDefinition, IRouteEnterGuard
+    private sealed class EnterGuardView : IComponent, IRouteEnterGuard
     {
         private readonly List<string> _log;
         private readonly string _label;
@@ -194,7 +194,7 @@ public class NavigationOrderingTests
             return Task.FromResult(NavigationGuardResult.Allow);
         }
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             Lifecycle.OnMounted(() => _log.Add("mounted"));
             return () => VirtualNodeFactory.Element(
@@ -205,11 +205,11 @@ public class NavigationOrderingTests
     }
 
     // A view whose beforeRouteLeave guard aborts every navigation away from it.
-    private sealed class BlockingLeaveView : IComponentDefinition
+    private sealed class BlockingLeaveView : IComponent
     {
         public string? Name => "a";
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             RouterGuards.OnBeforeRouteLeave((_, _, _) => Task.FromResult(NavigationGuardResult.Abort));
             return () => VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("class", "a")), "a");
@@ -217,7 +217,7 @@ public class NavigationOrderingTests
     }
 
     // A view that records every beforeRouteUpdate target it is reused for.
-    private sealed class UpdateTrackingView : IComponentDefinition
+    private sealed class UpdateTrackingView : IComponent
     {
         private readonly List<string> _updates;
 
@@ -225,7 +225,7 @@ public class NavigationOrderingTests
 
         public string? Name => "user";
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             RouterGuards.OnBeforeRouteUpdate((to, _, _) =>
             {

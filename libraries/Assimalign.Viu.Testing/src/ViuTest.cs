@@ -25,7 +25,7 @@ public static class ViuTest
     /// <returns>The root component wrapper.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="component"/> is null.</exception>
     public static ComponentWrapper Mount<TComponent>(TComponent component, ComponentMountOptions? options = null)
-        where TComponent : IComponentDefinition
+        where TComponent : IComponent
     {
         ArgumentNullException.ThrowIfNull(component);
         options ??= new ComponentMountOptions();
@@ -60,17 +60,17 @@ public static class ViuTest
         }
         if (options.Stubs.Count > 0)
         {
-            var stubs = new Dictionary<IComponentDefinition, IComponentDefinition>();
+            var stubs = new Dictionary<IComponent, IComponent>();
             foreach (var (real, stub) in options.Stubs)
             {
                 stubs[real] = stub ?? StubComponent.For(real);
             }
             context.ComponentStubs = stubs;
         }
-        options.ConfigureApplication?.Invoke(context.Config);
+        options.ConfigureApplication?.Invoke(context);
         // App-level DI provider ([V01.01.03.24]): reachable from the mounted tree's Setup through
         // ComponentInstance.Services, independent of the component-tree provides above.
-        context.Services = options.Services;
+        context.ServicesProvider = options.Services;
         emitted = new EmittedEvents();
         context.EmitObserver = emitted.Record;
         return context;

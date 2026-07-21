@@ -96,7 +96,7 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
     public int InvokerCount => _registry.InvokerCount;
 
     /// <summary>Renders a component's tree into the container.</summary>
-    public void Render(IComponentDefinition component)
+    public void Render(IComponent component)
         => _renderer.Render(VirtualNodeFactory.Component(component), Container);
 
     /// <summary>Unmounts everything from the container.</summary>

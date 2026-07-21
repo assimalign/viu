@@ -11,7 +11,7 @@ namespace Assimalign.Viu.HackerNews;
 /// the single <see cref="Router.RouterView"/> outlet that renders the matched route. The whole page
 /// chrome mirrors vuejs/vue-hackernews-2.0's <c>App.vue</c>.
 /// </summary>
-internal sealed class AppShell : IComponentDefinition
+internal sealed class AppShell : IComponent
 {
     /// <summary>The shared root definition instance.</summary>
     public static readonly AppShell Instance = new();
@@ -24,7 +24,7 @@ internal sealed class AppShell : IComponentDefinition
     public string? Name => "AppShell";
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () => VirtualNodeFactory.Element(
             "div",
             VirtualNodeFactory.Properties(("class", "hn-app")),

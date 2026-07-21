@@ -119,7 +119,7 @@ public sealed class ComponentWrapper : IDisposable
     /// </summary>
     /// <typeparam name="TComponent">The child component definition type to locate.</typeparam>
     public ComponentWrapper? FindComponent<TComponent>()
-        where TComponent : IComponentDefinition
+        where TComponent : IComponent
     {
         foreach (var candidate in TestQuery.DescendantComponents(_instance.Subtree))
         {
@@ -135,7 +135,7 @@ public sealed class ComponentWrapper : IDisposable
     /// <typeparam name="TComponent">The child component definition type to locate.</typeparam>
     /// <exception cref="InvalidOperationException">No matching child component is mounted.</exception>
     public ComponentWrapper GetComponent<TComponent>()
-        where TComponent : IComponentDefinition
+        where TComponent : IComponent
         => FindComponent<TComponent>()
             ?? throw new InvalidOperationException($"Unable to find a mounted {typeof(TComponent).Name} component.");
 

@@ -120,7 +120,7 @@ public sealed class WatchTests
         object?[]? lastNew = null;
         object?[]? lastOld = null;
         Reactive.Watch(
-            new IReference[] { first, second },
+            new ReactiveValue[] { first, second },
             (newValues, oldValues, _) =>
             {
                 lastNew = newValues;

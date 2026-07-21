@@ -29,7 +29,7 @@ internal static class ServerComponentRenderer
     /// <returns>The rendered, normalized subtree vnode to serialize.</returns>
     public static async Task<VirtualNode> SetupAndRenderRootAsync(VirtualNode componentVirtualNode, ComponentInstance? parent)
     {
-        var definition = (IComponentDefinition)componentVirtualNode.ComponentType!;
+        var definition = (IComponent)componentVirtualNode.ComponentType!;
         var instance = new ComponentInstance(definition, componentVirtualNode, parent);
         componentVirtualNode.Component = instance;
 

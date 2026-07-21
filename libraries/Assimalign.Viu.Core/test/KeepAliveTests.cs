@@ -23,7 +23,7 @@ public sealed class KeepAliveTests : IDisposable
     private readonly TestSchedulerPump _pump;
     private readonly List<string> _events = [];
     private readonly Dictionary<string, int> _setupCounts = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, IReference<int>> _states = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ReactiveValue<int>> _states = new(StringComparer.Ordinal);
 
     public KeepAliveTests()
     {

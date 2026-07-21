@@ -101,7 +101,7 @@ public sealed class Router : IDisposable
     /// trigger per completed navigation drives every <see cref="RouterView"/> and the active-class
     /// computation of every <see cref="RouterLink"/> through the normal reactivity graph.
     /// </summary>
-    public IReference<RouteLocation> CurrentRoute => _currentRoute;
+    public ReactiveValue<RouteLocation> CurrentRoute => _currentRoute;
 
     /// <summary>
     /// The default active class applied to a <see cref="RouterLink"/> whose target is an inclusive

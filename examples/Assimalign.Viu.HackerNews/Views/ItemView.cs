@@ -12,7 +12,7 @@ namespace Assimalign.Viu.HackerNews;
 /// renders the story header plus the recursive comment tree (<see cref="CommentView"/>). All state
 /// comes from the store. Wrapped as an async route component in <see cref="AppRoutes"/>.
 /// </summary>
-internal sealed class ItemView : IComponentDefinition
+internal sealed class ItemView : IComponent
 {
     /// <summary>The shared route-view definition instance.</summary>
     public static readonly ItemView Instance = new();
@@ -25,7 +25,7 @@ internal sealed class ItemView : IComponentDefinition
     public string? Name => "ItemView";
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var router = DependencyInjection.Inject(RouterInjectionKeys.Router)!;
         var stores = DependencyInjection.GetRequiredService<HackerNewsStores>();

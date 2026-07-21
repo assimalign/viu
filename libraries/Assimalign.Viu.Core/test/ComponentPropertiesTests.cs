@@ -30,7 +30,7 @@ public class ComponentPropertiesTests : IDisposable
         _pump.Dispose();
     }
 
-    private void Mount(IComponentDefinition component, VirtualNodeProperties? properties = null)
+    private void Mount(IComponent component, VirtualNodeProperties? properties = null)
         => _renderer.Render(VirtualNodeFactory.Component(component, properties), _container);
 
     [Fact]

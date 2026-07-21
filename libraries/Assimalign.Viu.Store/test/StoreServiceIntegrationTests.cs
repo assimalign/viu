@@ -23,19 +23,15 @@ public sealed class StoreServiceIntegrationTests : IDisposable
         Stores.SetActiveRegistry(null);
     }
 
-    // A recording IApplicationBuilder that captures Use/Provide and exposes a real service builder — no
+    // A recording IApplicationBuilder that captures Use/Provide and exposes a real service container — no
     // renderer or interop, so it isolates what AddStore records.
     private sealed class RecordingApplicationBuilder : IApplicationBuilder
     {
-        public IServiceProviderBuilder Services { get; } = new ServiceProviderBuilder();
+        public IServiceContainer Services { get; } = new ServiceContainer();
 
         public int UseCount { get; private set; }
 
-        public IComponentDefinition RootComponent => throw new NotSupportedException();
-
-        public VirtualNodeProperties? RootProperties => null;
-
-        public IApplicationBuilder Use(IPlugin plugin, object? options = null)
+        public IApplicationBuilder Use(IApplicationPlugin plugin)
         {
             UseCount++;
             return this;
@@ -45,15 +41,15 @@ public sealed class StoreServiceIntegrationTests : IDisposable
 
         public IApplicationBuilder Provide(string key, object? value) => this;
 
-        public IApplicationBuilder Component(string name, IComponentDefinition definition) => this;
+        public IApplicationBuilder Component(string name, IComponent definition) => this;
 
         public IApplicationBuilder Directive(string name, IDirective directive) => this;
 
-        public IApplicationBuilder ConfigureApplication(Action<ApplicationConfiguration> configure) => this;
+        public IApplicationBuilder ConfigureApplication(Action<IApplicationContext> configure) => this;
 
-        public IApplicationBuilder UseServiceProviderBuilder(IServiceProviderBuilder services) => this;
+        public IApplicationBuilder UseServiceContainer(IServiceContainer services) => this;
 
-        public IApplicationBuilder ConfigureServices(Action<IServiceProviderBuilder> configure)
+        public IApplicationBuilder ConfigureServices(Action<IServiceContainer> configure)
         {
             configure(Services);
             return this;
@@ -90,7 +86,7 @@ public sealed class StoreServiceIntegrationTests : IDisposable
                 return static () => VirtualNodeFactory.Text("root");
             },
         };
-        var services = new ServiceProviderBuilder().AddSingleton(registry).Build();
+        var services = new ServiceContainer().AddSingleton(registry).Build();
 
         using var wrapper = ViuTest.Mount(component, new ComponentMountOptions { Services = services });
 
@@ -114,7 +110,7 @@ public sealed class StoreServiceIntegrationTests : IDisposable
                 return static () => VirtualNodeFactory.Text("root");
             },
         };
-        var services = new ServiceProviderBuilder().AddSingleton(serviceRegistry).Build();
+        var services = new ServiceContainer().AddSingleton(serviceRegistry).Build();
         var options = new ComponentMountOptions { Services = services };
         options.Provide(StoreRegistry.InjectionKey, provideRegistry);
 
@@ -142,7 +138,7 @@ public sealed class StoreServiceIntegrationTests : IDisposable
                 return static () => VirtualNodeFactory.Text("root");
             },
         };
-        var options = new ComponentMountOptions { Services = new ServiceProviderBuilder().Build() };
+        var options = new ComponentMountOptions { Services = new ServiceContainer().Build() };
         options.Provide(StoreRegistry.InjectionKey, registry);
 
         using var wrapper = ViuTest.Mount(component, options);

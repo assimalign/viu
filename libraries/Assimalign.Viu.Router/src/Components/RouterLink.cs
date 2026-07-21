@@ -23,7 +23,7 @@ namespace Assimalign.Viu.Router;
 /// guard reads the link's own <c>target</c> attribute. Not thread-safe (single-threaded JS
 /// event-loop model).
 /// </remarks>
-public sealed class RouterLink : IComponentDefinition
+public sealed class RouterLink : IComponent
 {
     private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
     [
@@ -40,7 +40,7 @@ public sealed class RouterLink : IComponentDefinition
     public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         // Resolve the router service-first-then-provide ([V01.01.03.24]).
         var router = RouterResolution.Resolve();

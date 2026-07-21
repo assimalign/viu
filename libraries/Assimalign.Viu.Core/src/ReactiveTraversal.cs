@@ -8,7 +8,7 @@ namespace Assimalign.Viu;
 /// (<c>packages/reactivity/src/watch.ts</c>). A deep <c>watch</c> runs its source through a
 /// traversal so a mutation anywhere in the graph re-runs the watcher.
 /// <para>
-/// Recursion is reflection-free: it descends only through <see cref="IReference"/> cells and
+/// Recursion is reflection-free: it descends only through <see cref="ReactiveValue"/> cells and
 /// <see cref="IReactiveTraversable"/> values (source-generated <c>[Reactive]</c> objects and the
 /// reactive collections), which expose their members explicitly. Plain CLR objects are leaves — a
 /// deliberate divergence from Vue, whose runtime enumerates every own key, documented on
@@ -38,7 +38,7 @@ public sealed class ReactiveTraversal
 
     /// <summary>
     /// Descends into <paramref name="value"/>, reading (and thereby tracking) every reactive member
-    /// reachable within the remaining depth. Unwraps <see cref="IReference"/> cells and recurses into
+    /// reachable within the remaining depth. Unwraps <see cref="ReactiveValue"/> cells and recurses into
     /// <see cref="IReactiveTraversable"/> values; other values are leaves. Safe to call with
     /// <see langword="null"/> and re-entrant (the generated/collection <c>Traverse</c> calls back in).
     /// </summary>
@@ -58,12 +58,12 @@ public sealed class ReactiveTraversal
             return;
         }
 
-        // A ref: reading Value tracks the ref's own dependency, then we recurse one level into the
+        // A ref: reading BoxedValue tracks the ref's own dependency, then we recurse one level into the
         // unwrapped value (Vue traverse: isRef -> traverse(value.value, depth - 1)).
-        if (value is IReference reference)
+        if (value is ReactiveValue reference)
         {
             _remainingDepth--;
-            Visit(reference.Value);
+            Visit(reference.BoxedValue);
             _remainingDepth++;
             return;
         }

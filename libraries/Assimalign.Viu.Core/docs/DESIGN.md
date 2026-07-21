@@ -41,8 +41,45 @@ This is how the stopwatch re-renders reactively instead of polling.
 Per [ADR-0004](../../../docs/adr/0004-composition-only-component-model.md), the component model is
 composition-only: a `ComponentInstance` runs a setup function; props/emits/slots/lifecycle are
 typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`) and plugins
-(`IPlugin`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
+(`IApplicationPlugin`). `Application<TNode>` and its `IApplicationContext` deliberately omit an
 `app.config.globalProperties` bag.
+
+## The component class model ([V01.01.03.26], reshape arc 2 R7)
+
+The component contract is the `IComponent` interface (the arc-1 `IComponentDefinition` renamed) plus the
+`ComponentSetup` render-function delegate. `IComponent` carries its definition-time metadata as
+**default-interface members** — `Name` (null), `InheritAttributes` (true), `Properties` (null), `Emits`
+(null) — so a plain implementer overrides only what it declares and the renderer, which reads every
+metadatum through the `IComponent`-typed `ComponentInstance.Definition`, sees the DIM default otherwise.
+`Setup(ComponentProperties, ComponentSetupContext)` returns `ComponentSetup` (a nominal
+`delegate VirtualNode?()`) rather than a bare `Func<VirtualNode?>`, so the render-function type has a name
+in the public surface and in the SFC generator's emitted bridge. Implementing the interface directly stays
+first-class — the built-ins (`KeepAlive`, `BaseTransition`), the Router components, and source-generated
+`.viu` partials are interface implementers, not base-class subclasses.
+
+`Component` is an **optional abstract authoring base**: it turns the composition primitives into protected
+factory helpers (`Reference`/`ShallowReference`/`CustomReference`/`Computed`/`Effect`/`EffectScope`) and
+exposes a fluent `Configure(IComponentDescriptor)` seam for declaring props and emits. Deriving from it is
+sugar only; the base implicitly implements `Properties`/`Emits`/`Name`/`InheritAttributes` (the last two
+declared `virtual` on the base so an author can `override` them and have the interface mapping observe the
+override rather than the DIM default).
+
+**`Configure` runs lazily, never from the constructor.** A virtual call in the base constructor would run a
+derived override before the derived constructor body finished (fields still unset) — the classic
+virtual-call-during-construction hazard. Instead a single `bool` guard defers `Configure` to the first read
+of `Properties` or `Emits`; the guard is set *before* the call so a re-entrant metadata read from inside
+`Configure` cannot recurse. A plain bool (no lock) is correct because the runtime is single-threaded (the JS
+event loop). Pinned by `ComponentBaseTests` (Configure runs exactly once, on first metadata access, not in
+the ctor).
+
+**Lifecycle hooks are off `IComponentDescriptor` for v1** (ratified arc-2 decision 3): the descriptor is
+definition-time metadata only (`WithProperty`/`WithEmit`); lifecycle registration stays inside `Setup`
+through the composition-API hooks per ADR-0004. Definition-level hooks would need their own ADR.
+
+The vnode family moved from `src/Dom/` to `src/VirtualDom/` (`VirtualNode`, `VirtualNodeFactory`,
+`VirtualNodeProperties`, `VirtualNodeType`): Core is DOM-free by construction, so the platform-neutral
+virtual-DOM types no longer read as a DOM concern. The move is physical only — the flat `Assimalign.Viu`
+namespace is unchanged.
 
 ## App-level dependency injection over `System.IServiceProvider` ([V01.01.03.24])
 
@@ -53,28 +90,56 @@ subtree (an ancestor provides, a descendant injects, nearer shadows farther); th
 the .NET-idiomatic home for one-per-application singletons. Keeping them distinct means each stays
 simple and neither has to grow the other's semantics.
 
-The bridge is our own `IServiceProviderBuilder` (registration intake + `IServiceProvider Build()`), so
-users bring any container without Core taking a `Microsoft.Extensions.DependencyInjection` dependency.
-The **default** provider is a factory-delegate registry (`ServiceProviderBuilder` →
-`FactoryServiceProvider`): every service is created by a `Func<IServiceProvider, object>`, so there is
-**no reflection activation, no constructor discovery, no assembly scanning** — the only path that is
-trimming- and WASM/NativeAOT-safe. The application is the single root scope, so `Singleton` and
-`Scoped` both cache once per app (isolated across apps) and `Transient` runs its factory per
-resolution; disposing the app disposes its owned singleton/scoped disposables. Deliberately **not**
-supported in the default provider (documented; bring an MS.Ext.DI adapter for them): child
-`IServiceScope`s, open generics, decorators, `IEnumerable<T>` multi-registration, keyed services, and
-transient-disposal tracking. The built provider is attached to `ApplicationContext.Services` by the
-`ApplicationBuilder` before plugins install and inherited by every `ComponentInstance`
-(`ComponentInstance.Services`), so `Setup` resolves through `DependencyInjection.GetService<T>()`.
-Router/Store gain additive `AddRouter`/`AddStore` builder extensions that register into services while
-keeping their existing provide-based paths (resolution is service-first-then-provide), so no existing
-behavior changes. An MS.Ext.DI adapter package is possible future work, out of scope here.
+The bridge is our own `IServiceContainer` (registration intake via `Add(ServiceRegistration)` +
+`IServiceProvider Build()`), so users bring any container without Core taking a
+`Microsoft.Extensions.DependencyInjection` dependency. The **default** container is a factory-delegate
+registry (`ServiceContainer` → `FactoryServiceProvider`): every service is created by a
+`Func<IServiceProvider, object>`, so there is **no reflection activation, no constructor discovery, no
+assembly scanning** — the only path that is trimming- and WASM/NativeAOT-safe. The application is the
+single root scope, so `Singleton` and `Scoped` both cache once per app (isolated across apps) and
+`Transient` runs its factory per resolution; disposing the app disposes its owned singleton/scoped
+disposables. Deliberately **not** supported in the default provider (documented; bring an MS.Ext.DI
+adapter for them): child `IServiceScope`s, open generics, decorators, `IEnumerable<T>`
+multi-registration, keyed services, and transient-disposal tracking. The built provider is attached to
+`ApplicationContext.ServicesProvider` by the `ApplicationBuilder` before plugins install and inherited
+by every `ComponentInstance` (`ComponentInstance.Services`), so `Setup` resolves through
+`DependencyInjection.GetService<T>()`. Router/Store gain additive `AddRouter`/`AddStore` builder
+extensions that register into services while keeping their existing provide-based paths (resolution is
+service-first-then-provide), so no existing behavior changes. An MS.Ext.DI adapter package is possible
+future work, out of scope here.
+
+## The application context, async plugins, and service container ([V01.01.03.27], reshape arc 2 R8)
+
+Arc 2's final unit consolidates the application surface. `IApplicationContext` absorbs the former
+`ApplicationConfiguration` bag (`ErrorHandler`/`WarnHandler`/`Performance`) plus the root
+component/props and the `ServicesProvider`; **runtime** state stays on `IApplication` (`IsMounted`,
+`RootInstance`) — the context is configuration, the application is lifecycle. The concrete
+`ApplicationContext` implements the public interface; `Application<TNode>`/`ServerApplication` expose it
+publicly through an explicit `IApplication.Context` while keeping an `internal` concrete accessor for the
+renderer and platform builders.
+
+`IApplicationPlugin` replaces the synchronous `IPlugin`: `ValueTask InstallAsync(IApplication)`, with
+upstream's plugin `options` carried by the plugin's own constructor state. `Use(IApplicationPlugin)`
+**records** the plugin (install-once, dedup-with-dev-warning); installation is awaited inside the mount
+path in the documented order **services frozen → plugins install → platform init → render**. `Build()`
+stays synchronous, so the synchronous `Mount(TNode)` drains any pending plugins synchronously (throwing a
+pointed error if a plugin's install does not complete synchronously), while `MountAsync` awaits them.
+`ServerApplication` never mounts, so its `Use` installs immediately and requires synchronous completion.
+
+**`IServiceContainer` keeps its name (ratified arc-2 decision 2).** It deliberately shadows the legacy
+`System.ComponentModel.Design.IServiceContainer` — a designer-era interface effectively absent from
+modern application code — so the reactive/DI surface reads naturally (`builder.Services` is an
+`IServiceContainer`). `ServiceProviderBuilder` became `ServiceContainer`, its `AddSingleton`/`AddScoped`/
+`AddTransient` extensions retarget to `IServiceContainer` and return it for chaining, and
+`UseServiceProviderBuilder` became `UseServiceContainer`. **Freeze semantics:** `ApplicationBuilder.Build()`
+calls `Services.Build()` exactly once; the container freezes then, so a later `Add` throws
+`InvalidOperationException` with an actionable message.
 
 ## Teleport is a special vnode type, not a component
 
 `Teleport` ([V01.01.03.17], upstream `components/Teleport.ts`) mirrors upstream by being a distinct
 `VirtualNodeType.Teleport` (carrying `ShapeFlags.Teleport`) that the renderer branches on in
-*patch / move / unmount* — **not** an `IComponentDefinition` like `BaseTransition`. It cannot be an
+*patch / move / unmount* — **not** an `IComponent` like `BaseTransition`. It cannot be an
 ordinary component: it frames its own tree position with a main-tree anchor pair (reusing the vnode's
 `El`/`Anchor`) while mounting its children into a *different* container, and it moves those children
 between containers when `disabled`/`to` change — behavior with no place in the component render model.
@@ -105,7 +170,7 @@ Deliberate divergences from upstream `Teleport.ts`, each documented at its call 
 ## KeepAlive is a component with renderer-internal reach
 
 `KeepAlive` ([V01.01.03.18], upstream `components/KeepAlive.ts`) is — unlike Teleport — a real
-`IComponentDefinition` (`KeepAlive.Instance`, the singleton `RenderHelpers._KeepAlive` resolves to). It
+`IComponent` (`KeepAlive.Instance`, the singleton `RenderHelpers._KeepAlive` resolves to). It
 wraps one dynamic child and, when the view switches, has the renderer **move the outgoing child's subtree
 into a hidden storage container instead of unmounting it** (`deactivate`) and move it home on return
 (`activate`), so the child's `Setup` runs once and all its state survives. The two paths are driven by
@@ -123,7 +188,7 @@ least-recently-used key order, the current/pending keys) is **closure** state cr
 never an instance field. The cache key is the child's vnode key when present, else the component
 definition reference — a typed key, never a reflected type name (AOT/trimming). `Max` caps the cache with
 LRU eviction (a `LinkedList<object>` orders keys oldest-first); `Include`/`Exclude` match the child's
-declared `IComponentDefinition.Name`, and a `flush: 'post'` watch prunes newly excluded entries when the
+declared `IComponent.Name`, and a `flush: 'post'` watch prunes newly excluded entries when the
 props change.
 
 `Activated`/`Deactivated` hooks mirror upstream's `registerKeepAliveHook`: a KeepAlive activates only its
@@ -148,7 +213,7 @@ Deliberate divergences from upstream `KeepAlive.ts`, each documented at its call
 
 `AsyncComponents.DefineAsyncComponent` ([V01.01.03.16], upstream `apiAsyncComponent.ts`,
 https://vuejs.org/guide/components/async.html) returns an internal `AsyncComponentWrapper`
-(`IComponentDefinition`): a loader (`Func<Task<IComponentDefinition>>`) resolves the real component
+(`IComponent`): a loader (`Func<Task<IComponent>>`) resolves the real component
 asynchronously; a loading component shows after `Delay`, an error component on failure or `Timeout`,
 and the resolved component renders in place. Unlike `KeepAlive` (one shared singleton whose per-mount
 state must be closure-local), each `DefineAsyncComponent` call yields a *fresh* wrapper, so the
@@ -315,6 +380,48 @@ and trigger on write — Vue 3.5's own ref internals port directly. `reactive(ob
 `[Reactive]` partial class whose property wrappers a source generator emits, and reactive collections
 are dedicated types rather than proxied BCL collections.
 
+## The reactive value class model ([V01.01.03.25], reshape arc 2 R6)
+
+The ref family is an **abstract class hierarchy**, not a set of interfaces. `public abstract class
+ReactiveValue` owns a single `Dependency` cell inline (a `private protected` field surfaced through a
+public, never-tracking `Dependency` property) plus an abstract `object? BoxedValue` (reading tracks)
+and a virtual `bool IsReadOnly => false`; `public abstract class ReactiveValue<T> : ReactiveValue`
+adds the typed `T Value { get; set; }` and seals `BoxedValue => Value`. `Reference<T>`,
+`ShallowReference<T>`, `CustomReference<T>` (and the internal `AccessorReference<T>` behind `ToRef`)
+are `sealed` leaves over `ReactiveValue<T>`.
+
+A class, not an interface, for three reasons that all trace to the repo's *dispatch-on-hot-paths*
+rule: the `is`-a-ref / `unref` introspection collapses to an O(1), reflection-free `is ReactiveValue`
+type test; the shared dependency cell is a **field on the base** (a direct load, no interface-property
+stub); and a `private protected` constructor closes the reactive-value set to external subclassing.
+This subsumes the arc-1 `IReference`/`IReference<T>`/`IDependencyReference`/`IReadonlyReactive`
+interfaces, which are deleted — `Reactive.TriggerReference(ReactiveValue)` force-notifies through the
+inherited `Dependency` with no silent no-op branch, and `IsRef`/`Unref`/`IsReadonly` pattern-match the
+class.
+
+**`Computed<T>` is composition, not inheritance** (ratified arc-2 decision 1). A computed is *both* a
+`Dependency` to its readers and a `Subscriber` to its sources; since it must now be a `ReactiveValue<T>`
+it can no longer *be* a `Subscriber`, so it **owns** an internal `sealed ComputedSubscriber : Subscriber`
+(a nested type, reaching the owner's private getter/value/version state without widening it). The
+readers-facing `Dependency` (inherited from `ReactiveValue`) points its `Computed` back-reference at
+the `ComputedSubscriber` so the computed still does not self-track. The `refreshComputed` hot path is
+carried over verbatim onto the nested subscriber; the composition is gated by `ReactivityBenchmarks`
+(`ComputedChainRecompute`/`DependencyTrackTrigger` stay within noise of the pre-change baseline, zero
+new allocation).
+
+**Read-only writes warn, never throw** (Vue 3.5 parity, `packages/reactivity/src/computed.ts`):
+writing a getter-only `Computed<T>` or a setter-less projected ref routes through the runtime warning
+sink (`RuntimeWarnings`) and leaves the value unchanged. This aligns `Computed<T>` from its earlier
+`NotSupportedException` to the upstream warn-and-no-op behavior.
+
+**Recorded exception — `IReactiveObject` stays an interface.** Unlike the ref family, the source-generated
+`[Reactive]` contract is an interface, because `[Reactive]` partials attach to *user* classes that
+already have their own base types — a base class is structurally impossible there. The readonly flag
+that the deleted `IReadonlyReactive` carried folds into `IReactiveObject` as a default-interface member
+(`bool IsReadOnly => false`) that a readonly variant overrides to `true`. This is the reactive-area
+analogue of the general-rules **namespace-vs-assembly exception** recorded for R2: a deliberate,
+scoped deviation from the otherwise class-based ref surface.
+
 ## The dependency engine
 
 The engine ports Vue 3.5's **version-counter + doubly-linked-list** design: a `Dependency` holds
@@ -327,16 +434,19 @@ reused across runs so a stable dependency set allocates nothing on re-track. Bat
 constructor** — opaque and un-subclassable externally, but a real base so the engine's hot path
 (per-trigger notification) dispatches through a vtable virtual call rather than interface dispatch,
 which is measurably costlier on mono-wasm / NativeAOT (the repo's "dispatch on hot paths" rule).
-Concrete leaves (`ReactiveEffect`, `Computed<T>`) are `sealed` so the JIT can devirtualize.
+Concrete leaves (`ReactiveEffect` and `Computed<T>`'s internal `ComputedSubscriber`) are `sealed`
+so the JIT can devirtualize.
 
 ## Public engine surface (read-only)
 
 The dependency graph is part of the public API — but only for *reading*. `SubscriberLink` (the port
-of Vue's `Link`), `Subscriber.FirstDependency`, the already-public `Dependency`, and
-`ITrackedReference` let a .NET developer inspect what depends on what: walk a subscriber's
-`FirstDependency` → `NextDependency` chain, reach the `Dependency` behind a ref via
-`ITrackedReference`, and read each edge's observed `Version`. This mirrors how .NET developers expect
-to introspect a framework's object graph, and Vue itself keeps the same structures in `dep.ts`.
+of Vue's `Link`), `Subscriber.FirstDependency`, and the public, never-tracking `ReactiveValue.Dependency`
+property let a .NET developer inspect what depends on what: walk a subscriber's
+`FirstDependency` → `NextDependency` chain, reach the `Dependency` behind a ref via its
+`Dependency` property, and read each edge's observed `Version`. This mirrors how .NET developers expect
+to introspect a framework's object graph, and Vue itself keeps the same structures in `dep.ts`. The
+`Dependency` property has no public setter and the cell's own mutating members stay `internal`, so a
+reactive value's dependency wiring cannot be swapped or corrupted through the public surface.
 
 Every state-mutating member — link construction, list splicing, version bookkeeping, the flags word —
 stays `internal`, so external code can observe the graph but cannot desynchronize the engine. Two

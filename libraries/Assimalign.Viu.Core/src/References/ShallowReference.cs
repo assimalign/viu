@@ -14,9 +14,8 @@ namespace Assimalign.Viu;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The type of the contained value (never boxed for struct types).</typeparam>
-public sealed class ShallowReference<T> : IReference<T>, ITrackedReference
+public sealed class ShallowReference<T> : ReactiveValue<T>
 {
-    private readonly Dependency _dependency = new();
     private T _value;
 
     /// <summary>Creates a shallow ref holding <paramref name="value"/>.</summary>
@@ -30,7 +29,7 @@ public sealed class ShallowReference<T> : IReference<T>, ITrackedReference
     /// Gets or sets the contained value. Reads track the ambient subscriber; writes trigger
     /// subscribers only when the new value differs per <see cref="EqualityComparer{T}.Default"/>.
     /// </summary>
-    public T Value
+    public override T Value
     {
         get
         {
@@ -46,9 +45,4 @@ public sealed class ShallowReference<T> : IReference<T>, ITrackedReference
             }
         }
     }
-
-    /// <inheritdoc />
-    object? IReference.Value => Value;
-
-    Dependency ITrackedReference.Dependency => _dependency;
 }

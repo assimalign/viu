@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
@@ -64,11 +65,20 @@ public sealed class ApplicationBuilderTests : IDisposable
 
         var application = builder.Build();
 
-        order.ShouldBe(["config-a", "plugin-a", "plugin-b", "config-b"]);
+        // Provides and config callbacks apply at Build in call order; plugins are queued on the app and
+        // install later, during the mount path ([V01.01.03.27]), so only the config callbacks ran so far.
+        order.ShouldBe(["config-a", "config-b"]);
 
-        using var warnings = new WarningCapture();
-        application.Provide("key", "again"); // re-providing the same key warns -> the builder's provide landed
-        warnings.Messages.ShouldContain(message => message.Contains("already provides"));
+        using (var warnings = new WarningCapture())
+        {
+            application.Provide("key", "again"); // re-providing the same key warns -> the builder's provide landed
+            warnings.Messages.ShouldContain(message => message.Contains("already provides"));
+        }
+
+        application.Mount(_container);
+
+        // Plugins install in Use order during mount, after the build-time provides/config callbacks.
+        order.ShouldBe(["config-a", "config-b", "plugin-a", "plugin-b"]);
     }
 
     [Fact]
@@ -80,14 +90,15 @@ public sealed class ApplicationBuilderTests : IDisposable
         builder.Use(new ProvidingPlugin(key, "installed"));
 
         var application = builder.Build();
+        application.Mount(_container);
 
-        // The plugin registered a component and an app-level provide through the built app.
+        // The plugin installed during mount, registering a component and an app-level provide.
         application.Component("plugin-widget").ShouldNotBeNull();
         application.Context.Provides[key].ShouldBe("installed");
     }
 
     // A concrete builder over the in-memory renderer; Build creates the app and replays configuration.
-    private sealed class TestApplicationBuilder(Renderer<TestNode> renderer, IComponentDefinition root, VirtualNodeProperties? properties = null)
+    private sealed class TestApplicationBuilder(Renderer<TestNode> renderer, IComponent root, VirtualNodeProperties? properties = null)
         : ApplicationBuilder(root, properties)
     {
         public override Application<TestNode> Build()
@@ -98,20 +109,25 @@ public sealed class ApplicationBuilderTests : IDisposable
         }
     }
 
-    private sealed class RecordingPlugin(List<string> order, string name) : IPlugin
+    private sealed class RecordingPlugin(List<string> order, string name) : IApplicationPlugin
     {
-        public void Install(IApplication application, object? options) => order.Add(name);
+        public ValueTask InstallAsync(IApplication application)
+        {
+            order.Add(name);
+            return ValueTask.CompletedTask;
+        }
     }
 
-    private sealed class ProvidingPlugin(InjectionKey<string> key, string value) : IPlugin
+    private sealed class ProvidingPlugin(InjectionKey<string> key, string value) : IApplicationPlugin
     {
-        public void Install(IApplication application, object? options)
+        public ValueTask InstallAsync(IApplication application)
         {
             application.Component("plugin-widget", new TestComponent
             {
                 SetupFunction = static (_, _) => static () => VirtualNodeFactory.Text("plugin-widget"),
             });
             application.Provide(key, value);
+            return ValueTask.CompletedTask;
         }
     }
 }

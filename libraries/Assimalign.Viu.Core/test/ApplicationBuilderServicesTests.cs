@@ -8,11 +8,11 @@ using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Tests;
 
-// Pins the application-builder services surface ([V01.01.03.24]): builder.Services / ConfigureServices /
-// UseServiceProviderBuilder register app-level DI, Build() attaches the provider to the app
-// (IApplication.Services), and it is reachable from component Setup — while the Vue-semantic
-// component-tree provide/inject stays untouched. Exercised through a minimal concrete builder over the
-// in-memory test renderer.
+// Pins the application-builder services surface ([V01.01.03.24], [V01.01.03.27]): builder.Services /
+// ConfigureServices / UseServiceContainer register app-level DI, Build() attaches the provider to the
+// app (IApplicationContext.ServicesProvider) and freezes the container, and it is reachable from
+// component Setup — while the Vue-semantic component-tree provide/inject stays untouched. Exercised
+// through a minimal concrete builder over the in-memory test renderer.
 public class ApplicationBuilderServicesTests : IDisposable
 {
     private readonly TestRenderer _renderer = new();
@@ -51,31 +51,31 @@ public class ApplicationBuilderServicesTests : IDisposable
     {
         private readonly Renderer<TestNode> _renderer;
 
-        public TestApplicationBuilder(Renderer<TestNode> renderer, IComponentDefinition root)
+        public TestApplicationBuilder(Renderer<TestNode> renderer, IComponent root)
             : base(root, null)
             => _renderer = renderer;
 
         public override Application<TestNode> Build()
         {
             var application = _renderer.CreateApplication(RootComponent, RootProperties);
-            application.Context.Services = BuildServiceProvider();
+            application.Context.ServicesProvider = BuildServiceProvider();
             ApplyConfiguration(application);
             return application;
         }
     }
 
-    // A bring-your-own IServiceProviderBuilder over a plain dictionary — nothing to do with the default
+    // A bring-your-own IServiceContainer over a plain dictionary — nothing to do with the default
     // provider. Build() returns the SAME provider instance every call, so the app-builder must attach it
     // verbatim.
-    private sealed class FakeServiceProviderBuilder : IServiceProviderBuilder
+    private sealed class FakeServiceContainer : IServiceContainer
     {
         private readonly Dictionary<Type, object> _map = new();
 
-        public FakeServiceProviderBuilder() => Provider = new FakeProvider(_map);
+        public FakeServiceContainer() => Provider = new FakeProvider(_map);
 
         public IServiceProvider Provider { get; }
 
-        public IServiceProviderBuilder Add(ServiceRegistration registration)
+        public IServiceContainer Add(ServiceRegistration registration)
         {
             _map[registration.ServiceType] = registration.Factory(Provider);
             return this;
@@ -113,8 +113,8 @@ public class ApplicationBuilderServicesTests : IDisposable
 
         var application = builder.Build();
 
-        application.Services.ShouldNotBeNull();
-        application.Services!.GetRequiredService<Service>().ShouldBeSameAs(service);
+        application.Context.ServicesProvider.ShouldNotBeNull();
+        application.Context.ServicesProvider!.GetRequiredService<Service>().ShouldBeSameAs(service);
     }
 
     [Fact]
@@ -124,23 +124,36 @@ public class ApplicationBuilderServicesTests : IDisposable
         var builder = new TestApplicationBuilder(_renderer.Renderer, Leaf());
         builder.ConfigureServices(services => services.AddSingleton(service));
 
-        builder.Build().Services!.GetRequiredService<Service>().ShouldBeSameAs(service);
+        builder.Build().Context.ServicesProvider!.GetRequiredService<Service>().ShouldBeSameAs(service);
     }
 
     [Fact]
-    public void UseServiceProviderBuilder_AttachesTheBuiltProviderVerbatim()
+    public void UseServiceContainer_AttachesTheBuiltProviderVerbatim()
     {
         var service = new Service { Id = 3 };
-        var fake = new FakeServiceProviderBuilder();
+        var fake = new FakeServiceContainer();
         var builder = new TestApplicationBuilder(_renderer.Renderer, Leaf());
-        builder.UseServiceProviderBuilder(fake);
+        builder.UseServiceContainer(fake);
         builder.Services.AddSingleton(service); // now goes to the fake
 
         var application = builder.Build();
 
-        // The exact IServiceProvider the BYO builder returned is what the app exposes.
-        application.Services.ShouldBeSameAs(fake.Provider);
-        application.Services!.GetRequiredService<Service>().ShouldBeSameAs(service);
+        // The exact IServiceProvider the BYO container returned is what the app exposes.
+        application.Context.ServicesProvider.ShouldBeSameAs(fake.Provider);
+        application.Context.ServicesProvider!.GetRequiredService<Service>().ShouldBeSameAs(service);
+    }
+
+    [Fact]
+    public void Add_AfterBuild_Throws_FreezeSemantics()
+    {
+        // Freeze semantics ([V01.01.03.27]): Build() freezes the container, so a later registration throws
+        // with an actionable message.
+        var builder = new TestApplicationBuilder(_renderer.Renderer, Leaf());
+        builder.Services.AddSingleton(new Service { Id = 5 });
+        builder.Build();
+
+        Should.Throw<InvalidOperationException>(() => builder.Services.AddSingleton(new Service { Id = 6 }))
+            .Message.ShouldContain("before calling builder.Build()");
     }
 
     [Fact]
@@ -172,8 +185,8 @@ public class ApplicationBuilderServicesTests : IDisposable
         var builderB = new TestApplicationBuilder(_renderer.Renderer, Leaf());
         builderB.Services.AddSingleton(_ => new Service());
 
-        var serviceA = builderA.Build().Services!.GetRequiredService<Service>();
-        var serviceB = builderB.Build().Services!.GetRequiredService<Service>();
+        var serviceA = builderA.Build().Context.ServicesProvider!.GetRequiredService<Service>();
+        var serviceB = builderB.Build().Context.ServicesProvider!.GetRequiredService<Service>();
 
         serviceA.ShouldNotBeSameAs(serviceB);
     }
@@ -184,7 +197,7 @@ public class ApplicationBuilderServicesTests : IDisposable
         var builder = new TestApplicationBuilder(_renderer.Renderer, Leaf());
         builder.Services.AddSingleton(_ => new TrackingDisposable());
         var application = builder.Build();
-        var disposable = (TrackingDisposable)application.Services!.GetRequiredService<TrackingDisposable>();
+        var disposable = (TrackingDisposable)application.Context.ServicesProvider!.GetRequiredService<TrackingDisposable>();
 
         application.Dispose();
 

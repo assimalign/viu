@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using Shouldly;
 using Xunit;
@@ -5,11 +6,13 @@ using Xunit;
 namespace Assimalign.Viu.Tests;
 
 /// <summary>
-/// Pins the R1 public reactivity surface — <see cref="SubscriberLink"/>,
-/// <see cref="Subscriber.FirstDependency"/>, and <see cref="ITrackedReference"/>: the dependency
-/// graph is publicly <b>readable</b> but never publicly <b>mutable</b>. No public member can
-/// construct a link, splice a link list, or move a version counter. Upstream shape parity:
-/// vuejs/core <c>packages/reactivity/src/dep.ts</c> (the <c>Link</c> class).
+/// Pins the public reactivity surface — <see cref="SubscriberLink"/>,
+/// <see cref="Subscriber.FirstDependency"/>, and the <see cref="ReactiveValue"/> class hierarchy
+/// (R6, [V01.01.03.25]): the dependency graph is publicly <b>readable</b> but never publicly
+/// <b>mutable</b>. No public member can construct a link, splice a link list, move a version counter,
+/// or swap out a reactive value's <see cref="ReactiveValue.Dependency"/>. Upstream shape parity:
+/// vuejs/core <c>packages/reactivity/src/dep.ts</c> (the <c>Link</c> class) and
+/// <c>packages/reactivity/src/ref.ts</c> (the ref's <c>dep</c>).
 /// </summary>
 public sealed class PublicSurfaceTests
 {
@@ -50,10 +53,122 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ITrackedReference_IsAPublicInterface()
+    public void ReactiveValue_IsAPublicAbstractClassClosedToExternalSubclassing()
     {
-        typeof(ITrackedReference).IsInterface.ShouldBeTrue();
-        typeof(ITrackedReference).IsPublic.ShouldBeTrue();
+        // The reactive value abstraction is now a class, not an interface (R6). It is public and
+        // abstract, and its constructor is private protected so it cannot be subclassed outside the
+        // assembly — the reactive value set stays closed.
+        typeof(ReactiveValue).IsClass.ShouldBeTrue();
+        typeof(ReactiveValue).IsAbstract.ShouldBeTrue();
+        typeof(ReactiveValue).IsPublic.ShouldBeTrue();
+        typeof(ReactiveValue)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void EveryRefKind_IsAReactiveValue()
+    {
+        // The is-ref check is now a class type-test (replacing the old is-IReference interface check).
+        (Reactive.Reference(1) is ReactiveValue).ShouldBeTrue();
+        (Reactive.ShallowReference(1) is ReactiveValue).ShouldBeTrue();
+        (Reactive.Computed(() => 1) is ReactiveValue).ShouldBeTrue();
+        (Reactive.CustomReference<int>((track, trigger) => (() => { track(); return 1; }, _ => trigger())) is ReactiveValue)
+            .ShouldBeTrue();
+        Reactive.IsRef(Reactive.Reference(1)).ShouldBeTrue();
+        Reactive.IsRef(42).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ReactiveValue_Dependency_IsPubliclyReadableButNotSettable()
+    {
+        // The dependency wiring is exposed for graph inspection but cannot be swapped through the
+        // public surface — no public setter on Dependency, and the cell's own mutating members
+        // (Version, subscriber list, Trigger bookkeeping) stay non-public.
+        var property = typeof(ReactiveValue).GetProperty(nameof(ReactiveValue.Dependency));
+        property.ShouldNotBeNull();
+        property!.GetGetMethod(nonPublic: false).ShouldNotBeNull();
+        property.GetSetMethod(nonPublic: false).ShouldBeNull();
+
+        // Reading Dependency never tracks (it is a pure inspection handle).
+        var count = Reactive.Reference(1);
+        var runs = 0;
+        var effect = new ReactiveEffect(() =>
+        {
+            runs++;
+            _ = count.Dependency;
+        });
+        effect.Run();
+        count.Value = 2;
+        runs.ShouldBe(1);
+    }
+
+    [Fact]
+    public void TriggerReference_NullArgument_Throws()
+    {
+        // The new contract (R6): the argument is a non-null ReactiveValue; null is rejected.
+        Should.Throw<ArgumentNullException>(() => Reactive.TriggerReference(null!));
+    }
+
+    [Fact]
+    public void TriggerReference_OnAnyReactiveValue_ForceNotifies_NoSilentNoOp()
+    {
+        // The old IReference-not-IDependencyReference silent no-op branch is gone: every ReactiveValue
+        // owns a dependency, so a plain ref force-notifies (upstream triggerRef parity).
+        var count = Reactive.Reference(0);
+        var runs = 0;
+        Reactive.Effect(() =>
+        {
+            runs++;
+            _ = count.Value;
+        });
+        runs.ShouldBe(1);
+
+        Reactive.TriggerReference(count);
+        runs.ShouldBe(2);
+    }
+
+    [Fact]
+    public void BoxedValue_BoxesTheTypedValueAndTracks()
+    {
+        // BoxedValue exposes the typed Value as object (boxing value types) and reading it tracks.
+        ReactiveValue reference = Reactive.Reference(7);
+        reference.BoxedValue.ShouldBe(7);
+
+        var count = Reactive.Reference(1);
+        var runs = 0;
+        Reactive.Effect(() =>
+        {
+            runs++;
+            _ = ((ReactiveValue)count).BoxedValue;
+        });
+        runs.ShouldBe(1);
+        count.Value = 2;
+        runs.ShouldBe(2); // a BoxedValue read established the dependency
+    }
+
+    [Fact]
+    public void ReadonlyComputed_SetterWarns_ThroughTheWarningsSink_AndDoesNotThrow()
+    {
+        // Vue 3.5 parity (packages/reactivity/src/computed.ts): writing a getter-only computed warns
+        // in dev and is a no-op — it never throws. The warning routes through the runtime sink.
+        var captured = new System.Collections.Generic.List<string>();
+        var previousSink = RuntimeWarnings.Sink;
+        RuntimeWarnings.Sink = captured.Add;
+        try
+        {
+            var readonlyComputed = Reactive.Computed(() => 41);
+            readonlyComputed.IsReadOnly.ShouldBeTrue();
+
+            Should.NotThrow(() => readonlyComputed.Value = 99);
+
+            readonlyComputed.Value.ShouldBe(41); // unchanged
+            captured.ShouldContain(message => message.Contains("readonly"));
+        }
+        finally
+        {
+            RuntimeWarnings.Sink = previousSink;
+        }
     }
 
     [Fact]
@@ -72,12 +187,12 @@ public sealed class PublicSurfaceTests
         var first = effect.FirstDependency;
         first.ShouldNotBeNull();
         first!.Subscriber.ShouldBeSameAs(effect);
-        first.Dependency.ShouldBeSameAs(((ITrackedReference)count).Dependency);
+        first.Dependency.ShouldBeSameAs(count.Dependency);
         first.PreviousDependency.ShouldBeNull();
 
         var second = first.NextDependency;
         second.ShouldNotBeNull();
-        second!.Dependency.ShouldBeSameAs(((ITrackedReference)label).Dependency);
+        second!.Dependency.ShouldBeSameAs(label.Dependency);
         second.PreviousDependency.ShouldBeSameAs(first);
         second.NextDependency.ShouldBeNull();
     }
@@ -91,7 +206,7 @@ public sealed class PublicSurfaceTests
         firstEffect.Run();
         secondEffect.Run();
 
-        var dependency = ((ITrackedReference)shared).Dependency;
+        var dependency = shared.Dependency;
         var firstLink = firstEffect.FirstDependency!;
         var secondLink = secondEffect.FirstDependency!;
         firstLink.Dependency.ShouldBeSameAs(dependency);

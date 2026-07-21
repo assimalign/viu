@@ -134,8 +134,8 @@ public class KeyedChildrenDiffTests : IDisposable
     public void KeyedComponents_Reverse_MoveSubtrees_NotRemount()
     {
         // Reused component definitions keyed by name so the same-type check matches across renders.
-        var definitions = new Dictionary<string, IComponentDefinition>(StringComparer.Ordinal);
-        IComponentDefinition Definition(string key)
+        var definitions = new Dictionary<string, IComponent>(StringComparer.Ordinal);
+        IComponent Definition(string key)
         {
             if (!definitions.TryGetValue(key, out var definition))
             {

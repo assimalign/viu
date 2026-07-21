@@ -33,4 +33,17 @@ public interface IReactiveObject : IReactiveTraversable
     /// <param name="propertyName">The declared property name (case-sensitive, ordinal).</param>
     /// <returns>The property's dependency cell, or <see langword="null"/>.</returns>
     Dependency? GetDependency(string propertyName);
+
+    /// <summary>
+    /// Whether this reactive object rejects writes (reads still track) — the port of Vue 3.5's
+    /// <c>ReactiveFlags.IS_READONLY</c> flag consulted by <c>isReadonly()</c>
+    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly), surfaced through
+    /// <see cref="Reactive.IsReadonly"/>. A source-generated <c>[Reactive(Readonly = true)]</c>/
+    /// <c>[ShallowReactive(Readonly = true)]</c> object (the port of <c>readonly()</c>/
+    /// <c>shallowReadonly()</c>) reports <see langword="true"/>; a mutable reactive object uses this
+    /// default of <see langword="false"/>. It is the object-side counterpart of
+    /// <see cref="ReactiveValue.IsReadOnly"/> — a default-interface member so mutable generated
+    /// objects (and any hand-written implementer) need not restate it.
+    /// </summary>
+    bool IsReadOnly => false;
 }

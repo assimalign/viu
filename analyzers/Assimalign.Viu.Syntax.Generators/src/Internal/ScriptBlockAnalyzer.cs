@@ -72,7 +72,7 @@ internal static class ScriptBlockAnalyzer
         "ShallowReference",
         "CustomReference",
         "Computed",
-        "IReference",
+        "ReactiveValue",
     };
 
     /// <summary>

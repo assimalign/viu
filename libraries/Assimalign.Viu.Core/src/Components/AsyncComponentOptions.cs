@@ -20,14 +20,14 @@ public sealed class AsyncComponentOptions
     /// The component shown after <see cref="Delay"/> while the loader is pending (upstream:
     /// <c>loadingComponent</c>), or null to show nothing (a comment placeholder) while loading.
     /// </summary>
-    public IComponentDefinition? LoadingComponent { get; init; }
+    public IComponent? LoadingComponent { get; init; }
 
     /// <summary>
     /// The component shown on loader failure or after <see cref="Timeout"/> elapses (upstream:
     /// <c>errorComponent</c>), or null. When present it receives an <c>"error"</c> prop carrying the
     /// failure, and its presence keeps a load failure from crashing the flush.
     /// </summary>
-    public IComponentDefinition? ErrorComponent { get; init; }
+    public IComponent? ErrorComponent { get; init; }
 
     /// <summary>
     /// Milliseconds to wait before showing <see cref="LoadingComponent"/> (upstream: <c>delay</c>,

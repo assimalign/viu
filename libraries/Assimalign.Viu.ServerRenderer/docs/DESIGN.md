@@ -121,8 +121,8 @@ order when several teleports share a target:
   provide surface over the shared `ApplicationContext`, without a renderer. The host DI wiring that a
   real `renderToString(app)` implies is the server adaptor's concern ([V01.01.07.04]).
 - **`Setup` is synchronous; async server data is `OnServerPrefetch`.** Upstream awaits an `async setup()`
-  Promise. Viu's `IComponentDefinition.Setup` is synchronous by contract — the closure it returns *is*
-  the proxy-free realization of upstream's state object (see `IComponentDefinition`'s XML docs), so there
+  Promise. Viu's `IComponent.Setup` is synchronous by contract — the closure it returns *is*
+  the proxy-free realization of upstream's state object (see `IComponent`'s XML docs), so there
   is no setup Promise to await. The upstream requirement to "await each component's async setup" is
   therefore realized through `Lifecycle.OnServerPrefetch` (the sanctioned async server-data hook, awaited
   before the subtree serializes) and, for `<Suspense>`, its async-component dependencies. Pinned by

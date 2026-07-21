@@ -22,7 +22,7 @@ Downstream libraries parse the block contents: the template compiler
 (`Assimalign.Viu.Syntax.Templates`) for `@template`, the CSS library for `@style`, and script
 analysis for `@script` ([V01.01.06.03]). The source generator that composes those parsers then
 assembles the result into the mountable component — the compiled render, the merged `@script`, and the
-`IComponentDefinition` bridge that makes a `@template`-bearing `.viu` a real runtime component
+`IComponent` bridge that makes a `@template`-bearing `.viu` a real runtime component
 ([V01.01.06.07]). None of that lives here: this library's output is the descriptor, nothing more.
 
 ## The registration seam

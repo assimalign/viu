@@ -53,7 +53,7 @@ public sealed class StoreRegistry : IDisposable
     /// the same plugin installs on a browser app or a server app. Call once per app.
     /// </summary>
     /// <returns>A plugin that installs this registry.</returns>
-    public IPlugin AsPlugin() => new StorePlugin(this);
+    public IApplicationPlugin AsPlugin() => new StorePlugin(this);
 
     /// <summary>
     /// Stops the root effect scope — cascading to every store's child scope, so all computeds and

@@ -59,6 +59,9 @@ public sealed class StoreApplicationIntegrationTests : IDisposable
             new SetupComponent { SetupFunction = static () => static () => VirtualNodeFactory.Text("x") });
 
         application.Use(registry.AsPlugin());
+        // The store plugin installs during the mount path ([V01.01.03.27]), so mounting runs its install
+        // (Pinia's setActivePinia) which sets the ambient active registry.
+        application.Mount(renderer.CreateContainer());
 
         Stores.ActiveRegistry.ShouldBeSameAs(registry);
     }

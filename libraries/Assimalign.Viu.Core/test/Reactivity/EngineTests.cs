@@ -51,8 +51,8 @@ public sealed class EngineTests
         var b = Reactive.Reference(10);
         Reactive.Effect(() => _ = flag.Value ? a.Value : b.Value);
 
-        var aDependency = ((ITrackedReference)a).Dependency;
-        var bDependency = ((ITrackedReference)b).Dependency;
+        var aDependency = a.Dependency;
+        var bDependency = b.Dependency;
         aDependency.Subscribers.ShouldNotBeNull();
         bDependency.Subscribers.ShouldBeNull();
 
@@ -86,7 +86,7 @@ public sealed class EngineTests
     public void StoppingTheLastSubscriberSoftDetachesAComputedAndAReadReattaches()
     {
         var count = Reactive.Reference(1);
-        var sourceDependency = ((ITrackedReference)count).Dependency;
+        var sourceDependency = count.Dependency;
         var getterRuns = 0;
         var doubled = Reactive.Computed(() =>
         {

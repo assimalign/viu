@@ -3,30 +3,31 @@ using System;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Ergonomic registration helpers over <see cref="IServiceProviderBuilder.Add"/> — the Viu
+/// Ergonomic registration helpers over <see cref="IServiceContainer.Add"/> — the Viu
 /// counterparts of <c>ServiceCollectionServiceExtensions.AddSingleton/AddScoped/AddTransient</c>
 /// (https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.servicecollectionserviceextensions).
 /// Each builds a <see cref="ServiceRegistration"/> from a factory delegate and adds it, so registration
 /// stays AOT-safe (no reflection activation). Generic helpers target reference types; register a
-/// value-typed or differently-shaped service through <see cref="IServiceProviderBuilder.Add"/> directly.
+/// value-typed or differently-shaped service through <see cref="IServiceContainer.Add"/> directly. Every
+/// helper returns the container so registrations chain.
 /// </summary>
-public static class ServiceProviderBuilderExtensions
+public static class ServiceContainerExtensions
 {
     /// <summary>
     /// Registers <typeparamref name="TService"/> as a <see cref="ServiceLifetime.Singleton"/> created
     /// by <paramref name="factory"/> — one instance per application, cached and disposed with the app.
     /// </summary>
     /// <typeparam name="TService">The service type consumers resolve by.</typeparam>
-    /// <param name="builder">The service builder.</param>
+    /// <param name="services">The service container.</param>
     /// <param name="factory">Creates the instance from the resolving provider.</param>
-    /// <returns>The builder, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="factory"/> is null.</exception>
-    public static IServiceProviderBuilder AddSingleton<TService>(this IServiceProviderBuilder builder, Func<IServiceProvider, TService> factory)
+    /// <returns>The container, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="factory"/> is null.</exception>
+    public static IServiceContainer AddSingleton<TService>(this IServiceContainer services, Func<IServiceProvider, TService> factory)
         where TService : class
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(factory);
-        return builder.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Singleton, provider => factory(provider)));
+        return services.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Singleton, provider => factory(provider)));
     }
 
     /// <summary>
@@ -36,16 +37,16 @@ public static class ServiceProviderBuilderExtensions
     /// disposes <paramref name="instance"/> if it is <see cref="IDisposable"/>.
     /// </summary>
     /// <typeparam name="TService">The service type consumers resolve by.</typeparam>
-    /// <param name="builder">The service builder.</param>
+    /// <param name="services">The service container.</param>
     /// <param name="instance">The singleton instance.</param>
-    /// <returns>The builder, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="instance"/> is null.</exception>
-    public static IServiceProviderBuilder AddSingleton<TService>(this IServiceProviderBuilder builder, TService instance)
+    /// <returns>The container, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="instance"/> is null.</exception>
+    public static IServiceContainer AddSingleton<TService>(this IServiceContainer services, TService instance)
         where TService : class
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(instance);
-        return builder.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Singleton, _ => instance));
+        return services.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Singleton, _ => instance));
     }
 
     /// <summary>
@@ -55,16 +56,16 @@ public static class ServiceProviderBuilderExtensions
     /// scopes gives it full per-scope meaning.
     /// </summary>
     /// <typeparam name="TService">The service type consumers resolve by.</typeparam>
-    /// <param name="builder">The service builder.</param>
+    /// <param name="services">The service container.</param>
     /// <param name="factory">Creates the instance from the resolving provider.</param>
-    /// <returns>The builder, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="factory"/> is null.</exception>
-    public static IServiceProviderBuilder AddScoped<TService>(this IServiceProviderBuilder builder, Func<IServiceProvider, TService> factory)
+    /// <returns>The container, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="factory"/> is null.</exception>
+    public static IServiceContainer AddScoped<TService>(this IServiceContainer services, Func<IServiceProvider, TService> factory)
         where TService : class
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(factory);
-        return builder.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Scoped, provider => factory(provider)));
+        return services.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Scoped, provider => factory(provider)));
     }
 
     /// <summary>
@@ -73,15 +74,15 @@ public static class ServiceProviderBuilderExtensions
     /// dispose transient instances (a disposable transient is the caller's responsibility).
     /// </summary>
     /// <typeparam name="TService">The service type consumers resolve by.</typeparam>
-    /// <param name="builder">The service builder.</param>
+    /// <param name="services">The service container.</param>
     /// <param name="factory">Creates the instance from the resolving provider.</param>
-    /// <returns>The builder, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="factory"/> is null.</exception>
-    public static IServiceProviderBuilder AddTransient<TService>(this IServiceProviderBuilder builder, Func<IServiceProvider, TService> factory)
+    /// <returns>The container, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> or <paramref name="factory"/> is null.</exception>
+    public static IServiceContainer AddTransient<TService>(this IServiceContainer services, Func<IServiceProvider, TService> factory)
         where TService : class
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(factory);
-        return builder.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Transient, provider => factory(provider)));
+        return services.Add(new ServiceRegistration(typeof(TService), ServiceLifetime.Transient, provider => factory(provider)));
     }
 }

@@ -53,7 +53,7 @@ public static class ServerRenderer
     /// <param name="cancellationToken">Cancels the render.</param>
     /// <returns>The serialized HTML.</returns>
     public static Task<string> RenderToStringAsync(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties = null,
         SsrContext? context = null,
         CancellationToken cancellationToken = default)
@@ -91,7 +91,7 @@ public static class ServerRenderer
     /// <param name="context">The render context, or null for a fresh one.</param>
     /// <param name="cancellationToken">Cancels the render.</param>
     public static Task RenderToStreamAsync(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         TextWriter writer,
         VirtualNodeProperties? rootProperties = null,
         SsrContext? context = null,

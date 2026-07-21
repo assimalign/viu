@@ -15,7 +15,7 @@ namespace Assimalign.Viu.CompiledRenderTests;
 /// ([V01.01.06], #56) waited on. A real single-file component (<c>@template</c> + reactive
 /// <c>@script</c> state + an event handler) is compiled by the ACTUAL
 /// <see cref="Assimalign.Viu.Syntax.Generators.SingleFileComponentGenerator"/>, the generated partial —
-/// now a mountable <see cref="IComponentDefinition"/> through the generated Name + Setup bridge — is
+/// now a mountable <see cref="IComponent"/> through the generated Name + Setup bridge — is
 /// Roslyn-compiled against the runtime helper surface (as in <see cref="CompiledRenderEndToEndTests"/>),
 /// and the reflectively-loaded definition is mounted through the shipping <see cref="ViuTest"/> renderer:
 /// the real <c>MountComponent → SetupComponent → Setup → render effect</c> path. This proves the closed
@@ -51,8 +51,8 @@ public sealed class SingleFileComponentMountTests
         var definition = CompileSingleFileComponent("Greeting", GreetingViu);
 
         // The generated bridge makes the .viu partial a real, named component definition.
-        definition.ShouldBeAssignableTo<IComponentDefinition>();
-        definition.Name.ShouldBe("Greeting"); // the generated IComponentDefinition.Name, inferred from the file
+        definition.ShouldBeAssignableTo<IComponent>();
+        definition.Name.ShouldBe("Greeting"); // the generated IComponent.Name, inferred from the file
 
         // Mount through the shipping Testing renderer: the real MountComponent -> SetupComponent ->
         // Definition.Setup(...) -> render-effect path, exactly as a hand-written component mounts.
@@ -119,22 +119,22 @@ public sealed class SingleFileComponentMountTests
         wrapper.Get(".themed").Text().ShouldBe("themed");
     }
 
-    private static IComponentDefinition CompileSingleFileComponent(string name, string viu)
+    private static IComponent CompileSingleFileComponent(string name, string viu)
     {
         var generated = CompiledRenderSupport.Generate(name, viu);
         // The generated partial is now a mountable component — the [V01.01.06.07] bridge is present.
-        generated.ShouldContain(": global::Assimalign.Viu.IComponentDefinition");
-        generated.ShouldContain("global::Assimalign.Viu.IComponentDefinition.Setup(");
+        generated.ShouldContain(": global::Assimalign.Viu.IComponent");
+        generated.ShouldContain("global::Assimalign.Viu.IComponent.Setup(");
         generated.ShouldContain("NormalizeRoot(Render(this, _cache))");
         return LoadDefinition(name, generated);
     }
 
-    private static IComponentDefinition LoadDefinition(string name, string generated)
+    private static IComponent LoadDefinition(string name, string generated)
     {
         // The .viu is self-contained, so the second Roslyn tree is empty (no hand-written half).
         var assembly = Assembly.Load(CompiledRenderSupport.CompileToAssembly(generated, "// self-contained .viu component\n"));
         var type = assembly.GetType($"Demo.{name}")
             ?? throw new InvalidOperationException($"The compiled assembly did not contain Demo.{name}.");
-        return (IComponentDefinition)Activator.CreateInstance(type, nonPublic: true)!;
+        return (IComponent)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }

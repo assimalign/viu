@@ -8,47 +8,33 @@ namespace Assimalign.Viu;
 /// (<c>packages/runtime-core/src/apiCreateApp.ts</c>, https://vuejs.org/api/application.html),
 /// reduced to the surface that does not need the platform node type: component/directive
 /// registration, app-level <see cref="Provide{T}(InjectionKey{T}, T)"/>, plugin installation
-/// (<see cref="Use"/>), configuration, and teardown. It is the face a plugin's
-/// <see cref="IPlugin.Install"/> receives and the type an <see cref="IApplicationBuilder"/> produces,
-/// so plugins and generic hosting code work against any platform.
+/// (<see cref="Use"/>), the shared <see cref="Context"/>, and teardown. It is the face a plugin's
+/// <see cref="IApplicationPlugin.InstallAsync"/> receives and the type an <see cref="IApplicationBuilder"/>
+/// produces, so plugins and generic hosting code work against any platform.
 /// <para>
 /// <c>Mount</c> is deliberately absent: the container type is platform-specific (a browser CSS
 /// selector or node handle, a Core <c>TNode</c>), so mounting lives on the concrete platform
 /// applications (<see cref="Application{TNode}.Mount(TNode)"/>,
-/// <c>BrowserApplication.MountAsync(string)</c>). Introspection that needs no node type
-/// (<see cref="IsMounted"/>, <see cref="RootInstance"/>) and <see cref="Unmount"/> stay here.
+/// <c>BrowserApplication.MountAsync(string)</c>). Configuration lives on <see cref="Context"/>;
+/// runtime introspection that needs no node type (<see cref="IsMounted"/>, <see cref="RootInstance"/>)
+/// and <see cref="Unmount"/> stay here.
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 public interface IApplication
 {
     /// <summary>
-    /// The app-level configuration (upstream: <c>app.config</c>) — the error handler, warn handler,
-    /// and performance flag. Set its handlers before mounting.
+    /// The shared application context (upstream: <c>app._context</c> + <c>app.config</c>) — the root
+    /// component/props, the app-level <see cref="IApplicationContext.ServicesProvider"/>, and the
+    /// error/warn/performance handlers. Configuration lives here; the application object owns lifecycle.
     /// </summary>
-    ApplicationConfiguration Config { get; }
+    IApplicationContext Context { get; }
 
     /// <summary>Whether the application is currently mounted.</summary>
     bool IsMounted { get; }
 
     /// <summary>The root component instance after mounting, or null.</summary>
     ComponentInstance? RootInstance { get; }
-
-    /// <summary>
-    /// The application's dependency-injection provider ([V01.01.03.24]) — the
-    /// <see cref="System.IServiceProvider"/> the <see cref="IApplicationBuilder"/> built from its
-    /// service registrations and attached, reachable from component <c>Setup</c> through
-    /// <see cref="ComponentInstance.Services"/> and the <see cref="DependencyInjection.GetService{T}()"/>
-    /// composition functions. Null when the application was created without a builder (a raw
-    /// renderer-created app). The application owns this provider and disposes it (if
-    /// <see cref="System.IDisposable"/>) when it disposes.
-    /// <para>
-    /// This is app-level DI over <see cref="System.IServiceProvider"/>, layered <b>beside</b> — never
-    /// replacing — the Vue-semantic component-tree <see cref="Provide{T}(InjectionKey{T}, T)"/>/inject
-    /// chain (<see cref="DependencyInjection"/>).
-    /// </para>
-    /// </summary>
-    IServiceProvider? Services { get; }
 
     /// <summary>
     /// Registers a component under <paramref name="name"/> so descendants of the root can resolve it
@@ -59,7 +45,7 @@ public interface IApplication
     /// <param name="name">The component name (resolved case-insensitively at render).</param>
     /// <param name="definition">The component definition.</param>
     /// <returns>This application, for chaining.</returns>
-    IApplication Component(string name, IComponentDefinition definition);
+    IApplication Component(string name, IComponent definition);
 
     /// <summary>
     /// Returns the component registered under <paramref name="name"/>, or null (upstream:
@@ -67,7 +53,7 @@ public interface IApplication
     /// </summary>
     /// <param name="name">The registered name.</param>
     /// <returns>The registered definition, or null.</returns>
-    IComponentDefinition? Component(string name);
+    IComponent? Component(string name);
 
     /// <summary>
     /// Registers a directive under <paramref name="name"/> so descendants of the root can resolve it
@@ -109,15 +95,17 @@ public interface IApplication
     IApplication Provide(string key, object? value);
 
     /// <summary>
-    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>).
-    /// A repeat <c>Use</c> of the same plugin instance is deduplicated with a dev warning; a plugin
-    /// installed after mount warns. The plugin's <see cref="IPlugin.Install"/> receives this
-    /// application. Returns the application for chaining.
+    /// Records <paramref name="plugin"/> for installation, exactly once (upstream:
+    /// <c>app.use(plugin)</c>). A repeat <c>Use</c> of the same plugin instance is deduplicated with
+    /// a dev warning; a plugin recorded after mount warns. Options are carried by the plugin's own
+    /// constructor state, so there is no separate options argument. The plugin's asynchronous
+    /// <see cref="IApplicationPlugin.InstallAsync"/> is awaited during the mount path (before platform
+    /// initialization and the first render), so a plugin can register components, directives, and
+    /// provides that the initial render sees. Returns the application for chaining.
     /// </summary>
     /// <param name="plugin">The plugin to install.</param>
-    /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
-    IApplication Use(IPlugin plugin, object? options = null);
+    IApplication Use(IApplicationPlugin plugin);
 
     /// <summary>
     /// Unmounts the application (upstream: <c>app.unmount</c>): runs component teardown lifecycles and

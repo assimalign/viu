@@ -7,7 +7,7 @@ namespace Assimalign.Viu.HackerNews;
 /// <summary>
 /// The catch-all not-found route (<c>/:pathMatch(.*)*</c>).
 /// </summary>
-internal sealed class NotFoundView : IComponentDefinition
+internal sealed class NotFoundView : IComponent
 {
     /// <summary>The shared route-view definition instance.</summary>
     public static readonly NotFoundView Instance = new();
@@ -20,7 +20,7 @@ internal sealed class NotFoundView : IComponentDefinition
     public string? Name => "NotFoundView";
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () => VirtualNodeFactory.Element(
             "section",
             VirtualNodeFactory.Properties(("class", "hn-view hn-notfound-view")),

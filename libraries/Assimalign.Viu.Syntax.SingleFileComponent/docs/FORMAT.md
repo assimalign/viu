@@ -41,7 +41,7 @@ template compiler (`Assimalign.Viu.Syntax.Templates`, [V01.01.05.01]); the C# in
 
 A `.viu` with an `@template` compiles to a **mountable component**: the source generator emits the
 compiled render function ([V01.01.05.05]), merges the `@script` C# into the partial class ([V01.01.06.03]),
-and — as of [V01.01.06.07] — generates the `IComponentDefinition` bridge (a `Name` plus a `Setup` that
+and — as of [V01.01.06.07] — generates the `IComponent` bridge (a `Name` plus a `Setup` that
 allocates the render cache, wires slots, applies any `v-bind()` CSS custom properties, and returns the
 render delegate). So a `@template`-bearing `.viu` is passed straight to `BrowserApplication.CreateBuilder(...)` /
 `VirtualNodeFactory.Component(...)` with no hand-written wiring, and reactive `@script` members drive

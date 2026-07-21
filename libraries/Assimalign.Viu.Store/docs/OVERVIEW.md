@@ -55,8 +55,8 @@ Member model (`[V01.01.09.02]`, the C# port of Pinia's store instance API):
 - **`StoreSubscriptionCallback<TState>`** and **`StoreActionCallback`** (`Delegates/`): the subscribe
   and action callbacks.
 
-Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): `StorePlugin<TNode>` (the
-`IPlugin` adapter that provides the registry app-wide and sets it active on install) and
+Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): `StorePlugin` (the
+`IApplicationPlugin` adapter that provides the registry app-wide and sets it active on install) and
 `StoreEntry` (a registry's per-store record: instance, owning scope, and owning definition).
 
 ## Using it
@@ -130,7 +130,7 @@ store.Reset();                                                      // back to t
 ## Boundaries
 
 - References **only** `Assimalign.Viu.Core` (for `EffectScope`/`Reference`/`Computed`, the
-  `[Reactive]` state contract, `Watch`, and batching, plus `App`, `IPlugin`, provide/inject, the
+  `[Reactive]` state contract, `Watch`, and batching, plus `App`, `IApplicationPlugin`, provide/inject, the
   current component instance, and `ViuWatch`/the scheduler that batches subscription notifications).
   It references **no DOM/JavaScript-interop assembly** — stores are
   platform-agnostic and run in a plain .NET test host.

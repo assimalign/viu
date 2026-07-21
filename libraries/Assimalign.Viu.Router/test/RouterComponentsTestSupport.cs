@@ -68,7 +68,7 @@ internal static class RouterComponentsTestSupport
 
 // A component definition that records how many times it was set up and rendered and captures its
 // instance, so the suites can assert re-render run counts and remount-vs-patch behavior.
-internal sealed class TrackingComponent : IComponentDefinition
+internal sealed class TrackingComponent : IComponent
 {
     private readonly Func<ComponentProperties, VirtualNode?> _render;
 
@@ -92,7 +92,7 @@ internal sealed class TrackingComponent : IComponentDefinition
 
     public ComponentInstance? Instance { get; private set; }
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         SetupCount++;
         Instance = ComponentInstance.Current;

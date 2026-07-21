@@ -23,7 +23,7 @@ namespace Assimalign.Viu;
 /// thread-safe (single-threaded JS event-loop model).
 /// </para>
 /// </summary>
-public sealed class BaseTransition : IComponentDefinition
+public sealed class BaseTransition : IComponent
 {
     /// <summary>
     /// The reserved prop name carrying a pre-resolved <see cref="BaseTransitionProperties"/> — the
@@ -48,7 +48,7 @@ public sealed class BaseTransition : IComponentDefinition
     public bool InheritAttributes => false;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var instance = ComponentInstance.Current!;
         var state = UseTransitionState();

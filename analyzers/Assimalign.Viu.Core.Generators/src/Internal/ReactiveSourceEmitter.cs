@@ -14,8 +14,7 @@ internal static class ReactiveSourceEmitter
 {
     private const string DependencyType = "global::Assimalign.Viu.Dependency";
     private const string ReactiveObjectType = "global::Assimalign.Viu.IReactiveObject";
-    private const string ReadonlyReactiveType = "global::Assimalign.Viu.IReadonlyReactive";
-    private const string ReferenceType = "global::Assimalign.Viu.IReference";
+    private const string ReferenceType = "global::Assimalign.Viu.ReactiveValue";
     private const string ReactiveFacadeType = "global::Assimalign.Viu.Reactive";
     private const string TraversableType = "global::Assimalign.Viu.IReactiveTraversable";
     private const string TraversalType = "global::Assimalign.Viu.ReactiveTraversal";
@@ -52,11 +51,6 @@ internal static class ReactiveSourceEmitter
         builder.Append(model.AccessibilityKeyword).Append("partial class ")
             .Append(model.TypeName).Append(model.TypeParameterList)
             .Append(" : ").Append(ReactiveObjectType);
-        if (model.Readonly)
-        {
-            // The port of readonly()/shallowReadonly(): expose the IS_READONLY flag for isReadonly().
-            builder.Append(", ").Append(ReadonlyReactiveType);
-        }
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("{\n");
@@ -212,13 +206,15 @@ internal static class ReactiveSourceEmitter
     {
         if (!model.Readonly)
         {
+            // A mutable reactive object uses the default IReactiveObject.IsReadOnly => false.
             return;
         }
 
-        // The port of Vue's ReactiveFlags.IS_READONLY, surfaced through Reactive.IsReadonly().
+        // The port of Vue's ReactiveFlags.IS_READONLY, surfaced through Reactive.IsReadonly(): a
+        // readonly variant overrides the IReactiveObject default-interface member to report true.
         builder.Append('\n');
         AppendIndent(builder, indent);
-        builder.Append("bool ").Append(ReadonlyReactiveType).Append(".IsReadonly => true;\n");
+        builder.Append("bool ").Append(ReactiveObjectType).Append(".IsReadOnly => true;\n");
     }
 
     private static void EmitReferences(StringBuilder builder, in ReactiveClassModel model, int indent)

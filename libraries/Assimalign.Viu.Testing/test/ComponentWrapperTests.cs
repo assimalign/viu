@@ -143,7 +143,7 @@ public class ComponentWrapperTests
     // --- sample components -----------------------------------------------------------------------
 
     // A counter: prop-seeded reactive count, emits "ready" on mount and "change" per increment.
-    private sealed class CounterComponent : IComponentDefinition
+    private sealed class CounterComponent : IComponent
     {
         private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
             [new ComponentPropertyDefinition("start") { DefaultValue = 0 }];
@@ -156,7 +156,7 @@ public class ComponentWrapperTests
 
         public IReadOnlyList<ComponentEmitDefinition>? Emits => DeclaredEmits;
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             var count = Reactive.Reference(properties.Get<int>("start"));
             context.Emit("ready", count.Value); // emitted during mount
@@ -176,18 +176,18 @@ public class ComponentWrapperTests
     }
 
     // Renders a Counter child (stable definition) so FindComponent/stubbing have something to find.
-    private sealed class HostComponent : IComponentDefinition
+    private sealed class HostComponent : IComponent
     {
         public CounterComponent Counter { get; } = new();
 
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
             => () => VirtualNodeFactory.Element("main", VirtualNodeFactory.Component(Counter));
     }
 
     // Covers each selector kind (two spans, an id, a class, a data attribute).
-    private sealed class SelectorComponent : IComponentDefinition
+    private sealed class SelectorComponent : IComponent
     {
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
             => () => VirtualNodeFactory.Element(
                 "section",
                 VirtualNodeFactory.Element("span", VirtualNodeFactory.Properties(("id", "title")), "Title"),
@@ -197,9 +197,9 @@ public class ComponentWrapperTests
     }
 
     // A v-model-style input echoing its value into a span.
-    private sealed class InputComponent : IComponentDefinition
+    private sealed class InputComponent : IComponent
     {
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             var text = Reactive.Reference(string.Empty);
             void OnInput(object? value) => text.Value = value?.ToString() ?? string.Empty;
@@ -215,9 +215,9 @@ public class ComponentWrapperTests
     }
 
     // Injects an app-level provide and renders it.
-    private sealed class InjectingComponent : IComponentDefinition
+    private sealed class InjectingComponent : IComponent
     {
-        public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         {
             var theme = DependencyInjection.Inject("theme") as string ?? "default";
             return () => VirtualNodeFactory.Element("div", theme);

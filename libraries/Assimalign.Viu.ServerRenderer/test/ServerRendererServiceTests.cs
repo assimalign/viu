@@ -44,8 +44,8 @@ public class ServerRendererServiceTests
         var html = await ServerRenderer.RenderToStringAsync(application);
 
         html.ShouldBe("<div>hello</div>");
-        application.Services.ShouldNotBeNull();
-        application.Services!.GetRequiredService<Greeting>().ShouldBeSameAs(service);
+        application.Context.ServicesProvider.ShouldNotBeNull();
+        application.Context.ServicesProvider!.GetRequiredService<Greeting>().ShouldBeSameAs(service);
     }
 
     [Fact]
@@ -62,8 +62,8 @@ public class ServerRendererServiceTests
         var appA = BuildApp();
         var appB = BuildApp();
 
-        appA.Services!.GetRequiredService<Greeting>()
-            .ShouldNotBeSameAs(appB.Services!.GetRequiredService<Greeting>());
+        appA.Context.ServicesProvider!.GetRequiredService<Greeting>()
+            .ShouldNotBeSameAs(appB.Context.ServicesProvider!.GetRequiredService<Greeting>());
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class ServerRendererServiceTests
             new InlineComponent((_, _) => static () => VirtualNodeFactory.Element("div", "x")));
         builder.Services.AddSingleton(disposable);
         var application = builder.Build();
-        _ = application.Services!.GetRequiredService<TrackingDisposable>(); // realize the singleton
+        _ = application.Context.ServicesProvider!.GetRequiredService<TrackingDisposable>(); // realize the singleton
 
         application.Dispose();
 

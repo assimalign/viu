@@ -386,7 +386,7 @@ public class BlockTreeTests : IDisposable
         };
         var application = _renderer.Renderer.CreateApplication(failing);
         var handled = 0;
-        application.Config.ErrorHandler = (_, _, _) => handled++;
+        application.Context.ErrorHandler = (_, _, _) => handled++;
         application.Mount(_container);
         handled.ShouldBe(1);
 

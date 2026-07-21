@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
@@ -15,19 +14,22 @@ namespace Assimalign.Viu.TodoMvc.Components;
 /// begin-edit are no-argument handlers so the in-memory test renderer can drive them; the two text
 /// inputs read the typed <see cref="BrowserEvent"/> payload and so run only in the browser.
 /// </summary>
-public sealed class TodoItemComponent : IComponentDefinition
+public sealed class TodoItemComponent : Component
 {
-    private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
-        [new ComponentPropertyDefinition("todo")];
+    /// <inheritdoc/>
+    public override string? Name => "TodoItem";
+
+    /// <summary>
+    /// Registers the single <c>todo</c> prop through the <see cref="Component"/> authoring base —
+    /// the opt-in alternative to declaring <see cref="IComponent.Properties"/> directly. Runs lazily
+    /// once, on first metadata access (not from the constructor).
+    /// </summary>
+    /// <param name="descriptor">The definition-time props/emits registration surface.</param>
+    protected override void Configure(IComponentDescriptor descriptor)
+        => descriptor.WithProperty(new ComponentPropertyDefinition("todo"));
 
     /// <inheritdoc/>
-    public string? Name => "TodoItem";
-
-    /// <inheritdoc/>
-    public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
-
-    /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public override ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         // The todo reference is stable for the life of this keyed instance, so capturing it once is
         // correct; its reactive members (read in the render below) drive re-renders on their own.

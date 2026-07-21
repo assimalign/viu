@@ -15,7 +15,7 @@ namespace Assimalign.Viu.HackerNews;
 /// renders a keyed <see cref="TransitionGroup"/> list plus pagination. All list state comes from the
 /// store; the view holds none of its own.
 /// </summary>
-internal sealed class StoriesView : IComponentDefinition
+internal sealed class StoriesView : IComponent
 {
     /// <summary>The shared route-view definition instance.</summary>
     public static readonly StoriesView Instance = new();
@@ -28,7 +28,7 @@ internal sealed class StoriesView : IComponentDefinition
     public string? Name => "StoriesView";
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var router = DependencyInjection.Inject(RouterInjectionKeys.Router)!;
         var stores = DependencyInjection.GetRequiredService<HackerNewsStores>();

@@ -147,7 +147,7 @@ public sealed class SingleFileComponentScriptTests
             "    public Reference<int> Count = default!;\n" +
             "    public ShallowReference<int> Shallow = default!;\n" +
             "    public CustomReference<int> Custom = default!;\n" +
-            "    public IReference<int> Interface = default!;\n" +
+            "    public ReactiveValue<int> Base = default!;\n" +
             "    public Computed<string> Label { get; } = default!;\n" +
             "    public global::Assimalign.Viu.Reference<int> Qualified = default!;\n" +
             "    public const int Max = 10;\n" +
@@ -166,7 +166,7 @@ public sealed class SingleFileComponentScriptTests
         map["Count"].ShouldBe(BindingType.SetupReference);
         map["Shallow"].ShouldBe(BindingType.SetupReference);
         map["Custom"].ShouldBe(BindingType.SetupReference);
-        map["Interface"].ShouldBe(BindingType.SetupReference);
+        map["Base"].ShouldBe(BindingType.SetupReference);
         map["Label"].ShouldBe(BindingType.SetupReference);
         map["Qualified"].ShouldBe(BindingType.SetupReference);
         map["Max"].ShouldBe(BindingType.LiteralConstant);

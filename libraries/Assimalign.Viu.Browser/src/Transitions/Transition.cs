@@ -22,7 +22,7 @@ namespace Assimalign.Viu.Browser;
 /// <see cref="DomRenderHelpers._Transition"/>. Not thread-safe (single-threaded JS event-loop model).
 /// </para>
 /// </summary>
-public sealed class Transition : IComponentDefinition
+public sealed class Transition : IComponent
 {
     private const string TransitionType = "transition";
     private const string AnimationType = "animation";
@@ -42,7 +42,7 @@ public sealed class Transition : IComponentDefinition
     public bool InheritAttributes => false;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var instance = ComponentInstance.Current!;
         return () =>

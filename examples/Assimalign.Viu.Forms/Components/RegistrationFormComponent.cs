@@ -23,7 +23,7 @@ namespace Assimalign.Viu.Forms.Components;
 ///   <item><description>radio group and single/multiple <c>&lt;select&gt;</c></description></item>
 /// </list>
 /// </summary>
-public sealed class RegistrationFormComponent : IComponentDefinition
+public sealed class RegistrationFormComponent : IComponent
 {
     private static readonly FormPreviewComponent PreviewView = new();
 
@@ -39,7 +39,7 @@ public sealed class RegistrationFormComponent : IComponentDefinition
     public string? Name => "RegistrationForm";
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var form = new RegistrationForm();
 

@@ -8,7 +8,7 @@ namespace Assimalign.Viu.HackerNews;
 /// A small loading indicator, used both inline (while a store load is in flight) and as the
 /// <c>LoadingComponent</c> of the async route components (<see cref="AppRoutes"/>).
 /// </summary>
-internal sealed class LoadingView : IComponentDefinition
+internal sealed class LoadingView : IComponent
 {
     /// <summary>The shared loading definition instance.</summary>
     public static readonly LoadingView Instance = new();
@@ -21,7 +21,7 @@ internal sealed class LoadingView : IComponentDefinition
     public string? Name => "LoadingView";
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () => VirtualNodeFactory.Element(
             "div",
             VirtualNodeFactory.Properties(("class", "hn-loading"), ("role", "status")),

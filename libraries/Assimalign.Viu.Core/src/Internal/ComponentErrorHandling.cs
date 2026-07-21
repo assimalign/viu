@@ -8,7 +8,7 @@ namespace Assimalign.Viu;
 /// <c>handleError</c> in <c>packages/runtime-core/src/errorHandling.ts</c>. Each ancestor's
 /// captured hooks receive <c>(exception, instance, info)</c>; returning false stops
 /// propagation. An error no hook stopped is delivered to the app-level
-/// <see cref="ApplicationConfiguration.ErrorHandler"/> ([V01.01.03.12]); with no handler set it
+/// <see cref="IApplicationContext.ErrorHandler"/> ([V01.01.03.12]); with no handler set it
 /// rethrows to the host (crash loudly).
 /// </summary>
 internal static class ComponentErrorHandling
@@ -50,7 +50,7 @@ internal static class ComponentErrorHandling
         // Last resort: the app-level errorHandler (upstream: logError -> appContext.config
         // .errorHandler). When set it terminates propagation — an error thrown by the handler
         // itself is reported as a warning rather than re-routed, so it cannot loop.
-        var errorHandler = instance?.AppContext?.Config.ErrorHandler;
+        var errorHandler = instance?.AppContext?.ErrorHandler;
         if (errorHandler is not null)
         {
             try

@@ -101,17 +101,33 @@ public sealed class BrowserApplicationTests
     }
 
     [Fact]
-    public void Use_InstallsThePluginOnce_AgainstThisApplication()
+    public async Task Use_InstallsThePluginOnce_AgainstThisApplication()
     {
-        var app = CreateApp();
+        Scheduler.Reset();
+        var app = CreateApp(initialize: static _ => Task.CompletedTask, clearContainer: static _ => { });
         var plugin = new CountingPlugin();
+        try
+        {
+            app.Use(plugin).ShouldBeSameAs(app);
+            using (CaptureWarnings(out var messages))
+            {
+                app.Use(plugin).ShouldBeSameAs(app); // repeat Use of the same instance is deduplicated
+                messages.ShouldContain(message => message.Contains("already been applied"));
+            }
 
-        app.Use(plugin, options: "options").ShouldBeSameAs(app);
-        app.Use(plugin).ShouldBeSameAs(app); // repeat Use of the same instance is deduplicated
+            // Recorded, not yet installed: the plugin installs later, inside the mount path ([V01.01.03.27]).
+            plugin.InstallCount.ShouldBe(0);
 
-        plugin.InstallCount.ShouldBe(1);
-        plugin.SeenApplication.ShouldBeSameAs(app); // the plugin receives the app itself (the IApplication)
-        plugin.SeenOptions.ShouldBe("options");
+            await app.MountAsync(container: 5);
+
+            plugin.InstallCount.ShouldBe(1); // installed exactly once, inside MountAsync
+            plugin.SeenApplication.ShouldBeSameAs(app); // the plugin receives the app itself (the IApplication)
+        }
+        finally
+        {
+            app.Unmount();
+            Scheduler.Reset();
+        }
     }
 
     [Fact]
@@ -120,8 +136,8 @@ public sealed class BrowserApplicationTests
         var app = CreateApp();
 
         Action<string> warnHandler = static _ => { };
-        app.Config.WarnHandler = warnHandler;
-        app.Config.WarnHandler.ShouldBeSameAs(warnHandler);
+        app.Context.WarnHandler = warnHandler;
+        app.Context.WarnHandler.ShouldBeSameAs(warnHandler);
     }
 
     [Fact]
@@ -225,19 +241,17 @@ public sealed class BrowserApplicationTests
         public void Dispose() => RuntimeWarnings.Sink = previous;
     }
 
-    private sealed class CountingPlugin : IPlugin
+    private sealed class CountingPlugin : IApplicationPlugin
     {
         public int InstallCount { get; private set; }
 
         public IApplication? SeenApplication { get; private set; }
 
-        public object? SeenOptions { get; private set; }
-
-        public void Install(IApplication application, object? options)
+        public ValueTask InstallAsync(IApplication application)
         {
             InstallCount++;
             SeenApplication = application;
-            SeenOptions = options;
+            return ValueTask.CompletedTask;
         }
     }
 }

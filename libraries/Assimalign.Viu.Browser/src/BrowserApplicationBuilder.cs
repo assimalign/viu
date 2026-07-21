@@ -6,8 +6,8 @@ namespace Assimalign.Viu.Browser;
 
 /// <summary>
 /// The <see cref="IApplicationBuilder"/> for browser applications — created by
-/// <see cref="BrowserApplication.CreateBuilder(IComponentDefinition, VirtualNodeProperties?, bool)"/>
-/// or <see cref="BrowserApplication.CreateSsrBuilder(IComponentDefinition, VirtualNodeProperties?)"/>.
+/// <see cref="BrowserApplication.CreateBuilder(IComponent, VirtualNodeProperties?, bool)"/>
+/// or <see cref="BrowserApplication.CreateSsrBuilder(IComponent, VirtualNodeProperties?)"/>.
 /// Records plugins/provides/registrations on the base <see cref="ApplicationBuilder"/> and, on
 /// <see cref="Build"/>, constructs a <see cref="BrowserApplication"/> over the direct or
 /// command-buffered browser node-ops and replays the recorded configuration onto it in order.
@@ -20,7 +20,7 @@ public sealed class BrowserApplicationBuilder : ApplicationBuilder
     private readonly bool _hydrate;
 
     internal BrowserApplicationBuilder(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties,
         bool useCommandBuffer,
         bool hydrate)
@@ -38,9 +38,9 @@ public sealed class BrowserApplicationBuilder : ApplicationBuilder
     public override BrowserApplication Build()
     {
         var application = BrowserApplication.Create(RootComponent, RootProperties, _useCommandBuffer, _hydrate);
-        // Attach the built provider before ApplyConfiguration so a plugin install can resolve from
-        // app.Services ([V01.01.03.24]); the app owns and disposes it.
-        application.Context.Services = BuildServiceProvider();
+        // Attach the built provider before ApplyConfiguration so a plugin install can resolve from the
+        // app service provider ([V01.01.03.24]); the app owns and disposes it.
+        application.Context.ServicesProvider = BuildServiceProvider();
         ApplyConfiguration(application);
         return application;
     }

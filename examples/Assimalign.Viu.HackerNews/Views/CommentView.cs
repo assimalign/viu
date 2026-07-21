@@ -11,7 +11,7 @@ namespace Assimalign.Viu.HackerNews;
 /// vnode is keyed by its comment id so the tree reconciles by identity. Comment HTML is rendered as
 /// safe plain-text paragraphs (see <see cref="HtmlText"/>).
 /// </summary>
-internal sealed class CommentView : IComponentDefinition
+internal sealed class CommentView : IComponent
 {
     /// <summary>The shared comment definition instance (also the recursion target).</summary>
     public static readonly CommentView Instance = new();
@@ -30,7 +30,7 @@ internal sealed class CommentView : IComponentDefinition
     ];
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () =>
         {
             var node = properties.Get<CommentNode>("node");

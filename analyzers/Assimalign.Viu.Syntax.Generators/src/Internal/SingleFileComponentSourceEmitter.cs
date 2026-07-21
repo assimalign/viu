@@ -45,10 +45,10 @@ internal static class SingleFileComponentSourceEmitter
     private const string DomRenderHelperSurface = "global::Assimalign.Viu.Browser.DomRenderHelpers";
 
     /// <summary>
-    /// The fully qualified runtime-core namespace the generated <c>IComponentDefinition</c> bridge
+    /// The fully qualified runtime-core namespace the generated <c>IComponent</c> bridge
     /// ([V01.01.06.07]) names by <c>global::</c> reference — the generator never references the runtime
     /// assembly, exactly as the render-helper surfaces are bound by name. The bridge members
-    /// (<c>IComponentDefinition</c>, <c>ComponentProperties</c>, <c>ComponentSetupContext</c>,
+    /// (<c>IComponent</c>, <c>ComponentSetup</c>, <c>ComponentProperties</c>, <c>ComponentSetupContext</c>,
     /// <c>ComponentSlots</c>, <c>VirtualNode</c>, and <c>RenderHelpers.NormalizeRoot</c>) all live here.
     /// </summary>
     private const string CoreNamespace = "global::Assimalign.Viu";
@@ -113,11 +113,11 @@ internal static class SingleFileComponentSourceEmitter
         if (model.RenderBody is not null)
         {
             // [V01.01.06.07] A @template-bearing .viu is a mountable component: the generated partial
-            // implements IComponentDefinition (base list added here, the sole class-declaration site) so it
-            // can be passed to CreateApp/VirtualNodeFactory.Component. A @style-only or scriptless .viu with
+            // implements IComponent (base list added here, the sole class-declaration site) so it
+            // can be passed to the app builder/VirtualNodeFactory.Component. A @style-only or scriptless .viu with
             // no render body stays a plain partial class — no interface, no Setup — so the CSS-bundle .viu
             // files keep compiling unchanged. Named by global:: reference, never an assembly reference.
-            builder.Append(" : ").Append(CoreNamespace).Append(".IComponentDefinition");
+            builder.Append(" : ").Append(CoreNamespace).Append(".IComponent");
         }
 
         builder.Append('\n');
@@ -184,8 +184,8 @@ internal static class SingleFileComponentSourceEmitter
         return builder.ToString();
     }
 
-    // [V01.01.06.07] The IComponentDefinition bridge — the generated Name + Setup that turn a compiled
-    // @template/@script partial into a component the runtime can instantiate and mount (CreateApp,
+    // [V01.01.06.07] The IComponent bridge — the generated Name + Setup that turn a compiled
+    // @template/@script partial into a component the runtime can instantiate and mount (the app builder,
     // VirtualNodeFactory.Component) with no hand-written wiring. Emitted only alongside a render body (the
     // base list is added to match, in Emit); a render-less .viu never reaches here. The members are
     // EXPLICIT interface implementations, so they never collide with a merged @script member named Name or
@@ -211,9 +211,9 @@ internal static class SingleFileComponentSourceEmitter
 
         builder.Append('\n');
         AppendIndent(builder, indent);
-        builder.Append("// [V01.01.06.07] The IComponentDefinition bridge: the generated Name + Setup that make this\n");
+        builder.Append("// [V01.01.06.07] The IComponent bridge: the generated Name + Setup that make this\n");
         AppendIndent(builder, indent);
-        builder.Append("// compiled @template component mountable through CreateApp / VirtualNodeFactory.Component with no\n");
+        builder.Append("// compiled @template component mountable through the app builder / VirtualNodeFactory.Component with no\n");
         AppendIndent(builder, indent);
         builder.Append("// hand-written wiring. Explicitly implemented so they never collide with a merged @script member.\n");
 
@@ -226,7 +226,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// </summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("string? ").Append(CoreNamespace).Append(".IComponentDefinition.Name => ")
+        builder.Append("string? ").Append(CoreNamespace).Append(".IComponent.Name => ")
             .Append(Literal(displayName)).Append(";\n");
 
         if (usesSlots)
@@ -277,8 +277,8 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// <returns>The render function producing the component's subtree.</returns>\n");
         AppendIndent(builder, indent);
-        builder.Append("global::System.Func<").Append(CoreNamespace).Append(".VirtualNode?> ")
-            .Append(CoreNamespace).Append(".IComponentDefinition.Setup(\n");
+        builder.Append(CoreNamespace).Append(".ComponentSetup ")
+            .Append(CoreNamespace).Append(".IComponent.Setup(\n");
         AppendIndent(builder, indent + 1);
         builder.Append(CoreNamespace).Append(".ComponentProperties properties,\n");
         AppendIndent(builder, indent + 1);
