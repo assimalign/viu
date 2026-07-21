@@ -137,7 +137,7 @@ internal sealed class AsyncComponentWrapper : IComponent
         };
     }
 
-    private async Task TrackLoadAsync(IReference<bool> loaded, IReference<Exception?> error, ComponentInstance instance)
+    private async Task TrackLoadAsync(ReactiveValue<bool> loaded, ReactiveValue<Exception?> error, ComponentInstance instance)
     {
         try
         {

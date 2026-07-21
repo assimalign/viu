@@ -518,7 +518,7 @@ public static class RenderHelpers
     /// <c>Assimalign.Viu</c> (upstream: <c>unref</c>). Reading a ref's value tracks it.
     /// </summary>
     /// <param name="value">The value that may be a ref.</param>
-    public static object? _unref(object? value) => value is IReference reference ? reference.Value : value;
+    public static object? _unref(object? value) => value is ReactiveValue reference ? reference.BoxedValue : value;
 
     /// <summary>Whether a value is a ref (upstream: <c>isRef</c>).</summary>
     /// <param name="value">The value to test.</param>

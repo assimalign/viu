@@ -29,7 +29,7 @@ public static class ViuWatch
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
     /// <returns>The handle that stops, pauses, or resumes the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch<T>(IReference<T> source, WatchCallback<T> callback, WatchOptions? options = null)
+    public static WatchHandle Watch<T>(ReactiveValue<T> source, WatchCallback<T> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(callback);
@@ -77,7 +77,7 @@ public static class ViuWatch
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
     /// <returns>The handle that stops, pauses, or resumes the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sources"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch(IReference[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
+    public static WatchHandle Watch(ReactiveValue[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(callback);

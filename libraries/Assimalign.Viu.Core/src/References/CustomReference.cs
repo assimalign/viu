@@ -10,9 +10,8 @@ namespace Assimalign.Viu;
 /// model).
 /// </summary>
 /// <typeparam name="T">The type of the contained value.</typeparam>
-public sealed class CustomReference<T> : IReference<T>, IDependencyReference
+public sealed class CustomReference<T> : ReactiveValue<T>
 {
-    private readonly Dependency _dependency = new();
     private readonly Func<T> _get;
     private readonly Action<T> _set;
 
@@ -28,14 +27,9 @@ public sealed class CustomReference<T> : IReference<T>, IDependencyReference
     }
 
     /// <summary>Gets or sets the value through the factory-provided getter/setter.</summary>
-    public T Value
+    public override T Value
     {
         get => _get();
         set => _set(value);
     }
-
-    /// <inheritdoc />
-    object? IReference.Value => Value;
-
-    Dependency IDependencyReference.Dependency => _dependency;
 }
