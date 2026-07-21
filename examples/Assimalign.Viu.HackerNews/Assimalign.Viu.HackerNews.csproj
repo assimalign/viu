@@ -16,8 +16,8 @@
   </ItemGroup>
 
   <!-- The full Wave-4 surface this capstone exercises: the DOM runtime, the router + its browser click
-       bridge (RouterLinkDomBridge, installed at bootstrap), and the Pinia-style store. RuntimeCore,
-       Reactivity, and Shared flow transitively. Libraries never reference examples (one-way edge). -->
+       bridge (RouterLinkDomBridge, installed at bootstrap), and the Pinia-style store. Core and
+       Shared flow transitively. Libraries never reference examples (one-way edge). -->
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />

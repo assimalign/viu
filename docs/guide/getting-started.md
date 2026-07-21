@@ -48,7 +48,7 @@ A Viu app project uses the Viu MSBuild SDK instead of a plain `Microsoft.NET.Sdk
 ```
 
 That one line chains `Microsoft.NET.Sdk.WebAssembly`, references the `Assimalign.Viu.App` shared
-framework (the reactivity, runtime-core, and runtime-dom libraries), and turns on `.viu` single-file
+framework (the core and runtime-dom libraries), and turns on `.viu` single-file
 component compilation and CSS bundling — with no per-project wiring. The full consumer surface,
 including every opt-out property, is documented in [`sdks/README.md`](../../sdks/README.md); the
 packaging model is [founding decision 8](../PLAN.md#founding-design-decisions-cwasm-divergences).
@@ -191,8 +191,7 @@ await Task.Delay(Timeout.Infinite);
 ```csharp
 using System;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace HelloViu;
 
@@ -235,7 +234,7 @@ DOM mutation crosses the JS-interop boundary**, so idiomatic Viu leans on the co
 and the renderer's batched updates rather than imperative DOM access
 ([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNodeFactory`, `IComponentDefinition`,
 `ComponentProperties`, and `ComponentSetupContext` all live in
-[`Assimalign.Viu.RuntimeCore`](../../libraries/Assimalign.Viu.RuntimeCore/docs/OVERVIEW.md); the
+[`Assimalign.Viu.Core`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md); the
 browser entry point `BrowserRuntime` lives in
 [`Assimalign.Viu.RuntimeDom`](../../libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md). For a larger
 component — props, emitted events, and lifecycle hooks (`Lifecycle.OnMounted`/`OnUnmounted`) — read the
@@ -267,11 +266,11 @@ The C# deltas a Vue developer must internalize:
 
 `[Reactive]` is the counterpart of `reactive()` — Vue's `Proxy` becomes a build-time source generator
 (see [ADR-0002](../adr/0002-ref-first-reactivity.md) and the
-[Reactivity overview](../../libraries/Assimalign.Viu.Reactivity/docs/OVERVIEW.md)). The class must be
+[reactivity section of the Core overview](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md)). The class must be
 `partial`, and every reactive property is declared `partial`:
 
 ```csharp
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 
 namespace HelloViu;
 
@@ -350,7 +349,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 >     <button class="counter" @click="Increment">{{ Count }}</button>
 > }
 > @script {
->     using Assimalign.Viu.Reactivity;
+>     using Assimalign.Viu;
 >     public readonly Reference<int> Count = Reactive.Reference(0);
 >     public void Increment() => Count.Value++;
 > }
@@ -389,7 +388,7 @@ dotnet publish -c Release
 The published `bin/Release/net10.0/publish/wwwroot` contains:
 
 - your compiled component and the Viu framework assemblies, fingerprinted and trimmed, under
-  `_framework/` (e.g. `HelloViu.<hash>.wasm`, `Assimalign.Viu.RuntimeCore.<hash>.wasm`, …);
+  `_framework/` (e.g. `HelloViu.<hash>.wasm`, `Assimalign.Viu.Core.<hash>.wasm`, …);
 - the CSS bundle `HelloViu.viu.css` — registered as a content-fingerprinted static web asset, though
   a standalone publish ships the stable plain-named file that any static host can serve — with its
   `.gz` and `.br` variants;
@@ -405,8 +404,7 @@ That folder is a static site — host it on any static web host.
   and packaging project.
 - **Per-library overviews** — each library documents itself in `docs/OVERVIEW.md` (what it is) and
   `docs/DESIGN.md` (why it is shaped that way). Start with
-  [Reactivity](../../libraries/Assimalign.Viu.Reactivity/docs/OVERVIEW.md),
-  [RuntimeCore](../../libraries/Assimalign.Viu.RuntimeCore/docs/OVERVIEW.md), and
+  [Core](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) and
   [RuntimeDom](../../libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md).
 - **The sample app** — [`examples/Assimalign.Viu.WebApp`](../../examples/Assimalign.Viu.WebApp) is a
   component tree with props, emits, and lifecycle hooks, and it dogfoods the `.viu` CSS pipeline.

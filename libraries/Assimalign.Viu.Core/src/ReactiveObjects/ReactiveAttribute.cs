@@ -5,7 +5,7 @@ namespace Assimalign.Viu;
 /// <summary>
 /// Marks a <see langword="partial"/> class as deeply reactive — the compiled C# counterpart of Vue
 /// 3.5's <c>reactive()</c> (https://vuejs.org/api/reactivity-core.html#reactive). The
-/// <c>Assimalign.Viu.Reactivity.Generators</c> source generator fills in every <c>partial</c>
+/// <c>Assimalign.Viu.Core.Generators</c> source generator fills in every <c>partial</c>
 /// property with a per-property <see cref="Dependency"/>: the getter tracks, the setter triggers
 /// only on an <see cref="System.Collections.Generic.EqualityComparer{T}"/> change. The generated
 /// type implements <see cref="IReactiveObject"/>, so nested <c>[Reactive]</c> objects, refs, and

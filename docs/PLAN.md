@@ -40,8 +40,8 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | Area (WBS) | Viu library | Vue 3 counterpart |
 | --- | --- | --- |
 | Shared (`V01.01.01`) | `Assimalign.Viu.Shared` | `@vue/shared` — PatchFlags/ShapeFlags/SlotFlags, normalization, DOM tables |
-| Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
-| RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
+| Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` → merged into `Assimalign.Viu.Core` ([V01.01.12.21]) | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
+| RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` → renamed `Assimalign.Viu.Core`, root namespace `Assimalign.Viu` ([V01.01.12.21]) | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
 | Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
 | SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
@@ -158,6 +158,9 @@ Work is tracked exactly like the sibling Cohesion repo:
 
 ### [V01.01.02] Framework - Reactivity (W01, P001)
 
+> Merged into `Assimalign.Viu.Core` by the .NET reshape (R2, [V01.01.12.21], `docs/NET-RESHAPE-PLAN.md`).
+> The epic and its feature history stay; the shipping code now lives in the consolidated core library.
+
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
 | `V01.01.02.01` | Implement the dependency tracking engine | W01 | P001 |
@@ -171,6 +174,9 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.02.09` | Implement reactivity escape hatches and introspection | W02 | P003 |
 
 ### [V01.01.03] Framework - RuntimeCore (W01, P001)
+
+> Renamed to `Assimalign.Viu.Core` (root namespace `Assimalign.Viu`), with the Reactivity area merged in,
+> by the .NET reshape (R2, [V01.01.12.21], `docs/NET-RESHAPE-PLAN.md`). The epic and its feature history stay.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |

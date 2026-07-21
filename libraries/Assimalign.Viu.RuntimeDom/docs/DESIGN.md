@@ -110,7 +110,7 @@ The boundary is the budget, so the batched mode collapses a whole scheduler flus
 **one** interop call. There is no upstream Vue counterpart — the prior art is Blazor's `RenderBatch`
 — but it is behaviorally invisible: buffered and direct modes produce byte-identical DOM. It is a
 construction-time choice (`BrowserRuntime.CreateApp(root, props, useCommandBuffer: true)`); the
-renderer and RuntimeCore see the identical `RendererOptions<int>` either way. Default is direct;
+renderer and Core see the identical `RendererOptions<int>` either way. Default is direct;
 buffered is opt-in for this delivery.
 
 - **Encoder** (`DomCommandBuffer`): every write op — create/insert/remove/text and each `patchProp`
@@ -131,7 +131,7 @@ buffered is opt-in for this delivery.
   handle it releases while draining the batch and returns them from the single apply call, feeding the
   same `PurgeReleasedHandles` path (this settles ADR-0001's "revisit the released-handle shape with
   the command buffer" consequence).
-- **Flush boundary** (`Scheduler.FlushBoundaryCallback`, the one minimal RuntimeCore seam): the batch
+- **Flush boundary** (`Scheduler.FlushBoundaryCallback`, the one minimal Core seam): the batch
   applies after the render queue drains and *before* post-flush callbacks (so mounted/updated hooks
   read the committed DOM), and again *after* them (so post-flush DOM writes — a `v-show` `updated`
   hook — commit within the same flush). The callback is idempotent, so a render-only flush still
@@ -224,7 +224,7 @@ around a `v-if` runs it on mount/remove. Upstream calls this *persisted* mode (`
 changes **who** calls the transition hooks, not the hook contract: the renderer's mount/insert and
 remove paths skip a persisted transition (`needTransition` = `transition && !transition.persisted`),
 and the `v-show` directive drives `beforeEnter`/`enter`/`leave` itself from its `beforeMount`/
-`mounted`/`updated` hooks. `BaseTransition`'s state machine (`Assimalign.Viu.RuntimeCore`) is
+`mounted`/`updated` hooks. `BaseTransition`'s state machine (`Assimalign.Viu.Core`) is
 untouched — the enter/leave cancellation that converges an interrupted toggle already lives on the
 shared `TransitionState`, keyed by the once-boxed `node.El` identity that survives every re-render
 (`next.El = current.El`), so the directive just has to call the same hooks with that element.
@@ -302,7 +302,7 @@ The fix is to participate in the same standard mechanism rather than hand-copy a
 
 ## Hydration reads: one batched snapshot per root ([V01.01.07.03])
 
-Client hydration (the walker lives in `Assimalign.Viu.RuntimeCore`) reads the existing server DOM to
+Client hydration (the walker lives in `Assimalign.Viu.Core`) reads the existing server DOM to
 decide what to adopt: node kind, tag, text/comment data, first-child/next-sibling structure, and a few
 attributes. Answering each of those with a `JSImport` call per node would make hydration the chattiest
 path in the framework — the opposite of "the boundary is the budget". So the browser answers them the

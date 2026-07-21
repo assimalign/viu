@@ -1,4 +1,4 @@
-# Assimalign.Viu.RuntimeCore — design
+# Assimalign.Viu.Core — design
 
 Why the platform-agnostic runtime is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md).
 Upstream counterpart: [`@vue/runtime-core`](https://github.com/vuejs/core/tree/main/packages/runtime-core).
@@ -30,8 +30,8 @@ build-time compilation is [ADR-0005](../../../docs/adr/0005-no-runtime-template-
 
 ## Scheduler and reactive re-render
 
-A component's render is a `RenderEffect<TNode>` — a `ReactiveEffect` (from
-`Assimalign.Viu.Reactivity`) whose scheduler enqueues the component's update job on the `Scheduler`.
+A component's render is a `RenderEffect<TNode>` — a `ReactiveEffect`
+whose scheduler enqueues the component's update job on the `Scheduler`.
 The `Scheduler` batches jobs into flush phases with `NextTick`; the internal `RuntimeWatchScheduler`
 bridges Reactivity's `IWatchScheduler` seam to the same queue so `ViuWatch` flushes with rendering.
 This is how the stopwatch re-renders reactively instead of polling.
@@ -273,7 +273,7 @@ adoption seam is in place, but the concrete triggers are not.
 
 ---
 
-# Reactive core (merged from Assimalign.Viu.Reactivity)
+# Reactive core (merged reactivity area)
 
 The reactivity engine, merged into this library ([V01.01.12.21]). What it is: see [OVERVIEW.md](OVERVIEW.md).
 

@@ -5,7 +5,7 @@ using System.Diagnostics;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The static entry-point facade for the Viu reactivity system, mirroring the public API of
+/// The static entry-point facade for Viu's reactivity system, mirroring the public API of
 /// <c>@vue/reactivity</c>: refs, computeds, effects, effect scopes, tracking control, and
 /// batching. All ambient state is static and NOT thread-safe by design — the runtime targets the
 /// single-threaded JS event-loop model (browser WASM).

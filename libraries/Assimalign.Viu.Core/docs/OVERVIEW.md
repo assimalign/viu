@@ -1,4 +1,4 @@
-# Assimalign.Viu.RuntimeCore — overview
+# Assimalign.Viu.Core — overview
 
 The platform-agnostic runtime — the C# port of
 [`@vue/runtime-core`](https://github.com/vuejs/core/tree/main/packages/runtime-core): the virtual
@@ -37,14 +37,14 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.RuntimeD
 - **Directives** (`Directives/`) — `IDirective`, `Directive`, `Directives`, `DirectiveBinding`,
   `DirectiveArgument`, plus the `DirectiveHook` delegate.
 - **Watch** (`Watch/`) — `ViuWatch`, the runtime-scheduler-integrated `watch`/`watchEffect` over the
-  `Assimalign.Viu.Reactivity` primitives.
+  reactivity primitives.
 - **`RenderHelpers`** — the static helper surface (`_openBlock`, `_createElementBlock`,
   `_toDisplayString`, `_renderList`, …) that compiler-generated render methods bind to **by name**.
 
 ## Boundaries
 
-- References **`Assimalign.Viu.Shared`** (the flag vocabulary) and **`Assimalign.Viu.Reactivity`**
-  only; it never references a platform/DOM package. Ships as a net10.0 runtime library with
+- References **`Assimalign.Viu.Shared`** (the flag vocabulary)
+  only; it never references a platform/DOM package (the reactivity engine is part of this assembly). Ships as a net10.0 runtime library with
   `IsAotCompatible=true`.
 - **Composition-only** component model — no Options API, no mixins, no `app.config.globalProperties`
   (see [ADR-0004](../../../docs/adr/0004-composition-only-component-model.md)).
@@ -54,7 +54,7 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.RuntimeD
 
 ## Reactivity — the merged reactive core (area V01.01.02)
 
-Merged into this library from the former `Assimalign.Viu.Reactivity` package ([V01.01.12.21]).
+Merged into this library from the former reactivity package ([V01.01.12.21]).
 
 The reactive core of Viu — the C# port of
 [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity): dependencies,

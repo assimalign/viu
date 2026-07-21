@@ -221,7 +221,7 @@ removeAuthGuard();   // registration handles unregister the guard
 - **Matcher and history stay framework-free; the components reference the runtime.** The matcher and
   memory history run in a plain .NET test host, using no other Viu library. `[V01.01.08.03]` adds the
   `RouterView`/`RouterLink` components, which consume the component model and reactivity, so the
-  assembly now references `Assimalign.Viu.RuntimeCore` and `Assimalign.Viu.Reactivity` (issue #72's
+  assembly now references `Assimalign.Viu.Core` (issue #72's
   boundary). It still references **no browser DOM adapter** (`Assimalign.Viu.RuntimeDom`): the
   components produce platform-agnostic `VirtualNode`s that render through the injected node-ops
   abstraction — the in-memory test renderer and the SSR renderer alike — never the DOM directly (a

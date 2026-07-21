@@ -27,7 +27,7 @@ paths:
 ## DOM-free by default
 
 - Unit tests must not require a browser. Exercise the runtime through an in-memory adapter/renderer (the
-  RuntimeCore `FakeDomAdapter` today; the shipping `Assimalign.Viu.Testing` renderer once
+  Core `FakeDomAdapter` today; the shipping `Assimalign.Viu.Testing` renderer once
   [V01.01.11.01] lands). Real-browser coverage is the separate e2e harness ([V01.01.11.03]).
 - Use `InternalsVisibleTo` (in `src/Properties/AssemblyInfo.cs`) for tests that probe internal engine
   state.

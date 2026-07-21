@@ -28,7 +28,7 @@ toolchain, no JS interop. Area: `V01.01.11`.
 
 ## Boundaries
 
-- References **`Assimalign.Viu.RuntimeCore`** (and transitively Shared/Reactivity) only. Ships as a
+- References **`Assimalign.Viu.Core`** (and transitively Shared) only. Ships as a
   net10.0 library with `IsAotCompatible=true`.
 - It is a **platform package** in the same sense as `Assimalign.Viu.RuntimeDom` — it supplies a
   `RendererOptions<TNode>` (here `TNode = TestNode`) to the shared renderer — but its platform is an

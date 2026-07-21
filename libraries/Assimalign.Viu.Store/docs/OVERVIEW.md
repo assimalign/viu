@@ -62,7 +62,7 @@ Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): `StorePlug
 ## Using it
 
 ```csharp
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 using Assimalign.Viu.Store;
 
 // A setup-style store: state is a Ref, the getter is a Computed, the action is a method.
@@ -125,10 +125,10 @@ store.Reset();                                                      // back to t
 
 ## Boundaries
 
-- References **only** `Assimalign.Viu.Reactivity` (for `EffectScope`/`Reference`/`Computed`, the
-  `[Reactive]` state contract, `Watch`, and batching) and `Assimalign.Viu.RuntimeCore` (for `App`,
-  `IPlugin`, provide/inject, the current component instance, and `ViuWatch`/the scheduler that batches
-  subscription notifications). It references **no DOM/JavaScript-interop assembly** — stores are
+- References **only** `Assimalign.Viu.Core` (for `EffectScope`/`Reference`/`Computed`, the
+  `[Reactive]` state contract, `Watch`, and batching, plus `App`, `IPlugin`, provide/inject, the
+  current component instance, and `ViuWatch`/the scheduler that batches subscription notifications).
+  It references **no DOM/JavaScript-interop assembly** — stores are
   platform-agnostic and run in a plain .NET test host.
 - Trimming- and NativeAOT-safe: store construction goes through the typed setup delegate captured at
   `DefineStore` time — never `Activator.CreateInstance` or attribute scanning — so there is no
