@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Viu performance benchmark suite ([V01.01.11.04], #88). A non-shipping, never-packed console
+    app hosting two things on CoreCLR (never a browser, never trimmed/AOT'd — like a test project):
+
+      1. BenchmarkDotNet micro/meso benchmarks of the pure-.NET hot paths the architecture bets on —
+         reactivity track/trigger and renderer diff/patch over the in-memory test adapter. Wall-clock
+         numbers are environment-relative, so they are published as artifacts, never a CI gate.
+      2. A deterministic interop-count harness: it drives the js-framework-benchmark scenarios through
+         the same in-memory adapter and counts node operations. Op count is the DOM-free proxy for
+         JSImport crossings (Assimalign.Viu.Testing's op log == "N node ops == N interop calls"), so it
+         is exact and machine-independent — the metric the regression gate compares to a reviewed
+         baseline (benchmarks/baselines/InteropCounts.json).
+
+    Real-browser wall-clock, live interop-crossing counts, and per-assembly payload size need the
+    Playwright end-to-end harness ([V01.01.11.03], #87) and are deferred honestly (see
+    Browser/DeferredBrowserBenchmarks.cs and .github/workflows/benchmarks.yml), never faked.
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- Benchmark methods and the harness types are public by contract (BenchmarkDotNet requires public
+         benchmark classes/methods); this app has no public-API surface to document for consumers. -->
+    <RootNamespace>Assimalign.Viu.Testing.Benchmarks</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The in-memory adapter (its op log is the interop proxy) plus the two runtime areas the
+         micro/meso benchmarks measure directly; Shared/RuntimeCore flow transitively through Testing. -->
+    <ViuProjectReference Include="Assimalign.Viu.Testing" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+    <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The reviewed interop-count baseline travels with the app so the gate can find it beside the
+         binary in CI, and a local interop run compares against the checked-in numbers. -->
+    <Content Include="..\baselines\InteropCounts.json" Link="baselines\InteropCounts.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
