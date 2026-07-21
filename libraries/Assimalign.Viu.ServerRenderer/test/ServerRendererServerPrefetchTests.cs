@@ -79,7 +79,7 @@ public class ServerRendererServerPrefetchTests
             return () => VirtualNodeFactory.Element("div", "recovered");
         });
         var application = new ServerApplication(component);
-        application.Config.ErrorHandler = (exception, _, _) => captured = exception;
+        application.Context.ErrorHandler = (exception, _, _) => captured = exception;
 
         var html = await ServerRenderer.RenderToStringAsync(application);
 

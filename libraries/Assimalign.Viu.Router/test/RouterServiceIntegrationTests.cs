@@ -16,18 +16,14 @@ namespace Assimalign.Viu.Router.Tests;
 // service-first-then-provide. The existing provide-only path (RouterViewTests) is unchanged.
 public class RouterServiceIntegrationTests
 {
-    // A recording IApplicationBuilder that captures Provide and exposes a real service builder.
+    // A recording IApplicationBuilder that captures Provide and exposes a real service container.
     private sealed class RecordingApplicationBuilder : IApplicationBuilder
     {
-        public IServiceProviderBuilder Services { get; } = new ServiceProviderBuilder();
+        public IServiceContainer Services { get; } = new ServiceContainer();
 
         public Dictionary<object, object?> Provided { get; } = [];
 
-        public IComponent RootComponent => throw new NotSupportedException();
-
-        public VirtualNodeProperties? RootProperties => null;
-
-        public IApplicationBuilder Use(IPlugin plugin, object? options = null) => this;
+        public IApplicationBuilder Use(IApplicationPlugin plugin) => this;
 
         public IApplicationBuilder Provide<T>(InjectionKey<T> key, T value)
         {
@@ -45,11 +41,11 @@ public class RouterServiceIntegrationTests
 
         public IApplicationBuilder Directive(string name, IDirective directive) => this;
 
-        public IApplicationBuilder ConfigureApplication(Action<ApplicationConfiguration> configure) => this;
+        public IApplicationBuilder ConfigureApplication(Action<IApplicationContext> configure) => this;
 
-        public IApplicationBuilder UseServiceProviderBuilder(IServiceProviderBuilder services) => this;
+        public IApplicationBuilder UseServiceContainer(IServiceContainer services) => this;
 
-        public IApplicationBuilder ConfigureServices(Action<IServiceProviderBuilder> configure)
+        public IApplicationBuilder ConfigureServices(Action<IServiceContainer> configure)
         {
             configure(Services);
             return this;
@@ -60,7 +56,7 @@ public class RouterServiceIntegrationTests
 
     private static ComponentWrapper MountViewWithServices(Router router)
     {
-        var services = new ServiceProviderBuilder().AddSingleton(router).Build();
+        var services = new ServiceContainer().AddSingleton(router).Build();
         return ViuTest.Mount(new RouterView(), new ComponentMountOptions { Services = services });
     }
 
@@ -100,7 +96,7 @@ public class RouterServiceIntegrationTests
         _ = serviceRouter.Push("/a");
         _ = provideRouter.Push("/a");
 
-        var services = new ServiceProviderBuilder().AddSingleton(serviceRouter).Build();
+        var services = new ServiceContainer().AddSingleton(serviceRouter).Build();
         var options = new ComponentMountOptions { Services = services };
         options.Provide(RouterInjectionKeys.Router, provideRouter);
 

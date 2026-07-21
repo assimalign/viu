@@ -285,7 +285,7 @@ public sealed class AsyncComponentTests : IDisposable
         var request = new TaskCompletionSource<IComponent>();
         var async = AsyncComponents.DefineAsyncComponent(() => request.Task);
         var application = _renderer.Renderer.CreateApplication(async);
-        application.Config.ErrorHandler = (exception, _, _) => handled = exception;
+        application.Context.ErrorHandler = (exception, _, _) => handled = exception;
         application.Mount(_container);
 
         // A load failure with no error component routes through the app error handler (upstream:

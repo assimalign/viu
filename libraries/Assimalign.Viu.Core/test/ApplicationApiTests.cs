@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
@@ -137,14 +138,16 @@ public class ApplicationApiTests : IDisposable
         var application = _renderer.Renderer.CreateApplication(
             new TestComponent { SetupFunction = (_, _) => () => VirtualNodeFactory.Component(leaf) });
 
-        application.Use(plugin).Use(plugin); // second Use is a no-op
+        application.Use(plugin).Use(plugin); // second Use dedupes with a warning
 
-        plugin.InstallCount.ShouldBe(1);
+        // Dedup happens at Use time; the plugin installs later, in the mount path ([V01.01.03.27]).
         warnings.Messages.ShouldContain(message => message.Contains("already been applied"));
+        plugin.InstallCount.ShouldBe(0);
 
         application.Mount(_container);
 
-        // The plugin registered a component and an app-level provide through the app.
+        // The plugin installed exactly once during mount, registering a component and an app-level provide.
+        plugin.InstallCount.ShouldBe(1);
         application.Component("plugin-widget").ShouldNotBeNull();
         injected.ShouldBe("from-plugin");
     }
@@ -162,7 +165,7 @@ public class ApplicationApiTests : IDisposable
             SetupFunction = static (_, _) => static () => throw new InvalidOperationException("render boom"),
         };
         var application = _renderer.Renderer.CreateApplication(failing);
-        application.Config.ErrorHandler = (exception, instance, info) =>
+        application.Context.ErrorHandler = (exception, instance, info) =>
         {
             seen = exception;
             seenInstance = instance;
@@ -199,7 +202,7 @@ public class ApplicationApiTests : IDisposable
 
         var root = Leaf(onSetup: (_, _) => DependencyInjection.Inject(key)); // warns: injection not found
         var application = _renderer.Renderer.CreateApplication(root);
-        application.Config.WarnHandler = captured.Add;
+        application.Context.WarnHandler = captured.Add;
 
         application.Mount(_container);
 
@@ -222,11 +225,11 @@ public class ApplicationApiTests : IDisposable
     }
 
     // A plugin that registers a component and an app-level provide, counting its installs.
-    private sealed class RecordingPlugin(InjectionKey<string> key) : IPlugin
+    private sealed class RecordingPlugin(InjectionKey<string> key) : IApplicationPlugin
     {
         public int InstallCount { get; private set; }
 
-        public void Install(IApplication application, object? options)
+        public ValueTask InstallAsync(IApplication application)
         {
             InstallCount++;
             application.Component("plugin-widget", new TestComponent
@@ -234,6 +237,7 @@ public class ApplicationApiTests : IDisposable
                 SetupFunction = static (_, _) => static () => VirtualNodeFactory.Text("plugin-widget"),
             });
             application.Provide(key, "from-plugin");
+            return ValueTask.CompletedTask;
         }
     }
 }

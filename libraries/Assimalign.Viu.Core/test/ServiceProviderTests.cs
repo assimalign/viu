@@ -48,7 +48,7 @@ public class ServiceProviderTests
     [Fact]
     public void Singleton_ResolvesTheSameInstance_WithinAProvider()
     {
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton(_ => new Service { Id = 1 })
             .Build();
 
@@ -62,7 +62,7 @@ public class ServiceProviderTests
     public void Singleton_Instance_IsReturnedVerbatim()
     {
         var instance = new Service { Id = 7 };
-        var provider = new ServiceProviderBuilder().AddSingleton(instance).Build();
+        var provider = new ServiceContainer().AddSingleton(instance).Build();
 
         provider.GetRequiredService<Service>().ShouldBeSameAs(instance);
     }
@@ -71,7 +71,7 @@ public class ServiceProviderTests
     public void Transient_ResolvesAFreshInstance_EveryTime()
     {
         var created = 0;
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddTransient(_ => new Service { Id = ++created })
             .Build();
 
@@ -87,7 +87,7 @@ public class ServiceProviderTests
     {
         // The application is the root scope, so scoped == one-per-app; two providers (two apps) never
         // share the instance — the per-app isolation the reshape promises.
-        var builder = new ServiceProviderBuilder().AddScoped(_ => new Service());
+        var builder = new ServiceContainer().AddScoped(_ => new Service());
 
         var providerA = builder.Build();
         var providerB = builder.Build();
@@ -99,7 +99,7 @@ public class ServiceProviderTests
     [Fact]
     public void Singleton_IsIsolatedAcrossProviders()
     {
-        var builder = new ServiceProviderBuilder().AddSingleton(_ => new Service());
+        var builder = new ServiceContainer().AddSingleton(_ => new Service());
 
         var providerA = builder.Build();
         var providerB = builder.Build();
@@ -110,7 +110,7 @@ public class ServiceProviderTests
     [Fact]
     public void Factory_ResolvesDependenciesThroughTheProvider()
     {
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton(_ => new Service { Id = 42 })
             .AddSingleton(sp => new Dependent(sp.GetRequiredService<Service>()))
             .Build();
@@ -121,7 +121,7 @@ public class ServiceProviderTests
     [Fact]
     public void Provider_ResolvesItself()
     {
-        var provider = new ServiceProviderBuilder().Build();
+        var provider = new ServiceContainer().Build();
 
         provider.GetService(typeof(IServiceProvider)).ShouldBeSameAs(provider);
     }
@@ -129,7 +129,7 @@ public class ServiceProviderTests
     [Fact]
     public void GetService_ForUnregisteredType_ReturnsNull()
     {
-        var provider = new ServiceProviderBuilder().Build();
+        var provider = new ServiceContainer().Build();
 
         provider.GetService<Service>().ShouldBeNull();
         provider.GetService(typeof(Service)).ShouldBeNull();
@@ -138,7 +138,7 @@ public class ServiceProviderTests
     [Fact]
     public void GetRequiredService_ForUnregisteredType_Throws()
     {
-        var provider = new ServiceProviderBuilder().Build();
+        var provider = new ServiceContainer().Build();
 
         Should.Throw<InvalidOperationException>(() => provider.GetRequiredService<Service>());
     }
@@ -146,7 +146,7 @@ public class ServiceProviderTests
     [Fact]
     public void LastRegistration_WinsForAServiceType()
     {
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton(_ => new Service { Id = 1 })
             .AddSingleton(_ => new Service { Id = 2 })
             .Build();
@@ -157,7 +157,7 @@ public class ServiceProviderTests
     [Fact]
     public void Factory_ReturningNull_Throws()
     {
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .Add(new ServiceRegistration(typeof(Service), ServiceLifetime.Singleton, _ => null!))
             .Build();
 
@@ -168,7 +168,7 @@ public class ServiceProviderTests
     public void Dispose_DisposesOwnedSingletonAndScopedInstances()
     {
         var log = new List<string>();
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton(_ => new TrackingDisposable(log, "singleton"))
             .AddScoped(_ => new SecondDisposable(log, "scoped"))
             .Build();
@@ -185,7 +185,7 @@ public class ServiceProviderTests
     public void Dispose_DisposesInReverseCreationOrder()
     {
         var log = new List<string>();
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton(_ => new TrackingDisposable(log, "first"))
             .AddSingleton(_ => new SecondDisposable(log, "second"))
             .Build();
@@ -223,7 +223,7 @@ public class ServiceProviderTests
     public void Dispose_DoesNotDisposeTransients()
     {
         var log = new List<string>();
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddTransient(_ => new TrackingDisposable(log, "transient"))
             .Build();
         var transient = (TrackingDisposable)provider.GetRequiredService<TrackingDisposable>();
@@ -238,7 +238,7 @@ public class ServiceProviderTests
     public void Dispose_IsIdempotent()
     {
         var log = new List<string>();
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton(_ => new TrackingDisposable(log, "singleton"))
             .Build();
         provider.GetRequiredService<TrackingDisposable>();
@@ -252,7 +252,7 @@ public class ServiceProviderTests
     [Fact]
     public void GetService_AfterDispose_Throws()
     {
-        var provider = new ServiceProviderBuilder().AddSingleton(_ => new Service()).Build();
+        var provider = new ServiceContainer().AddSingleton(_ => new Service()).Build();
         (provider as IDisposable)!.Dispose();
 
         Should.Throw<ObjectDisposedException>(() => provider.GetService<Service>());
@@ -262,7 +262,7 @@ public class ServiceProviderTests
     public void DependencyCycle_Throws_InsteadOfStackOverflow()
     {
         // Two singletons whose factories resolve each other: A's factory needs B, B's factory needs A.
-        var provider = new ServiceProviderBuilder()
+        var provider = new ServiceContainer()
             .AddSingleton<Dependent>(sp => new Dependent(sp.GetRequiredService<Service>()))
             .Add(new ServiceRegistration(typeof(Service), ServiceLifetime.Singleton,
                 sp => ((Dependent)sp.GetRequiredService<Dependent>()).Service))

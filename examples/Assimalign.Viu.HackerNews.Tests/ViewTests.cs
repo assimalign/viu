@@ -35,7 +35,7 @@ public sealed class ViewTests
         {
             // The store-definitions container resolves through the app service provider (the shape the
             // browser bootstrap uses); the router stays provided under its injection key.
-            Services = new ServiceProviderBuilder().AddSingleton(stores).Build(),
+            Services = new ServiceContainer().AddSingleton(stores).Build(),
         }
         .Provide(RouterInjectionKeys.Router, router);
 
