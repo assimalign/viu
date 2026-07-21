@@ -228,7 +228,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
             "        internal static VirtualNode NormalizeRoot(object? value) => null!;\n" +
             "    }\n" +
             "}\n" +
-            "namespace Assimalign.Viu.RuntimeDom\n" +
+            "namespace Assimalign.Viu.Browser\n" +
             "{\n" +
             "    internal static class DomRenderHelpers\n" +
             "    {\n" +

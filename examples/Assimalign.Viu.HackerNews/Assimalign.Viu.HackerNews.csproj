@@ -19,9 +19,9 @@
        bridge (RouterLinkDomBridge, installed at bootstrap), and the Pinia-style store. Core and
        Shared flow transitively. Libraries never reference examples (one-way edge). -->
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
-    <ViuProjectReference Include="Assimalign.Viu.Router.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Router.Browser" />
     <ViuProjectReference Include="Assimalign.Viu.Store" />
   </ItemGroup>
 

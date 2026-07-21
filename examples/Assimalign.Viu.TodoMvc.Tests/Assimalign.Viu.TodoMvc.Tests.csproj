@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Core" />
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
     <!-- The linked TodoItem is a [Reactive] partial class, so the reactivity generator must run here
          too (the PrivateAssets=all analyzer does not flow through a project reference). -->

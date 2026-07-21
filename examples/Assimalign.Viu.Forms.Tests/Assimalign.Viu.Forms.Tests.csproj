@@ -9,7 +9,7 @@
     analyzers/ only), and the sample is a Microsoft.NET.Sdk.WebAssembly executable, so this test
     compiles the sample's platform-neutral source directly (Program.cs and FormsBootstrap.cs, the
     browser-only files, are excluded). The reactive model and the preview component are exercised
-    DOM-free; the v-model DOM directives are a browser concern covered by the RuntimeDom tests.
+    DOM-free; the v-model DOM directives are a browser concern covered by the Browser tests.
   -->
   <ItemGroup>
     <Compile Include="..\Assimalign.Viu.Forms\Composition\**\*.cs" LinkBase="Sample\Composition" />
@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Core" />
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>
 </Project>

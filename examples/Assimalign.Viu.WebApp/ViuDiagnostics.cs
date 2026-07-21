@@ -7,11 +7,11 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Assimalign.Viu;
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 
 // The ?diagnostics=1 mode: runs the [V01.01.04.01] handle-lifecycle stress check and the
 // int-handle vs JSObject marshaling benchmark that feeds the ADR
-// (libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md), then renders the
+// (libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md), then renders the
 // report into #app. Example-level tooling: numbers are indicative dev-build measurements; the
 // tracked benchmark suite is [V01.01.11.04].
 [SupportedOSPlatform("browser")]

@@ -68,7 +68,7 @@ public sealed class SingleFileComponentCssModuleTests
         // getter that evaluates the original expression (resolved against the merged @script member `color`).
         generated.ShouldContain("color: var(--");
         generated.ShouldContain("internal void ApplyCssVariables()");
-        generated.ShouldContain("global::Assimalign.Viu.RuntimeDom.CssVariables.UseCssVars(");
+        generated.ShouldContain("global::Assimalign.Viu.Browser.CssVariables.UseCssVars(");
         generated.ShouldContain("(object?)(color)");
     }
 

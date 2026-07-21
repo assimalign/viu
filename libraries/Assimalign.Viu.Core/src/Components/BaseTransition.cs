@@ -16,7 +16,7 @@ namespace Assimalign.Viu;
 /// the incoming enter finishes) and <c>appear</c> (enter on initial mount).
 /// <para>
 /// This layer carries no CSS or DOM knowledge — the DOM <c>&lt;Transition&gt;</c>/
-/// <c>&lt;TransitionGroup&gt;</c> (<c>Assimalign.Viu.RuntimeDom</c>) supply the class-based hooks. The
+/// <c>&lt;TransitionGroup&gt;</c> (<c>Assimalign.Viu.Browser</c>) supply the class-based hooks. The
 /// resolved properties are threaded in through the reserved <see cref="PropertiesKey"/> prop (the DOM
 /// layer's <c>resolveTransitionProps</c> output) or, for direct use, assembled from individual props.
 /// Referenced by the compiled render through <see cref="RenderHelpers._BaseTransition"/>. Not

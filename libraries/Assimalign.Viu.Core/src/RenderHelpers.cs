@@ -28,7 +28,7 @@ namespace Assimalign.Viu;
 /// <c>Assimalign.Viu.Shared</c> — never any <c>Assimalign.Viu.Syntax.*</c> assembly. The contract flows one
 /// way (by name) so the runtime never depends on the compiler. DOM-only helpers (<c>_vShow</c>, the
 /// <c>_vModel*</c> directive values, <c>_withModifiers</c>/<c>_withKeys</c>, <c>_Transition</c>/
-/// <c>_TransitionGroup</c>) are <b>not</b> here: their behavior lives in <c>Assimalign.Viu.RuntimeDom</c>,
+/// <c>_TransitionGroup</c>) are <b>not</b> here: their behavior lives in <c>Assimalign.Viu.Browser</c>,
 /// which this platform-agnostic layer must not reference — see <c>docs/DESIGN.md</c> for that split.
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </para>

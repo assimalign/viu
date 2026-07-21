@@ -9,7 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <!-- [Reactive] on TodoItem needs the reactivity generator. The generator ships with
          Assimalign.Viu.Core as a PrivateAssets=all analyzer, so it does not flow through the
          (transitive) project reference; an in-repo consumer opts in explicitly, exactly as the

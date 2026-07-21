@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <!-- Run the .viu single-file-component source generator ([V01.01.06.02]/[V01.01.06.07]) so ViuBadge.viu
          compiles to a mountable IComponentDefinition component (StopwatchApplication mounts it via
          VirtualNodeFactory.Component). In-repo this must be referenced directly alongside

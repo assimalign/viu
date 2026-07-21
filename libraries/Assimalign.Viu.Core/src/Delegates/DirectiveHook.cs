@@ -9,7 +9,7 @@ namespace Assimalign.Viu;
 /// <para>
 /// <paramref name="element"/> is the bound host node. It arrives as <see cref="object"/> — the
 /// boxed platform node the generic renderer stored on <see cref="VirtualNode.El"/> — because
-/// <see cref="VirtualNode"/> is not generic over the node type; RuntimeDom's directive helpers
+/// <see cref="VirtualNode"/> is not generic over the node type; Browser's directive helpers
 /// unbox it to the concrete DOM element.
 /// </para>
 /// </summary>

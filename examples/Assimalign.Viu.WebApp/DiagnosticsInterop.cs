@@ -34,18 +34,18 @@ internal static partial class DiagnosticsInterop
 
     // --- int-handle strategy: the production bridge module's own leaf ops ---------------------
 
-    [JSImport("dom.createElement", "Assimalign.Viu.RuntimeDom")]
+    [JSImport("dom.createElement", "Assimalign.Viu.Browser")]
     internal static partial int CreateElementHandle(string tagName, string? namespaceName);
 
-    [JSImport("dom.setElementText", "Assimalign.Viu.RuntimeDom")]
+    [JSImport("dom.setElementText", "Assimalign.Viu.Browser")]
     internal static partial int[] SetElementTextHandle(int nodeHandle, string text);
 
-    [JSImport("dom.setAttribute", "Assimalign.Viu.RuntimeDom")]
+    [JSImport("dom.setAttribute", "Assimalign.Viu.Browser")]
     internal static partial void SetAttributeHandle(int nodeHandle, string name, string value);
 
-    [JSImport("dom.insert", "Assimalign.Viu.RuntimeDom")]
+    [JSImport("dom.insert", "Assimalign.Viu.Browser")]
     internal static partial void InsertHandle(int parentHandle, int childHandle, int anchorHandle);
 
-    [JSImport("dom.remove", "Assimalign.Viu.RuntimeDom")]
+    [JSImport("dom.remove", "Assimalign.Viu.Browser")]
     internal static partial int[] RemoveHandle(int childHandle);
 }
