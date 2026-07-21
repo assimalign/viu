@@ -9,17 +9,17 @@ namespace Assimalign.Viu;
 /// The application shell — the C# port of the app object produced by <c>createAppAPI(render)</c>
 /// in <c>@vue/runtime-core</c> (<c>packages/runtime-core/src/apiCreateApp.ts</c>,
 /// https://vuejs.org/api/application.html): one root component mounted into one container and
-/// unmounted as a whole, over a shared <see cref="ApplicationContext"/> that carries the component
-/// registry, app-level provides, and <see cref="ApplicationConfiguration"/> to every descendant.
-/// <see cref="Component(string, IComponent)"/>, <see cref="Provide{T}"/>, and
-/// <see cref="Use(IApplicationPlugin, object?)"/> configure the app before mounting; registering after
+/// unmounted as a whole, over a shared <see cref="IApplicationContext"/> that carries the component
+/// registry, app-level provides, the service provider, and the error/warn/performance handlers to
+/// every descendant. <see cref="Component(string, IComponent)"/>, <see cref="Provide{T}"/>, and
+/// <see cref="Use(IApplicationPlugin)"/> configure the app before mounting; registering after
 /// <see cref="Mount"/> warns (upstream parity).
 /// <para>
 /// This is the platform-neutral, <b>extensible base</b> (the reshape's "application base",
 /// <c>V01.01.03.23</c>): it implements the node-type-agnostic <see cref="IApplication"/> and exposes
 /// <c>virtual</c>/<c>protected</c> lifecycle seams — <see cref="OnInitializeAsync"/> (the async
 /// initialization step in the mount path a browser needs for its awaited module imports),
-/// <see cref="CreateRootVirtualNode"/>, <see cref="InstallPlugin"/>, <see cref="Mount(TNode)"/>, and
+/// <see cref="CreateRootVirtualNode"/>, <see cref="InstallPluginAsync"/>, <see cref="Mount(TNode)"/>, and
 /// <see cref="Unmount"/>. It is not marked <c>abstract</c> because the default renderer-bound app
 /// (Core, the Testing renderer, custom renderers) is created directly by
 /// <see cref="Renderer{TNode}.CreateApplication"/> and mounts as-is; platform packages that need
@@ -27,8 +27,16 @@ namespace Assimalign.Viu;
 /// <c>internal</c>, so the type is opaque and un-subclassable outside the framework.
 /// </para>
 /// <para>
+/// <b>Plugin install order ([V01.01.03.27]).</b> <see cref="Use(IApplicationPlugin)"/> records a plugin;
+/// its asynchronous <see cref="IApplicationPlugin.InstallAsync"/> is awaited during the mount path, in
+/// the documented order <b>services frozen → plugins install → platform init → render</b>. The
+/// synchronous <see cref="Mount(TNode)"/> installs pending plugins synchronously (throwing if a plugin's
+/// install does not complete synchronously); <see cref="MountAsync(TNode, CancellationToken)"/> awaits
+/// them.
+/// </para>
+/// <para>
 /// <c>app.config.globalProperties</c> is deliberately excluded in favor of typed app-level
-/// provide/inject — see <see cref="ApplicationConfiguration"/> and the founding ADR
+/// provide/inject — see <see cref="IApplicationContext"/> and the founding ADR
 /// ([V01.01.13.01]). Platform packages wrap this with container resolution and a builder entry point
 /// (the browser's <c>BrowserApplication.CreateBuilder(root).Build().MountAsync("#app")</c>).
 /// </para>
@@ -43,6 +51,7 @@ public class Application<TNode> : IApplication, IDisposable
     private readonly VirtualNodeProperties? _rootProperties;
     private readonly ApplicationContext _context = new();
     private HashSet<object>? _installedPlugins;
+    private List<IApplicationPlugin>? _pendingPlugins;
     private VirtualNode? _rootVirtualNode;
     private TNode? _container;
     private Action<string>? _previousWarnSink;
@@ -54,6 +63,8 @@ public class Application<TNode> : IApplication, IDisposable
         _renderer = renderer;
         _rootComponent = rootComponent;
         _rootProperties = rootProperties;
+        _context.RootComponent = rootComponent;
+        _context.RootProperties = rootProperties;
     }
 
     /// <summary>Whether the app is currently mounted.</summary>
@@ -62,24 +73,11 @@ public class Application<TNode> : IApplication, IDisposable
     /// <summary>The root component instance after mounting, or null.</summary>
     public ComponentInstance? RootInstance => _rootVirtualNode?.Component as ComponentInstance;
 
-    /// <summary>
-    /// The app-level configuration (upstream: <c>app.config</c>) — the error handler, warn
-    /// handler, and performance flag. Set its handlers before <see cref="Mount"/>.
-    /// </summary>
-    public ApplicationConfiguration Config => _context.Config;
-
-    /// <summary>
-    /// The application's dependency-injection provider ([V01.01.03.24]) — the
-    /// <see cref="IServiceProvider"/> an <see cref="IApplicationBuilder"/> built and attached, reachable
-    /// from component <c>Setup</c> through <see cref="ComponentInstance.Services"/> and the
-    /// <see cref="DependencyInjection.GetService{T}()"/> composition functions. Null when the app was
-    /// created directly through <see cref="Renderer{TNode}.CreateApplication"/> (no builder). The app
-    /// owns this provider and disposes it (if <see cref="IDisposable"/>) in <see cref="Dispose"/>.
-    /// </summary>
-    public IServiceProvider? Services => _context.Services;
-
-    /// <summary>The shared application context (internal seam for the platform packages and test utilities).</summary>
+    /// <summary>The shared application context (internal concrete seam for the platform packages and test utilities).</summary>
     internal ApplicationContext Context => _context;
+
+    /// <inheritdoc/>
+    IApplicationContext IApplication.Context => _context;
 
     /// <summary>
     /// Registers a component under <paramref name="name"/> so descendants of the root can resolve
@@ -189,17 +187,18 @@ public class Application<TNode> : IApplication, IDisposable
     }
 
     /// <summary>
-    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>).
-    /// A repeat <c>Use</c> of the same plugin instance is deduplicated with a dev warning; a plugin
-    /// installed after mount warns. The plugin's <see cref="IApplicationPlugin.Install"/> receives this app
-    /// (through the <see cref="InstallPlugin"/> seam), through which it registers components,
-    /// directives, and provides. Returns the app for chaining.
+    /// Records <paramref name="plugin"/> for installation, exactly once (upstream:
+    /// <c>app.use(plugin)</c>). A repeat <c>Use</c> of the same plugin instance is deduplicated with a
+    /// dev warning; a plugin recorded after mount warns. The plugin's asynchronous
+    /// <see cref="IApplicationPlugin.InstallAsync"/> runs later, during the mount path (through the
+    /// <see cref="InstallPluginAsync"/> seam), so a plugin registers components, directives, and provides
+    /// the initial render sees. Options are carried by the plugin's own constructor state. Returns the
+    /// app for chaining.
     /// </summary>
     /// <param name="plugin">The plugin to install.</param>
-    /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public Application<TNode> Use(IApplicationPlugin plugin, object? options = null)
+    public Application<TNode> Use(IApplicationPlugin plugin)
     {
         ArgumentNullException.ThrowIfNull(plugin);
         WarnIfMounted(nameof(Use));
@@ -210,15 +209,17 @@ public class Application<TNode> : IApplication, IDisposable
             RuntimeWarnings.Warn("Plugin has already been applied to target app.");
             return this;
         }
-        InstallPlugin(plugin, options);
+        (_pendingPlugins ??= []).Add(plugin);
         return this;
     }
 
     /// <summary>
     /// Mounts the root component into <paramref name="container"/> synchronously (upstream:
-    /// <c>app.mount</c>), attaching the app context so descendants resolve app-level provides,
-    /// registered components, and config. A second call warns and no-ops, returning the existing
-    /// instance (upstream parity).
+    /// <c>app.mount</c>), installing any pending plugins first (synchronously — a plugin whose
+    /// <see cref="IApplicationPlugin.InstallAsync"/> does not complete synchronously requires
+    /// <see cref="MountAsync(TNode, CancellationToken)"/>), then attaching the app context so
+    /// descendants resolve app-level provides, registered components, and config. A second call warns
+    /// and no-ops, returning the existing instance (upstream parity).
     /// <para>
     /// This is the synchronous mount for platforms whose <see cref="OnInitializeAsync"/> is a no-op
     /// (Core, the Testing renderer, custom renderers). Platforms with awaited initialization override
@@ -231,11 +232,12 @@ public class Application<TNode> : IApplication, IDisposable
     public virtual ComponentInstance? Mount(TNode container) => MountCore(container, hydrate: false);
 
     /// <summary>
-    /// Runs the overridable <see cref="OnInitializeAsync"/> step (a no-op by default; the browser
-    /// awaits its module imports here), then mounts into <paramref name="container"/>. This is the
-    /// mount path the reshape's builder bootstrap uses (builder -&gt; <c>Build()</c> -&gt;
-    /// <c>MountAsync</c>), so no separate runtime initialization pre-call is needed. A second call
-    /// warns and no-ops (initialization does not re-run).
+    /// Installs any pending plugins, runs the overridable <see cref="OnInitializeAsync"/> step (a no-op
+    /// by default; the browser awaits its module imports here), then mounts into
+    /// <paramref name="container"/> — the documented order <b>plugins install → platform init →
+    /// render</b>. This is the mount path the reshape's builder bootstrap uses (builder -&gt;
+    /// <c>Build()</c> -&gt; <c>MountAsync</c>), so no separate runtime initialization pre-call is needed.
+    /// A second call warns and no-ops (initialization does not re-run).
     /// </summary>
     /// <param name="container">The platform container node.</param>
     /// <param name="cancellationToken">Cancels the initialization step.</param>
@@ -244,6 +246,7 @@ public class Application<TNode> : IApplication, IDisposable
     {
         if (!IsMounted)
         {
+            await InstallPendingPluginsAsync().ConfigureAwait(false);
             await OnInitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         return Mount(container);
@@ -272,12 +275,15 @@ public class Application<TNode> : IApplication, IDisposable
         }
         // Route dev warnings to the configured handler for the mounted lifetime (upstream consults
         // appContext.config.warnHandler at warn time; the seam here is the message-based sink).
-        if (_context.Config.WarnHandler is { } warnHandler)
+        if (_context.WarnHandler is { } warnHandler)
         {
             _previousWarnSink = RuntimeWarnings.Sink;
             RuntimeWarnings.Sink = warnHandler;
             _warnSinkInstalled = true;
         }
+        // Plugins install before the first render (documented order). MountAsync has already drained
+        // the queue asynchronously; the synchronous path drains it here.
+        InstallPendingPluginsSynchronously();
         _rootVirtualNode = CreateRootVirtualNode();
         _rootVirtualNode.AppContext = _context;
         if (hydrate)
@@ -319,9 +325,10 @@ public class Application<TNode> : IApplication, IDisposable
 
     /// <summary>
     /// Disposes the app: unmounts it (a <c>using</c>-friendly alias for <see cref="Unmount"/>) and then
-    /// disposes the owned <see cref="Services"/> provider if it is <see cref="IDisposable"/>, cascading
-    /// to its owned disposable singleton/scoped services ([V01.01.03.24]). Idempotent — the provider is
-    /// disposed at most once, and unmount is a no-op when not mounted.
+    /// disposes the owned <see cref="IApplicationContext.ServicesProvider"/> if it is
+    /// <see cref="IDisposable"/>, cascading to its owned disposable singleton/scoped services
+    /// ([V01.01.03.24]). Idempotent — the provider is disposed at most once, and unmount is a no-op when
+    /// not mounted.
     /// </summary>
     public void Dispose()
     {
@@ -329,18 +336,18 @@ public class Application<TNode> : IApplication, IDisposable
         if (!_servicesDisposed)
         {
             _servicesDisposed = true;
-            (_context.Services as IDisposable)?.Dispose();
+            (_context.ServicesProvider as IDisposable)?.Dispose();
         }
         GC.SuppressFinalize(this);
     }
 
     /// <summary>
-    /// The overridable asynchronous initialization step run by <see cref="MountAsync"/> before the
-    /// first mount — the seam that lets a platform await work that must complete before rendering
-    /// (the browser awaits its <c>viu-dom.js</c> module import here, [V01.01.04.03]). The default is
-    /// a completed task (no initialization), so the synchronous <see cref="Mount(TNode)"/> path is
-    /// unaffected. Implementations should be idempotent (cache the work) so repeated mount attempts
-    /// initialize at most once.
+    /// The overridable asynchronous initialization step run by <see cref="MountAsync"/> after plugins
+    /// install and before the first mount — the seam that lets a platform await work that must complete
+    /// before rendering (the browser awaits its <c>viu-dom.js</c> module import here, [V01.01.04.03]).
+    /// The default is a completed task (no initialization), so the synchronous <see cref="Mount(TNode)"/>
+    /// path is unaffected. Implementations should be idempotent (cache the work) so repeated mount
+    /// attempts initialize at most once.
     /// </summary>
     /// <param name="cancellationToken">Cancels the initialization work.</param>
     /// <returns>A task that completes when the platform is ready to render.</returns>
@@ -357,13 +364,56 @@ public class Application<TNode> : IApplication, IDisposable
 
     /// <summary>
     /// Installs <paramref name="plugin"/> into this application (upstream:
-    /// <c>plugin.install(app, options)</c>) — the seam <see cref="Use"/> calls once per plugin
-    /// instance, after the dedupe/after-mount guards. The default invokes
-    /// <see cref="IApplicationPlugin.Install"/> against this app.
+    /// <c>plugin.install(app)</c>) — the seam the mount path calls once per recorded plugin. The default
+    /// awaits <see cref="IApplicationPlugin.InstallAsync"/> against this app.
     /// </summary>
     /// <param name="plugin">The plugin to install.</param>
-    /// <param name="options">Options passed to the plugin's install, or null.</param>
-    protected virtual void InstallPlugin(IApplicationPlugin plugin, object? options) => plugin.Install(this, options);
+    /// <returns>A task that completes when the plugin has finished installing.</returns>
+    protected virtual ValueTask InstallPluginAsync(IApplicationPlugin plugin) => plugin.InstallAsync(this);
+
+    /// <summary>
+    /// Installs every recorded-but-not-yet-installed plugin in <see cref="Use(IApplicationPlugin)"/> order,
+    /// awaiting each <see cref="InstallPluginAsync"/>. The <see cref="MountAsync(TNode, CancellationToken)"/>
+    /// path calls this before platform initialization and the first render; a platform with its own async
+    /// mount entry (the browser's selector mount) calls it in the same position.
+    /// </summary>
+    /// <returns>A task that completes when all pending plugins have installed.</returns>
+    protected async ValueTask InstallPendingPluginsAsync()
+    {
+        if (_pendingPlugins is null)
+        {
+            return;
+        }
+        while (_pendingPlugins.Count > 0)
+        {
+            var plugin = _pendingPlugins[0];
+            _pendingPlugins.RemoveAt(0);
+            await InstallPluginAsync(plugin).ConfigureAwait(false);
+        }
+    }
+
+    private void InstallPendingPluginsSynchronously()
+    {
+        if (_pendingPlugins is null)
+        {
+            return;
+        }
+        while (_pendingPlugins.Count > 0)
+        {
+            var plugin = _pendingPlugins[0];
+            _pendingPlugins.RemoveAt(0);
+            var install = InstallPluginAsync(plugin);
+            if (!install.IsCompleted)
+            {
+                throw new InvalidOperationException(
+                    $"Plugin \"{plugin.GetType()}\" did not finish installing synchronously, so it cannot be "
+                    + "installed by the synchronous Mount path. Mount with MountAsync to await asynchronous "
+                    + "plugin installation.");
+            }
+            // Observe the result so a synchronously-faulted install rethrows here.
+            install.GetAwaiter().GetResult();
+        }
+    }
 
     private void ProvideCore(object key, object? value)
     {
@@ -394,5 +444,5 @@ public class Application<TNode> : IApplication, IDisposable
 
     IApplication IApplication.Provide(string key, object? value) => Provide(key, value);
 
-    IApplication IApplication.Use(IApplicationPlugin plugin, object? options) => Use(plugin, options);
+    IApplication IApplication.Use(IApplicationPlugin plugin) => Use(plugin);
 }

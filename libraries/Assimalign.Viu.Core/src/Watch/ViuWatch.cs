@@ -12,7 +12,7 @@ namespace Assimalign.Viu;
 /// timing on the runtime scheduler (batched into, and running ahead of, the render flush —
 /// upstream's default), and a callback, effect-body, or getter exception routes through the
 /// component <c>OnErrorCaptured</c> chain to the app-level
-/// <see cref="ApplicationConfiguration.ErrorHandler"/> instead of tearing down the flush
+/// <see cref="IApplicationContext.ErrorHandler"/> instead of tearing down the flush
 /// ([V01.01.03.12], issue #28). Call during <c>Setup</c> so the watcher joins the component's
 /// effect scope and stops automatically on unmount. Omitted <paramref name="options"/> mean
 /// <see cref="WatchFlushMode.Pre"/>; pass <see cref="WatchOptions"/> with an explicit

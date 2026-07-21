@@ -136,7 +136,7 @@ public sealed class VirtualNode
     /// The application context attached to the root vnode at mount (upstream:
     /// <c>vnode.appContext</c>, set in <c>app.mount</c>). Every <see cref="ComponentInstance"/>
     /// created for the tree inherits it (<see cref="ComponentInstance.AppContext"/>), so app-level
-    /// provides, the component registry, and <see cref="ApplicationConfiguration"/> reach every
+    /// provides, the component registry, and <see cref="IApplicationContext"/> reach every
     /// descendant ([V01.01.03.12]). Null on non-root vnodes and on trees rendered without an app.
     /// </summary>
     internal ApplicationContext? AppContext { get; set; }

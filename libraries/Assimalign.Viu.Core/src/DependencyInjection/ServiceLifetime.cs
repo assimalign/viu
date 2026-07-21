@@ -1,7 +1,7 @@
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The lifetime of a service registered on an <see cref="IServiceProviderBuilder"/> — the Viu
+/// The lifetime of a service registered on an <see cref="IServiceContainer"/> — the Viu
 /// counterpart of <c>Microsoft.Extensions.DependencyInjection.ServiceLifetime</c>
 /// (https://learn.microsoft.com/dotnet/core/extensions/dependency-injection#service-lifetimes),
 /// declared here so Core takes no dependency on that package. It has no Vue upstream: app-level
@@ -12,7 +12,7 @@ namespace Assimalign.Viu;
 /// <see cref="Singleton"/> and <see cref="Scoped"/> both resolve once per application and differ only
 /// across applications (each has its own provider). The three lifetimes are still distinct so a
 /// bring-your-own container adapter can map them onto a container that <i>does</i> create child scopes
-/// (a server host resolving per request); see <see cref="IServiceProviderBuilder"/>.
+/// (a server host resolving per request); see <see cref="IServiceContainer"/>.
 /// </para>
 /// </summary>
 public enum ServiceLifetime

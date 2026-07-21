@@ -8,16 +8,36 @@ namespace Assimalign.Viu;
 // unchanged.
 
 /// <summary>
-/// The shared per-application context — the C# port of upstream's <c>AppContext</c>
-/// (<c>packages/runtime-core/src/apiCreateApp.ts</c>). Carries the registries and app-level
-/// provides that every component in the app resolves against: it is attached to the root vnode at
-/// mount and inherited by every <see cref="ComponentInstance"/> down the tree
-/// (<see cref="ComponentInstance.AppContext"/>), exactly as upstream inherits
-/// <c>instance.appContext</c> from the parent (or the root vnode). Internal — the public surface is
-/// <see cref="Application{TNode}"/>. Not thread-safe (single-threaded JS event-loop model).
+/// The shared per-application context — the C# port of upstream's <c>AppContext</c> + <c>app.config</c>
+/// (<c>packages/runtime-core/src/apiCreateApp.ts</c>) and the concrete <see cref="IApplicationContext"/>
+/// implementation ([V01.01.03.27]). Carries the root component/props, the app-level service provider,
+/// the error/warn/performance handlers, and the registries and provides that every component in the app
+/// resolves against: it is attached to the root vnode at mount and inherited by every
+/// <see cref="ComponentInstance"/> down the tree (<see cref="ComponentInstance.AppContext"/>), exactly as
+/// upstream inherits <c>instance.appContext</c> from the parent (or the root vnode). Internal — the
+/// public surface is <see cref="IApplicationContext"/> (reached through <see cref="IApplication.Context"/>).
+/// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
-internal sealed class ApplicationContext
+internal sealed class ApplicationContext : IApplicationContext
 {
+    /// <inheritdoc/>
+    public IComponent RootComponent { get; set; } = null!;
+
+    /// <inheritdoc/>
+    public VirtualNodeProperties? RootProperties { get; set; }
+
+    /// <inheritdoc/>
+    public IServiceProvider? ServicesProvider { get; set; }
+
+    /// <inheritdoc/>
+    public Action<Exception, ComponentInstance?, string>? ErrorHandler { get; set; }
+
+    /// <inheritdoc/>
+    public Action<string>? WarnHandler { get; set; }
+
+    /// <inheritdoc/>
+    public bool Performance { get; set; }
+
     /// <summary>
     /// App-level provides (upstream: <c>appContext.provides</c>), the final fallback in the
     /// inject lookup chain (see <see cref="DependencyInjection"/>). Keyed by the same
@@ -25,25 +45,11 @@ internal sealed class ApplicationContext
     /// </summary>
     public Dictionary<object, object?> Provides { get; } = [];
 
-    /// <summary>
-    /// The application's bring-your-own dependency-injection provider ([V01.01.03.24]) — the
-    /// <see cref="IServiceProvider"/> an <see cref="IApplicationBuilder"/> built and attached, reachable
-    /// as <see cref="Application{TNode}.Services"/> and, through the inherited
-    /// <see cref="ComponentInstance.AppContext"/>, as <see cref="ComponentInstance.Services"/> in every
-    /// descendant. Null for a tree rendered without a builder (a raw
-    /// <see cref="Renderer{TNode}.CreateApplication"/> app). This is app-level DI, layered beside the
-    /// Vue-semantic <see cref="Provides"/> chain — the two are independent.
-    /// </summary>
-    public IServiceProvider? Services { get; set; }
-
     /// <summary>The name → definition registry (upstream: <c>appContext.components</c>).</summary>
     public Dictionary<string, IComponent> Components { get; } = new(StringComparer.Ordinal);
 
     /// <summary>The name → directive registry (upstream: <c>appContext.directives</c>).</summary>
     public Dictionary<string, IDirective> Directives { get; } = new(StringComparer.Ordinal);
-
-    /// <summary>The app-level configuration (upstream: <c>appContext.config</c>).</summary>
-    public ApplicationConfiguration Config { get; } = new();
 
     /// <summary>
     /// Test-utilities seam: observes every component emit (before dispatch) as

@@ -162,7 +162,7 @@ public static class DependencyInjection
 
     /// <summary>
     /// Resolves <typeparamref name="TService"/> from the current component's <b>application service
-    /// provider</b> (<see cref="IApplication.Services"/>) — the app-level dependency-injection
+    /// provider</b> (<see cref="IApplicationContext.ServicesProvider"/>) — the app-level dependency-injection
     /// composition function ([V01.01.03.24]), the .NET-idiomatic counterpart of
     /// <see cref="Inject{T}(InjectionKey{T})"/>. Returns <c>null</c> when the service is unregistered;
     /// returns <c>null</c> with a dev warning when called with no active instance (outside

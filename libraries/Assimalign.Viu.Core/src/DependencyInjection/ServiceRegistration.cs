@@ -3,7 +3,7 @@ using System;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// A single service registration handed to an <see cref="IServiceProviderBuilder"/> — the Viu
+/// A single service registration handed to an <see cref="IServiceContainer"/> — the Viu
 /// counterpart of <c>Microsoft.Extensions.DependencyInjection.ServiceDescriptor</c>
 /// (https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.servicedescriptor),
 /// carried by our own type so Core takes no dependency on that package. It couples a service
@@ -13,7 +13,7 @@ namespace Assimalign.Viu;
 /// <b>Factory-only, AOT-safe by construction.</b> Every service is produced by an explicit
 /// <see cref="Factory"/> delegate — there is no constructor discovery, assembly scanning, or reflective
 /// activation, so registrations are trimming- and WASM/NativeAOT-safe. The ergonomic
-/// <see cref="ServiceProviderBuilderExtensions"/> (<c>AddSingleton</c>/<c>AddScoped</c>/<c>AddTransient</c>)
+/// <see cref="ServiceContainerExtensions"/> (<c>AddSingleton</c>/<c>AddScoped</c>/<c>AddTransient</c>)
 /// build these descriptors for you.
 /// </para>
 /// </summary>
