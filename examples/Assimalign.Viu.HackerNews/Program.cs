@@ -23,9 +23,9 @@ internal static class Program
     [SupportedOSPlatform("browser")]
     internal static async Task Main()
     {
-        // Initialize the DOM bridge and the router's browser history, then enable client-side
-        // navigation (maps real DOM clicks on RouterLinks into router.Push, suppressing full reloads).
-        await BrowserRuntime.InitializeAsync();
+        // Initialize the router's browser history, then enable client-side navigation (maps real DOM
+        // clicks on RouterLinks into router.Push, suppressing full reloads) before mounting. The Viu
+        // DOM bridge itself is loaded inside the app's MountAsync path — no separate init call.
         await RouterHistory.InitializeAsync();
         RouterLinkDomBridge.Install();
 
@@ -48,11 +48,11 @@ internal static class Program
         // A per-app store registry, provided app-wide so UseStore() resolves through component context;
         // the store-definitions container and the router are provided under their injection keys.
         var registry = new StoreRegistry();
-        BrowserRuntime.CreateApp(AppShell.Instance)
-            .Use(registry.AsPlugin<int>())
-            .Provide(HackerNewsStores.InjectionKey, stores)
-            .Provide(RouterInjectionKeys.Router, router)
-            .Mount("#app");
+        var builder = BrowserApplication.CreateBuilder(AppShell.Instance);
+        builder.Use(registry.AsPlugin());
+        builder.Provide(HackerNewsStores.InjectionKey, stores);
+        builder.Provide(RouterInjectionKeys.Router, router);
+        await builder.Build().MountAsync("#app");
 
         // Keep the WASM main loop alive; rendering is reactive from here.
         await Task.Delay(Timeout.Infinite);

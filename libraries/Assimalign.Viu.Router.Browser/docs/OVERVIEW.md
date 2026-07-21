@@ -19,9 +19,8 @@ either package it bridges.
 ## Using it
 
 ```csharp
-await BrowserRuntime.InitializeAsync();
 RouterLinkDomBridge.Install();            // enable RouterLink navigation in the browser
-BrowserRuntime.CreateApp(new AppRoot()).Mount("#app");
+await BrowserApplication.CreateBuilder(new AppRoot()).Build().MountAsync("#app");
 ```
 
 Only browser apps that use the Router need this package — it is not part of the base

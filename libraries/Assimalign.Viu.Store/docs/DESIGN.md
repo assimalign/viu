@@ -81,9 +81,9 @@ argument-less `UseStore()` outside a component; server code passes the registry 
 
 ## Integration with the App API
 
-`App.Use` installs an `IPlugin<TNode>`. A registry is platform-agnostic, but `IPlugin<TNode>` is
-generic over the platform node, so `StoreRegistry.AsPlugin<TNode>()` wraps the registry in an
-internal `StorePlugin<TNode>` rather than making the registry itself generic. On install the plugin:
+`App.Use` installs an `IPlugin`. The plugin contract is platform-neutral (it extends the
+node-type-agnostic `IApplication`), so `StoreRegistry.AsPlugin()` wraps the registry in an internal
+`StorePlugin` — the same plugin installs on a browser app or a server app. On install the plugin:
 
 - `app.Provide(StoreRegistry.InjectionKey, registry)` — provides the registry app-wide, so a
   component's `UseStore()` resolves it through the existing provide/inject chain
@@ -155,10 +155,10 @@ unsubscribing never tears down notification for other subscribers.
 ## Deliberate divergences from Pinia
 
 - **The registry is not itself the plugin.** In Pinia the `pinia` object has an `install` method, so
-  `app.use(pinia)` and `useStore(pinia)` take the same value. C#'s `IPlugin<TNode>` is generic over
-  the node type while the registry is not, so installation goes through
-  `registry.AsPlugin<TNode>()`. The registry stays the DI handle; the adapter is the bridge to
-  `App.Use`. Call `AsPlugin` once per app.
+  `app.use(pinia)` and `useStore(pinia)` take the same value. To keep the registry a plain DI handle
+  (not an `IApplication` extension), installation goes through `registry.AsPlugin()`, which wraps it in
+  an internal `StorePlugin`. The registry stays the DI handle; the adapter is the bridge to `App.Use`.
+  Call `AsPlugin` once per app.
 - **Setup style only.** Option stores (`state`/`getters`/`actions` object literals) are a Proxy-bound
   convenience with no clean C# analogue; Viu ports the setup form. `Store<TState>` is the typed
   member model on top of it — a single `[Reactive]` `$state` rather than one reactive object per

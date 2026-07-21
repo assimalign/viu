@@ -45,7 +45,7 @@ public static class Stores
     /// <summary>
     /// Creates a store registry — the per-app root that owns every store's lifetime, the C# port of
     /// Pinia's <c>createPinia()</c> (<c>packages/pinia/src/createPinia.ts</c>). Install it on an app
-    /// with <c>App.Use(registry.AsPlugin&lt;TNode&gt;())</c>, or pass it directly to
+    /// with <c>App.Use(registry.AsPlugin())</c>, or pass it directly to
     /// <see cref="StoreDefinition{TStore}.UseStore(StoreRegistry)"/> for DI-style resolution.
     /// Equivalent to <c>new StoreRegistry()</c>.
     /// </summary>

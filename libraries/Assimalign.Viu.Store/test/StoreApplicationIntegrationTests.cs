@@ -41,7 +41,7 @@ public sealed class StoreApplicationIntegrationTests : IDisposable
 
         var renderer = new TestRenderer();
         var application = renderer.Renderer.CreateApplication(root);
-        application.Use(registry.AsPlugin<TestNode>());
+        application.Use(registry.AsPlugin());
         application.Mount(renderer.CreateContainer());
 
         resolvedInSetup.ShouldNotBeNull();
@@ -58,7 +58,7 @@ public sealed class StoreApplicationIntegrationTests : IDisposable
         var application = renderer.Renderer.CreateApplication(
             new SetupComponent { SetupFunction = static () => static () => VirtualNodeFactory.Text("x") });
 
-        application.Use(registry.AsPlugin<TestNode>());
+        application.Use(registry.AsPlugin());
 
         Stores.ActiveRegistry.ShouldBeSameAs(registry);
     }
@@ -81,7 +81,7 @@ public sealed class StoreApplicationIntegrationTests : IDisposable
             };
             var renderer = new TestRenderer();
             var application = renderer.Renderer.CreateApplication(root);
-            application.Use(registry.AsPlugin<TestNode>());
+            application.Use(registry.AsPlugin());
             application.Mount(renderer.CreateContainer());
             return resolved!;
         }

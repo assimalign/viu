@@ -30,7 +30,7 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`
   (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
 - **Application / plugins** — `Application<TNode>` (Vue's `createApp` shell: one root mounted into
   one container), `ApplicationConfiguration` (error/warn handlers, performance flag),
-  `IComponentDefinition`, `IPlugin<TNode>`, and `ISuspenseBoundary` (the async-component / Suspense
+  `IComponentDefinition`, `IPlugin`, and `ISuspenseBoundary` (the async-component / Suspense
   registration seam completed by [V01.01.03.20]).
 - **Provide / inject** (`DependencyInjection/`) — `DependencyInjection` and the typed
   `InjectionKey<T>`.

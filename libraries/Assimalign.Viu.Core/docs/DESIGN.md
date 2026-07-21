@@ -41,7 +41,7 @@ This is how the stopwatch re-renders reactively instead of polling.
 Per [ADR-0004](../../../docs/adr/0004-composition-only-component-model.md), the component model is
 composition-only: a `ComponentInstance` runs a setup function; props/emits/slots/lifecycle are
 typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`) and plugins
-(`IPlugin<TNode>`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
+(`IPlugin`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
 `app.config.globalProperties` bag.
 
 ## Teleport is a special vnode type, not a component

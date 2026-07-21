@@ -8,7 +8,7 @@ libraries. Area: `V01.01.06`.
 
 Downstream, the source generator turns a `@template`-bearing `.viu` into a **mountable component** — the
 compiled render function, the merged `@script`, and the `IComponentDefinition` bridge ([V01.01.06.07]) that
-lets it be passed straight to `CreateApp` / `VirtualNodeFactory.Component`. A `@style`-only `.viu` stays a
+lets it be passed straight to `BrowserApplication.CreateBuilder` / `VirtualNodeFactory.Component`. A `@style`-only `.viu` stays a
 CSS-bundle unit. This library owns none of that; it only produces the descriptor those consumers read.
 
 The exact container syntax (the `@template`/`@script`/`@style` `@`-block grammar, the column-0
