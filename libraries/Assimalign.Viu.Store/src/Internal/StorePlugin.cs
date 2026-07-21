@@ -1,24 +1,26 @@
 using System;
+using System.Threading.Tasks;
 
 using Assimalign.Viu;
 
 namespace Assimalign.Viu.Store;
 
 /// <summary>
-/// The <see cref="IPlugin"/> adapter that installs a <see cref="StoreRegistry"/> on an app — the C#
-/// bridge for Pinia's <c>app.use(pinia)</c> (<c>packages/pinia/src/createPinia.ts</c>
+/// The <see cref="IApplicationPlugin"/> adapter that installs a <see cref="StoreRegistry"/> on an app —
+/// the C# bridge for Pinia's <c>app.use(pinia)</c> (<c>packages/pinia/src/createPinia.ts</c>
 /// <c>pinia.install</c>). A registry is platform-agnostic, so it is wrapped by
 /// <see cref="StoreRegistry.AsPlugin"/> rather than implementing the (platform-neutral) plugin
-/// interface itself. Installing provides the registry app-wide (so a component <c>Setup</c> can inject
-/// it) and makes it the ambient <see cref="Stores.ActiveRegistry"/>. Internal.
+/// interface itself; the registry is carried as constructor state (upstream's plugin <c>options</c>).
+/// Installing provides the registry app-wide (so a component <c>Setup</c> can inject it) and makes it
+/// the ambient <see cref="Stores.ActiveRegistry"/>. The install completes synchronously. Internal.
 /// </summary>
-internal sealed class StorePlugin : IPlugin
+internal sealed class StorePlugin : IApplicationPlugin
 {
     private readonly StoreRegistry _registry;
 
     public StorePlugin(StoreRegistry registry) => _registry = registry;
 
-    public void Install(IApplication application, object? options)
+    public ValueTask InstallAsync(IApplication application)
     {
         ArgumentNullException.ThrowIfNull(application);
         // Provide the registry app-wide (upstream: app.provide(piniaSymbol, pinia)) so UseStore() in a
@@ -26,5 +28,6 @@ internal sealed class StorePlugin : IPlugin
         // non-component resolution has a fallback.
         application.Provide(StoreRegistry.InjectionKey, _registry);
         Stores.SetActiveRegistry(_registry);
+        return ValueTask.CompletedTask;
     }
 }

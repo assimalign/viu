@@ -122,9 +122,11 @@ public sealed class BrowserApplication : Application<int>
     public async Task<ComponentInstance?> MountAsync(string selector, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
+        // Documented mount order (services frozen at Build) -> plugins install -> platform init -> render.
         // Initialize before resolving the selector — QuerySelector needs the bridge loaded.
         if (!IsMounted)
         {
+            await InstallPendingPluginsAsync().ConfigureAwait(false);
             await OnInitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         return Mount(BrowserRuntime.QuerySelector(selector));

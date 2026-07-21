@@ -39,19 +39,19 @@ public sealed class ComponentMountOptions
 
     /// <summary>
     /// An optional hook to set app-level configuration (upstream: <c>global.config</c>) — for
-    /// example an <see cref="ApplicationConfiguration.ErrorHandler"/> or
-    /// <see cref="ApplicationConfiguration.WarnHandler"/>.
+    /// example an <see cref="IApplicationContext.ErrorHandler"/> or
+    /// <see cref="IApplicationContext.WarnHandler"/>.
     /// </summary>
-    public Action<ApplicationConfiguration>? ConfigureApplication { get; set; }
+    public Action<IApplicationContext>? ConfigureApplication { get; set; }
 
     /// <summary>
     /// The app-level dependency-injection provider for the mounted tree ([V01.01.03.24]) — attached to
     /// the mount's application context so the component's <c>Setup</c> can resolve services through
     /// <see cref="ComponentInstance.Services"/> and the <see cref="DependencyInjection.GetService{T}()"/>
-    /// composition functions, exactly as a builder-built app exposes <see cref="IApplication.Services"/>.
-    /// Build one with a <see cref="ServiceProviderBuilder"/> (or a bring-your-own provider). Null (the
-    /// default) mounts a tree with no service provider. This is app-level DI, independent of the
-    /// component-tree <see cref="Provides"/>.
+    /// composition functions, exactly as a builder-built app exposes
+    /// <see cref="IApplicationContext.ServicesProvider"/>. Build one with a <see cref="ServiceContainer"/>
+    /// (or a bring-your-own provider). Null (the default) mounts a tree with no service provider. This is
+    /// app-level DI, independent of the component-tree <see cref="Provides"/>.
     /// </summary>
     public IServiceProvider? Services { get; set; }
 
