@@ -1,0 +1,36 @@
+{
+  "note": [
+    "Reviewed interop-crossing baseline for the Viu benchmark suite ([V01.01.11.04], #88).",
+    "The interop-crossing analogue of the publish-size manifest (scripts/budgets/PublishBudgets.json).",
+    "",
+    "totalOperationCount: the number of in-memory node operations the scenario's MEASURED step performs",
+    "against the test adapter (Assimalign.Viu.Testing). Each node op is one JSImport crossing in the",
+    "browser (the epic's 'N node ops == N interop calls' equivalence), so this count is the DOM-free proxy",
+    "the gate protects. It is deterministic and machine-independent, so tolerance is 0 by default: any",
+    "increase is a regression the gate fails.",
+    "",
+    "No silent ratcheting: CI never rewrites this file. Raising a ceiling is an explicit, reviewed edit in",
+    "the pull request, so a crossing increase is always a deliberate decision. Seeded from the measured",
+    "actual of the Optimized (keyed, patch-flagged) variant -- the shipped renderer path.",
+    "",
+    "The keyed advantage this baseline locks in is visible against the KeylessBypass variant (run",
+    "'interop --variant KeylessBypass'): remove-row costs 1 crossing keyed but 1996 keyless, swap-rows 2",
+    "vs 4. A change that silently drops keys or patch flags is time-neutral yet multiplies crossings, and",
+    "trips this gate -- the DOM-free stand-in for a browser command-buffer bypass.",
+    "",
+    "Seed provenance: measured 2026-07-20 with .NET SDK 10.0.301 via 'dotnet run -- interop'. Counts are",
+    "renderer-deterministic (independent of host/label values), so a differing CI measurement means the",
+    "renderer's crossing behavior changed -- investigate rather than re-seed."
+  ],
+  "scenarios": [
+    { "name": "create-1000", "totalOperationCount": 26005, "tolerance": 0 },
+    { "name": "create-10000", "totalOperationCount": 260005, "tolerance": 0 },
+    { "name": "update-every-10th", "totalOperationCount": 100, "tolerance": 0 },
+    { "name": "swap-rows", "totalOperationCount": 2, "tolerance": 0 },
+    { "name": "select-row", "totalOperationCount": 1, "tolerance": 0 },
+    { "name": "remove-row", "totalOperationCount": 1, "tolerance": 0 },
+    { "name": "append-1000", "totalOperationCount": 26000, "tolerance": 0 },
+    { "name": "replace-1000", "totalOperationCount": 27000, "tolerance": 0 },
+    { "name": "clear-1000", "totalOperationCount": 1000, "tolerance": 0 }
+  ]
+}

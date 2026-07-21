@@ -60,6 +60,7 @@
 		<File Path=".github/workflows/area-shared.yml" />
 		<File Path=".github/workflows/area-syntax.yml" />
 		<File Path=".github/workflows/area-testing.yml" />
+		<File Path=".github/workflows/benchmarks.yml" />
 		<File Path=".github/workflows/budget-gates.yml" />
 		<File Path=".github/workflows/webapp.yml" />
 	</Folder>
@@ -135,6 +136,15 @@
 	</Folder>
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Tasks/">
 		<Project Path="sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj" />
+	</Folder>
+	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.Benchmarks/">
+		<Project Path="benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj" />
+	</Folder>
+	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.Benchmarks.Tests/">
+		<Project Path="benchmarks/Assimalign.Viu.Testing.Benchmarks.Tests/Assimalign.Viu.Testing.Benchmarks.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/benchmarks/baselines/">
+		<File Path="benchmarks/baselines/InteropCounts.json" />
 	</Folder>
 	<Folder Name="/viu/scripts/">
 		<File Path="scripts/Install-Local.ps1" />
