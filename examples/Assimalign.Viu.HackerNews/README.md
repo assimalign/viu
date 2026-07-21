@@ -34,8 +34,9 @@ from `https://hacker-news.firebaseio.com/v0/`, which sends permissive CORS heade
 | `/user/:id` | `user` | `UserView` (async) | User profile. |
 | `/:pathMatch(.*)*` | `not-found` | `NotFoundView` | Catch-all 404. |
 
-`/` is mapped to `/top` at bootstrap, and a `beforeEach` guard redirects in-session navigations to `/`
-(e.g. the logo) to `/top`.
+A `beforeEach` guard redirects `/` to `/top`. Bootstrap awaits `router.ReadyAsync()` before mounting,
+so this guard runs the initial navigation through the full pipeline — the redirect fires both for a
+page loaded directly at `/` and for in-session navigations to `/` (e.g. clicking the logo).
 
 ## Architecture
 

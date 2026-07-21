@@ -39,12 +39,11 @@ internal static class Program
         var router = new Assimalign.Viu.Router.Router(history, AppRoutes.Create());
         router.BeforeEach(AppRoutes.RedirectRoot);
 
-        // Resolve the initial URL before mounting. The router resolves its initial location eagerly and
-        // without running guards (no vue-router START sentinel — [V01.01.08.07], #219), so the BeforeEach
-        // root redirect cannot fire for a page loaded directly at "/". Map it to the top feed here; the
-        // guard still handles in-session navigations to "/" (e.g. the logo).
-        var initialLocation = history.Location is "/" or "" ? "/top" : history.Location;
-        await router.Replace(initialLocation);
+        // Run the initial navigation through the full guard pipeline before mounting ([V01.01.08.07],
+        // #219): the router starts at the START sentinel, so ReadyAsync navigates to the current URL
+        // with from = START and the RedirectRoot beforeEach fires even for a page loaded directly at
+        // "/", redirecting it to /top. Awaiting settles the first route so the initial render is correct.
+        await router.ReadyAsync();
 
         // A per-app store registry, provided app-wide so UseStore() resolves through component context;
         // the store-definitions container and the router are provided under their injection keys.

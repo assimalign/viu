@@ -18,6 +18,10 @@ namespace Assimalign.Viu.Router;
 /// </remarks>
 public sealed class RouteLocation : IEquatable<RouteLocation>
 {
+    private static readonly IReadOnlyList<RouteRecord> EmptyMatched = Array.Empty<RouteRecord>();
+    private static readonly IReadOnlyDictionary<string, object?> EmptyMeta =
+        new Dictionary<string, object?>(0);
+
     internal RouteLocation(
         string path,
         string? name,
@@ -31,6 +35,19 @@ public sealed class RouteLocation : IEquatable<RouteLocation>
         Matched = matched;
         Meta = meta;
     }
+
+    /// <summary>
+    /// The initial (start) location a <see cref="Router.CurrentRoute"/> holds before its first
+    /// navigation confirms — the C# port of vue-router's <c>START_LOCATION_NORMALIZED</c>
+    /// (<c>packages/router/src/location.ts</c>,
+    /// https://router.vuejs.org/api/#Variables-START-LOCATION). It has path <c>"/"</c>, no name, no
+    /// parameters, and — the defining trait — an <b>empty</b> <see cref="Matched"/> chain, so it is
+    /// never equal to any resolved route and never renders through a <see cref="RouterView"/>. The
+    /// router compares against this exact instance by reference to recognize the first navigation,
+    /// which runs the full guard pipeline with <c>from</c> set to this sentinel.
+    /// </summary>
+    public static RouteLocation Start { get; } =
+        new("/", name: null, RouteParameters.Empty, EmptyMatched, EmptyMeta);
 
     /// <summary>The concrete resolved path.</summary>
     public string Path { get; }
