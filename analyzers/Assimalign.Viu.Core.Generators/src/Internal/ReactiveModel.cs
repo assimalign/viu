@@ -1,6 +1,6 @@
 using System;
 
-namespace Assimalign.Viu.Reactivity.Generators;
+namespace Assimalign.Viu.Core.Generators;
 
 /// <summary>
 /// The value-equatable description of one <c>[Reactive]</c>/<c>[ShallowReactive]</c> class the

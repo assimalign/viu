@@ -13,6 +13,6 @@
        that add a package/project reference to this library get [Reactive] support without
        referencing the generator directly. Merged in with the reactive core ([V01.01.12.21]). -->
   <ItemGroup>
-    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
   </ItemGroup>
 </Project>

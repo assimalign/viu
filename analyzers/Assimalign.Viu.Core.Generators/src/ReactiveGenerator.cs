@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace Assimalign.Viu.Reactivity.Generators;
+namespace Assimalign.Viu.Core.Generators;
 
 /// <summary>
 /// The incremental source generator behind <c>[Reactive]</c>/<c>[ShallowReactive]</c> — the compiled

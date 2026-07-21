@@ -65,14 +65,14 @@
 		<File Path=".github/workflows/webapp.yml" />
 	</Folder>
 	<Folder Name="/viu/analyzers/" />
-	<Folder Name="/viu/analyzers/Assimalign.Viu.Reactivity.Generators/">
-		<File Path="analyzers/Assimalign.Viu.Reactivity.Generators/Assimalign.Viu.Reactivity.Generators.slnx" />
+	<Folder Name="/viu/analyzers/Assimalign.Viu.Core.Generators/">
+		<File Path="analyzers/Assimalign.Viu.Core.Generators/Assimalign.Viu.Core.Generators.slnx" />
 	</Folder>
-	<Folder Name="/viu/analyzers/Assimalign.Viu.Reactivity.Generators/src/">
-		<Project Path="analyzers/Assimalign.Viu.Reactivity.Generators/src/Assimalign.Viu.Reactivity.Generators.csproj" />
+	<Folder Name="/viu/analyzers/Assimalign.Viu.Core.Generators/src/">
+		<Project Path="analyzers/Assimalign.Viu.Core.Generators/src/Assimalign.Viu.Core.Generators.csproj" />
 	</Folder>
-	<Folder Name="/viu/analyzers/Assimalign.Viu.Reactivity.Generators/test/">
-		<Project Path="analyzers/Assimalign.Viu.Reactivity.Generators/test/Assimalign.Viu.Reactivity.Generators.Tests.csproj" />
+	<Folder Name="/viu/analyzers/Assimalign.Viu.Core.Generators/test/">
+		<Project Path="analyzers/Assimalign.Viu.Core.Generators/test/Assimalign.Viu.Core.Generators.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/analyzers/Assimalign.Viu.Syntax.Generators/">
 		<File Path="analyzers/Assimalign.Viu.Syntax.Generators/Assimalign.Viu.Syntax.Generators.slnx" />

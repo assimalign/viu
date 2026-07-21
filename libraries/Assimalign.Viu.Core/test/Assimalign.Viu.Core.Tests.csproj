@@ -25,6 +25,6 @@
   <!-- Run the [Reactive] source generator over this project's test classes so the behavioral tests
        (the merged Reactivity/GeneratedReactiveObjectTests) consume real generated output. -->
   <ItemGroup>
-    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
   </ItemGroup>
 </Project>

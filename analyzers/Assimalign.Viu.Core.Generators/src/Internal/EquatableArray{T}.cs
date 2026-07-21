@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Assimalign.Viu.Reactivity.Generators;
+namespace Assimalign.Viu.Core.Generators;
 
 /// <summary>
 /// An immutable array with value equality, used inside the incremental generator's model records so

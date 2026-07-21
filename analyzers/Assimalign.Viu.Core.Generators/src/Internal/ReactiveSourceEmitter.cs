@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Assimalign.Viu.Reactivity.Generators;
+namespace Assimalign.Viu.Core.Generators;
 
 /// <summary>
 /// Renders a <see cref="ReactiveClassModel"/> into the partial-class implementation the generator

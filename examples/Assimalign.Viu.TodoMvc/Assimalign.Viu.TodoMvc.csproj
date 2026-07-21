@@ -14,6 +14,6 @@
          Assimalign.Viu.Reactivity as a PrivateAssets=all analyzer, so it does not flow through the
          (transitive) project reference; an in-repo consumer opts in explicitly, exactly as the
          Reactivity test project does. -->
-    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
   </ItemGroup>
 </Project>

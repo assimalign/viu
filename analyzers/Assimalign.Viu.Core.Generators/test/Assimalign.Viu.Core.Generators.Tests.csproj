@@ -14,7 +14,7 @@
     <!-- Normal compile reference to the generator (to instantiate and drive it), plus the runtime
          library so the test compilation can resolve [Reactive] and IReactiveObject. The generator
          resolves by name because build/Targets/Build.References.Projects.targets also indexes analyzers/. -->
-    <ViuPrivateProjectReference Include="Assimalign.Viu.Reactivity.Generators" />
+    <ViuPrivateProjectReference Include="Assimalign.Viu.Core.Generators" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
   </ItemGroup>
 </Project>

@@ -2,7 +2,7 @@ using System;
 
 using Microsoft.CodeAnalysis;
 
-namespace Assimalign.Viu.Reactivity.Generators;
+namespace Assimalign.Viu.Core.Generators;
 
 /// <summary>
 /// A value-equatable diagnostic to emit, carried inside the generator's cached model. Deferring the

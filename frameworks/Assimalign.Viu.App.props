@@ -59,7 +59,7 @@
         <ViuFrameworkAssembly Include="Assimalign.Viu.Core" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.RuntimeDom" />
 
-        <ViuFrameworkAnalyzer Include="Assimalign.Viu.Reactivity.Generators" />
+        <ViuFrameworkAnalyzer Include="Assimalign.Viu.Core.Generators" />
         <ViuFrameworkAnalyzer Include="Assimalign.Viu.Syntax.Generators" />
     </ItemGroup>
 </Project>
