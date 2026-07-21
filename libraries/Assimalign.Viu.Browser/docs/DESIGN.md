@@ -54,8 +54,9 @@ is [V01.01.01.02] (#4). Until then style map keys are CSS property names (kebab-
 
 ## Shipping the JS half (WasmAppHost constraint)
 
-The bridge module (`src/wwwroot/viu-dom.js`) is owned by this package and loaded by
-`BrowserRuntime.InitializeAsync` from `/_content/Assimalign.Viu.Browser/viu-dom.js`. The
+The bridge module (`src/wwwroot/viu-dom.js`) is owned by this package and loaded by the browser
+bridge initialization — `BrowserApplication`'s mount path, or the low-level
+`BrowserRuntime.InitializeAsync` — from `/_content/Assimalign.Viu.Browser/viu-dom.js`. The
 canonical RCL (Razor SDK) static-web-asset flow is **not usable here**: measured on .NET SDK
 10.0.10, the non-Blazor WebAssembly dev host (WasmAppHost) stops serving the app entirely when
 it references a Razor-SDK class library, and its dev serving pattern only maps the app's source
@@ -109,7 +110,7 @@ the boundary in the response flags — the browser already applied the arrival o
 The boundary is the budget, so the batched mode collapses a whole scheduler flush's node-ops into
 **one** interop call. There is no upstream Vue counterpart — the prior art is Blazor's `RenderBatch`
 — but it is behaviorally invisible: buffered and direct modes produce byte-identical DOM. It is a
-construction-time choice (`BrowserRuntime.CreateApp(root, props, useCommandBuffer: true)`); the
+construction-time choice (`BrowserApplication.CreateBuilder(root, props, useCommandBuffer: true)`); the
 renderer and Core see the identical `RendererOptions<int>` either way. Default is direct;
 buffered is opt-in for this delivery.
 
@@ -320,10 +321,10 @@ same way it answers a FLIP measure or a history read: **one crossing that return
   dedups, so an overlapping re-snapshot is harmless.
 - **Buffered mode** treats the snapshot as a read: it commits any pending command-buffer frame first (so
   the walk sees committed DOM), then snapshots — the same "reads force a flush" rule `parentNode`/
-  `nextSibling`/`querySelector` follow. `CreateSSRApp` uses the direct path; the buffered wrapper carries a
+  `nextSibling`/`querySelector` follow. The hydrating (SSR) app uses the direct path; the buffered wrapper carries a
   snapshot source too so a buffered renderer is not left mount-only.
-- **`BrowserRuntime.CreateSsrApp(...).Mount(...)`** does **not** clear the container (unlike a client
-  `CreateApp` mount) — the server content is precisely what hydration reuses.
+- **`CreateSsrBuilder(...).Build().MountAsync(...)`** does **not** clear the container (unlike a client
+  `CreateBuilder` mount) — the server content is precisely what hydration reuses.
 
 Over-registration is deliberate and bounded: a text node deep inside an adopted element gets a handle even
 though no vnode points at it, but the whole subtree's handles are released together when the element is
@@ -331,7 +332,7 @@ removed (`releaseSubtree`), so a mount/unmount cycle still returns the registrie
 
 ## Non-goals (sequenced work)
 
-- App bootstrap (`CreateApp`-equivalent, container clearing) — [V01.01.04.04] (#42).
+- App bootstrap (builder + mount, container clearing) — [V01.01.04.04] (#42).
 - `v-model` runtime — [V01.01.04.06].
 - Compiler `persisted` injection (`transformTransition`: mark a `<Transition>` persisted when its
   single child carries `v-show`) — a `Assimalign.Viu.Syntax.Templates` follow-up; the runtime already

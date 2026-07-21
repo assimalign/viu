@@ -14,6 +14,14 @@ namespace Assimalign.Viu.Browser;
 /// this package ships as a static web asset, then hands out renderers whose node-ops drive the
 /// real DOM over int-handle interop. Single-threaded by design (browser main thread only);
 /// not thread-safe.
+/// <para>
+/// Normal app bootstrap does <b>not</b> call this type: build a <c>BrowserApplication</c> with
+/// <see cref="BrowserApplication.CreateBuilder(IComponentDefinition, VirtualNodeProperties?, bool)"/>
+/// and mount it with <c>MountAsync</c>, which owns the bridge initialization internally (the reshape
+/// eliminated the external initialization pre-call, <c>V01.01.03.23</c>). The members here are the
+/// low-level primitives for advanced scenarios — a bare renderer, selector resolution, or the
+/// handle-leak diagnostics — that operate without an application.
+/// </para>
 /// </summary>
 [SupportedOSPlatform("browser")]
 public static class BrowserRuntime
@@ -22,83 +30,38 @@ public static class BrowserRuntime
 
     /// <summary>
     /// Loads the package's <c>viu-dom.js</c> bridge module and wires event dispatch. Idempotent —
-    /// later calls await the same initialization. Must complete before any renderer is created.
+    /// later calls await the same initialization.
+    /// <para>
+    /// <b>Advanced/low-level.</b> A normal app does not call this: <c>BrowserApplication.MountAsync</c>
+    /// runs the same initialization internally through its mount path. Use this only for the bare-
+    /// primitive scenarios (<see cref="CreateRenderer"/>, <see cref="QuerySelector"/>, the leak
+    /// diagnostics) that need the bridge without an application.
+    /// </para>
     /// </summary>
     /// <param name="cancellationToken">Cancels the module download.</param>
     public static Task InitializeAsync(CancellationToken cancellationToken = default)
+        => EnsureBridgeAsync(cancellationToken);
+
+    /// <summary>
+    /// Ensures the <c>viu-dom.js</c> bridge module is loaded and event dispatch is wired, caching the
+    /// initialization so it runs at most once per process no matter how many applications mount. This
+    /// is the seam <see cref="BrowserApplication.OnInitializeAsync"/> awaits inside its mount path.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the module download.</param>
+    internal static Task EnsureBridgeAsync(CancellationToken cancellationToken = default)
         => _initialization ??= InitializeCoreAsync(cancellationToken);
+
+    /// <summary>Whether the <c>viu-dom.js</c> bridge has finished initializing.</summary>
+    internal static bool IsBridgeInitialized => _initialization is { IsCompletedSuccessfully: true };
 
     /// <summary>
     /// Creates a renderer over the browser node-ops (upstream: <c>ensureRenderer()</c>).
     /// </summary>
-    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
+    /// <exception cref="InvalidOperationException">The bridge has not been initialized (call <see cref="InitializeAsync"/>).</exception>
     public static Renderer<int> CreateRenderer()
     {
-        EnsureInitialized();
+        EnsureBridgeInitialized();
         return RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
-    }
-
-    /// <summary>
-    /// Creates a browser application for <paramref name="rootComponent"/> (upstream:
-    /// <c>createApp(rootComponent)</c>, https://vuejs.org/api/application.html) —
-    /// <c>BrowserRuntime.CreateApp(root).Mount("#app")</c> is a Viu WASM app's whole
-    /// bootstrap ([V01.01.04.04]).
-    /// <para>
-    /// Set <paramref name="useCommandBuffer"/> to run the renderer over the interop command buffer
-    /// ([V01.01.04.05]): node-ops serialize into a shared binary frame that a single interop call
-    /// applies per scheduler flush instead of one call per mutation. It is behaviorally invisible —
-    /// buffered and direct modes produce byte-identical DOM — and is a construction-time choice the
-    /// renderer and Core see through the identical adapter. Default is direct; buffered is
-    /// opt-in for this delivery.
-    /// </para>
-    /// </summary>
-    /// <param name="rootComponent">The root component definition.</param>
-    /// <param name="rootProperties">Props for the root component, or null.</param>
-    /// <param name="useCommandBuffer">Whether to batch node-ops through the command buffer.</param>
-    /// <returns>The app; mount it by selector or handle.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
-    public static BrowserApplication CreateApp(
-        IComponentDefinition rootComponent,
-        VirtualNodeProperties? rootProperties = null,
-        bool useCommandBuffer = false)
-    {
-        ArgumentNullException.ThrowIfNull(rootComponent);
-        EnsureInitialized();
-        if (useCommandBuffer)
-        {
-            var bufferedOperations = BufferedBrowserNodeOperations.CreateProduction();
-            var bufferedRenderer = RendererFactory.CreateRenderer(bufferedOperations.Create());
-            return new BrowserApplication(
-                bufferedRenderer.CreateApplication(rootComponent, rootProperties),
-                bufferedOperations);
-        }
-        var renderer = RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
-        return new BrowserApplication(renderer.CreateApplication(rootComponent, rootProperties));
-    }
-
-    /// <summary>
-    /// Creates a browser application that <b>hydrates</b> existing server-rendered markup rather than
-    /// mounting fresh — the C# port of <c>createSSRApp(rootComponent)</c> in <c>@vue/runtime-dom</c>
-    /// (https://vuejs.org/guide/scaling-up/ssr.html#client-hydration). Its
-    /// <see cref="BrowserApplication.Mount(string)"/> adopts the container's server DOM (attaching event
-    /// listeners and component instances, reconciling only dynamic bindings) instead of clearing and
-    /// recreating it; a server/client mismatch recovers per subtree without crashing. The container must
-    /// already hold the markup the server renderer produced for the same root component.
-    /// </summary>
-    /// <param name="rootComponent">The root component definition (the same one rendered on the server).</param>
-    /// <param name="rootProperties">Props for the root component, or null.</param>
-    /// <returns>The hydrating app; mount it by selector or handle over the server-rendered container.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
-    public static BrowserApplication CreateSsrApp(
-        IComponentDefinition rootComponent,
-        VirtualNodeProperties? rootProperties = null)
-    {
-        ArgumentNullException.ThrowIfNull(rootComponent);
-        EnsureInitialized();
-        var renderer = RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
-        return new BrowserApplication(renderer.CreateApplication(rootComponent, rootProperties), hydrate: true);
     }
 
     /// <summary>Clears a container's content in one interop call, releasing registered child handles.</summary>
@@ -109,11 +72,11 @@ public static class BrowserRuntime
     /// <summary>Resolves a selector to a node handle (e.g. the mount container).</summary>
     /// <param name="selector">The CSS selector.</param>
     /// <exception cref="BrowserDomException">No node matches <paramref name="selector"/>.</exception>
-    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
+    /// <exception cref="InvalidOperationException">The bridge has not been initialized.</exception>
     public static int QuerySelector(string selector)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
-        EnsureInitialized();
+        EnsureBridgeInitialized();
         return BrowserDomBridge.QuerySelector(selector);
     }
 
@@ -124,7 +87,7 @@ public static class BrowserRuntime
     /// </summary>
     public static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
     {
-        EnsureInitialized();
+        EnsureBridgeInitialized();
         return BrowserNodeOperations.GetRegistryDiagnostics();
     }
 
@@ -141,12 +104,18 @@ public static class BrowserRuntime
         await BrowserDomBridge.InitializeModuleAsync();
     }
 
-    private static void EnsureInitialized()
+    /// <summary>
+    /// Throws when the bridge has not finished initializing — the guard for the synchronous
+    /// primitives and the synchronous <c>BrowserApplication.Mount(int)</c> advanced path.
+    /// </summary>
+    internal static void EnsureBridgeInitialized()
     {
-        if (_initialization is not { IsCompletedSuccessfully: true })
+        if (!IsBridgeInitialized)
         {
             throw new InvalidOperationException(
-                "BrowserRuntime.InitializeAsync() must complete before using the DOM bridge.");
+                "The Viu browser bridge is not initialized. Mount a BrowserApplication with MountAsync "
+                + "(which initializes the bridge in its mount path), or await BrowserRuntime.InitializeAsync() "
+                + "before using the bare-renderer/selector primitives.");
         }
     }
 }

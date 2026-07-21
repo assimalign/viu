@@ -167,9 +167,10 @@ state it read changes. Because C# has no `Proxy`, that closure *is* the proxy-fr
 state object ([ADR-0004](../adr/0004-composition-only-component-model.md): Viu is composition-only —
 no Options API).
 
-**`Program.cs`** — a Viu WASM app's whole bootstrap: initialize the DOM bridge, create the app from a
-root component, mount it by selector, then keep the WASM main loop alive (rendering is reactive from
-there on):
+**`Program.cs`** — a Viu WASM app's whole bootstrap: build the app from a root component and mount it
+by selector, then keep the WASM main loop alive (rendering is reactive from there on). The builder is
+the .NET-idiomatic shape (compare `WebApplication.CreateBuilder`), and `MountAsync` loads the browser
+bridge inside the mount path — there is no separate initialization call:
 
 ```csharp
 using System.Threading;
@@ -179,12 +180,14 @@ using Assimalign.Viu.Browser;
 
 using HelloViu;
 
-await BrowserRuntime.InitializeAsync();
-
-BrowserRuntime.CreateApp(new Counter()).Mount("#app");
+await BrowserApplication.CreateBuilder(new Counter()).Build().MountAsync("#app");
 
 await Task.Delay(Timeout.Infinite);
 ```
+
+Configure the app on the builder before `Build()` — plugins with `builder.Use(...)`, app-level values
+with `builder.Provide(key, value)` — exactly as `createApp(App).use(...).provide(...)` composes an app
+in Vue.
 
 **`Counter.cs`** — a working counter:
 
@@ -235,7 +238,7 @@ and the renderer's batched updates rather than imperative DOM access
 ([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNodeFactory`, `IComponentDefinition`,
 `ComponentProperties`, and `ComponentSetupContext` all live in
 [`Assimalign.Viu.Core`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md); the
-browser entry point `BrowserRuntime` lives in
+browser entry point `BrowserApplication` lives in
 [`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a larger
 component — props, emitted events, and lifecycle hooks (`Lifecycle.OnMounted`/`OnUnmounted`) — read the
 [`Assimalign.Viu.WebApp`](../../examples/Assimalign.Viu.WebApp) sample.
@@ -339,7 +342,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > A `.viu` with an `@template` (standard Vue template markup) and an `@script` (C#) block now compiles to a
 > **mountable component**: the generator emits the render function, merges the script into the partial
 > class, **and** generates the `IComponentDefinition` bridge (a `Setup` that returns the render delegate),
-> so you mount it exactly like a hand-written component — `BrowserRuntime.CreateApp(new Greeting()).Mount("#app")`
+> so you mount it exactly like a hand-written component — `BrowserApplication.CreateBuilder(new Greeting()).Build().MountAsync("#app")`
 > or `VirtualNodeFactory.Component(new Greeting(), props)` — with no manual wiring beyond the package
 > reference. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive re-render, and a
 > template event handler (`@click="Increment"`) calls the like-named `@script` method:

@@ -17,9 +17,9 @@ namespace Assimalign.Viu.Router.Browser;
 /// depends on both the Router and the DOM adapter, kept out of every non-router app's framework
 /// closure ([V01.01.08.03.01], issue #191).
 /// <para>
-/// Install once at app bootstrap (after <c>BrowserRuntime.InitializeAsync</c>, before mounting).
-/// Not thread-safe (browser main thread only); the installed bridge is ambient process-global state
-/// on <see cref="BrowserObjectEvents"/>.
+/// Install once at app bootstrap, before mounting (the Viu DOM bridge itself is loaded inside the
+/// app's <c>MountAsync</c> path). Not thread-safe (browser main thread only); the installed bridge is
+/// ambient process-global state on <see cref="BrowserObjectEvents"/>.
 /// </para>
 /// </summary>
 public static class RouterLinkDomBridge

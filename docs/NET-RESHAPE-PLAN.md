@@ -1,6 +1,6 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
-**Status: in progress — R1, R2, and R3 implemented (awaiting main-session review); R4+ not started.** This
+**Status: in progress — R1, R2, R3, and R4 implemented (awaiting main-session review); R5 not started.** This
 document is the session-independent source of truth for the reshape arc. Any session (human or agent)
 resuming this work reads this file first, checks the *State* table, and continues from the first
 incomplete unit. Update the State table in the same commit as any unit's progress.
@@ -118,8 +118,12 @@ until reviewed.
     Testing renderer's mount align to the same contract.
   - `IApplicationBuilder` + default `ApplicationBuilder` in Core: configuration surface for root
     component/props, plugins (`Use`), provides, and (R5) services; platform packages supply
-    entry points (e.g. Browser's `CreateApplicationBuilder`). Existing `CreateApp`/`CreateSsrApp`
-    become thin wrappers or get obsoleted per the issue's decision — samples/guide updated either way.
+    entry points. **As implemented (#233):** the entry points are `BrowserApplication.CreateBuilder`/
+    `CreateSsrBuilder` and `ServerApplication.CreateBuilder`; `IPlugin<TNode>` became non-generic
+    `IPlugin`; `CreateApp`/`CreateSsrApp` were **removed** (a sync `Mount` cannot run the killed init)
+    and all call sites migrated; `BrowserRuntime` was retained as a low-level primitive holder
+    (`InitializeAsync` repositioned as advanced, module-import owned internally by the mount path); the
+    builder reserves the R5 `IServiceProviderBuilder Services` seam (documented, not implemented).
 - **Compat blast radius**: every sample `Program.cs`, Testing harness mounts, Router/Store
   `AsPlugin` docs, getting-started guide, SSR round-trip tests.
 
@@ -148,7 +152,7 @@ until reviewed.
 | R1 | #230 (`V01.01.02.10`) | `feature/V01.01.02.10-reactivity-public-surface` | implemented, awaiting main-session review |
 | R2 | #231 (`V01.01.12.21`) | `feature/V01.01.12.21-core-consolidation` | implemented, awaiting main-session review |
 | R3 | #232 (`V01.01.12.22`) | `feature/V01.01.12.22-browser-rename` | implemented, awaiting main-session review |
-| R4 | not yet filed (`V01.01.03.23`) | `feature/V01.01.03.23-application-model` | not started |
+| R4 | #233 (`V01.01.03.23`) | `feature/V01.01.03.23-application-model` | implemented, awaiting main-session review |
 | R5 | not yet filed (`V01.01.03.24`) | `feature/V01.01.03.24-service-provider-integration` | not started |
 
 ## Resume protocol

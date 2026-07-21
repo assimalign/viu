@@ -7,17 +7,18 @@ using Assimalign.Viu.Browser;
 namespace Assimalign.Viu.Forms;
 
 /// <summary>
-/// The browser bootstrap for the forms sample — the only browser-only code in the app. Initializes
-/// the DOM bridge and mounts the root form component, mirroring Vue's <c>createApp(App).mount('#app')</c>.
+/// The browser bootstrap for the forms sample — the only browser-only code in the app. Builds and
+/// mounts the root form component, mirroring Vue's <c>createApp(App).mount('#app')</c> in the .NET
+/// builder shape; <c>MountAsync</c> loads the browser bridge inside the mount path (no separate
+/// initialization call).
 /// </summary>
 [SupportedOSPlatform("browser")]
 internal static class FormsBootstrap
 {
-    /// <summary>Initializes the runtime and mounts the form into <c>#app</c>.</summary>
+    /// <summary>Builds and mounts the form into <c>#app</c>.</summary>
     /// <returns>A task that completes once the app is mounted.</returns>
     public static async Task RunAsync()
     {
-        await BrowserRuntime.InitializeAsync();
-        BrowserRuntime.CreateApp(new RegistrationFormComponent()).Mount("#app");
+        await BrowserApplication.CreateBuilder(new RegistrationFormComponent()).Build().MountAsync("#app");
     }
 }

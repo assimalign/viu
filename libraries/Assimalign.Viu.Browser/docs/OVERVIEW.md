@@ -7,14 +7,21 @@ node-ops and prop patching that the platform-agnostic renderer
 
 ## What it contains
 
-- **`BrowserRuntime`** (public entry): `InitializeAsync()` loads the package's JS bridge module;
-  `CreateApp(rootComponent).Mount("#app")` is a whole app bootstrap ([V01.01.04.04]);
-  `CreateApp(root, props, useCommandBuffer: true)` runs the renderer over the batched interop command
-  buffer ([V01.01.04.05], behaviorally identical to direct); `CreateRenderer()` returns a
-  `Renderer<int>` over the browser node-ops; `QuerySelector()` resolves mount containers;
-  `GetRegistryDiagnostics()` exposes handle-registry sizes for leak checks.
-- **`BrowserApplication`** (public): the mounted app — selector or handle mounting with
+- **`BrowserApplication`** (public entry): the mounted app. Build one with
+  `BrowserApplication.CreateBuilder(rootComponent)` (or `CreateSsrBuilder(...)` to hydrate
+  server-rendered markup, `CreateBuilder(root, props, useCommandBuffer: true)` to run the renderer over
+  the batched interop command buffer, [V01.01.04.05], behaviorally identical to direct), then
+  `await app.MountAsync("#app")`. It extends the platform-agnostic `Application<int>` base and
+  **overrides the initialization seam** to load the JS bridge module inside its own mount path — so
+  there is no external initialization pre-call ([V01.01.03.23]) — with selector/handle mounting,
   clear-before-mount, and `Unmount()` returning the bridge registry to its pre-mount baseline.
+- **`BrowserApplicationBuilder`** (public): the `IApplicationBuilder` created by
+  `BrowserApplication.CreateBuilder`/`CreateSsrBuilder`; records plugins/provides and, on `Build()`,
+  constructs the app over the direct or command-buffered node-ops.
+- **`BrowserRuntime`** (public, low-level): `InitializeAsync()` loads the JS bridge module (advanced —
+  a normal app never calls it; `MountAsync` runs the same initialization internally); `CreateRenderer()`
+  returns a `Renderer<int>` over the browser node-ops; `QuerySelector()` resolves mount containers;
+  `GetRegistryDiagnostics()` exposes handle-registry sizes for leak checks.
 - **`BrowserDomException`** (public): typed interop failure carrying the operation name and the
   node handle.
 - **`viu-dom.js`** (`src/wwwroot/`, shipped with the package): the JS half — the handle
@@ -35,8 +42,7 @@ node-ops and prop patching that the platform-agnostic renderer
 ## Using it
 
 ```csharp
-await BrowserRuntime.InitializeAsync();
-BrowserRuntime.CreateApp(new RootComponent()).Mount("#app");
+await BrowserApplication.CreateBuilder(new RootComponent()).Build().MountAsync("#app");
 ```
 
 The example app (`examples/Assimalign.Viu.WebApp`) is the living usage sample; its

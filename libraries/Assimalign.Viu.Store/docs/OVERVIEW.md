@@ -30,7 +30,7 @@ Public surface (all under namespace `Assimalign.Viu.Store`):
   from a component's app context or the active registry), and disposes a single store with
   `Dispose(registry)` (the port of `store.$dispose()`).
 - **`StoreRegistry`**: the per-app store root (the C# port of the `Pinia` instance). Owns a detached
-  root `EffectScope` and the id → instance map; `AsPlugin<TNode>()` bridges it onto an app through
+  root `EffectScope` and the id → instance map; `AsPlugin()` bridges it onto an app through
   `App.Use(...)`; `Dispose()` stops the whole subsystem; `Count` and `IsDisposed` round out the
   surface. Directly constructible (`new StoreRegistry()`) so a DI container can own it.
 - **`StoreSetup<TStore>`** (`Delegates/`): the parameterless setup delegate that constructs the store
@@ -56,7 +56,7 @@ Member model (`[V01.01.09.02]`, the C# port of Pinia's store instance API):
   and action callbacks.
 
 Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): `StorePlugin<TNode>` (the
-`IPlugin<TNode>` adapter that provides the registry app-wide and sets it active on install) and
+`IPlugin` adapter that provides the registry app-wide and sets it active on install) and
 `StoreEntry` (a registry's per-store record: instance, owning scope, and owning definition).
 
 ## Using it
@@ -80,7 +80,7 @@ static readonly StoreDefinition<CounterStore> UseCounter =
 
 // Per app: create a registry and install it.
 var pinia = Stores.CreateRegistry();
-app.Use(pinia.AsPlugin<TNode>());          // provides the registry app-wide
+app.Use(pinia.AsPlugin());          // provides the registry app-wide
 
 // Inside a component Setup — resolves the app's registry, no argument needed:
 var counter = UseCounter.UseStore();

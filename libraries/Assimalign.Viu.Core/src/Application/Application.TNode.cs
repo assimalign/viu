@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Assimalign.Viu;
 
@@ -10,18 +12,30 @@ namespace Assimalign.Viu;
 /// unmounted as a whole, over a shared <see cref="ApplicationContext"/> that carries the component
 /// registry, app-level provides, and <see cref="ApplicationConfiguration"/> to every descendant.
 /// <see cref="Component(string, IComponentDefinition)"/>, <see cref="Provide{T}"/>, and
-/// <see cref="Use(IPlugin{TNode}, object?)"/> configure the app before mounting; registering
-/// after <see cref="Mount"/> warns (upstream parity). Platform packages wrap this with container
-/// resolution (the browser's <c>CreateApp(...).Mount("#app")</c> is [V01.01.04.04]).
+/// <see cref="Use(IPlugin, object?)"/> configure the app before mounting; registering after
+/// <see cref="Mount"/> warns (upstream parity).
+/// <para>
+/// This is the platform-neutral, <b>extensible base</b> (the reshape's "application base",
+/// <c>V01.01.03.23</c>): it implements the node-type-agnostic <see cref="IApplication"/> and exposes
+/// <c>virtual</c>/<c>protected</c> lifecycle seams — <see cref="OnInitializeAsync"/> (the async
+/// initialization step in the mount path a browser needs for its awaited module imports),
+/// <see cref="CreateRootVirtualNode"/>, <see cref="InstallPlugin"/>, <see cref="Mount(TNode)"/>, and
+/// <see cref="Unmount"/>. It is not marked <c>abstract</c> because the default renderer-bound app
+/// (Core, the Testing renderer, custom renderers) is created directly by
+/// <see cref="Renderer{TNode}.CreateApplication"/> and mounts as-is; platform packages that need
+/// awaited initialization (the browser) derive and override the seams. The constructor stays
+/// <c>internal</c>, so the type is opaque and un-subclassable outside the framework.
+/// </para>
 /// <para>
 /// <c>app.config.globalProperties</c> is deliberately excluded in favor of typed app-level
 /// provide/inject — see <see cref="ApplicationConfiguration"/> and the founding ADR
-/// ([V01.01.13.01]).
+/// ([V01.01.13.01]). Platform packages wrap this with container resolution and a builder entry point
+/// (the browser's <c>BrowserApplication.CreateBuilder(root).Build().MountAsync("#app")</c>).
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 /// <typeparam name="TNode">The platform node type.</typeparam>
-public sealed class Application<TNode>
+public class Application<TNode> : IApplication, IDisposable
     where TNode : notnull
 {
     private readonly Renderer<TNode> _renderer;
@@ -166,15 +180,15 @@ public sealed class Application<TNode>
     /// <summary>
     /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>).
     /// A repeat <c>Use</c> of the same plugin instance is deduplicated with a dev warning; a plugin
-    /// installed after mount warns. The plugin's <see cref="IPlugin{TNode}.Install"/> receives
-    /// this app, through which it registers components, directives, and provides. Returns the app
-    /// for chaining.
+    /// installed after mount warns. The plugin's <see cref="IPlugin.Install"/> receives this app
+    /// (through the <see cref="InstallPlugin"/> seam), through which it registers components,
+    /// directives, and provides. Returns the app for chaining.
     /// </summary>
     /// <param name="plugin">The plugin to install.</param>
     /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public Application<TNode> Use(IPlugin<TNode> plugin, object? options = null)
+    public Application<TNode> Use(IPlugin plugin, object? options = null)
     {
         ArgumentNullException.ThrowIfNull(plugin);
         WarnIfMounted(nameof(Use));
@@ -185,19 +199,44 @@ public sealed class Application<TNode>
             RuntimeWarnings.Warn("Plugin has already been applied to target app.");
             return this;
         }
-        plugin.Install(this, options);
+        InstallPlugin(plugin, options);
         return this;
     }
 
     /// <summary>
-    /// Mounts the root component into <paramref name="container"/> (upstream: <c>app.mount</c>),
-    /// attaching the app context so descendants resolve app-level provides, registered components,
-    /// and config. A second call warns and no-ops, returning the existing instance (upstream
-    /// parity).
+    /// Mounts the root component into <paramref name="container"/> synchronously (upstream:
+    /// <c>app.mount</c>), attaching the app context so descendants resolve app-level provides,
+    /// registered components, and config. A second call warns and no-ops, returning the existing
+    /// instance (upstream parity).
+    /// <para>
+    /// This is the synchronous mount for platforms whose <see cref="OnInitializeAsync"/> is a no-op
+    /// (Core, the Testing renderer, custom renderers). Platforms with awaited initialization override
+    /// this seam and expose an async entry (the browser's <c>MountAsync</c>); prefer
+    /// <see cref="MountAsync"/> for the initialization-aware path.
+    /// </para>
     /// </summary>
     /// <param name="container">The platform container node.</param>
     /// <returns>The root component instance.</returns>
-    public ComponentInstance? Mount(TNode container) => MountCore(container, hydrate: false);
+    public virtual ComponentInstance? Mount(TNode container) => MountCore(container, hydrate: false);
+
+    /// <summary>
+    /// Runs the overridable <see cref="OnInitializeAsync"/> step (a no-op by default; the browser
+    /// awaits its module imports here), then mounts into <paramref name="container"/>. This is the
+    /// mount path the reshape's builder bootstrap uses (builder -&gt; <c>Build()</c> -&gt;
+    /// <c>MountAsync</c>), so no separate runtime initialization pre-call is needed. A second call
+    /// warns and no-ops (initialization does not re-run).
+    /// </summary>
+    /// <param name="container">The platform container node.</param>
+    /// <param name="cancellationToken">Cancels the initialization step.</param>
+    /// <returns>The root component instance.</returns>
+    public async Task<ComponentInstance?> MountAsync(TNode container, CancellationToken cancellationToken = default)
+    {
+        if (!IsMounted)
+        {
+            await OnInitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+        return Mount(container);
+    }
 
     /// <summary>
     /// Mounts by hydrating the existing server-rendered content of <paramref name="container"/>
@@ -205,8 +244,8 @@ public sealed class Application<TNode>
     /// <c>packages/runtime-core/src/renderer.ts</c> — <c>createAppAPI(render, hydrate)</c>,
     /// https://vuejs.org/guide/scaling-up/ssr.html#client-hydration). The root component adopts the
     /// server DOM instead of recreating it; a server/client mismatch recovers per subtree without
-    /// crashing. Platform packages surface this as their <c>CreateSSRApp(...).Mount(...)</c> entry.
-    /// A second call warns and no-ops.
+    /// crashing. Platform packages surface this as their <c>CreateSsrBuilder(...).Build().MountAsync(...)</c>
+    /// entry. A second call warns and no-ops.
     /// </summary>
     /// <param name="container">The container holding the server-rendered markup.</param>
     /// <returns>The root component instance.</returns>
@@ -228,7 +267,7 @@ public sealed class Application<TNode>
             RuntimeWarnings.Sink = warnHandler;
             _warnSinkInstalled = true;
         }
-        _rootVirtualNode = VirtualNodeFactory.Component(_rootComponent, _rootProperties);
+        _rootVirtualNode = CreateRootVirtualNode();
         _rootVirtualNode.AppContext = _context;
         if (hydrate)
         {
@@ -245,9 +284,11 @@ public sealed class Application<TNode>
 
     /// <summary>
     /// Unmounts the app (upstream: <c>app.unmount</c>): runs the component teardown lifecycles,
-    /// removes the rendered tree from the container, and restores the warning sink.
+    /// removes the rendered tree from the container, and restores the warning sink. A no-op when not
+    /// mounted. Platforms with extra teardown (the browser's interop-handle cleanup) override and
+    /// call <c>base.Unmount()</c>.
     /// </summary>
-    public void Unmount()
+    public virtual void Unmount()
     {
         if (!IsMounted)
         {
@@ -264,6 +305,47 @@ public sealed class Application<TNode>
             _warnSinkInstalled = false;
         }
     }
+
+    /// <summary>
+    /// Disposes the app by unmounting it (a <c>using</c>-friendly alias for <see cref="Unmount"/>).
+    /// Idempotent — a no-op when not mounted.
+    /// </summary>
+    public void Dispose()
+    {
+        Unmount();
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// The overridable asynchronous initialization step run by <see cref="MountAsync"/> before the
+    /// first mount — the seam that lets a platform await work that must complete before rendering
+    /// (the browser awaits its <c>viu-dom.js</c> module import here, [V01.01.04.03]). The default is
+    /// a completed task (no initialization), so the synchronous <see cref="Mount(TNode)"/> path is
+    /// unaffected. Implementations should be idempotent (cache the work) so repeated mount attempts
+    /// initialize at most once.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the initialization work.</param>
+    /// <returns>A task that completes when the platform is ready to render.</returns>
+    protected virtual Task OnInitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Creates the root virtual node mounted into the container (upstream: the root vnode built in
+    /// <c>app.mount</c>). The default builds a component vnode from the configured root component and
+    /// props; a platform may override to customize root-vnode creation.
+    /// </summary>
+    /// <returns>The root virtual node.</returns>
+    protected virtual VirtualNode CreateRootVirtualNode()
+        => VirtualNodeFactory.Component(_rootComponent, _rootProperties);
+
+    /// <summary>
+    /// Installs <paramref name="plugin"/> into this application (upstream:
+    /// <c>plugin.install(app, options)</c>) — the seam <see cref="Use"/> calls once per plugin
+    /// instance, after the dedupe/after-mount guards. The default invokes
+    /// <see cref="IPlugin.Install"/> against this app.
+    /// </summary>
+    /// <param name="plugin">The plugin to install.</param>
+    /// <param name="options">Options passed to the plugin's install, or null.</param>
+    protected virtual void InstallPlugin(IPlugin plugin, object? options) => plugin.Install(this, options);
 
     private void ProvideCore(object key, object? value)
     {
@@ -285,4 +367,14 @@ public sealed class Application<TNode>
                 + "rendered tree. Configure the app before Mount().");
         }
     }
+
+    IApplication IApplication.Component(string name, IComponentDefinition definition) => Component(name, definition);
+
+    IApplication IApplication.Directive(string name, IDirective directive) => Directive(name, directive);
+
+    IApplication IApplication.Provide<T>(InjectionKey<T> key, T value) => Provide(key, value);
+
+    IApplication IApplication.Provide(string key, object? value) => Provide(key, value);
+
+    IApplication IApplication.Use(IPlugin plugin, object? options) => Use(plugin, options);
 }

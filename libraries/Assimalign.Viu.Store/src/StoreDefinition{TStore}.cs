@@ -64,7 +64,7 @@ public sealed class StoreDefinition<TStore>
         var registry = ResolveAmbientRegistry()
             ?? throw new InvalidOperationException(
                 $"No store registry is available to resolve store \"{Id}\". Install one on the app with "
-                + "App.Use(registry.AsPlugin<TNode>()), pass a registry to UseStore(registry), or set one "
+                + "App.Use(registry.AsPlugin()), pass a registry to UseStore(registry), or set one "
                 + "with Stores.SetActiveRegistry(...).");
         return registry.Resolve(this);
     }

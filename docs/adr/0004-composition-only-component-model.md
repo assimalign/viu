@@ -26,7 +26,7 @@ runtime machinery — a poor fit for an AOT/trimming target and for C#'s type sy
 - No Options API and no mixins: component logic is expressed in a setup function returning reactive
   state (refs, computeds) and handlers.
 - No `app.config.globalProperties`: cross-cutting values are supplied through **typed
-  provide/inject** (`InjectionKey<T>`, app-level `Provide<T>`) and plugins (`IPlugin<TNode>`).
+  provide/inject** (`InjectionKey<T>`, app-level `Provide<T>`) and plugins (`IPlugin`).
 - `Application<TNode>` (the C# port of `createAppAPI(render)`) and `ApplicationConfiguration`
   deliberately exclude a global-properties bag; `ApplicationConfiguration` carries the error
   handler, warn handler, and performance flag only. This exclusion is called out in

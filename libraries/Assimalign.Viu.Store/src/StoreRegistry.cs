@@ -15,8 +15,8 @@ namespace Assimalign.Viu.Store;
 /// Keeping the registry per app instance is what gives server-side (multi-request) hosting its
 /// isolation — two registries never share store state, so a long-lived .NET server serves concurrent
 /// requests without the global mutable state a fresh JS module graph would provide per request
-/// (https://pinia.vuejs.org/ssr/). Install a registry on an <see cref="Application{TNode}"/> with
-/// <c>App.Use(registry.AsPlugin&lt;TNode&gt;())</c>. Not thread-safe (single-threaded JS event-loop
+/// (https://pinia.vuejs.org/ssr/). Install a registry on an <see cref="IApplication"/> with
+/// <c>App.Use(registry.AsPlugin())</c>. Not thread-safe (single-threaded JS event-loop
 /// model): WASM needs no locks, and servers isolate by using one registry per request rather than a
 /// shared singleton.
 /// </para>
@@ -46,16 +46,14 @@ public sealed class StoreRegistry : IDisposable
 
     /// <summary>
     /// Wraps this registry as an installable app plugin so it can be applied with
-    /// <c>App.Use(registry.AsPlugin&lt;TNode&gt;())</c> — the C# stand-in for the Pinia <c>pinia</c>
-    /// object being itself the plugin passed to <c>app.use(pinia)</c>. Installing provides this
-    /// registry app-wide (the final inject fallback) and makes it the ambient
-    /// <see cref="Stores.ActiveRegistry"/>. Call once per app.
+    /// <c>App.Use(registry.AsPlugin())</c> — the C# stand-in for the Pinia <c>pinia</c> object being
+    /// itself the plugin passed to <c>app.use(pinia)</c>. Installing provides this registry app-wide
+    /// (the final inject fallback) and makes it the ambient <see cref="Stores.ActiveRegistry"/>. The
+    /// plugin is platform-neutral (it extends the node-type-agnostic <see cref="IApplication"/>), so
+    /// the same plugin installs on a browser app or a server app. Call once per app.
     /// </summary>
-    /// <typeparam name="TNode">The app's platform node type.</typeparam>
     /// <returns>A plugin that installs this registry.</returns>
-    public IPlugin<TNode> AsPlugin<TNode>()
-        where TNode : notnull
-        => new StorePlugin<TNode>(this);
+    public IPlugin AsPlugin() => new StorePlugin(this);
 
     /// <summary>
     /// Stops the root effect scope — cascading to every store's child scope, so all computeds and
