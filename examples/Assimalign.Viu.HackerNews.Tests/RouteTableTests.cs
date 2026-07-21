@@ -79,13 +79,26 @@ public sealed class RouteTableTests
     }
 
     [Fact]
+    public async Task Root_redirects_to_the_top_feed_on_initial_navigation()
+    {
+        // The initial page-load "/" case: the router starts at the START sentinel, so ReadyAsync runs
+        // the RedirectRoot beforeEach for the entry URL and redirects "/" -> "/top" on first resolve —
+        // the exact scenario #219 (a direct load at "/") the bootstrap no longer works around
+        // ([V01.01.08.07]).
+        var router = CreateRouter();
+
+        await router.ReadyAsync();
+
+        router.CurrentRoute.Value.Name.ShouldBe("feed");
+        router.CurrentRoute.Value.Parameters.GetString("feed").ShouldBe("top");
+    }
+
+    [Fact]
     public async Task Root_redirects_to_the_top_feed_in_session()
     {
-        // The BeforeEach root redirect fires for an in-session navigation to "/" (e.g. clicking the
-        // logo). Navigate away from the router's pre-resolved initial "/" first, so this Push is not a
-        // deduplicated same-location no-op. (The initial page-load "/" case is handled in bootstrap —
-        // Program.Main — because the router resolves its initial location without running guards; see
-        // [V01.01.08.07], #219.)
+        // The BeforeEach root redirect also fires for an in-session navigation to "/" (e.g. clicking
+        // the logo). Navigate away from the initial location first, so this Push is not a deduplicated
+        // same-location no-op.
         var router = CreateRouter();
         await router.Push("/new");
 

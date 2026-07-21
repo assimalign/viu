@@ -250,6 +250,41 @@ ordering test that mounts a real view tree and records every hook.
   `OnError` handlers and faults the returned task — upstream's `triggerError` + promise rejection.
   `RouterLink` observes its fire-and-forget navigation so a fault never strands unobserved.
 
+### The initial navigation runs the pipeline from the START location
+
+`CurrentRoute` begins at `RouteLocation.Start` — the port of upstream's `START_LOCATION_NORMALIZED`
+(`packages/router/src/location.ts`): path `/`, no name, no params, and an **empty matched chain**. The
+constructor deliberately does *not* eagerly resolve `history.Location` into the current route, because
+that pre-resolution is exactly what made the first `Push` to the already-resolved entry URL a
+`Duplicated` no-op that skipped the guard pipeline — so a global `beforeEach` redirect for the entry
+URL (the classic `{ path: '/', redirect: '/x' }`) never fired for a page loaded directly at that URL
+(`[V01.01.08.07]`, #219).
+
+- **Distinguishing the initial pass from an in-session duplicate.** The same-location dedup is gated
+  on `from.Matched.Count > 0` — the port of upstream's `from.matched.length` guard on the duplicate
+  check. START has an empty matched chain, so the initial navigation is never deduplicated and always
+  runs the full pipeline; every in-session navigation starts from a matched route, so same-location
+  pushes still short-circuit to `Duplicated`. The START sentinel is value-equal to an *unmatched* `/`
+  resolution, so this count gate (not value equality) is what keeps them apart.
+- **`ReadyAsync` triggers and awaits the first navigation.** With no `app.use(router)` install hook in
+  Viu, one idempotent method folds upstream's install-time initial `push(routerHistory.location)` and
+  its `router.isReady()`. The first call navigates to the current history location through the full
+  pipeline with `from` = START (so the leave phase is trivially empty and every enter/global guard
+  fires once), memoizes the resulting task, and returns it to every later caller. A bootstrap awaits it
+  before mounting so the first render already reflects the resolved (or redirected) route. Unlike
+  upstream's `isReady()` — which can hang if the initial navigation aborts — Viu's always settles.
+- **The first confirm replaces, never pushes.** `finalizeNavigation` forces a replace when `from` is
+  the START sentinel (`ReferenceEquals`, upstream's `isFirstNavigation`), so the app's entry URL is not
+  left as a stale back-target; through an initial redirect the reference stays START across the whole
+  chain because nothing is committed until the final confirm.
+- **RouterView is empty at START.** With an empty matched chain, every `RouterView` resolves no record
+  at its depth and renders nothing until the initial navigation confirms — matching upstream's empty
+  `matched` at START.
+- **No compensating `go` for the initial resolution.** The initial navigation runs through the
+  application push path (`ReadyAsync` → `Navigate` → `PushWithRedirect`), never the popstate listener,
+  so the pop path's compensating `history.go` (below) cannot fire for it — an aborted initial
+  navigation simply leaves `CurrentRoute` at START and history untouched.
+
 ### In-component guards hook the component lifecycle, never reflection
 
 `beforeRouteLeave`/`beforeRouteUpdate` need per-instance state, so they are **registration-based**
