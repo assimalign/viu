@@ -44,6 +44,15 @@ internal static class SingleFileComponentSourceEmitter
     /// </summary>
     private const string DomRenderHelperSurface = "global::Assimalign.Viu.RuntimeDom.DomRenderHelpers";
 
+    /// <summary>
+    /// The fully qualified runtime-core namespace the generated <c>IComponentDefinition</c> bridge
+    /// ([V01.01.06.07]) names by <c>global::</c> reference — the generator never references the runtime
+    /// assembly, exactly as the render-helper surfaces are bound by name. The bridge members
+    /// (<c>IComponentDefinition</c>, <c>ComponentProperties</c>, <c>ComponentSetupContext</c>,
+    /// <c>ComponentSlots</c>, <c>VirtualNode</c>, and <c>RenderHelpers.NormalizeRoot</c>) all live here.
+    /// </summary>
+    private const string RuntimeCoreNamespace = "global::Assimalign.Viu.RuntimeCore";
+
     /// <summary>Emits the full generated source for <paramref name="model"/>.</summary>
     /// <param name="model">The scaffold to render.</param>
     /// <returns>The generated C# source text.</returns>
@@ -100,7 +109,18 @@ internal static class SingleFileComponentSourceEmitter
             .Append(", custom=").Append(Count(model.CustomBlockCount)).Append(".\n");
 
         AppendIndent(builder, indent);
-        builder.Append("partial class ").Append(model.ClassName).Append('\n');
+        builder.Append("partial class ").Append(model.ClassName);
+        if (model.RenderBody is not null)
+        {
+            // [V01.01.06.07] A @template-bearing .viu is a mountable component: the generated partial
+            // implements IComponentDefinition (base list added here, the sole class-declaration site) so it
+            // can be passed to CreateApp/VirtualNodeFactory.Component. A @style-only or scriptless .viu with
+            // no render body stays a plain partial class — no interface, no Setup — so the CSS-bundle .viu
+            // files keep compiling unchanged. Named by global:: reference, never an assembly reference.
+            builder.Append(" : ").Append(RuntimeCoreNamespace).Append(".IComponentDefinition");
+        }
+
+        builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("{\n");
 
@@ -138,6 +158,8 @@ internal static class SingleFileComponentSourceEmitter
             builder.Append(renderBody);
             AppendIndent(builder, bodyIndent);
             builder.Append("}\n");
+
+            AppendComponentDefinitionBridge(builder, bodyIndent, model);
         }
         else
         {
@@ -160,6 +182,137 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         return builder.ToString();
+    }
+
+    // [V01.01.06.07] The IComponentDefinition bridge — the generated Name + Setup that turn a compiled
+    // @template/@script partial into a component the runtime can instantiate and mount (CreateApp,
+    // VirtualNodeFactory.Component) with no hand-written wiring. Emitted only alongside a render body (the
+    // base list is added to match, in Emit); a render-less .viu never reaches here. The members are
+    // EXPLICIT interface implementations, so they never collide with a merged @script member named Name or
+    // Setup, and the class surface the render's _ctx sees stays exactly the @script members. Setup runs once
+    // per instance with the instance current (upstream setup(props, context)): it allocates the per-instance
+    // render cache, captures the setup context for the compiled render's slot outlets when the template uses
+    // them, applies the v-bind() CSS custom properties when the component declares any, and returns the
+    // render delegate that normalizes the compiled static Render(_ctx, _cache) result to a vnode. Reactive
+    // @script members (a Reference<T> read as _ctx.name.Value, a [Reactive] field) are tracked by the render
+    // effect that runs the returned delegate, so a mutation drives a re-render — the .viu analogue of Vue's
+    // <script setup> binding semantics.
+    private static void AppendComponentDefinitionBridge(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        // The compiled render reads parent-provided slots as `_ctx.__slots` (docs/DESIGN.md: `$slots` is not
+        // a legal C# identifier). Only wire the slot accessor when the render actually reads it, so a
+        // slotless component stays minimal.
+        var usesSlots = model.RenderBody is { } renderBody
+            && renderBody.IndexOf("_ctx.__slots", StringComparison.Ordinal) >= 0;
+        var appliesCssVariables = model.CssVariableBindings.Count > 0;
+        var displayName = model.ClassName.Length > 0 && model.ClassName[0] == '@'
+            ? model.ClassName.Substring(1)
+            : model.ClassName;
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("// [V01.01.06.07] The IComponentDefinition bridge: the generated Name + Setup that make this\n");
+        AppendIndent(builder, indent);
+        builder.Append("// compiled @template component mountable through CreateApp / VirtualNodeFactory.Component with no\n");
+        AppendIndent(builder, indent);
+        builder.Append("// hand-written wiring. Explicitly implemented so they never collide with a merged @script member.\n");
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// The component's display name (upstream: the component <c>name</c> option, inferred from the\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <c>.viu</c> file name) — surfaced to runtime warnings and devtools.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("string? ").Append(RuntimeCoreNamespace).Append(".IComponentDefinition.Name => ")
+            .Append(Literal(displayName)).Append(";\n");
+
+        if (usesSlots)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>The setup context captured for the compiled render's slot outlets; held so a\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// slot-affecting parent update is reflected live.</summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("private ").Append(RuntimeCoreNamespace).Append(".ComponentSetupContext? __setupContext;\n");
+            builder.Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// The parent-provided slots (upstream: <c>_ctx.$slots</c>; <c>$</c> is not legal in C#, so the\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// compiled render spells it <c>__slots</c>) — the by-name binding site the render's\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// <c>_renderSlot</c> calls read.\n");
+            AppendIndent(builder, indent);
+            builder.Append("/// </summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("private ").Append(RuntimeCoreNamespace).Append(".ComponentSlots? __slots => __setupContext?.Slots;\n");
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// The Composition API entry point (upstream: <c>setup(props, context)</c>,\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// https://vuejs.org/api/composition-api-setup.html) generated for this <c>@template</c> component\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// ([V01.01.06.07]). It runs once per instance: it allocates the per-instance render cache\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// (<see cref=\"RenderCacheSize\"/> slots) and returns the render delegate, which re-executes the\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// compiled <see cref=\"Render\"/> on every reactive update. State is the merged <c>@script</c>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// members the render reads through <c>_ctx</c>, so a reactive member drives re-render.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <param name=\"properties\">The instance's shallow-reactive props (upstream: <c>setup</c>'s <c>props</c>).</param>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <param name=\"context\">The setup context: attrs, emit, expose, and slots.</param>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <returns>The render function producing the component's subtree.</returns>\n");
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Func<").Append(RuntimeCoreNamespace).Append(".VirtualNode?> ")
+            .Append(RuntimeCoreNamespace).Append(".IComponentDefinition.Setup(\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append(RuntimeCoreNamespace).Append(".ComponentProperties properties,\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append(RuntimeCoreNamespace).Append(".ComponentSetupContext context)\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+
+        if (usesSlots)
+        {
+            AppendIndent(builder, indent + 1);
+            builder.Append("__setupContext = context;\n");
+        }
+
+        AppendIndent(builder, indent + 1);
+        builder.Append("// The per-instance render cache (v-once subtrees and cached handlers), allocated once and\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("// captured by the render delegate so cached slots persist across re-renders.\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("var _cache = new object?[RenderCacheSize];\n");
+
+        if (appliesCssVariables)
+        {
+            AppendIndent(builder, indent + 1);
+            builder.Append("// Apply this component's v-bind() CSS custom properties ([V01.01.06.06]); the UseCssVars\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("// runtime re-applies them reactively after each flush without re-rendering.\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("ApplyCssVariables();\n");
+        }
+
+        AppendIndent(builder, indent + 1);
+        builder.Append("return () => ").Append(RenderHelperSurface).Append(".NormalizeRoot(Render(this, _cache));\n");
+        AppendIndent(builder, indent);
+        builder.Append("}\n");
     }
 
     // [V01.01.06.03]/[V01.01.06.03.01] The @script member seam. Leading using directives are hoisted

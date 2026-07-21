@@ -46,7 +46,8 @@ public sealed class SingleFileComponentGeneratorTests
         // [V01.01.05.05] render function (helpers bound BY NAME through the file-level using static of
         // the runtime render-helper surface) wrapped in the [V01.01.05.08] #line span map (the dynamic
         // {{ message }} access anchors a directive that points a C# error at the .viu template line 2,
-        // column 13), whose @script seam ([V01.01.06.03]) stays untouched, whose scoped @style block
+        // column 13), whose [V01.01.06.07] IComponentDefinition bridge (base list + explicit Name + Setup)
+        // makes it mountable, whose @script seam ([V01.01.06.03]) stays untouched, whose scoped @style block
         // ([V01.01.06.04]) compiles to the ScopeId + ExtractedStyles constants at the class tail, and
         // whose render body binds by name against both helper surfaces — the runtime-core import and
         // the DOM import ([V01.01.04.09]).
@@ -64,7 +65,7 @@ namespace Demo
     // "Counter.viu" by the Assimalign.Viu.Syntax source generator ([V01.01.06.02]).
     //
     // Parsed blocks: @template=present, @script=present, @style=1, custom=0.
-    partial class Counter
+    partial class Counter : global::Assimalign.Viu.RuntimeCore.IComponentDefinition
     {
         /// <summary>
         /// The number of render cache slots (<c>v-once</c> subtrees and cached handlers) the
@@ -82,6 +83,36 @@ namespace Demo
 #line (2,13)-(2,20) 88 "C:/proj/Counter.viu"
             return _createElementBlock(_openBlock(), "div", null, _toDisplayString(_ctx.message), 1 /* TEXT */);
 #line default
+        }
+
+        // [V01.01.06.07] The IComponentDefinition bridge: the generated Name + Setup that make this
+        // compiled @template component mountable through CreateApp / VirtualNodeFactory.Component with no
+        // hand-written wiring. Explicitly implemented so they never collide with a merged @script member.
+        /// <summary>
+        /// The component's display name (upstream: the component <c>name</c> option, inferred from the
+        /// <c>.viu</c> file name) — surfaced to runtime warnings and devtools.
+        /// </summary>
+        string? global::Assimalign.Viu.RuntimeCore.IComponentDefinition.Name => "Counter";
+
+        /// <summary>
+        /// The Composition API entry point (upstream: <c>setup(props, context)</c>,
+        /// https://vuejs.org/api/composition-api-setup.html) generated for this <c>@template</c> component
+        /// ([V01.01.06.07]). It runs once per instance: it allocates the per-instance render cache
+        /// (<see cref="RenderCacheSize"/> slots) and returns the render delegate, which re-executes the
+        /// compiled <see cref="Render"/> on every reactive update. State is the merged <c>@script</c>
+        /// members the render reads through <c>_ctx</c>, so a reactive member drives re-render.
+        /// </summary>
+        /// <param name="properties">The instance's shallow-reactive props (upstream: <c>setup</c>'s <c>props</c>).</param>
+        /// <param name="context">The setup context: attrs, emit, expose, and slots.</param>
+        /// <returns>The render function producing the component's subtree.</returns>
+        global::System.Func<global::Assimalign.Viu.RuntimeCore.VirtualNode?> global::Assimalign.Viu.RuntimeCore.IComponentDefinition.Setup(
+            global::Assimalign.Viu.RuntimeCore.ComponentProperties properties,
+            global::Assimalign.Viu.RuntimeCore.ComponentSetupContext context)
+        {
+            // The per-instance render cache (v-once subtrees and cached handlers), allocated once and
+            // captured by the render delegate so cached slots persist across re-renders.
+            var _cache = new object?[RenderCacheSize];
+            return () => global::Assimalign.Viu.RuntimeCore.RenderHelpers.NormalizeRoot(Render(this, _cache));
         }
 
         // [V01.01.06.03] Merged @script block. The block's C# is emitted verbatim below, wrapped in
@@ -132,6 +163,30 @@ namespace Demo
         generated.ShouldContain("// [V01.01.05.05] No @template block: no render function is emitted for this component.");
         generated.ShouldNotContain("using static");
         generated.ShouldNotContain("internal static object? Render(");
+    }
+
+    [Fact]
+    public void RenderlessComponent_StaysAPlainPartialClass_WithNoComponentDefinitionBridge()
+    {
+        // [V01.01.06.07] The bridge is emitted ONLY for a @template-bearing .viu: a @style-only .viu (the
+        // AppStyles.viu / HackerNews CSS-bundle shape) must keep compiling as a plain partial class — no
+        // IComponentDefinition base list, no Setup — so it never suddenly demands a template or a runtime
+        // reference. Pins the "keep @style-only files compiling exactly as today" requirement.
+        const string source =
+            "@style scoped {\n" +
+            "    .box { color: red; }\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/AppStyles.viu", source, RootNamespace, ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "AppStyles.SingleFileComponent.g.cs");
+        generated.ShouldContain("partial class AppStyles\n");
+        generated.ShouldNotContain("IComponentDefinition");
+        generated.ShouldNotContain(".Setup(");
+        generated.ShouldNotContain("using static");
+        // The @style seam still compiles to the scope id + extracted CSS exactly as before.
+        generated.ShouldContain("internal const string ExtractedStyles = ");
     }
 
     [Fact]

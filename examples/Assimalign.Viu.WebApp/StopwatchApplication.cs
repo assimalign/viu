@@ -6,11 +6,14 @@ using System.Threading.Tasks;
 
 using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu.WebApp;
 
 // The root component of the demo ([V01.01.03.06]): Setup runs once, closes over refs, and
 // returns the render function. The timer starts OnMounted and stops OnUnmounted, so unmounting
 // the app tears everything down. The elapsed display is a child component exercising props and
-// emits ([V01.01.03.07]/[V01.01.03.08]) live.
+// emits ([V01.01.03.07]/[V01.01.03.08]) live, and the badge is a compiled .viu single-file
+// component mounted as a child ([V01.01.06.07]) — the sample's proof that a .viu @template
+// component mounts, is reactive, and publishes trimmed + AOT (the budget-gates canary).
 internal sealed class StopwatchApplication : IComponentDefinition
 {
     public string? Name => "StopwatchApplication";
@@ -21,6 +24,10 @@ internal sealed class StopwatchApplication : IComponentDefinition
         var isRunning = Reactive.Reference(false);
         var elapsedText = Reactive.Reference("00:00:00");
         var display = new ElapsedDisplay();
+        // The compiled .viu child ([V01.01.06.07]). Instantiated once in Setup (like `display`) so it is
+        // a stable component identity across the parent's re-renders — the runtime patches it in place and
+        // its @script reactive state (the click count) persists rather than remounting each stopwatch tick.
+        var badge = new ViuBadge();
         CancellationTokenSource? ticking = null;
 
         void Toggle()
@@ -96,7 +103,8 @@ internal sealed class StopwatchApplication : IComponentDefinition
                     VirtualNodeFactory.Element(
                         "button",
                         VirtualNodeFactory.Properties(("class", "primary"), ("onClick", (Action)Toggle), ("type", "button")),
-                        VirtualNodeFactory.Text(isRunning.Value ? "Pause" : "Start")))));
+                        VirtualNodeFactory.Text(isRunning.Value ? "Pause" : "Start"))),
+                VirtualNodeFactory.Component(badge)));
     }
 }
 

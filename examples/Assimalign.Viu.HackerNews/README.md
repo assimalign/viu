@@ -95,17 +95,15 @@ renderer and a **memory-history** router (no network, no browser):
 dotnet test examples/Assimalign.Viu.HackerNews.Tests
 ```
 
-## Why `.viu` is CSS-only today
+## Why `.viu` here is `@style`-only
 
-The logic-bearing components are C# `IComponentDefinition` render functions (like the `WebApp`
-sample's `StopwatchApplication`), and the `.viu` files carry only `@style` blocks. That is a current
-framework limitation, not a preference: the `.viu` single-file-component generator emits a `partial
-class` with a static `Render(...)` method but **no `IComponentDefinition`/`Setup` bridge**, so a
-`.viu` file cannot yet be authored as a mountable component (tracked by [V01.01.06.07], #216).
-The `.viu` `@style` blocks are global (unscoped) selectors matched by class name — scoped CSS relies
-on the renderer stamping a scope id onto a component *generated from* the `.viu`, which the same gap
-blocks. When the SFC→component bridge lands, these views can migrate to full `.viu` components with
-scoped `<template>`s with no change to the app's shape.
+The logic-bearing components are hand-written C# `IComponentDefinition` render functions (like the
+`WebApp` sample's `StopwatchApplication`), and the `.viu` files carry only `@style` blocks. This is now a
+migration the sample has not yet made, not a framework limitation: as of [V01.01.06.07] (#216) a
+`@template`-bearing `.viu` compiles to a **mountable component** — the generator emits the
+`IComponentDefinition`/`Setup` bridge — so these views could be authored as full `.viu` components. The
+`.viu` `@style` blocks here are global (unscoped) selectors matched by class name; converting a view to a
+scoped `@template` `.viu` component is future cleanup with no change to the app's shape.
 
 ## Deep-link hosting note
 
