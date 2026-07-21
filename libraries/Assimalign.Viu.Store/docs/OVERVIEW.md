@@ -55,7 +55,7 @@ Member model (`[V01.01.09.02]`, the C# port of Pinia's store instance API):
 - **`StoreSubscriptionCallback<TState>`** and **`StoreActionCallback`** (`Delegates/`): the subscribe
   and action callbacks.
 
-Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): `StorePlugin<TNode>` (the
+Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): `StorePlugin` (the
 `IApplicationPlugin` adapter that provides the registry app-wide and sets it active on install) and
 `StoreEntry` (a registry's per-store record: instance, owning scope, and owning definition).
 

@@ -434,7 +434,8 @@ reused across runs so a stable dependency set allocates nothing on re-track. Bat
 constructor** — opaque and un-subclassable externally, but a real base so the engine's hot path
 (per-trigger notification) dispatches through a vtable virtual call rather than interface dispatch,
 which is measurably costlier on mono-wasm / NativeAOT (the repo's "dispatch on hot paths" rule).
-Concrete leaves (`ReactiveEffect`, `Computed<T>`) are `sealed` so the JIT can devirtualize.
+Concrete leaves (`ReactiveEffect` and `Computed<T>`'s internal `ComputedSubscriber`) are `sealed`
+so the JIT can devirtualize.
 
 ## Public engine surface (read-only)
 

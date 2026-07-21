@@ -206,6 +206,12 @@ public sealed class ServerApplication : IApplication, IDisposable
             // Observe the result so a synchronously-faulted install rethrows here.
             install.GetAwaiter().GetResult();
         }
+        else
+        {
+            // Upstream parity (installedPlugins.has(plugin)) and Application<TNode>.Use symmetry:
+            // a repeated registration is a silent no-op only in prod; dev surfaces it.
+            RuntimeWarnings.Warn("Plugin has already been applied to target app.");
+        }
         return this;
     }
 
