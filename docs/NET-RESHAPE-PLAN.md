@@ -16,8 +16,8 @@ of *behavior* stays; upstream *packaging and naming* stops being load-bearing.
 
 ## Hard sequencing prerequisites
 
-1. **Merge the four green Wave 5 PRs first**: #223 (initial-navigation guards), #224 (SSR string
-   renderer), #226 (benchmark suite), #228 (`.viu` component mounting). The reshape renames sweep
+1. **[SATISFIED 2026-07-20]** ~~Merge the four green Wave 5 PRs first~~: #223, #224, #226, #228 are
+   all merged to `main`. The reshape renames sweep
    nearly every file those PRs touch — merging them after the renames means unresolvable conflict
    churn. Do not start unit R2 until all four are merged.
 2. **The hydration branch is the train base.** `feature/V01.01.07.03-hydration-walker` (issue #66,
@@ -146,7 +146,7 @@ until reviewed.
 | --- | --- | --- | --- |
 | Train base | #66 hydration + review fixes | `feature/V01.01.07.03-hydration-walker` | fixes in progress (agent); PR HELD by user request |
 | R1 | not yet filed (`V01.01.02.10`) | `feature/V01.01.02.10-reactivity-public-surface` | not started |
-| R2 | not yet filed (`V01.01.12.21`) | `feature/V01.01.12.21-core-consolidation` | not started — blocked on #223/#224/#226/#228 merging |
+| R2 | not yet filed (`V01.01.12.21`) | `feature/V01.01.12.21-core-consolidation` | not started — unblocked (prerequisite 1 satisfied 2026-07-20: #223/#224/#226/#228 all merged) |
 | R3 | not yet filed (`V01.01.12.22`) | `feature/V01.01.12.22-browser-rename` | not started |
 | R4 | not yet filed (`V01.01.03.23`) | `feature/V01.01.03.23-application-model` | not started |
 | R5 | not yet filed (`V01.01.03.24`) | `feature/V01.01.03.24-service-provider-integration` | not started |
