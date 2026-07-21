@@ -16,7 +16,12 @@ objects. It is Ref-first — there is no JavaScript `Proxy` (see
   All expose a settable `Value` and implement `IReference` / `IReference<T>`.
 - **Effects and scopes** — `ReactiveEffect` (the effect runner with scheduler injection),
   `EffectScope` (hierarchical disposal, `effectScope()`), `Dependency` (the tracked-dependency
-  primitive), and `Subscriber` (the opaque `public abstract` base for effect-like subscribers).
+  primitive), and `Subscriber` (the opaque `public abstract` base for effect-like subscribers,
+  exposing its dependency chain read-only via `FirstDependency`).
+- **Dependency-graph inspection** — `SubscriberLink` (the read-only edge node between a `Dependency`
+  and a `Subscriber`; walk it from `Subscriber.FirstDependency`) and `ITrackedReference` (reaches the
+  `Dependency` behind a ref/computed). The whole graph is publicly readable but only the engine can
+  mutate it.
 - **Watch** — `WatchOptions`, `WatchHandle`, `WatchJob`, `WatchFlushMode`, the `WatchCallback<T>` and
   `OnCleanup` delegates, and the `IWatchScheduler` seam a host (the runtime scheduler) plugs into.
 - **Source-generated reactive objects** — the `[Reactive]` / `[ShallowReactive]` attributes
