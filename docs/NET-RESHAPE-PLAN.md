@@ -1,8 +1,9 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
 **Status: arc implementation complete — R1, R2, R3, R4, and R5 all implemented (awaiting main-session
-review); the stacked train (hydration → R1 → R2 → R3 → R4 → R5) is built locally and awaiting the
-user's publish decision (no PRs opened; the hold stands).** This
+review); the hold is LIFTED (2026-07-21): the stacked train is PUBLISHED as the bottom-up PR series
+#235 (hydration) → #236 (R1) → #237 (R2) → #238 (R3) → #239 (R4) → #240 (R5) — merge strictly in
+that order.** This
 document is the session-independent source of truth for the reshape arc. Any session (human or agent)
 resuming this work reads this file first, checks the *State* table, and continues from the first
 incomplete unit. Update the State table in the same commit as any unit's progress.
