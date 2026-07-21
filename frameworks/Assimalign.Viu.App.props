@@ -56,7 +56,6 @@
     <ItemGroup Condition="'$(ViuFrameworkName)' == 'Assimalign.Viu.App'">
         <ViuFrameworkAssembly Include="Assimalign.Viu.App" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Shared" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.Reactivity" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.RuntimeCore" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.RuntimeDom" />
 

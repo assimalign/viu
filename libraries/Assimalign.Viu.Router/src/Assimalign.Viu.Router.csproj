@@ -12,6 +12,5 @@
        itself stays framework-free; only the components/Router facade touch these references. -->
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
-    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
 </Project>

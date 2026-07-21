@@ -20,7 +20,11 @@
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
-    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <ViuProjectReference Include="Assimalign.Viu.Shared" />
+  </ItemGroup>
+  <!-- Run the [Reactive] source generator over this project's test classes so the behavioral tests
+       (the merged Reactivity/GeneratedReactiveObjectTests) consume real generated output. -->
+  <ItemGroup>
+    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
   </ItemGroup>
 </Project>

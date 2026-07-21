@@ -12,7 +12,6 @@
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
     <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
-    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <!-- The hydration round-trip tests ([V01.01.07.03]) render with the SSR renderer, then parse the
          output into the in-memory tree and hydrate against it — pinning that the SSR marker output is the
          exact contract the hydration walker consumes. -->

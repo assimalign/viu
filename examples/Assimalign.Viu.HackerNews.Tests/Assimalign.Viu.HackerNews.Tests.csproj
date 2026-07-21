@@ -16,7 +16,6 @@
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
     <ViuProjectReference Include="Assimalign.Viu.Store" />
-    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
 
   <!--

@@ -249,13 +249,6 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.Css/test/">
 		<Project Path="libraries/Assimalign.Viu.Tooling.Css/test/Assimalign.Viu.Tooling.Css.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Reactivity/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Reactivity/src/">
-		<Project Path="libraries/Assimalign.Viu.Reactivity/src/Assimalign.Viu.Reactivity.csproj" />
-	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Reactivity/test/">
-		<Project Path="libraries/Assimalign.Viu.Reactivity/test/Assimalign.Viu.Reactivity.Tests.csproj" />
-	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/docs/">
 		<File Path="libraries/Assimalign.Viu.Router/docs/DESIGN.md" />
