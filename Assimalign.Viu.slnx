@@ -52,10 +52,9 @@
 		<File Path=".github/ISSUE_TEMPLATE/task.yml" />
 	</Folder>
 	<Folder Name="/viu/.github/workflows/">
+		<File Path=".github/workflows/area-core.yml" />
 		<File Path=".github/workflows/area-generators.yml" />
 		<File Path=".github/workflows/area-packaging.yml" />
-		<File Path=".github/workflows/area-reactivity.yml" />
-		<File Path=".github/workflows/area-runtimecore.yml" />
 		<File Path=".github/workflows/area-runtimedom.yml" />
 		<File Path=".github/workflows/area-shared.yml" />
 		<File Path=".github/workflows/area-syntax.yml" />

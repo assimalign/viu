@@ -1,7 +1,7 @@
 # Area build+test for the Viu source generators ([V01.01.12.02]): path-filtered so a PR only runs the
 # areas it touches; shared build files trigger every area. The build scope is each per-area slnx, keeping
 # CI and local builds in lockstep.
-#   - Assimalign.Viu.Reactivity.Generators compiles against the Assimalign.Viu.Reactivity runtime library
+#   - Assimalign.Viu.Core.Generators compiles against the Assimalign.Viu.Core runtime library
 #     (for the [Reactive] attribute), so changes there also trigger this area.
 #   - Assimalign.Viu.Syntax.Generators is the composition root of the Assimalign.Viu.Syntax.* cluster
 #     ([V01.01.06.02]); it references the base parser and the SingleFileComponent + Templates language
@@ -13,9 +13,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'analyzers/Assimalign.Viu.Reactivity.Generators/**'
+      - 'analyzers/Assimalign.Viu.Core.Generators/**'
       - 'analyzers/Assimalign.Viu.Syntax.Generators/**'
-      - 'libraries/Assimalign.Viu.Reactivity/**'
+      - 'libraries/Assimalign.Viu.Core/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
       - 'build/**'
       - 'Directory.Build.props'
@@ -27,9 +27,9 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'analyzers/Assimalign.Viu.Reactivity.Generators/**'
+      - 'analyzers/Assimalign.Viu.Core.Generators/**'
       - 'analyzers/Assimalign.Viu.Syntax.Generators/**'
-      - 'libraries/Assimalign.Viu.Reactivity/**'
+      - 'libraries/Assimalign.Viu.Core/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
       - 'build/**'
       - 'Directory.Build.props'
@@ -50,11 +50,11 @@ jobs:
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
 
-      - name: Build Reactivity generator (warnings are errors)
-        run: dotnet build analyzers/Assimalign.Viu.Reactivity.Generators/Assimalign.Viu.Reactivity.Generators.slnx --configuration Release -warnaserror
+      - name: Build Core generator (warnings are errors)
+        run: dotnet build analyzers/Assimalign.Viu.Core.Generators/Assimalign.Viu.Core.Generators.slnx --configuration Release -warnaserror
 
-      - name: Test Reactivity generator
-        run: dotnet test analyzers/Assimalign.Viu.Reactivity.Generators/Assimalign.Viu.Reactivity.Generators.slnx --configuration Release --no-build
+      - name: Test Core generator
+        run: dotnet test analyzers/Assimalign.Viu.Core.Generators/Assimalign.Viu.Core.Generators.slnx --configuration Release --no-build
 
       - name: Build SingleFileComponent generator (warnings are errors)
         run: dotnet build analyzers/Assimalign.Viu.Syntax.Generators/Assimalign.Viu.Syntax.Generators.slnx --configuration Release -warnaserror

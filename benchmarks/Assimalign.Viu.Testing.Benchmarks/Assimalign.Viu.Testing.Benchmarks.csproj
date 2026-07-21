@@ -31,7 +31,7 @@
 
   <ItemGroup>
     <!-- The in-memory adapter (its op log is the interop proxy) plus the two runtime areas the
-         micro/meso benchmarks measure directly; Shared/RuntimeCore flow transitively through Testing. -->
+         micro/meso benchmarks measure directly; Shared/Core flow transitively through Testing. -->
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
   </ItemGroup>
