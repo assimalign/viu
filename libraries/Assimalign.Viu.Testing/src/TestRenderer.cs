@@ -63,4 +63,20 @@ public sealed class TestRenderer
         RegisterQueryRoot(container);
         Renderer.Render(node, container);
     }
+
+    /// <summary>
+    /// Hydrates <paramref name="node"/> against the existing server-rendered children already present in
+    /// <paramref name="container"/> — the DOM-free counterpart of a browser <c>CreateSSRApp(...).Mount</c>
+    /// (upstream: <c>createSSRApp</c>'s hydrating mount, https://vuejs.org/guide/scaling-up/ssr.html#client-hydration).
+    /// Populate <paramref name="container"/> with the server tree first (by hand or by parsing SSR output),
+    /// then hydrate: matching nodes are adopted with zero structural mutations, and a mismatch recovers per
+    /// subtree ([V01.01.07.03]).
+    /// </summary>
+    /// <param name="node">The client vnode tree to hydrate onto the server nodes.</param>
+    /// <param name="container">The container holding the pre-rendered server tree.</param>
+    public void Hydrate(VirtualNode node, TestElement container)
+    {
+        RegisterQueryRoot(container);
+        Renderer.Hydrate(node, container);
+    }
 }

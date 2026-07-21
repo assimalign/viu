@@ -20,11 +20,16 @@ public sealed class BrowserApplication
 {
     private readonly Application<int> _application;
     private readonly BufferedBrowserNodeOperations? _bufferedOperations;
+    private readonly bool _hydrate;
 
-    internal BrowserApplication(Application<int> application, BufferedBrowserNodeOperations? bufferedOperations = null)
+    internal BrowserApplication(
+        Application<int> application,
+        BufferedBrowserNodeOperations? bufferedOperations = null,
+        bool hydrate = false)
     {
         _application = application;
         _bufferedOperations = bufferedOperations;
+        _hydrate = hydrate;
     }
 
     /// <summary>Whether the app is currently mounted.</summary>
@@ -164,16 +169,23 @@ public sealed class BrowserApplication
     /// <returns>The root component instance.</returns>
     public ComponentInstance? Mount(int containerHandle)
     {
-        if (!_application.IsMounted)
+        if (_application.IsMounted)
         {
-            // The container is a foreign node the bridge registered (a QuerySelector result); fold its
-            // handle into the buffered handle counter so a buffered create never reuses it. Harmless
-            // in direct mode (no buffered operations).
-            _bufferedOperations?.ObserveForeignHandle(containerHandle);
-            // Non-hydrating client mount clears existing container content (upstream parity);
-            // one interop call that also releases any registered child handles.
-            BrowserRuntime.ClearContainer(containerHandle);
+            // Already mounted: delegate so the app warns and returns the existing instance (upstream parity).
+            return _application.Mount(containerHandle);
         }
+        // The container is a foreign node the bridge registered (a QuerySelector result); fold its handle
+        // into the buffered handle counter so a buffered create never reuses it. Harmless in direct mode.
+        _bufferedOperations?.ObserveForeignHandle(containerHandle);
+        if (_hydrate)
+        {
+            // An app created with CreateSsrApp adopts the existing server-rendered content — the container
+            // is NOT cleared (that content is what hydration reuses).
+            return _application.Hydrate(containerHandle);
+        }
+        // Non-hydrating client mount clears existing container content (upstream parity); one interop call
+        // that also releases any registered child handles.
+        BrowserRuntime.ClearContainer(containerHandle);
         return _application.Mount(containerHandle);
     }
 

@@ -141,6 +141,18 @@ internal static partial class BrowserDomBridge
         }
     }
 
+    internal static string SnapshotHydration(int containerHandle)
+    {
+        try
+        {
+            return Imports.SnapshotHydration(containerHandle);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("snapshotHydration", containerHandle, exception);
+        }
+    }
+
     internal static int[] InsertStaticContent(string content, int parentHandle, int anchorHandle, string? namespaceName)
     {
         try
@@ -527,6 +539,9 @@ internal static partial class BrowserDomBridge
 
         [JSImport("dom.nextSibling", ModuleName)]
         internal static partial int NextSibling(int nodeHandle);
+
+        [JSImport("dom.snapshotHydration", ModuleName)]
+        internal static partial string SnapshotHydration(int containerHandle);
 
         [JSImport("dom.insertStaticContent", ModuleName)]
         internal static partial int[] InsertStaticContent(string content, int parentHandle, int anchorHandle, string? namespaceName);

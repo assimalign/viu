@@ -195,6 +195,51 @@ Deliberate divergences from upstream `apiAsyncComponent.ts`, each documented at 
 - **The `useId` `markAsyncBoundary` id-stability hook is omitted** — it belongs to SSR id generation,
   not this client-only runtime contract.
 
+## Client hydration adopts the SSR output ([V01.01.07.03])
+
+Hydration lives here, not in `Assimalign.Viu.ServerRenderer` — the walker is the C# port of
+`@vue/runtime-core`'s `createHydrationFunctions` (`packages/runtime-core/src/hydration.ts`), and like
+upstream it is bound to the renderer internals, so it ships as a `partial` of `Renderer<TNode>`
+(`Renderer.Hydration.cs`) that closes over the same `_options`, `Patch`, `MountComponent`, and `Unmount`
+the mount path uses. `Application<TNode>.Hydrate` (surfaced as each platform's `CreateSSRApp(...).Mount`)
+enters it instead of `Render`.
+
+- **Adopt, don't create.** The walk matches the client vnode tree against the existing server nodes:
+  elements are matched by tag and have only their dynamic bindings reconciled (event listeners are
+  *always* attached), text is adopted with its content asserted, fragments are consumed between their
+  `[`/`]` comment anchors, components hydrate their subtree over the existing nodes, and teleports resolve
+  their target and adopt the content there. A clean hydration performs **zero** node-creating or
+  structural operations.
+- **Reads go through an injected reader; writes through the node-ops.** The walk never touches a platform
+  node except through a `HydrationNodeReader<TNode>` (kind, firstChild, nextSibling, parentNode, tag,
+  data, attribute) and the existing `RendererOptions<TNode>` write ops. That keeps it platform-agnostic —
+  tests read the in-memory tree directly, the browser reads a single batched snapshot — and is why the
+  contract added exactly one node-op (`CreateHydrationReader`), not a chatty per-read surface.
+- **The SSR markers are a shared convention, not shared code.** `HydrationMarkers` duplicates the marker
+  content (`[`, `]`, `teleport start`/`end`/`anchor`) the server renderer's `SsrMarkers` emits, pinned to
+  the same upstream reference. Hydration must **not** take a code dependency on `Assimalign.Viu.ServerRenderer`
+  (issue #66 boundary); only the emitted byte sequences couple the two ends (pinned by the SSR→hydrate
+  round-trip tests in the ServerRenderer suite).
+- **PatchFlag fast paths carry over.** A `CACHED` (hoisted / `v-once`) element is adopted verbatim without
+  inspecting its children or props; an optimized element patches only the listeners and the compiler's
+  `dynamicProps`; static attributes are never touched. Skipping a static subtree during hydration is the
+  same interop saving it is during patching.
+- **Mismatch never crashes; it recovers per subtree.** A node-type/structure mismatch logs a recoverable
+  warning (naming the offending node's path, suppressible per node via `data-allow-mismatch`) and falls
+  back to a client render of just that subtree via `Patch(null, …)` — the rest of the tree is still
+  adopted, the tree converges, and every listener ends up attached exactly once. Text/attribute/class/style
+  mismatches warn and correct in place.
+- **The component bridge mirrors upstream's `componentUpdateFn`.** Before mounting a hydrated component the
+  walker stamps the server node onto its vnode's `El` and arms `_componentHydrationReader`; the first
+  render effect then adopts the subtree (`HydrateNode(el, subTree)`) instead of `Patch(null, …)`. After
+  hydration the `.El` back-pointers are exactly what a mount would set, so reactive re-renders patch the
+  adopted nodes with **no remount**.
+
+Deliberate divergences: **Static** vnodes adopt a single node run (the multi-node `staticCount` the SSR
+compiler records arrives with [V01.01.07.02]); **lazy hydration strategies** (`hydrateOnIdle`/`Visible`/
+`MediaQuery`/`Interaction`) are a browser-API-bound follow-up (see Non-goals) — the async-component
+adoption seam is in place, but the concrete triggers are not.
+
 ## Deltas from Vue 3
 
 - **DOM directives live one layer up.** `v-show` and `v-model` and the DOM transitions are *not*
@@ -211,4 +256,10 @@ Deliberate divergences from upstream `apiAsyncComponent.ts`, each documented at 
 
 - `Suspense` — [V01.01.03.20] (W06).
 - DOM `Transition`/`TransitionGroup` and custom elements — `Assimalign.Viu.RuntimeDom`.
-- Server-side rendering and hydration — `Assimalign.Viu.ServerRenderer` (a later area).
+- Server-side rendering (the string/stream renderer) — `Assimalign.Viu.ServerRenderer`. Client
+  **hydration** of that output lives here (above, [V01.01.07.03]); only the SSR renderer itself is out.
+- **Lazy hydration strategies** (`hydrateOnIdle`/`hydrateOnVisible`/`hydrateOnMediaQuery`/
+  `hydrateOnInteraction`) — a browser-API-bound follow-up ([V01.01.07.03.01]): they need
+  `requestIdleCallback`/`IntersectionObserver`/`matchMedia`/interaction listeners in
+  `Assimalign.Viu.RuntimeDom` and cannot be exercised by the DOM-free suite. The walker already routes
+  async-component subtrees through the scheduler's post-flush queue, which is where the triggers will hook.

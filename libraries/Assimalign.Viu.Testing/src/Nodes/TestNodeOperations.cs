@@ -152,6 +152,9 @@ public static class TestNodeOperations
             // wired when target roots are supplied, so a renderer built without them behaves like one
             // that declares no querySelector option (a string Teleport target then warns as unsupported).
             QuerySelector = teleportTargetRoots is null ? null : selector => ResolveTarget(teleportTargetRoots, selector),
+            // The in-memory hydration reader reads the live tree directly (no interop snapshot needed), so
+            // one stateless instance serves the hydration root and every teleport target ([V01.01.07.03]).
+            CreateHydrationReader = _ => TestHydrationReader.Instance,
         };
     }
 

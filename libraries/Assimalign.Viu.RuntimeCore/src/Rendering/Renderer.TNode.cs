@@ -27,7 +27,7 @@ namespace Assimalign.Viu.RuntimeCore;
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 /// <typeparam name="TNode">The platform node type; <c>default</c> means "no node".</typeparam>
-public sealed class Renderer<TNode>
+public sealed partial class Renderer<TNode>
     where TNode : notnull
 {
     private static readonly EqualityComparer<TNode> NodeComparer = EqualityComparer<TNode>.Default;
@@ -671,7 +671,19 @@ public sealed class Renderer<TNode>
             instance.ToggleRecurse(true);
             var subtree = RenderComponentRoot(instance);
             instance.Subtree = subtree;
-            Patch(null, subtree, container, anchor, elementNamespace, instance);
+            // Hydration bridge (upstream componentUpdateFn: the `if (el && hydrateNode)` arm). When the
+            // walker positioned this component over a server node it stamped that node onto the component
+            // vnode's El and armed _componentHydrationReader before mounting, so the first render adopts
+            // the existing DOM subtree instead of creating it. Every other mount (El null, or no active
+            // hydration) takes the normal create path.
+            if (instance.VirtualNode.El is { } hydrationNode && _componentHydrationReader is { } hydrationReader)
+            {
+                HydrateNode(hydrationReader, (TNode)hydrationNode, subtree, instance, optimized: false);
+            }
+            else
+            {
+                Patch(null, subtree, container, anchor, elementNamespace, instance);
+            }
             instance.VirtualNode.El = subtree.El;
             instance.VirtualNode.Anchor = subtree.Anchor;
             instance.IsMounted = true;

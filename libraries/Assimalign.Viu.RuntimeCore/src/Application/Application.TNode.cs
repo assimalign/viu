@@ -197,7 +197,22 @@ public sealed class Application<TNode>
     /// </summary>
     /// <param name="container">The platform container node.</param>
     /// <returns>The root component instance.</returns>
-    public ComponentInstance? Mount(TNode container)
+    public ComponentInstance? Mount(TNode container) => MountCore(container, hydrate: false);
+
+    /// <summary>
+    /// Mounts by hydrating the existing server-rendered content of <paramref name="container"/>
+    /// (upstream: the <c>mount</c> of an app created with <c>createSSRApp</c>,
+    /// <c>packages/runtime-core/src/renderer.ts</c> — <c>createAppAPI(render, hydrate)</c>,
+    /// https://vuejs.org/guide/scaling-up/ssr.html#client-hydration). The root component adopts the
+    /// server DOM instead of recreating it; a server/client mismatch recovers per subtree without
+    /// crashing. Platform packages surface this as their <c>CreateSSRApp(...).Mount(...)</c> entry.
+    /// A second call warns and no-ops.
+    /// </summary>
+    /// <param name="container">The container holding the server-rendered markup.</param>
+    /// <returns>The root component instance.</returns>
+    internal ComponentInstance? Hydrate(TNode container) => MountCore(container, hydrate: true);
+
+    private ComponentInstance? MountCore(TNode container, bool hydrate)
     {
         if (IsMounted)
         {
@@ -215,7 +230,14 @@ public sealed class Application<TNode>
         }
         _rootVirtualNode = VirtualNodeFactory.Component(_rootComponent, _rootProperties);
         _rootVirtualNode.AppContext = _context;
-        _renderer.Render(_rootVirtualNode, container);
+        if (hydrate)
+        {
+            _renderer.Hydrate(_rootVirtualNode, container);
+        }
+        else
+        {
+            _renderer.Render(_rootVirtualNode, container);
+        }
         _container = container;
         IsMounted = true;
         return RootInstance;
