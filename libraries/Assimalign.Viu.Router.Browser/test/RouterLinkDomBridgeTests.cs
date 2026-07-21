@@ -4,10 +4,10 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 using Assimalign.Viu.Testing;
 
-namespace Assimalign.Viu.Router.RuntimeDom.Tests;
+namespace Assimalign.Viu.Router.Browser.Tests;
 
 // Pins the Router<->DOM click bridge ([V01.01.08.03.01], issue #191): the browser adapter's
 // BrowserEvent is mapped onto vue-router's guardEvent contract (button + system modifiers +
@@ -174,7 +174,7 @@ public class RouterLinkDomBridgeTests
     }
 
     // A synthesized click; the BrowserEvent constructor is internal (production events come only from
-    // the dispatch [JSExport]), reached here through RuntimeDom's InternalsVisibleTo.
+    // the dispatch [JSExport]), reached here through Browser's InternalsVisibleTo.
     private static BrowserEvent Click(
         int button = 0,
         BrowserEventModifiers modifiers = BrowserEventModifiers.None,

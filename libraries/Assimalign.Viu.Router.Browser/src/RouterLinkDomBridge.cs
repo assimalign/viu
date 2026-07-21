@@ -1,8 +1,8 @@
 using System;
 
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 
-namespace Assimalign.Viu.Router.RuntimeDom;
+namespace Assimalign.Viu.Router.Browser;
 
 /// <summary>
 /// The browser integration layer that lets <see cref="RouterLink"/> navigate on a real click — it
@@ -13,7 +13,7 @@ namespace Assimalign.Viu.Router.RuntimeDom;
 /// <c>MouseEvent</c> and calls <c>e.preventDefault()</c> directly,
 /// <c>packages/router/src/RouterLink.ts</c>, https://github.com/vuejs/router); Viu keeps
 /// <see cref="RouterLink"/> renderer-agnostic (it never references the
-/// <c>Assimalign.Viu.RuntimeDom</c> DOM adapter), so the mapping lives here instead — a package that
+/// <c>Assimalign.Viu.Browser</c> DOM adapter), so the mapping lives here instead — a package that
 /// depends on both the Router and the DOM adapter, kept out of every non-router app's framework
 /// closure ([V01.01.08.03.01], issue #191).
 /// <para>
