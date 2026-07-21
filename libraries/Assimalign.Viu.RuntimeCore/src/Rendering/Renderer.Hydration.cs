@@ -294,6 +294,8 @@ public sealed partial class Renderer<TNode>
         if (properties is not null)
         {
             var elementNamespace = NamespaceForTag(tag);
+            // A custom element (tag with a hyphen) has every non-reserved prop hydrated (upstream isCustomElement).
+            var isCustomElement = tag.Contains('-', StringComparison.Ordinal);
             var mustIterate = forcePatch
                 || hasDynamicProperties
                 || !optimized
@@ -302,9 +304,10 @@ public sealed partial class Renderer<TNode>
             {
                 foreach (var (name, value) in properties)
                 {
-                    // Dev-mode mismatch reporting for class/style/attribute bindings (upstream propHasMismatch).
+                    // Dev-mode mismatch reporting for class/style/attribute bindings (upstream propHasMismatch:
+                    // warn only, never patch — the reconciliation set is ShouldHydrateProperty, below).
                     ReportPropertyMismatch(reader, element, name, value, vnode);
-                    if (ShouldHydrateProperty(name, forcePatch, vnode.DynamicProperties))
+                    if (ShouldHydrateProperty(name, forcePatch, isCustomElement))
                     {
                         _options.PatchProperty(element, tag, name, null, value, elementNamespace);
                     }
@@ -343,31 +346,22 @@ public sealed partial class Renderer<TNode>
                 : children[index] = VirtualNodeFactory.Normalize(children[index]);
             if (TryNode(cursor, out var node))
             {
-                // Consecutive client text vnodes served as one server text node: split it so each vnode
-                // adopts its own node (upstream hydrateChildren adjacent-text handling).
+                // Consecutive client text vnodes served as one server text node: peel the server text so each
+                // vnode adopts its own node (upstream hydrateChildren adjacent-text handling). The peel is
+                // snapshot-safe — it creates the split nodes and adopts them by the handle it holds, never
+                // re-reading the reader for nodes an immutable snapshot does not contain.
                 if (!optimized
                     && child.Type == VirtualNodeType.Text
+                    && reader.Kind(node) == HydrationNodeKind.Text
                     && index + 1 < children.Length
-                    && VirtualNodeFactory.Normalize(children[index + 1]).Type == VirtualNodeType.Text
-                    && reader.Kind(node) == HydrationNodeKind.Text)
+                    && VirtualNodeFactory.Normalize(children[index + 1]).Type == VirtualNodeType.Text)
                 {
-                    var serverData = reader.Data(node);
-                    var clientText = child.TextChildren ?? string.Empty;
-                    if (serverData.Length > clientText.Length)
-                    {
-                        var split = _options.CreateText(serverData[clientText.Length..]);
-                        if (TryNode(reader.NextSibling(node), out var afterNode))
-                        {
-                            _options.Insert(split, container, afterNode);
-                        }
-                        else
-                        {
-                            _options.Insert(split, container, default);
-                        }
-                        _options.SetText(node, clientText);
-                    }
+                    index = HydrateAdjacentTextRun(reader, node, container, children, index, out cursor);
                 }
-                cursor = HydrateNode(reader, node, child, parentComponent, optimized);
+                else
+                {
+                    cursor = HydrateNode(reader, node, child, parentComponent, optimized);
+                }
             }
             else if (child.Type == VirtualNodeType.Text && string.IsNullOrEmpty(child.TextChildren))
             {
@@ -394,6 +388,60 @@ public sealed partial class Renderer<TNode>
             }
         }
         return cursor;
+    }
+
+    private int HydrateAdjacentTextRun(
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        TNode container,
+        VirtualNode[] children,
+        int startIndex,
+        out TNode? cursor)
+    {
+        // Adopt a run of consecutive client Text vnodes that the server rendered as ONE text node, by peeling
+        // the server text: the first vnode adopts `node`; each subsequent one adopts a freshly created node
+        // carrying the remaining text (upstream splits via node.data.slice + live nextSibling — Viu holds the
+        // created nodes so it needs no live re-read). Snapshot-safe: the only reader call is NextSibling(node)
+        // for the original following sibling (stable), and Data(node) once. Returns the index of the last
+        // vnode consumed (the caller's loop advances past it); `cursor` resumes at that following sibling.
+        var afterRun = reader.NextSibling(node);
+        var currentNode = node;
+        var currentData = reader.Data(node);
+        var index = startIndex;
+        while (true)
+        {
+            var textVnode = children[index] = VirtualNodeFactory.Normalize(children[index]);
+            var clientText = textVnode.TextChildren ?? string.Empty;
+            var hasMoreText = index + 1 < children.Length
+                && VirtualNodeFactory.Normalize(children[index + 1]).Type == VirtualNodeType.Text;
+            if (hasMoreText && currentData.Length > clientText.Length)
+            {
+                // Split off the remainder into a new node inserted before the run's original following sibling
+                // (each split lands after the previous one, preserving order), then trim this node to its share.
+                var overflow = _options.CreateText(currentData[clientText.Length..]);
+                _options.Insert(overflow, container, TryNode(afterRun, out var anchor) ? anchor : default);
+                if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
+                {
+                    _options.SetText(currentNode, clientText);
+                }
+                textVnode.El = currentNode;
+                currentNode = overflow;
+                currentData = currentData[clientText.Length..];
+                index++;
+            }
+            else
+            {
+                // Last vnode of the run (or nothing left to split): adopt the current node, correcting its text.
+                if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
+                {
+                    _options.SetText(currentNode, clientText);
+                }
+                textVnode.El = currentNode;
+                break;
+            }
+        }
+        cursor = afterRun;
+        return index;
     }
 
     private TNode? HydrateFragment(
@@ -549,17 +597,35 @@ public sealed partial class Renderer<TNode>
             WarnNodeMismatch(reader, node, vnode);
         }
         vnode.El = null;
+        TNode? next;
         if (isFragment)
         {
-            // Remove the excess fragment children between the [ marker and its matching ].
+            // Collect the whole [ .. ] range from the reader BEFORE removing anything: a browser hydration
+            // reader is an immutable pre-walk snapshot, so re-reading NextSibling after a Remove would keep
+            // yielding the already-removed child (upstream mutates the live DOM and re-reads; Viu reads first).
+            // `end` is the node after the matching ] (honoring nesting); the collected chain is the children
+            // and the ] marker.
             var end = LocateClosingAnchor(reader, node, HydrationMarkers.FragmentStart, HydrationMarkers.FragmentEnd);
-            while (TryNode(reader.NextSibling(node), out var following)
-                && !(TryNode(end, out var endNode) && NodeComparer.Equals(following, endNode)))
+            var fragmentRange = new List<TNode>();
+            var scan = reader.NextSibling(node);
+            while (TryNode(scan, out var current)
+                && !(TryNode(end, out var endNode) && NodeComparer.Equals(current, endNode)))
             {
-                _options.Remove(following);
+                fragmentRange.Add(current);
+                scan = reader.NextSibling(current);
             }
+            foreach (var removed in fragmentRange)
+            {
+                _options.Remove(removed);
+            }
+            // The range (children + ]) is gone, so the walk resumes at `end` — NOT NextSibling(node), which
+            // the immutable snapshot would still report as the removed first child.
+            next = end;
         }
-        var next = reader.NextSibling(node);
+        else
+        {
+            next = reader.NextSibling(node);
+        }
         if (!TryNode(reader.ParentNode(node), out var container))
         {
             container = node;
@@ -604,10 +670,18 @@ public sealed partial class Renderer<TNode>
         return cursor;
     }
 
-    private static bool ShouldHydrateProperty(string name, bool forcePatch, string[]? dynamicProperties)
+    private static bool ShouldHydrateProperty(string name, bool forcePatch, bool isCustomElement)
     {
-        // Upstream hydrateElement prop-qualification: value-like props on input/option (forcePatch), event
-        // listeners (always attached), .-prefixed DOM properties, and the compiler's dynamic prop list.
+        // Upstream hydrateElement prop qualification (v3.5, packages/runtime-core/src/hydration.ts) — the
+        // exact set of props actively patched during hydration:
+        //   (forcePatch && (endsWith "value" || "indeterminate")) || (isOn && !reserved) || key[0]=='.' || isCustomElement
+        // dynamicProps are deliberately NOT in this set: v3.5 does not re-patch dynamic attributes during
+        // hydration (that would spend interop per dynamic prop and, on a mismatch, overwrite the server value
+        // — e.g. re-setting a dynamic innerHTML and discarding the hydrated children). A dynamic-attribute
+        // mismatch is instead reported by ReportPropertyMismatch and the server value is left in place
+        // (warn-and-leave); the next reactive update patches it through the normal diff. The !reserved guard
+        // on the custom-element clause compensates for Viu keeping key/ref in the prop bag where upstream's
+        // props object never contains them — giving identical effective behavior.
         if (forcePatch
             && (name.EndsWith("value", StringComparison.Ordinal)
                 || string.Equals(name, "indeterminate", StringComparison.Ordinal)))
@@ -622,17 +696,7 @@ public sealed partial class Renderer<TNode>
         {
             return true;
         }
-        if (dynamicProperties is not null)
-        {
-            foreach (var dynamicName in dynamicProperties)
-            {
-                if (string.Equals(dynamicName, name, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return isCustomElement && !IsReservedProperty(name);
     }
 
     private string ReadElementText(HydrationNodeReader<TNode> reader, TNode element)
@@ -820,31 +884,25 @@ public sealed partial class Renderer<TNode>
 
     private static bool IsMismatchAllowedByAttribute(string? attribute, HydrationMismatchType type)
     {
+        // Upstream isMismatchAllowed (v3.5, packages/runtime-core/src/hydration.ts): a null attribute allows
+        // nothing; an empty attribute allows every kind; otherwise the comma-split list must contain the
+        // type's token — with the single special case that a text mismatch is allowed by "children" ("text is
+        // a subset of children"). Matched exactly: the list is NOT trimmed, and there is no "attribute" token
+        // that covers class/style (each kind carries its own token).
         if (attribute is null)
         {
             return false;
         }
         if (attribute.Length == 0)
         {
-            // A bare data-allow-mismatch allows every kind (upstream: attr === '').
             return true;
         }
-        var typeToken = MismatchTypeToken(type);
-        foreach (var raw in attribute.Split(','))
+        var list = attribute.Split(',');
+        if (type == HydrationMismatchType.Text && Array.IndexOf(list, "children") >= 0)
         {
-            var token = raw.Trim();
-            if (string.Equals(token, typeToken, StringComparison.Ordinal))
-            {
-                return true;
-            }
-            // Allowing "attribute" also allows class and style (they are attributes) — upstream parity.
-            if ((type is HydrationMismatchType.Class or HydrationMismatchType.Style)
-                && string.Equals(token, "attribute", StringComparison.Ordinal))
-            {
-                return true;
-            }
+            return true;
         }
-        return false;
+        return Array.IndexOf(list, MismatchTypeToken(type)) >= 0;
     }
 
     private static string MismatchTypeToken(HydrationMismatchType type) => type switch

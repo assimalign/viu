@@ -94,23 +94,74 @@ public class HydrationTests : IDisposable
     }
 
     [Fact]
-    public void HydrateElement_ReconcilesOnlyDynamicProps_LeavingStaticPropsUntouched()
+    public void HydrateElement_DynamicNonListenerAttribute_NotPatchedDuringCleanHydration()
     {
-        // The PatchFlag fast path: only the compiler's dynamicProps are reconciled during the walk; the
-        // static id attribute is never patched (upstream: the ShouldHydrateProperty qualification).
+        // v3.5 hydrateElement patches only (forcePatch && value/indeterminate) || (isOn && !reserved) ||
+        // key[0]=='.' || isCustomElement — NOT dynamicProps. A dynamic `title` is left as the server rendered
+        // it; only the click listener is attached. Reconciling it would spend interop per dynamic prop and,
+        // on a mismatch, overwrite the hydrated server value.
+        var clicks = 0;
         var container = TestServerMarkup.Parse("<div id=\"static\" title=\"live\">hi</div>");
         var vnode = VirtualNodeFactory.Element(
             "div",
-            VirtualNodeFactory.Properties(("id", "static"), ("title", "live")),
+            VirtualNodeFactory.Properties(("id", "static"), ("title", "live"), ("onClick", (Action)(() => clicks++))),
             "hi",
-            PatchFlags.Props,
+            PatchFlags.Props | PatchFlags.NeedHydration,
             new[] { "title" });
 
         _renderer.Hydrate(vnode, container);
 
-        _log.Count(TestNodeOperationType.PatchProperty).ShouldBe(1);
-        _log.OfType(TestNodeOperationType.PatchProperty)[0].PropertyName.ShouldBe("title");
+        // Exactly one property patch — the click listener; the dynamic `title` attribute is not touched.
+        var patches = _log.OfType(TestNodeOperationType.PatchProperty);
+        patches.Count.ShouldBe(1);
+        patches[0].PropertyName.ShouldBe("onClick");
         _log.Count(TestNodeOperationType.Insert).ShouldBe(0);
+    }
+
+    [Fact]
+    public void HydrateElement_DynamicAttributeMismatch_WarnsWithoutOverwriting()
+    {
+        // A dynamic attribute whose server value differs: v3.5 warns (propHasMismatch) but does NOT patch —
+        // the server value stays; the next reactive update reconciles it through the normal diff.
+        var container = TestServerMarkup.Parse("<div title=\"server\">hi</div>");
+        var vnode = VirtualNodeFactory.Element(
+            "div", VirtualNodeFactory.Properties(("title", "client")), "hi", PatchFlags.Props, new[] { "title" });
+        using var warnings = new WarningCapture();
+
+        _renderer.Hydrate(vnode, container);
+
+        warnings.Messages.ShouldContain(message => message.Contains("attribute mismatch", StringComparison.OrdinalIgnoreCase));
+        _log.Count(TestNodeOperationType.PatchProperty).ShouldBe(0);
+        ((TestElement)container.Children[0]).Properties["title"].ShouldBe("server");
+    }
+
+    [Fact]
+    public void Hydrate_TextMismatch_SuppressedByDataAllowMismatchChildren()
+    {
+        // v3.5 isMismatchAllowed: "text is a subset of children" — a text mismatch is suppressed by
+        // data-allow-mismatch="children".
+        var container = TestServerMarkup.Parse("<div data-allow-mismatch=\"children\">server</div>");
+        var vnode = VirtualNodeFactory.Element("div", "client");
+        using var warnings = new WarningCapture();
+
+        _renderer.Hydrate(vnode, container);
+
+        warnings.Messages.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Hydrate_ClassMismatch_NotSuppressedByDataAllowMismatchAttribute()
+    {
+        // v3.5 isMismatchAllowed: an "attribute" token does NOT cover class/style — each carries its own
+        // token — so a class mismatch is still reported.
+        var container = TestServerMarkup.Parse("<div class=\"a b\" data-allow-mismatch=\"attribute\">hi</div>");
+        var vnode = VirtualNodeFactory.Element(
+            "div", VirtualNodeFactory.Properties(("class", "a c")), "hi");
+        using var warnings = new WarningCapture();
+
+        _renderer.Hydrate(vnode, container);
+
+        warnings.Messages.ShouldContain(message => message.Contains("class mismatch", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

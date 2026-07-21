@@ -18,10 +18,17 @@ public sealed class TestRenderer
     private readonly List<TestElement> _teleportTargetRoots = [];
 
     /// <summary>Creates a renderer over a fresh op log.</summary>
-    public TestRenderer()
+    /// <param name="snapshotSemantics">
+    /// When true, hydration reads use an immutable <see cref="FrozenTestHydrationReader"/> and a double-remove
+    /// throws — mirroring the browser's batched snapshot reader so a hydration walk that re-reads structure
+    /// after mutating fails loudly (the snapshot-safety regression mode, [V01.01.07.03]). Default false
+    /// (live-tree reads).
+    /// </param>
+    public TestRenderer(bool snapshotSemantics = false)
     {
         OperationLog = new TestNodeOperationLog();
-        Renderer = RendererFactory.CreateRenderer(TestNodeOperations.Create(OperationLog, _teleportTargetRoots));
+        Renderer = RendererFactory.CreateRenderer(
+            TestNodeOperations.Create(OperationLog, _teleportTargetRoots, snapshotSemantics));
     }
 
     /// <summary>The underlying platform-agnostic renderer.</summary>

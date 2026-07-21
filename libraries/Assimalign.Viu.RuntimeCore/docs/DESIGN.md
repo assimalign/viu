@@ -221,14 +221,21 @@ enters it instead of `Render`.
   (issue #66 boundary); only the emitted byte sequences couple the two ends (pinned by the SSR→hydrate
   round-trip tests in the ServerRenderer suite).
 - **PatchFlag fast paths carry over.** A `CACHED` (hoisted / `v-once`) element is adopted verbatim without
-  inspecting its children or props; an optimized element patches only the listeners and the compiler's
-  `dynamicProps`; static attributes are never touched. Skipping a static subtree during hydration is the
-  same interop saving it is during patching.
+  inspecting its children or props. Otherwise the walk actively patches only the exact set v3.5 does
+  (`ShouldHydrateProperty`): event listeners (always attached), `.`-prop bindings, forced `input`/`option`
+  values, and every non-reserved prop on a custom element. Server-rendered attributes — static **and**
+  compiler-dynamic — are adopted, not re-patched: hydration trusts the SSR output for them, so it spends no
+  interop per attribute, and the next reactive update reconciles a dynamic attribute through the normal diff.
 - **Mismatch never crashes; it recovers per subtree.** A node-type/structure mismatch logs a recoverable
   warning (naming the offending node's path, suppressible per node via `data-allow-mismatch`) and falls
   back to a client render of just that subtree via `Patch(null, …)` — the rest of the tree is still
-  adopted, the tree converges, and every listener ends up attached exactly once. Text/attribute/class/style
-  mismatches warn and correct in place.
+  adopted, the tree converges, and every listener ends up attached exactly once. A **text** mismatch warns
+  and corrects the content in place; a **class/style/attribute** mismatch is dev-warned but **left as the
+  server rendered it** (v3.5 `propHasMismatch` warns without patching), suppressible via `data-allow-mismatch`
+  (where a `children` allowance also covers `text`, "text being a subset of children"). Because the walk
+  reads structure from a possibly-immutable snapshot (the browser reader is a batched pre-walk), the mismatch
+  and fragment-teardown paths read the whole affected range **before** removing anything — never re-reading a
+  sibling they just mutated.
 - **The component bridge mirrors upstream's `componentUpdateFn`.** Before mounting a hydrated component the
   walker stamps the server node onto its vnode's `El` and arms `_componentHydrationReader`; the first
   render effect then adopts the subtree (`HydrateNode(el, subTree)`) instead of `Patch(null, …)`. After

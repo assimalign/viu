@@ -24,12 +24,21 @@ public static class TestNodeOperations
     /// The browser adapter resolves targets through the real DOM <c>querySelector</c>; this registered-root
     /// search is the in-memory stand-in ([V01.01.03.17]).
     /// </param>
+    /// <param name="snapshotSemantics">
+    /// When true, hydration reads are answered by a <see cref="FrozenTestHydrationReader"/> (an immutable
+    /// pre-walk, like the browser's batched snapshot) instead of the live-tree
+    /// <see cref="TestHydrationReader"/>, and <c>Remove</c> throws on a double-remove (like the browser
+    /// bridge's "unknown DOM handle" on a released handle). Together they surface a walker that re-reads
+    /// structure after mutating — the snapshot-safety regression coverage for hydration ([V01.01.07.03]).
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="log"/> is null.</exception>
     public static RendererOptions<TestNode> Create(
         TestNodeOperationLog log,
-        IReadOnlyList<TestElement>? teleportTargetRoots = null)
+        IReadOnlyList<TestElement>? teleportTargetRoots = null,
+        bool snapshotSemantics = false)
     {
         ArgumentNullException.ThrowIfNull(log);
+        var removedNodes = snapshotSemantics ? new HashSet<TestNode>(ReferenceEqualityComparer.Instance) : null;
         return new RendererOptions<TestNode>
         {
             CreateElement = (tag, elementNamespace) =>
@@ -88,6 +97,16 @@ public static class TestNodeOperations
             },
             Remove = child =>
             {
+                // Snapshot-semantics mode mirrors the browser bridge: removing an already-removed node throws
+                // ("unknown DOM handle" on a released handle), so a walker that re-reads a stale sibling from
+                // an immutable snapshot and double-removes fails loudly instead of looping.
+                if (removedNodes is not null && !removedNodes.Add(child))
+                {
+                    throw new InvalidOperationException(
+                        $"Snapshot semantics: node #{child.Identifier} removed twice — the hydration walk "
+                        + "re-read a stale sibling from the immutable snapshot after mutating "
+                        + "(mirrors the browser bridge's 'unknown DOM handle' on a released handle).");
+                }
                 var parent = child.Parent;
                 Detach(child);
                 log.Add(new TestNodeOperation(TestNodeOperationType.Remove, child, parent));
@@ -153,8 +172,12 @@ public static class TestNodeOperations
             // that declares no querySelector option (a string Teleport target then warns as unsupported).
             QuerySelector = teleportTargetRoots is null ? null : selector => ResolveTarget(teleportTargetRoots, selector),
             // The in-memory hydration reader reads the live tree directly (no interop snapshot needed), so
-            // one stateless instance serves the hydration root and every teleport target ([V01.01.07.03]).
-            CreateHydrationReader = _ => TestHydrationReader.Instance,
+            // one stateless instance serves the hydration root and every teleport target. Snapshot-semantics
+            // mode instead builds an immutable FrozenTestHydrationReader per root/target, mirroring the
+            // browser's batched one-crossing snapshot ([V01.01.07.03]).
+            CreateHydrationReader = snapshotSemantics
+                ? container => new FrozenTestHydrationReader(container)
+                : _ => TestHydrationReader.Instance,
         };
     }
 
