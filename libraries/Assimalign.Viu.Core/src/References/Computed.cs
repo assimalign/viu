@@ -18,7 +18,7 @@ namespace Assimalign.Viu;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The computed value type.</typeparam>
-public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference, IReadonlyReactive
+public sealed class Computed<T> : Subscriber, IReference<T>, IDependencyReference, IReadOnlyReactive
 {
     private readonly Func<T> _getter;
     private readonly Action<T>? _setter;
@@ -51,7 +51,7 @@ public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference, 
     /// A getter-only computed is read-only (the port of Vue's readonly <c>ComputedRef</c>); a
     /// writable computed is not. Surfaced through <see cref="Reactive.IsReadonly"/>.
     /// </summary>
-    bool IReadonlyReactive.IsReadonly => _setter is null;
+    bool IReadOnlyReactive.IsReadOnly => _setter is null;
 
     /// <summary>
     /// Gets the (possibly recomputed) value, tracking the ambient subscriber; or routes assignment
@@ -155,7 +155,7 @@ public sealed class Computed<T> : Subscriber, IReference<T>, ITrackedReference, 
     /// </summary>
     internal override void NotifyReaders() => _dependency.Notify();
 
-    Dependency ITrackedReference.Dependency => _dependency;
+    Dependency IDependencyReference.Dependency => _dependency;
 
     /// <summary>
     /// Called when a source dependency triggers: marks this computed dirty and, when it is being

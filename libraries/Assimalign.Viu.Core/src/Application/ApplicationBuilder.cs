@@ -43,7 +43,7 @@ public abstract class ApplicationBuilder : IApplicationBuilder
     /// <param name="rootComponent">The root component the built application mounts.</param>
     /// <param name="rootProperties">The props passed to the root component, or null.</param>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    protected ApplicationBuilder(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties)
+    protected ApplicationBuilder(IComponent rootComponent, VirtualNodeProperties? rootProperties)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         RootComponent = rootComponent;
@@ -51,13 +51,13 @@ public abstract class ApplicationBuilder : IApplicationBuilder
     }
 
     /// <inheritdoc/>
-    public IComponentDefinition RootComponent { get; }
+    public IComponent RootComponent { get; }
 
     /// <inheritdoc/>
     public VirtualNodeProperties? RootProperties { get; }
 
     /// <inheritdoc/>
-    public IApplicationBuilder Use(IPlugin plugin, object? options = null)
+    public IApplicationBuilder Use(IApplicationPlugin plugin, object? options = null)
     {
         ArgumentNullException.ThrowIfNull(plugin);
         _configuration.Add(application => application.Use(plugin, options));
@@ -81,7 +81,7 @@ public abstract class ApplicationBuilder : IApplicationBuilder
     }
 
     /// <inheritdoc/>
-    public IApplicationBuilder Component(string name, IComponentDefinition definition)
+    public IApplicationBuilder Component(string name, IComponent definition)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(definition);

@@ -42,7 +42,7 @@ public sealed class ComponentSlots
     /// of this flag; only structural changes (<c>v-if</c>/<c>v-for</c>/dynamic names) need
     /// <see cref="Shared.SlotFlags.Dynamic"/>. A <see cref="Shared.SlotFlags.Forwarded"/> value is
     /// resolved to Stable or Dynamic at vnode creation
-    /// (<see cref="VirtualNodeFactory.Component(IComponentDefinition, VirtualNodeProperties?, ComponentSlots?, Shared.PatchFlags, string[]?)"/>).
+    /// (<see cref="VirtualNodeFactory.Component(IComponent, VirtualNodeProperties?, ComponentSlots?, Shared.PatchFlags, string[]?)"/>).
     /// </summary>
     public SlotFlags Flag { get; set; }
 

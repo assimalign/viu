@@ -12,13 +12,13 @@ public static class DynamicComponents
 {
     /// <summary>
     /// Resolves the <c>is</c> value of a dynamic component (upstream: <c>resolveDynamicComponent</c>):
-    /// an <see cref="IComponentDefinition"/> is returned unchanged; a non-empty string is resolved
+    /// an <see cref="IComponent"/> is returned unchanged; a non-empty string is resolved
     /// against the app component registry (raw/camelCase/PascalCase) and, if unregistered, returned
     /// as-is to be used as an element tag; a null or empty value resolves to null (rendered as a
     /// comment placeholder).
     /// </summary>
     /// <param name="source">The <c>is</c> value — a component definition, a name, or null.</param>
-    /// <returns>The resolved <see cref="IComponentDefinition"/>, the element-tag string, or null.</returns>
+    /// <returns>The resolved <see cref="IComponent"/>, the element-tag string, or null.</returns>
     /// <remarks>
     /// Deviates from issue #37's literal "warns in dev" clause per upstream parity: upstream
     /// <c>resolveDynamicComponent</c> calls <c>resolveAsset(COMPONENTS, name, /*warnMissing*/ false)</c>,
@@ -28,7 +28,7 @@ public static class DynamicComponents
     /// </remarks>
     public static object? ResolveDynamicComponent(object? source)
     {
-        if (source is IComponentDefinition definition)
+        if (source is IComponent definition)
         {
             return definition;
         }
@@ -62,7 +62,7 @@ public static class DynamicComponents
     {
         return ResolveDynamicComponent(source) switch
         {
-            IComponentDefinition definition => slots is null
+            IComponent definition => slots is null
                 ? VirtualNodeFactory.Component(definition, properties)
                 : VirtualNodeFactory.Component(definition, properties, slots),
             string tag => VirtualNodeFactory.Element(tag, properties, (VirtualNode?[]?)null),

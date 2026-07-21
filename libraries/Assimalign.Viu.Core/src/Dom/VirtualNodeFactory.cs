@@ -246,7 +246,7 @@ public static class VirtualNodeFactory
     /// </summary>
     /// <param name="definition">The component definition.</param>
     /// <param name="properties">The props passed by the parent, or null.</param>
-    public static VirtualNode Component(IComponentDefinition definition, VirtualNodeProperties? properties = null)
+    public static VirtualNode Component(IComponent definition, VirtualNodeProperties? properties = null)
         => Component(definition, properties, default, null);
 
     /// <summary>
@@ -260,7 +260,7 @@ public static class VirtualNodeFactory
     /// <param name="patchFlag">The compiler patch hint.</param>
     /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
     public static VirtualNode Component(
-        IComponentDefinition definition,
+        IComponent definition,
         VirtualNodeProperties? properties,
         PatchFlags patchFlag,
         string[]? dynamicProperties)
@@ -287,7 +287,7 @@ public static class VirtualNodeFactory
     /// <param name="patchFlag">The compiler patch hint (<see cref="PatchFlags.DynamicSlots"/> forces child updates).</param>
     /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
     public static VirtualNode Component(
-        IComponentDefinition definition,
+        IComponent definition,
         VirtualNodeProperties? properties,
         ComponentSlots? slots,
         PatchFlags patchFlag = default,
@@ -303,7 +303,7 @@ public static class VirtualNodeFactory
     /// Creates a block component vnode whose <see cref="VirtualNode.DynamicChildren"/> are the dynamic
     /// descendants collected since <see cref="OpenBlock"/> (upstream: <c>createBlock</c> over a component
     /// type, i.e. <c>setupBlock(createVNode(Component, ...))</c>). This is the block-form counterpart of
-    /// <see cref="Component(IComponentDefinition, VirtualNodeProperties?, ComponentSlots?, PatchFlags, string[]?)"/>
+    /// <see cref="Component(IComponent, VirtualNodeProperties?, ComponentSlots?, PatchFlags, string[]?)"/>
     /// that the compiled render emits as <c>createBlock</c>; it closes the open block onto the component
     /// vnode instead of tracking the vnode into that same block.
     /// </summary>
@@ -313,7 +313,7 @@ public static class VirtualNodeFactory
     /// <param name="patchFlag">The compiler patch hint.</param>
     /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> has <see cref="PatchFlags.Props"/>.</param>
     public static VirtualNode ComponentBlock(
-        IComponentDefinition definition,
+        IComponent definition,
         VirtualNodeProperties? properties,
         ComponentSlots? slots,
         PatchFlags patchFlag = default,
@@ -321,7 +321,7 @@ public static class VirtualNodeFactory
         => BlockStack.CloseBlockAndSetup(BuildComponent(definition, properties, slots, patchFlag, dynamicProperties));
 
     private static VirtualNode BuildComponent(
-        IComponentDefinition definition,
+        IComponent definition,
         VirtualNodeProperties? properties,
         ComponentSlots? slots,
         PatchFlags patchFlag,

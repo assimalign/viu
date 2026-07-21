@@ -1,5 +1,7 @@
 namespace Assimalign.Viu;
 
+
+// TODO: Convert IReference into first class citizen by making it a class instead of an interface.
 /// <summary>
 /// Non-generic marker for all ref-like reactive containers (<see cref="Reference{T}"/>,
 /// <see cref="ShallowReference{T}"/>, <see cref="CustomReference{T}"/>, <see cref="Computed{T}"/>).
@@ -7,6 +9,8 @@ namespace Assimalign.Viu;
 /// </summary>
 public interface IReference
 {
-    /// <summary>The current value as <see cref="object"/> (boxes value types); reading tracks.</summary>
+    /// <summary>
+    /// The current value as <see cref="object"/> (boxes value types); reading tracks.
+    /// </summary>
     object? Value { get; }
 }

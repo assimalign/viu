@@ -37,7 +37,7 @@ internal sealed class ApplicationContext
     public IServiceProvider? Services { get; set; }
 
     /// <summary>The name → definition registry (upstream: <c>appContext.components</c>).</summary>
-    public Dictionary<string, IComponentDefinition> Components { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, IComponent> Components { get; } = new(StringComparer.Ordinal);
 
     /// <summary>The name → directive registry (upstream: <c>appContext.directives</c>).</summary>
     public Dictionary<string, IDirective> Directives { get; } = new(StringComparer.Ordinal);
@@ -56,11 +56,11 @@ internal sealed class ApplicationContext
     /// Test-utilities seam: maps a real component definition to the stub definition the renderer
     /// mounts in its place ([V01.01.11.02]). Null (the default) means no stubbing.
     /// </summary>
-    public Dictionary<IComponentDefinition, IComponentDefinition>? ComponentStubs { get; set; }
+    public Dictionary<IComponent, IComponent>? ComponentStubs { get; set; }
 
     /// <summary>Returns the stub registered for <paramref name="definition"/>, or null.</summary>
     /// <param name="definition">The real component definition about to be mounted.</param>
-    public IComponentDefinition? ResolveStub(IComponentDefinition definition)
+    public IComponent? ResolveStub(IComponent definition)
         => ComponentStubs is not null && ComponentStubs.TryGetValue(definition, out var stub) ? stub : null;
 
     /// <summary>
@@ -70,7 +70,7 @@ internal sealed class ApplicationContext
     /// </summary>
     /// <param name="name">The component name as used at the call site.</param>
     /// <returns>The registered definition, or null when none matches.</returns>
-    public IComponentDefinition? ResolveComponent(string name) => Resolve(Components, name);
+    public IComponent? ResolveComponent(string name) => Resolve(Components, name);
 
     /// <summary>
     /// Resolves a registered directive by name (upstream: <c>resolveAsset(DIRECTIVES, name)</c>),

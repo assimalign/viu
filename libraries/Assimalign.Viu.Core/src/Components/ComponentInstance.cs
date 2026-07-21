@@ -25,7 +25,7 @@ public sealed class ComponentInstance
     private readonly Dictionary<string, ComponentEmitDefinition>? _declaredEmits;
     private HashSet<string>? _emittedOnceEvents;
 
-    internal ComponentInstance(IComponentDefinition definition, VirtualNode virtualNode, ComponentInstance? parent)
+    internal ComponentInstance(IComponent definition, VirtualNode virtualNode, ComponentInstance? parent)
     {
         Uid = _nextUid++;
         Definition = definition;
@@ -139,7 +139,7 @@ public sealed class ComponentInstance
     public int Uid { get; }
 
     /// <summary>The component definition this instance runs.</summary>
-    public IComponentDefinition Definition { get; }
+    public IComponent Definition { get; }
 
     /// <summary>The parent instance, or null at the root.</summary>
     public ComponentInstance? Parent { get; }

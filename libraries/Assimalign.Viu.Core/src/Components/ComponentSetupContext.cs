@@ -3,7 +3,7 @@ using System;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The second argument to <see cref="IComponentDefinition.Setup"/> — the C# port of upstream's
+/// The second argument to <see cref="IComponent.Setup"/> — the C# port of upstream's
 /// <c>SetupContext</c> (<c>packages/runtime-core/src/component.ts</c>,
 /// https://vuejs.org/api/composition-api-setup.html#setup-context): the live fallthrough
 /// attributes, the emit function, <see cref="Expose"/>, and the slots object (typed once
@@ -26,6 +26,9 @@ public sealed class ComponentSetupContext
     /// <see cref="VirtualNodeFactory.RenderSlot"/>; null when the parent passed no slot content.
     /// </summary>
     public ComponentSlots? Slots => _instance.Slots;
+
+    // Service provider get's passed via 
+    public IServiceProvider? ServiceProvider => throw new NotImplementedException();
 
     /// <summary>
     /// Emits a component event to the matching handler prop (upstream: <c>context.emit</c>;

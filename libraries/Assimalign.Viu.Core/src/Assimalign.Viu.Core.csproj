@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- Deviates from the repo namespace==assembly-name rule per the .NET reshape (R2, [V01.01.12.21],
          docs/NET-RESHAPE-PLAN.md): the assembly/package id is Assimalign.Viu.Core, but every type roots
@@ -14,5 +14,8 @@
        referencing the generator directly. Merged in with the reactive core ([V01.01.12.21]). -->
   <ItemGroup>
     <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="ValueTypes\" />
   </ItemGroup>
 </Project>

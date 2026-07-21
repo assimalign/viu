@@ -10,7 +10,7 @@ namespace Assimalign.Viu;
 /// (<c>packages/reactivity/src/ref.ts</c>). Implementations expose it as an explicit interface
 /// member so it does not widen the ref's public value-facing surface.
 /// </summary>
-public interface ITrackedReference
+public interface IDependencyReference : IReference
 {
     /// <summary>
     /// The dependency that tracks reads of, and is triggered by writes to, this source's value cell.

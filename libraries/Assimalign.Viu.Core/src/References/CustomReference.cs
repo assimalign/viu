@@ -10,7 +10,7 @@ namespace Assimalign.Viu;
 /// model).
 /// </summary>
 /// <typeparam name="T">The type of the contained value.</typeparam>
-public sealed class CustomReference<T> : IReference<T>, ITrackedReference
+public sealed class CustomReference<T> : IReference<T>, IDependencyReference
 {
     private readonly Dependency _dependency = new();
     private readonly Func<T> _get;
@@ -37,5 +37,5 @@ public sealed class CustomReference<T> : IReference<T>, ITrackedReference
     /// <inheritdoc />
     object? IReference.Value => Value;
 
-    Dependency ITrackedReference.Dependency => _dependency;
+    Dependency IDependencyReference.Dependency => _dependency;
 }

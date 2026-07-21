@@ -10,11 +10,11 @@ namespace Assimalign.Viu;
 /// reactive objects do not implement it — or implement it returning <see langword="false"/> — so
 /// <see cref="Reactive.IsReadonly"/> stays an O(1), reflection-free interface check.
 /// </summary>
-public interface IReadonlyReactive
+public interface IReadOnlyReactive
 {
     /// <summary>
     /// <see langword="true"/> when this value rejects writes (reads still track). A getter-only
     /// computed reports <see langword="true"/>; a writable computed reports <see langword="false"/>.
     /// </summary>
-    bool IsReadonly { get; }
+    bool IsReadOnly { get; }
 }

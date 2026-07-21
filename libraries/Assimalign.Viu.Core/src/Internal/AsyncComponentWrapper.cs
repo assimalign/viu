@@ -24,16 +24,16 @@ namespace Assimalign.Viu;
 /// model).
 /// </para>
 /// </summary>
-internal sealed class AsyncComponentWrapper : IComponentDefinition
+internal sealed class AsyncComponentWrapper : IComponent
 {
     private readonly AsyncComponentOptions _options;
 
     // Shared load state across every mount of this async component (upstream: defineAsyncComponent
     // closure). _pendingToken identifies the in-flight request so a retry that replaced it can be
     // reconciled (upstream: thisRequest !== pendingRequest).
-    private Task<IComponentDefinition>? _pendingRequest;
+    private Task<IComponent>? _pendingRequest;
     private object? _pendingToken;
-    private IComponentDefinition? _resolvedComponent;
+    private IComponent? _resolvedComponent;
     private int _retries;
 
     internal AsyncComponentWrapper(AsyncComponentOptions options)
@@ -172,7 +172,7 @@ internal sealed class AsyncComponentWrapper : IComponentDefinition
             error, instance, "async component loader", rethrowIfUnhandled: _options.ErrorComponent is null);
     }
 
-    private Task<IComponentDefinition> Load()
+    private Task<IComponent> Load()
     {
         // Upstream load(): one in-flight request shared across concurrent mounts (pendingRequest).
         if (_pendingRequest is not null)
@@ -184,7 +184,7 @@ internal sealed class AsyncComponentWrapper : IComponentDefinition
         return _pendingRequest = LoadOnceAsync(token);
     }
 
-    private Task<IComponentDefinition> Retry()
+    private Task<IComponent> Retry()
     {
         // Upstream retry(): bump the attempt count, drop the settled request, and load again.
         _retries++;
@@ -192,9 +192,9 @@ internal sealed class AsyncComponentWrapper : IComponentDefinition
         return Load();
     }
 
-    private async Task<IComponentDefinition> LoadOnceAsync(object token)
+    private async Task<IComponent> LoadOnceAsync(object token)
     {
-        IComponentDefinition component;
+        IComponent component;
         try
         {
             component = await _options.Loader();
@@ -203,7 +203,7 @@ internal sealed class AsyncComponentWrapper : IComponentDefinition
         {
             // Hand the user retry/fail control (upstream: the loader().catch arm wrapping a new
             // Promise whose resolve = retry() and reject = the error).
-            var completion = new TaskCompletionSource<IComponentDefinition>();
+            var completion = new TaskCompletionSource<IComponent>();
             void UserRetry() => _ = BridgeRetryAsync(completion);
             void UserFail() => completion.TrySetException(loadError);
             _options.OnError(loadError, UserRetry, UserFail, _retries + 1);
@@ -219,7 +219,7 @@ internal sealed class AsyncComponentWrapper : IComponentDefinition
         return component;
     }
 
-    private async Task BridgeRetryAsync(TaskCompletionSource<IComponentDefinition> completion)
+    private async Task BridgeRetryAsync(TaskCompletionSource<IComponent> completion)
     {
         // Resolve the onError completion with whatever the retried load settles to, so the awaiting
         // LoadOnceAsync continues (or fails) once the retry does.
@@ -233,7 +233,7 @@ internal sealed class AsyncComponentWrapper : IComponentDefinition
         }
     }
 
-    private static VirtualNode CreateInnerComponent(IComponentDefinition resolved, ComponentInstance instance)
+    private static VirtualNode CreateInnerComponent(IComponent resolved, ComponentInstance instance)
     {
         // Upstream createInnerComp: createVNode(resolvedComp, parent.vnode.props, parent.vnode.children).
         // The wrapper declares no props, so its whole prop bag (including the reserved "ref", which the

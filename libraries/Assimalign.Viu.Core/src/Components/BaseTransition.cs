@@ -23,7 +23,7 @@ namespace Assimalign.Viu;
 /// thread-safe (single-threaded JS event-loop model).
 /// </para>
 /// </summary>
-public sealed class BaseTransition : IComponentDefinition
+public sealed class BaseTransition : IComponent
 {
     /// <summary>
     /// The reserved prop name carrying a pre-resolved <see cref="BaseTransitionProperties"/> — the

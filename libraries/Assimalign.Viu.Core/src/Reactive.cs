@@ -106,7 +106,7 @@ public static class Reactive
     public static void TriggerReference(IReference reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
-        if (reference is ITrackedReference tracked)
+        if (reference is IDependencyReference tracked)
         {
             tracked.Dependency.Trigger();
         }
@@ -329,12 +329,12 @@ public static class Reactive
     /// Whether <paramref name="value"/> is a read-only reactive view — a getter-only
     /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(Readonly = true)]</c>/
     /// <c>[ShallowReactive(Readonly = true)]</c> object — the C# port of Vue 3.5's <c>isReadonly()</c>
-    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly). Keys on <see cref="IReadonlyReactive"/>.
+    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly). Keys on <see cref="IReadOnlyReactive"/>.
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> rejects writes.</returns>
     public static bool IsReadonly(object? value)
-        => value is IReadonlyReactive readonlyReactive && readonlyReactive.IsReadonly;
+        => value is IReadOnlyReactive readonlyReactive && readonlyReactive.IsReadOnly;
 
     /// <summary>
     /// Returns the value inside a ref, or the argument itself when it is not a ref — the C# port of Vue

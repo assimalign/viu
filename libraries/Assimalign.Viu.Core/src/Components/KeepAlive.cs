@@ -10,14 +10,14 @@ namespace Assimalign.Viu;
 /// (<c>packages/runtime-core/src/components/KeepAlive.ts</c>,
 /// https://vuejs.org/guide/built-ins/keep-alive.html). Unlike <see cref="BaseTransition"/> (which only
 /// stamps hooks) and unlike <c>Teleport</c> (a special vnode type), KeepAlive is a real
-/// <see cref="IComponentDefinition"/> with renderer-internal reach: it wraps a single dynamic child and,
+/// <see cref="IComponent"/> with renderer-internal reach: it wraps a single dynamic child and,
 /// instead of unmounting the outgoing child when the view switches, has the renderer move its subtree
 /// into a hidden storage container (<c>deactivate</c>) and move it back on return (<c>activate</c>), so
 /// the child's <c>Setup</c> runs once and all internal state is preserved across switches.
 /// <para>
 /// The cache is keyed by the child's vnode key when present, else by the component definition reference
 /// (a typed key — never a reflected type name). <c>Include</c>/<c>Exclude</c> match on the component's
-/// declared <see cref="IComponentDefinition.Name"/> (a comma-separated string, a string list, or a
+/// declared <see cref="IComponent.Name"/> (a comma-separated string, a string list, or a
 /// predicate — the C# analogue of upstream's string / array / RegExp); a non-matching child mounts and
 /// unmounts normally. <c>Max</c> caps the cache with least-recently-used eviction: the least-recently
 /// accessed cached instance is fully unmounted when the cache would overflow. Changing
@@ -35,7 +35,7 @@ namespace Assimalign.Viu;
 /// (single-threaded JS event-loop model).
 /// </para>
 /// </summary>
-public sealed class KeepAlive : IComponentDefinition
+public sealed class KeepAlive : IComponent
 {
     /// <summary>The shared component instance the compiled render references via <see cref="RenderHelpers._KeepAlive"/>.</summary>
     public static readonly KeepAlive Instance = new();
@@ -221,7 +221,7 @@ public sealed class KeepAlive : IComponentDefinition
             // Only a stateful component can be kept alive (upstream: else current = null; return rawVNode).
             if (rawChild is null
                 || (rawChild.ShapeFlag & ShapeFlags.StatefulComponent) == 0
-                || rawChild.ComponentType is not IComponentDefinition componentDefinition)
+                || rawChild.ComponentType is not IComponent componentDefinition)
             {
                 current = rawChild;
                 return rawChild;
@@ -330,7 +330,7 @@ public sealed class KeepAlive : IComponentDefinition
     };
 
     private static string? ComponentName(VirtualNode vnode)
-        => (vnode.ComponentType as IComponentDefinition)?.Name;
+        => (vnode.ComponentType as IComponent)?.Name;
 
     private static bool IsSameCacheType(VirtualNode left, VirtualNode right)
         => left.Type == right.Type

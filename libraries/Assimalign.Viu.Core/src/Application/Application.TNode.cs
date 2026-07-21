@@ -11,8 +11,8 @@ namespace Assimalign.Viu;
 /// https://vuejs.org/api/application.html): one root component mounted into one container and
 /// unmounted as a whole, over a shared <see cref="ApplicationContext"/> that carries the component
 /// registry, app-level provides, and <see cref="ApplicationConfiguration"/> to every descendant.
-/// <see cref="Component(string, IComponentDefinition)"/>, <see cref="Provide{T}"/>, and
-/// <see cref="Use(IPlugin, object?)"/> configure the app before mounting; registering after
+/// <see cref="Component(string, IComponent)"/>, <see cref="Provide{T}"/>, and
+/// <see cref="Use(IApplicationPlugin, object?)"/> configure the app before mounting; registering after
 /// <see cref="Mount"/> warns (upstream parity).
 /// <para>
 /// This is the platform-neutral, <b>extensible base</b> (the reshape's "application base",
@@ -39,7 +39,7 @@ public class Application<TNode> : IApplication, IDisposable
     where TNode : notnull
 {
     private readonly Renderer<TNode> _renderer;
-    private readonly IComponentDefinition _rootComponent;
+    private readonly IComponent _rootComponent;
     private readonly VirtualNodeProperties? _rootProperties;
     private readonly ApplicationContext _context = new();
     private HashSet<object>? _installedPlugins;
@@ -49,7 +49,7 @@ public class Application<TNode> : IApplication, IDisposable
     private bool _warnSinkInstalled;
     private bool _servicesDisposed;
 
-    internal Application(Renderer<TNode> renderer, IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties)
+    internal Application(Renderer<TNode> renderer, IComponent rootComponent, VirtualNodeProperties? rootProperties)
     {
         _renderer = renderer;
         _rootComponent = rootComponent;
@@ -92,7 +92,7 @@ public class Application<TNode> : IApplication, IDisposable
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
-    public Application<TNode> Component(string name, IComponentDefinition definition)
+    public Application<TNode> Component(string name, IComponent definition)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(definition);
@@ -112,7 +112,7 @@ public class Application<TNode> : IApplication, IDisposable
     /// <param name="name">The registered name.</param>
     /// <returns>The registered definition, or null.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public IComponentDefinition? Component(string name)
+    public IComponent? Component(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         return _context.Components.TryGetValue(name, out var definition) ? definition : null;
@@ -191,7 +191,7 @@ public class Application<TNode> : IApplication, IDisposable
     /// <summary>
     /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>).
     /// A repeat <c>Use</c> of the same plugin instance is deduplicated with a dev warning; a plugin
-    /// installed after mount warns. The plugin's <see cref="IPlugin.Install"/> receives this app
+    /// installed after mount warns. The plugin's <see cref="IApplicationPlugin.Install"/> receives this app
     /// (through the <see cref="InstallPlugin"/> seam), through which it registers components,
     /// directives, and provides. Returns the app for chaining.
     /// </summary>
@@ -199,7 +199,7 @@ public class Application<TNode> : IApplication, IDisposable
     /// <param name="options">Options passed to the plugin's install, or null.</param>
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public Application<TNode> Use(IPlugin plugin, object? options = null)
+    public Application<TNode> Use(IApplicationPlugin plugin, object? options = null)
     {
         ArgumentNullException.ThrowIfNull(plugin);
         WarnIfMounted(nameof(Use));
@@ -359,11 +359,11 @@ public class Application<TNode> : IApplication, IDisposable
     /// Installs <paramref name="plugin"/> into this application (upstream:
     /// <c>plugin.install(app, options)</c>) — the seam <see cref="Use"/> calls once per plugin
     /// instance, after the dedupe/after-mount guards. The default invokes
-    /// <see cref="IPlugin.Install"/> against this app.
+    /// <see cref="IApplicationPlugin.Install"/> against this app.
     /// </summary>
     /// <param name="plugin">The plugin to install.</param>
     /// <param name="options">Options passed to the plugin's install, or null.</param>
-    protected virtual void InstallPlugin(IPlugin plugin, object? options) => plugin.Install(this, options);
+    protected virtual void InstallPlugin(IApplicationPlugin plugin, object? options) => plugin.Install(this, options);
 
     private void ProvideCore(object key, object? value)
     {
@@ -386,7 +386,7 @@ public class Application<TNode> : IApplication, IDisposable
         }
     }
 
-    IApplication IApplication.Component(string name, IComponentDefinition definition) => Component(name, definition);
+    IApplication IApplication.Component(string name, IComponent definition) => Component(name, definition);
 
     IApplication IApplication.Directive(string name, IDirective directive) => Directive(name, directive);
 
@@ -394,5 +394,5 @@ public class Application<TNode> : IApplication, IDisposable
 
     IApplication IApplication.Provide(string key, object? value) => Provide(key, value);
 
-    IApplication IApplication.Use(IPlugin plugin, object? options) => Use(plugin, options);
+    IApplication IApplication.Use(IApplicationPlugin plugin, object? options) => Use(plugin, options);
 }

@@ -14,7 +14,7 @@ namespace Assimalign.Viu;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The type of the contained value (never boxed for struct types).</typeparam>
-public sealed class Reference<T> : IReference<T>, ITrackedReference
+public sealed class Reference<T> : IReference<T>, IDependencyReference
 {
     private readonly Dependency _dependency = new();
     private T _value;
@@ -50,5 +50,5 @@ public sealed class Reference<T> : IReference<T>, ITrackedReference
     /// <inheritdoc />
     object? IReference.Value => Value;
 
-    Dependency ITrackedReference.Dependency => _dependency;
+    Dependency IDependencyReference.Dependency => _dependency;
 }

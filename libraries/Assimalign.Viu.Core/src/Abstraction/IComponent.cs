@@ -13,10 +13,24 @@ namespace Assimalign.Viu;
 /// plain objects instantiated by user code or source-generated factories — never activated
 /// reflectively (AOT/trimming contract).
 /// </summary>
-public interface IComponentDefinition
+public interface IComponent
 {
-    /// <summary>The component's display name for warnings and devtools, or null.</summary>
+    /// <summary>
+    /// The component's display name for warnings and devtools, or null.
+    /// </summary>
     string? Name => null;
+
+    /// <summary>
+    /// Whether undeclared attributes fall through to a single element root (upstream:
+    /// <c>inheritAttrs</c>, default true).
+    /// </summary>
+    bool InheritAttributes => true;
+
+    /// <summary>
+    /// The declared emitted events (upstream: the <c>emits</c> option). Declared events'
+    /// handler props are excluded from attribute fallthrough.
+    /// </summary>
+    IReadOnlyList<ComponentEmitDefinition>? Emits => null;
 
     /// <summary>
     /// The declared props (upstream: the <c>props</c> option), as precomputed metadata —
@@ -26,18 +40,6 @@ public interface IComponentDefinition
     IReadOnlyList<ComponentPropertyDefinition>? Properties => null;
 
     /// <summary>
-    /// The declared emitted events (upstream: the <c>emits</c> option). Declared events'
-    /// handler props are excluded from attribute fallthrough.
-    /// </summary>
-    IReadOnlyList<ComponentEmitDefinition>? Emits => null;
-
-    /// <summary>
-    /// Whether undeclared attributes fall through to a single element root (upstream:
-    /// <c>inheritAttrs</c>, default true).
-    /// </summary>
-    bool InheritAttributes => true;
-
-    /// <summary>
     /// The Composition API entry point (upstream: <c>setup(props, context)</c>): runs once per
     /// instance with the instance current, and returns the render function that re-executes
     /// per update.
@@ -45,5 +47,5 @@ public interface IComponentDefinition
     /// <param name="properties">The instance's shallow-reactive props.</param>
     /// <param name="context">Attrs, Emit, Expose, and Slots.</param>
     /// <returns>The render function producing the component's subtree.</returns>
-    Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context);
+    ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context);
 }
