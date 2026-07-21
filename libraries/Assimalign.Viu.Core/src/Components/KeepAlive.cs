@@ -65,7 +65,7 @@ public sealed class KeepAlive : IComponent
     public bool InheritAttributes => false;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var instance = ComponentInstance.Current!;
         // The renderer injects its internals (storage container + real unmount) before Setup runs

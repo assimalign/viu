@@ -186,7 +186,7 @@ public sealed class ComponentInstance
     /// </summary>
     internal Dictionary<object, object?>? Provides { get; set; }
 
-    internal Func<VirtualNode?>? RenderFunction { get; set; }
+    internal ComponentSetup? RenderFunction { get; set; }
 
     internal ReactiveEffect? Effect { get; set; }
 

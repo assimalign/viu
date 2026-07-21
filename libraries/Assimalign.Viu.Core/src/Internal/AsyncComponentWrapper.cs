@@ -45,7 +45,7 @@ internal sealed class AsyncComponentWrapper : IComponent
     public string? Name => "AsyncComponentWrapper";
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var instance = ComponentInstance.Current!;
 

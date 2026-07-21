@@ -48,7 +48,7 @@ public sealed class BaseTransition : IComponent
     public bool InheritAttributes => false;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var instance = ComponentInstance.Current!;
         var state = UseTransitionState();

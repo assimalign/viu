@@ -1,40 +1,86 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Assimalign.Viu;
 
+/// <summary>
+/// Optional abstract base for authoring an <see cref="IComponent"/> with C# ergonomics: it turns
+/// the composition-API primitives into protected factory helpers (<see cref="Reference{T}(T)"/>,
+/// <see cref="Computed{T}(Func{T}, Action{T}?)"/>, …) and exposes a fluent
+/// <see cref="Configure(IComponentDescriptor)"/> seam for declaring props and emits. Deriving from
+/// this base is authoring sugar only — implementing <see cref="IComponent"/> directly is equally
+/// supported. Mirrors upstream's <c>defineComponent</c> convenience over the raw options object
+/// (<c>packages/runtime-core/src/apiDefineComponent.ts</c>).
+/// </summary>
+/// <remarks>
+/// Not thread-safe: like the rest of the runtime it targets the single-threaded JS event loop.
+/// </remarks>
 public abstract class Component : IComponent
 {
     private readonly List<ComponentPropertyDefinition> _properties = new();
     private readonly List<ComponentEmitDefinition> _emits = new();
-
-
-    protected Component()
-    {
-        Configure(new ComponentDescirptor(this));
-    }
-
-    public virtual bool InheritAttrs => true;
-    public virtual IReadOnlyList<ComponentPropertyDefinition> Properties => _properties.AsReadOnly();
-    public virtual IReadOnlyList<ComponentEmitDefinition> Emits => _emits.AsReadOnly();
+    private bool _configured;
 
     /// <summary>
-    /// Configures the component on constructor initialization. This is the place to register emits and properties for the component.
+    /// The component's display name for warnings and devtools (upstream: the <c>name</c> option),
+    /// or null. Declared virtual on the base — rather than left to the <see cref="IComponent"/>
+    /// default member — so a derived author can <c>override</c> it and have the runtime, which reads
+    /// <see cref="IComponent.Name"/>, observe the override.
     /// </summary>
-    /// <param name="descriptor"></param>
+    public virtual string? Name => null;
+
+    /// <summary>
+    /// Whether undeclared attributes fall through to a single element root (upstream:
+    /// <c>inheritAttrs</c>, default true). Override to opt out.
+    /// </summary>
+    public virtual bool InheritAttributes => true;
+
+    /// <summary>
+    /// The declared props, materialized on first access by running <see cref="Configure"/> once
+    /// (upstream: the <c>props</c> option).
+    /// </summary>
+    public virtual IReadOnlyList<ComponentPropertyDefinition> Properties
+    {
+        get
+        {
+            EnsureConfigured();
+            return _properties.AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// The declared emitted events, materialized on first access by running <see cref="Configure"/>
+    /// once (upstream: the <c>emits</c> option).
+    /// </summary>
+    public virtual IReadOnlyList<ComponentEmitDefinition> Emits
+    {
+        get
+        {
+            EnsureConfigured();
+            return _emits.AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Registers this component's props and emits. Called lazily exactly once, on the first access
+    /// to <see cref="Properties"/> or <see cref="Emits"/> — deliberately NOT from the constructor,
+    /// because a virtual call during construction would run a derived override before the derived
+    /// constructor body finished. Definition-time metadata only; lifecycle hooks belong in
+    /// <see cref="Setup"/> (ADR-0004, composition-only).
+    /// </summary>
+    /// <param name="descriptor">The fluent registration surface for props and emits.</param>
     protected virtual void Configure(IComponentDescriptor descriptor)
     {
-
     }
 
     /// <summary>
-    /// 
+    /// The Composition API entry point (upstream: <c>setup(props, context)</c>): runs once per
+    /// instance and returns the render function that re-executes per update.
     /// </summary>
-    /// <param name="properties"></param>
-    /// <param name="context"></param>
-    /// <returns></returns>
+    /// <param name="properties">The instance's shallow-reactive props.</param>
+    /// <param name="context">Attrs, Emit, Expose, and Slots.</param>
+    /// <returns>The render function producing the component's subtree.</returns>
     public abstract ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context);
-
 
     /// <summary>Creates a reactive ref holding <paramref name="value"/> (Vue's <c>ref()</c>).</summary>
     /// <typeparam name="T">The value type.</typeparam>
@@ -109,13 +155,29 @@ public abstract class Component : IComponent
         return new EffectScope(detached);
     }
 
-
-    private partial class ComponentDescirptor : IComponentDescriptor
+    /// <summary>
+    /// Runs <see cref="Configure"/> the first time component metadata is read. The runtime is
+    /// single-threaded (JS event loop), so a plain bool guard is sufficient — no locking. The
+    /// guard is set before the call so a re-entrant metadata read from within
+    /// <see cref="Configure"/> cannot recurse.
+    /// </summary>
+    private void EnsureConfigured()
     {
-        public ComponentDescirptor(Component component)
+        if (_configured)
+        {
+            return;
+        }
+        _configured = true;
+        Configure(new ComponentDescriptor(this));
+    }
+
+    private sealed class ComponentDescriptor : IComponentDescriptor
+    {
+        public ComponentDescriptor(Component component)
         {
             Component = component;
         }
+
         public Component Component { get; }
 
         public IComponentDescriptor WithEmit(ComponentEmitDefinition emit)
