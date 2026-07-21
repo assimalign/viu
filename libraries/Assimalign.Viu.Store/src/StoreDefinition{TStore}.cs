@@ -88,13 +88,22 @@ public sealed class StoreDefinition<TStore>
 
     private static StoreRegistry? ResolveAmbientRegistry()
     {
-        // Inside a component Setup: the registry provided app-wide by the store plugin (upstream:
-        // useStore injects piniaSymbol from the current component). The defaulted Inject overload
-        // treats a missing provide as a silent null rather than a dev "injection not found" warning;
-        // the (StoreRegistry)null! default keeps the key's non-nullable type argument (avoiding an
-        // InjectionKey<StoreRegistry?> variance mismatch) and selects the value overload unambiguously.
+        // Inside a component Setup, resolve service-first-then-provide ([V01.01.03.24]):
         if (ComponentInstance.Current is not null)
         {
+            // 1. The application service provider — a registry registered via builder.AddStore /
+            //    Services.AddSingleton(registry). Absent on a provide-only app, so this falls through
+            //    and the existing provide-based path (and its tests) is unchanged.
+            var fromServices = ComponentInstance.Current.Services?.GetService<StoreRegistry>();
+            if (fromServices is not null)
+            {
+                return fromServices;
+            }
+            // 2. The registry provided app-wide by the store plugin (upstream: useStore injects
+            //    piniaSymbol from the current component). The defaulted Inject overload treats a missing
+            //    provide as a silent null rather than a dev "injection not found" warning; the
+            //    (StoreRegistry)null! default keeps the key's non-nullable type argument (avoiding an
+            //    InjectionKey<StoreRegistry?> variance mismatch) and selects the value overload unambiguously.
             StoreRegistry? injected = DependencyInjection.Inject(StoreRegistry.InjectionKey, (StoreRegistry)null!);
             if (injected is not null)
             {

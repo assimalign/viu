@@ -42,7 +42,8 @@ public sealed class RouterLink : IComponentDefinition
     /// <inheritdoc/>
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
     {
-        var router = DependencyInjection.Inject(RouterInjectionKeys.Router);
+        // Resolve the router service-first-then-provide ([V01.01.03.24]).
+        var router = RouterResolution.Resolve();
 
         // Built once and reused, so the anchor's onClick prop is a stable reference across renders
         // (no listener re-patch). Reads to/replace at click time — no active effect, so untracked.
