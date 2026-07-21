@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Router.Tests;

@@ -24,8 +24,8 @@ namespace Assimalign.Viu.Reactivity.Generators;
 [Generator(LanguageNames.CSharp)]
 public sealed class ReactiveGenerator : IIncrementalGenerator
 {
-    private const string ReactiveAttributeName = "Assimalign.Viu.Reactivity.ReactiveAttribute";
-    private const string ShallowReactiveAttributeName = "Assimalign.Viu.Reactivity.ShallowReactiveAttribute";
+    private const string ReactiveAttributeName = "Assimalign.Viu.ReactiveAttribute";
+    private const string ShallowReactiveAttributeName = "Assimalign.Viu.ShallowReactiveAttribute";
 
     /// <summary>Pipeline step tracking name for the deep model transform (used by incremental-cache tests).</summary>
     public const string DeepModelTrackingName = "ReactiveDeepModel";

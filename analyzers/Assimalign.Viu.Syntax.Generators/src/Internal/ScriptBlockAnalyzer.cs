@@ -36,7 +36,7 @@ namespace Assimalign.Viu.Syntax.Generators;
 /// <b>Binding-metadata extraction.</b> Each top-level member is classified into a <see cref="BindingType"/>
 /// (the C# port of Vue's <c>BindingTypes</c>), driving where the template compiler inserts
 /// <c>.Value</c>. Classification is conservative: only a field/property whose declared type is a known
-/// <c>Assimalign.Viu.Reactivity</c> reference type becomes <see cref="BindingType.SetupReference"/> (the
+/// <c>Assimalign.Viu</c> reference type becomes <see cref="BindingType.SetupReference"/> (the
 /// only binding the template ever unwraps), so a misclassification can never ship a wrong <c>.Value</c>.
 /// It is unaffected by the region split — only members are classified, exactly as if the usings were absent.
 /// </item>
@@ -62,7 +62,7 @@ internal static class ScriptBlockAnalyzer
     private static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview, DocumentationMode.None, SourceCodeKind.Regular);
 
-    // The Assimalign.Viu.Reactivity reference-carrying types — the C# ports of Vue's ref/computed/
+    // The Assimalign.Viu reference-carrying types — the C# ports of Vue's ref/computed/
     // shallowRef/customRef. A field or property of one of these holds a reactive reference the template
     // compiler must unwrap through .Value (BindingType.SetupReference, upstream SETUP_REF). Matched by
     // simple type name because classification is syntactic; the generator references no runtime library.
@@ -322,7 +322,7 @@ internal static class ScriptBlockAnalyzer
     }
 
     // The right-most simple identifier of a type reference, unwrapping nullable annotations and namespace
-    // qualification so `Reference<int>`, `Reactivity.Reference<int>`, and `Reference<int>?` all classify.
+    // qualification so `Reference<int>`, `Assimalign.Viu.Reference<int>`, and `Reference<int>?` all classify.
     private static string? GetSimpleTypeName(TypeSyntax type)
         => type switch
         {

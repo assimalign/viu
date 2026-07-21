@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 

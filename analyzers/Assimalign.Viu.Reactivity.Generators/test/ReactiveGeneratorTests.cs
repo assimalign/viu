@@ -15,7 +15,7 @@ namespace Assimalign.Viu.Reactivity.Generators.Tests;
 public sealed class ReactiveGeneratorTests
 {
     private const string TodoItemSource = """
-        using Assimalign.Viu.Reactivity;
+        using Assimalign.Viu;
         namespace Demo;
         [Reactive]
         public partial class TodoItem
@@ -40,9 +40,9 @@ public sealed class ReactiveGeneratorTests
 
 namespace Demo
 {
-    public partial class TodoItem : global::Assimalign.Viu.Reactivity.IReactiveObject
+    public partial class TodoItem : global::Assimalign.Viu.IReactiveObject
     {
-        private global::Assimalign.Viu.Reactivity.Dependency __TitleDependency = new global::Assimalign.Viu.Reactivity.Dependency();
+        private global::Assimalign.Viu.Dependency __TitleDependency = new global::Assimalign.Viu.Dependency();
         private string __TitleValue = default!;
 
         public partial string Title
@@ -62,7 +62,7 @@ namespace Demo
             }
         }
 
-        private global::Assimalign.Viu.Reactivity.Dependency __DoneDependency = new global::Assimalign.Viu.Reactivity.Dependency();
+        private global::Assimalign.Viu.Dependency __DoneDependency = new global::Assimalign.Viu.Dependency();
         private bool __DoneValue = default!;
 
         public partial bool Done
@@ -82,9 +82,9 @@ namespace Demo
             }
         }
 
-        object global::Assimalign.Viu.Reactivity.IReactiveObject.ToRaw() => this;
+        object global::Assimalign.Viu.IReactiveObject.ToRaw() => this;
 
-        global::Assimalign.Viu.Reactivity.Dependency? global::Assimalign.Viu.Reactivity.IReactiveObject.GetDependency(string propertyName)
+        global::Assimalign.Viu.Dependency? global::Assimalign.Viu.IReactiveObject.GetDependency(string propertyName)
         {
             switch (propertyName)
             {
@@ -97,7 +97,7 @@ namespace Demo
             }
         }
 
-        void global::Assimalign.Viu.Reactivity.IReactiveTraversable.Traverse(global::Assimalign.Viu.Reactivity.ReactiveTraversal traversal)
+        void global::Assimalign.Viu.IReactiveTraversable.Traverse(global::Assimalign.Viu.ReactiveTraversal traversal)
         {
             traversal.Visit(this.Title);
             _ = this.Done;
@@ -107,13 +107,13 @@ namespace Demo
         {
             internal ReactiveReferences(TodoItem source)
             {
-                this.Title = global::Assimalign.Viu.Reactivity.Reactive.ToRef<string>(() => source.Title, value => source.Title = value);
-                this.Done = global::Assimalign.Viu.Reactivity.Reactive.ToRef<bool>(() => source.Done, value => source.Done = value);
+                this.Title = global::Assimalign.Viu.Reactive.ToRef<string>(() => source.Title, value => source.Title = value);
+                this.Done = global::Assimalign.Viu.Reactive.ToRef<bool>(() => source.Done, value => source.Done = value);
             }
 
-            public global::Assimalign.Viu.Reactivity.IReference<string> Title { get; }
+            public global::Assimalign.Viu.IReference<string> Title { get; }
 
-            public global::Assimalign.Viu.Reactivity.IReference<bool> Done { get; }
+            public global::Assimalign.Viu.IReference<bool> Done { get; }
         }
 
         public ReactiveReferences ToReferences() => new ReactiveReferences(this);
@@ -156,7 +156,7 @@ namespace Demo
     public void ShallowReactive_ReadsRootPropertiesWithoutRecursing_AndNestsPartialContainers()
     {
         const string source = """
-            using Assimalign.Viu.Reactivity;
+            using Assimalign.Viu;
             namespace Demo;
             public partial class Outer
             {
@@ -173,7 +173,7 @@ namespace Demo
         // Containing type re-declared partial, shallow traversal reads the property (tracks) without
         // descending, so no Visit call is emitted.
         generated.ShouldContain("partial class Outer");
-        generated.ShouldContain("internal partial class Inner : global::Assimalign.Viu.Reactivity.IReactiveObject");
+        generated.ShouldContain("internal partial class Inner : global::Assimalign.Viu.IReactiveObject");
         generated.ShouldContain("_ = this.Count;");
         generated.ShouldNotContain("traversal.Visit(");
     }
@@ -182,7 +182,7 @@ namespace Demo
     public void ReadonlyReactive_SetterWarnsAndDoesNotTrigger_ButReadsStillTrack()
     {
         const string source = """
-            using Assimalign.Viu.Reactivity;
+            using Assimalign.Viu;
             namespace Demo;
             [Reactive(Readonly = true)]
             public partial class Frozen { public partial string Name { get; set; } }
@@ -201,7 +201,7 @@ namespace Demo
         // The readonly variant implements IReadonlyReactive (IsReadonly => true) so Reactive.IsReadonly()
         // reports a source-generated readonly object — the port of readonly()'s IS_READONLY flag.
         const string source = """
-            using Assimalign.Viu.Reactivity;
+            using Assimalign.Viu;
             namespace Demo;
             [Reactive(Readonly = true)]
             public partial class Frozen { public partial string Name { get; set; } }
@@ -209,8 +209,8 @@ namespace Demo
 
         var generated = GeneratorTestHarness.GeneratedSource(GeneratorTestHarness.Run(source), "Frozen.Reactive.g.cs");
 
-        generated.ShouldContain(", global::Assimalign.Viu.Reactivity.IReadonlyReactive");
-        generated.ShouldContain("bool global::Assimalign.Viu.Reactivity.IReadonlyReactive.IsReadonly => true;");
+        generated.ShouldContain(", global::Assimalign.Viu.IReadonlyReactive");
+        generated.ShouldContain("bool global::Assimalign.Viu.IReadonlyReactive.IsReadonly => true;");
     }
 
     [Theory]
@@ -219,7 +219,7 @@ namespace Demo
     [InlineData("[Reactive] public partial class InitOnly { public partial string Name { get; init; } }", "VUER1003")]
     public void ReportsDiagnostic_ForMisuse(string declaration, string expectedId)
     {
-        var source = "using Assimalign.Viu.Reactivity; namespace Demo { " + declaration + " }";
+        var source = "using Assimalign.Viu; namespace Demo { " + declaration + " }";
 
         var outcome = GeneratorTestHarness.Run(source);
 
@@ -230,7 +230,7 @@ namespace Demo
     public void ReportsConflictingAttributes_Once_WhenBothReactiveAndShallowReactivePresent()
     {
         const string source = """
-            using Assimalign.Viu.Reactivity;
+            using Assimalign.Viu;
             namespace Demo;
             [Reactive]
             [ShallowReactive]

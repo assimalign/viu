@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Testing.Benchmarks;

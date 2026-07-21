@@ -6,11 +6,10 @@ using System.Runtime.Versioning;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
-using static Assimalign.Viu.RuntimeCore.VirtualNodeFactory;
+using static Assimalign.Viu.VirtualNodeFactory;
 
 namespace Assimalign.Viu.RuntimeDom.Tests;
 

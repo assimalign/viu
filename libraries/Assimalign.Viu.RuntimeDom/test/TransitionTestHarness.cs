@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.RuntimeDom.Tests;
 
-// A DOM-free harness that drives the real RuntimeCore renderer + the real DOM <Transition>/
+// A DOM-free harness that drives the real Core renderer + the real DOM <Transition>/
 // <TransitionGroup> components over int node handles, with a recording DomTransitionOperations that
 // the test advances deterministically. It mirrors how upstream tests transitions without a browser
 // (packages/runtime-dom/__tests__/components/Transition* use jsdom + synthetic transitionend); here

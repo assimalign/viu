@@ -4,7 +4,7 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu.Forms.Components;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Forms.Tests;

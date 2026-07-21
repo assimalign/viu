@@ -3,16 +3,16 @@ using System.Runtime.Versioning;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
-using static Assimalign.Viu.RuntimeCore.VirtualNodeFactory;
+using static Assimalign.Viu.VirtualNodeFactory;
 
 namespace Assimalign.Viu.RuntimeDom.Tests;
 
 // Exercises Teleport ([V01.01.03.17]) over the browser-shaped int-handle node-ops (RendererOptions<int>
 // wired to the InMemoryHandleDom exactly as production BrowserNodeOperations wires the JS bridge), so the
 // value-type TNode path — boxing handles into the teleport state, the default(TNode)==0 "no node"
-// sentinel — is covered as well as the reference-type TestNode path is in RuntimeCore. Browser-annotated
+// sentinel — is covered as well as the reference-type TestNode path is in Core. Browser-annotated
 // like the other tests touching the browser-only node-ops types; nothing crosses a real interop boundary.
 [SupportedOSPlatform("browser")]
 public sealed class TeleportDomTests

@@ -19,7 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
     <ViuProjectReference Include="Assimalign.Viu.Shared" />
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>

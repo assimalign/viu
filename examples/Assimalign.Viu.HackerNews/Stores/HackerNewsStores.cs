@@ -1,6 +1,6 @@
 using System;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Store;
 
 namespace Assimalign.Viu.HackerNews;

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu.Router;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.HackerNews;
 

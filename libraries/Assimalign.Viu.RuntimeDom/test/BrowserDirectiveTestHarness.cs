@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.RuntimeDom.Tests;
 
-// A DOM-free harness that drives the real RuntimeCore renderer + directive pipeline over int node
+// A DOM-free harness that drives the real Core renderer + directive pipeline over int node
 // handles (as the browser does), recording element state in memory and routing events through the
 // real BrowserEventInvokerRegistry. It installs a recording BrowserDirectiveOperations so v-model /
 // v-show exercise their whole production path with no browser, WASM toolchain, or JS interop. The

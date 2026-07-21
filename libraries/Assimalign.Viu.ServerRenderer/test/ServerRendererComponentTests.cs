@@ -4,8 +4,7 @@ using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.ServerRenderer.Tests;
 

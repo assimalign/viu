@@ -31,7 +31,7 @@ internal static class SingleFileComponentSourceEmitter
     /// with the runtime block/vnode helpers ([V01.01.05.02] and follow-ups); the generator only ever
     /// names it.
     /// </summary>
-    private const string RenderHelperSurface = "global::Assimalign.Viu.RuntimeCore.RenderHelpers";
+    private const string RenderHelperSurface = "global::Assimalign.Viu.RenderHelpers";
 
     /// <summary>
     /// The fully qualified DOM render-helper surface the emitted render body binds the DOM directive/modifier
@@ -51,7 +51,7 @@ internal static class SingleFileComponentSourceEmitter
     /// (<c>IComponentDefinition</c>, <c>ComponentProperties</c>, <c>ComponentSetupContext</c>,
     /// <c>ComponentSlots</c>, <c>VirtualNode</c>, and <c>RenderHelpers.NormalizeRoot</c>) all live here.
     /// </summary>
-    private const string RuntimeCoreNamespace = "global::Assimalign.Viu.RuntimeCore";
+    private const string CoreNamespace = "global::Assimalign.Viu";
 
     /// <summary>Emits the full generated source for <paramref name="model"/>.</summary>
     /// <param name="model">The scaffold to render.</param>
@@ -117,7 +117,7 @@ internal static class SingleFileComponentSourceEmitter
             // can be passed to CreateApp/VirtualNodeFactory.Component. A @style-only or scriptless .viu with
             // no render body stays a plain partial class — no interface, no Setup — so the CSS-bundle .viu
             // files keep compiling unchanged. Named by global:: reference, never an assembly reference.
-            builder.Append(" : ").Append(RuntimeCoreNamespace).Append(".IComponentDefinition");
+            builder.Append(" : ").Append(CoreNamespace).Append(".IComponentDefinition");
         }
 
         builder.Append('\n');
@@ -226,7 +226,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// </summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("string? ").Append(RuntimeCoreNamespace).Append(".IComponentDefinition.Name => ")
+        builder.Append("string? ").Append(CoreNamespace).Append(".IComponentDefinition.Name => ")
             .Append(Literal(displayName)).Append(";\n");
 
         if (usesSlots)
@@ -237,7 +237,7 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, indent);
             builder.Append("/// slot-affecting parent update is reflected live.</summary>\n");
             AppendIndent(builder, indent);
-            builder.Append("private ").Append(RuntimeCoreNamespace).Append(".ComponentSetupContext? __setupContext;\n");
+            builder.Append("private ").Append(CoreNamespace).Append(".ComponentSetupContext? __setupContext;\n");
             builder.Append('\n');
             AppendIndent(builder, indent);
             builder.Append("/// <summary>\n");
@@ -250,7 +250,7 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, indent);
             builder.Append("/// </summary>\n");
             AppendIndent(builder, indent);
-            builder.Append("private ").Append(RuntimeCoreNamespace).Append(".ComponentSlots? __slots => __setupContext?.Slots;\n");
+            builder.Append("private ").Append(CoreNamespace).Append(".ComponentSlots? __slots => __setupContext?.Slots;\n");
         }
 
         builder.Append('\n');
@@ -277,12 +277,12 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// <returns>The render function producing the component's subtree.</returns>\n");
         AppendIndent(builder, indent);
-        builder.Append("global::System.Func<").Append(RuntimeCoreNamespace).Append(".VirtualNode?> ")
-            .Append(RuntimeCoreNamespace).Append(".IComponentDefinition.Setup(\n");
+        builder.Append("global::System.Func<").Append(CoreNamespace).Append(".VirtualNode?> ")
+            .Append(CoreNamespace).Append(".IComponentDefinition.Setup(\n");
         AppendIndent(builder, indent + 1);
-        builder.Append(RuntimeCoreNamespace).Append(".ComponentProperties properties,\n");
+        builder.Append(CoreNamespace).Append(".ComponentProperties properties,\n");
         AppendIndent(builder, indent + 1);
-        builder.Append(RuntimeCoreNamespace).Append(".ComponentSetupContext context)\n");
+        builder.Append(CoreNamespace).Append(".ComponentSetupContext context)\n");
         AppendIndent(builder, indent);
         builder.Append("{\n");
 

@@ -11,6 +11,6 @@
        Router area may reference Runtime Core, Reactivity, and Shared). The matcher and history code
        itself stays framework-free; only the components/Router facade touch these references. -->
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
   </ItemGroup>
 </Project>

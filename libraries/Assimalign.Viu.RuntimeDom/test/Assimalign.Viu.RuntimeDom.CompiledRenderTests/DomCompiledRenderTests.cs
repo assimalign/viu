@@ -14,7 +14,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.RuntimeDom;
 using Assimalign.Viu.Syntax.Generators;
 
@@ -22,7 +22,7 @@ namespace Assimalign.Viu.RuntimeDom.CompiledRenderTests;
 
 /// <summary>
 /// The [V01.01.04.09] compile-binding proof for the DOM half of the render-helper contract — the DOM
-/// analogue of <c>Assimalign.Viu.RuntimeCore.CompiledRenderTests</c>. A real <c>.viu</c> that uses every DOM
+/// analogue of <c>Assimalign.Viu.CompiledRenderTests</c>. A real <c>.viu</c> that uses every DOM
 /// directive spelling — <c>v-show</c>, a <c>v-model</c> on each input kind (text, checkbox, radio, select,
 /// dynamic <c>:type</c>), and modifier/key event handlers — is compiled by
 /// <see cref="SingleFileComponentGenerator"/>, and the generated render body is semantically compiled with
@@ -89,7 +89,7 @@ public sealed class DomCompiledRenderTests
         // writes are present verbatim.
         var generated = CompiledRenderSupport.Generate("DomWidget", DomDirectiveTemplate);
 
-        generated.ShouldContain("using static global::Assimalign.Viu.RuntimeCore.RenderHelpers;");
+        generated.ShouldContain("using static global::Assimalign.Viu.RenderHelpers;");
         generated.ShouldContain("using static global::Assimalign.Viu.RuntimeDom.DomRenderHelpers;");
 
         generated.ShouldContain("_vShow");
@@ -219,7 +219,7 @@ public sealed class DomCompiledRenderTests
     // ApplyCssVariables getter must unwrap it to `count.Value` and compile against the real Reference<int>.
     private const string ReactiveVBindComponent =
         "@script {\n" +
-        "using Assimalign.Viu.Reactivity;\n" +
+        "using Assimalign.Viu;\n" +
         "public Reference<int> count = Reactive.Reference(1);\n" +
         "}\n" +
         "@template {\n" +
@@ -422,7 +422,7 @@ internal static class CompiledRenderSupport
         }
 
         // The framework's trusted platform assemblies plus exactly the Viu assemblies the generated render
-        // and its hand-written half bind against — both helper surfaces (RuntimeCore + RuntimeDom), and Shared
+        // and its hand-written half bind against — both helper surfaces (Core + RuntimeDom), and Shared
         // looked up by name so no linked shared type is referenced here. The compiler/parser assemblies are
         // deliberately NOT referenced: the generated render is pure runtime C#.
         if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string trusted)
@@ -439,8 +439,8 @@ internal static class CompiledRenderSupport
         Add(typeof(RenderHelpers).Assembly.Location);
         Add(typeof(DomRenderHelpers).Assembly.Location);
         // Reactivity: a @script Reference<T> member that a v-bind() getter unwraps ([V01.01.06.06.01]) binds
-        // Assimalign.Viu.Reactivity's Reference<T>/Reactive.
-        Add(typeof(Assimalign.Viu.Reactivity.Reactive).Assembly.Location);
+        // Assimalign.Viu's Reference<T>/Reactive.
+        Add(typeof(Assimalign.Viu.Reactive).Assembly.Location);
         var shared = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, "Assimalign.Viu.Shared", StringComparison.Ordinal));
         Add(shared?.Location);

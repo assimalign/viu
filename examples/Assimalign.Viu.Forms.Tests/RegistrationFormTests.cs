@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.Forms.Tests;
 

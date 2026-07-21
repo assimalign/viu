@@ -1,4 +1,4 @@
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 
 using Shouldly;
 using Xunit;

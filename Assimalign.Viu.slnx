@@ -271,13 +271,13 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/test/">
 		<Project Path="libraries/Assimalign.Viu.Router.RuntimeDom/test/Assimalign.Viu.Router.RuntimeDom.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeCore/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeCore/src/">
-		<Project Path="libraries/Assimalign.Viu.RuntimeCore/src/Assimalign.Viu.RuntimeCore.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Core/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Core/src/">
+		<Project Path="libraries/Assimalign.Viu.Core/src/Assimalign.Viu.Core.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeCore/test/">
-		<Project Path="libraries/Assimalign.Viu.RuntimeCore/test/Assimalign.Viu.RuntimeCore.CompiledRenderTests/Assimalign.Viu.RuntimeCore.CompiledRenderTests.csproj" />
-		<Project Path="libraries/Assimalign.Viu.RuntimeCore/test/Assimalign.Viu.RuntimeCore.Tests.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Core/test/">
+		<Project Path="libraries/Assimalign.Viu.Core/test/Assimalign.Viu.Core.CompiledRenderTests/Assimalign.Viu.Core.CompiledRenderTests.csproj" />
+		<Project Path="libraries/Assimalign.Viu.Core/test/Assimalign.Viu.Core.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeDom/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeDom/docs/">

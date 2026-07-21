@@ -8,17 +8,17 @@ namespace Assimalign.Viu.Reactivity.Generators;
 /// qualified (no <c>using</c>s), nullable-annotated, and free of reflection so the output is
 /// trim/AOT-safe. The per-property getter/setter fast path calls
 /// <c>Dependency.Track()</c>/<c>Trigger()</c> directly on a sealed field — no interface dispatch —
-/// mirroring the hand-written pattern in RuntimeCore's <c>ComponentProperties</c>.
+/// mirroring the hand-written pattern in the core.s <c>ComponentProperties</c>.
 /// </summary>
 internal static class ReactiveSourceEmitter
 {
-    private const string DependencyType = "global::Assimalign.Viu.Reactivity.Dependency";
-    private const string ReactiveObjectType = "global::Assimalign.Viu.Reactivity.IReactiveObject";
-    private const string ReadonlyReactiveType = "global::Assimalign.Viu.Reactivity.IReadonlyReactive";
-    private const string ReferenceType = "global::Assimalign.Viu.Reactivity.IReference";
-    private const string ReactiveFacadeType = "global::Assimalign.Viu.Reactivity.Reactive";
-    private const string TraversableType = "global::Assimalign.Viu.Reactivity.IReactiveTraversable";
-    private const string TraversalType = "global::Assimalign.Viu.Reactivity.ReactiveTraversal";
+    private const string DependencyType = "global::Assimalign.Viu.Dependency";
+    private const string ReactiveObjectType = "global::Assimalign.Viu.IReactiveObject";
+    private const string ReadonlyReactiveType = "global::Assimalign.Viu.IReadonlyReactive";
+    private const string ReferenceType = "global::Assimalign.Viu.IReference";
+    private const string ReactiveFacadeType = "global::Assimalign.Viu.Reactive";
+    private const string TraversableType = "global::Assimalign.Viu.IReactiveTraversable";
+    private const string TraversalType = "global::Assimalign.Viu.ReactiveTraversal";
     private const string EqualityComparerType = "global::System.Collections.Generic.EqualityComparer";
 
     /// <summary>Emits the full generated source for <paramref name="model"/>.</summary>

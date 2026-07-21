@@ -1,7 +1,7 @@
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.TodoMvc.Tests;
 

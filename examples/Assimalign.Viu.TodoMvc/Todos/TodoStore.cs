@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.TodoMvc;
 
@@ -10,7 +9,7 @@ namespace Assimalign.Viu.TodoMvc;
 /// The TodoMVC application state, written as a composition-style store: a <see cref="ReactiveList{T}"/>
 /// of <see cref="TodoItem"/> plus a handful of <c>Computed</c> views and the actions that mutate them.
 /// This is the whole "model" of the app and the primary unit under test — it depends only on
-/// <c>Assimalign.Viu.Reactivity</c>, so the sibling test project drives it with no browser.
+/// <c>Assimalign.Viu</c>, so the sibling test project drives it with no browser.
 /// <para>
 /// It is shared across components through the typed <see cref="Key"/> (Vue's <c>InjectionKey</c>):
 /// the bootstrap <c>provide</c>s one instance app-wide and every component <c>inject</c>s it, mirroring

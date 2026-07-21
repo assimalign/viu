@@ -1,6 +1,6 @@
 using System;
 
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 using Shouldly;

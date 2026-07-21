@@ -7,7 +7,7 @@ namespace Assimalign.Viu.Store;
 /// <see cref="Store{TState}.OnAction"/> — the C# port of the stop function Pinia's <c>$subscribe</c>
 /// and <c>$onAction</c> return (<c>packages/pinia/src/subscriptions.ts</c>). Calling <see cref="Stop"/>
 /// (or disposing) removes the subscription. A subscription created inside an active
-/// <see cref="Assimalign.Viu.Reactivity.EffectScope"/> (for example a component's) is also removed
+/// <see cref="Assimalign.Viu.EffectScope"/> (for example a component's) is also removed
 /// automatically when that scope stops, unless it was created <c>detached</c>. Stopping is idempotent.
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>

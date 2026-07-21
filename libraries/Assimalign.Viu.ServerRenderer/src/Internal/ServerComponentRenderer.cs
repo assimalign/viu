@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.ServerRenderer;
@@ -9,7 +9,7 @@ namespace Assimalign.Viu.ServerRenderer;
 /// <summary>
 /// Drives the platform-agnostic half of a component's lifecycle server-side — the C# port of the
 /// <c>renderComponentVNode</c> / <c>renderComponentSubTree</c> setup path in
-/// <c>@vue/server-renderer</c> (<c>packages/server-renderer/src/render.ts</c>) over the RuntimeCore
+/// <c>@vue/server-renderer</c> (<c>packages/server-renderer/src/render.ts</c>) over the Core
 /// component primitives upstream exposes as <c>ssrUtils</c>. For one component vnode it creates the
 /// <see cref="ComponentInstance"/>, resolves props and slots, runs <c>Setup</c> once inside the
 /// instance's effect scope, awaits every <see cref="Lifecycle.OnServerPrefetch"/> hook, and renders the
@@ -78,7 +78,7 @@ internal static class ServerComponentRenderer
         // Await every serverPrefetch hook before serializing this component's subtree (upstream
         // renderComponentSubTree: if (asyncSetupResult || instance.sp?.length) await ...). The hooks run
         // WITHOUT the instance on the current-instance stack — no synchronous vnode work happens across
-        // the await, so the ambient RuntimeCore machinery (ComponentInstance.Current, the block-tree
+        // the await, so the ambient Core machinery (ComponentInstance.Current, the block-tree
         // accumulator) stays balanced across suspension points.
         var hooks = instance.GetHooks(LifecycleHookKind.ServerPrefetch);
         if (hooks is null)
