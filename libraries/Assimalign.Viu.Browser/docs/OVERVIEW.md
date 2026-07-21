@@ -1,4 +1,4 @@
-# Assimalign.Viu.RuntimeDom — overview
+# Assimalign.Viu.Browser — overview
 
 The browser package of Viu — the role `@vue/runtime-dom` plays for Vue 3
 (https://github.com/vuejs/core/tree/main/packages/runtime-dom): it supplies the real-DOM

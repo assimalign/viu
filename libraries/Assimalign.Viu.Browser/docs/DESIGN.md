@@ -1,4 +1,4 @@
-# Assimalign.Viu.RuntimeDom — design
+# Assimalign.Viu.Browser — design
 
 Why the browser package is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md).
 Upstream counterpart: `@vue/runtime-dom`
@@ -55,7 +55,7 @@ is [V01.01.01.02] (#4). Until then style map keys are CSS property names (kebab-
 ## Shipping the JS half (WasmAppHost constraint)
 
 The bridge module (`src/wwwroot/viu-dom.js`) is owned by this package and loaded by
-`BrowserRuntime.InitializeAsync` from `/_content/Assimalign.Viu.RuntimeDom/viu-dom.js`. The
+`BrowserRuntime.InitializeAsync` from `/_content/Assimalign.Viu.Browser/viu-dom.js`. The
 canonical RCL (Razor SDK) static-web-asset flow is **not usable here**: measured on .NET SDK
 10.0.10, the non-Blazor WebAssembly dev host (WasmAppHost) stops serving the app entirely when
 it references a Razor-SDK class library, and its dev serving pattern only maps the app's source
@@ -96,7 +96,7 @@ single dispatch return. With no invoker installed, dispatching such a handler su
 `NotSupportedException` to the error sink rather than silently dropping the event. This mirrors the
 Testing renderer's `Action<object?>` dispatch (`TestEventDispatcher`) — same handler shape, host-
 specific payload — and keeps the coupling to `RouterLinkClickEvent` in the dedicated
-`Assimalign.Viu.Router.RuntimeDom` bridge, never here.
+`Assimalign.Viu.Router.Browser` bridge, never here.
 
 The dispatch payload carries the live event's arrival-time `event.defaultPrevented` (a new
 `[JSExport]` field) so the bridge honors `guardEvent`'s already-prevented bail. `BrowserEvent` keeps

@@ -175,7 +175,7 @@ there on):
 using System.Threading;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeDom;
+using Assimalign.Viu.Browser;
 
 using HelloViu;
 
@@ -236,7 +236,7 @@ and the renderer's batched updates rather than imperative DOM access
 `ComponentProperties`, and `ComponentSetupContext` all live in
 [`Assimalign.Viu.Core`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md); the
 browser entry point `BrowserRuntime` lives in
-[`Assimalign.Viu.RuntimeDom`](../../libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md). For a larger
+[`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a larger
 component — props, emitted events, and lifecycle hooks (`Lifecycle.OnMounted`/`OnUnmounted`) — read the
 [`Assimalign.Viu.WebApp`](../../examples/Assimalign.Viu.WebApp) sample.
 
@@ -394,7 +394,7 @@ The published `bin/Release/net10.0/publish/wwwroot` contains:
   `.gz` and `.br` variants;
 - `index.html` with the injected `<link rel="stylesheet" href="HelloViu.viu.css" />` (carried into the
   compressed `index.html.gz` / `index.html.br` too);
-- the `viu-dom.js` interop bridge under `_content/Assimalign.Viu.RuntimeDom/`.
+- the `viu-dom.js` interop bridge under `_content/Assimalign.Viu.Browser/`.
 
 That folder is a static site — host it on any static web host.
 
@@ -405,7 +405,7 @@ That folder is a static site — host it on any static web host.
 - **Per-library overviews** — each library documents itself in `docs/OVERVIEW.md` (what it is) and
   `docs/DESIGN.md` (why it is shaped that way). Start with
   [Core](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) and
-  [RuntimeDom](../../libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md).
+  [Browser](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md).
 - **The sample app** — [`examples/Assimalign.Viu.WebApp`](../../examples/Assimalign.Viu.WebApp) is a
   component tree with props, emits, and lifecycle hooks, and it dogfoods the `.viu` CSS pipeline.
 - **The delivery plan** — [`docs/PLAN.md`](../PLAN.md) maps each Vue 3 package to its Viu library and

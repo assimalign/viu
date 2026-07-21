@@ -24,7 +24,7 @@ its `ServerPrefetch` hooks, and render its root — the platform-agnostic half o
 Upstream exposes exactly these primitives to `@vue/server-renderer` through runtime-core's `ssrUtils`
 `@internal` export (`createComponentInstance`, `setupComponent`, `renderComponentRoot`). Viu's analog is
 a single `[assembly: InternalsVisibleTo("Assimalign.Viu.ServerRenderer")]` on `Assimalign.Viu.Core`
-(alongside the grants it already makes to `Assimalign.Viu.Testing` and `Assimalign.Viu.RuntimeDom`).
+(alongside the grants it already makes to `Assimalign.Viu.Testing` and `Assimalign.Viu.Browser`).
 `ServerComponentRenderer` then drives the real pipeline — the same `ComponentPropertyResolution.Resolve`,
 the same setup-in-scope discipline, the same `RenderComponentRoot` normalization and single-root attrs
 fallthrough the client renderer uses — instead of forking a second copy that could drift. No render

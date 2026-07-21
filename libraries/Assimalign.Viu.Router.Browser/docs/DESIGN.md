@@ -1,4 +1,4 @@
-# Assimalign.Viu.Router.RuntimeDom — design
+# Assimalign.Viu.Router.Browser — design
 
 Why this is a separate package and how the click bridge works. What it is: see
 [OVERVIEW.md](OVERVIEW.md). Upstream counterpart: vue-router's `guardEvent`
@@ -14,8 +14,8 @@ and SSR, and the assembly references no DOM adapter (pinned by
 `RouterAssembly_DoesNotReferenceTheBrowserDomAdapter`). The mapping from a real browser event to that
 contract therefore cannot live in `Assimalign.Viu.Router`.
 
-It cannot live in `Assimalign.Viu.RuntimeDom` either: `RuntimeDom` is a framework member shipped in
-every Viu app (`@(ViuFrameworkAssembly)`), while `Router` is an opt-in package. A `RuntimeDom → Router`
+It cannot live in `Assimalign.Viu.Browser` either: `Browser` is a framework member shipped in
+every Viu app (`@(ViuFrameworkAssembly)`), while `Router` is an opt-in package. A `Browser → Router`
 reference would drag the whole Router into every non-router app's framework closure — the generic DOM
 runtime taking on a specific feature library, the reverse of upstream's `vue-router → @vue/runtime-dom`
 direction. So the DOM runtime stays Router-agnostic behind a generic seam, and the concrete mapping
@@ -24,7 +24,7 @@ coupling is a leaf.
 
 ## The generic seam it plugs into
 
-`RuntimeDom` exposes an ambient `BrowserObjectEvents.Invoker` (`BrowserObjectEventInvoker`): the event
+`Browser` exposes an ambient `BrowserObjectEvents.Invoker` (`BrowserObjectEventInvoker`): the event
 system routes any renderer-agnostic `Action<object?>` handler — the shape a component rendering
 through the node-ops abstraction attaches — through the installed invoker, which owns the whole
 conversion. This mirrors the Testing renderer's `Action<object?>` dispatch (`TestEventDispatcher`):
@@ -40,7 +40,7 @@ Control/Shift/Alt/Meta `Modifiers`, runs the handler (the link's guard), and the
 suppress the browser default:
 
 - **Already-prevented events fall through.** The dispatch payload carries the live event's
-  arrival-time `event.defaultPrevented` (a `RuntimeDom` `[JSExport]` field added by this work item).
+  arrival-time `event.defaultPrevented` (a `Browser` `[JSExport]` field added by this work item).
   When set, the bridge seeds `RouterLinkClickEvent.PreventDefault()` before the guard runs, so the
   guard bails exactly as upstream `guardEvent` bails on `e.defaultPrevented` — and the bridge does not
   re-signal, because the browser already suppressed the default.
@@ -57,7 +57,7 @@ suppress the browser default:
 
 No reflection, no dynamic code generation: the mapping is direct field reads and one allocation per
 intercepted click (the `RouterLinkClickEvent`). `IsAotCompatible=true`. The bridge uses only the
-non-`[SupportedOSPlatform("browser")]` surface of `RuntimeDom` (`BrowserEvent`, `BrowserEventModifiers`,
+non-`[SupportedOSPlatform("browser")]` surface of `Browser` (`BrowserEvent`, `BrowserEventModifiers`,
 `BrowserObjectEvents`), so it carries no platform gate of its own.
 
 ## Non-goals

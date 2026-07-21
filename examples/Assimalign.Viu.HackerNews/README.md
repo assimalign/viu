@@ -4,7 +4,7 @@ The Wave-4 **exit demo** ([V01.01.13.06], #103): a HackerNews client that compos
 surface together — the Viu counterpart of [vuejs/vue-hackernews-2.0](https://github.com/vuejs/vue-hackernews-2.0).
 It exercises, in one app:
 
-- **Routing** — `Assimalign.Viu.Router` with **web history**, plus the `Assimalign.Viu.Router.RuntimeDom`
+- **Routing** — `Assimalign.Viu.Router` with **web history**, plus the `Assimalign.Viu.Router.Browser`
   **click bridge** installed at bootstrap so `RouterLink` navigations are client-side.
 - **Store** — a Pinia-style `Assimalign.Viu.Store` (`Store<TState>` member model over `[Reactive]`
   state); *all* fetched state flows through stores, never through component fields.

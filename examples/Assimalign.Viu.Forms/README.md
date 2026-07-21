@@ -39,4 +39,4 @@ dotnet publish examples/Assimalign.Viu.Forms -c Release
 The reactive model and the preview component are covered by
 [`Assimalign.Viu.Forms.Tests`](../Assimalign.Viu.Forms.Tests). The `v-model` DOM directives are a
 browser concern (they require the DOM bridge) and are covered by the framework's own
-`Assimalign.Viu.RuntimeDom` directive tests; here the tests pin the model and the derived state.
+`Assimalign.Viu.Browser` directive tests; here the tests pin the model and the derived state.

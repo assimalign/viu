@@ -25,8 +25,9 @@ conversation's context.
 This directory holds **repo-wide and cross-cutting** decisions. A decision that is contained within
 a single library — measured, library-specific, and unlikely to be cited elsewhere — may instead live
 in that library's `docs/` folder as a local ADR. The existing example is
-[`Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md`](../../libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md)
-(int-handle node identity over `JSObject` proxies), which is the RuntimeDom-local realization of the
+[`Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`](../../libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md)
+(int-handle node identity over `JSObject` proxies; the library was renamed from `Assimalign.Viu.RuntimeDom`
+in [V01.01.12.22]), which is the RuntimeDom-local realization of the
 repo-wide budget recorded here in [ADR-0003](0003-batched-interop-dom-operations.md). Library-local
 ADRs keep their own numbering within their library folder.
 

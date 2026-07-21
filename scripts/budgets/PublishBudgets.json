@@ -25,7 +25,7 @@
     "",
     "Seed provenance: Assimalign.Viu.HackerNews measured 2,533,416 bytes brotli (8,576,012 raw, 34 files)",
     "on 2026-07-20 with .NET SDK 10.0.302; budget 2,790,000 seeds ~10% headroom (9.2% of budget). It is",
-    "larger than the WebApp because it pulls in the Router, Store, and Router.RuntimeDom assemblies and",
+    "larger than the WebApp because it pulls in the Router, Store, and Router.Browser assemblies and",
     "System.Text.Json (source-generated). CI (ubuntu x64) is the authority; if its measurement differs",
     "materially from these Windows seeds, recalibrate via an explicit edit here."
   ],

@@ -4,7 +4,7 @@ The platform-agnostic runtime — the C# port of
 [`@vue/runtime-core`](https://github.com/vuejs/core/tree/main/packages/runtime-core): the virtual
 DOM model, the renderer factory, the scheduler, the component model, provide/inject, the runtime
 directive system, and the built-in component scaffolding. It performs no DOM or JS interop itself —
-a platform package supplies the node-ops (the browser's `Assimalign.Viu.RuntimeDom`, tests'
+a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`, tests'
 `Assimalign.Viu.Testing`). Area: `V01.01.03`.
 
 ## Public surface

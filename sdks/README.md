@@ -35,12 +35,12 @@ dotnet CLI with no installer and no admin rights.
 | Piece | Mechanism |
 | --- | --- |
 | WASM browser app model | `Sdk.props`/`Sdk.targets` chain `Microsoft.NET.Sdk.WebAssembly` |
-| The framework libraries (`Assimalign.Viu.Shared`, `.Core`, `.RuntimeDom`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
+| The framework libraries (`Assimalign.Viu.Shared`, `.Core`, `.Browser`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
 | The `[Reactive]` and `.viu` source generators | Shipped inside the `Assimalign.Viu.App.Ref` targeting pack at `analyzers/dotnet/cs/` and listed as `<File Type="Analyzer">` in its `data/FrameworkList.xml` |
 | `.viu` single-file component compilation | The generator's AdditionalFiles/CompilerVisibleProperty wiring, packed into the SDK's `Targets/` from its in-repo source |
 | `.viu` `@style` CSS bundling | The `ViuBundleCss` MSBuild task (+ parser closure) in the SDK package's `Tasks/`, driven by the packed `Assimalign.Viu.Sdk.Css.Bundling.targets`. The bundle registers as a **content-fingerprinted** static web asset ([V01.01.12.12.03]) |
 | `.viu` `@style` stylesheet `<link>` | **Injected automatically** — no manual link tag. The `ViuInjectCssBundleLink` task (same `Tasks/` assembly) splices `<link rel="stylesheet" href="<AssemblyName>.viu.css" />` into `wwwroot/index.html` at build, *before* the SDK's compression pipeline so gzip/brotli negotiation stays intact ([V01.01.12.12.01]). The href is the stable plain route a static host serves; a fingerprinted route is also registered for manifest-aware hosts. Opt out with `<ViuInjectSingleFileComponentCssLink>false</ViuInjectSingleFileComponentCssLink>` (a hand-authored link also suppresses injection) |
-| `viu-dom.js` interop bridge | Packed under `assets/` and copied to the consumer's `wwwroot/_content/Assimalign.Viu.RuntimeDom/` at build |
+| `viu-dom.js` interop bridge | Packed under `assets/` and copied to the consumer's `wwwroot/_content/Assimalign.Viu.Browser/` at build |
 
 The framework reference resolves to two NuGet packages (the
 `Microsoft.AspNetCore.App.Ref` / `.Runtime.<rid>` shape):

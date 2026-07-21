@@ -1,6 +1,6 @@
-# Assimalign.Viu.Router.RuntimeDom — overview
+# Assimalign.Viu.Router.Browser — overview
 
-The browser integration layer between `Assimalign.Viu.Router` and `Assimalign.Viu.RuntimeDom`: the
+The browser integration layer between `Assimalign.Viu.Router` and `Assimalign.Viu.Browser`: the
 one small adapter that lets `RouterLink` intercept a real DOM click and navigate client-side. It is
 the C# home for the coupling vue-router keeps inline — upstream's `guardEvent`
 (`packages/router/src/RouterLink.ts`, https://github.com/vuejs/router) reads the DOM `MouseEvent`
@@ -29,8 +29,8 @@ Only browser apps that use the Router need this package — it is not part of th
 
 ## Boundaries
 
-- References both `Assimalign.Viu.Router` and `Assimalign.Viu.RuntimeDom`; nothing references it back.
-- `RuntimeDom` stays Router-agnostic and `Router` stays DOM-free (pinned by
+- References both `Assimalign.Viu.Router` and `Assimalign.Viu.Browser`; nothing references it back.
+- `Browser` stays Router-agnostic and `Router` stays DOM-free (pinned by
   `RouterAssembly_DoesNotReferenceTheBrowserDomAdapter`); this package is the only place the two meet.
 - Real-browser click behavior is exercised by the end-to-end harness ([V01.01.11.03], #87); the unit
   tests here pin the mapping and the prevent-default plumbing DOM-free.
