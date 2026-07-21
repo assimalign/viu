@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 using Assimalign.Viu;
 
@@ -14,16 +15,20 @@ namespace Assimalign.Viu.ServerRenderer;
 /// inseparable from a DOM renderer (it is generic over the platform node and owns a
 /// <c>Renderer&lt;TNode&gt;</c>), whereas founding decision 7 requires the server renderer to run on a
 /// plain .NET host with no DOM/interop dependency. So the SSR app carries the same
-/// component/directive/provide surface over the shared <see cref="ApplicationContext"/> without the
-/// renderer. Per-request discipline is the caller's: construct a fresh <see cref="ServerApplication"/>
-/// per request so no reactive state crosses requests (the host DI wiring is the server adaptor's
-/// concern, [V01.01.07.04]).
+/// component/directive/provide/plugin surface over the shared <see cref="ApplicationContext"/> without
+/// the renderer, implementing the platform-neutral <see cref="IApplication"/> so plugins and the
+/// builder work against it uniformly. It never mounts (SSR renders to a string per request), so
+/// <see cref="IsMounted"/> is always false, <see cref="RootInstance"/> null, and <see cref="Unmount"/>
+/// a no-op. Per-request discipline is the caller's: construct a fresh <see cref="ServerApplication"/>
+/// per request (see <see cref="CreateBuilder"/>) so no reactive state crosses requests (the host DI
+/// wiring is the server adaptor's concern, [V01.01.07.04]).
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
-public sealed class ServerApplication
+public sealed class ServerApplication : IApplication
 {
     private readonly ApplicationContext _context = new();
+    private HashSet<object>? _installedPlugins;
 
     /// <summary>Creates a server app for <paramref name="rootComponent"/> with optional root props.</summary>
     /// <param name="rootComponent">The root component definition (upstream: <c>createSSRApp</c>'s argument).</param>
@@ -35,6 +40,31 @@ public sealed class ServerApplication
         RootComponent = rootComponent;
         RootProperties = rootProperties;
     }
+
+    /// <summary>
+    /// Creates a builder for a server application that renders <paramref name="rootComponent"/> — the
+    /// .NET-idiomatic bootstrap aligned with the browser's builder. Configure plugins/provides on the
+    /// builder, <c>Build()</c> the app, then pass it to
+    /// <see cref="ServerRenderer.RenderToStringAsync(ServerApplication, SsrContext?, System.Threading.CancellationToken)"/>.
+    /// Build a fresh app per request (no cross-request state).
+    /// </summary>
+    /// <param name="rootComponent">The root component definition.</param>
+    /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <returns>A builder whose <see cref="ServerApplicationBuilder.Build"/> produces the app.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
+    public static ServerApplicationBuilder CreateBuilder(
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootComponent);
+        return new ServerApplicationBuilder(rootComponent, rootProperties);
+    }
+
+    /// <summary>Always false — a server application renders to a string and never mounts.</summary>
+    public bool IsMounted => false;
+
+    /// <summary>Always null — a server application has no live mounted root instance.</summary>
+    public ComponentInstance? RootInstance => null;
 
     /// <summary>The root component definition.</summary>
     public IComponentDefinition RootComponent { get; }
@@ -70,6 +100,19 @@ public sealed class ServerApplication
     }
 
     /// <summary>
+    /// Returns the component registered under <paramref name="name"/>, or null (upstream:
+    /// <c>app.component(name)</c> getter — an exact-name lookup).
+    /// </summary>
+    /// <param name="name">The registered name.</param>
+    /// <returns>The registered definition, or null.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    public IComponentDefinition? Component(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return _context.Components.TryGetValue(name, out var definition) ? definition : null;
+    }
+
+    /// <summary>
     /// Registers a directive under <paramref name="name"/> (upstream: <c>app.directive(name, directive)</c>).
     /// Returns the app for chaining. (Directive server-side props via <c>getSSRProps</c> are future work;
     /// registration is provided so name resolution succeeds.)
@@ -85,6 +128,19 @@ public sealed class ServerApplication
         ArgumentNullException.ThrowIfNull(directive);
         _context.Directives[name] = directive;
         return this;
+    }
+
+    /// <summary>
+    /// Returns the directive registered under <paramref name="name"/>, or null (upstream:
+    /// <c>app.directive(name)</c> getter — an exact-name lookup).
+    /// </summary>
+    /// <param name="name">The registered name.</param>
+    /// <returns>The registered directive, or null.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
+    public IDirective? Directive(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return _context.Directives.TryGetValue(name, out var directive) ? directive : null;
     }
 
     /// <summary>
@@ -118,4 +174,44 @@ public sealed class ServerApplication
         _context.Provides[key] = value;
         return this;
     }
+
+    /// <summary>
+    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>),
+    /// so app-level plugins (a Pinia-style store registry, for example) register their provides into
+    /// the shared context before rendering. A repeat <c>Use</c> of the same instance is deduplicated.
+    /// Returns the app for chaining.
+    /// </summary>
+    /// <param name="plugin">The plugin to install.</param>
+    /// <param name="options">Options passed to the plugin's install, or null.</param>
+    /// <returns>This application, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
+    public ServerApplication Use(IPlugin plugin, object? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(plugin);
+        _installedPlugins ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
+        if (_installedPlugins.Add(plugin))
+        {
+            plugin.Install(this, options);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// No-op — a server application renders to a string per request and never mounts, so there is
+    /// nothing to tear down (satisfies <see cref="IApplication"/>). Isolate requests by building a
+    /// fresh <see cref="ServerApplication"/> per request instead of unmounting a shared one.
+    /// </summary>
+    public void Unmount()
+    {
+    }
+
+    IApplication IApplication.Component(string name, IComponentDefinition definition) => Component(name, definition);
+
+    IApplication IApplication.Directive(string name, IDirective directive) => Directive(name, directive);
+
+    IApplication IApplication.Provide<T>(InjectionKey<T> key, T value) => Provide(key, value);
+
+    IApplication IApplication.Provide(string key, object? value) => Provide(key, value);
+
+    IApplication IApplication.Use(IPlugin plugin, object? options) => Use(plugin, options);
 }
