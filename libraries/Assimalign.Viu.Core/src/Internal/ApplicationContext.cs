@@ -25,6 +25,17 @@ internal sealed class ApplicationContext
     /// </summary>
     public Dictionary<object, object?> Provides { get; } = [];
 
+    /// <summary>
+    /// The application's bring-your-own dependency-injection provider ([V01.01.03.24]) — the
+    /// <see cref="IServiceProvider"/> an <see cref="IApplicationBuilder"/> built and attached, reachable
+    /// as <see cref="Application{TNode}.Services"/> and, through the inherited
+    /// <see cref="ComponentInstance.AppContext"/>, as <see cref="ComponentInstance.Services"/> in every
+    /// descendant. Null for a tree rendered without a builder (a raw
+    /// <see cref="Renderer{TNode}.CreateApplication"/> app). This is app-level DI, layered beside the
+    /// Vue-semantic <see cref="Provides"/> chain — the two are independent.
+    /// </summary>
+    public IServiceProvider? Services { get; set; }
+
     /// <summary>The name → definition registry (upstream: <c>appContext.components</c>).</summary>
     public Dictionary<string, IComponentDefinition> Components { get; } = new(StringComparer.Ordinal);
 

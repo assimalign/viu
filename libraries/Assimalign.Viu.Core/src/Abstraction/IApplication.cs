@@ -1,3 +1,5 @@
+using System;
+
 namespace Assimalign.Viu;
 
 /// <summary>
@@ -31,6 +33,22 @@ public interface IApplication
 
     /// <summary>The root component instance after mounting, or null.</summary>
     ComponentInstance? RootInstance { get; }
+
+    /// <summary>
+    /// The application's dependency-injection provider ([V01.01.03.24]) — the
+    /// <see cref="System.IServiceProvider"/> the <see cref="IApplicationBuilder"/> built from its
+    /// service registrations and attached, reachable from component <c>Setup</c> through
+    /// <see cref="ComponentInstance.Services"/> and the <see cref="DependencyInjection.GetService{T}()"/>
+    /// composition functions. Null when the application was created without a builder (a raw
+    /// renderer-created app). The application owns this provider and disposes it (if
+    /// <see cref="System.IDisposable"/>) when it disposes.
+    /// <para>
+    /// This is app-level DI over <see cref="System.IServiceProvider"/>, layered <b>beside</b> — never
+    /// replacing — the Vue-semantic component-tree <see cref="Provide{T}(InjectionKey{T}, T)"/>/inject
+    /// chain (<see cref="DependencyInjection"/>).
+    /// </para>
+    /// </summary>
+    IServiceProvider? Services { get; }
 
     /// <summary>
     /// Registers a component under <paramref name="name"/> so descendants of the root can resolve it

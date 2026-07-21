@@ -160,6 +160,54 @@ public static class DependencyInjection
         };
     }
 
+    /// <summary>
+    /// Resolves <typeparamref name="TService"/> from the current component's <b>application service
+    /// provider</b> (<see cref="IApplication.Services"/>) — the app-level dependency-injection
+    /// composition function ([V01.01.03.24]), the .NET-idiomatic counterpart of
+    /// <see cref="Inject{T}(InjectionKey{T})"/>. Returns <c>null</c> when the service is unregistered;
+    /// returns <c>null</c> with a dev warning when called with no active instance (outside
+    /// <c>Setup</c>) or on an app that has no provider.
+    /// <para>
+    /// This resolves from the app service provider, <b>not</b> the Vue-semantic component-tree
+    /// provide/inject chain (<see cref="Inject{T}(InjectionKey{T})"/>): the two are independent app-
+    /// and component-level mechanisms. Bind to <see cref="ComponentInstance.Current"/> like
+    /// <see cref="Inject{T}(InjectionKey{T})"/>, so call it during <c>Setup</c>.
+    /// </para>
+    /// </summary>
+    /// <typeparam name="TService">The service type to resolve.</typeparam>
+    /// <returns>The resolved service, or null when unavailable/unregistered.</returns>
+    public static TService? GetService<TService>()
+        where TService : class
+    {
+        var instance = ComponentInstance.Current;
+        if (instance is null)
+        {
+            RuntimeWarnings.Warn("GetService<T>() can only be used inside Setup().");
+            return null;
+        }
+        return instance.Services?.GetService<TService>();
+    }
+
+    /// <summary>
+    /// Resolves <typeparamref name="TService"/> from the current component's application service
+    /// provider, throwing when there is no active instance, no provider, or no registration — the
+    /// required-service form of <see cref="GetService{TService}()"/> ([V01.01.03.24]).
+    /// </summary>
+    /// <typeparam name="TService">The service type to resolve.</typeparam>
+    /// <returns>The resolved service.</returns>
+    /// <exception cref="InvalidOperationException">Called outside <c>Setup</c>, the app has no service provider, or <typeparamref name="TService"/> is not registered.</exception>
+    public static TService GetRequiredService<TService>()
+        where TService : class
+    {
+        var instance = ComponentInstance.Current
+            ?? throw new InvalidOperationException("GetRequiredService<T>() can only be used inside Setup().");
+        var provider = instance.Services
+            ?? throw new InvalidOperationException(
+                $"No application service provider is available to resolve \"{typeof(TService)}\". Register services "
+                + "on the application builder (builder.Services / ConfigureServices) before Build().");
+        return provider.GetRequiredService<TService>();
+    }
+
     private static object? ResolveDefault(object? defaultValue, bool treatDefaultAsFactory)
         => treatDefaultAsFactory && defaultValue is Func<object?> factory ? factory() : defaultValue;
 
