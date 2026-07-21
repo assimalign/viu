@@ -53,6 +53,6 @@ version-counter and doubly-linked-list dependency graph — all of which port to
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 2.
-- [`Assimalign.Viu.Reactivity/docs/DESIGN.md`](../../libraries/Assimalign.Viu.Reactivity/docs/DESIGN.md).
+- [`Assimalign.Viu.Core/docs/DESIGN.md`](../../libraries/Assimalign.Viu.Core/docs/DESIGN.md) — the reactive core (merged from the former `Assimalign.Viu.Reactivity` in [V01.01.12.21]).
 - Vue 3: [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity),
   [Reactivity API: Core](https://vuejs.org/api/reactivity-core.html).

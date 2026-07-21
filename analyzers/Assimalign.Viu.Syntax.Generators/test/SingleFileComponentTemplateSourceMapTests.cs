@@ -209,7 +209,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
     private static ImmutableArray<RoslynDiagnostic> CompileGeneratedWithHelperStub(string generated)
     {
         const string helperStub =
-            "namespace Assimalign.Viu.RuntimeCore\n" +
+            "namespace Assimalign.Viu\n" +
             "{\n" +
             "    internal sealed class VirtualNode { }\n" +
             "    internal sealed class ComponentProperties { }\n" +

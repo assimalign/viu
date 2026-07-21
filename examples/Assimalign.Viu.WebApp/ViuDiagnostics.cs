@@ -6,7 +6,7 @@ using System.Runtime.Versioning;
 using System.Text;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.RuntimeDom;
 
 // The ?diagnostics=1 mode: runs the [V01.01.04.01] handle-lifecycle stress check and the

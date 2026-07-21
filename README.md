@@ -41,8 +41,7 @@ carries a `docs/OVERVIEW.md` (what it is, its public surface, its Vue 3 counterp
 | Library | Vue 3 counterpart | Docs |
 | --- | --- | --- |
 | [`Assimalign.Viu.Shared`](libraries/Assimalign.Viu.Shared) | [`@vue/shared`](https://github.com/vuejs/core/tree/main/packages/shared) — PatchFlags/ShapeFlags/SlotFlags, class/style normalization, DOM knowledge tables | [OVERVIEW](libraries/Assimalign.Viu.Shared/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Shared/docs/DESIGN.md) |
-| [`Assimalign.Viu.Reactivity`](libraries/Assimalign.Viu.Reactivity) | [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity) — dependencies, Ref/Computed, effects, scopes, watch, reactive collections | [OVERVIEW](libraries/Assimalign.Viu.Reactivity/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Reactivity/docs/DESIGN.md) |
-| [`Assimalign.Viu.RuntimeCore`](libraries/Assimalign.Viu.RuntimeCore) | [`@vue/runtime-core`](https://github.com/vuejs/core/tree/main/packages/runtime-core) — vnodes, renderer, scheduler, component model, built-ins | [OVERVIEW](libraries/Assimalign.Viu.RuntimeCore/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.RuntimeCore/docs/DESIGN.md) |
+| [`Assimalign.Viu.Core`](libraries/Assimalign.Viu.Core) | [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity) + [`@vue/runtime-core`](https://github.com/vuejs/core/tree/main/packages/runtime-core) — dependencies, Ref/Computed, effects, scopes, watch, reactive collections; vnodes, renderer, scheduler, component model, built-ins (the consolidated core, rooted at the `Assimalign.Viu` namespace) | [OVERVIEW](libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Core/docs/DESIGN.md) |
 | [`Assimalign.Viu.RuntimeDom`](libraries/Assimalign.Viu.RuntimeDom) | [`@vue/runtime-dom`](https://github.com/vuejs/core/tree/main/packages/runtime-dom) — JS-interop DOM bridge, patchProp, events, v-model/v-show | [OVERVIEW](libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.RuntimeDom/docs/DESIGN.md) |
 | [`Assimalign.Viu.ServerRenderer`](libraries/Assimalign.Viu.ServerRenderer) | [`@vue/server-renderer`](https://github.com/vuejs/core/tree/main/packages/server-renderer) — the DOM-free, vnode-walking SSR string/stream renderer and `ssrRender` helper library (WHATWG-exact escaping, attrs, class/style, slots, teleport buffering, `serverPrefetch`); the compiler SSR codegen, hydration walker, and server adaptor follow ([V01.01.07]) | [OVERVIEW](libraries/Assimalign.Viu.ServerRenderer/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.ServerRenderer/docs/DESIGN.md) |
 | [`Assimalign.Viu.Router`](libraries/Assimalign.Viu.Router) | [`vue-router`](https://github.com/vuejs/router) — the DOM-free route table and matcher, history integration (memory/web/hash), the RouterView/RouterLink components, and the async navigation-guard pipeline today; lazy routes and scroll behavior follow ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Router/docs/DESIGN.md) |
@@ -64,7 +63,7 @@ runtime template compilation. They never ship in the runtime assemblies.
 
 | Project | Role |
 | --- | --- |
-| `Assimalign.Viu.Reactivity.Generators` | Emits the property wrappers for `[Reactive]`/`[ShallowReactive]` partial classes (Vue's `reactive()`, source-generated). |
+| `Assimalign.Viu.Core.Generators` | Emits the property wrappers for `[Reactive]`/`[ShallowReactive]` partial classes (Vue's `reactive()`, source-generated). |
 | `Assimalign.Viu.Syntax.Generators` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
 | `Assimalign.Viu.Tooling.Tasks` | The `ViuBundleCss` MSBuild task that writes the compiled `.viu` `@style` output to a physical stylesheet (outside the analyzer sandbox). |
 
@@ -119,8 +118,7 @@ dotnet build Assimalign.Viu.slnx
 Each library's tests live beside it under `test/`:
 
 ```sh
-dotnet test libraries/Assimalign.Viu.Reactivity/test/
-dotnet test libraries/Assimalign.Viu.RuntimeCore/test/
+dotnet test libraries/Assimalign.Viu.Core/test/
 ```
 
 ### Run the demo

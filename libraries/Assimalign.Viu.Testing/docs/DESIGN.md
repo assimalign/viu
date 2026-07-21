@@ -6,9 +6,9 @@ and [`@vue/test-utils`](https://test-utils.vuejs.org).
 
 ## A second platform for the one renderer
 
-`Assimalign.Viu.RuntimeCore`'s renderer is platform-agnostic: it drives whatever
+`Assimalign.Viu.Core`'s renderer is platform-agnostic: it drives whatever
 `RendererOptions<TNode>` it is given (see
-[`Assimalign.Viu.RuntimeCore/docs/DESIGN.md`](../../Assimalign.Viu.RuntimeCore/docs/DESIGN.md)).
+[`Assimalign.Viu.Core/docs/DESIGN.md`](../../Assimalign.Viu.Core/docs/DESIGN.md)).
 `TestNodeOperations.Create(log, teleportTargetRoots?)` supplies node-ops over a plain in-memory tree
 (`TestElement`/`TestText`/`TestComment`), so component behavior is exercised through the *same*
 mount/patch/unmount pipeline the browser uses — just with no DOM and no interop. This is exactly

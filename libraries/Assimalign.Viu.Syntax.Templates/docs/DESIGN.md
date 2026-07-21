@@ -179,7 +179,7 @@ the result record is value-equatable, preserving the incremental-generator cachi
 The upstream `mode`/`prefixIdentifiers` preamble split (module imports versus `with (_ctx)` function
 mode) has no C# counterpart: the composition root — the source generator ([V01.01.06.02]) — owns the
 method declaration and binds every helper name with one file-level
-`using static global::Assimalign.Viu.RuntimeCore.RenderHelpers;`, the C# analogue of upstream's aliased
+`using static global::Assimalign.Viu.RenderHelpers;`, the C# analogue of upstream's aliased
 helper import. Neither this library nor the generator references the runtime assembly; the emitted code
 binds **by name**, and the contract below is pinned by `RenderFunctionEmitterTests` and the generator
 snapshot tests.
@@ -213,7 +213,7 @@ snapshot test in `RenderFunctionEmitterTests`.
 
 ### The runtime helper name/signature contract
 
-The emitted code compiles against `global::Assimalign.Viu.RuntimeCore.RenderHelpers` (imported via
+The emitted code compiles against `global::Assimalign.Viu.RenderHelpers` (imported via
 `using static` by the generator) — a static surface the runtime area provides ([V01.01.03.22], issue
 #136). Members carry the upstream-aliased names on purpose (a deliberate, generated-code-only deviation
 from the repository C# naming rule; the names ARE the upstream contract). What code generation requires
@@ -249,7 +249,7 @@ of each member:
 - Built-in tags as values (runtime-core): `_Fragment`, `_Teleport`, `_Suspense`, `_KeepAlive`,
   `_BaseTransition`. `_Fragment` is fully realized; the component-like built-ins are surface markers
   whose renderer support lands with their own work items.
-- `_unref(object?) : object?` / `_isRef(object?) : bool` — bridge to `Assimalign.Viu.Reactivity`
+- `_unref(object?) : object?` / `_isRef(object?) : bool` — bridge to `Assimalign.Viu.Core`
   references (upstream `unref`/`isRef`).
 - Viu-defined (no upstream counterpart, per the divergence table): `_createProps(params (string, object?)[] entries)`,
   `_withHandler(handler)` (delegate-typed overloads), `_setCache(int index, BlockToken tracking, object? value)`,
@@ -260,7 +260,7 @@ of each member:
 The DOM-directive helpers are a **separate facade for layering**: `_vShow`, `_vModelText`, `_vModelCheckbox`,
 `_vModelRadio`, `_vModelSelect`, `_vModelDynamic`, the `_withModifiers` / `_withKeys` guard wrappers, and the
 DOM built-ins `_Transition` / `_TransitionGroup` are **not** members of
-`Assimalign.Viu.RuntimeCore.RenderHelpers` — their behavior lives in `Assimalign.Viu.RuntimeDom`, which the
+`Assimalign.Viu.Core.RenderHelpers` — their behavior lives in `Assimalign.Viu.RuntimeDom`, which the
 platform-agnostic runtime-core layer must not reference (keeping runtime-core DOM-free, and keeping a real DOM
 directive from ever mis-binding onto a runtime-core marker). They ship instead as
 `global::Assimalign.Viu.RuntimeDom.DomRenderHelpers`, and the composition-root generator ([V01.01.06.02])
@@ -268,7 +268,7 @@ emits a **second** file-level `using static global::Assimalign.Viu.RuntimeDom.Do
 runtime-core one whenever a render body is present. A browser `.viu` always has RuntimeDom available (it is the
 DOM renderer), so both imports are unconditional — DOM-directive templates (`v-show`, `v-model`,
 `@click.prevent`, `@keyup.enter`) are now end-to-end compilable. `DomRenderHelpers` references only RuntimeDom's
-own machinery and RuntimeCore's `IDirective`, never any `Assimalign.Viu.Syntax.*` assembly; the by-name contract
+own machinery and Core's `IDirective`, never any `Assimalign.Viu.Syntax.*` assembly; the by-name contract
 still flows one way. Pinned by `Assimalign.Viu.RuntimeDom.CompiledRenderTests` (a `.viu` using every spelling
 below compiles against both facades) and `Assimalign.Viu.RuntimeDom.Tests.DomRenderHelpersTests` (facade
 mapping + v-show / `.prevent` execution through the in-memory adapter).
@@ -307,7 +307,7 @@ per-instance cache from the constant). `RenderCacheSize` and `Render` are reserv
 `.viu` component's partial class. `Render` returns `object?`; the runtime normalizes it into a vnode
 through `RenderHelpers.NormalizeRoot(object?)` (the C# analogue of upstream `normalizeVNode` over the
 render result). The runtime-side implementation of `RenderHelpers` and the end-to-end execution tests
-against the renderer landed in [V01.01.03.22] (`Assimalign.Viu.RuntimeCore.CompiledRenderTests`), which
+against the renderer landed in [V01.01.03.22] (`Assimalign.Viu.Core.CompiledRenderTests`), which
 compiles a generator-emitted render body with Roslyn and drives it through the in-memory renderer —
 delivering the integration criterion deferred from [V01.01.05.05].
 

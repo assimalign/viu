@@ -71,7 +71,7 @@ await ServerRenderer.RenderToStreamAsync(app, Console.Out, context);
 ## Boundaries
 
 - References **only** `Assimalign.Viu.Shared` (DOM knowledge tables, class/style normalization,
-  `toDisplayString`), `Assimalign.Viu.Reactivity`, and `Assimalign.Viu.RuntimeCore` (the vnode model,
+  `toDisplayString`), `Assimalign.Viu.Core` (the vnode model,
   the component lifecycle, provide/inject). It references **no** web framework and **no** DOM/interop
   assembly (`RuntimeDom`), so it runs in a plain .NET host — its own test story is pure unit tests over
   components and vnodes asserting exact HTML strings (founding decision 7).

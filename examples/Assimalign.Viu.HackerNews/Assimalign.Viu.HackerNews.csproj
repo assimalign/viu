@@ -16,8 +16,8 @@
   </ItemGroup>
 
   <!-- The full Wave-4 surface this capstone exercises: the DOM runtime, the router + its browser click
-       bridge (RouterLinkDomBridge, installed at bootstrap), and the Pinia-style store. RuntimeCore,
-       Reactivity, and Shared flow transitively. Libraries never reference examples (one-way edge). -->
+       bridge (RouterLinkDomBridge, installed at bootstrap), and the Pinia-style store. Core and
+       Shared flow transitively. Libraries never reference examples (one-way edge). -->
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.RuntimeDom" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
@@ -29,6 +29,6 @@
        In-repo the generator attaches only through a direct analyzer reference (it is not transitive via
        ViuProjectReference); packaged consumers instead get it from the Reactivity nupkg's analyzers/. -->
   <ItemGroup>
-    <ViuAnalyzerReference Include="Assimalign.Viu.Reactivity.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
   </ItemGroup>
 </Project>

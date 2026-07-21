@@ -24,9 +24,15 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 ## Namespaces
 
 - **File-scoped** namespace declarations (`namespace X;`).
-- **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.Reactivity` declares
-  `namespace Assimalign.Viu.Reactivity;` regardless of subfolder. `Abstraction/` and `Internal/` are
+- **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.RuntimeDom` declares
+  `namespace Assimalign.Viu.RuntimeDom;` regardless of subfolder. `Abstraction/` and `Internal/` are
   **physical folders only** — they never appear in a namespace.
+- **Recorded exception ([V01.01.12.21], `docs/NET-RESHAPE-PLAN.md` R2):** `Assimalign.Viu.Core` — the
+  consolidated runtime core + reactivity — roots every type at the **`Assimalign.Viu`** namespace (set via
+  `<RootNamespace>Assimalign.Viu</RootNamespace>` on its `src` csproj), *not* `Assimalign.Viu.Core`,
+  because the core **is** the product and its primitives read best unprefixed (`Assimalign.Viu.Reference<T>`,
+  `Assimalign.Viu.VirtualNode`). This is the single deliberate deviation from the rule; every other library
+  keeps namespace == assembly id (the source-generator assemblies included).
 
 ## Folders within `src/`
 
@@ -74,7 +80,7 @@ win** — link the reference in the code, test, or issue that pins the behavior.
   no property-getter dispatch); `seal` concrete leaf types so the JIT can devirtualize. When a public
   type must derive from an otherwise-internal base, make the base a `public abstract` class with
   `internal` members and a `private protected` constructor so it stays opaque and un-subclassable
-  externally (see `Assimalign.Viu.Reactivity`'s `Subscriber`).
+  externally (see `Assimalign.Viu.Core`'s `Subscriber`).
 - **Single-threaded model**: the runtime targets the JS event loop. Ambient `static` state is acceptable,
   but any non-thread-safe type must say so in its XML docs.
 

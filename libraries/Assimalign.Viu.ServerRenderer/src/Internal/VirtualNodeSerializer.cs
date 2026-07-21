@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.ServerRenderer;

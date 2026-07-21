@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.ServerRenderer;

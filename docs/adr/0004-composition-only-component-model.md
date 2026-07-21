@@ -53,7 +53,8 @@ runtime machinery — a poor fit for an AOT/trimming target and for C#'s type sy
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 5.
-- [`Assimalign.Viu.RuntimeCore/docs/DESIGN.md`](../../libraries/Assimalign.Viu.RuntimeCore/docs/DESIGN.md)
-  and `Application<TNode>` / `ApplicationConfiguration`.
+- [`Assimalign.Viu.Core/docs/DESIGN.md`](../../libraries/Assimalign.Viu.Core/docs/DESIGN.md)
+  (formerly `Assimalign.Viu.RuntimeCore`, renamed in [V01.01.12.21]) and `Application<TNode>` /
+  `ApplicationConfiguration`.
 - Vue 3: [Composition API FAQ](https://vuejs.org/guide/extras/composition-api-faq.html),
   [provide/inject](https://vuejs.org/guide/components/provide-inject.html).

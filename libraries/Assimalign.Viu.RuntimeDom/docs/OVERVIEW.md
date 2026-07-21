@@ -3,7 +3,7 @@
 The browser package of Viu — the role `@vue/runtime-dom` plays for Vue 3
 (https://github.com/vuejs/core/tree/main/packages/runtime-dom): it supplies the real-DOM
 node-ops and prop patching that the platform-agnostic renderer
-(`Assimalign.Viu.RuntimeCore`) drives.
+(`Assimalign.Viu.Core`) drives.
 
 ## What it contains
 
@@ -45,7 +45,7 @@ behind [ADR-0001](ADR-0001-interop-marshaling.md).
 
 ## Boundaries
 
-- May reference `Assimalign.Viu.RuntimeCore` (and transitively Shared/Reactivity) only.
+- May reference `Assimalign.Viu.Core` (and transitively Shared) only.
 - All interop stubs come from the `[JSImport]` source generator — no reflection, AOT/trimming
   safe, browser main thread only.
 - Design rationale and sequenced non-goals: [DESIGN.md](DESIGN.md).

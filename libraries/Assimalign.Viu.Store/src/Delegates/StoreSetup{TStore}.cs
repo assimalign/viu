@@ -6,7 +6,7 @@ namespace Assimalign.Viu.Store;
 /// <c>defineStore(id, () =&gt; { ... })</c> (https://pinia.vuejs.org/core-concepts/#setup-stores,
 /// <c>packages/pinia/src/store.ts</c> <c>createSetupStore</c>). It runs exactly once per
 /// <see cref="StoreRegistry"/> the store is resolved in, inside that store's own
-/// <see cref="Assimalign.Viu.Reactivity.EffectScope"/>, and returns the store instance — the object
+/// <see cref="Assimalign.Viu.EffectScope"/>, and returns the store instance — the object
 /// whose refs are state, computeds are getters, and methods are actions ([V01.01.09.02] builds those
 /// members on top of this delegate).
 /// <para>

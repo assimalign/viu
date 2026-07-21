@@ -138,7 +138,7 @@ public sealed class SingleFileComponentScriptTests
     public void Classification_MapsEachMemberShape_ToItsBindingType()
     {
         // Pins the conservative, syntactic classification table (the C# port of Vue's BindingTypes):
-        // only a field/property whose declared type is a known Assimalign.Viu.Reactivity reference type
+        // only a field/property whose declared type is a known Assimalign.Viu reference type
         // is SetupReference (the only binding the template ever unwraps through .Value); const is a folded
         // LiteralConstant; a mutable binding is SetupLet; a fixed (readonly / get-only) binding is
         // SetupConstant; and a method is a non-ref SetupConstant. See
@@ -149,7 +149,7 @@ public sealed class SingleFileComponentScriptTests
             "    public CustomReference<int> Custom = default!;\n" +
             "    public IReference<int> Interface = default!;\n" +
             "    public Computed<string> Label { get; } = default!;\n" +
-            "    public global::Assimalign.Viu.Reactivity.Reference<int> Qualified = default!;\n" +
+            "    public global::Assimalign.Viu.Reference<int> Qualified = default!;\n" +
             "    public const int Max = 10;\n" +
             "    public readonly string Name = \"x\";\n" +
             "    public int Mutable = 0;\n" +
@@ -534,7 +534,7 @@ public sealed class SingleFileComponentScriptTests
             "    <div>{{ Count }}</div>\n" +
             "}\n" +
             "@script {\n" +
-            "    public Assimalign.Viu.Reactivity.Reference<int> Count = new(0);\n" +
+            "    public Assimalign.Viu.Reference<int> Count = new(0);\n" +
             "}\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);

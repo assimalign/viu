@@ -3,7 +3,7 @@ using System;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.RuntimeDom;
 using Assimalign.Viu.Testing;
 

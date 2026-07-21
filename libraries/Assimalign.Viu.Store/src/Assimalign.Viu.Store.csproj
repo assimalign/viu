@@ -4,7 +4,6 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
-    <ViuProjectReference Include="Assimalign.Viu.RuntimeCore" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
   </ItemGroup>
 </Project>

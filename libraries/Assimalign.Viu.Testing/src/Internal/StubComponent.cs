@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.Testing;
 

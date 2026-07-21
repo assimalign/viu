@@ -1,6 +1,6 @@
 using System;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.RuntimeDom;
 
@@ -10,7 +10,7 @@ namespace Assimalign.Viu.RuntimeDom;
 /// <c>runtimeHelpers.ts</c> (<c>packages/runtime-dom/src/directives/vShow.ts</c>, <c>directives/vModel.ts</c>,
 /// <c>modules/events.ts</c>, and the <c>Transition</c>/<c>TransitionGroup</c> built-ins). It is the DOM sibling
 /// of <see cref="RenderHelpers"/>: a DOM-targeted compiled render binds both surfaces with two file-level
-/// static imports — <c>using static global::Assimalign.Viu.RuntimeCore.RenderHelpers;</c> and
+/// static imports — <c>using static global::Assimalign.Viu.RenderHelpers;</c> and
 /// <c>using static global::Assimalign.Viu.RuntimeDom.DomRenderHelpers;</c> — so the members here carry the
 /// upstream-aliased spellings (<c>_vShow</c>, <c>_vModelText</c>, <c>_withModifiers</c>, …), the same names the
 /// emitter writes (<c>_</c> + the <c>helperNameMap</c> name). The authoritative name/signature table is the
@@ -26,7 +26,7 @@ namespace Assimalign.Viu.RuntimeDom;
 /// </para>
 /// <para>
 /// This class layers on <c>Assimalign.Viu.RuntimeDom</c> (the directive singletons <see cref="VShow"/>/
-/// <c>VModel*</c> and the <see cref="BrowserEvents"/> modifier/key guards) plus <c>Assimalign.Viu.RuntimeCore</c>
+/// <c>VModel*</c> and the <see cref="BrowserEvents"/> modifier/key guards) plus <c>Assimalign.Viu</c>
 /// (<see cref="IDirective"/>) — never any <c>Assimalign.Viu.Syntax.*</c> assembly. The contract flows one way
 /// (by name) so the runtime never depends on the compiler, and these DOM helpers deliberately live here rather
 /// than on the platform-agnostic <see cref="RenderHelpers"/> so a DOM directive can never mis-bind onto a
@@ -177,7 +177,7 @@ public static class DomRenderHelpers
     /// The <c>&lt;Transition&gt;</c> DOM built-in (upstream: <c>Transition</c>), resolved to the real
     /// <see cref="RuntimeDom.Transition"/> component ([V01.01.04.07]). The compiled render passes it as a
     /// vnode <c>tag</c>; the vnode factory's component-definition arm mounts it, and it resolves the
-    /// CSS-class enter/leave hooks over <see cref="RuntimeCore.BaseTransition"/>.
+    /// CSS-class enter/leave hooks over <see cref="BaseTransition"/>.
     /// </summary>
     public static readonly object _Transition = Transition.Instance;
 

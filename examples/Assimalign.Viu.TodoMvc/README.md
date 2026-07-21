@@ -7,12 +7,12 @@ state, `ReactiveList<T>`, computed views, and typed provide/inject.
 ## What it shows
 
 - **`[Reactive]` objects** — [`TodoItem`](Todos/TodoItem.cs) is a `[Reactive]` partial class; the
-  `Assimalign.Viu.Reactivity` source generator fills in each property's track/trigger plumbing (Vue's
+  `Assimalign.Viu.Core` source generator fills in each property's track/trigger plumbing (Vue's
   `reactive()`), so toggling one todo re-renders only what read it.
 - **`ReactiveList<T>` + computed views** — [`TodoStore`](Todos/TodoStore.cs) holds a
   `ReactiveList<TodoItem>` and derives the filtered list, remaining/completed counts, and the
   toggle-all state as `Computed<T>` values. The store is a composition-style unit that depends on
-  nothing but `Assimalign.Viu.Reactivity`, so it is fully unit-tested with no browser.
+  nothing but `Assimalign.Viu.Core`, so it is fully unit-tested with no browser.
 - **Component model** — a root [`TodoAppComponent`](Components/TodoAppComponent.cs) renders a keyed
   list of [`TodoItemComponent`](Components/TodoItemComponent.cs) rows (props in, per-row local edit
   state), reused across filtering by `key`.

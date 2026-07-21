@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Normal compile reference to the generator (to instantiate and drive it), plus the runtime
+         library so the test compilation can resolve [Reactive] and IReactiveObject. The generator
+         resolves by name because build/Targets/Build.References.Projects.targets also indexes analyzers/. -->
+    <ViuPrivateProjectReference Include="Assimalign.Viu.Core.Generators" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
+  </ItemGroup>
+</Project>

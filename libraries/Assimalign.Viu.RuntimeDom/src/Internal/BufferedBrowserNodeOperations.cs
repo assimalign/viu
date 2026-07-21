@@ -1,13 +1,13 @@
 using System;
 using System.Runtime.Versioning;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.RuntimeDom;
 
 /// <summary>
 /// The buffered <see cref="RendererOptions{TNode}"/> ([V01.01.04.05]): the same adapter shape the
-/// renderer and RuntimeCore see in direct mode (<see cref="BrowserNodeOperations"/>), but every
+/// renderer and Core see in direct mode (<see cref="BrowserNodeOperations"/>), but every
 /// write op — create/insert/remove/text and every <c>patchProp</c> leaf — encodes into a
 /// <see cref="DomCommandBuffer"/> instead of crossing the interop boundary, and the whole frame
 /// applies in one call at the scheduler flush boundary (<see cref="Scheduler.FlushBoundaryCallback"/>).

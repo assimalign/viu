@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Router;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.HackerNews;
 

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.Router;
 

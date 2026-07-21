@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.Versioning;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.RuntimeDom;
 

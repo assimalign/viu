@@ -17,13 +17,13 @@ client renderer patches, its output is the parity baseline the compiled `ssrRend
 `renderVNode` / `renderElementVNode` / `renderVNodeChildren`; `ServerComponentRenderer` is the port of
 the `renderComponentVNode` / `renderComponentSubTree` setup path.
 
-## The RuntimeCore seam: reusing the real component pipeline
+## The Core seam: reusing the real component pipeline
 
 The server renderer must create a `ComponentInstance`, run its `Setup` inside its effect scope, await
 its `ServerPrefetch` hooks, and render its root — the platform-agnostic half of the component lifecycle.
 Upstream exposes exactly these primitives to `@vue/server-renderer` through runtime-core's `ssrUtils`
 `@internal` export (`createComponentInstance`, `setupComponent`, `renderComponentRoot`). Viu's analog is
-a single `[assembly: InternalsVisibleTo("Assimalign.Viu.ServerRenderer")]` on `Assimalign.Viu.RuntimeCore`
+a single `[assembly: InternalsVisibleTo("Assimalign.Viu.ServerRenderer")]` on `Assimalign.Viu.Core`
 (alongside the grants it already makes to `Assimalign.Viu.Testing` and `Assimalign.Viu.RuntimeDom`).
 `ServerComponentRenderer` then drives the real pipeline — the same `ComponentPropertyResolution.Resolve`,
 the same setup-in-scope discipline, the same `RenderComponentRoot` normalization and single-root attrs
@@ -54,7 +54,7 @@ tree position but belongs at a different target, so it is collected into a per-t
 Every render creates its own root vnode, its own component instances (each with freshly `Setup`-created
 refs/computeds), and renders against one `ServerApplication`'s `ApplicationContext`. The renderer holds
 no static mutable render state, so two renders with distinct app instances share nothing — the
-per-request app-instance discipline Vue's SSR requires. The ambient RuntimeCore machinery
+per-request app-instance discipline Vue's SSR requires. The ambient Core machinery
 (`ComponentInstance.Current`, the block-tree accumulator) is used **only synchronously within a render
 turn** and is always balanced across the two async boundaries (`ServerPrefetch` and flush) — neither is
 ever crossed with an instance on the current stack or a block open — so even two renders interleaving at

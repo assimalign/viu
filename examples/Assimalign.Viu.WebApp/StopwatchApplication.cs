@@ -4,8 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.WebApp;
 
 // The root component of the demo ([V01.01.03.06]): Setup runs once, closes over refs, and

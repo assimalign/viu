@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.RuntimeDom.Tests;
 
 // A DOM-free harness for the PERSISTED v-show transition path ([V01.01.04.07.01]): it drives the real
-// RuntimeCore renderer + the real DOM <Transition> + the real v-show directive over int node handles,
+// Core renderer + the real DOM <Transition> + the real v-show directive over int node handles,
 // installing BOTH a recording DomTransitionOperations (the CSS class choreography) AND a recording
 // BrowserDirectiveOperations (the v-show display toggle), so a <Transition persisted> wrapping a v-show
 // <div> exercises its whole production path with no browser. It is TransitionTestHarness merged with the

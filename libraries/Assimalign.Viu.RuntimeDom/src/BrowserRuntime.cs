@@ -4,7 +4,7 @@ using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.RuntimeDom;
 
@@ -48,7 +48,7 @@ public static class BrowserRuntime
     /// ([V01.01.04.05]): node-ops serialize into a shared binary frame that a single interop call
     /// applies per scheduler flush instead of one call per mutation. It is behaviorally invisible —
     /// buffered and direct modes produce byte-identical DOM — and is a construction-time choice the
-    /// renderer and RuntimeCore see through the identical adapter. Default is direct; buffered is
+    /// renderer and Core see through the identical adapter. Default is direct; buffered is
     /// opt-in for this delivery.
     /// </para>
     /// </summary>

@@ -1,8 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.Store.Tests;
 
@@ -38,7 +37,7 @@ internal sealed class CounterStore
 
 /// <summary>
 /// A component definition whose <c>Setup</c> is supplied by a delegate — the store tests need to run
-/// code with a current <see cref="ComponentInstance"/> and app context. Mirrors the RuntimeCore test
+/// code with a current <see cref="ComponentInstance"/> and app context. Mirrors the Core test
 /// helper of the same shape.
 /// </summary>
 internal sealed class SetupComponent : IComponentDefinition

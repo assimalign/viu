@@ -2,8 +2,7 @@ using System;
 
 using BenchmarkDotNet.Attributes;
 
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.RuntimeCore;
+using Assimalign.Viu;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Testing.Benchmarks;

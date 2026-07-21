@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-using Assimalign.Viu.Reactivity;
+using Assimalign.Viu;
 
 namespace Assimalign.Viu.Forms;
 
 /// <summary>
 /// The reactive model behind the registration form, written as a composition function: one
 /// <c>Reference&lt;T&gt;</c> per field (Vue's <c>ref()</c>, the natural pairing for <c>v-model</c>)
-/// plus a couple of <c>Computed</c> derivations. It depends only on <c>Assimalign.Viu.Reactivity</c>,
+/// plus a couple of <c>Computed</c> derivations. It depends only on <c>Assimalign.Viu</c>,
 /// so the sibling test project exercises the field bindings and the derived state with no browser.
 /// The form component binds each field with the matching <c>v-model</c> directive; see
 /// https://vuejs.org/guide/essentials/forms.html.

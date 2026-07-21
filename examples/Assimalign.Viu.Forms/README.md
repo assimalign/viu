@@ -15,7 +15,7 @@ gallery's showcase of Viu's form-binding surface. Vue reference:
   (the bio commits on change, not every keystroke).
 - **Composition function + computed** — [`RegistrationForm`](Composition/RegistrationForm.cs) is the
   reactive model as a `ref`-per-field composition unit with `IsValid` and `Summary` computeds; it
-  depends only on `Assimalign.Viu.Reactivity` and is unit-tested with no browser.
+  depends only on `Assimalign.Viu.Core` and is unit-tested with no browser.
 - **A live view component** — [`FormPreviewComponent`](Components/FormPreviewComponent.cs) reflects the
   model as it changes and, because it uses no `v-model`, mounts in the in-memory test renderer.
 
