@@ -9,7 +9,7 @@
         viu-dom.js) must exist there.
 
         Sources come from the SDK package's assets/ folder
-        (assets/Assimalign.Viu.RuntimeDom/viu-dom.js today; the RecursiveDir
+        (assets/Assimalign.Viu.Browser/viu-dom.js today; the RecursiveDir
         carries the library folder into the _content path).
     -->
     <Target Name="ViuFlowFrameworkWebAssets"

@@ -52,10 +52,10 @@
 		<File Path=".github/ISSUE_TEMPLATE/task.yml" />
 	</Folder>
 	<Folder Name="/viu/.github/workflows/">
+		<File Path=".github/workflows/area-browser.yml" />
 		<File Path=".github/workflows/area-core.yml" />
 		<File Path=".github/workflows/area-generators.yml" />
 		<File Path=".github/workflows/area-packaging.yml" />
-		<File Path=".github/workflows/area-runtimedom.yml" />
 		<File Path=".github/workflows/area-shared.yml" />
 		<File Path=".github/workflows/area-syntax.yml" />
 		<File Path=".github/workflows/area-testing.yml" />
@@ -259,16 +259,16 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/test/">
 		<Project Path="libraries/Assimalign.Viu.Router/test/Assimalign.Viu.Router.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/docs/">
-		<File Path="libraries/Assimalign.Viu.Router.RuntimeDom/docs/DESIGN.md" />
-		<File Path="libraries/Assimalign.Viu.Router.RuntimeDom/docs/OVERVIEW.md" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/docs/">
+		<File Path="libraries/Assimalign.Viu.Router.Browser/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Router.Browser/docs/OVERVIEW.md" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/src/">
-		<Project Path="libraries/Assimalign.Viu.Router.RuntimeDom/src/Assimalign.Viu.Router.RuntimeDom.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/src/">
+		<Project Path="libraries/Assimalign.Viu.Router.Browser/src/Assimalign.Viu.Router.Browser.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.RuntimeDom/test/">
-		<Project Path="libraries/Assimalign.Viu.Router.RuntimeDom/test/Assimalign.Viu.Router.RuntimeDom.Tests.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/test/">
+		<Project Path="libraries/Assimalign.Viu.Router.Browser/test/Assimalign.Viu.Router.Browser.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/src/">
@@ -278,18 +278,18 @@
 		<Project Path="libraries/Assimalign.Viu.Core/test/Assimalign.Viu.Core.CompiledRenderTests/Assimalign.Viu.Core.CompiledRenderTests.csproj" />
 		<Project Path="libraries/Assimalign.Viu.Core/test/Assimalign.Viu.Core.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeDom/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeDom/docs/">
-		<File Path="libraries/Assimalign.Viu.RuntimeDom/docs/ADR-0001-interop-marshaling.md" />
-		<File Path="libraries/Assimalign.Viu.RuntimeDom/docs/DESIGN.md" />
-		<File Path="libraries/Assimalign.Viu.RuntimeDom/docs/OVERVIEW.md" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser/docs/">
+		<File Path="libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md" />
+		<File Path="libraries/Assimalign.Viu.Browser/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeDom/src/">
-		<Project Path="libraries/Assimalign.Viu.RuntimeDom/src/Assimalign.Viu.RuntimeDom.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser/src/">
+		<Project Path="libraries/Assimalign.Viu.Browser/src/Assimalign.Viu.Browser.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.RuntimeDom/test/">
-		<Project Path="libraries/Assimalign.Viu.RuntimeDom/test/Assimalign.Viu.RuntimeDom.CompiledRenderTests/Assimalign.Viu.RuntimeDom.CompiledRenderTests.csproj" />
-		<Project Path="libraries/Assimalign.Viu.RuntimeDom/test/Assimalign.Viu.RuntimeDom.Tests.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser/test/">
+		<Project Path="libraries/Assimalign.Viu.Browser/test/Assimalign.Viu.Browser.CompiledRenderTests/Assimalign.Viu.Browser.CompiledRenderTests.csproj" />
+		<Project Path="libraries/Assimalign.Viu.Browser/test/Assimalign.Viu.Browser.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/docs/">

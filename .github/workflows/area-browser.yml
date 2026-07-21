@@ -1,36 +1,36 @@
-# Area build+test for Assimalign.Viu.RuntimeDom ([V01.01.12.02]): path-filtered so a PR only
+# Area build+test for Assimalign.Viu.Browser ([V01.01.12.02]): path-filtered so a PR only
 # runs the areas it touches; shared build files trigger every area. The build scope is the
 # per-area slnx, keeping CI and local builds in lockstep. Jobs are independent by design —
 # cross-area contracts are enforced by project references at build time, not workflow ordering.
-name: area-runtimedom
+name: area-browser
 
 on:
   push:
     branches: [main]
     paths:
-      - 'libraries/Assimalign.Viu.RuntimeDom/**'
+      - 'libraries/Assimalign.Viu.Browser/**'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'global.json'
       - 'nuget.config'
       - '.github/actions/**'
-      - '.github/workflows/area-runtimedom.yml'
+      - '.github/workflows/area-browser.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'libraries/Assimalign.Viu.RuntimeDom/**'
+      - 'libraries/Assimalign.Viu.Browser/**'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'global.json'
       - 'nuget.config'
       - '.github/actions/**'
-      - '.github/workflows/area-runtimedom.yml'
+      - '.github/workflows/area-browser.yml'
 
 jobs:
   build-test:
-    name: build+test RuntimeDom
+    name: build+test Browser
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -40,7 +40,7 @@ jobs:
         uses: ./.github/actions/setup-dotnet-wasm
 
       - name: Build (warnings are errors)
-        run: dotnet build libraries/Assimalign.Viu.RuntimeDom/Assimalign.Viu.RuntimeDom.slnx --configuration Release -warnaserror
+        run: dotnet build libraries/Assimalign.Viu.Browser/Assimalign.Viu.Browser.slnx --configuration Release -warnaserror
 
       - name: Test
-        run: dotnet test libraries/Assimalign.Viu.RuntimeDom/Assimalign.Viu.RuntimeDom.slnx --configuration Release --no-build
+        run: dotnet test libraries/Assimalign.Viu.Browser/Assimalign.Viu.Browser.slnx --configuration Release --no-build

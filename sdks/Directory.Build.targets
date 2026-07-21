@@ -32,14 +32,14 @@
 
         <!--
             Framework static web assets. A FrameworkReference delivers DLLs
-            only, so the JS half of the RuntimeDom interop bridge rides in the
+            only, so the JS half of the Browser interop bridge rides in the
             SDK package and Assimalign.Viu.Sdk.StaticWebAssets.targets copies
             it into the consumer's wwwroot/_content/<library>/ (the same
             /_content/<id>/ URL shape the in-repo
             build/Targets/Build.StaticWebAssets.targets produces).
         -->
-        <None Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.RuntimeDom\src\wwwroot\**\*"
-              Pack="true" PackagePath="assets\Assimalign.Viu.RuntimeDom\%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
+        <None Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*"
+              Pack="true" PackagePath="assets\Assimalign.Viu.Browser\%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
 
         <None Include="$(ViuRepositoryDirectory)sdks\README.md" Pack="true" PackagePath="README.md" Visible="false" />
     </ItemGroup>
@@ -61,10 +61,10 @@
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" />
         <ItemGroup>
-            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.RuntimeDom\src\wwwroot\**\*" />
+            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkAssetFile)"
-              DestinationFiles="@(_ViuSdkAssetFile->'$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\assets\Assimalign.Viu.RuntimeDom\%(RecursiveDir)%(Filename)%(Extension)')" />
+              DestinationFiles="@(_ViuSdkAssetFile->'$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\assets\Assimalign.Viu.Browser\%(RecursiveDir)%(Filename)%(Extension)')" />
     </Target>
 
     <!--
