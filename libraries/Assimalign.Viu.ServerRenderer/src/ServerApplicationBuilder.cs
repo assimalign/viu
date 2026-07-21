@@ -26,6 +26,9 @@ public sealed class ServerApplicationBuilder : ApplicationBuilder
     public override ServerApplication Build()
     {
         var application = new ServerApplication(RootComponent, RootProperties);
+        // Attach the built provider before ApplyConfiguration so a plugin install can resolve from
+        // app.Services ([V01.01.03.24]); the app owns and disposes it (Dispose()).
+        application.Context.Services = BuildServiceProvider();
         ApplyConfiguration(application);
         return application;
     }

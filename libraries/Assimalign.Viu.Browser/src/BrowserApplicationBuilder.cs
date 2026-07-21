@@ -31,13 +31,16 @@ public sealed class BrowserApplicationBuilder : ApplicationBuilder
     }
 
     /// <summary>
-    /// Builds the browser application and applies the recorded configuration in call order. Mount the
-    /// returned app with <c>await app.MountAsync("#app")</c>.
+    /// Builds the browser application, attaches the service provider, and applies the recorded
+    /// configuration in call order. Mount the returned app with <c>await app.MountAsync("#app")</c>.
     /// </summary>
     /// <returns>The configured <see cref="BrowserApplication"/>.</returns>
     public override BrowserApplication Build()
     {
         var application = BrowserApplication.Create(RootComponent, RootProperties, _useCommandBuffer, _hydrate);
+        // Attach the built provider before ApplyConfiguration so a plugin install can resolve from
+        // app.Services ([V01.01.03.24]); the app owns and disposes it.
+        application.Context.Services = BuildServiceProvider();
         ApplyConfiguration(application);
         return application;
     }

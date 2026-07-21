@@ -21,7 +21,10 @@ Public surface (all under namespace `Assimalign.Viu.ServerRenderer`):
   carries the root component, its props, and the app-level component/directive registries and provides
   every descendant resolves against, over the shared `ApplicationContext`. Deliberately **not** the
   DOM-bound `Application<TNode>` (which is inseparable from a `Renderer<TNode>`); see
-  [DESIGN.md](DESIGN.md).
+  [DESIGN.md](DESIGN.md). It also exposes `Services` (the app's `System.IServiceProvider`, attached by
+  `ServerApplicationBuilder` from `builder.Services`, [V01.01.03.24]) reachable from `Setup` during
+  render, and implements `IDisposable` so a host disposes the per-request provider (and its owned
+  disposable services) after rendering — build a fresh app per request.
 - **`SsrContext`**: the per-render context — the port of `SSRContext`. Carries `Teleports` (out-of-tree
   content keyed by target selector, resolved when the render completes) and a free-form `State` bag for
   application handoff (e.g. serialized store state for the client to rehydrate).
