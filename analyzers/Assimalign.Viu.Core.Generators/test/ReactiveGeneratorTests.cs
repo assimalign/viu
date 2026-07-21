@@ -111,9 +111,9 @@ namespace Demo
                 this.Done = global::Assimalign.Viu.Reactive.ToRef<bool>(() => source.Done, value => source.Done = value);
             }
 
-            public global::Assimalign.Viu.IReference<string> Title { get; }
+            public global::Assimalign.Viu.ReactiveValue<string> Title { get; }
 
-            public global::Assimalign.Viu.IReference<bool> Done { get; }
+            public global::Assimalign.Viu.ReactiveValue<bool> Done { get; }
         }
 
         public ReactiveReferences ToReferences() => new ReactiveReferences(this);
@@ -196,10 +196,12 @@ namespace Demo
     }
 
     [Fact]
-    public void ReadonlyReactive_ImplementsIReadonlyReactiveMarker_ForIsReadonly()
+    public void ReadonlyReactive_OverridesIReactiveObjectIsReadOnly_ForIsReadonly()
     {
-        // The readonly variant implements IReadonlyReactive (IsReadonly => true) so Reactive.IsReadonly()
-        // reports a source-generated readonly object — the port of readonly()'s IS_READONLY flag.
+        // R6: the readonly flag folded into IReactiveObject. A readonly variant overrides the
+        // IReactiveObject.IsReadOnly default-interface member to true so Reactive.IsReadonly() reports
+        // a source-generated readonly object — the port of readonly()'s IS_READONLY flag. There is no
+        // separate marker interface any more (the class only implements IReactiveObject).
         const string source = """
             using Assimalign.Viu;
             namespace Demo;
@@ -209,8 +211,9 @@ namespace Demo
 
         var generated = GeneratorTestHarness.GeneratedSource(GeneratorTestHarness.Run(source), "Frozen.Reactive.g.cs");
 
-        generated.ShouldContain(", global::Assimalign.Viu.IReadonlyReactive");
-        generated.ShouldContain("bool global::Assimalign.Viu.IReadonlyReactive.IsReadonly => true;");
+        generated.ShouldContain("bool global::Assimalign.Viu.IReactiveObject.IsReadOnly => true;");
+        generated.ShouldNotContain("IReadonlyReactive");
+        generated.ShouldNotContain("IReadOnlyReactive");
     }
 
     [Theory]

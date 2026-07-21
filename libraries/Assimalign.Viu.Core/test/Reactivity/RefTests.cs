@@ -168,12 +168,12 @@ public sealed class RefTests
     }
 
     [Fact]
-    public void NonGenericIRefExposesBoxedValue()
+    public void NonGenericReactiveValueExposesBoxedValue()
     {
-        IReference boxedRef = Reactive.Reference(3);
-        boxedRef.Value.ShouldBe(3);
+        ReactiveValue boxedRef = Reactive.Reference(3);
+        boxedRef.BoxedValue.ShouldBe(3);
 
-        IReference boxedComputed = Reactive.Computed(() => 9);
-        boxedComputed.Value.ShouldBe(9);
+        ReactiveValue boxedComputed = Reactive.Computed(() => 9);
+        boxedComputed.BoxedValue.ShouldBe(9);
     }
 }

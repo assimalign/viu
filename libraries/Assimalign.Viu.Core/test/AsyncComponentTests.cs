@@ -27,7 +27,7 @@ public sealed class AsyncComponentTests : IDisposable
     private readonly ManualTimeController _time;
     private readonly SynchronizationContext? _previousContext;
     private int _realSetups;
-    private IReference<int>? _realState;
+    private ReactiveValue<int>? _realState;
 
     public AsyncComponentTests()
     {

@@ -72,10 +72,10 @@ public sealed class ReactivityUtilitiesTests
     }
 
     [Fact]
-    public void Unref_OnIReferenceHandle_IsATrackedRead()
+    public void Unref_OnReactiveValueHandle_IsATrackedRead()
     {
         var count = Reactive.Reference(1);
-        IReference<int> handle = count;
+        ReactiveValue<int> handle = count;
         var runs = 0;
         var seen = 0;
         Reactive.Effect(() =>
