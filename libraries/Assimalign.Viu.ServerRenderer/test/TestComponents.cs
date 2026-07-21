@@ -10,7 +10,7 @@ namespace Assimalign.Viu.ServerRenderer.Tests;
 internal static class Ssr
 {
     /// <summary>Renders <paramref name="render"/> (as a root component) to an HTML string.</summary>
-    public static Task<string> RenderAsync(Func<VirtualNode?> render, SsrContext? context = null)
+    public static Task<string> RenderAsync(ComponentSetup render, SsrContext? context = null)
         => ServerRenderer.RenderToStringAsync(new InlineComponent((_, _) => render), null, context);
 
     /// <summary>Renders an <see cref="InlineComponent"/> to an HTML string.</summary>
@@ -23,12 +23,12 @@ internal static class Ssr
 /// component. Setup runs once and returns the render function, exactly like a real component; tests
 /// build their vnode trees with <see cref="VirtualNodeFactory"/> inside it.
 /// </summary>
-internal sealed class InlineComponent : IComponentDefinition
+internal sealed class InlineComponent : IComponent
 {
-    private readonly Func<ComponentProperties, ComponentSetupContext, Func<VirtualNode?>> _setup;
+    private readonly Func<ComponentProperties, ComponentSetupContext, ComponentSetup> _setup;
 
     public InlineComponent(
-        Func<ComponentProperties, ComponentSetupContext, Func<VirtualNode?>> setup,
+        Func<ComponentProperties, ComponentSetupContext, ComponentSetup> setup,
         string? name = null,
         IReadOnlyList<ComponentPropertyDefinition>? properties = null,
         bool inheritAttributes = true)
@@ -45,6 +45,6 @@ internal sealed class InlineComponent : IComponentDefinition
 
     public bool InheritAttributes { get; }
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => _setup(properties, context);
 }

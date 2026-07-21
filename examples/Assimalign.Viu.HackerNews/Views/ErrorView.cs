@@ -10,7 +10,7 @@ namespace Assimalign.Viu.HackerNews;
 /// the <c>ErrorComponent</c> of the async route components (which passes the failure as an
 /// <c>error</c> prop, per <see cref="AsyncComponents"/>).
 /// </summary>
-internal sealed class ErrorView : IComponentDefinition
+internal sealed class ErrorView : IComponent
 {
     /// <summary>The shared error definition instance.</summary>
     public static readonly ErrorView Instance = new();
@@ -35,7 +35,7 @@ internal sealed class ErrorView : IComponentDefinition
         => VirtualNodeFactory.Component(Instance, VirtualNodeFactory.Properties(("message", message)));
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () =>
         {
             var message = properties.Get<string>("message")

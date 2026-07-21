@@ -106,7 +106,7 @@ public class DependencyInjectionTests : IDisposable
         var key = new InjectionKey<int>("level");
         var seen = new List<int?>();
 
-        IComponentDefinition Build(int depth)
+        IComponent Build(int depth)
         {
             if (depth == 0)
             {

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Tests;
 
 /// <summary>A configurable component definition for tests.</summary>
-internal sealed class TestComponent : IComponentDefinition
+internal sealed class TestComponent : IComponent
 {
     public string? Name { get; init; }
 
@@ -14,9 +14,9 @@ internal sealed class TestComponent : IComponentDefinition
 
     public bool InheritAttributes { get; init; } = true;
 
-    public required Func<ComponentProperties, ComponentSetupContext, Func<VirtualNode?>> SetupFunction { get; init; }
+    public required Func<ComponentProperties, ComponentSetupContext, ComponentSetup> SetupFunction { get; init; }
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => SetupFunction(properties, context);
 }
 

@@ -11,7 +11,7 @@ namespace Assimalign.Viu.Forms.Components;
 /// no <c>v-model</c> and no event payloads, so (unlike the form itself) it mounts in the in-memory test
 /// renderer and its reactive updates are asserted DOM-free.
 /// </summary>
-public sealed class FormPreviewComponent : IComponentDefinition
+public sealed class FormPreviewComponent : IComponent
 {
     private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
         [new ComponentPropertyDefinition("form")];
@@ -23,7 +23,7 @@ public sealed class FormPreviewComponent : IComponentDefinition
     public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var form = properties.Get<RegistrationForm>("form")!;
         return () => VirtualNodeFactory.Element(

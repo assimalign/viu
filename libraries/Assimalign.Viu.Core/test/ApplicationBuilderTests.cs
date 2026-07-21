@@ -87,7 +87,7 @@ public sealed class ApplicationBuilderTests : IDisposable
     }
 
     // A concrete builder over the in-memory renderer; Build creates the app and replays configuration.
-    private sealed class TestApplicationBuilder(Renderer<TestNode> renderer, IComponentDefinition root, VirtualNodeProperties? properties = null)
+    private sealed class TestApplicationBuilder(Renderer<TestNode> renderer, IComponent root, VirtualNodeProperties? properties = null)
         : ApplicationBuilder(root, properties)
     {
         public override Application<TestNode> Build()

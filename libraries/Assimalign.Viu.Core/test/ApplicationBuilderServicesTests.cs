@@ -51,7 +51,7 @@ public class ApplicationBuilderServicesTests : IDisposable
     {
         private readonly Renderer<TestNode> _renderer;
 
-        public TestApplicationBuilder(Renderer<TestNode> renderer, IComponentDefinition root)
+        public TestApplicationBuilder(Renderer<TestNode> renderer, IComponent root)
             : base(root, null)
             => _renderer = renderer;
 

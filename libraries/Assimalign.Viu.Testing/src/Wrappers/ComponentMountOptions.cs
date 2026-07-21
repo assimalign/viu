@@ -29,13 +29,13 @@ public sealed class ComponentMountOptions
     /// <summary>
     /// Components registered by name for dynamic/name resolution (upstream: <c>global.components</c>).
     /// </summary>
-    public Dictionary<string, IComponentDefinition> Components { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, IComponent> Components { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Child-component stubs (upstream: <c>global.stubs</c>): each real definition maps to the stub
     /// mounted in its place, or null to use an auto-generated placeholder stub.
     /// </summary>
-    public Dictionary<IComponentDefinition, IComponentDefinition?> Stubs { get; } = [];
+    public Dictionary<IComponent, IComponent?> Stubs { get; } = [];
 
     /// <summary>
     /// An optional hook to set app-level configuration (upstream: <c>global.config</c>) — for
@@ -89,7 +89,7 @@ public sealed class ComponentMountOptions
     /// <param name="stub">The stub to use, or null for an auto placeholder.</param>
     /// <returns>These options, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="real"/> is null.</exception>
-    public ComponentMountOptions Stub(IComponentDefinition real, IComponentDefinition? stub = null)
+    public ComponentMountOptions Stub(IComponent real, IComponent? stub = null)
     {
         ArgumentNullException.ThrowIfNull(real);
         Stubs[real] = stub;

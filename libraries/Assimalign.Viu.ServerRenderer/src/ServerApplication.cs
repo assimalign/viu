@@ -35,7 +35,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <param name="rootComponent">The root component definition (upstream: <c>createSSRApp</c>'s argument).</param>
     /// <param name="rootProperties">The props passed to the root component, or null.</param>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
-    public ServerApplication(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties = null)
+    public ServerApplication(IComponent rootComponent, VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         RootComponent = rootComponent;
@@ -54,7 +54,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <returns>A builder whose <see cref="ServerApplicationBuilder.Build"/> produces the app.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
     public static ServerApplicationBuilder CreateBuilder(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
@@ -68,7 +68,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     public ComponentInstance? RootInstance => null;
 
     /// <summary>The root component definition.</summary>
-    public IComponentDefinition RootComponent { get; }
+    public IComponent RootComponent { get; }
 
     /// <summary>The root component's props, or null.</summary>
     public VirtualNodeProperties? RootProperties { get; }
@@ -102,7 +102,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <returns>This application, for chaining.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
-    public ServerApplication Component(string name, IComponentDefinition definition)
+    public ServerApplication Component(string name, IComponent definition)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(definition);
@@ -117,7 +117,7 @@ public sealed class ServerApplication : IApplication, IDisposable
     /// <param name="name">The registered name.</param>
     /// <returns>The registered definition, or null.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public IComponentDefinition? Component(string name)
+    public IComponent? Component(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         return _context.Components.TryGetValue(name, out var definition) ? definition : null;
@@ -232,7 +232,7 @@ public sealed class ServerApplication : IApplication, IDisposable
         (_context.Services as IDisposable)?.Dispose();
     }
 
-    IApplication IApplication.Component(string name, IComponentDefinition definition) => Component(name, definition);
+    IApplication IApplication.Component(string name, IComponent definition) => Component(name, definition);
 
     IApplication IApplication.Directive(string name, IDirective directive) => Directive(name, directive);
 

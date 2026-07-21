@@ -11,7 +11,7 @@ namespace Assimalign.Viu.HackerNews;
 /// <c>:id</c> from the route, drives <see cref="UserStore"/> through a route-watching effect, and
 /// renders the profile from store state. Wrapped as an async route component in <see cref="AppRoutes"/>.
 /// </summary>
-internal sealed class UserView : IComponentDefinition
+internal sealed class UserView : IComponent
 {
     /// <summary>The shared route-view definition instance.</summary>
     public static readonly UserView Instance = new();
@@ -24,7 +24,7 @@ internal sealed class UserView : IComponentDefinition
     public string? Name => "UserView";
 
     /// <inheritdoc />
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var router = DependencyInjection.Inject(RouterInjectionKeys.Router)!;
         var stores = DependencyInjection.GetRequiredService<HackerNewsStores>();

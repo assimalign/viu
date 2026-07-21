@@ -31,7 +31,7 @@ public sealed class StoreServiceIntegrationTests : IDisposable
 
         public int UseCount { get; private set; }
 
-        public IComponentDefinition RootComponent => throw new NotSupportedException();
+        public IComponent RootComponent => throw new NotSupportedException();
 
         public VirtualNodeProperties? RootProperties => null;
 
@@ -45,7 +45,7 @@ public sealed class StoreServiceIntegrationTests : IDisposable
 
         public IApplicationBuilder Provide(string key, object? value) => this;
 
-        public IApplicationBuilder Component(string name, IComponentDefinition definition) => this;
+        public IApplicationBuilder Component(string name, IComponent definition) => this;
 
         public IApplicationBuilder Directive(string name, IDirective directive) => this;
 

@@ -40,11 +40,11 @@ internal sealed class CounterStore
 /// code with a current <see cref="ComponentInstance"/> and app context. Mirrors the Core test
 /// helper of the same shape.
 /// </summary>
-internal sealed class SetupComponent : IComponentDefinition
+internal sealed class SetupComponent : IComponent
 {
-    public required Func<Func<VirtualNode?>> SetupFunction { get; init; }
+    public required Func<ComponentSetup> SetupFunction { get; init; }
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => SetupFunction();
 }
 

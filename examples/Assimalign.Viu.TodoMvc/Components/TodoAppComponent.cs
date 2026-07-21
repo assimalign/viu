@@ -14,7 +14,7 @@ namespace Assimalign.Viu.TodoMvc.Components;
 /// renderer reuses instances across filtering and reordering (Vue's keyed <c>v-for</c>). The whole
 /// app spec is at https://github.com/tastejs/todomvc/blob/master/app-spec.md.
 /// </summary>
-public sealed class TodoAppComponent : IComponentDefinition
+public sealed class TodoAppComponent : IComponent
 {
     // One shared child definition drives every row; per-row state lives on the instance the renderer
     // creates for each keyed vnode (see TodoItemComponent).
@@ -24,7 +24,7 @@ public sealed class TodoAppComponent : IComponentDefinition
     public string? Name => "TodoApp";
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var store = DependencyInjection.Inject(TodoStore.Key) ?? new TodoStore();
         DependencyInjection.Provide(TodoStore.Key, store);

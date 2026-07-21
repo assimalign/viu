@@ -94,7 +94,7 @@ public sealed class AsyncComponentTests : IDisposable
         _ = AsyncComponents.DefineAsyncComponent(() =>
         {
             loaderCalls++;
-            return Task.FromResult<IComponentDefinition>(RealComponent());
+            return Task.FromResult<IComponent>(RealComponent());
         });
 
         // Defining the component must not run the loader — it runs on first mount (upstream parity).
@@ -105,7 +105,7 @@ public sealed class AsyncComponentTests : IDisposable
     public void Loader_RunsOnceOnFirstMount_AndResolutionReRendersThroughScheduler()
     {
         var loaderCalls = 0;
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var real = RealComponent();
         var async = AsyncComponents.DefineAsyncComponent(() =>
         {
@@ -134,7 +134,7 @@ public sealed class AsyncComponentTests : IDisposable
     public void Loader_ConcurrentMountsShareOneInflightLoad_InvokedOnce()
     {
         var loaderCalls = 0;
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var real = RealComponent();
         var async = AsyncComponents.DefineAsyncComponent(() =>
         {
@@ -163,7 +163,7 @@ public sealed class AsyncComponentTests : IDisposable
         var async = AsyncComponents.DefineAsyncComponent(() =>
         {
             loaderCalls++;
-            return Task.FromResult<IComponentDefinition>(real);
+            return Task.FromResult<IComponent>(real);
         });
 
         _renderer.Render(VirtualNodeFactory.Component(async), _container);
@@ -186,7 +186,7 @@ public sealed class AsyncComponentTests : IDisposable
     public void LoadingComponent_AppearsOnlyAfterDelay_ThenResolvedReplacesIt()
     {
         var loaderCalls = 0;
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var real = RealComponent();
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
         {
@@ -223,7 +223,7 @@ public sealed class AsyncComponentTests : IDisposable
     [Fact]
     public void LoadingComponent_WithZeroDelay_AppearsImmediately()
     {
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
         {
             Loader = () => request.Task,
@@ -242,7 +242,7 @@ public sealed class AsyncComponentTests : IDisposable
     [Fact]
     public void ErrorComponent_RendersOnLoaderFailure_WithErrorProp()
     {
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
         {
             Loader = () => request.Task,
@@ -261,7 +261,7 @@ public sealed class AsyncComponentTests : IDisposable
     [Fact]
     public void ErrorComponent_RendersAfterTimeoutElapses()
     {
-        var request = new TaskCompletionSource<IComponentDefinition>(); // never resolves
+        var request = new TaskCompletionSource<IComponent>(); // never resolves
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
         {
             Loader = () => request.Task,
@@ -282,7 +282,7 @@ public sealed class AsyncComponentTests : IDisposable
     public void LoaderFailure_WithNoErrorComponent_RoutesToAppErrorHandler_WithoutCrashing()
     {
         Exception? handled = null;
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var async = AsyncComponents.DefineAsyncComponent(() => request.Task);
         var application = _renderer.Renderer.CreateApplication(async);
         application.Config.ErrorHandler = (exception, _, _) => handled = exception;
@@ -312,8 +312,8 @@ public sealed class AsyncComponentTests : IDisposable
                 loaderCalls++;
                 // Fail the first two attempts, succeed on the third.
                 return loaderCalls < 3
-                    ? Task.FromException<IComponentDefinition>(new InvalidOperationException($"fail{loaderCalls}"))
-                    : Task.FromResult<IComponentDefinition>(real);
+                    ? Task.FromException<IComponent>(new InvalidOperationException($"fail{loaderCalls}"))
+                    : Task.FromResult<IComponent>(real);
             },
             OnError = (_, retry, fail, attempt) =>
             {
@@ -347,7 +347,7 @@ public sealed class AsyncComponentTests : IDisposable
             Loader = () =>
             {
                 loaderCalls++;
-                return Task.FromException<IComponentDefinition>(new InvalidOperationException("nope"));
+                return Task.FromException<IComponent>(new InvalidOperationException("nope"));
             },
             ErrorComponent = ErrorDisplayComponent(),
             OnError = (_, _, fail, _) => fail(),
@@ -366,7 +366,7 @@ public sealed class AsyncComponentTests : IDisposable
     [Fact]
     public void UnmountBeforeResolution_DiscardsPendingRender_NoErrorsOrLeaks()
     {
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var real = RealComponent();
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
         {
@@ -398,7 +398,7 @@ public sealed class AsyncComponentTests : IDisposable
     [Fact]
     public void Suspensible_WithBoundary_RegistersPendingLoad_AndDefersDisplayToBoundary()
     {
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var real = RealComponent();
         var boundary = new FakeSuspenseBoundary();
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
@@ -436,7 +436,7 @@ public sealed class AsyncComponentTests : IDisposable
     [Fact]
     public void NonSuspensible_WithBoundary_IgnoresBoundary_ShowsOwnLoadingUI()
     {
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var boundary = new FakeSuspenseBoundary();
         var async = AsyncComponents.DefineAsyncComponent(new AsyncComponentOptions
         {
@@ -467,7 +467,7 @@ public sealed class AsyncComponentTests : IDisposable
     public void KeptAliveAsyncComponent_PreservesResolvedStateAcrossSwitches_LoaderRunsOnce()
     {
         var loaderCalls = 0;
-        var request = new TaskCompletionSource<IComponentDefinition>();
+        var request = new TaskCompletionSource<IComponent>();
         var real = RealComponent();
         var other = new TestComponent
         {

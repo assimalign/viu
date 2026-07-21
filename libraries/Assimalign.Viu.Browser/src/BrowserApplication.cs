@@ -19,8 +19,8 @@ namespace Assimalign.Viu.Browser;
 /// content before a non-hydrating client mount (upstream parity), and releases every JS-side handle
 /// and listener on <see cref="Unmount"/>.
 /// <para>
-/// Build one with <see cref="CreateBuilder(IComponentDefinition, VirtualNodeProperties?, bool)"/>
-/// (client mount) or <see cref="CreateSsrBuilder(IComponentDefinition, VirtualNodeProperties?)"/>
+/// Build one with <see cref="CreateBuilder(IComponent, VirtualNodeProperties?, bool)"/>
+/// (client mount) or <see cref="CreateSsrBuilder(IComponent, VirtualNodeProperties?)"/>
 /// (hydrate server-rendered markup), then <c>await app.MountAsync("#app")</c>. Not thread-safe
 /// (browser main thread only).
 /// </para>
@@ -42,7 +42,7 @@ public sealed class BrowserApplication : Application<int>
 
     internal BrowserApplication(
         Renderer<int> renderer,
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties,
         BufferedBrowserNodeOperations? bufferedOperations = null,
         bool hydrate = false,
@@ -80,7 +80,7 @@ public sealed class BrowserApplication : Application<int>
     /// <returns>A builder whose <see cref="BrowserApplicationBuilder.Build"/> produces the app.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
     public static BrowserApplicationBuilder CreateBuilder(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties = null,
         bool useCommandBuffer = false)
     {
@@ -102,7 +102,7 @@ public sealed class BrowserApplication : Application<int>
     /// <returns>A builder whose <see cref="BrowserApplicationBuilder.Build"/> produces the hydrating app.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
     public static BrowserApplicationBuilder CreateSsrBuilder(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
@@ -196,7 +196,7 @@ public sealed class BrowserApplication : Application<int>
 
     // Builds the app over the direct or command-buffered browser node-ops; the builder calls this.
     internal static BrowserApplication Create(
-        IComponentDefinition rootComponent,
+        IComponent rootComponent,
         VirtualNodeProperties? rootProperties,
         bool useCommandBuffer,
         bool hydrate)

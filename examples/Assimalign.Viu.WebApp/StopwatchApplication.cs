@@ -13,11 +13,11 @@ using Assimalign.Viu.WebApp;
 // emits ([V01.01.03.07]/[V01.01.03.08]) live, and the badge is a compiled .viu single-file
 // component mounted as a child ([V01.01.06.07]) — the sample's proof that a .viu @template
 // component mounts, is reactive, and publishes trimmed + AOT (the budget-gates canary).
-internal sealed class StopwatchApplication : IComponentDefinition
+internal sealed class StopwatchApplication : IComponent
 {
     public string? Name => "StopwatchApplication";
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var stopwatch = new Stopwatch();
         var isRunning = Reactive.Reference(false);
@@ -109,7 +109,7 @@ internal sealed class StopwatchApplication : IComponentDefinition
 
 // The child component: declared props with a default and a validator, a declared emit, and
 // lifecycle hooks — the whole W02 contract in one small component.
-internal sealed class ElapsedDisplay : IComponentDefinition
+internal sealed class ElapsedDisplay : IComponent
 {
     public string? Name => "ElapsedDisplay";
 
@@ -124,7 +124,7 @@ internal sealed class ElapsedDisplay : IComponentDefinition
         new ComponentEmitDefinition("reset"),
     ];
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
         => () => VirtualNodeFactory.Element(
             "div",
             VirtualNodeFactory.Properties(("class", "meter")),

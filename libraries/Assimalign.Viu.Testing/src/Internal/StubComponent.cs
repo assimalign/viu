@@ -12,9 +12,9 @@ namespace Assimalign.Viu.Testing;
 /// component's subtree, with no reflection-based proxy generation — the stub is a plain component
 /// definition returning a fixed render function.
 /// </summary>
-internal sealed class StubComponent : IComponentDefinition
+internal sealed class StubComponent : IComponent
 {
-    private readonly Func<VirtualNode?> _render;
+    private readonly ComponentSetup _render;
 
     private StubComponent(string tag)
     {
@@ -25,11 +25,11 @@ internal sealed class StubComponent : IComponentDefinition
 
     public string? Name { get; }
 
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context) => _render;
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context) => _render;
 
     /// <summary>Creates the placeholder stub for <paramref name="real"/> (tag = kebab name + "-stub").</summary>
     /// <param name="real">The component being stubbed.</param>
-    public static StubComponent For(IComponentDefinition real) => new(ToStubTag(real.Name));
+    public static StubComponent For(IComponent real) => new(ToStubTag(real.Name));
 
     private static string ToStubTag(string? name)
     {

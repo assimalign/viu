@@ -38,7 +38,7 @@ namespace Assimalign.Viu.Browser;
 /// any fragment/text root.
 /// </para>
 /// </summary>
-public sealed class TransitionGroup : IComponentDefinition
+public sealed class TransitionGroup : IComponent
 {
     /// <summary>The shared component instance the compiled render references via <see cref="DomRenderHelpers._TransitionGroup"/>.</summary>
     public static readonly TransitionGroup Instance = new();
@@ -99,7 +99,7 @@ public sealed class TransitionGroup : IComponentDefinition
     /// <c>extend({}, TransitionPropsValidators, { tag, moveClass })</c> in
     /// <c>packages/runtime-dom/src/components/TransitionGroup.ts</c>). Declaring them keeps every one out
     /// of the fallthrough attrs, so only <c>class</c>/<c>style</c>/arbitrary attributes fall through onto
-    /// the rendered <c>tag</c> element. <see cref="IComponentDefinition.InheritAttributes"/> stays at its
+    /// the rendered <c>tag</c> element. <see cref="IComponent.InheritAttributes"/> stays at its
     /// default (true) — unlike <c>Transition</c>/<c>KeepAlive</c>, the group owns a real root element to
     /// inherit onto — so the standard single-root merge lands them (upstream never sets
     /// <c>inheritAttrs: false</c> on TransitionGroup).
@@ -107,7 +107,7 @@ public sealed class TransitionGroup : IComponentDefinition
     public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var instance = ComponentInstance.Current!;
         var state = BaseTransition.UseTransitionState();

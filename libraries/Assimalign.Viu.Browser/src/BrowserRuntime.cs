@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Browser;
 /// not thread-safe.
 /// <para>
 /// Normal app bootstrap does <b>not</b> call this type: build a <c>BrowserApplication</c> with
-/// <see cref="BrowserApplication.CreateBuilder(IComponentDefinition, VirtualNodeProperties?, bool)"/>
+/// <see cref="BrowserApplication.CreateBuilder(IComponent, VirtualNodeProperties?, bool)"/>
 /// and mount it with <c>MountAsync</c>, which owns the bridge initialization internally (the reshape
 /// eliminated the external initialization pre-call, <c>V01.01.03.23</c>). The members here are the
 /// low-level primitives for advanced scenarios — a bare renderer, selector resolution, or the

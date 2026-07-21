@@ -45,7 +45,7 @@ public class ApplicationApiTests : IDisposable
     public void RegisteredComponent_ResolvesDuringRender_ForDescendantsOfTheRoot()
     {
         var widget = Leaf("widget");
-        IComponentDefinition? resolvedInChild = null;
+        IComponent? resolvedInChild = null;
 
         var child = new TestComponent
         {

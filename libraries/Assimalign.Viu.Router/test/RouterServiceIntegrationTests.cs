@@ -23,7 +23,7 @@ public class RouterServiceIntegrationTests
 
         public Dictionary<object, object?> Provided { get; } = [];
 
-        public IComponentDefinition RootComponent => throw new NotSupportedException();
+        public IComponent RootComponent => throw new NotSupportedException();
 
         public VirtualNodeProperties? RootProperties => null;
 
@@ -41,7 +41,7 @@ public class RouterServiceIntegrationTests
             return this;
         }
 
-        public IApplicationBuilder Component(string name, IComponentDefinition definition) => this;
+        public IApplicationBuilder Component(string name, IComponent definition) => this;
 
         public IApplicationBuilder Directive(string name, IDirective directive) => this;
 

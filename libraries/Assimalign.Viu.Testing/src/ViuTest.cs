@@ -25,7 +25,7 @@ public static class ViuTest
     /// <returns>The root component wrapper.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="component"/> is null.</exception>
     public static ComponentWrapper Mount<TComponent>(TComponent component, ComponentMountOptions? options = null)
-        where TComponent : IComponentDefinition
+        where TComponent : IComponent
     {
         ArgumentNullException.ThrowIfNull(component);
         options ??= new ComponentMountOptions();
@@ -60,7 +60,7 @@ public static class ViuTest
         }
         if (options.Stubs.Count > 0)
         {
-            var stubs = new Dictionary<IComponentDefinition, IComponentDefinition>();
+            var stubs = new Dictionary<IComponent, IComponent>();
             foreach (var (real, stub) in options.Stubs)
             {
                 stubs[real] = stub ?? StubComponent.For(real);

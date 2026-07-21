@@ -21,13 +21,13 @@ namespace Assimalign.Viu.Router;
 /// placeholder rather than being skipped in the depth walk. Not thread-safe (single-threaded JS
 /// event-loop model).
 /// </remarks>
-public sealed class RouterView : IComponentDefinition
+public sealed class RouterView : IComponent
 {
     /// <inheritdoc/>
     public string? Name => "RouterView";
 
     /// <inheritdoc/>
-    public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         // Resolve the router service-first-then-provide ([V01.01.03.24]; a true miss warns through the
         // runtime's inject diagnostics) and this view's depth, then provide depth + 1 for any view

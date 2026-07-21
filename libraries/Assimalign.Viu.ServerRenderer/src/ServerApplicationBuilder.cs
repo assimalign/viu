@@ -4,7 +4,7 @@ namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
 /// The <see cref="IApplicationBuilder"/> for server-rendering applications — created by
-/// <see cref="ServerApplication.CreateBuilder(IComponentDefinition, VirtualNodeProperties?)"/>.
+/// <see cref="ServerApplication.CreateBuilder(IComponent, VirtualNodeProperties?)"/>.
 /// Records plugins/provides/registrations on the base <see cref="ApplicationBuilder"/> and, on
 /// <see cref="Build"/>, constructs a fresh <see cref="ServerApplication"/> and replays the recorded
 /// configuration onto it in order. Build one app per request so no reactive state crosses requests.
@@ -12,7 +12,7 @@ namespace Assimalign.Viu.ServerRenderer;
 /// </summary>
 public sealed class ServerApplicationBuilder : ApplicationBuilder
 {
-    internal ServerApplicationBuilder(IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties)
+    internal ServerApplicationBuilder(IComponent rootComponent, VirtualNodeProperties? rootProperties)
         : base(rootComponent, rootProperties)
     {
     }
