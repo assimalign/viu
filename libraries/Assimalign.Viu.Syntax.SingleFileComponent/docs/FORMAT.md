@@ -39,6 +39,16 @@ slices the file into blocks and records their source spans. The template markup 
 template compiler (`Assimalign.Viu.Syntax.Templates`, [V01.01.05.01]); the C# in `@script` is analysed by
 [V01.01.06.03].
 
+A `.viu` with an `@template` compiles to a **mountable component**: the source generator emits the
+compiled render function ([V01.01.05.05]), merges the `@script` C# into the partial class ([V01.01.06.03]),
+and — as of [V01.01.06.07] — generates the `IComponentDefinition` bridge (a `Name` plus a `Setup` that
+allocates the render cache, wires slots, applies any `v-bind()` CSS custom properties, and returns the
+render delegate). So a `@template`-bearing `.viu` is passed straight to `BrowserRuntime.CreateApp(...)` /
+`VirtualNodeFactory.Component(...)` with no hand-written wiring, and reactive `@script` members drive
+re-render. A `.viu` with **no** `@template` (a `@style`-only CSS-bundle unit, or a `@script`-only partial)
+stays a plain partial class — no component bridge — so it keeps compiling exactly as before. This library
+still only *slices*; the bridge is emitted by the generator that consumes the descriptor.
+
 ### Upstream-semantics mapping
 
 | `.viu`                         | Vue SFC                          | Meaning (per the Vue SFC spec)                    |

@@ -2,9 +2,9 @@
     /* App chrome, view frame, loading/error, and user page. Authored as .viu @style blocks so the
        ViuBundleCss task compiles every **/*.viu into the fingerprinted
        Assimalign.Viu.HackerNews.viu.css bundle, whose <link> the build auto-injects into index.html
-       (no manual stylesheet tag). These are global (unscoped) selectors matched by class name, because
-       the logic-bearing components are C# render functions rather than generated .viu components —
-       see README.md "Why .viu is CSS-only today". */
+       (no manual stylesheet tag). These are global (unscoped) selectors matched by class name: the
+       logic-bearing components here are hand-written C# render functions rather than .viu components
+       (a not-yet-made migration, not a gap — see README.md "Why .viu here is @style-only"). */
 
     .hn-app {
         display: flex;

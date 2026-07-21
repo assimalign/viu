@@ -1,0 +1,20 @@
+@template {
+    <div class="viu-badge">
+        <span class="eyebrow">Rendered from a .viu component</span>
+        <button class="secondary" type="button" @click="Increment">
+            Clicked {{ Count }} time(s)
+        </button>
+    </div>
+}
+
+@script {
+    using Assimalign.Viu.Reactivity;
+
+    // A self-contained .viu single-file component ([V01.01.06.07]): the @script holds the reactive
+    // state and the click handler, the generator emits the IComponentDefinition bridge, and the parent
+    // mounts it with VirtualNodeFactory.Component — no hand-written wiring. This is the WASM sample's
+    // proof that a compiled .viu component publishes trimmed + AOT (the budget-gates canary).
+    public readonly Reference<int> Count = Reactive.Reference(0);
+
+    public void Increment() => Count.Value++;
+}

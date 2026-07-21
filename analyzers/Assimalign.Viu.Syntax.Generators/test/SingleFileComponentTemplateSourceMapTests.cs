@@ -199,21 +199,33 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         => new(new Position(0, startLine, startColumn), new Position(source.Length, endLine, endColumn), source);
 
     // Compiles the generated .g.cs together with a minimal runtime render-helper stub so every emitted
-    // helper call (_openBlock/_createElementBlock/_toDisplayString) binds, leaving the unresolved template
-    // member (`_ctx.Cont`) as the SOLE compile error — the one the #line map must relocate. The stub lives
-    // in the namespace the generated `using static` names. The generator emits a second `using static` of
-    // the DOM helper surface ([V01.01.04.09]) alongside the runtime-core one, so an (empty) DomRenderHelpers
-    // stub must resolve too — these static-only templates use no DOM helper, so no members are needed.
+    // helper call (_openBlock/_createElementBlock/_toDisplayString) and the [V01.01.06.07]
+    // IComponentDefinition bridge (IComponentDefinition/ComponentProperties/ComponentSetupContext/
+    // VirtualNode/NormalizeRoot) binds, leaving the unresolved template member (`_ctx.Cont`) as the SOLE
+    // compile error — the one the #line map must relocate. The stub lives in the namespace the generated
+    // `using static` names. The generator emits a second `using static` of the DOM helper surface
+    // ([V01.01.04.09]) alongside the runtime-core one, so an (empty) DomRenderHelpers stub must resolve too —
+    // these static-only templates use no DOM helper, so no members are needed.
     private static ImmutableArray<RoslynDiagnostic> CompileGeneratedWithHelperStub(string generated)
     {
         const string helperStub =
             "namespace Assimalign.Viu.RuntimeCore\n" +
             "{\n" +
+            "    internal sealed class VirtualNode { }\n" +
+            "    internal sealed class ComponentProperties { }\n" +
+            "    internal sealed class ComponentSlots { }\n" +
+            "    internal sealed class ComponentSetupContext { public ComponentSlots? Slots => null; }\n" +
+            "    internal interface IComponentDefinition\n" +
+            "    {\n" +
+            "        string? Name { get; }\n" +
+            "        System.Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context);\n" +
+            "    }\n" +
             "    internal static class RenderHelpers\n" +
             "    {\n" +
             "        internal static object _openBlock(bool disableTracking = false) => null!;\n" +
             "        internal static object? _createElementBlock(object token, object tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null) => null;\n" +
             "        internal static string _toDisplayString(object? value) => \"\";\n" +
+            "        internal static VirtualNode NormalizeRoot(object? value) => null!;\n" +
             "    }\n" +
             "}\n" +
             "namespace Assimalign.Viu.RuntimeDom\n" +

@@ -7,7 +7,7 @@
          $(ViuBundleSingleFileComponentCss), so the ViuBundleCss task emits the Styles/*.viu @style blocks into
          the fingerprinted Assimalign.Viu.HackerNews.viu.css bundle that the build splices into index.html — no
          manual <link> tag. This sample authors component styling in .viu @style blocks (the logic-bearing
-         components are C# render functions; see README.md "Why .viu is CSS-only today"). -->
+         components are hand-written C# render functions; see README.md "Why .viu here is @style-only"). -->
     <ViuUseSingleFileComponents>true</ViuUseSingleFileComponents>
   </PropertyGroup>
 
