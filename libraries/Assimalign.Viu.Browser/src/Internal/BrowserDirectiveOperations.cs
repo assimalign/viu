@@ -52,7 +52,7 @@ internal sealed class BrowserDirectiveOperations
     /// <summary>The ambient instance, or a thrown <see cref="InvalidOperationException"/> when none is installed.</summary>
     public static BrowserDirectiveOperations Require()
         => Current ?? throw new InvalidOperationException(
-            "No BrowserDirectiveOperations installed. BrowserRuntime.CreateApp installs the "
+            "No BrowserDirectiveOperations installed. Building a BrowserApplication installs the "
             + "browser-backed operations; a v-model/v-show directive ran before it.");
 
     /// <summary>Gets (creating on first use) the model state for <paramref name="handle"/>.</summary>

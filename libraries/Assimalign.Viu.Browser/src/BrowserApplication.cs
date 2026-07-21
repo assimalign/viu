@@ -1,203 +1,213 @@
 using System;
 using System.Runtime.Versioning;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Assimalign.Viu;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// A browser-mounted Viu application — the C# port of the app object
-/// <c>createApp</c> returns in <c>@vue/runtime-dom</c>
-/// (https://vuejs.org/api/application.html, <c>packages/runtime-dom/src/index.ts</c>). Wraps
-/// the platform-agnostic <see cref="Application{TNode}"/> with browser container concerns:
-/// selector resolution, clearing existing content before a non-hydrating client mount
-/// (upstream parity), and full interop cleanup on <see cref="Unmount"/> — the bridge registry
-/// returns to its pre-mount baseline. Create through
-/// <see cref="BrowserRuntime.CreateApp"/>. Not thread-safe (browser main thread only).
+/// A browser-mounted Viu application — the C# port of the app object <c>createApp</c> returns in
+/// <c>@vue/runtime-dom</c> (https://vuejs.org/api/application.html,
+/// <c>packages/runtime-dom/src/index.ts</c>). It <b>extends</b> the platform-agnostic
+/// <see cref="Application{TNode}"/> base (over <see cref="int"/> node handles) and owns the browser
+/// concerns: it <b>overrides <see cref="Application{TNode}.OnInitializeAsync"/></b> to load the
+/// <c>viu-dom.js</c> bridge module inside its own mount path — so there is no external
+/// initialization pre-call (the reshape eliminated <c>BrowserRuntime.InitializeAsync()</c> from
+/// consumer bootstrap, <c>V01.01.03.23</c>) — resolves CSS selectors, clears existing container
+/// content before a non-hydrating client mount (upstream parity), and releases every JS-side handle
+/// and listener on <see cref="Unmount"/>.
+/// <para>
+/// Build one with <see cref="CreateBuilder(IComponentDefinition, VirtualNodeProperties?, bool)"/>
+/// (client mount) or <see cref="CreateSsrBuilder(IComponentDefinition, VirtualNodeProperties?)"/>
+/// (hydrate server-rendered markup), then <c>await app.MountAsync("#app")</c>. Not thread-safe
+/// (browser main thread only).
+/// </para>
 /// </summary>
 [SupportedOSPlatform("browser")]
-public sealed class BrowserApplication
+public sealed class BrowserApplication : Application<int>
 {
-    private readonly Application<int> _application;
     private readonly BufferedBrowserNodeOperations? _bufferedOperations;
     private readonly bool _hydrate;
+    // Seams (defaulting to the real bridge) so the DOM-dependent operations are substitutable in
+    // DOM-free tests — the recording initialization seam pins "the bridge initializes exactly once
+    // inside the mount path".
+    private readonly Func<CancellationToken, Task> _initialize;
+    private readonly Action<int> _clearContainer;
+    // Per-app cache of the initialization task and its completion, so OnInitializeAsync runs the
+    // module import at most once no matter how many times the mount path awaits it.
+    private Task? _initialization;
+    private bool _initialized;
 
     internal BrowserApplication(
-        Application<int> application,
+        Renderer<int> renderer,
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties,
         BufferedBrowserNodeOperations? bufferedOperations = null,
-        bool hydrate = false)
+        bool hydrate = false,
+        Func<CancellationToken, Task>? initialize = null,
+        Action<int>? clearContainer = null)
+        : base(renderer, rootComponent, rootProperties)
     {
-        _application = application;
         _bufferedOperations = bufferedOperations;
         _hydrate = hydrate;
+        _initialize = initialize ?? BrowserRuntime.EnsureBridgeAsync;
+        _clearContainer = clearContainer ?? BrowserRuntime.ClearContainer;
     }
 
-    /// <summary>Whether the app is currently mounted.</summary>
-    public bool IsMounted => _application.IsMounted;
-
-    /// <summary>The root component instance after mounting, or null.</summary>
-    public ComponentInstance? RootInstance => _application.RootInstance;
+    /// <summary>
+    /// Whether this app hydrates existing server-rendered markup (created through
+    /// <see cref="CreateSsrBuilder"/>) rather than mounting fresh.
+    /// </summary>
+    public bool IsHydrating => _hydrate;
 
     /// <summary>
-    /// The app-level configuration (upstream: <c>app.config</c>,
-    /// https://vuejs.org/api/application.html#app-config) — the
-    /// <see cref="ApplicationConfiguration.ErrorHandler"/> and
-    /// <see cref="ApplicationConfiguration.WarnHandler"/>. Set its handlers before
-    /// <see cref="Mount(string)"/>. Delegates to the wrapped <see cref="Application{TNode}.Config"/>.
+    /// Creates a builder for a browser application that mounts <paramref name="rootComponent"/>
+    /// fresh — the .NET-idiomatic bootstrap (compare <c>WebApplication.CreateBuilder</c>) that
+    /// replaces upstream's <c>createApp(rootComponent)</c>. Configure plugins/provides on the
+    /// builder, <c>Build()</c> the app, then <c>await app.MountAsync("#app")</c>.
+    /// <para>
+    /// Set <paramref name="useCommandBuffer"/> to run the renderer over the interop command buffer
+    /// ([V01.01.04.05]): node-ops serialize into a shared binary frame that a single interop call
+    /// applies per scheduler flush instead of one call per mutation. It is behaviorally invisible —
+    /// buffered and direct modes produce byte-identical DOM. Default is direct.
+    /// </para>
     /// </summary>
-    public ApplicationConfiguration Config => _application.Config;
-
-    /// <summary>
-    /// Registers a component under <paramref name="name"/> so descendants of the root resolve it by
-    /// name — including <c>&lt;component :is="name"&gt;</c> (upstream:
-    /// <c>app.component(name, definition)</c>, https://vuejs.org/api/application.html#app-component).
-    /// Registering a duplicate name, or registering after mount, warns in dev. Delegates to the
-    /// wrapped <see cref="Application{TNode}"/>.
-    /// </summary>
-    /// <param name="name">The component name (resolved case-insensitively at render).</param>
-    /// <param name="definition">The component definition.</param>
-    /// <returns>This application, for chaining.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
-    public BrowserApplication Component(string name, IComponentDefinition definition)
+    /// <param name="rootComponent">The root component definition.</param>
+    /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <param name="useCommandBuffer">Whether to batch node-ops through the command buffer.</param>
+    /// <returns>A builder whose <see cref="BrowserApplicationBuilder.Build"/> produces the app.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
+    public static BrowserApplicationBuilder CreateBuilder(
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties = null,
+        bool useCommandBuffer = false)
     {
-        _application.Component(name, definition);
-        return this;
+        ArgumentNullException.ThrowIfNull(rootComponent);
+        return new BrowserApplicationBuilder(rootComponent, rootProperties, useCommandBuffer, hydrate: false);
     }
 
     /// <summary>
-    /// Returns the component registered under <paramref name="name"/>, or null (upstream:
-    /// <c>app.component(name)</c> getter — an exact-name lookup).
+    /// Creates a builder for a browser application that <b>hydrates</b> existing server-rendered
+    /// markup rather than mounting fresh — the C# port of <c>createSSRApp(rootComponent)</c> in
+    /// <c>@vue/runtime-dom</c> (https://vuejs.org/guide/scaling-up/ssr.html#client-hydration). The
+    /// built app's <see cref="MountAsync(string, CancellationToken)"/> adopts the container's server
+    /// DOM (attaching listeners and component instances, reconciling only dynamic bindings) instead
+    /// of clearing and recreating it; a server/client mismatch recovers per subtree without crashing.
+    /// The container must already hold the markup the server renderer produced for the same root.
     /// </summary>
-    /// <param name="name">The registered name.</param>
-    /// <returns>The registered definition, or null.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public IComponentDefinition? Component(string name) => _application.Component(name);
-
-    /// <summary>
-    /// Registers a directive under <paramref name="name"/> so descendants resolve it by name through
-    /// <see cref="Directives.ResolveDirective"/> (upstream: <c>app.directive(name, directive)</c>,
-    /// https://vuejs.org/api/application.html#app-directive). Registering a duplicate name, or
-    /// registering after mount, warns in dev. Delegates to the wrapped
-    /// <see cref="Application{TNode}"/>.
-    /// </summary>
-    /// <param name="name">The directive name (resolved case-insensitively at render).</param>
-    /// <param name="directive">The directive definition.</param>
-    /// <returns>This application, for chaining.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="directive"/> is null.</exception>
-    public BrowserApplication Directive(string name, IDirective directive)
+    /// <param name="rootComponent">The root component definition (the same one rendered on the server).</param>
+    /// <param name="rootProperties">Props for the root component, or null.</param>
+    /// <returns>A builder whose <see cref="BrowserApplicationBuilder.Build"/> produces the hydrating app.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="rootComponent"/> is null.</exception>
+    public static BrowserApplicationBuilder CreateSsrBuilder(
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties = null)
     {
-        _application.Directive(name, directive);
-        return this;
+        ArgumentNullException.ThrowIfNull(rootComponent);
+        return new BrowserApplicationBuilder(rootComponent, rootProperties, useCommandBuffer: false, hydrate: true);
     }
 
     /// <summary>
-    /// Returns the directive registered under <paramref name="name"/>, or null (upstream:
-    /// <c>app.directive(name)</c> getter — an exact-name lookup).
-    /// </summary>
-    /// <param name="name">The registered name.</param>
-    /// <returns>The registered directive, or null.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public IDirective? Directive(string name) => _application.Directive(name);
-
-    /// <summary>
-    /// Provides <paramref name="value"/> app-wide under the typed <paramref name="key"/> (upstream:
-    /// <c>app.provide(key, value)</c>, https://vuejs.org/api/application.html#app-provide) — the
-    /// final fallback in the inject lookup chain. Providing a duplicate key, or providing after
-    /// mount, warns in dev. Delegates to the wrapped <see cref="Application{TNode}"/>.
-    /// </summary>
-    /// <typeparam name="T">The provided value type.</typeparam>
-    /// <param name="key">The identity-based key descendants inject with.</param>
-    /// <param name="value">The value to provide.</param>
-    /// <returns>This application, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="key"/> is null.</exception>
-    public BrowserApplication Provide<T>(InjectionKey<T> key, T value)
-    {
-        _application.Provide(key, value);
-        return this;
-    }
-
-    /// <summary>
-    /// Provides <paramref name="value"/> app-wide under a string <paramref name="key"/> (upstream:
-    /// <c>app.provide</c> with a string key). Delegates to the wrapped
-    /// <see cref="Application{TNode}"/>.
-    /// </summary>
-    /// <param name="key">The string key descendants inject with.</param>
-    /// <param name="value">The value to provide.</param>
-    /// <returns>This application, for chaining.</returns>
-    /// <exception cref="ArgumentException"><paramref name="key"/> is null or empty.</exception>
-    public BrowserApplication Provide(string key, object? value)
-    {
-        _application.Provide(key, value);
-        return this;
-    }
-
-    /// <summary>
-    /// Installs <paramref name="plugin"/> exactly once (upstream: <c>app.use(plugin, options)</c>,
-    /// https://vuejs.org/api/application.html#app-use). A repeat <c>Use</c> of the same plugin
-    /// instance is deduplicated with a dev warning; a plugin installed after mount warns. The
-    /// plugin's <see cref="IVuePlugin{TNode}.Install"/> receives the wrapped
-    /// <see cref="Application{TNode}"/>. Delegates to the wrapped application.
-    /// </summary>
-    /// <param name="plugin">The plugin to install (over the browser's <see cref="int"/> node handles).</param>
-    /// <param name="options">Options passed to the plugin's install, or null.</param>
-    /// <returns>This application, for chaining.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="plugin"/> is null.</exception>
-    public BrowserApplication Use(IPlugin<int> plugin, object? options = null)
-    {
-        _application.Use(plugin, options);
-        return this;
-    }
-
-    /// <summary>
-    /// Resolves <paramref name="selector"/> and mounts there (upstream:
-    /// <c>app.mount('#app')</c>). A selector matching nothing throws a
-    /// <see cref="BrowserDomException"/> naming the selector.
+    /// Resolves <paramref name="selector"/> and mounts there (upstream: <c>app.mount('#app')</c>),
+    /// initializing the browser bridge inside this mount path first. A selector matching nothing
+    /// throws a <see cref="BrowserDomException"/> naming the selector.
     /// </summary>
     /// <param name="selector">The CSS selector of the container.</param>
+    /// <param name="cancellationToken">Cancels the bridge initialization.</param>
     /// <returns>The root component instance.</returns>
+    /// <exception cref="ArgumentException"><paramref name="selector"/> is null or empty.</exception>
     /// <exception cref="BrowserDomException">No element matches <paramref name="selector"/>.</exception>
-    public ComponentInstance? Mount(string selector)
+    public async Task<ComponentInstance?> MountAsync(string selector, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
+        // Initialize before resolving the selector — QuerySelector needs the bridge loaded.
+        if (!IsMounted)
+        {
+            await OnInitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
         return Mount(BrowserRuntime.QuerySelector(selector));
     }
 
-    /// <summary>Mounts into an already-resolved container handle.</summary>
-    /// <param name="containerHandle">The container's node handle.</param>
+    /// <summary>
+    /// Synchronously mounts into an already-resolved container handle. Advanced: the browser bridge
+    /// must already be initialized (use <see cref="MountAsync(string, CancellationToken)"/> or
+    /// <see cref="Application{TNode}.MountAsync(int, CancellationToken)"/> otherwise). Clears the
+    /// container for a client mount, or adopts its content when hydrating.
+    /// </summary>
+    /// <param name="container">The container's node handle.</param>
     /// <returns>The root component instance.</returns>
-    public ComponentInstance? Mount(int containerHandle)
+    /// <exception cref="InvalidOperationException">The bridge is not initialized and this app has not initialized it.</exception>
+    public override ComponentInstance? Mount(int container)
     {
-        if (_application.IsMounted)
+        if (!_initialized && !BrowserRuntime.IsBridgeInitialized)
         {
-            // Already mounted: delegate so the app warns and returns the existing instance (upstream parity).
-            return _application.Mount(containerHandle);
+            throw new InvalidOperationException(
+                "The Viu browser bridge is not initialized. Mount with MountAsync so the bridge initializes "
+                + "in the mount path (the reshape removed the external BrowserRuntime.InitializeAsync() pre-call).");
+        }
+        if (IsMounted)
+        {
+            // Already mounted: delegate so the base warns and returns the existing instance (upstream parity).
+            return base.Mount(container);
         }
         // The container is a foreign node the bridge registered (a QuerySelector result); fold its handle
         // into the buffered handle counter so a buffered create never reuses it. Harmless in direct mode.
-        _bufferedOperations?.ObserveForeignHandle(containerHandle);
+        _bufferedOperations?.ObserveForeignHandle(container);
         if (_hydrate)
         {
-            // An app created with CreateSsrApp adopts the existing server-rendered content — the container
-            // is NOT cleared (that content is what hydration reuses).
-            return _application.Hydrate(containerHandle);
+            // A hydrating app adopts the existing server-rendered content — the container is NOT cleared.
+            return Hydrate(container);
         }
         // Non-hydrating client mount clears existing container content (upstream parity); one interop call
         // that also releases any registered child handles.
-        BrowserRuntime.ClearContainer(containerHandle);
-        return _application.Mount(containerHandle);
+        _clearContainer(container);
+        return base.Mount(container);
     }
 
     /// <summary>
     /// Unmounts the app (upstream: <c>app.unmount()</c>): runs component teardown lifecycles,
-    /// removes the rendered DOM, and releases every JS-side handle and listener the app
-    /// created. In buffered mode the teardown mutations commit through the command buffer before the
-    /// buffered operations are detached from the ambient scheduler/dispatch seams.
+    /// removes the rendered DOM, and releases every JS-side handle and listener the app created. In
+    /// buffered mode the teardown mutations commit through the command buffer before the buffered
+    /// operations are detached from the ambient scheduler/dispatch seams.
     /// </summary>
-    public void Unmount()
+    public override void Unmount()
     {
-        _application.Unmount();
+        base.Unmount();
         _bufferedOperations?.Deactivate();
+    }
+
+    /// <summary>
+    /// Loads the <c>viu-dom.js</c> bridge module for this mount path (upstream has no analog — the
+    /// JS runtime is always present). Cached per app so the module import runs at most once no matter
+    /// how many times the mount path awaits it; the shared bridge itself initializes once per process.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the module download.</param>
+    /// <returns>A task that completes when the bridge is ready.</returns>
+    protected override Task OnInitializeAsync(CancellationToken cancellationToken)
+        => _initialization ??= InitializeBridgeAsync(cancellationToken);
+
+    private async Task InitializeBridgeAsync(CancellationToken cancellationToken)
+    {
+        await _initialize(cancellationToken).ConfigureAwait(false);
+        _initialized = true;
+    }
+
+    // Builds the app over the direct or command-buffered browser node-ops; the builder calls this.
+    internal static BrowserApplication Create(
+        IComponentDefinition rootComponent,
+        VirtualNodeProperties? rootProperties,
+        bool useCommandBuffer,
+        bool hydrate)
+    {
+        if (useCommandBuffer)
+        {
+            var bufferedOperations = BufferedBrowserNodeOperations.CreateProduction();
+            var bufferedRenderer = RendererFactory.CreateRenderer(bufferedOperations.Create());
+            return new BrowserApplication(bufferedRenderer, rootComponent, rootProperties, bufferedOperations, hydrate);
+        }
+        var renderer = RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
+        return new BrowserApplication(renderer, rootComponent, rootProperties, bufferedOperations: null, hydrate);
     }
 }
