@@ -259,7 +259,7 @@ Branch stacked on R7.
 | --- | --- | --- | --- |
 | Sketch base | — | `draft/core-abstraction-sketch` | captured + pushed |
 | R6 | #241 (`V01.01.03.25`) | `feature/V01.01.03.25-reactive-class-model` | implemented — reactive slice compiles + isolated-benchmark gate PASS (ComputedChainRecompute +6.5%, 0 alloc); full solution/suites/budget/interop gates remain blocked by the sketch's unbuilt R7/R8 portions (by design), so they run at R7/R8; awaiting main-session review |
-| R7 | not yet filed (`V01.01.03.26`) | `feature/V01.01.03.26-component-class-model` | not started |
+| R7 | #242 (`V01.01.03.26`) | `feature/V01.01.03.26-component-class-model` | implemented — `IComponentDefinition`→`IComponent` + `ComponentSetup` cascaded across Core/Router/Store/ServerRenderer/Browser/Testing/all samples + the SFC generator's emitted bridge; `src/Dom`→`src/VirtualDom`; lifecycle removed from `IComponentDescriptor`; `Component` lazy `Configure` (bool guard, no ctor virtual call) proven by an isolated harness + committed `ComponentBaseTests`; TodoItemComponent adopts the `Component` base; SFC generator suite green (73/73); build errors confined to the R8 slice by design; full solution/suites/budget/interop gates remain R8-blocked (arc-end gate); awaiting main-session review |
 | R8 | not yet filed (`V01.01.03.27`) | `feature/V01.01.03.27-application-services-model` | not started |
 
 Same train discipline as arc 1: Opus worktree agents, work item filed first, local commits,

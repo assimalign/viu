@@ -15,7 +15,7 @@ Public surface (all under namespace `Assimalign.Viu.ServerRenderer`):
 
 - **`ServerRenderer`** (static facade): `RenderToStringAsync(app, context?)` is the C# port of
   `renderToString`; `RenderToStreamAsync(app, TextWriter, context?)` streams completed subtrees to a
-  writer with `FlushAsync` backpressure. Convenience overloads take a root `IComponentDefinition`
+  writer with `FlushAsync` backpressure. Convenience overloads take a root `IComponent`
   directly.
 - **`ServerApplication`**: the host-agnostic SSR app — the port of `createSSRApp(RootComponent)`. It
   carries the root component, its props, and the app-level component/directive registries and provides

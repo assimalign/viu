@@ -166,7 +166,7 @@ object graph (`BrowserHistorySnapshotMarshaller` pins the wire format).
 ## Components: depth, reactivity, and click guards
 
 `RouterView`/`RouterLink` (`[V01.01.08.03]`, the C# port of `RouterView.ts`/`RouterLink.ts`) are
-ordinary `IComponentDefinition`s in this assembly. Issue #72 places them here and lets the Router area
+ordinary `IComponent`s in this assembly. Issue #72 places them here and lets the Router area
 reference Runtime Core and Reactivity; the matcher/history code keeps its own purity (the assembly
 references no DOM adapter, pinned by `RouterAssembly_DoesNotReferenceTheBrowserDomAdapter`). Component
 wiring lands on `RouteRecord` itself — `Component` and `PropertiesResolver` — mirroring vue-router's

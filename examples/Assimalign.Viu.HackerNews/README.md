@@ -108,11 +108,11 @@ dotnet test examples/Assimalign.Viu.HackerNews.Tests
 
 ## Why `.viu` here is `@style`-only
 
-The logic-bearing components are hand-written C# `IComponentDefinition` render functions (like the
+The logic-bearing components are hand-written C# `IComponent` render functions (like the
 `WebApp` sample's `StopwatchApplication`), and the `.viu` files carry only `@style` blocks. This is now a
 migration the sample has not yet made, not a framework limitation: as of [V01.01.06.07] (#216) a
 `@template`-bearing `.viu` compiles to a **mountable component** — the generator emits the
-`IComponentDefinition`/`Setup` bridge — so these views could be authored as full `.viu` components. The
+`IComponent`/`Setup` bridge — so these views could be authored as full `.viu` components. The
 `.viu` `@style` blocks here are global (unscoped) selectors matched by class name; converting a view to a
 scoped `@template` `.viu` component is future cleanup with no change to the app's shape.
 

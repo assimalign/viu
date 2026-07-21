@@ -20,7 +20,12 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`
   Teleport string target), `RenderEffect<TNode>` (reactive re-render integration), and `BlockToken`.
 - **Scheduler** (`Scheduling/`) — `Scheduler` (batched flush phases and `NextTick`) and
   `SchedulerJob`.
-- **Component model** (`Components/`) — `ComponentInstance`, `ComponentSetupContext`,
+- **Component model** (`Components/`) — the `IComponent` contract (Vue's component options + the
+  Composition API `setup()`: default-interface-member metadata `Name`/`InheritAttributes`/`Properties`/
+  `Emits` plus `Setup`), the `ComponentSetup` render-function delegate `Setup` returns, and the optional
+  `Component` abstract authoring base (protected `Reference`/`Computed`/`Effect`/… factory helpers and a
+  lazy `Configure(IComponentDescriptor)` seam for declaring props/emits — run once on first metadata
+  access, never from the constructor); `ComponentInstance`, `ComponentSetupContext`,
   `ComponentProperties` / `ComponentPropertyDefinition` (props declaration and validation),
   `ComponentAttributes` (attrs fallthrough), `ComponentEmitDefinition` (emits), `ComponentSlots`,
   `Lifecycle` (the hook registration facade, including `OnActivated`/`OnDeactivated`),
@@ -31,7 +36,7 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`
 - **Application / plugins / builder** — `Application<TNode>` (Vue's `createApp` shell: one root
   mounted into one container), the `IApplication` contract, `IApplicationBuilder` +
   `ApplicationBuilder` (the `WebApplication`-style bootstrap seam), `ApplicationConfiguration`
-  (error/warn handlers, performance flag), `IComponentDefinition`, `IPlugin`, and `ISuspenseBoundary`
+  (error/warn handlers, performance flag), `IComponent`, `IPlugin`, and `ISuspenseBoundary`
   (the async-component / Suspense registration seam completed by [V01.01.03.20]).
 - **Provide / inject** (`DependencyInjection/`) — `DependencyInjection` and the typed
   `InjectionKey<T>` (the C# port of Vue's component-tree provide/inject).

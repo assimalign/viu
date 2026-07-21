@@ -44,6 +44,43 @@ typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`
 (`IPlugin`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
 `app.config.globalProperties` bag.
 
+## The component class model ([V01.01.03.26], reshape arc 2 R7)
+
+The component contract is the `IComponent` interface (the arc-1 `IComponentDefinition` renamed) plus the
+`ComponentSetup` render-function delegate. `IComponent` carries its definition-time metadata as
+**default-interface members** — `Name` (null), `InheritAttributes` (true), `Properties` (null), `Emits`
+(null) — so a plain implementer overrides only what it declares and the renderer, which reads every
+metadatum through the `IComponent`-typed `ComponentInstance.Definition`, sees the DIM default otherwise.
+`Setup(ComponentProperties, ComponentSetupContext)` returns `ComponentSetup` (a nominal
+`delegate VirtualNode?()`) rather than a bare `Func<VirtualNode?>`, so the render-function type has a name
+in the public surface and in the SFC generator's emitted bridge. Implementing the interface directly stays
+first-class — the built-ins (`KeepAlive`, `BaseTransition`), the Router components, and source-generated
+`.viu` partials are interface implementers, not base-class subclasses.
+
+`Component` is an **optional abstract authoring base**: it turns the composition primitives into protected
+factory helpers (`Reference`/`ShallowReference`/`CustomReference`/`Computed`/`Effect`/`EffectScope`) and
+exposes a fluent `Configure(IComponentDescriptor)` seam for declaring props and emits. Deriving from it is
+sugar only; the base implicitly implements `Properties`/`Emits`/`Name`/`InheritAttributes` (the last two
+declared `virtual` on the base so an author can `override` them and have the interface mapping observe the
+override rather than the DIM default).
+
+**`Configure` runs lazily, never from the constructor.** A virtual call in the base constructor would run a
+derived override before the derived constructor body finished (fields still unset) — the classic
+virtual-call-during-construction hazard. Instead a single `bool` guard defers `Configure` to the first read
+of `Properties` or `Emits`; the guard is set *before* the call so a re-entrant metadata read from inside
+`Configure` cannot recurse. A plain bool (no lock) is correct because the runtime is single-threaded (the JS
+event loop). Pinned by `ComponentBaseTests` (Configure runs exactly once, on first metadata access, not in
+the ctor).
+
+**Lifecycle hooks are off `IComponentDescriptor` for v1** (ratified arc-2 decision 3): the descriptor is
+definition-time metadata only (`WithProperty`/`WithEmit`); lifecycle registration stays inside `Setup`
+through the composition-API hooks per ADR-0004. Definition-level hooks would need their own ADR.
+
+The vnode family moved from `src/Dom/` to `src/VirtualDom/` (`VirtualNode`, `VirtualNodeFactory`,
+`VirtualNodeProperties`, `VirtualNodeType`): Core is DOM-free by construction, so the platform-neutral
+virtual-DOM types no longer read as a DOM concern. The move is physical only — the flat `Assimalign.Viu`
+namespace is unchanged.
+
 ## App-level dependency injection over `System.IServiceProvider` ([V01.01.03.24])
 
 App-level singleton wiring — a data client, a router, a store registry — resolves through
@@ -74,7 +111,7 @@ behavior changes. An MS.Ext.DI adapter package is possible future work, out of s
 
 `Teleport` ([V01.01.03.17], upstream `components/Teleport.ts`) mirrors upstream by being a distinct
 `VirtualNodeType.Teleport` (carrying `ShapeFlags.Teleport`) that the renderer branches on in
-*patch / move / unmount* — **not** an `IComponentDefinition` like `BaseTransition`. It cannot be an
+*patch / move / unmount* — **not** an `IComponent` like `BaseTransition`. It cannot be an
 ordinary component: it frames its own tree position with a main-tree anchor pair (reusing the vnode's
 `El`/`Anchor`) while mounting its children into a *different* container, and it moves those children
 between containers when `disabled`/`to` change — behavior with no place in the component render model.
@@ -105,7 +142,7 @@ Deliberate divergences from upstream `Teleport.ts`, each documented at its call 
 ## KeepAlive is a component with renderer-internal reach
 
 `KeepAlive` ([V01.01.03.18], upstream `components/KeepAlive.ts`) is — unlike Teleport — a real
-`IComponentDefinition` (`KeepAlive.Instance`, the singleton `RenderHelpers._KeepAlive` resolves to). It
+`IComponent` (`KeepAlive.Instance`, the singleton `RenderHelpers._KeepAlive` resolves to). It
 wraps one dynamic child and, when the view switches, has the renderer **move the outgoing child's subtree
 into a hidden storage container instead of unmounting it** (`deactivate`) and move it home on return
 (`activate`), so the child's `Setup` runs once and all its state survives. The two paths are driven by
@@ -123,7 +160,7 @@ least-recently-used key order, the current/pending keys) is **closure** state cr
 never an instance field. The cache key is the child's vnode key when present, else the component
 definition reference — a typed key, never a reflected type name (AOT/trimming). `Max` caps the cache with
 LRU eviction (a `LinkedList<object>` orders keys oldest-first); `Include`/`Exclude` match the child's
-declared `IComponentDefinition.Name`, and a `flush: 'post'` watch prunes newly excluded entries when the
+declared `IComponent.Name`, and a `flush: 'post'` watch prunes newly excluded entries when the
 props change.
 
 `Activated`/`Deactivated` hooks mirror upstream's `registerKeepAliveHook`: a KeepAlive activates only its
@@ -148,7 +185,7 @@ Deliberate divergences from upstream `KeepAlive.ts`, each documented at its call
 
 `AsyncComponents.DefineAsyncComponent` ([V01.01.03.16], upstream `apiAsyncComponent.ts`,
 https://vuejs.org/guide/components/async.html) returns an internal `AsyncComponentWrapper`
-(`IComponentDefinition`): a loader (`Func<Task<IComponentDefinition>>`) resolves the real component
+(`IComponent`): a loader (`Func<Task<IComponent>>`) resolves the real component
 asynchronously; a loading component shows after `Delay`, an error component on failure or `Timeout`,
 and the resolved component renders in place. Unlike `KeepAlive` (one shared singleton whose per-mount
 state must be closure-local), each `DefineAsyncComponent` call yields a *fresh* wrapper, so the
