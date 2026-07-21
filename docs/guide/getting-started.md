@@ -208,7 +208,7 @@ await builder.Build().MountAsync("#app");
 
 ```csharp
 // inside a component's Setup:
-var api = DependencyInjection.GetRequiredService<ApiClient>();      // resolves from IApplication.Services
+var api = DependencyInjection.GetRequiredService<ApiClient>();      // resolves from the app service provider
 ```
 
 The default provider is **AOT-safe**: every service is created by a factory delegate — there is no
@@ -216,8 +216,8 @@ reflection, no constructor discovery, and no `Microsoft.Extensions.DependencyInj
 supports `Singleton`, `Scoped` (per application — the app is the root scope), and `Transient`
 lifetimes; two applications get isolated providers, and disposing an application disposes its owned
 singleton/scoped services. To use a full container (`Microsoft.Extensions.DependencyInjection`,
-Autofac, …), implement the small `IServiceProviderBuilder` over it and pass it to
-`builder.UseServiceProviderBuilder(...)`.
+Autofac, …), implement the small `IServiceContainer` over it and pass it to
+`builder.UseServiceContainer(...)`.
 
 This is **app-level** DI. It sits beside — it does not replace — Vue's component-tree
 [provide/inject](https://vuejs.org/guide/components/provide-inject.html) (`DependencyInjection.Provide`/

@@ -35,20 +35,21 @@ a platform package supplies the node-ops (the browser's `Assimalign.Viu.Browser`
   (`BaseTransition`, `BaseTransitionProperties`, `TransitionState`).
 - **Application / plugins / builder** — `Application<TNode>` (Vue's `createApp` shell: one root
   mounted into one container), the `IApplication` contract, `IApplicationBuilder` +
-  `ApplicationBuilder` (the `WebApplication`-style bootstrap seam), `ApplicationConfiguration`
-  (error/warn handlers, performance flag), `IComponent`, `IPlugin`, and `ISuspenseBoundary`
+  `ApplicationBuilder` (the `WebApplication`-style bootstrap seam), `IApplicationContext`
+  (root component/props, service provider, error/warn handlers, performance flag), `IComponent`,
+  `IApplicationPlugin` (async `InstallAsync`, installed during the mount path), and `ISuspenseBoundary`
   (the async-component / Suspense registration seam completed by [V01.01.03.20]).
 - **Provide / inject** (`DependencyInjection/`) — `DependencyInjection` and the typed
   `InjectionKey<T>` (the C# port of Vue's component-tree provide/inject).
 - **Dependency injection over `System.IServiceProvider`** (`DependencyInjection/`, [V01.01.03.24]) —
-  bring-your-own app-level DI: the `IServiceProviderBuilder` bridge (implement over any container),
-  the default AOT-safe factory-delegate `ServiceProviderBuilder` (Singleton / Scoped-per-app /
+  bring-your-own app-level DI: the `IServiceContainer` bridge (implement over any container),
+  the default AOT-safe factory-delegate `ServiceContainer` (Singleton / Scoped-per-app /
   Transient, no reflection, no `Microsoft.Extensions.DependencyInjection` dependency), the
   `ServiceLifetime`/`ServiceRegistration` descriptors, the `AddSingleton`/`AddScoped`/`AddTransient`
   and `GetService<T>`/`GetRequiredService<T>` extensions, and the `DependencyInjection.GetService<T>()`
-  composition functions. The built provider hangs off `IApplication.Services` and is reachable from
-  `Setup` via `ComponentInstance.Services`. This is **app-level** wiring — distinct from, and layered
-  beside, the Vue-semantic provide/inject above.
+  composition functions. The built provider hangs off `IApplicationContext.ServicesProvider` and is
+  reachable from `Setup` via `ComponentInstance.Services`. This is **app-level** wiring — distinct from,
+  and layered beside, the Vue-semantic provide/inject above.
 - **Directives** (`Directives/`) — `IDirective`, `Directive`, `Directives`, `DirectiveBinding`,
   `DirectiveArgument`, plus the `DirectiveHook` delegate.
 - **Watch** (`Watch/`) — `ViuWatch`, the runtime-scheduler-integrated `watch`/`watchEffect` over the

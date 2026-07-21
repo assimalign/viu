@@ -1,6 +1,7 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
-**Status: ARC 1 MERGED (train #235-#240, 2026-07-21). ARC 2 (below, §Arc 2) is ACTIVE — base:
+**Status: ARC 1 MERGED (train #235-#240, 2026-07-21). ARC 2 (below, §Arc 2) IMPLEMENTATION COMPLETE
+(R6–R8 all implemented; R8 owns the passed arc-end gate) — awaiting main-session arc review; base:
 `draft/core-abstraction-sketch`.** Original arc-1 status follows.
 
 **Arc-1 status: arc implementation complete — R1, R2, R3, R4, and R5 all implemented (awaiting main-session
@@ -260,7 +261,9 @@ Branch stacked on R7.
 | Sketch base | — | `draft/core-abstraction-sketch` | captured + pushed |
 | R6 | #241 (`V01.01.03.25`) | `feature/V01.01.03.25-reactive-class-model` | implemented — reactive slice compiles + isolated-benchmark gate PASS (ComputedChainRecompute +6.5%, 0 alloc); full solution/suites/budget/interop gates remain blocked by the sketch's unbuilt R7/R8 portions (by design), so they run at R7/R8; awaiting main-session review |
 | R7 | #242 (`V01.01.03.26`) | `feature/V01.01.03.26-component-class-model` | implemented — `IComponentDefinition`→`IComponent` + `ComponentSetup` cascaded across Core/Router/Store/ServerRenderer/Browser/Testing/all samples + the SFC generator's emitted bridge; `src/Dom`→`src/VirtualDom`; lifecycle removed from `IComponentDescriptor`; `Component` lazy `Configure` (bool guard, no ctor virtual call) proven by an isolated harness + committed `ComponentBaseTests`; TodoItemComponent adopts the `Component` base; SFC generator suite green (73/73); build errors confined to the R8 slice by design; full solution/suites/budget/interop gates remain R8-blocked (arc-end gate); awaiting main-session review |
-| R8 | not yet filed (`V01.01.03.27`) | `feature/V01.01.03.27-application-services-model` | not started |
+| R8 | #243 (`V01.01.03.27`) | `feature/V01.01.03.27-application-services-model` | implemented — `IApplicationContext` consolidation (config `ErrorHandler`/`WarnHandler`/`Performance` + `ServicesProvider` + `RootComponent`/`RootProperties`; runtime `IsMounted`/`RootInstance` stay on `IApplication`, concrete `ApplicationContext` + explicit `IApplication.Context`); `IApplicationPlugin` async `InstallAsync` (options via ctor state), installed during the mount path in the order services frozen → plugins install → platform init → render (`Build()` sync; sync `Mount` drains synchronously, `MountAsync` awaits); `IServiceContainer` (`ServiceProviderBuilder`→`ServiceContainer`, `Add`/`Build`, freeze: `Add` after `Build` throws; `UseServiceProviderBuilder`→`UseServiceContainer`; `AddSingleton/AddScoped/AddTransient` retargeted+chained); cascaded across Browser/ServerRenderer/Router/Store/Testing/samples/docs. **Arc-end gate: full solution 0/0; every suite green (Core 450, Browser 185, Router 202, Store 52, ServerRenderer 70, Testing 18 + all downstream/samples/generators); publish budget PASS 4/4 (trim-clean); interop gate +0 delta (baseline unchanged); ComputedChainRecompute 0 alloc (no reactive-core files changed by R8).** awaiting main-session arc review |
+
+**Arc 2 status: arc 2 implementation complete (R6–R8 all implemented) — awaiting main-session arc review.**
 
 Same train discipline as arc 1: Opus worktree agents, work item filed first, local commits,
 main-session review, push after review, PRs only when Chase says publish.

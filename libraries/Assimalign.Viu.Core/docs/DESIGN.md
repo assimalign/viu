@@ -41,7 +41,7 @@ This is how the stopwatch re-renders reactively instead of polling.
 Per [ADR-0004](../../../docs/adr/0004-composition-only-component-model.md), the component model is
 composition-only: a `ComponentInstance` runs a setup function; props/emits/slots/lifecycle are
 typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`) and plugins
-(`IPlugin`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
+(`IApplicationPlugin`). `Application<TNode>` and its `IApplicationContext` deliberately omit an
 `app.config.globalProperties` bag.
 
 ## The component class model ([V01.01.03.26], reshape arc 2 R7)
@@ -90,22 +90,50 @@ subtree (an ancestor provides, a descendant injects, nearer shadows farther); th
 the .NET-idiomatic home for one-per-application singletons. Keeping them distinct means each stays
 simple and neither has to grow the other's semantics.
 
-The bridge is our own `IServiceProviderBuilder` (registration intake + `IServiceProvider Build()`), so
-users bring any container without Core taking a `Microsoft.Extensions.DependencyInjection` dependency.
-The **default** provider is a factory-delegate registry (`ServiceProviderBuilder` →
-`FactoryServiceProvider`): every service is created by a `Func<IServiceProvider, object>`, so there is
-**no reflection activation, no constructor discovery, no assembly scanning** — the only path that is
-trimming- and WASM/NativeAOT-safe. The application is the single root scope, so `Singleton` and
-`Scoped` both cache once per app (isolated across apps) and `Transient` runs its factory per
-resolution; disposing the app disposes its owned singleton/scoped disposables. Deliberately **not**
-supported in the default provider (documented; bring an MS.Ext.DI adapter for them): child
-`IServiceScope`s, open generics, decorators, `IEnumerable<T>` multi-registration, keyed services, and
-transient-disposal tracking. The built provider is attached to `ApplicationContext.Services` by the
-`ApplicationBuilder` before plugins install and inherited by every `ComponentInstance`
-(`ComponentInstance.Services`), so `Setup` resolves through `DependencyInjection.GetService<T>()`.
-Router/Store gain additive `AddRouter`/`AddStore` builder extensions that register into services while
-keeping their existing provide-based paths (resolution is service-first-then-provide), so no existing
-behavior changes. An MS.Ext.DI adapter package is possible future work, out of scope here.
+The bridge is our own `IServiceContainer` (registration intake via `Add(ServiceRegistration)` +
+`IServiceProvider Build()`), so users bring any container without Core taking a
+`Microsoft.Extensions.DependencyInjection` dependency. The **default** container is a factory-delegate
+registry (`ServiceContainer` → `FactoryServiceProvider`): every service is created by a
+`Func<IServiceProvider, object>`, so there is **no reflection activation, no constructor discovery, no
+assembly scanning** — the only path that is trimming- and WASM/NativeAOT-safe. The application is the
+single root scope, so `Singleton` and `Scoped` both cache once per app (isolated across apps) and
+`Transient` runs its factory per resolution; disposing the app disposes its owned singleton/scoped
+disposables. Deliberately **not** supported in the default provider (documented; bring an MS.Ext.DI
+adapter for them): child `IServiceScope`s, open generics, decorators, `IEnumerable<T>`
+multi-registration, keyed services, and transient-disposal tracking. The built provider is attached to
+`ApplicationContext.ServicesProvider` by the `ApplicationBuilder` before plugins install and inherited
+by every `ComponentInstance` (`ComponentInstance.Services`), so `Setup` resolves through
+`DependencyInjection.GetService<T>()`. Router/Store gain additive `AddRouter`/`AddStore` builder
+extensions that register into services while keeping their existing provide-based paths (resolution is
+service-first-then-provide), so no existing behavior changes. An MS.Ext.DI adapter package is possible
+future work, out of scope here.
+
+## The application context, async plugins, and service container ([V01.01.03.27], reshape arc 2 R8)
+
+Arc 2's final unit consolidates the application surface. `IApplicationContext` absorbs the former
+`ApplicationConfiguration` bag (`ErrorHandler`/`WarnHandler`/`Performance`) plus the root
+component/props and the `ServicesProvider`; **runtime** state stays on `IApplication` (`IsMounted`,
+`RootInstance`) — the context is configuration, the application is lifecycle. The concrete
+`ApplicationContext` implements the public interface; `Application<TNode>`/`ServerApplication` expose it
+publicly through an explicit `IApplication.Context` while keeping an `internal` concrete accessor for the
+renderer and platform builders.
+
+`IApplicationPlugin` replaces the synchronous `IPlugin`: `ValueTask InstallAsync(IApplication)`, with
+upstream's plugin `options` carried by the plugin's own constructor state. `Use(IApplicationPlugin)`
+**records** the plugin (install-once, dedup-with-dev-warning); installation is awaited inside the mount
+path in the documented order **services frozen → plugins install → platform init → render**. `Build()`
+stays synchronous, so the synchronous `Mount(TNode)` drains any pending plugins synchronously (throwing a
+pointed error if a plugin's install does not complete synchronously), while `MountAsync` awaits them.
+`ServerApplication` never mounts, so its `Use` installs immediately and requires synchronous completion.
+
+**`IServiceContainer` keeps its name (ratified arc-2 decision 2).** It deliberately shadows the legacy
+`System.ComponentModel.Design.IServiceContainer` — a designer-era interface effectively absent from
+modern application code — so the reactive/DI surface reads naturally (`builder.Services` is an
+`IServiceContainer`). `ServiceProviderBuilder` became `ServiceContainer`, its `AddSingleton`/`AddScoped`/
+`AddTransient` extensions retarget to `IServiceContainer` and return it for chaining, and
+`UseServiceProviderBuilder` became `UseServiceContainer`. **Freeze semantics:** `ApplicationBuilder.Build()`
+calls `Services.Build()` exactly once; the container freezes then, so a later `Add` throws
+`InvalidOperationException` with an actionable message.
 
 ## Teleport is a special vnode type, not a component
 
