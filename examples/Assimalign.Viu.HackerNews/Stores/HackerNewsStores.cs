@@ -7,16 +7,16 @@ namespace Assimalign.Viu.HackerNews;
 
 /// <summary>
 /// The app's store definitions, built once over an injected <see cref="IHackerNewsClient"/> and
-/// provided app-wide under <see cref="InjectionKey"/>. This is how the injectable data client reaches
-/// the stores while keeping <c>UseStore()</c> component-context resolution intact: the browser app
-/// builds one over the live client, tests build one over a fake, and both provide it to the tree.
-/// Each <see cref="StoreDefinition{TStore}"/> is resolved lazily and once per registry.
+/// registered as an <b>application service</b> ([V01.01.03.24]). This is how the injectable data client
+/// reaches the stores while keeping <c>UseStore()</c> component-context resolution intact: the browser
+/// app registers one over the live client (<c>builder.Services.AddSingleton(stores)</c>), tests register
+/// one over a fake, and the views resolve it with <c>DependencyInjection.GetRequiredService&lt;HackerNewsStores&gt;()</c>.
+/// This is the reshape's app-level singleton wiring migrated from component-tree provide/inject to
+/// <see cref="IServiceProvider"/>. Each <see cref="StoreDefinition{TStore}"/> is resolved lazily and
+/// once per registry.
 /// </summary>
 internal sealed class HackerNewsStores
 {
-    /// <summary>The provide/inject key components resolve the store definitions under.</summary>
-    public static readonly InjectionKey<HackerNewsStores> InjectionKey = new("hn:stores");
-
     /// <summary>Creates the definitions over <paramref name="client"/>.</summary>
     /// <param name="client">The data client every store reads through.</param>
     /// <exception cref="ArgumentNullException"><paramref name="client"/> is null.</exception>

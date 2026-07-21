@@ -31,9 +31,13 @@ public sealed class ViewTests
     }
 
     private static ComponentMountOptions Options(ViuRouter router, HackerNewsStores stores)
-        => new ComponentMountOptions()
-            .Provide(RouterInjectionKeys.Router, router)
-            .Provide(HackerNewsStores.InjectionKey, stores);
+        => new ComponentMountOptions
+        {
+            // The store-definitions container resolves through the app service provider (the shape the
+            // browser bootstrap uses); the router stays provided under its injection key.
+            Services = new ServiceProviderBuilder().AddSingleton(stores).Build(),
+        }
+        .Provide(RouterInjectionKeys.Router, router);
 
     private static async Task WithActiveRegistry(HackerNewsStores stores, StoreRegistry registry, Func<Task> body)
     {

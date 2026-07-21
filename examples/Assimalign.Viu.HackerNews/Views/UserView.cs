@@ -27,7 +27,7 @@ internal sealed class UserView : IComponentDefinition
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var router = DependencyInjection.Inject(RouterInjectionKeys.Router)!;
-        var stores = DependencyInjection.Inject(HackerNewsStores.InjectionKey)!;
+        var stores = DependencyInjection.GetRequiredService<HackerNewsStores>();
         var store = stores.User.UseStore();
 
         string ReadId() => router.CurrentRoute.Value.Parameters.TryGetString("id", out var id) ? id : string.Empty;

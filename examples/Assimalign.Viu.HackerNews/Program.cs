@@ -45,13 +45,17 @@ internal static class Program
         // "/", redirecting it to /top. Awaiting settles the first route so the initial render is correct.
         await router.ReadyAsync();
 
-        // A per-app store registry, provided app-wide so UseStore() resolves through component context;
-        // the store-definitions container and the router are provided under their injection keys.
+        // Compose the app with bring-your-own dependency injection over System.IServiceProvider
+        // ([V01.01.03.24]): the store registry and the router register through the services surface
+        // (AddStore/AddRouter also keep the plugin/provide parity so UseStore() and RouterView resolve
+        // either way), and the store-definitions container is a plain app-level service singleton the
+        // views resolve with GetRequiredService<HackerNewsStores>(). Component-tree provide/inject stays
+        // available for Vue-semantic wiring; this is app-level singleton wiring, now idiomatic .NET DI.
         var registry = new StoreRegistry();
         var builder = BrowserApplication.CreateBuilder(AppShell.Instance);
-        builder.Use(registry.AsPlugin());
-        builder.Provide(HackerNewsStores.InjectionKey, stores);
-        builder.Provide(RouterInjectionKeys.Router, router);
+        builder.AddStore(registry);
+        builder.AddRouter(router);
+        builder.Services.AddSingleton(stores);
         await builder.Build().MountAsync("#app");
 
         // Keep the WASM main loop alive; rendering is reactive from here.

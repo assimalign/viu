@@ -28,7 +28,7 @@ internal sealed class ItemView : IComponentDefinition
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var router = DependencyInjection.Inject(RouterInjectionKeys.Router)!;
-        var stores = DependencyInjection.Inject(HackerNewsStores.InjectionKey)!;
+        var stores = DependencyInjection.GetRequiredService<HackerNewsStores>();
         var store = stores.Item.UseStore();
 
         long ReadId() => router.CurrentRoute.Value.Parameters.TryGetInteger("id", out var id) ? id : 0;

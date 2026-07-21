@@ -189,6 +189,41 @@ Configure the app on the builder before `Build()` — plugins with `builder.Use(
 with `builder.Provide(key, value)` — exactly as `createApp(App).use(...).provide(...)` composes an app
 in Vue.
 
+### Dependency injection (`System.IServiceProvider`)
+
+For app-level singletons — a data client, a router, a store registry — Viu integrates
+**bring-your-own dependency injection over `System.IServiceProvider`**. Register services on the
+builder (the shape a .NET developer expects, compare `WebApplicationBuilder.Services`), then resolve
+them from a component's `Setup`:
+
+```csharp
+using Assimalign.Viu;
+using Assimalign.Viu.Browser;
+
+var builder = BrowserApplication.CreateBuilder(new App());
+builder.Services.AddSingleton(new ApiClient(baseAddress));         // an app-level singleton
+builder.Services.AddTransient<RequestId>(_ => new RequestId());    // a fresh instance per resolution
+await builder.Build().MountAsync("#app");
+```
+
+```csharp
+// inside a component's Setup:
+var api = DependencyInjection.GetRequiredService<ApiClient>();      // resolves from IApplication.Services
+```
+
+The default provider is **AOT-safe**: every service is created by a factory delegate — there is no
+reflection, no constructor discovery, and no `Microsoft.Extensions.DependencyInjection` dependency. It
+supports `Singleton`, `Scoped` (per application — the app is the root scope), and `Transient`
+lifetimes; two applications get isolated providers, and disposing an application disposes its owned
+singleton/scoped services. To use a full container (`Microsoft.Extensions.DependencyInjection`,
+Autofac, …), implement the small `IServiceProviderBuilder` over it and pass it to
+`builder.UseServiceProviderBuilder(...)`.
+
+This is **app-level** DI. It sits beside — it does not replace — Vue's component-tree
+[provide/inject](https://vuejs.org/guide/components/provide-inject.html) (`DependencyInjection.Provide`/
+`Inject` with `InjectionKey<T>`), which stays the mechanism for passing values down a component subtree.
+App-level singleton wiring is what belongs in services.
+
 **`Counter.cs`** — a working counter:
 
 ```csharp
