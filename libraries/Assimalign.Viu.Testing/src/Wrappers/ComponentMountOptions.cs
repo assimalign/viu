@@ -44,6 +44,17 @@ public sealed class ComponentMountOptions
     /// </summary>
     public Action<ApplicationConfiguration>? ConfigureApplication { get; set; }
 
+    /// <summary>
+    /// The app-level dependency-injection provider for the mounted tree ([V01.01.03.24]) — attached to
+    /// the mount's application context so the component's <c>Setup</c> can resolve services through
+    /// <see cref="ComponentInstance.Services"/> and the <see cref="DependencyInjection.GetService{T}()"/>
+    /// composition functions, exactly as a builder-built app exposes <see cref="IApplication.Services"/>.
+    /// Build one with a <see cref="ServiceProviderBuilder"/> (or a bring-your-own provider). Null (the
+    /// default) mounts a tree with no service provider. This is app-level DI, independent of the
+    /// component-tree <see cref="Provides"/>.
+    /// </summary>
+    public IServiceProvider? Services { get; set; }
+
     /// <summary>Adds an app-level provide under a typed key (fluent).</summary>
     /// <typeparam name="T">The provided value type.</typeparam>
     /// <param name="key">The injection key.</param>

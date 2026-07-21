@@ -52,8 +52,18 @@ Styles/   app.viu · stories.viu · item.viu  (@style bundles)
 Program.cs  browser bootstrap (the only [SupportedOSPlatform("browser")] type)
 ```
 
-**Data flow.** Views inject the router and the `HackerNewsStores` container, resolve their store with
-`UseStore()`, and drive it from a route-watching effect (`Reactive.Watch(..., Immediate)`), so the
+**Dependency injection (`System.IServiceProvider`).** Bootstrap composes the app with bring-your-own DI
+([V01.01.03.24]): `builder.AddStore(registry)` and `builder.AddRouter(router)` register the store
+registry and router as application services (each also keeps the plugin/provide parity, so `UseStore()`
+and `RouterView` resolve either way), and `builder.Services.AddSingleton(stores)` registers the
+`HackerNewsStores` container as a plain app-level singleton. This is the flagship of the reshape's
+app-level singleton wiring migrated from component-tree provide/inject to `IServiceProvider` — the
+default provider is Core's AOT-safe factory-delegate registry (no reflection, no MS.Ext.DI dependency).
+Component-tree `Provide`/`Inject` stays available for Vue-semantic wiring.
+
+**Data flow.** Views resolve the `HackerNewsStores` container with
+`DependencyInjection.GetRequiredService<HackerNewsStores>()`, inject the router, resolve their store
+with `UseStore()`, and drive it from a route-watching effect (`Reactive.Watch(..., Immediate)`), so the
 initial mount and every navigation fetch. Loading and error are explicit `[Reactive]` state; a
 superseded load is cancelled so navigation never leaves a stale page. Story lists render as **keyed**
 rows (stable `Id`), with no per-item interop — a list-virtualization strategy can be added later

@@ -68,6 +68,9 @@ public static class ViuTest
             context.ComponentStubs = stubs;
         }
         options.ConfigureApplication?.Invoke(context.Config);
+        // App-level DI provider ([V01.01.03.24]): reachable from the mounted tree's Setup through
+        // ComponentInstance.Services, independent of the component-tree provides above.
+        context.Services = options.Services;
         emitted = new EmittedEvents();
         context.EmitObserver = emitted.Record;
         return context;

@@ -29,10 +29,10 @@ public sealed class RouterView : IComponentDefinition
     /// <inheritdoc/>
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
     {
-        // Inject the router (a missing provide warns through the runtime's inject diagnostics) and
-        // this view's depth, then provide depth + 1 for any view nested in the rendered component
-        // (upstream: inject(viewDepthKey, 0); provide(viewDepthKey, depth + 1)).
-        var router = DependencyInjection.Inject(RouterInjectionKeys.Router);
+        // Resolve the router service-first-then-provide ([V01.01.03.24]; a true miss warns through the
+        // runtime's inject diagnostics) and this view's depth, then provide depth + 1 for any view
+        // nested in the rendered component (upstream: inject(viewDepthKey, 0); provide(viewDepthKey, depth + 1)).
+        var router = RouterResolution.Resolve();
         var depth = DependencyInjection.Inject(RouterInjectionKeys.ViewDepth, 0);
         DependencyInjection.Provide(RouterInjectionKeys.ViewDepth, depth + 1);
 

@@ -195,6 +195,9 @@ var router = new Router(RouterHistory.CreateMemory(),
 NavigationFailure? failure = await router.Push("/users/42");   // awaitable; null on success
 
 app.Provide(RouterInjectionKeys.Router, router);   // a host provides the router app-wide
+// Or, on an application builder, register it through services ([V01.01.03.24]) — this also provides it
+// app-wide, so RouterView/RouterLink resolve either way (service-first-then-provide):
+builder.AddRouter(router);                         // Services.AddSingleton(router) + Provide(RouterInjectionKeys.Router, router)
 // <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
 // and a plain left-click on it calls router.Push instead of triggering a page load.
 ```

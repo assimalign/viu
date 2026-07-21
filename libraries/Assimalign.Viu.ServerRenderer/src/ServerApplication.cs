@@ -25,10 +25,11 @@ namespace Assimalign.Viu.ServerRenderer;
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
-public sealed class ServerApplication : IApplication
+public sealed class ServerApplication : IApplication, IDisposable
 {
     private readonly ApplicationContext _context = new();
     private HashSet<object>? _installedPlugins;
+    private bool _servicesDisposed;
 
     /// <summary>Creates a server app for <paramref name="rootComponent"/> with optional root props.</summary>
     /// <param name="rootComponent">The root component definition (upstream: <c>createSSRApp</c>'s argument).</param>
@@ -77,6 +78,16 @@ public sealed class ServerApplication : IApplication
     /// error path consults. Configure it before rendering.
     /// </summary>
     public ApplicationConfiguration Config => _context.Config;
+
+    /// <summary>
+    /// The application's dependency-injection provider ([V01.01.03.24]) — the
+    /// <see cref="IServiceProvider"/> the <see cref="ServerApplicationBuilder"/> built and attached,
+    /// reachable from component <c>Setup</c> during render through <see cref="ComponentInstance.Services"/>.
+    /// Null when the app was constructed directly (<c>new ServerApplication(...)</c>) without a builder.
+    /// Build a fresh app (and provider) per request so no service state crosses requests; dispose it
+    /// (<see cref="Dispose"/>) to release owned disposable services.
+    /// </summary>
+    public IServiceProvider? Services => _context.Services;
 
     /// <summary>The shared application context threaded onto the root vnode at render.</summary>
     internal ApplicationContext Context => _context;
@@ -203,6 +214,22 @@ public sealed class ServerApplication : IApplication
     /// </summary>
     public void Unmount()
     {
+    }
+
+    /// <summary>
+    /// Disposes the owned <see cref="Services"/> provider if it is <see cref="IDisposable"/>, cascading
+    /// to its owned disposable singleton/scoped services ([V01.01.03.24]) — the per-request cleanup a
+    /// server host runs after rendering. Idempotent. There is nothing else to tear down (SSR never
+    /// mounts), so this is the whole disposal surface.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_servicesDisposed)
+        {
+            return;
+        }
+        _servicesDisposed = true;
+        (_context.Services as IDisposable)?.Dispose();
     }
 
     IApplication IApplication.Component(string name, IComponentDefinition definition) => Component(name, definition);

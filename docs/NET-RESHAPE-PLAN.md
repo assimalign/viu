@@ -1,6 +1,9 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
-**Status: in progress — R1, R2, R3, and R4 implemented (awaiting main-session review); R5 not started.** This
+**Status: arc implementation complete — R1, R2, R3, R4, and R5 all implemented (awaiting main-session
+review); the hold is LIFTED (2026-07-21): the stacked train is PUBLISHED as the bottom-up PR series
+#235 (hydration) → #236 (R1) → #237 (R2) → #238 (R3) → #239 (R4) → #240 (R5) — merge strictly in
+that order.** This
 document is the session-independent source of truth for the reshape arc. Any session (human or agent)
 resuming this work reads this file first, checks the *State* table, and continues from the first
 incomplete unit. Update the State table in the same commit as any unit's progress.
@@ -153,7 +156,7 @@ until reviewed.
 | R2 | #231 (`V01.01.12.21`) | `feature/V01.01.12.21-core-consolidation` | implemented, awaiting main-session review |
 | R3 | #232 (`V01.01.12.22`) | `feature/V01.01.12.22-browser-rename` | implemented, awaiting main-session review |
 | R4 | #233 (`V01.01.03.23`) | `feature/V01.01.03.23-application-model` | implemented, awaiting main-session review |
-| R5 | not yet filed (`V01.01.03.24`) | `feature/V01.01.03.24-service-provider-integration` | not started |
+| R5 | #234 (`V01.01.03.24`) | `feature/V01.01.03.24-service-provider-integration` | implemented, awaiting main-session review |
 
 ## Resume protocol
 

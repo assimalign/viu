@@ -47,6 +47,7 @@ public class Application<TNode> : IApplication, IDisposable
     private TNode? _container;
     private Action<string>? _previousWarnSink;
     private bool _warnSinkInstalled;
+    private bool _servicesDisposed;
 
     internal Application(Renderer<TNode> renderer, IComponentDefinition rootComponent, VirtualNodeProperties? rootProperties)
     {
@@ -66,6 +67,16 @@ public class Application<TNode> : IApplication, IDisposable
     /// handler, and performance flag. Set its handlers before <see cref="Mount"/>.
     /// </summary>
     public ApplicationConfiguration Config => _context.Config;
+
+    /// <summary>
+    /// The application's dependency-injection provider ([V01.01.03.24]) — the
+    /// <see cref="IServiceProvider"/> an <see cref="IApplicationBuilder"/> built and attached, reachable
+    /// from component <c>Setup</c> through <see cref="ComponentInstance.Services"/> and the
+    /// <see cref="DependencyInjection.GetService{T}()"/> composition functions. Null when the app was
+    /// created directly through <see cref="Renderer{TNode}.CreateApplication"/> (no builder). The app
+    /// owns this provider and disposes it (if <see cref="IDisposable"/>) in <see cref="Dispose"/>.
+    /// </summary>
+    public IServiceProvider? Services => _context.Services;
 
     /// <summary>The shared application context (internal seam for the platform packages and test utilities).</summary>
     internal ApplicationContext Context => _context;
@@ -307,12 +318,19 @@ public class Application<TNode> : IApplication, IDisposable
     }
 
     /// <summary>
-    /// Disposes the app by unmounting it (a <c>using</c>-friendly alias for <see cref="Unmount"/>).
-    /// Idempotent — a no-op when not mounted.
+    /// Disposes the app: unmounts it (a <c>using</c>-friendly alias for <see cref="Unmount"/>) and then
+    /// disposes the owned <see cref="Services"/> provider if it is <see cref="IDisposable"/>, cascading
+    /// to its owned disposable singleton/scoped services ([V01.01.03.24]). Idempotent — the provider is
+    /// disposed at most once, and unmount is a no-op when not mounted.
     /// </summary>
     public void Dispose()
     {
         Unmount();
+        if (!_servicesDisposed)
+        {
+            _servicesDisposed = true;
+            (_context.Services as IDisposable)?.Dispose();
+        }
         GC.SuppressFinalize(this);
     }
 

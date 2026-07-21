@@ -31,7 +31,7 @@ internal sealed class StoriesView : IComponentDefinition
     public Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context)
     {
         var router = DependencyInjection.Inject(RouterInjectionKeys.Router)!;
-        var stores = DependencyInjection.Inject(HackerNewsStores.InjectionKey)!;
+        var stores = DependencyInjection.GetRequiredService<HackerNewsStores>();
         var store = stores.Stories.UseStore();
 
         (string Slug, int Page) ReadRouteKey()

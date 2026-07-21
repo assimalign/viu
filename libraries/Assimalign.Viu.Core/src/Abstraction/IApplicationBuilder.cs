@@ -17,12 +17,12 @@ namespace Assimalign.Viu;
 /// <see cref="Build"/> returns the platform application type (covariant return).
 /// </para>
 /// <para>
-/// <b>Reserved services seam (R5, <c>V01.01.03.24</c>).</b> Bring-your-own dependency injection over
-/// <c>System.IServiceProvider</c> attaches here: R5 adds an <c>IServiceProviderBuilder Services</c>
-/// registration surface to this interface, and <see cref="Build"/> constructs the provider and hands
-/// it to the application. R4 deliberately does not implement services — it only leaves this extension
-/// point. Component-tree <c>Provide</c>/<c>Inject</c> (the Vue-semantic feature) stays; app-level
-/// singleton wiring is what migrates to services.
+/// <b>Services (bring-your-own DI, <c>V01.01.03.24</c>).</b> Bring-your-own dependency injection over
+/// <c>System.IServiceProvider</c> attaches through <see cref="Services"/> (register on the default Core
+/// builder, or replace it with a container adapter via <see cref="UseServiceProviderBuilder"/>);
+/// <see cref="Build"/> builds the provider and hands it to the application
+/// (<see cref="IApplication.Services"/>). Component-tree <c>Provide</c>/<c>Inject</c> (the Vue-semantic
+/// feature) stays untouched; app-level singleton wiring is what migrates to services.
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
@@ -88,6 +88,37 @@ public interface IApplicationBuilder
     /// <param name="configure">The configuration callback.</param>
     /// <returns>This builder, for chaining.</returns>
     IApplicationBuilder ConfigureApplication(Action<ApplicationConfiguration> configure);
+
+    /// <summary>
+    /// The bring-your-own dependency-injection registration surface ([V01.01.03.24]) — the Viu
+    /// counterpart of <c>WebApplicationBuilder.Services</c>. Register services with the
+    /// <see cref="ServiceProviderBuilderExtensions"/> helpers (<c>Services.AddSingleton(...)</c>);
+    /// <see cref="Build"/> turns them into the application's <see cref="IApplication.Services"/> provider.
+    /// The default is Core's AOT-safe <see cref="ServiceProviderBuilder"/>; replace it with a container
+    /// adapter via <see cref="UseServiceProviderBuilder"/>.
+    /// </summary>
+    IServiceProviderBuilder Services { get; }
+
+    /// <summary>
+    /// Replaces the <see cref="Services"/> builder with a bring-your-own container adapter — the Viu
+    /// counterpart of <c>IHostBuilder.UseServiceProviderFactory</c> ([V01.01.03.24]). Call it before
+    /// registering services (registrations go to the active builder). At <see cref="Build"/> the
+    /// adapter's <see cref="IServiceProviderBuilder.Build"/> result becomes
+    /// <see cref="IApplication.Services"/> verbatim. Returns the builder for chaining.
+    /// </summary>
+    /// <param name="services">The bring-your-own service builder.</param>
+    /// <returns>This builder, for chaining.</returns>
+    IApplicationBuilder UseServiceProviderBuilder(IServiceProviderBuilder services);
+
+    /// <summary>
+    /// Records a callback that configures the <see cref="Services"/> registration surface — the fluent
+    /// convenience over <c>Services</c> ([V01.01.03.24], compare
+    /// <c>IHostBuilder.ConfigureServices</c>). Invoked immediately against the active service builder.
+    /// Returns the builder for chaining.
+    /// </summary>
+    /// <param name="configure">The service configuration callback.</param>
+    /// <returns>This builder, for chaining.</returns>
+    IApplicationBuilder ConfigureServices(Action<IServiceProviderBuilder> configure);
 
     /// <summary>
     /// Builds the platform application and applies the recorded configuration in call order (upstream:

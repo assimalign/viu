@@ -44,6 +44,32 @@ typed; cross-cutting values flow through typed provide/inject (`InjectionKey<T>`
 (`IPlugin`). `Application<TNode>` and `ApplicationConfiguration` deliberately omit an
 `app.config.globalProperties` bag.
 
+## App-level dependency injection over `System.IServiceProvider` ([V01.01.03.24])
+
+App-level singleton wiring — a data client, a router, a store registry — resolves through
+`System.IServiceProvider`, **not** the component-tree provide/inject chain. The two are deliberately
+separate: provide/inject with `InjectionKey<T>` is the Vue-semantic feature for passing a value down a
+subtree (an ancestor provides, a descendant injects, nearer shadows farther); the service provider is
+the .NET-idiomatic home for one-per-application singletons. Keeping them distinct means each stays
+simple and neither has to grow the other's semantics.
+
+The bridge is our own `IServiceProviderBuilder` (registration intake + `IServiceProvider Build()`), so
+users bring any container without Core taking a `Microsoft.Extensions.DependencyInjection` dependency.
+The **default** provider is a factory-delegate registry (`ServiceProviderBuilder` →
+`FactoryServiceProvider`): every service is created by a `Func<IServiceProvider, object>`, so there is
+**no reflection activation, no constructor discovery, no assembly scanning** — the only path that is
+trimming- and WASM/NativeAOT-safe. The application is the single root scope, so `Singleton` and
+`Scoped` both cache once per app (isolated across apps) and `Transient` runs its factory per
+resolution; disposing the app disposes its owned singleton/scoped disposables. Deliberately **not**
+supported in the default provider (documented; bring an MS.Ext.DI adapter for them): child
+`IServiceScope`s, open generics, decorators, `IEnumerable<T>` multi-registration, keyed services, and
+transient-disposal tracking. The built provider is attached to `ApplicationContext.Services` by the
+`ApplicationBuilder` before plugins install and inherited by every `ComponentInstance`
+(`ComponentInstance.Services`), so `Setup` resolves through `DependencyInjection.GetService<T>()`.
+Router/Store gain additive `AddRouter`/`AddStore` builder extensions that register into services while
+keeping their existing provide-based paths (resolution is service-first-then-provide), so no existing
+behavior changes. An MS.Ext.DI adapter package is possible future work, out of scope here.
+
 ## Teleport is a special vnode type, not a component
 
 `Teleport` ([V01.01.03.17], upstream `components/Teleport.ts`) mirrors upstream by being a distinct

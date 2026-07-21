@@ -43,7 +43,8 @@ public static class RouterGuards
     private static void Register(NavigationGuard guard, bool leaving)
     {
         ArgumentNullException.ThrowIfNull(guard);
-        var router = DependencyInjection.Inject(RouterInjectionKeys.Router);
+        // Resolve the router service-first-then-provide ([V01.01.03.24]).
+        var router = RouterResolution.Resolve();
         var scope = DependencyInjection.Inject(RouterInjectionKeys.MatchedRecord);
         // No active router / matched record: called outside a router-provided route component
         // (upstream warns in dev; inject's own miss warning stands in, then this is an inert no-op).

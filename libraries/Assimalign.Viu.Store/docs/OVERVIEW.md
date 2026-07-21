@@ -82,6 +82,10 @@ static readonly StoreDefinition<CounterStore> UseCounter =
 var pinia = Stores.CreateRegistry();
 app.Use(pinia.AsPlugin());          // provides the registry app-wide
 
+// Or, on an application builder, register it through services ([V01.01.03.24]) — this also keeps the
+// plugin/provide parity, so UseStore() resolves either way (service-first-then-provide):
+builder.AddStore(pinia);            // Services.AddSingleton(pinia) + Use(pinia.AsPlugin())
+
 // Inside a component Setup — resolves the app's registry, no argument needed:
 var counter = UseCounter.UseStore();
 // From plain C#/DI — pass the registry handle explicitly:

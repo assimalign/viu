@@ -79,6 +79,18 @@ public sealed class ComponentInstance
     /// </summary>
     internal ApplicationContext? AppContext { get; }
 
+    /// <summary>
+    /// The application's dependency-injection provider ([V01.01.03.24]) — the
+    /// <see cref="IServiceProvider"/> the <see cref="IApplicationBuilder"/> built, inherited through
+    /// <see cref="AppContext"/> so it is reachable from this component's <c>Setup</c>. Null when the
+    /// tree was rendered without a builder (a raw <see cref="Renderer{TNode}.CreateApplication"/> app).
+    /// Resolve typed services with <see cref="ServiceProviderExtensions.GetRequiredService{T}"/>, or use
+    /// the <see cref="DependencyInjection.GetService{T}()"/> composition functions which read this for
+    /// you. This is app-level DI, distinct from the Vue-semantic component-tree
+    /// <see cref="DependencyInjection.Inject{T}(InjectionKey{T})"/> chain.
+    /// </summary>
+    public IServiceProvider? Services => AppContext?.Services;
+
     /// <summary>Declared-prop lookup by camelCase AND kebab-case name; null when none declared.</summary>
     internal Dictionary<string, ComponentPropertyDefinition>? DeclaredProperties { get; }
 
