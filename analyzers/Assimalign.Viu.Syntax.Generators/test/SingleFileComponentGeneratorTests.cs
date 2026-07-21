@@ -46,7 +46,7 @@ public sealed class SingleFileComponentGeneratorTests
         // [V01.01.05.05] render function (helpers bound BY NAME through the file-level using static of
         // the runtime render-helper surface) wrapped in the [V01.01.05.08] #line span map (the dynamic
         // {{ message }} access anchors a directive that points a C# error at the .viu template line 2,
-        // column 13), whose [V01.01.06.07] IComponentDefinition bridge (base list + explicit Name + Setup)
+        // column 13), whose [V01.01.06.07] IComponent bridge (base list + explicit Name + Setup)
         // makes it mountable, whose @script seam ([V01.01.06.03]) stays untouched, whose scoped @style block
         // ([V01.01.06.04]) compiles to the ScopeId + ExtractedStyles constants at the class tail, and
         // whose render body binds by name against both helper surfaces — the runtime-core import and
@@ -65,7 +65,7 @@ namespace Demo
     // "Counter.viu" by the Assimalign.Viu.Syntax source generator ([V01.01.06.02]).
     //
     // Parsed blocks: @template=present, @script=present, @style=1, custom=0.
-    partial class Counter : global::Assimalign.Viu.IComponentDefinition
+    partial class Counter : global::Assimalign.Viu.IComponent
     {
         /// <summary>
         /// The number of render cache slots (<c>v-once</c> subtrees and cached handlers) the
@@ -85,14 +85,14 @@ namespace Demo
 #line default
         }
 
-        // [V01.01.06.07] The IComponentDefinition bridge: the generated Name + Setup that make this
-        // compiled @template component mountable through CreateApp / VirtualNodeFactory.Component with no
+        // [V01.01.06.07] The IComponent bridge: the generated Name + Setup that make this
+        // compiled @template component mountable through the app builder / VirtualNodeFactory.Component with no
         // hand-written wiring. Explicitly implemented so they never collide with a merged @script member.
         /// <summary>
         /// The component's display name (upstream: the component <c>name</c> option, inferred from the
         /// <c>.viu</c> file name) — surfaced to runtime warnings and devtools.
         /// </summary>
-        string? global::Assimalign.Viu.IComponentDefinition.Name => "Counter";
+        string? global::Assimalign.Viu.IComponent.Name => "Counter";
 
         /// <summary>
         /// The Composition API entry point (upstream: <c>setup(props, context)</c>,
@@ -105,7 +105,7 @@ namespace Demo
         /// <param name="properties">The instance's shallow-reactive props (upstream: <c>setup</c>'s <c>props</c>).</param>
         /// <param name="context">The setup context: attrs, emit, expose, and slots.</param>
         /// <returns>The render function producing the component's subtree.</returns>
-        global::System.Func<global::Assimalign.Viu.VirtualNode?> global::Assimalign.Viu.IComponentDefinition.Setup(
+        global::Assimalign.Viu.ComponentSetup global::Assimalign.Viu.IComponent.Setup(
             global::Assimalign.Viu.ComponentProperties properties,
             global::Assimalign.Viu.ComponentSetupContext context)
         {
@@ -166,11 +166,11 @@ namespace Demo
     }
 
     [Fact]
-    public void RenderlessComponent_StaysAPlainPartialClass_WithNoComponentDefinitionBridge()
+    public void RenderlessComponent_StaysAPlainPartialClass_WithNoComponentBridge()
     {
         // [V01.01.06.07] The bridge is emitted ONLY for a @template-bearing .viu: a @style-only .viu (the
         // AppStyles.viu / HackerNews CSS-bundle shape) must keep compiling as a plain partial class — no
-        // IComponentDefinition base list, no Setup — so it never suddenly demands a template or a runtime
+        // IComponent base list, no Setup — so it never suddenly demands a template or a runtime
         // reference. Pins the "keep @style-only files compiling exactly as today" requirement.
         const string source =
             "@style scoped {\n" +
@@ -182,7 +182,7 @@ namespace Demo
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "AppStyles.SingleFileComponent.g.cs");
         generated.ShouldContain("partial class AppStyles\n");
-        generated.ShouldNotContain("IComponentDefinition");
+        generated.ShouldNotContain("IComponent");
         generated.ShouldNotContain(".Setup(");
         generated.ShouldNotContain("using static");
         // The @style seam still compiles to the scope id + extracted CSS exactly as before.

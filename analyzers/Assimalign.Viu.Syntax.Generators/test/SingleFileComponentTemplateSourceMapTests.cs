@@ -200,7 +200,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
 
     // Compiles the generated .g.cs together with a minimal runtime render-helper stub so every emitted
     // helper call (_openBlock/_createElementBlock/_toDisplayString) and the [V01.01.06.07]
-    // IComponentDefinition bridge (IComponentDefinition/ComponentProperties/ComponentSetupContext/
+    // IComponent bridge (IComponent/ComponentSetup/ComponentProperties/ComponentSetupContext/
     // VirtualNode/NormalizeRoot) binds, leaving the unresolved template member (`_ctx.Cont`) as the SOLE
     // compile error — the one the #line map must relocate. The stub lives in the namespace the generated
     // `using static` names. The generator emits a second `using static` of the DOM helper surface
@@ -215,10 +215,11 @@ public sealed class SingleFileComponentTemplateSourceMapTests
             "    internal sealed class ComponentProperties { }\n" +
             "    internal sealed class ComponentSlots { }\n" +
             "    internal sealed class ComponentSetupContext { public ComponentSlots? Slots => null; }\n" +
-            "    internal interface IComponentDefinition\n" +
+            "    internal delegate VirtualNode? ComponentSetup();\n" +
+            "    internal interface IComponent\n" +
             "    {\n" +
             "        string? Name { get; }\n" +
-            "        System.Func<VirtualNode?> Setup(ComponentProperties properties, ComponentSetupContext context);\n" +
+            "        ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context);\n" +
             "    }\n" +
             "    internal static class RenderHelpers\n" +
             "    {\n" +
