@@ -6,7 +6,7 @@ namespace Assimalign.Viu.Reactivity;
 /// Owns reactive effects and cleanup callbacks as one disposable lifetime. The shipping
 /// implementation is the abstraction boundary over the current <c>EffectScope</c>.
 /// </summary>
-public interface IReactiveScope : IDisposable
+public interface IReactiveEffectScope : IDisposable
 {
     /// <summary>Gets whether the scope can still collect reactive work.</summary>
     bool IsActive { get; }
@@ -24,4 +24,3 @@ public interface IReactiveScope : IDisposable
     /// <summary>Stops owned effects, child scopes, and cleanup callbacks. Idempotent.</summary>
     void Stop();
 }
-

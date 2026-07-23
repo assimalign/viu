@@ -16,15 +16,14 @@ public sealed class StateStoreRegistryTests
     public void GetOrCreate_SameDefinition_UsesComponentsServicesAndOneDetachedScope()
     {
         MessageService message = new("state");
-        ComponentFactory components = new(
-            new DictionaryServiceProvider(
-                new Dictionary<Type, object>
-                {
-                    [typeof(MessageService)] = message,
-                }),
-            Array.Empty<ComponentRegistration>());
-        TestReactiveScopeFactory scopes = new();
-        StateStoreRegistry registry = new(components, scopes);
+        ComponentFactory components = new(Array.Empty<ComponentRegistration>());
+        DictionaryServiceProvider services = new(
+            new Dictionary<Type, object>
+            {
+                [typeof(MessageService)] = message,
+            });
+        TestReactiveEffectScopeFactory scopes = new();
+        StateStoreRegistry registry = new(components, services, scopes);
         int setupRuns = 0;
         StateStoreDefinition<MessageStore> definition = new(
             "message",
@@ -32,7 +31,8 @@ public sealed class StateStoreRegistryTests
             {
                 setupRuns++;
                 context.Scope.ShouldBeSameAs(scopes.CreatedScopes[0]);
-                context.Services.ShouldBeSameAs(components);
+                context.Components.ShouldBeSameAs(components);
+                context.Services.ShouldBeSameAs(services);
                 MessageService service =
                     (MessageService)context.Services.GetService(typeof(MessageService))!;
                 return new MessageStore(service.Message);
@@ -85,22 +85,22 @@ public sealed class StateStoreRegistryTests
         }
     }
 
-    private sealed class TestReactiveScopeFactory : IReactiveScopeFactory
+    private sealed class TestReactiveEffectScopeFactory : IReactiveEffectScopeFactory
     {
-        internal List<TestReactiveScope> CreatedScopes { get; } = new();
+        internal List<TestReactiveEffectScope> CreatedScopes { get; } = new();
 
         internal List<bool> CreatedDetachedValues { get; } = new();
 
-        public IReactiveScope Create(bool isDetached = false)
+        public IReactiveEffectScope Create(bool isDetached = false)
         {
-            TestReactiveScope scope = new();
+            TestReactiveEffectScope scope = new();
             CreatedScopes.Add(scope);
             CreatedDetachedValues.Add(isDetached);
             return scope;
         }
     }
 
-    private sealed class TestReactiveScope : IReactiveScope
+    private sealed class TestReactiveEffectScope : IReactiveEffectScope
     {
         public bool IsActive { get; private set; } = true;
 

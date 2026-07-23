@@ -84,7 +84,7 @@ public static class Directives
     /// <c>resolveDirective(name)</c>). The name resolves case-insensitively (raw, camelCase,
     /// PascalCase); an unresolved name warns in dev and returns null.
     /// </summary>
-    /// <param name="name">The registered directive name.</param>
+    /// <param name="name">The registered directive name .</param>
     /// <returns>The resolved directive, or null.</returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     public static IDirective? ResolveDirective(string name)

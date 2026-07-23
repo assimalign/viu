@@ -1,9 +1,9 @@
-using System;
-
 namespace Assimalign.Viu.Components;
 
-/// <summary>Creates one component template using the shared service resolver.</summary>
-/// <param name="services">The service resolver exposed by the component factory.</param>
+/// <summary>Creates one component template.</summary>
 /// <returns>A fresh component template for one mount.</returns>
-public delegate IComponentTemplate ComponentActivator(IServiceProvider services);
-
+/// <remarks>
+/// An activator may close over any application-owned resolver. The component package neither
+/// supplies nor owns that resolver.
+/// </remarks>
+public delegate IComponentTemplate ComponentActivator();

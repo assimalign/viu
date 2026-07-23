@@ -18,8 +18,11 @@ The current `.viu` generator does not expose its setup context to `@script`.
 | Surface used below | Status |
 | --- | --- |
 | `IComponent`, `IComponentTemplate`, `IComponentContext`, `IComponentFactory`, and `ComponentTree` | Scaffolded |
+| Typed `IComponentLifecycle` hooks and the component-lifetime cancellation token | Scaffolded |
 | Generated `.viu` `Context` and `OnSetup()` | Proposed convenience |
 | Component event-listener collection | Proposed convenience |
+| Task-returning DOM and component-event handlers | Proposed compiler and runtime integration |
+| Application-level error handler | Proposed restoration from the shipping Core contract |
 | `IReactiveReference*` and `IReactiveEffectScope*` interfaces | Scaffolded |
 | `Reactive`, references, computeds, effects, watches, scopes, generated reactive objects, and collections | Restored target |
 | First-party `ReactiveEffectScopeFactory` adapter | Proposed convenience |
@@ -106,7 +109,7 @@ automatically when the component unmounts.
 | `Context.Arguments` | Read parent-supplied component parameters |
 | `Context.Services` | Resolve application services through the independently supplied `IServiceProvider` |
 | `Context.Components` | Access the application-selected component resolver in advanced infrastructure code |
-| `Context.Lifecycle` | Register callbacks owned by this mounted component |
+| `Context.Lifecycle` | Register synchronous or asynchronous callbacks and access the component-lifetime cancellation token |
 | `Context.Emit(...)` | Emit a declared event to the parent |
 
 `Context.Arguments` must present the latest parent-supplied snapshot on every render. The individual
@@ -129,9 +132,9 @@ The intended mounted-instance timeline is:
 4. On a reactive invalidation or changed parent argument, Core runs `BeforeUpdate`, invokes the same
    render delegate again, patches the old/new trees, and then runs `Updated`. `OnSetup()` does not run
    again.
-5. On unmount, Core runs `BeforeUnmount`, stops the component effect scope and its cleanup callbacks,
-   tears down the rendered subtree, runs `Unmounted`, and finally disposes the mount-owned template
-   when it implements `IDisposable`.
+5. On unmount, Core runs `BeforeUnmount`, cancels the component-lifetime token, stops the component
+   effect scope and its cleanup callbacks, tears down the rendered subtree, runs `Unmounted`, and
+   finally disposes the mount-owned template when it implements `IDisposable`.
 
 A property that reads `Context.Arguments` observes the current argument snapshot. Copying an argument
 into a field during `OnSetup()` intentionally captures only its initial value.
@@ -140,6 +143,53 @@ If setup or initial mounting fails, Core must stop the partially created compone
 the mount-owned template. `Unmounted` should not be treated as guaranteed for a component that never
 finished mounting; resource cleanup that must run on failure belongs in
 `Reactive.OnScopeDispose(...)` or the template's `Dispose`.
+
+### 2.4 Asynchronous component work
+
+`Setup` and generated `OnSetup()` remain synchronous. `OnSetup()` registers task factories with a
+typed lifecycle hook; it does not start an unobserved task:
+
+```csharp
+partial void OnSetup()
+{
+    Context.Lifecycle.OnMounted(LoadAsync);
+}
+
+private Task LoadAsync(CancellationToken cancellationToken)
+{
+    return LoadFromServerAsync(cancellationToken);
+}
+```
+
+Core invokes an asynchronous `OnMounted` callback after the initial host mount, observes the
+returned task, and continues client rendering without awaiting it. Reference writes made before or
+after an `await` use the ordinary reactive scheduler and block-tree patch path. An unhandled fault
+goes through the component error-capture chain and then the application error handler. Cancellation
+caused by `Context.Lifecycle.CancellationToken` during unmount is expected rather than reported as a
+component failure.
+
+The same nonblocking rule applies to task-returning before-mount, update, unmount, activated, and
+deactivated hooks: Core invokes the task factory inside synchronous error handling, then observes its
+result without delaying lifecycle progression. Only code before the callback's first incomplete
+`await` runs within the named phase. A returned null task is a lifecycle error, and repeated updated
+callbacks may overlap unless application code prevents it. After unmount, a late fault bypasses
+disposed component hooks and goes directly to the application error handler or host.
+
+An asynchronous DOM or component-event handler is not a lifecycle callback. Its returned task must
+nevertheless be observed by the same internal Core task-tracking and error-routing mechanism. Event
+dispatch remains synchronous and does not await the handler. Never use `async void`; the compiler
+and analyzer should diagnose it for every lifecycle, event, watch, and application callback because
+a fault after its first `await` cannot be observed reliably.
+
+`OnServerPrefetch` has different semantics: the server renderer awaits it before serializing the
+component and links the host request-abort token into the component-lifetime token. `OnMounted` does
+not run during server-side rendering. Truly suspending client setup, where the component does not
+render until an operation completes, remains a separate Suspense capability rather than the normal
+data-loading path.
+
+The error-handler destination described here is a selected target contract, not yet a scaffolded
+Core API. The redesign must restore an application-level error sink before these task semantics are
+implemented.
 
 ## 3. `.viu` examples
 
@@ -175,8 +225,7 @@ This is the smallest expected component-local state experience:
             Console.WriteLine($"The component-local count is {Count.Value}.");
         });
 
-        Context.Lifecycle.Register(
-            ComponentLifecycleKind.Mounted,
+        Context.Lifecycle.OnMounted(
             () => Console.WriteLine("Counter mounted."));
     }
 
@@ -254,12 +303,10 @@ required:
             ?? throw new InvalidOperationException(
                 "The application did not provide IAuditLog.");
 
-        Context.Lifecycle.Register(
-            ComponentLifecycleKind.Mounted,
+        Context.Lifecycle.OnMounted(
             () => AuditLog.Record($"Mounted {Label}."));
 
-        Context.Lifecycle.Register(
-            ComponentLifecycleKind.Unmounted,
+        Context.Lifecycle.OnUnmounted(
             () => AuditLog.Record($"Unmounted {Label}."));
     }
 
@@ -302,7 +349,218 @@ slots but has no parent-listener collection. The final tree contract needs a ded
 event-listener collection so Core can route `Context.Emit(...)` without treating listeners as
 ordinary arguments.
 
-### 3.3 Application/global state from a `.viu` component
+### 3.3 Asynchronous initial loading and event handling
+
+Setup resolves dependencies and registers the initial task factory. The component renders its
+loading state immediately; it does not await data before creating its renderer:
+
+```viu
+@template {
+    <section class="todo-list">
+        @if (Error.Value is not null)
+        {
+            <p role="alert">{{ Error }}</p>
+        }
+        else if (IsLoading.Value)
+        {
+            <p>Loading...</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (TodoItem item in Items.Value)
+                {
+                    <li :key="item.Id">{{ item.Title }}</li>
+                }
+            </ul>
+        }
+
+        <button
+            type="button"
+            :disabled="IsLoading.Value || IsSaving.Value"
+            @click="SaveAsync">
+            {{ IsSaving.Value ? "Saving..." : "Save" }}
+        </button>
+    </section>
+}
+
+@script {
+    using System;
+    using System.Collections.Generic;
+    using System.Net.Http;
+    using System.Net.Http.Json;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    using Assimalign.Viu.Components;
+    using Assimalign.Viu.Reactivity;
+
+    public IReactiveReference<IReadOnlyList<TodoItem>> Items { get; } =
+        Reactive.Reference<IReadOnlyList<TodoItem>>([]);
+
+    public IReactiveReference<bool> IsLoading { get; } =
+        Reactive.Reference(true);
+
+    public IReactiveReference<bool> IsSaving { get; } =
+        Reactive.Reference(false);
+
+    public IReactiveReference<string?> Error { get; } =
+        Reactive.Reference<string?>(null);
+
+    private HttpClient Client { get; set; } = null!;
+
+    partial void OnSetup()
+    {
+        Client =
+            (HttpClient?)Context.Services.GetService(typeof(HttpClient))
+            ?? throw new InvalidOperationException(
+                "The application did not provide HttpClient.");
+
+        Context.Lifecycle.OnMounted(LoadItemsAsync);
+    }
+
+    private async Task LoadItemsAsync(CancellationToken cancellationToken)
+    {
+        IsLoading.Value = true;
+        Error.Value = null;
+
+        try
+        {
+            using HttpRequestMessage request =
+                new(HttpMethod.Get, "api/todos");
+
+            using HttpResponseMessage response =
+                await Client.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken);
+
+            response.EnsureSuccessStatusCode();
+
+            Items.Value =
+                await response.Content.ReadFromJsonAsync(
+                    AppJsonSerializerContext.Default.TodoItemArray,
+                    cancellationToken)
+                ?? [];
+        }
+        catch (HttpRequestException exception)
+        {
+            Error.Value = exception.Message;
+        }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                IsLoading.Value = false;
+            }
+        }
+    }
+
+    public async Task SaveAsync()
+    {
+        if (IsSaving.Value)
+        {
+            return;
+        }
+
+        IsSaving.Value = true;
+
+        try
+        {
+            TodoItem[] items = [.. Items.Value];
+
+            using HttpRequestMessage request =
+                new(HttpMethod.Put, "api/todos")
+                {
+                    Content = JsonContent.Create(
+                        items,
+                        AppJsonSerializerContext.Default.TodoItemArray),
+                };
+
+            using HttpResponseMessage response =
+                await Client.SendAsync(
+                    request,
+                    Context.Lifecycle.CancellationToken);
+
+            response.EnsureSuccessStatusCode();
+            Context.Emit("saved", items);
+        }
+        finally
+        {
+            if (!Context.Lifecycle.CancellationToken.IsCancellationRequested)
+            {
+                IsSaving.Value = false;
+            }
+        }
+    }
+}
+```
+
+`OnMounted(LoadItemsAsync)` passes the component-lifetime cancellation token and lets Core observe
+the returned task. A cancellation caused by unmount is normal. The caught `HttpRequestException`
+becomes component UI; any uncaught failure is routed through `OnErrorCaptured` and then the
+application error handler.
+
+`SaveAsync` is bound as a task-returning event handler. The event dispatcher returns control to the
+browser immediately but continues observing the task. The `IsSaving` guard makes this handler
+single-flight; without it, repeated clicks start concurrent operations. Event modifiers such as
+`.prevent` must run synchronously before the handler's first `await`.
+
+Assignments to `Items.Value`, `IsLoading.Value`, and `IsSaving.Value` schedule the same reactive
+block-tree updates as synchronous assignments. No refresh API is needed. Await the Core `NextTick`
+counterpart only when code must inspect the patched host DOM after a reference write.
+
+`AppJsonSerializerContext` represents application-generated `System.Text.Json` metadata. The
+example intentionally does not use reflection-based serialization because Viu applications must
+remain trimming- and WASM-AOT-safe.
+
+### 3.4 Server-prefetched data
+
+Server-side data loading is an awaited lifecycle phase rather than an ordinary mounted task:
+
+```viu
+@script {
+    using System;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    using Assimalign.Viu.Reactivity;
+
+    public IReactiveReference<Report?> Report { get; } =
+        Reactive.Reference<Report?>(null);
+
+    private IReportClient Reports { get; set; } = null!;
+
+    partial void OnSetup()
+    {
+        Reports =
+            (IReportClient?)Context.Services.GetService(typeof(IReportClient))
+            ?? throw new InvalidOperationException(
+                "The application did not provide IReportClient.");
+
+        Context.Lifecycle.OnServerPrefetch(EnsureReportLoadedAsync);
+        Context.Lifecycle.OnMounted(EnsureReportLoadedAsync);
+    }
+
+    private async Task EnsureReportLoadedAsync(
+        CancellationToken cancellationToken)
+    {
+        if (Report.Value is not null)
+        {
+            return;
+        }
+
+        Report.Value =
+            await Reports.GetReportAsync(cancellationToken);
+    }
+}
+```
+
+The server renderer awaits `OnServerPrefetch` before serializing the component. Client-only
+rendering ignores that hook and starts the `OnMounted` callback after the host mount. During
+hydration, restored state or the shown already-loaded guard prevents a second request.
+
+### 3.5 Application/global state from a `.viu` component
 
 “Global” means one instance within an application registry. The static value is the definition, not
 the mutable store:
@@ -417,7 +675,7 @@ registry, they receive the same `CounterStore`. They do not subscribe merely by 
 component whose template reads `Counter.Count` or `Counter.Doubled` establishes its own render
 dependency and updates when that value changes.
 
-### 3.4 Explicit isolated registry passed into a subtree
+### 3.6 Explicit isolated registry passed into a subtree
 
 The current scaffold can express isolated feature state by creating a separate registry and passing
 the store explicitly to descendants:
@@ -499,7 +757,7 @@ does not yet let a descendant call `Definition.Use(Context)` and automatically f
 subtree registry. If that experience is desired, State still needs a first-class child-scope
 contract and a nearest-scope lookup rule.
 
-### 3.5 Component-level store object without a registry
+### 3.7 Component-level store object without a registry
 
 A component can organize local state into a class without registering it globally:
 
@@ -561,8 +819,7 @@ public sealed class CounterTemplate : IComponentTemplate
         IReactiveReference<int> doubled =
             Reactive.Computed(() => count.Value * 2);
 
-        context.Lifecycle.Register(
-            ComponentLifecycleKind.Mounted,
+        context.Lifecycle.OnMounted(
             () => Console.WriteLine("Counter mounted."));
 
         void Increment()
@@ -627,7 +884,87 @@ that snapshot. The `.viu` compiler lowers `@changed="HandleChanged"` to the same
 Element-host events remain `ComponentAttribute` values with the existing canonical property naming
 (`onClick`, `onClickCapture`, and similar names); they are distinct from component-emitted listeners.
 
-### 4.2 A fragment and child template
+### 4.2 Asynchronous mounted work and host events
+
+Hand-authored templates use the same lifecycle and event-task contracts as generated `.viu`
+components:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
+
+public sealed class TodoListTemplate : IComponentTemplate
+{
+    public ComponentRenderer Setup(IComponentContext context)
+    {
+        ITodoClient client =
+            (ITodoClient?)context.Services.GetService(typeof(ITodoClient))
+            ?? throw new InvalidOperationException(
+                "The application did not provide ITodoClient.");
+
+        IReactiveReference<IReadOnlyList<TodoItem>> items =
+            Reactive.Reference<IReadOnlyList<TodoItem>>([]);
+
+        IReactiveReference<bool> isLoading =
+            Reactive.Reference(true);
+
+        async Task LoadAsync(CancellationToken cancellationToken)
+        {
+            isLoading.Value = true;
+
+            try
+            {
+                items.Value =
+                    await client.GetItemsAsync(cancellationToken);
+            }
+            finally
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    isLoading.Value = false;
+                }
+            }
+        }
+
+        Task RefreshAsync()
+        {
+            return LoadAsync(
+                context.Lifecycle.CancellationToken);
+        }
+
+        context.Lifecycle.OnMounted(LoadAsync);
+
+        return () => ComponentTree.Element(
+            "button",
+            new ComponentAttributes(
+            [
+                new ComponentAttribute("type", "button"),
+                new ComponentAttribute("disabled", isLoading.Value),
+                new ComponentAttribute(
+                    "onClick",
+                    (Func<Task>)RefreshAsync),
+            ]),
+            [
+                ComponentTree.Text(
+                    isLoading.Value
+                        ? "Loading..."
+                        : $"Reload {items.Value.Count} items"),
+            ]);
+    }
+}
+```
+
+The `Func<Task>` attribute is the pure-code representation targeted by
+`@click="RefreshAsync"`. Core starts and observes it without blocking browser dispatch. Both the
+mounted callback and event handler mutate ordinary references, so they schedule the same renderer
+and block-tree work as synchronous callbacks.
+
+### 4.3 A fragment and child template
 
 ```csharp
 using System.Collections.Generic;
@@ -655,7 +992,7 @@ IComponent page = ComponentTree.Fragment(
 Hand-written component trees default to `ComponentOptimization.None`. Generated `.viu` render code
 adds patch flags and block dynamic-child metadata so Core can use the block-tree fast path.
 
-### 4.3 What compiler-produced block metadata looks like
+### 4.4 What compiler-produced block metadata looks like
 
 Application developers should not normally write this by hand, but this illustrates how the unified
 component tree retains Vue-style optimized updates:
@@ -783,9 +1120,99 @@ scope per component. An application that wants that policy creates a scope insid
 mount-owned template disposal then closes it. The wrapper must also dispose the scope when inner
 component resolution fails.
 
-### 5.3 Application composition
+### 5.3 Application composition without a container
 
-The target composition shape is:
+No dependency-injection container is required. An application can compose explicit values and
+supply any small `IServiceProvider` implementation it owns:
+
+```csharp
+using System;
+
+using Assimalign.Viu.Reactivity;
+
+public sealed class ApplicationServiceProvider : IServiceProvider
+{
+    private readonly IReportClient _reportClient;
+    private readonly IReactiveEffectScopeFactory _effectScopes;
+
+    public ApplicationServiceProvider(
+        IReportClient reportClient,
+        IReactiveEffectScopeFactory effectScopes)
+    {
+        _reportClient = reportClient;
+        _effectScopes = effectScopes;
+    }
+
+    public object? GetService(Type serviceType)
+    {
+        if (serviceType == typeof(IReportClient))
+        {
+            return _reportClient;
+        }
+
+        if (serviceType == typeof(IReactiveEffectScopeFactory))
+        {
+            return _effectScopes;
+        }
+
+        return null;
+    }
+}
+```
+
+```csharp
+using System;
+
+using Assimalign.Viu;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.State;
+
+IReportClient reportClient =
+    new BrowserReportClient();
+
+IReactiveEffectScopeFactory effectScopes =
+    new ReactiveEffectScopeFactory();
+
+IServiceProvider services =
+    new ApplicationServiceProvider(
+        reportClient,
+        effectScopes);
+
+IComponentFactory components = new ComponentFactory(
+[
+    new ComponentRegistration(
+        typeof(ApplicationRoot),
+        () => new ApplicationRoot(),
+        "ApplicationRoot"),
+    new ComponentRegistration(
+        typeof(ReportPanel),
+        () => new ReportPanel(reportClient),
+        "ReportPanel"),
+]);
+
+using IStateStoreRegistry state =
+    new StateStoreRegistry(
+        components,
+        services,
+        effectScopes);
+
+IApplication application = new ApplicationBuilder()
+    .UseRootComponent(ComponentTree.Template<ApplicationRoot>())
+    .UseComponentFactory(components)
+    .UseServiceProvider(services)
+    .UseStateRegistry(state)
+    .Build();
+```
+
+`ApplicationServiceProvider` is an application-defined type that can be as small as a type switch
+over the services the application exposes. The composition root owns `state`; Core only borrows it.
+This example assumes the recommended `IStateStoreContext` bridge, so it intentionally does not
+duplicate the state registry inside `services`.
+
+### 5.4 Optional container-owned composition
+
+The same contracts also work when the application chooses a container:
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
@@ -837,6 +1264,9 @@ IApplication application = new ApplicationBuilder()
     .UseServiceProvider(services)
     .UseStateRegistry(state)
     .Build();
+
+IApplicationContext applicationContext =
+    application.Context;
 ```
 
 `ReactiveEffectScopeFactory` is a proposed first-party adapter over
@@ -959,15 +1389,42 @@ finally
 The batch coalesces downstream effect delivery. It does not make the two writes atomic for arbitrary
 non-reactive code.
 
-### 6.3 Watch with stale-work cleanup
+### 6.3 Watch with stale-work cleanup and explicit task observation
 
 ```csharp
+using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Reactivity;
 
 IReactiveReference<string> query =
     Reactive.Reference(string.Empty);
+
+IReactiveReference<Exception?> loadError =
+    Reactive.Reference<Exception?>(null);
+
+async Task ObserveLoadAsync(
+    string value,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        await LoadResultsAsync(
+            value,
+            cancellationToken);
+    }
+    catch (OperationCanceledException)
+        when (cancellationToken.IsCancellationRequested)
+    {
+        // Stale watch work was canceled by its cleanup callback.
+    }
+    catch (Exception exception)
+    {
+        // This terminal wrapper observes the task fault.
+        loadError.Value = exception;
+    }
+}
 
 using WatchHandle watcher = Reactive.Watch(
     query,
@@ -980,7 +1437,7 @@ using WatchHandle watcher = Reactive.Watch(
             cancellation.Dispose();
         });
 
-        _ = LoadResultsAsync(
+        _ = ObserveLoadAsync(
             value,
             cancellation.Token);
     },
@@ -996,6 +1453,11 @@ query.Value = "block tree";
 Before the second request begins, the watcher cancels work registered by the first callback. Disposing
 the `WatchHandle` stops the watcher and runs its final cleanup. The handle also preserves the existing
 `Pause`, `Resume`, and `Stop` behavior.
+
+The terminal `ObserveLoadAsync` wrapper catches both expected cancellation and faults; the discarded
+task therefore is not an unobserved-fault path. A future async-aware `Watch` overload could make that
+observation an engine responsibility. Component lifecycle task observation does not automatically
+own work started later by an independent reactivity callback.
 
 The restored interface-facing overload should accept `IReactiveReference<T>`, rather than forcing a
 consumer back to the concrete `ReactiveValue<T>` base.
@@ -1225,7 +1687,8 @@ StateStoreDefinition<ReportStore> reports = new(
 `context.Scope` is already the active scope while setup runs, so ordinary store authors do not need
 to call `Scope.Run(...)` themselves. `context.Components` is available to advanced state
 infrastructure that deliberately resolves component templates. `context.Owner` should not influence
-an application store because it is merely the component that won the first-resolution race.
+an application store because it is merely the first requesting component, making behavior
+mount-order dependent.
 
 The scaffolded registry owns and disposes the store's reactive scope; it does not call `Dispose` on
 the arbitrary object returned by setup. A store that owns external resources should register them
@@ -1360,6 +1823,8 @@ dispose it when navigation ends. The same rule applies: the object that creates 
 ### 7.3 Component-local state
 
 ```csharp
+using System;
+
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 
@@ -1375,7 +1840,8 @@ public sealed class SearchBox : IComponentTemplate
                 () => string.IsNullOrWhiteSpace(query.Value));
 
         Reactive.WatchEffect(
-            () => PrefetchSuggestions(query.Value));
+            () => Console.WriteLine(
+                $"The current search query is \"{query.Value}\"."));
 
         return () => ComponentTree.Element(
             "output",
@@ -1539,9 +2005,17 @@ scheduler should preserve Vue-style queued batching and define whether developer
 After Child A unmounts:
 
 - Child A's component scope stops, so its render effect and component-local watchers stop.
+- Child A's lifecycle token is canceled so cooperative mounted and event tasks can stop.
+- Lifecycle and event tasks remain observed until completion, so a late non-cancellation fault is not
+  lost even though rendering has stopped. Core cannot forcibly terminate a task that ignores its
+  token.
 - The application `CounterStore` stays alive.
 - The parent's subscription stays alive.
 - The store-owned watcher stays alive until the store is removed or its registry is disposed.
+
+Stopping the reactive effect scope and canceling asynchronous component work are related teardown
+actions, but they are not the same mechanism. After an asynchronous reference write, `NextTick` is
+needed only when the callback must inspect the patched host DOM.
 
 After the application state registry is disposed:
 
@@ -1566,38 +2040,47 @@ The examples are implementable only after the following points are resolved:
    callback to invoke.
 5. **Slots and fallthrough attributes:** `IComponentContext` does not expose slots or fallthrough
    attributes. Slot-consuming script examples should wait until those contracts are defined.
-6. **Lifecycle signatures:** a single `Action` registration is sufficient for ordinary mounted and
-   unmounted callbacks, but it cannot model `ErrorCaptured` return behavior or asynchronous
-   `ServerPrefetch`. Those phases need typed contracts or separate APIs.
-7. **State resolution from components:** adopt the proposed State-owned `IStateStoreContext`
+6. **Lifecycle execution:** the scaffold now selects named, typed callbacks and a component-lifetime
+   cancellation token. Core must implement task observation, token cancellation, expected-
+   cancellation filtering, `ErrorCaptured` propagation, awaited server prefetch, and restoration of
+   the application-level error-handler contract. The analyzer must reject `async void` lifecycle
+   callbacks.
+7. **Asynchronous event dispatch:** host and component listeners must accept `Task` handlers without
+   reflection, observe every returned task, and diagnose `async void`. Component emits remain
+   synchronous; a task-returning parent listener is started and observed rather than awaited.
+8. **Asynchronous watch callbacks:** the restored watch API needs an async-aware overload or an
+   explicit caller-owned observation policy. Effect-scope cleanup can cancel stale work, but it does
+   not by itself observe task faults.
+9. **State resolution from components:** adopt the proposed State-owned `IStateStoreContext`
    capability on Core's concrete component context, or choose another single-source bridge. Requiring
    both `UseStateRegistry(...)` and a matching service-provider registration risks divergence.
-8. **Scoped state:** separate registries support explicit isolation today. Implicit nearest-subtree
-   resolution requires a new scope and lookup contract.
-9. **Application-store owner:** when a caller passes an owner while initializing an application
-   store, `IStateContext.Owner` becomes whichever component won that first-resolution race. The
-   recommended global `Use(Context)` path must leave it null; ownership is meaningful only for an
-   explicit isolated registry.
-10. **Store lifetime topology:** preserve the existing detached registry root with per-store child
-    scopes instead of creating every store as an unrelated detached scope.
-11. **Effect-scope factory:** provide a first-party adapter or keep the seam internal so applications
-    do not have to implement infrastructure merely to create a state registry.
-12. **Store feature parity:** migrate `Patch`, `Reset`, `Subscribe`, `OnAction`, SSR requirements,
-    and later persistence/plugin requirements into State before removing Store.
-13. **Store object disposal:** decide whether a registry owns only its reactive scope or also invokes
-    `IDisposable` on the returned store, including teardown order and exception behavior. Until then,
-    store resources register through `Reactive.OnScopeDispose(...)`.
-14. **Dynamic component lookup:** `IComponentFactory.Create(string)` cannot currently be represented
-    as an unactivated tree request. If string-named dynamic components remain supported, the
-    component tree needs a name-based template request or an explicit name-to-type resolution step.
-15. **Reactive interface facade:** `Watch`, `Unref`, `IsRef`, `ToRef`, and multi-source watch APIs
-    should accept the restored `IReactiveReference` contracts. Forced triggering should require a
-    tracked-reference contract rather than silently accepting an arbitrary external implementation.
-16. **Read-only reference typing:** getter-only computeds currently expose a setter through
-    `IReactiveReference<T>` and report rejection through `IReactiveReadOnly`. Decide whether runtime
-    metadata is sufficient or a generic read-only contract is warranted.
-17. **Host and scheduler surface:** define the Browser/Core mount, unmount, and queued-update await
-    APIs for the new `IApplication`; the abstraction scaffold currently ends at `Build()`.
+10. **Scoped state:** separate registries support explicit isolation today. Implicit nearest-subtree
+    resolution requires a new scope and lookup contract.
+11. **Application-store owner:** when a caller passes an owner while initializing an application
+    store, `IStateContext.Owner` becomes the first requesting component, making behavior mount-order
+    dependent. The recommended global `Use(Context)` path must leave it null; ownership is meaningful
+    only for an explicit isolated registry.
+12. **Store lifetime topology:** preserve the existing detached registry root with per-store child
+     scopes instead of creating every store as an unrelated detached scope.
+13. **Effect-scope factory:** provide a first-party adapter or keep the seam internal so applications
+     do not have to implement infrastructure merely to create a state registry.
+14. **Store feature parity:** migrate `Patch`, `Reset`, `Subscribe`, `OnAction`, SSR requirements,
+     and later persistence/plugin requirements into State before removing Store.
+15. **Store object disposal:** decide whether a registry owns only its reactive scope or also invokes
+     `IDisposable` on the returned store, including teardown order and exception behavior. Until then,
+     store resources register through `Reactive.OnScopeDispose(...)`.
+16. **Dynamic component lookup:** `IComponentFactory.Create(string)` cannot currently be represented
+     as an unactivated tree request. If string-named dynamic components remain supported, the
+     component tree needs a name-based template request or an explicit name-to-type resolution step.
+17. **Reactive interface facade:** `Watch`, `Unref`, `IsRef`, `ToRef`, and multi-source watch APIs
+     should accept the restored `IReactiveReference` contracts. Forced triggering should require a
+     tracked-reference contract rather than silently accepting an arbitrary external implementation.
+18. **Read-only reference typing:** getter-only computeds currently expose a setter through
+     `IReactiveReference<T>` and report rejection through `IReactiveReadOnly`. Decide whether runtime
+     metadata is sufficient or a generic read-only contract is warranted.
+19. **Host and scheduler surface:** define the Browser/Core mount, unmount, queued-update await, and
+     async test-trigger APIs for the new `IApplication`; the abstraction scaffold currently ends at
+     `Build()`.
 
 These are design findings, not reasons to abandon the split. Making them explicit before the
 shipping refactor prevents the compiler, renderer, State package, and component contracts from

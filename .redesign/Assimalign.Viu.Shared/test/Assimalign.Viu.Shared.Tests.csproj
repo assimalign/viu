@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The GeneratorFixture project nests under test/; keep its sources out of this
+         project's implicit globs. -->
+    <Compile Remove="Assimalign.Viu.Shared.GeneratorFixture/**" />
+    <None Remove="Assimalign.Viu.Shared.GeneratorFixture/**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Shared" />
+    <ViuProjectReference Include="Assimalign.Viu.Shared.GeneratorFixture" />
+  </ItemGroup>
+</Project>

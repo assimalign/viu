@@ -11,17 +11,20 @@ public sealed class ElementComponent : IElementComponent
     /// <param name="attributes">The attributes and event bindings.</param>
     /// <param name="children">The element children.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     public ElementComponent(
         string tag,
         IComponentAttributeCollection? attributes = null,
         IReadOnlyList<IComponent>? children = null,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(tag);
         Tag = tag;
         Attributes = attributes ?? new ComponentAttributes();
         Children = ComponentChildren.Copy(children);
         Key = key;
+        Optimization = optimization ?? ComponentOptimization.None;
     }
 
     /// <inheritdoc/>
@@ -29,6 +32,9 @@ public sealed class ElementComponent : IElementComponent
 
     /// <inheritdoc/>
     public object? Key { get; }
+
+    /// <inheritdoc/>
+    public ComponentOptimization Optimization { get; }
 
     /// <inheritdoc/>
     public string Tag { get; }
@@ -39,4 +45,3 @@ public sealed class ElementComponent : IElementComponent
     /// <inheritdoc/>
     public IReadOnlyList<IComponent> Children { get; }
 }
-

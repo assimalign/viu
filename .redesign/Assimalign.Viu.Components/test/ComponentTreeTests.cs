@@ -4,6 +4,7 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Components.Tests;
 
@@ -49,6 +50,26 @@ public sealed class ComponentTreeTests
         element.Attributes.Count.ShouldBe(1);
         element.Attributes.TryGetValue("role", out object? role).ShouldBeTrue();
         role.ShouldBe("main");
+    }
+
+    [Fact]
+    public void Fragment_CompilerMetadata_PreservesBlockTreeFastPathInputs()
+    {
+        ITextComponent dynamicText = ComponentTree.Text(
+            "dynamic",
+            new ComponentOptimization(PatchFlags.Text));
+        IFragmentComponent block = ComponentTree.Fragment(
+            new IComponent[] { ComponentTree.Static("<h1>fixed</h1>"), dynamicText },
+            optimization: new ComponentOptimization(
+                PatchFlags.StableFragment,
+                dynamicChildren: new IComponent[] { dynamicText },
+                hasOnce: true));
+
+        block.Optimization.IsBlock.ShouldBeTrue();
+        block.Optimization.PatchFlags.ShouldBe(PatchFlags.StableFragment);
+        block.Optimization.DynamicChildren.ShouldBe(new IComponent[] { dynamicText });
+        block.Optimization.HasOnce.ShouldBeTrue();
+        dynamicText.Optimization.PatchFlags.ShouldBe(PatchFlags.Text);
     }
 
     private sealed class EmptyTemplate : IComponentTemplate

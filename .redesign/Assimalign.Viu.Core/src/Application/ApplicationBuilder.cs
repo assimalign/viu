@@ -13,6 +13,7 @@ public sealed class ApplicationBuilder : IApplicationBuilder
 {
     private IComponent? _rootComponent;
     private IComponentFactory? _components;
+    private IServiceProvider? _services;
     private IStateStoreRegistry? _state;
 
     /// <inheritdoc/>
@@ -28,6 +29,14 @@ public sealed class ApplicationBuilder : IApplicationBuilder
     {
         ArgumentNullException.ThrowIfNull(components);
         _components = components;
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public IApplicationBuilder UseServiceProvider(IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        _services = services;
         return this;
     }
 
@@ -50,7 +59,8 @@ public sealed class ApplicationBuilder : IApplicationBuilder
             ?? throw new InvalidOperationException("Configure a root component before building the application.");
         IComponentFactory components = _components
             ?? throw new InvalidOperationException("Configure a component factory before building the application.");
-        return new Application(new ApplicationContext(rootComponent, components, _state));
+        IServiceProvider services = _services
+            ?? throw new InvalidOperationException("Configure a service provider before building the application.");
+        return new Application(new ApplicationContext(rootComponent, components, services, _state));
     }
 }
-

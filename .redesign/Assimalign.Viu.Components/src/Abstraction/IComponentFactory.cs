@@ -3,11 +3,14 @@ using System;
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// Creates component templates from explicit registrations and resolves application services.
-/// Component activation and service resolution share one object but retain separate methods and
-/// lifetime semantics.
+/// Resolves component templates for mounting.
 /// </summary>
-public interface IComponentFactory : IServiceProvider
+/// <remarks>
+/// The contract intentionally does not prescribe how components are activated. An application may
+/// use explicit delegates, generated activators, a dependency-injection container, or another
+/// resolver without making service resolution part of this interface.
+/// </remarks>
+public interface IComponentFactory
 {
     /// <summary>Creates a fresh template from its explicitly registered type.</summary>
     /// <param name="componentType">The registered component template type.</param>
@@ -28,4 +31,3 @@ public interface IComponentFactory : IServiceProvider
         return (TComponent)Create(typeof(TComponent));
     }
 }
-

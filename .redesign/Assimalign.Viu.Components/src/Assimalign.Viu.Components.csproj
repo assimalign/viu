@@ -1,3 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Shared" />
+  </ItemGroup>
 </Project>
-

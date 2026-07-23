@@ -12,17 +12,20 @@ public sealed class TemplateComponent : ITemplateComponent
     /// <param name="arguments">The parent-supplied arguments.</param>
     /// <param name="slots">The parent-supplied slots.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     public TemplateComponent(
         Type templateType,
         IComponentArguments? arguments = null,
         IReadOnlyDictionary<string, ComponentSlot>? slots = null,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
         ArgumentNullException.ThrowIfNull(templateType);
         TemplateType = templateType;
         Arguments = arguments ?? new ComponentArguments();
         Slots = CopySlots(slots);
         Key = key;
+        Optimization = optimization ?? ComponentOptimization.None;
     }
 
     /// <inheritdoc/>
@@ -30,6 +33,9 @@ public sealed class TemplateComponent : ITemplateComponent
 
     /// <inheritdoc/>
     public object? Key { get; }
+
+    /// <inheritdoc/>
+    public ComponentOptimization Optimization { get; }
 
     /// <inheritdoc/>
     public Type TemplateType { get; }
@@ -59,4 +65,3 @@ public sealed class TemplateComponent : ITemplateComponent
         return new ReadOnlyDictionary<string, ComponentSlot>(snapshot);
     }
 }
-

@@ -11,22 +11,25 @@ public static class ComponentTree
     /// <param name="attributes">The attributes and event bindings.</param>
     /// <param name="children">The element children.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new element component.</returns>
     public static IElementComponent Element(
         string tag,
         IComponentAttributeCollection? attributes = null,
         IReadOnlyList<IComponent>? children = null,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
-        return new ElementComponent(tag, attributes, children, key);
+        return new ElementComponent(tag, attributes, children, key, optimization);
     }
 
     /// <summary>Creates a text component.</summary>
     /// <param name="text">The text content.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new text component.</returns>
-    public static ITextComponent Text(string text)
+    public static ITextComponent Text(string text, ComponentOptimization? optimization = null)
     {
-        return new TextComponent(text);
+        return new TextComponent(text, optimization);
     }
 
     /// <summary>Creates a comment component.</summary>
@@ -40,21 +43,27 @@ public static class ComponentTree
     /// <summary>Creates a static component.</summary>
     /// <param name="content">The platform-specific static markup.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new static component.</returns>
-    public static IStaticComponent Static(string content, object? key = null)
+    public static IStaticComponent Static(
+        string content,
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
-        return new StaticComponent(content, key);
+        return new StaticComponent(content, key, optimization);
     }
 
     /// <summary>Creates a fragment component.</summary>
     /// <param name="children">The grouped children.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new fragment component.</returns>
     public static IFragmentComponent Fragment(
         IReadOnlyList<IComponent>? children = null,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
-        return new FragmentComponent(children, key);
+        return new FragmentComponent(children, key, optimization);
     }
 
     /// <summary>Creates a teleport component.</summary>
@@ -62,14 +71,16 @@ public static class ComponentTree
     /// <param name="children">The teleported children.</param>
     /// <param name="isDisabled">Whether to render at the logical position.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new teleport component.</returns>
     public static ITeleportComponent Teleport(
         object target,
         IReadOnlyList<IComponent>? children = null,
         bool isDisabled = false,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
-        return new TeleportComponent(target, children, isDisabled, key);
+        return new TeleportComponent(target, children, isDisabled, key, optimization);
     }
 
     /// <summary>Creates a template component request.</summary>
@@ -77,14 +88,16 @@ public static class ComponentTree
     /// <param name="arguments">The parent-supplied arguments.</param>
     /// <param name="slots">The parent-supplied slots.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new template component request.</returns>
     public static ITemplateComponent Template(
         Type templateType,
         IComponentArguments? arguments = null,
         IReadOnlyDictionary<string, ComponentSlot>? slots = null,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
-        return new TemplateComponent(templateType, arguments, slots, key);
+        return new TemplateComponent(templateType, arguments, slots, key, optimization);
     }
 
     /// <summary>Creates a template component request from its generic type.</summary>
@@ -92,14 +105,15 @@ public static class ComponentTree
     /// <param name="arguments">The parent-supplied arguments.</param>
     /// <param name="slots">The parent-supplied slots.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     /// <returns>The new template component request.</returns>
     public static ITemplateComponent Template<TComponent>(
         IComponentArguments? arguments = null,
         IReadOnlyDictionary<string, ComponentSlot>? slots = null,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
         where TComponent : class, IComponentTemplate
     {
-        return new TemplateComponent(typeof(TComponent), arguments, slots, key);
+        return new TemplateComponent(typeof(TComponent), arguments, slots, key, optimization);
     }
 }
-

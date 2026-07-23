@@ -14,17 +14,24 @@ namespace Assimalign.Viu.State;
 public sealed class StateStoreRegistry : IStateStoreRegistry
 {
     private readonly IComponentFactory _components;
-    private readonly IReactiveScopeFactory _scopes;
+    private readonly IServiceProvider _services;
+    private readonly IReactiveEffectScopeFactory _scopes;
     private readonly Dictionary<string, StateStoreEntry> _stores = new(StringComparer.Ordinal);
 
     /// <summary>Creates a state store registry.</summary>
-    /// <param name="components">The shared component activator and dependency resolver.</param>
+    /// <param name="components">The application-selected component resolver.</param>
+    /// <param name="services">The independently supplied application service resolver.</param>
     /// <param name="scopes">The reactive scope factory.</param>
-    public StateStoreRegistry(IComponentFactory components, IReactiveScopeFactory scopes)
+    public StateStoreRegistry(
+        IComponentFactory components,
+        IServiceProvider services,
+        IReactiveEffectScopeFactory scopes)
     {
         ArgumentNullException.ThrowIfNull(components);
+        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(scopes);
         _components = components;
+        _services = services;
         _scopes = scopes;
     }
 
@@ -54,10 +61,10 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
             return (TStore)entry.Store;
         }
 
-        IReactiveScope scope = _scopes.Create(isDetached: true);
+        IReactiveEffectScope scope = _scopes.Create(isDetached: true);
         try
         {
-            StateContext context = new(scope, _components, owner);
+            StateContext context = new(scope, _components, _services, owner);
             TStore store = scope.Run(() => definition.Setup(context))
                 ?? throw new InvalidOperationException(
                     $"State store setup for \"{definition.Key}\" returned null.");
@@ -105,4 +112,3 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
         _stores.Clear();
     }
 }
-

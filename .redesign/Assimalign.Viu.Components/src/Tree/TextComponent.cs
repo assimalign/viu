@@ -7,10 +7,12 @@ public sealed class TextComponent : ITextComponent
 {
     /// <summary>Creates a text component.</summary>
     /// <param name="text">The text content.</param>
-    public TextComponent(string text)
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
+    public TextComponent(string text, ComponentOptimization? optimization = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         Text = text;
+        Optimization = optimization ?? ComponentOptimization.None;
     }
 
     /// <inheritdoc/>
@@ -20,6 +22,8 @@ public sealed class TextComponent : ITextComponent
     public object? Key => null;
 
     /// <inheritdoc/>
+    public ComponentOptimization Optimization { get; }
+
+    /// <inheritdoc/>
     public string Text { get; }
 }
-

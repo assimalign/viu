@@ -4,7 +4,7 @@ namespace Assimalign.Viu.State;
 
 internal sealed class StateStoreEntry
 {
-    internal StateStoreEntry(object definition, object store, IReactiveScope scope)
+    internal StateStoreEntry(object definition, object store, IReactiveEffectScope scope)
     {
         Definition = definition;
         Store = store;
@@ -15,6 +15,5 @@ internal sealed class StateStoreEntry
 
     internal object Store { get; }
 
-    internal IReactiveScope Scope { get; }
+    internal IReactiveEffectScope Scope { get; }
 }
-

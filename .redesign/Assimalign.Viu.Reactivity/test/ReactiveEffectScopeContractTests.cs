@@ -7,12 +7,12 @@ using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Reactivity.Tests;
 
-public sealed class ReactiveScopeContractTests
+public sealed class ReactiveEffectScopeContractTests
 {
     [Fact]
     public void Scope_RunAndStop_ExposeTheStateBoundaryNeededByConsumers()
     {
-        TestReactiveScope scope = new();
+        TestReactiveEffectScope scope = new();
 
         int result = scope.Run(() => 42);
         scope.Stop();
@@ -21,7 +21,7 @@ public sealed class ReactiveScopeContractTests
         scope.IsActive.ShouldBeFalse();
     }
 
-    private sealed class TestReactiveScope : IReactiveScope
+    private sealed class TestReactiveEffectScope : IReactiveEffectScope
     {
         public bool IsActive { get; private set; } = true;
 

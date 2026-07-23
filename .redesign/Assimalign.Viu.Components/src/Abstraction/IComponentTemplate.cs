@@ -6,6 +6,12 @@ namespace Assimalign.Viu.Components;
 /// A freshly activated, user-authored component template. One instance belongs to one mounted
 /// <see cref="ITemplateComponent"/>.
 /// </summary>
+/// <remarks>
+/// Core owns the per-mount instance returned by <see cref="IComponentFactory"/>. If the instance
+/// implements <see cref="System.IDisposable"/>, Core disposes it after unmount callbacks complete,
+/// or immediately when setup fails. The factory and any application service provider remain
+/// externally owned.
+/// </remarks>
 public interface IComponentTemplate
 {
     /// <summary>Gets the optional display name used for diagnostics.</summary>
@@ -25,4 +31,3 @@ public interface IComponentTemplate
     /// <returns>The renderer invoked by Core's reactive render effect.</returns>
     ComponentRenderer Setup(IComponentContext context);
 }
-

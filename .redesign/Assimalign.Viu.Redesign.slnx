@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/Assimalign.Viu.Shared/">
+    <Project Path="Assimalign.Viu.Shared/src/Assimalign.Viu.Shared.csproj" />
+    <Project Path="Assimalign.Viu.Shared/test/Assimalign.Viu.Shared.Tests.csproj" />
+    <Project Path="Assimalign.Viu.Shared/test/Assimalign.Viu.Shared.GeneratorFixture/Assimalign.Viu.Shared.GeneratorFixture.csproj" />
+  </Folder>
   <Folder Name="/Assimalign.Viu.Components/">
     <Project Path="Assimalign.Viu.Components/src/Assimalign.Viu.Components.csproj" />
     <Project Path="Assimalign.Viu.Components/test/Assimalign.Viu.Components.Tests.csproj" />

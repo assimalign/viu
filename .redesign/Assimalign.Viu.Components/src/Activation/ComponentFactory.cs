@@ -4,29 +4,23 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// The default component factory. It dispatches component activation through explicit delegates and
-/// forwards general service resolution to an externally supplied provider.
+/// The default component factory. It dispatches component activation through explicit delegates.
 /// </summary>
 /// <remarks>
-/// The factory does not own or dispose the supplied provider. It is not thread-safe.
+/// Activators may close over any application-owned resolver. The factory does not own or dispose
+/// values captured by activators. It is not thread-safe.
 /// </remarks>
 public sealed class ComponentFactory : IComponentFactory
 {
-    private readonly IServiceProvider _services;
     private readonly Dictionary<Type, ComponentActivator> _componentsByType = new();
     private readonly Dictionary<string, ComponentActivator> _componentsByName =
         new(StringComparer.Ordinal);
 
-    /// <summary>Creates a factory over an external provider and explicit component registrations.</summary>
-    /// <param name="services">The external application service provider.</param>
+    /// <summary>Creates a factory over explicit component registrations.</summary>
     /// <param name="registrations">The component activation registrations.</param>
-    public ComponentFactory(
-        IServiceProvider services,
-        IEnumerable<ComponentRegistration> registrations)
+    public ComponentFactory(IEnumerable<ComponentRegistration> registrations)
     {
-        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(registrations);
-        _services = services;
 
         foreach (ComponentRegistration registration in registrations)
         {
@@ -58,7 +52,7 @@ public sealed class ComponentFactory : IComponentFactory
                 + "ComponentActivator; runtime constructor discovery is not supported.");
         }
 
-        return activator(this);
+        return activator();
     }
 
     /// <inheritdoc/>
@@ -70,7 +64,7 @@ public sealed class ComponentFactory : IComponentFactory
             throw new InvalidOperationException($"Component name \"{name}\" is not registered.");
         }
 
-        return activator(this);
+        return activator();
     }
 
     /// <summary>Creates a fresh template from its explicitly registered generic type.</summary>
@@ -82,21 +76,4 @@ public sealed class ComponentFactory : IComponentFactory
         return (TComponent)Create(typeof(TComponent));
     }
 
-    /// <summary>
-    /// Resolves an application service. Requests for <see cref="IServiceProvider"/> or
-    /// <see cref="IComponentFactory"/> return this factory; all other requests are forwarded.
-    /// Component registrations are never treated as service registrations.
-    /// </summary>
-    /// <param name="serviceType">The requested service type.</param>
-    /// <returns>The service, or null when the external provider has no registration.</returns>
-    public object? GetService(Type serviceType)
-    {
-        ArgumentNullException.ThrowIfNull(serviceType);
-        if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IComponentFactory))
-        {
-            return this;
-        }
-
-        return _services.GetService(serviceType);
-    }
 }

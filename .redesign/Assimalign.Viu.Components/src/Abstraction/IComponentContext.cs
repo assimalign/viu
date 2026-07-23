@@ -2,21 +2,21 @@ using System;
 
 namespace Assimalign.Viu.Components;
 
-/// <summary>Provides the instance-local inputs and services used while setting up a template.</summary>
+/// <summary>Provides the instance-local inputs and application context used to set up a template.</summary>
 public interface IComponentContext
 {
     /// <summary>Gets the arguments supplied by the parent render.</summary>
     IComponentArguments Arguments { get; }
 
-    /// <summary>Gets the combined component activator and dependency resolver.</summary>
+    /// <summary>Gets the application-selected component resolver.</summary>
     IComponentFactory Components { get; }
 
-    /// <summary>
-    /// Gets the standard .NET service resolver. This is the same object as <see cref="Components"/>.
-    /// </summary>
-    IServiceProvider Services => Components;
+    /// <summary>Gets the independently supplied application service resolver.</summary>
+    IServiceProvider Services { get; }
 
-    /// <summary>Gets the instance-local lifecycle registrar.</summary>
+    /// <summary>
+    /// Gets the instance-local lifecycle registrar and component-lifetime cancellation token.
+    /// </summary>
     IComponentLifecycle Lifecycle { get; }
 
     /// <summary>Emits a declared component event to the parent.</summary>
@@ -24,4 +24,3 @@ public interface IComponentContext
     /// <param name="value">The event payload.</param>
     void Emit(string eventName, object? value);
 }
-

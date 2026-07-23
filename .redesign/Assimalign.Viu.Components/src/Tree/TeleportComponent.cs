@@ -11,17 +11,20 @@ public sealed class TeleportComponent : ITeleportComponent
     /// <param name="children">The teleported children.</param>
     /// <param name="isDisabled">Whether to render at the logical position.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="optimization">The compiler-produced optimization metadata.</param>
     public TeleportComponent(
         object target,
         IReadOnlyList<IComponent>? children = null,
         bool isDisabled = false,
-        object? key = null)
+        object? key = null,
+        ComponentOptimization? optimization = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         Target = target;
         Children = ComponentChildren.Copy(children);
         IsDisabled = isDisabled;
         Key = key;
+        Optimization = optimization ?? ComponentOptimization.None;
     }
 
     /// <inheritdoc/>
@@ -29,6 +32,9 @@ public sealed class TeleportComponent : ITeleportComponent
 
     /// <inheritdoc/>
     public object? Key { get; }
+
+    /// <inheritdoc/>
+    public ComponentOptimization Optimization { get; }
 
     /// <inheritdoc/>
     public object Target { get; }
@@ -39,4 +45,3 @@ public sealed class TeleportComponent : ITeleportComponent
     /// <inheritdoc/>
     public IReadOnlyList<IComponent> Children { get; }
 }
-

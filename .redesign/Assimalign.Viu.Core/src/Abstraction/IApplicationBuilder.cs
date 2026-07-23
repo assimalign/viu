@@ -1,11 +1,13 @@
+using System;
+
 using Assimalign.Viu.Components;
 using Assimalign.Viu.State;
 
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Composes a Viu application from a root component, a supplied component factory/service provider,
-/// and an optional state registry.
+/// Composes a Viu application from a root component, independently supplied component and service
+/// resolvers, and an optional state registry.
 /// </summary>
 public interface IApplicationBuilder
 {
@@ -14,10 +16,15 @@ public interface IApplicationBuilder
     /// <returns>This builder.</returns>
     IApplicationBuilder UseRootComponent(IComponent component);
 
-    /// <summary>Sets the combined component activator and dependency resolver.</summary>
+    /// <summary>Sets the application-selected component resolver.</summary>
     /// <param name="components">The application component factory.</param>
     /// <returns>This builder.</returns>
     IApplicationBuilder UseComponentFactory(IComponentFactory components);
+
+    /// <summary>Sets the independently supplied application service resolver.</summary>
+    /// <param name="services">The application service provider.</param>
+    /// <returns>This builder.</returns>
+    IApplicationBuilder UseServiceProvider(IServiceProvider services);
 
     /// <summary>Sets the optional application state registry.</summary>
     /// <param name="state">The application state registry.</param>
@@ -28,4 +35,3 @@ public interface IApplicationBuilder
     /// <returns>The application.</returns>
     IApplication Build();
 }
-

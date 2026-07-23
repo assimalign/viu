@@ -10,17 +10,21 @@ public sealed class ApplicationContext : IApplicationContext
 {
     /// <summary>Creates an application context.</summary>
     /// <param name="rootComponent">The root value in the component tree.</param>
-    /// <param name="components">The combined component activator and dependency resolver.</param>
+    /// <param name="components">The application-selected component resolver.</param>
+    /// <param name="services">The independently supplied application service resolver.</param>
     /// <param name="state">The optional application state registry.</param>
     public ApplicationContext(
         IComponent rootComponent,
         IComponentFactory components,
+        IServiceProvider services,
         IStateStoreRegistry? state = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         ArgumentNullException.ThrowIfNull(components);
+        ArgumentNullException.ThrowIfNull(services);
         RootComponent = rootComponent;
         Components = components;
+        Services = services;
         State = state;
     }
 
@@ -31,6 +35,8 @@ public sealed class ApplicationContext : IApplicationContext
     public IComponentFactory Components { get; }
 
     /// <inheritdoc/>
+    public IServiceProvider Services { get; }
+
+    /// <inheritdoc/>
     public IStateStoreRegistry? State { get; }
 }
-

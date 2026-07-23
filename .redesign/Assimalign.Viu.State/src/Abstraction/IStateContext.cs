@@ -9,15 +9,14 @@ namespace Assimalign.Viu.State;
 public interface IStateContext
 {
     /// <summary>Gets the store's detached reactive scope.</summary>
-    IReactiveScope Scope { get; }
+    IReactiveEffectScope Scope { get; }
 
-    /// <summary>Gets the shared component activator and dependency resolver.</summary>
+    /// <summary>Gets the application-selected component resolver.</summary>
     IComponentFactory Components { get; }
 
-    /// <summary>Gets the standard .NET service resolver.</summary>
-    IServiceProvider Services => Components;
+    /// <summary>Gets the independently supplied application service resolver.</summary>
+    IServiceProvider Services { get; }
 
     /// <summary>Gets the component that first requested the store, or null for application setup.</summary>
     IComponentContext? Owner { get; }
 }
-
