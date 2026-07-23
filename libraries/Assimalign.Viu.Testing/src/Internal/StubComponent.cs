@@ -1,35 +1,37 @@
 using System;
 using System.Text;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// The auto-generated stub for a stubbed child component — the C# port of <c>@vue/test-utils</c>'s
-/// default stub (https://test-utils.vuejs.org/guide/advanced/stubs-shallow-mount.html). Renders a
-/// recognizable placeholder element (<c>&lt;{kebab-name}-stub&gt;</c>) instead of the real
-/// component's subtree, with no reflection-based proxy generation — the stub is a plain component
-/// definition returning a fixed render function.
-/// </summary>
-internal sealed class StubComponent : IComponent
+internal sealed class StubComponent : IComponentTemplate
 {
-    private readonly ComponentSetup _render;
+    private readonly string _tag;
 
     private StubComponent(string tag)
     {
-        Name = tag;
-        var placeholder = VirtualNodeFactory.Element(tag);
-        _render = () => placeholder;
+        _tag = tag;
     }
 
-    public string? Name { get; }
+    public string? Name => _tag;
 
-    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context) => _render;
+    public ComponentRenderer Setup(IComponentContext context)
+    {
+        return () => ComponentTree.Element(_tag);
+    }
 
-    /// <summary>Creates the placeholder stub for <paramref name="real"/> (tag = kebab name + "-stub").</summary>
-    /// <param name="real">The component being stubbed.</param>
-    public static StubComponent For(IComponent real) => new(ToStubTag(real.Name));
+    internal static StubComponent For(IComponentTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        return new StubComponent(ToStubTag(template.Name));
+    }
+
+    internal static StubComponent For(Type templateType)
+    {
+        ArgumentNullException.ThrowIfNull(templateType);
+        return new StubComponent(ToStubTag(templateType.Name));
+    }
 
     private static string ToStubTag(string? name)
     {
@@ -37,16 +39,18 @@ internal sealed class StubComponent : IComponent
         {
             return "anonymous-stub";
         }
-        var builder = new StringBuilder(name.Length + 6);
-        for (var index = 0; index < name.Length; index++)
+
+        StringBuilder builder = new(name.Length + 6);
+        for (int index = 0; index < name.Length; index++)
         {
-            var character = name[index];
+            char character = name[index];
             if (char.IsUpper(character))
             {
                 if (index > 0)
                 {
                     builder.Append('-');
                 }
+
                 builder.Append(char.ToLowerInvariant(character));
             }
             else
@@ -54,6 +58,7 @@ internal sealed class StubComponent : IComponent
                 builder.Append(character);
             }
         }
+
         builder.Append("-stub");
         return builder.ToString();
     }

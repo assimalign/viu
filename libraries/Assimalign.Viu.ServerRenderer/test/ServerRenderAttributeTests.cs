@@ -2,8 +2,6 @@ using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
 /// <summary>
@@ -60,7 +58,7 @@ public class ServerRenderAttributeTests
     [Fact]
     public void SsrRenderAttrs_SkipsReservedHandlerAndDotPrefixedProperties()
     {
-        var properties = VirtualNodeFactory.Properties(
+        var attributes = TestTree.Attributes(
             ("id", "app"),
             ("key", "k"),
             ("ref", "r"),
@@ -69,30 +67,30 @@ public class ServerRenderAttributeTests
             ("textContent", "t"),
             ("onClick", (System.Action)(() => { })),
             (".prop", "forced-property"));
-        ServerRender.SsrRenderAttrs(properties).ShouldBe(" id=\"app\"");
+        ServerRender.SsrRenderAttrs(attributes).ShouldBe(" id=\"app\"");
     }
 
     [Fact]
     public void SsrRenderAttrs_CaretPrefix_ForcesAttributeAndIsStripped()
-        => ServerRender.SsrRenderAttrs(VirtualNodeFactory.Properties(("^foo", "bar"))).ShouldBe(" foo=\"bar\"");
+        => ServerRender.SsrRenderAttrs(TestTree.Attributes(("^foo", "bar"))).ShouldBe(" foo=\"bar\"");
 
     [Fact]
     public void SsrRenderAttrs_ClassAndStyle_RouteThroughNormalizers()
     {
-        var properties = VirtualNodeFactory.Properties(
+        var attributes = TestTree.Attributes(
             ("class", new System.Collections.Generic.List<object?> { "a", "b" }),
             ("style", new System.Collections.Generic.Dictionary<string, object?> { ["color"] = "red" }));
-        ServerRender.SsrRenderAttrs(properties).ShouldBe(" class=\"a b\" style=\"color:red;\"");
+        ServerRender.SsrRenderAttrs(attributes).ShouldBe(" class=\"a b\" style=\"color:red;\"");
     }
 
     [Fact]
     public void SsrRenderAttrs_ClassName_CoercesDirectlyToString()
-        => ServerRender.SsrRenderAttrs(VirtualNodeFactory.Properties(("className", "a b")))
+        => ServerRender.SsrRenderAttrs(TestTree.Attributes(("className", "a b")))
             .ShouldBe(" class=\"a b\"");
 
     [Fact]
     public void SsrRenderAttrs_TextareaValue_IsSkipped()
         // <textarea>'s value is its text content, not an attribute.
-        => ServerRender.SsrRenderAttrs(VirtualNodeFactory.Properties(("value", "hi")), "textarea")
+        => ServerRender.SsrRenderAttrs(TestTree.Attributes(("value", "hi")), "textarea")
             .ShouldBe(string.Empty);
 }

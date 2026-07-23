@@ -16,6 +16,8 @@ using Xunit;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Syntax.Generators;
 
 namespace Assimalign.Viu.Browser.CompiledRenderTests;
@@ -147,7 +149,7 @@ public sealed class DomCompiledRenderTests
     }
 
     // A component that exercises both [V01.01.06.06] seams: a `module` block (the typed accessor) and a
-    // `v-bind()` block (the ApplyCssVariables call into UseCssVars). The hand-written half supplies the
+    // `v-bind()` block (the ApplyCssVariables call into UseCssVariables). The hand-written half supplies the
     // members the emitted v-bind getter evaluates.
     private const string CssModuleAndVBindComponent =
         "@template {\n" +
@@ -201,15 +203,15 @@ public sealed class DomCompiledRenderTests
     [Fact]
     public void CssModuleAndVBind_SeamsCompile_AgainstBrowser()
     {
-        // The generated $style accessor and the ApplyCssVariables -> UseCssVars seam are real runtime C#:
-        // the accessor's const members compile, and the getter binds CssVariables.UseCssVars in Browser
+        // The generated $style accessor and the ApplyCssVariables -> UseCssVariables seam are real runtime C#:
+        // the accessor's const members compile, and the getter binds CssVariables.UseCssVariables in Browser
         // while its expressions resolve against the merged component members. This proves the [V01.01.06.06]
         // metadata the runtime half consumes is well-formed, DOM-free.
         var generated = CompiledRenderSupport.Generate("CssWidget", CssModuleAndVBindComponent);
 
         generated.ShouldContain("internal static class Style");
         generated.ShouldContain("internal void ApplyCssVariables()");
-        generated.ShouldContain("global::Assimalign.Viu.Browser.CssVariables.UseCssVars(");
+        generated.ShouldContain("global::Assimalign.Viu.Browser.CssVariables.UseCssVariables(Context,");
 
         var assembly = CompiledRenderSupport.CompileToAssembly(generated, CssModuleHandWrittenHalf);
         assembly.Length.ShouldBeGreaterThan(0);
@@ -219,7 +221,7 @@ public sealed class DomCompiledRenderTests
     // ApplyCssVariables getter must unwrap it to `count.Value` and compile against the real Reference<int>.
     private const string ReactiveVBindComponent =
         "@script {\n" +
-        "using Assimalign.Viu;\n" +
+        "using Assimalign.Viu.Reactivity;\n" +
         "public Reference<int> count = Reactive.Reference(1);\n" +
         "}\n" +
         "@template {\n" +
@@ -307,8 +309,17 @@ public sealed class DomCompiledRenderTests
             .GetRawConstantValue()!;
         var render = type.GetMethod("Render", BindingFlags.NonPublic | BindingFlags.Static)!;
 
-        var vnode = (VirtualNode)render.Invoke(null, new object?[] { instance, new object?[cacheSize] })!;
-        var handler = vnode.Properties!["onClick"].ShouldBeOfType<Action<BrowserEvent>>();
+        object rendered =
+            render.Invoke(
+                null,
+                new object?[] { instance, new object?[cacheSize] })
+            ?? throw new InvalidOperationException(
+                "The generated render returned null.");
+        rendered.ShouldBeAssignableTo<IElementComponent>();
+        var element = (IElementComponent)rendered;
+        element.Attributes.TryGetValue("onClick", out object? handlerValue)
+            .ShouldBeTrue();
+        var handler = handlerValue.ShouldBeOfType<Action<BrowserEvent>>();
 
         // BrowserEvent's constructor is internal and this compile-binding project has no InternalsVisibleTo
         // grant, so the dispatch event is built through the internal constructor by reflection (the argument
@@ -439,8 +450,8 @@ internal static class CompiledRenderSupport
         Add(typeof(RenderHelpers).Assembly.Location);
         Add(typeof(DomRenderHelpers).Assembly.Location);
         // Reactivity: a @script Reference<T> member that a v-bind() getter unwraps ([V01.01.06.06.01]) binds
-        // Assimalign.Viu's Reference<T>/Reactive.
-        Add(typeof(Assimalign.Viu.Reactive).Assembly.Location);
+        // Assimalign.Viu.Reactivity's Reference<T>/Reactive.
+        Add(typeof(Reactive).Assembly.Location);
         var shared = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, "Assimalign.Viu.Shared", StringComparison.Ordinal));
         Add(shared?.Location);

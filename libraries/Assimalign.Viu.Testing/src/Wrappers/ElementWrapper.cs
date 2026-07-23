@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
@@ -93,11 +91,14 @@ public sealed class ElementWrapper
     /// </summary>
     /// <param name="eventName">The event name (e.g. <c>"click"</c>).</param>
     /// <param name="payload">The payload passed to payload-accepting listeners.</param>
-    public Task Trigger(string eventName, object? payload = null)
+    public async Task Trigger(string eventName, object? payload = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
-        TestEventDispatcher.Trigger(_element, eventName, payload);
-        return _flush.RunAsync();
+        await TestEventDispatcher.TriggerAsync(
+            _element,
+            eventName,
+            payload).ConfigureAwait(false);
+        await _flush.RunAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -105,10 +106,13 @@ public sealed class ElementWrapper
     /// scheduler flush (upstream: <c>setValue</c> for input-like elements and v-model bindings).
     /// </summary>
     /// <param name="value">The new value.</param>
-    public Task SetValue(object? value)
+    public async Task SetValue(object? value)
     {
         _element.Properties["value"] = value;
-        TestEventDispatcher.Trigger(_element, "input", value);
-        return _flush.RunAsync();
+        await TestEventDispatcher.TriggerAsync(
+            _element,
+            "input",
+            value).ConfigureAwait(false);
+        await _flush.RunAsync().ConfigureAwait(false);
     }
 }

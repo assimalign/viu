@@ -11,8 +11,8 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Router" />
-    <!-- RouterView/RouterLink are exercised DOM-free through the in-memory Testing renderer
-         ([V01.01.08.03] / issue #72); the test components build reactive state via Reactivity. -->
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <!-- RouterView/RouterLink are exercised DOM-free through the in-memory Testing renderer. -->
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>
 </Project>

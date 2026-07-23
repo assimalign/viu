@@ -1,46 +1,47 @@
 using System.Runtime.Versioning;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The <see cref="IApplicationBuilder"/> for browser applications — created by
-/// <see cref="BrowserApplication.CreateBuilder(IComponent, VirtualNodeProperties?, bool)"/>
-/// or <see cref="BrowserApplication.CreateSsrBuilder(IComponent, VirtualNodeProperties?)"/>.
-/// Records plugins/provides/registrations on the base <see cref="ApplicationBuilder"/> and, on
-/// <see cref="Build"/>, constructs a <see cref="BrowserApplication"/> over the direct or
-/// command-buffered browser node-ops and replays the recorded configuration onto it in order.
-/// Not thread-safe (browser main thread only).
+/// Composes a browser application from a root component tree, component factory, service provider,
+/// optional state registry, and plugins.
 /// </summary>
+/// <remarks>
+/// The builder inherits the host-neutral configuration surface from
+/// <see cref="ApplicationBuilder"/>. It does not construct a dependency-injection container and
+/// the resulting application borrows every supplied resolver.
+/// </remarks>
 [SupportedOSPlatform("browser")]
 public sealed class BrowserApplicationBuilder : ApplicationBuilder
 {
     private readonly bool _useCommandBuffer;
     private readonly bool _hydrate;
 
-    internal BrowserApplicationBuilder(
-        IComponent rootComponent,
-        VirtualNodeProperties? rootProperties,
-        bool useCommandBuffer,
-        bool hydrate)
-        : base(rootComponent, rootProperties)
+    internal BrowserApplicationBuilder(bool useCommandBuffer, bool hydrate)
     {
         _useCommandBuffer = useCommandBuffer;
         _hydrate = hydrate;
+        UseDirectiveResolver(BrowserDirectiveResolver.Instance);
     }
 
     /// <summary>
-    /// Builds the browser application, attaches the service provider, and applies the recorded
-    /// configuration in call order. Mount the returned app with <c>await app.MountAsync("#app")</c>.
+    /// Builds the configured browser application.
     /// </summary>
-    /// <returns>The configured <see cref="BrowserApplication"/>.</returns>
+    /// <returns>The browser application.</returns>
     public override BrowserApplication Build()
     {
-        var application = BrowserApplication.Create(RootComponent, RootProperties, _useCommandBuffer, _hydrate);
-        // Attach the built provider before ApplyConfiguration so a plugin install can resolve from the
-        // app service provider ([V01.01.03.24]); the app owns and disposes it.
-        application.Context.ServicesProvider = BuildServiceProvider();
+        IApplicationContext configuredContext = CreateContext();
+        IApplicationContext context = new ApplicationContext(
+            configuredContext.RootComponent,
+            new BrowserComponentFactory(configuredContext.Components),
+            configuredContext.Services,
+            configuredContext.State,
+            configuredContext.Directives);
+        BrowserApplication application =
+            BrowserApplication.Create(context, _useCommandBuffer, _hydrate);
         ApplyConfiguration(application);
         return application;
     }

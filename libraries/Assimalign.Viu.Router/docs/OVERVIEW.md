@@ -36,9 +36,10 @@ Public surface (all under namespace `Assimalign.Viu.Router`):
   depends on, implemented by `RouteMatcher`.
 - **`RouteRecord`**: an immutable route definition — `Path`, optional `Name`, nested `Children`,
   arbitrary `Meta`, and (for the components) the `Component` the route renders plus an optional
-  `PropertiesResolver`. A reference type with identity semantics (the same instance appears in every
+  `ArgumentsResolver`. A reference type with identity semantics (the same instance appears in every
   matched chain it participates in). The C# port of vue-router's route record; the matcher ignores
-  `Component`/`PropertiesResolver`.
+  `Component`/`ArgumentsResolver`. The component may be any unified `IComponent`; an arguments
+  resolver is valid only for an `ITemplateComponent` request.
 - **`RouteLocation`**: the immutable resolution result — `Path`, `Name`, `Parameters`, the
   parent-to-child `Matched` record chain, merged `Meta`, and `IsMatched`. Value equality so a
   navigation layer can compare/snapshot cheaply. Mirrors the object returned by the matcher's
@@ -105,24 +106,24 @@ minimal slice of `createRouter` those components need:
   over an `IRouterHistory` and a matcher (or a route set), it listens to the history so browser
   back/forward drives `CurrentRoute` through the same guard pipeline. The C# stand-in for the object
   `createRouter` returns.
-- **`RouterView`** (`Components/`): the route outlet. It injects the `Router` and its own nesting
-  depth, renders `route.matched[depth].Component` with that record's resolved props, and provides
-  `depth + 1` to any `RouterView` nested inside the rendered component. The reactive current route it
-  reads re-renders it on navigation. The C# port of `RouterView.ts`.
+- **`RouterView`** (`Components/`): the route outlet. It resolves `Router` from
+  `IComponentContext.Services`, reads its explicit `depth` argument (default `0`), and renders
+  `route.matched[depth].Component` with that record's resolved arguments. A nested layout passes the
+  next depth explicitly because the redesign has no hierarchical component dependency API. The reactive
+  current route it reads re-renders it on navigation. The C# port of `RouterView.ts` with explicit
+  C# dependency flow.
 - **`RouterLink`** (`Components/`): the navigation anchor. It renders an `<a>` whose `href` resolves
   through the `Router` (base included), applies the active / exact-active classes by matching its
   target against the current route, and intercepts an unmodified primary-button click to navigate
-  client-side. Declared props: `to`, `replace`, `activeClass`, `exactActiveClass`. The C# port of
-  `RouterLink.ts`.
-- **`RouteComponentProperties`** (`Components/`) + **`RouteComponentPropertiesResolver`** (`Delegates/`):
+  client-side. Declared arguments: `to`, `replace`, `activeClass`, `exactActiveClass`. The C# port
+  of `RouterLink.ts`.
+- **`RouteComponentArguments`** (`Components/`) + **`RouteComponentArgumentsResolver`** (`Delegates/`):
   the per-route `props` option (https://router.vuejs.org/guide/essentials/passing-props.html).
-  `FromParameters()` is `props: true` (params become props), `FromValues(...)` is the static-object
+  `FromParameters()` is `props: true` (params become arguments), `FromValues(...)` is the static-object
   form, and a hand-written resolver is the function form.
 - **`RouterLinkClickEvent`** (`Components/`): the DOM-free click info `RouterLink`'s guard reads
   (button, system modifiers, `DefaultPrevented`) — a host's event bridge builds it from the native
   `MouseEvent`; tests construct it directly.
-- **`RouterInjectionKeys`**: the provide/inject keys wiring the router into the tree (`Router`
-  app-wide; the internal view-depth key threaded between nested views).
 
 ## Navigation guards
 
@@ -141,11 +142,11 @@ The awaitable, cancellable navigation pipeline (`[V01.01.08.04]`, all under name
   `OnError` signatures.
 - **`RouteRecord.BeforeEnter`**: the per-route enter guard (upstream `beforeEnter`).
 - **`RouterGuards`**: the `OnBeforeRouteLeave`/`OnBeforeRouteUpdate` composables, called during a route
-  component's `Setup` and bound to the component's lifecycle (upstream's in-component leave/update
-  guards).
-- **`IRouteEnterGuard`** (`Abstraction/`): implemented by a route component to contribute a
-  `beforeRouteEnter` guard (interface-based discovery, no reflection — the instance does not yet
-  exist when it runs).
+  component's `Setup` with its explicit `IComponentContext` and outlet depth, then bound to the
+  component's lifecycle (upstream's in-component leave/update guards).
+- **`IRouteEnterGuard`** (`Abstraction/`): supplied explicitly through
+  `RouteRecord.RouteEnterGuard` to contribute a `beforeRouteEnter` guard. No component is activated
+  and no reflection is used before the route is confirmed.
 - **`NavigationRedirectException`**: thrown when a guard-redirect chain exceeds the safety cap
   (upstream's infinite-redirect detection).
 
@@ -186,18 +187,21 @@ web.Listen((to, from, information) => { /* resolve `to` through the matcher */ }
 ```
 
 ```csharp
-// Wire routes to components, build a router over a history, and provide it to the tree.
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Router;
+
+// Wire routes to unified component-tree requests and build a router over a history.
 var router = new Router(RouterHistory.CreateMemory(),
 [
-    new RouteRecord("/users/:id", component: new UserView(),
-        propertiesResolver: RouteComponentProperties.FromParameters()),   // props: true
+    new RouteRecord(
+        "/users/:id",
+        component: ComponentTree.Template<UserView>(),
+        argumentsResolver: RouteComponentArguments.FromParameters()),   // props: true
 ]);
 NavigationFailure? failure = await router.Push("/users/42");   // awaitable; null on success
 
-app.Provide(RouterInjectionKeys.Router, router);   // a host provides the router app-wide
-// Or, on an application builder, register it through services ([V01.01.03.24]) — this also provides it
-// app-wide, so RouterView/RouterLink resolve either way (service-first-then-provide):
-builder.AddRouter(router);                         // Services.AddSingleton(router) + Provide(RouterInjectionKeys.Router, router)
+// Register Router in the IServiceProvider selected by the application, then pass that provider to
+// the host builder with UseServiceProvider(...). Router does not create or modify a container.
 // <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
 // and a plain left-click on it calls router.Push instead of triggering a page load.
 ```
@@ -212,23 +216,29 @@ Action removeAuthGuard = router.BeforeEach((to, from, cancellationToken) =>
 router.AfterEach((to, from, failure) => { /* failure is null on success */ });
 router.OnError((error, to, from) => { /* an unexpected guard exception */ });
 
-// In a route component's Setup: block leaving with unsaved changes.
-RouterGuards.OnBeforeRouteLeave((to, from, cancellationToken) =>
-    Task.FromResult(hasUnsavedChanges ? NavigationGuardResult.Abort : NavigationGuardResult.Allow));
+// In a route component's Setup: pass the explicit context and outlet depth.
+RouterGuards.OnBeforeRouteLeave(
+    context,
+    (to, from, cancellationToken) =>
+        Task.FromResult(
+            hasUnsavedChanges
+                ? NavigationGuardResult.Abort
+                : NavigationGuardResult.Allow),
+    depth: 0);
 
 removeAuthGuard();   // registration handles unregister the guard
 ```
 
 ## Boundaries
 
-- **Matcher and history stay framework-free; the components reference the runtime.** The matcher and
+- **Matcher and history stay framework-free; the built-ins reference contracts only.** The matcher and
   memory history run in a plain .NET test host, using no other Viu library. `[V01.01.08.03]` adds the
   `RouterView`/`RouterLink` components, which consume the component model and reactivity, so the
-  assembly now references `Assimalign.Viu.Core` (issue #72's
-  boundary). It still references **no browser DOM adapter** (`Assimalign.Viu.Browser`): the
-  components produce platform-agnostic `VirtualNode`s that render through the injected node-ops
-  abstraction — the in-memory test renderer and the SSR renderer alike — never the DOM directly (a
-  boundary the test suite asserts by reflection). `[V01.01.08.02]`'s browser history edge over the
+  assembly references `Assimalign.Viu.Components` and `Assimalign.Viu.Reactivity`, but not
+  `Assimalign.Viu.Core`. It still references **no browser DOM adapter** (`Assimalign.Viu.Browser`):
+  the built-ins produce platform-agnostic `IComponent` values that any host renderer can consume — the
+  in-memory test renderer and the server renderer alike — never the DOM directly (a boundary the test
+  suite asserts by reflection). `[V01.01.08.02]`'s browser history edge over the
   framework's `System.Runtime.InteropServices.JavaScript` primitive stays gated by
   `[SupportedOSPlatform("browser")]`.
 - Trimming- and NativeAOT-safe: no reflection-based serialization, no dynamic code generation. Path

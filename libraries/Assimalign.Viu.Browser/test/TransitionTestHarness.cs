@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Browser.Tests;
@@ -16,6 +17,7 @@ internal sealed class TransitionTestHarness : IDisposable
     private readonly Dictionary<int, RecordingNode> _nodes = [];
     private readonly Dictionary<int, List<int>> _children = [];
     private readonly Renderer<int> _renderer;
+    private readonly IApplicationContext _application;
     private readonly TestSchedulerPump _pump;
     private readonly DomTransitionOperations? _previousOperations;
     private readonly List<Action> _nextFrameQueue = [];
@@ -26,7 +28,6 @@ internal sealed class TransitionTestHarness : IDisposable
 
     public TransitionTestHarness()
     {
-        Scheduler.Reset();
         _pump = TestSchedulerPump.Install();
 
         _previousOperations = DomTransitionOperations.Current;
@@ -84,10 +85,9 @@ internal sealed class TransitionTestHarness : IDisposable
             CreateText = text => Create(new RecordingNode { Tag = "#text", Value = text }),
             CreateComment = text => Create(new RecordingNode { Tag = "#comment", Value = text }),
             SetText = (node, text) => _nodes[node].Value = text,
-            SetElementText = (node, text) => _nodes[node].Value = text,
             ParentNode = node => _nodes[node].Parent,
             NextSibling = NextSibling,
-            PatchProperty = (element, _, propertyName, _, nextValue, _) =>
+            PatchAttribute = (element, _, propertyName, _, nextValue, _) =>
             {
                 // Record every patched vnode prop (class/style/arbitrary attrs) so the fallthrough tests
                 // can read what landed on the wrapper element. This is the ELEMENT-prop channel — distinct
@@ -106,10 +106,24 @@ internal sealed class TransitionTestHarness : IDisposable
         });
 
         Container = Create(new RecordingNode { Tag = "#container" });
+        ApplicationContext application = new(
+            ComponentTree.Comment("transition-test-root"),
+            new ComponentFactory(
+            [
+                Transition.Registration,
+                TransitionGroup.Registration,
+                BaseTransition.Registration,
+            ]),
+            new EmptyServiceProvider());
+        application.WarnHandler = Warnings.Add;
+        _application = application;
     }
 
     /// <summary>The ordered log of transition class add/remove operations (the choreography sequence).</summary>
     public List<string> ClassLog { get; } = [];
+
+    /// <summary>The application warnings emitted while rendering.</summary>
+    public List<string> Warnings { get; } = [];
 
     /// <summary>The ordered log of FLIP transform/clear operations.</summary>
     public List<string> MoveLog { get; } = [];
@@ -140,15 +154,15 @@ internal sealed class TransitionTestHarness : IDisposable
 
     public void Dispose()
     {
+        _renderer.Render(null, Container, _application);
         DomTransitionOperations.Current = _previousOperations;
         _pump.Dispose();
-        Scheduler.Reset();
     }
 
     /// <summary>Renders a component's tree into the container and drains scheduled flushes.</summary>
     public void Render(IComponent component)
     {
-        _renderer.Render(VirtualNodeFactory.Component(component), Container);
+        _renderer.Render(component, Container, _application);
         _pump.RunUntilIdle();
     }
 
@@ -192,13 +206,23 @@ internal sealed class TransitionTestHarness : IDisposable
     /// element twice — old (in the render) then new (in onUpdated) — so enqueue the old position, then
     /// the new; the last enqueued value is reported for any further reads.
     /// </summary>
-    public void EnqueuePosition(int element, double left, double top)
+    public void EnqueuePosition(
+        int element,
+        double left,
+        double top,
+        double horizontalScale = 1,
+        double verticalScale = 1)
     {
         if (!_positions.TryGetValue(element, out var queue))
         {
             queue = _positions[element] = new Queue<TransitionRectangle>();
         }
-        queue.Enqueue(new TransitionRectangle(left, top));
+        queue.Enqueue(
+            new TransitionRectangle(
+                left,
+                top,
+                horizontalScale,
+                verticalScale));
     }
 
     /// <summary>The transition classes currently applied to an element.</summary>
@@ -320,5 +344,14 @@ internal sealed class TransitionTestHarness : IDisposable
         public int Parent;
         public readonly Dictionary<string, object?> BoundProperties = new(StringComparer.Ordinal);
         public readonly HashSet<string> TransitionClasses = new(StringComparer.Ordinal);
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            return null;
+        }
     }
 }

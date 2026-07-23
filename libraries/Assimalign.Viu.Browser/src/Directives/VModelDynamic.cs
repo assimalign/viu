@@ -1,19 +1,18 @@
 using System;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The <c>v-model</c> directive for elements whose kind is only known at runtime — the C# port of
-/// upstream's <c>vModelDynamic</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts). Each
-/// hook resolves the concrete directive from the element's current tag and <c>type</c> and forwards
-/// to it, so <c>&lt;input :type="t"&gt;</c> switches between text, checkbox, and radio behavior when
-/// <c>t</c> changes at runtime; <c>&lt;select&gt;</c> and <c>&lt;textarea&gt;</c> resolve by tag.
-/// Emitted by the compiler when the <c>v-model</c> element's type is dynamic
-/// ([V01.01.05.03]). Stateless singleton (<see cref="Instance"/>).
+/// The <c>v-model</c> directive for elements whose concrete model directive is selected from the
+/// current element tag and input type at runtime.
 /// </summary>
+/// <remarks>
+/// This is Viu's C# port of Vue 3.5's <c>vModelDynamic</c>:
+/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/directives/vModel.ts.
+/// </remarks>
 public sealed class VModelDynamic : IDirective
 {
     /// <summary>The shared directive instance the compiler references.</summary>
@@ -38,33 +37,91 @@ public sealed class VModelDynamic : IDirective
     /// <inheritdoc/>
     public DirectiveHook? BeforeUnmount => OnBeforeUnmount;
 
-    private static void OnCreated(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
-        => Resolve(node).Created?.Invoke(element, binding, node, previousNode);
-
-    private static void OnMounted(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
-        => Resolve(node).Mounted?.Invoke(element, binding, node, previousNode);
-
-    private static void OnBeforeUpdate(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
-        => Resolve(node).BeforeUpdate?.Invoke(element, binding, node, previousNode);
-
-    private static void OnUpdated(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
-        => Resolve(node).Updated?.Invoke(element, binding, node, previousNode);
-
-    private static void OnBeforeUnmount(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
-        => Resolve(node).BeforeUnmount?.Invoke(element, binding, node, previousNode);
-
-    // Upstream resolveDynamicModel: SELECT/TEXTAREA by tag, otherwise by input type.
-    private static IDirective Resolve(VirtualNode node)
+    private static void OnCreated(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
     {
-        if (string.Equals(node.ElementTag, "select", StringComparison.Ordinal))
+        Resolve(component).Created?.Invoke(
+            element,
+            binding,
+            component,
+            previousComponent);
+    }
+
+    private static void OnMounted(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
+    {
+        Resolve(component).Mounted?.Invoke(
+            element,
+            binding,
+            component,
+            previousComponent);
+    }
+
+    private static void OnBeforeUpdate(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
+    {
+        Resolve(component).BeforeUpdate?.Invoke(
+            element,
+            binding,
+            component,
+            previousComponent);
+    }
+
+    private static void OnUpdated(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
+    {
+        Resolve(component).Updated?.Invoke(
+            element,
+            binding,
+            component,
+            previousComponent);
+    }
+
+    private static void OnBeforeUnmount(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
+    {
+        Resolve(component).BeforeUnmount?.Invoke(
+            element,
+            binding,
+            component,
+            previousComponent);
+    }
+
+    private static IDirective Resolve(IElementComponent component)
+    {
+        if (string.Equals(
+            component.Tag,
+            "select",
+            StringComparison.OrdinalIgnoreCase))
         {
             return VModelSelect.Instance;
         }
-        if (string.Equals(node.ElementTag, "textarea", StringComparison.Ordinal))
+
+        if (string.Equals(
+            component.Tag,
+            "textarea",
+            StringComparison.OrdinalIgnoreCase))
         {
             return VModelText.Instance;
         }
-        return BrowserModelDirective.FormatValue(BrowserModelDirective.Property(node, "type")) switch
+
+        return BrowserModelDirective.FormatValue(
+            BrowserModelDirective.Property(component, "type")) switch
         {
             "checkbox" => VModelCheckbox.Instance,
             "radio" => VModelRadio.Instance,

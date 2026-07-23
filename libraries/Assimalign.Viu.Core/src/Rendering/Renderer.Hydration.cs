@@ -1,991 +1,1465 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Globalization;
 
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The client-side hydration walk — the C# port of <c>createHydrationFunctions</c> in
-/// <c>@vue/runtime-core</c> (<c>packages/runtime-core/src/hydration.ts</c>,
-/// https://vuejs.org/guide/scaling-up/ssr.html#client-hydration). Instead of creating platform
-/// nodes, the walker <b>adopts</b> the server-rendered DOM: elements are matched by tag and have
-/// only their dynamic props reconciled (event listeners always attached), text is adopted with its
-/// content asserted, fragments are consumed between their <c>[</c>/<c>]</c> comment anchors,
-/// components hydrate their subtree over the existing nodes, and teleported content hydrates at its
-/// resolved target. A server/client mismatch never crashes: it logs a recoverable warning and falls
-/// back to a client-side render of just the mismatched subtree, so the rest of the tree is still
-/// adopted and every listener ends up attached exactly once.
-/// <para>
-/// The walk drives entirely off a <see cref="HydrationNodeReader{TNode}"/> for reads and the
-/// existing <see cref="RendererOptions{TNode}"/> for writes, so it is platform-agnostic; the browser
-/// supplies a reader backed by one batched interop snapshot, keeping the walk free of per-node
-/// boundary crossings.
-/// </para>
+/// Contains the host-neutral hydration walk for <see cref="Renderer{TNode}"/>.
 /// </summary>
 public sealed partial class Renderer<TNode>
 {
     private const string AllowMismatchAttribute = "data-allow-mismatch";
+    private const string FragmentStartMarker = "[";
+    private const string FragmentEndMarker = "]";
+    private const string TeleportStartMarker = "teleport start";
+    private const string TeleportEndMarker = "teleport end";
+    private const string TeleportTargetMarker = "teleport anchor";
 
-    // Armed by the component branch immediately before MountComponent so the component's first render
-    // effect (ComponentUpdateFunction) hydrates its subtree against the server node stamped on its
-    // vnode.El instead of mounting fresh — the seam upstream's componentUpdateFn reaches through its
-    // closed-over hydrateNode. Non-null only during a synchronous hydration pass; single-threaded.
-    private HydrationNodeReader<TNode>? _componentHydrationReader;
+    private Dictionary<TNode, TNode?>? _hydrationTargetCursors;
 
     /// <summary>
-    /// Hydrates <paramref name="node"/> against the existing server-rendered content of
-    /// <paramref name="container"/> — the C# port of the root <c>hydrate(vnode, container)</c>
-    /// (<c>packages/runtime-core/src/hydration.ts</c>). When the container is empty it falls back to a
-    /// full client mount (upstream parity). Pending post-flush callbacks are drained before returning,
-    /// so mounted lifecycle hooks fire synchronously with the hydrate call.
+    /// Adopts server-rendered host nodes as the mounted representation of a component tree.
     /// </summary>
-    /// <param name="node">The client vnode tree to hydrate onto the server DOM.</param>
-    /// <param name="container">The container holding the server-rendered markup.</param>
-    /// <exception cref="NotSupportedException">The renderer options provide no <c>CreateHydrationReader</c>.</exception>
-    internal void Hydrate(VirtualNode node, TNode container)
+    /// <remarks>
+    /// Matching nodes are retained, interactive bindings and directive hooks are attached, and
+    /// later reactive updates patch the adopted nodes. A structural mismatch is recovered at the
+    /// smallest subtree by removing that server range and mounting the client component in its
+    /// place. This follows Vue 3.5's <c>createHydrationFunctions</c> contract:
+    /// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/hydration.ts.
+    /// </remarks>
+    /// <param name="component">The client component tree.</param>
+    /// <param name="container">The host container holding server-rendered children.</param>
+    /// <param name="application">
+    /// The application composition context required by templates and directives.
+    /// </param>
+    /// <returns>The root template context, or null when the root is not a template.</returns>
+    /// <exception cref="NotSupportedException">
+    /// The host did not supply <see cref="RendererOptions{TNode}.CreateHydrationReader"/>.
+    /// </exception>
+    public IComponentContext? Hydrate(
+        IComponent component,
+        TNode container,
+        IApplicationContext? application = null)
     {
-        if (_options.CreateHydrationReader is null)
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(container);
+        Func<TNode, HydrationNodeReader<TNode>> createReader =
+            _options.CreateHydrationReader
+            ?? throw new NotSupportedException(
+                "This host does not provide CreateHydrationReader, which hydration requires.");
+        if (_containerTrees.ContainsKey(container))
         {
-            throw new NotSupportedException(
-                "This renderer's options do not provide CreateHydrationReader, which hydration requires.");
+            throw new InvalidOperationException(
+                "A container with a mounted component tree cannot be hydrated again.");
         }
-        var reader = _options.CreateHydrationReader(container);
-        var firstChild = reader.FirstChild(container);
+
+        MountedTree<TNode> tree = new()
+        {
+            Application = application,
+        };
+        HydrationNodeReader<TNode> reader = createReader(container);
+        TNode? firstChild = reader.FirstChild(container);
+        _hydrationTargetCursors = new Dictionary<TNode, TNode?>(NodeComparer);
         try
         {
-            if (TryNode(firstChild, out var start))
+            if (HasHostNode(firstChild))
             {
-                HydrateNode(reader, start, node, parentComponent: null, optimized: false);
+                (MountedRenderNode<TNode> mounted, TNode? next) = HydrateNode(
+                    tree,
+                    reader,
+                    firstChild!,
+                    component,
+                    container,
+                    elementNamespace: null,
+                    owner: null);
+                tree.Root = mounted;
+                RemoveExcessHydrationNodes(
+                    tree,
+                    reader,
+                    next,
+                    "Hydration children mismatch: the server rendered extra root nodes.");
             }
             else
             {
-                // Empty container: nothing to adopt, so mount fresh (upstream parity).
-                RuntimeWarnings.Warn(
-                    "Attempting to hydrate existing markup but container is empty. Performing full mount instead.");
-                Patch(null, node, container, default, null, null);
+                Warn(
+                    tree,
+                    "Attempting to hydrate existing markup, but the container is empty. "
+                    + "Performing a full client mount.");
+                tree.Root = Mount(
+                    tree,
+                    component,
+                    container,
+                    default,
+                    elementNamespace: null,
+                    owner: null);
             }
+
+            _containerTrees.Add(container, tree);
         }
         finally
         {
-            _componentHydrationReader = null;
+            _hydrationTargetCursors = null;
         }
-        _containerRoots[container] = node;
+
+        QueueHostCommit();
         Scheduler.FlushAfterSynchronousRender();
+        return tree.Root is MountedTemplateNode<TNode> template
+            ? template.Instance.Context
+            : null;
     }
 
-    // The C# port of hydrateNode: adopt one server node for one vnode and return the server node that
-    // follows the adopted range (what the caller advances its cursor to). A type/structure mismatch
-    // routes through HandleMismatch, which recovers by client-rendering just this subtree.
-    private TNode? HydrateNode(
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateNode(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        bool optimized)
+        IComponent component,
+        TNode container,
+        string? elementNamespace,
+        ComponentContext? owner)
     {
-        optimized = optimized || vnode.DynamicChildren is not null;
-        var kind = reader.Kind(node);
-        var isFragmentStart = kind == HydrationNodeKind.Comment
-            && string.Equals(reader.Data(node), HydrationMarkers.FragmentStart, StringComparison.Ordinal);
-        // Adopt the node onto the vnode up front (upstream: vnode.el = node); a mismatch resets it.
-        vnode.El = node;
-        TNode? nextNode;
-        switch (vnode.Type)
+        return component.Kind switch
         {
-            case VirtualNodeType.Text:
-                nextNode = HydrateText(reader, node, vnode, parentComponent, kind, isFragmentStart);
-                break;
-            case VirtualNodeType.Comment:
-                if (kind != HydrationNodeKind.Comment || isFragmentStart)
-                {
-                    nextNode = HandleMismatch(reader, node, vnode, parentComponent, isFragmentStart);
-                }
-                else
-                {
-                    nextNode = reader.NextSibling(node);
-                }
-                break;
-            case VirtualNodeType.Static:
-                nextNode = HydrateStatic(reader, node, vnode, parentComponent, kind, isFragmentStart);
-                break;
-            case VirtualNodeType.Fragment:
-                nextNode = isFragmentStart
-                    ? HydrateFragment(reader, node, vnode, parentComponent, optimized)
-                    : HandleMismatch(reader, node, vnode, parentComponent, isFragmentStart);
-                break;
-            case VirtualNodeType.Element:
-                if (kind != HydrationNodeKind.Element
-                    || !string.Equals(reader.ElementTag(node), vnode.ElementTag, StringComparison.OrdinalIgnoreCase))
-                {
-                    nextNode = HandleMismatch(reader, node, vnode, parentComponent, isFragmentStart);
-                }
-                else
-                {
-                    nextNode = HydrateElement(reader, node, vnode, parentComponent, optimized);
-                }
-                break;
-            case VirtualNodeType.Component:
-                nextNode = HydrateComponent(reader, node, vnode, parentComponent, optimized, isFragmentStart);
-                break;
-            case VirtualNodeType.Teleport:
-                if (kind != HydrationNodeKind.Comment)
-                {
-                    nextNode = HandleMismatch(reader, node, vnode, parentComponent, isFragmentStart);
-                }
-                else
-                {
-                    nextNode = HydrateTeleport(reader, node, vnode, parentComponent, optimized);
-                }
-                break;
-            default:
-                throw new InvalidOperationException($"Unknown vnode type: {vnode.Type}.");
-        }
-        // Template ref is applied after adoption (upstream setRef call at the end of hydrateNode).
-        if (vnode.Reference is { } reference && vnode.El is not null)
-        {
-            SetReference(reference, oldReference: null, vnode, isUnmount: false, parentComponent);
-        }
-        return nextNode;
+            ComponentKind.Element => HydrateElement(
+                tree,
+                reader,
+                node,
+                RequireElement(component),
+                container,
+                elementNamespace,
+                owner),
+            ComponentKind.Text => HydrateText(
+                tree,
+                reader,
+                node,
+                RequireText(component),
+                container,
+                owner),
+            ComponentKind.Comment => HydrateComment(
+                tree,
+                reader,
+                node,
+                RequireComment(component),
+                container,
+                owner),
+            ComponentKind.Static => HydrateStatic(
+                tree,
+                reader,
+                node,
+                RequireStatic(component),
+                container,
+                elementNamespace,
+                owner),
+            ComponentKind.Fragment => HydrateFragment(
+                tree,
+                reader,
+                node,
+                RequireFragment(component),
+                container,
+                elementNamespace,
+                owner),
+            ComponentKind.Template => HydrateTemplate(
+                tree,
+                reader,
+                node,
+                RequireTemplate(component),
+                container,
+                elementNamespace,
+                owner),
+            ComponentKind.Teleport => HydrateTeleport(
+                tree,
+                reader,
+                node,
+                RequireTeleport(component),
+                container,
+                elementNamespace,
+                owner),
+            _ => throw new InvalidOperationException(
+                $"Unknown component kind: {component.Kind}."),
+        };
     }
 
-    private TNode? HydrateText(
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateText(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        HydrationNodeKind kind,
-        bool isFragmentStart)
+        ITextComponent component,
+        TNode container,
+        ComponentContext? owner)
     {
-        if (kind != HydrationNodeKind.Text)
+        if (reader.Kind(node) != HydrationNodeKind.Text)
         {
-            // #5728: an empty text vnode has no server node (adjacent to a slot) — create it in place
-            // rather than treat the following node as a mismatch (upstream Text case).
-            if (string.IsNullOrEmpty(vnode.TextChildren))
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace: null,
+                owner);
+        }
+
+        string serverText = reader.Data(node);
+        if (!string.Equals(serverText, component.Text, StringComparison.Ordinal))
+        {
+            if (!IsMismatchAllowed(reader, node, "text"))
             {
-                var created = _options.CreateText(string.Empty);
-                vnode.El = created;
-                if (TryNode(reader.ParentNode(node), out var textParent))
-                {
-                    _options.Insert(created, textParent, node);
-                }
-                return node;
+                Warn(
+                    tree,
+                    $"Hydration text mismatch: the server rendered \"{serverText}\", "
+                    + $"but the client expected \"{component.Text}\".");
             }
-            return HandleMismatch(reader, node, vnode, parentComponent, isFragmentStart);
+
+            _options.SetText(node, component.Text);
         }
-        var serverText = reader.Data(node);
-        if (!string.Equals(serverText, vnode.TextChildren, StringComparison.Ordinal))
-        {
-            if (!IsMismatchAllowed(reader, node, HydrationMismatchType.Text))
-            {
-                WarnMismatch(
-                    reader,
-                    node,
-                    $"Hydration text mismatch: rendered on server \"{serverText}\", expected on client "
-                    + $"\"{vnode.TextChildren}\".");
-            }
-            // Recover: adopt the node but correct its content to the client value (upstream parity).
-            _options.SetText(node, vnode.TextChildren ?? string.Empty);
-        }
-        return reader.NextSibling(node);
+
+        MountedLeafNode<TNode> mounted = new(component, node, owner);
+        Register(tree, component, mounted);
+        return (mounted, reader.NextSibling(node));
     }
 
-    private TNode? HydrateStatic(
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateComment(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        HydrationNodeKind kind,
-        bool isFragmentStart)
+        ICommentComponent component,
+        TNode container,
+        ComponentContext? owner)
     {
-        // Upstream Static case: a static vnode adopts a run of top-level server nodes, capturing the
-        // first as El and the last as the Anchor. When the markup was emitted inside a fragment the run
-        // starts after the [ marker.
-        var current = node;
-        if (isFragmentStart && TryNode(reader.NextSibling(node), out var afterMarker))
+        if (reader.Kind(node) != HydrationNodeKind.Comment
+            || IsStructuralStartMarker(reader.Data(node)))
         {
-            current = afterMarker;
-            kind = reader.Kind(current);
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace: null,
+                owner);
         }
+
+        MountedLeafNode<TNode> mounted = new(component, node, owner);
+        Register(tree, component, mounted);
+        return (mounted, reader.NextSibling(node));
+    }
+
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateStatic(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        IStaticComponent component,
+        TNode container,
+        string? elementNamespace,
+        ComponentContext? owner)
+    {
+        HydrationNodeKind kind = reader.Kind(node);
         if (kind is not (HydrationNodeKind.Element or HydrationNodeKind.Text))
         {
-            return HandleMismatch(reader, node, vnode, parentComponent, isFragmentStart);
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace,
+                owner);
         }
-        vnode.El = current;
-        // The runtime does not know the static node count the compiler records upstream (staticCount);
-        // Viu emits Static content as a single adopted node run bounded by the client vnode, so the
-        // adopted node stands as both El and Anchor. Multi-node static hydration arrives with the
-        // SSR compiler transforms ([V01.01.07.02]).
-        vnode.Anchor = current;
-        var next = reader.NextSibling(current);
-        return isFragmentStart && TryNode(next, out var afterStatic) ? reader.NextSibling(afterStatic) : next;
+
+        MountedStaticNode<TNode> mounted = new(component, node, node, owner);
+        Register(tree, component, mounted);
+        return (mounted, reader.NextSibling(node));
     }
 
-    private TNode? HydrateElement(
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateElement(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
-        TNode element,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        bool optimized)
-    {
-        optimized = optimized || vnode.DynamicChildren is not null;
-        var properties = vnode.Properties;
-        var patchFlag = vnode.PatchFlag;
-        var tag = vnode.ElementTag!;
-        // input/option force a value patch even when otherwise static (upstream forcePatch).
-        var forcePatch = string.Equals(tag, "input", StringComparison.Ordinal)
-            || string.Equals(tag, "option", StringComparison.Ordinal);
-        var hasDynamicProperties = vnode.DynamicProperties is not null;
-        // A CACHED (hoisted / v-once) element with no forced/dynamic props is trusted verbatim: adopt it
-        // without inspecting children or props (upstream: the `patchFlag !== CACHED` gate). This is the
-        // PatchFlag fast path — no per-attribute work on static subtrees.
-        if (!forcePatch && !hasDynamicProperties && patchFlag == PatchFlags.Cached)
-        {
-            return reader.NextSibling(element);
-        }
-        InvokeDirectiveHooks(vnode, null, DirectiveHookKind.Created);
-
-        // Children: an array of vnodes is walked; a single text-children element only asserts its text.
-        var hasChildOverride = properties is not null
-            && (properties.ContainsName("innerHTML") || properties.ContainsName("textContent"));
-        if ((vnode.ShapeFlag & ShapeFlags.ArrayChildren) != 0 && !hasChildOverride)
-        {
-            var leftover = HydrateChildren(
-                reader, reader.FirstChild(element), vnode, element, parentComponent, optimized);
-            // Excess server nodes the client vdom did not account for: warn once, then remove them so
-            // the adopted tree converges (upstream hydrateElement trailing while-loop).
-            if (TryNode(leftover, out _) && !IsMismatchAllowed(reader, element, HydrationMismatchType.Children))
-            {
-                WarnMismatch(
-                    reader,
-                    element,
-                    "Hydration children mismatch: server rendered more child nodes than the client vdom.");
-            }
-            var excess = leftover;
-            while (TryNode(excess, out var excessNode))
-            {
-                var following = reader.NextSibling(excessNode);
-                _options.Remove(excessNode);
-                excess = following;
-            }
-        }
-        else if ((vnode.ShapeFlag & ShapeFlags.TextChildren) != 0)
-        {
-            var clientText = vnode.TextChildren ?? string.Empty;
-            var serverText = ReadElementText(reader, element);
-            if (!string.Equals(serverText, clientText, StringComparison.Ordinal))
-            {
-                if (!IsMismatchAllowed(reader, element, HydrationMismatchType.Text))
-                {
-                    WarnMismatch(
-                        reader,
-                        element,
-                        $"Hydration text content mismatch: rendered on server \"{serverText}\", expected on "
-                        + $"client \"{clientText}\".");
-                }
-                _options.SetElementText(element, clientText);
-            }
-        }
-
-        // Props: attach listeners and reconcile only the bindings that can differ. The PatchFlag fast
-        // path keeps a static element off the per-prop loop — it either patches nothing, or only the
-        // click listener (the common interactive case).
-        if (properties is not null)
-        {
-            var elementNamespace = NamespaceForTag(tag);
-            // A custom element (tag with a hyphen) has every non-reserved prop hydrated (upstream isCustomElement).
-            var isCustomElement = tag.Contains('-', StringComparison.Ordinal);
-            var mustIterate = forcePatch
-                || hasDynamicProperties
-                || !optimized
-                || ((int)patchFlag > 0 && (patchFlag & (PatchFlags.FullProps | PatchFlags.NeedHydration)) != 0);
-            if (mustIterate)
-            {
-                foreach (var (name, value) in properties)
-                {
-                    // Dev-mode mismatch reporting for class/style/attribute bindings (upstream propHasMismatch:
-                    // warn only, never patch — the reconciliation set is ShouldHydrateProperty, below).
-                    ReportPropertyMismatch(reader, element, name, value, vnode);
-                    if (ShouldHydrateProperty(name, forcePatch, isCustomElement))
-                    {
-                        _options.PatchProperty(element, tag, name, null, value, elementNamespace);
-                    }
-                }
-            }
-            else if (properties.TryGetValue("onClick", out var clickHandler))
-            {
-                // Fast path (upstream): a static element still needs its click listener attached.
-                _options.PatchProperty(element, tag, "onClick", null, clickHandler, elementNamespace);
-            }
-        }
-
-        InvokeHook(vnode, null, "onVnodeBeforeMount");
-        InvokeDirectiveHooks(vnode, null, DirectiveHookKind.BeforeMount);
-        QueuePostHook(vnode, null, "onVnodeMounted");
-        QueuePostDirectiveHooks(vnode, null, DirectiveHookKind.Mounted);
-        return reader.NextSibling(element);
-    }
-
-    private TNode? HydrateChildren(
-        HydrationNodeReader<TNode> reader,
-        TNode? firstNode,
-        VirtualNode parentVnode,
+        TNode node,
+        IElementComponent component,
         TNode container,
-        ComponentInstance? parentComponent,
-        bool optimized)
+        string? elementNamespace,
+        ComponentContext? owner)
     {
-        optimized = optimized || parentVnode.DynamicChildren is not null;
-        var children = parentVnode.ArrayChildren ?? [];
-        var cursor = firstNode;
-        var warnedInsufficient = false;
-        for (var index = 0; index < children.Length; index++)
+        if (reader.Kind(node) != HydrationNodeKind.Element
+            || !string.Equals(
+                reader.ElementTag(node),
+                component.Tag,
+                StringComparison.OrdinalIgnoreCase))
         {
-            var child = optimized
-                ? children[index]
-                : children[index] = VirtualNodeFactory.Normalize(children[index]);
-            if (TryNode(cursor, out var node))
-            {
-                // Consecutive client text vnodes served as one server text node: peel the server text so each
-                // vnode adopts its own node (upstream hydrateChildren adjacent-text handling). The peel is
-                // snapshot-safe — it creates the split nodes and adopts them by the handle it holds, never
-                // re-reading the reader for nodes an immutable snapshot does not contain.
-                if (!optimized
-                    && child.Type == VirtualNodeType.Text
-                    && reader.Kind(node) == HydrationNodeKind.Text
-                    && index + 1 < children.Length
-                    && VirtualNodeFactory.Normalize(children[index + 1]).Type == VirtualNodeType.Text)
-                {
-                    index = HydrateAdjacentTextRun(reader, node, container, children, index, out cursor);
-                }
-                else
-                {
-                    cursor = HydrateNode(reader, node, child, parentComponent, optimized);
-                }
-            }
-            else if (child.Type == VirtualNodeType.Text && string.IsNullOrEmpty(child.TextChildren))
-            {
-                // #7215: an empty text vnode with no server node — create it (upstream parity).
-                var created = _options.CreateText(string.Empty);
-                child.El = created;
-                _options.Insert(created, container, default);
-            }
-            else
-            {
-                // Too few server nodes: warn once, then client-render the remaining vnodes (upstream).
-                if (!warnedInsufficient)
-                {
-                    warnedInsufficient = true;
-                    if (!IsMismatchAllowed(reader, container, HydrationMismatchType.Children))
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace,
+                owner);
+        }
+
+        string? ownNamespace = ElementNamespace(component.Tag, elementNamespace);
+        bool forceValue = string.Equals(
+                component.Tag,
+                "input",
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                component.Tag,
+                "option",
+                StringComparison.OrdinalIgnoreCase);
+        if (!forceValue
+            && component.Optimization.DynamicProperties is null
+            && component.Optimization.PatchFlags == PatchFlags.Cached)
+        {
+            MountedElementNode<TNode> cached = new(
+                component,
+                node,
+                [],
+                [],
+                owner);
+            cached.Transition = TransitionComponents.Get(component);
+            Register(tree, component, cached);
+            UpdateReference(
+                tree,
+                cached,
+                previousReference: null,
+                component.Reference,
+                node);
+            return (cached, reader.NextSibling(node));
+        }
+
+        List<DirectiveBinding> directiveBindings = ResolveDirectiveBindings(
+            tree,
+            component.Directives,
+            owner);
+        TransitionHooks? transition = TransitionComponents.Get(component);
+        BindDirectiveTransitions(directiveBindings, transition);
+        InvokeDirectiveHooks(
+            tree,
+            node,
+            directiveBindings,
+            component,
+            previousComponent: null,
+            DirectiveHookKind.Created);
+
+        bool hasChildOverride =
+            component.Attributes.TryGetValue("innerHTML", out _)
+            || component.Attributes.TryGetValue("textContent", out _);
+        List<MountedRenderNode<TNode>> children = hasChildOverride
+            ? []
+            : HydrateChildren(
+                tree,
+                reader,
+                reader.FirstChild(node),
+                component.Children,
+                node,
+                ChildrenNamespace(component.Tag, ownNamespace),
+                owner,
+                closingMarker: null);
+        HydrateAttributes(tree, reader, node, component, ownNamespace);
+        InvokeComponentNodeLifecycleHook(
+            tree,
+            owner,
+            component,
+            previousComponent: null,
+            "onVnodeBeforeMount");
+        InvokeDirectiveHooks(
+            tree,
+            node,
+            directiveBindings,
+            component,
+            previousComponent: null,
+            DirectiveHookKind.BeforeMount);
+
+        MountedElementNode<TNode> mounted = new(
+            component,
+            node,
+            children,
+            directiveBindings,
+            owner);
+        mounted.Transition = transition;
+        BindDirectiveHostElements(mounted, directiveBindings);
+        Register(tree, component, mounted);
+        UpdateReference(
+            tree,
+            mounted,
+            previousReference: null,
+            component.Reference,
+            node);
+        QueueComponentNodeLifecycleHook(
+            tree,
+            owner,
+            mounted,
+            component,
+            previousComponent: null,
+            "onVnodeMounted");
+        if (directiveBindings.Count > 0)
+        {
+            Scheduler.QueuePostFlushCallback(
+                new SchedulerJob(
+                    () =>
                     {
-                        WarnMismatch(
-                            reader,
-                            container,
-                            "Hydration children mismatch: server rendered fewer child nodes than the client vdom.");
+                        if (!mounted.IsUnmounted)
+                        {
+                            InvokeDirectiveHooks(
+                                tree,
+                                node,
+                                mounted.DirectiveBindings,
+                                RequireElement(mounted.Component),
+                                previousComponent: null,
+                                DirectiveHookKind.Mounted);
+                            QueueHostCommit();
+                        }
+                    })
+                {
+                    Name = "hydrated directive mounted lifecycle",
+                });
+        }
+
+        return (mounted, reader.NextSibling(node));
+    }
+
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateFragment(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        IFragmentComponent component,
+        TNode container,
+        string? elementNamespace,
+        ComponentContext? owner)
+    {
+        if (!IsCommentMarker(reader, node, FragmentStartMarker))
+        {
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace,
+                owner);
+        }
+
+        TNode fragmentContainer = HasHostNode(reader.ParentNode(node))
+            ? reader.ParentNode(node)!
+            : container;
+        TNode? closing = FindClosingMarker(
+            reader,
+            node,
+            FragmentStartMarker,
+            FragmentEndMarker);
+        List<MountedRenderNode<TNode>> children = HydrateChildren(
+            tree,
+            reader,
+            reader.NextSibling(node),
+            component.Children,
+            fragmentContainer,
+            elementNamespace,
+            owner,
+            FragmentEndMarker);
+        TNode endAnchor;
+        TNode? next;
+        if (HasHostNode(closing))
+        {
+            endAnchor = closing!;
+            next = reader.NextSibling(endAnchor);
+        }
+        else
+        {
+            endAnchor = _options.CreateComment(FragmentEndMarker);
+            _options.Insert(endAnchor, fragmentContainer, default);
+            next = default;
+            Warn(
+                tree,
+                "Hydration fragment mismatch: the server fragment had no closing anchor.");
+        }
+
+        MountedFragmentNode<TNode> mounted = new(
+            component,
+            node,
+            endAnchor,
+            children,
+            owner);
+        Register(tree, component, mounted);
+        return (mounted, next);
+    }
+
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateTemplate(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        ITemplateComponent component,
+        TNode container,
+        string? elementNamespace,
+        ComponentContext? owner)
+    {
+        if (IsSuspenseComponent(component))
+        {
+            throw new NotSupportedException(
+                "Suspense hydration is not implemented. Render the boundary on the client until "
+                + "pending-branch hydration can coordinate with server output.");
+        }
+
+        IApplicationContext application = tree.Application
+            ?? throw new InvalidOperationException(
+                "Template components require an application context. Supply it to Hydrate.");
+        int identifier = checked(++_nextComponentIdentifier);
+        MountedComponent instance = MountedComponent.Create(
+            application,
+            component,
+            owner,
+            identifier);
+        TransitionHooks? initialTransition =
+            TransitionComponents.Get(component);
+        MountedKeepAliveState<TNode>? keepAliveState =
+            CreateKeepAliveState(instance);
+        MountedRenderNode<TNode>? subtree = null;
+        MountedTemplateNode<TNode>? mounted = null;
+        ReactiveEffect? renderEffect = null;
+        SchedulerJob? renderJob = null;
+        TNode? initialNext = default;
+        SchedulerJob mountedJob = new(instance.InvokeMounted)
+        {
+            Name = "hydrated component mounted lifecycle",
+        };
+        SchedulerJob updatedJob = new(instance.InvokeUpdated)
+        {
+            Name = "component updated lifecycle",
+        };
+
+        try
+        {
+            IComponent RenderSubtree()
+            {
+                IComponent rendered = instance.Render();
+                TransitionHooks? transition =
+                    mounted?.Transition ?? initialTransition;
+                return transition is null
+                    ? rendered
+                    : TransitionComponents.Attach(rendered, transition);
+            }
+
+            void RenderComponent()
+            {
+                if (subtree is null)
+                {
+                    instance.InvokeBeforeMount();
+                    InvokeComponentNodeLifecycleHook(
+                        tree,
+                        owner,
+                        component,
+                        previousComponent: null,
+                        "onVnodeBeforeMount");
+                    IComponent initialRendered = RenderSubtree();
+                    (subtree, initialNext) = HydrateNode(
+                        tree,
+                        reader,
+                        node,
+                        initialRendered,
+                        container,
+                        elementNamespace,
+                        instance.Context);
+                    if (keepAliveState is not null)
+                    {
+                        InitializeKeepAlive(
+                            tree,
+                            keepAliveState,
+                            instance,
+                            subtree);
                     }
+
+                    QueueHostCommit();
+                    return;
                 }
-                Patch(null, child, container, default, NamespaceForTag(parentVnode.ElementTag), parentComponent);
+
+                instance.InvokeBeforeUpdate();
+                InvokePendingTemplateNodeBeforeUpdateHook(
+                    tree,
+                    mounted);
+                TNode fallbackContainer = mounted is null
+                    ? container
+                    : mounted.FallbackContainer;
+                TNode updateContainer = HostParentOrFallback(
+                    subtree.FirstHostNode,
+                    fallbackContainer);
+                TNode? updateAnchor = GetNextHostNode(subtree);
+                IComponent rendered = RenderSubtree();
+                subtree = keepAliveState is null
+                    ? Patch(
+                        tree,
+                        subtree,
+                        rendered,
+                        updateContainer,
+                        updateAnchor,
+                        mounted?.ElementNamespace ?? elementNamespace,
+                        instance.Context)
+                    : PatchKeepAlive(
+                        tree,
+                        keepAliveState,
+                        instance,
+                        subtree,
+                        rendered,
+                        updateContainer,
+                        updateAnchor,
+                        mounted?.ElementNamespace ?? elementNamespace);
+                if (mounted is not null)
+                {
+                    mounted.Subtree = subtree;
+                }
+
+                QueueHostCommit();
+                Scheduler.QueuePostFlushCallback(updatedJob);
+            }
+
+            renderEffect = instance.CreateRenderEffect(
+                RenderComponent,
+                () => Scheduler.QueueJob(renderJob!));
+            renderJob = new SchedulerJob(renderEffect.RunIfDirty)
+            {
+                Identifier = identifier,
+                Name = "hydrated component render",
+            };
+            renderEffect.Run();
+
+            mounted = new MountedTemplateNode<TNode>(
+                component,
+                instance,
+                subtree!,
+                renderEffect,
+                renderJob,
+                mountedJob,
+                updatedJob,
+                container,
+                elementNamespace,
+                owner);
+            mounted.Transition = initialTransition;
+            mounted.KeepAliveState = keepAliveState;
+            instance.Context.RootElementResolver =
+                () => GetRootElementObjects(mounted.Subtree);
+            instance.Context.KeyedChildElementResolver =
+                () => GetKeyedChildElementSnapshots(mounted.Subtree);
+            instance.Context.HostCommitScheduler = QueueHostCommit;
+            Register(tree, component, mounted);
+            UpdateReference(
+                tree,
+                mounted,
+                previousReference: null,
+                component.Reference,
+                ComponentReferenceValue(instance.Context));
+            Scheduler.QueuePostFlushCallback(mountedJob);
+            QueueComponentNodeLifecycleHook(
+                tree,
+                owner,
+                mounted,
+                component,
+                previousComponent: null,
+                "onVnodeMounted");
+            return (mounted, initialNext);
+        }
+        catch
+        {
+            renderJob?.IsDisposed = true;
+            mountedJob.IsDisposed = true;
+            updatedJob.IsDisposed = true;
+            instance.AbortMount(
+                subtree is null
+                    ? null
+                    : () => Unmount(tree, subtree, removeHostNodes: true));
+            if (keepAliveState is not null)
+            {
+                _options.Remove(keepAliveState.StorageContainer);
+            }
+
+            throw;
+        }
+    }
+
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateTeleport(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        ITeleportComponent component,
+        TNode container,
+        string? elementNamespace,
+        ComponentContext? owner)
+    {
+        if (!IsCommentMarker(reader, node, TeleportStartMarker))
+        {
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace,
+                owner);
+        }
+
+        TNode? mainEnd = FindClosingMarker(
+            reader,
+            node,
+            TeleportStartMarker,
+            TeleportEndMarker);
+        if (!HasHostNode(mainEnd))
+        {
+            return HydrateMismatch(
+                tree,
+                reader,
+                node,
+                component,
+                container,
+                elementNamespace,
+                owner);
+        }
+
+        TNode mainContainer = HasHostNode(reader.ParentNode(node))
+            ? reader.ParentNode(node)!
+            : container;
+        bool hasTarget = TryResolveTeleportTarget(
+            component.Target,
+            out TNode targetContainer);
+        if (!hasTarget)
+        {
+            WarnUnresolvedTeleportTarget(tree, component.Target);
+        }
+
+        List<MountedRenderNode<TNode>> children;
+        TNode? targetAnchor = default;
+        bool childrenMounted;
+        if (component.IsDisabled)
+        {
+            children = HydrateChildren(
+                tree,
+                reader,
+                reader.NextSibling(node),
+                component.Children,
+                mainContainer,
+                elementNamespace,
+                owner,
+                TeleportEndMarker);
+            childrenMounted = true;
+            if (hasTarget)
+            {
+                HydrationNodeReader<TNode> targetReader =
+                    _options.CreateHydrationReader!(targetContainer);
+                TNode? cursor = GetHydrationTargetCursor(targetReader, targetContainer);
+                targetAnchor = FindFirstMarker(
+                    targetReader,
+                    cursor,
+                    TeleportTargetMarker);
+                if (!HasHostNode(targetAnchor))
+                {
+                    targetAnchor = _options.CreateComment(TeleportTargetMarker);
+                    _options.Insert(targetAnchor, targetContainer, default);
+                }
+
+                SetHydrationTargetCursor(
+                    targetContainer,
+                    targetReader.NextSibling(targetAnchor!));
             }
         }
-        return cursor;
+        else if (hasTarget)
+        {
+            _ = HydrateChildren(
+                tree,
+                reader,
+                reader.NextSibling(node),
+                Array.Empty<IComponent>(),
+                mainContainer,
+                elementNamespace,
+                owner,
+                TeleportEndMarker);
+            HydrationNodeReader<TNode> targetReader =
+                _options.CreateHydrationReader!(targetContainer);
+            TNode? cursor = GetHydrationTargetCursor(targetReader, targetContainer);
+            children = HydrateChildren(
+                tree,
+                targetReader,
+                cursor,
+                component.Children,
+                targetContainer,
+                elementNamespace,
+                owner,
+                TeleportTargetMarker);
+            targetAnchor = FindFirstMarker(
+                targetReader,
+                cursor,
+                TeleportTargetMarker);
+            if (!HasHostNode(targetAnchor))
+            {
+                targetAnchor = _options.CreateComment(TeleportTargetMarker);
+                _options.Insert(targetAnchor, targetContainer, default);
+                Warn(
+                    tree,
+                    "Hydration teleport mismatch: the server target had no closing anchor.");
+            }
+
+            SetHydrationTargetCursor(
+                targetContainer,
+                HasHostNode(targetAnchor)
+                    ? targetReader.NextSibling(targetAnchor!)
+                    : default);
+            childrenMounted = true;
+        }
+        else
+        {
+            _ = HydrateChildren(
+                tree,
+                reader,
+                reader.NextSibling(node),
+                Array.Empty<IComponent>(),
+                mainContainer,
+                elementNamespace,
+                owner,
+                TeleportEndMarker);
+            children = [];
+            childrenMounted = false;
+        }
+
+        MountedTeleportNode<TNode> mounted = new(
+            component,
+            node,
+            mainEnd!,
+            hasTarget ? targetContainer : default,
+            targetAnchor,
+            hasTarget,
+            childrenMounted,
+            children,
+            elementNamespace,
+            owner);
+        Register(tree, component, mounted);
+        return (mounted, reader.NextSibling(mainEnd!));
+    }
+
+    private List<MountedRenderNode<TNode>> HydrateChildren(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode? first,
+        IReadOnlyList<IComponent> components,
+        TNode container,
+        string? elementNamespace,
+        ComponentContext? owner,
+        string? closingMarker)
+    {
+        List<MountedRenderNode<TNode>> mounted = new(components.Count);
+        TNode? cursor = first;
+        for (int index = 0; index < components.Count; index++)
+        {
+            if (!HasHostNode(cursor)
+                || (closingMarker is not null
+                    && IsCommentMarker(reader, cursor!, closingMarker)))
+            {
+                mounted.Add(
+                    Mount(
+                        tree,
+                        components[index],
+                        container,
+                        HasHostNode(cursor) ? cursor : default,
+                        elementNamespace,
+                        owner));
+                continue;
+            }
+
+            if (components[index] is ITextComponent
+                && reader.Kind(cursor!) == HydrationNodeKind.Text
+                && index + 1 < components.Count
+                && components[index + 1] is ITextComponent)
+            {
+                index = HydrateAdjacentTextRun(
+                    tree,
+                    reader,
+                    cursor!,
+                    container,
+                    components,
+                    index,
+                    owner,
+                    mounted,
+                    out cursor);
+                continue;
+            }
+
+            (MountedRenderNode<TNode> child, TNode? next) = HydrateNode(
+                tree,
+                reader,
+                cursor!,
+                components[index],
+                container,
+                elementNamespace,
+                owner);
+            mounted.Add(child);
+            cursor = next;
+        }
+
+        List<TNode> excess = [];
+        while (HasHostNode(cursor)
+            && (closingMarker is null
+                || !IsCommentMarker(reader, cursor!, closingMarker)))
+        {
+            excess.Add(cursor!);
+            cursor = reader.NextSibling(cursor!);
+        }
+
+        if (excess.Count > 0)
+        {
+            if (!IsMismatchAllowed(reader, container, "children"))
+            {
+                Warn(
+                    tree,
+                    "Hydration children mismatch: the server rendered more child nodes "
+                    + "than the client component tree.");
+            }
+
+            for (int index = 0; index < excess.Count; index++)
+            {
+                _options.Remove(excess[index]);
+            }
+        }
+
+        return mounted;
     }
 
     private int HydrateAdjacentTextRun(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
         TNode container,
-        VirtualNode[] children,
+        IReadOnlyList<IComponent> components,
         int startIndex,
+        ComponentContext? owner,
+        List<MountedRenderNode<TNode>> mounted,
         out TNode? cursor)
     {
-        // Adopt a run of consecutive client Text vnodes that the server rendered as ONE text node, by peeling
-        // the server text: the first vnode adopts `node`; each subsequent one adopts a freshly created node
-        // carrying the remaining text (upstream splits via node.data.slice + live nextSibling — Viu holds the
-        // created nodes so it needs no live re-read). Snapshot-safe: the only reader call is NextSibling(node)
-        // for the original following sibling (stable), and Data(node) once. Returns the index of the last
-        // vnode consumed (the caller's loop advances past it); `cursor` resumes at that following sibling.
-        var afterRun = reader.NextSibling(node);
-        var currentNode = node;
-        var currentData = reader.Data(node);
-        var index = startIndex;
+        TNode? afterRun = reader.NextSibling(node);
+        TNode currentNode = node;
+        string currentData = reader.Data(node);
+        int index = startIndex;
         while (true)
         {
-            var textVnode = children[index] = VirtualNodeFactory.Normalize(children[index]);
-            var clientText = textVnode.TextChildren ?? string.Empty;
-            var hasMoreText = index + 1 < children.Length
-                && VirtualNodeFactory.Normalize(children[index + 1]).Type == VirtualNodeType.Text;
+            ITextComponent component = RequireText(components[index]);
+            string clientText = component.Text;
+            bool hasMoreText = index + 1 < components.Count
+                && components[index + 1] is ITextComponent;
             if (hasMoreText && currentData.Length > clientText.Length)
             {
-                // Split off the remainder into a new node inserted before the run's original following sibling
-                // (each split lands after the previous one, preserving order), then trim this node to its share.
-                var overflow = _options.CreateText(currentData[clientText.Length..]);
-                _options.Insert(overflow, container, TryNode(afterRun, out var anchor) ? anchor : default);
+                string remainingText = currentData[clientText.Length..];
+                TNode overflow = _options.CreateText(remainingText);
+                _options.Insert(
+                    overflow,
+                    container,
+                    HasHostNode(afterRun) ? afterRun : default);
                 if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
                 {
                     _options.SetText(currentNode, clientText);
                 }
-                textVnode.El = currentNode;
+
+                MountedLeafNode<TNode> text = new(component, currentNode, owner);
+                mounted.Add(text);
+                Register(tree, component, text);
                 currentNode = overflow;
-                currentData = currentData[clientText.Length..];
+                currentData = remainingText;
                 index++;
+                continue;
             }
-            else
+
+            if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
             {
-                // Last vnode of the run (or nothing left to split): adopt the current node, correcting its text.
-                if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
-                {
-                    _options.SetText(currentNode, clientText);
-                }
-                textVnode.El = currentNode;
-                break;
+                _options.SetText(currentNode, clientText);
             }
+
+            MountedLeafNode<TNode> last = new(component, currentNode, owner);
+            mounted.Add(last);
+            Register(tree, component, last);
+            break;
         }
+
         cursor = afterRun;
         return index;
     }
 
-    private TNode? HydrateFragment(
+    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateMismatch(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        bool optimized)
+        IComponent component,
+        TNode fallbackContainer,
+        string? elementNamespace,
+        ComponentContext? owner)
     {
-        // The [ marker is the fragment's El; its children hydrate between the marker and the matching ]
-        // (upstream hydrateFragment). The parent container is the marker's parent.
-        vnode.El = node;
-        if (!TryNode(reader.ParentNode(node), out var container))
+        if (!IsMismatchAllowed(reader, node, "children"))
         {
-            return HandleMismatch(reader, node, vnode, parentComponent, isFragment: true);
+            Warn(
+                tree,
+                $"Hydration node mismatch: the server host node cannot represent "
+                + $"client component kind {component.Kind}.");
         }
-        var leftover = HydrateChildren(reader, reader.NextSibling(node), vnode, container, parentComponent, optimized);
-        if (TryNode(leftover, out var closing)
-            && reader.Kind(closing) == HydrationNodeKind.Comment
-            && string.Equals(reader.Data(closing), HydrationMarkers.FragmentEnd, StringComparison.Ordinal))
+
+        List<TNode> removalRange = ReadMismatchRange(reader, node);
+        TNode? next = reader.NextSibling(removalRange[^1]);
+        TNode parent = HasHostNode(reader.ParentNode(node))
+            ? reader.ParentNode(node)!
+            : fallbackContainer;
+        for (int index = 0; index < removalRange.Count; index++)
         {
-            vnode.Anchor = closing;
-            return reader.NextSibling(closing);
+            _options.Remove(removalRange[index]);
         }
-        // The server content did not close the fragment where expected: synthesize a closing anchor so
-        // later moves/unmounts still bound the fragment's range (upstream inserts a `]` comment).
-        var anchor = _options.CreateComment(HydrationMarkers.FragmentEnd);
-        vnode.Anchor = anchor;
-        if (TryNode(leftover, out var before))
-        {
-            _options.Insert(anchor, container, before);
-        }
-        else
-        {
-            _options.Insert(anchor, container, default);
-        }
-        return leftover;
+
+        MountedRenderNode<TNode> mounted = Mount(
+            tree,
+            component,
+            parent,
+            HasHostNode(next) ? next : default,
+            elementNamespace,
+            owner);
+        return (mounted, next);
     }
 
-    private TNode? HydrateComponent(
+    private static List<TNode> ReadMismatchRange(
         HydrationNodeReader<TNode> reader,
-        TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        bool optimized,
-        bool isFragmentStart)
+        TNode first)
     {
-        // Upstream component case: the subtree hydrates against the current node (mountComponent runs with
-        // vnode.el set, so componentUpdateFn adopts instead of mounts). The node that follows the component
-        // depends on its root shape — a fragment root spans [ .. ], a teleport root spans its start/end
-        // anchors, anything else is a single node.
-        if (!TryNode(reader.ParentNode(node), out var container))
+        List<TNode> nodes = [first];
+        if (reader.Kind(first) != HydrationNodeKind.Comment)
         {
-            container = node;
+            return nodes;
         }
-        TNode? nextNode;
-        if (isFragmentStart)
-        {
-            nextNode = LocateClosingAnchor(reader, node, HydrationMarkers.FragmentStart, HydrationMarkers.FragmentEnd);
-        }
-        else if (reader.Kind(node) == HydrationNodeKind.Comment
-            && string.Equals(reader.Data(node), HydrationMarkers.TeleportStart, StringComparison.Ordinal))
-        {
-            nextNode = LocateClosingAnchor(reader, node, HydrationMarkers.TeleportStart, HydrationMarkers.TeleportEnd);
-        }
-        else
-        {
-            nextNode = reader.NextSibling(node);
-        }
-        vnode.El = node;
-        // Arm the subtree-hydration bridge, then mount: the component's render effect adopts the existing
-        // nodes (see ComponentUpdateFunction). elementNamespace is null here — the subtree elements derive
-        // their namespace from their own tags during HydrateElement.
-        _componentHydrationReader = reader;
-        MountComponent(vnode, container, default, null, parentComponent);
-        return nextNode;
-    }
 
-    private TNode? HydrateTeleport(
-        HydrationNodeReader<TNode> reader,
-        TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        bool optimized)
-    {
-        // The C# port of TeleportImpl.hydrate (components/Teleport.ts). The main-tree anchors are the
-        // <!--teleport start--> (El) and <!--teleport end--> (Anchor) comments; the children live in the
-        // resolved target (enabled) or between the anchors in place (disabled).
-        vnode.El = node;
-        var disabled = IsTeleportDisabled(vnode);
-        var state = new TeleportState();
-        vnode.TeleportState = state;
-        var target = ResolveTarget(vnode);
-        state.Target = target;
+        string start = reader.Data(first);
+        string? end = start switch
+        {
+            FragmentStartMarker => FragmentEndMarker,
+            TeleportStartMarker => TeleportEndMarker,
+            _ => null,
+        };
+        if (end is null)
+        {
+            return nodes;
+        }
 
-        TNode? mainEnd;
-        if (disabled)
+        int depth = 0;
+        TNode? cursor = reader.NextSibling(first);
+        while (HasHostNode(cursor))
         {
-            // Disabled: the children are in place between the start and end anchors — adopt them, and the
-            // node the walk stops at is the <!--teleport end--> anchor.
-            mainEnd = TryNode(reader.ParentNode(node), out var container)
-                ? HydrateChildren(reader, reader.NextSibling(node), vnode, container, parentComponent, optimized)
-                : reader.NextSibling(node);
-            vnode.Anchor = Box(mainEnd);
-            if (target is TNode inPlaceTarget)
+            TNode current = cursor!;
+            nodes.Add(current);
+            if (reader.Kind(current) == HydrationNodeKind.Comment)
             {
-                // The target still carries the anchor comment; record it so a disabled->enabled toggle
-                // moves the children in front of it.
-                state.TargetAnchor = Box(LocateTeleportAnchor(inPlaceTarget));
-            }
-        }
-        else
-        {
-            // Enabled: the main tree carries only the adjacent start/end anchor pair; the children live in
-            // the resolved target. Snapshot the target subtree (one more batched crossing on the browser —
-            // a target lies outside the root's subtree) and adopt the range up to the anchor comment.
-            mainEnd = reader.NextSibling(node);
-            vnode.Anchor = Box(mainEnd);
-            if (target is TNode targetContainer && _options.CreateHydrationReader is not null)
-            {
-                var targetReader = _options.CreateHydrationReader(targetContainer);
-                var targetFirst = targetReader.FirstChild(targetContainer);
-                state.TargetStart = Box(targetFirst);
-                var leftover = HydrateChildren(targetReader, targetFirst, vnode, targetContainer, parentComponent, optimized);
-                state.TargetAnchor = TryNode(leftover, out var anchor)
-                    && targetReader.Kind(anchor) == HydrationNodeKind.Comment
-                    && string.Equals(targetReader.Data(anchor), HydrationMarkers.TeleportAnchor, StringComparison.Ordinal)
-                    ? anchor
-                    : null;
-            }
-        }
-        // The walk continues after the main-tree end anchor.
-        return TryNode(mainEnd, out var end) ? reader.NextSibling(end) : default;
-    }
-
-    // The C# port of handleMismatch: reset the vnode, discard the mismatched server node (and, for a
-    // fragment, its whole [ .. ] range), then client-render the vnode where it stood so the tree
-    // converges. Returns the server node that follows the discarded range.
-    private TNode? HandleMismatch(
-        HydrationNodeReader<TNode> reader,
-        TNode node,
-        VirtualNode vnode,
-        ComponentInstance? parentComponent,
-        bool isFragment)
-    {
-        // A node-type/structure mismatch is a CHILDREN mismatch of the container, so it is suppressible by
-        // data-allow-mismatch on the node (or its nearest element ancestor) — upstream isNodeMismatchAllowed.
-        var allowFrom = reader.Kind(node) == HydrationNodeKind.Element
-            ? node
-            : TryNode(reader.ParentNode(node), out var parentElement) ? parentElement : node;
-        if (!IsMismatchAllowed(reader, allowFrom, HydrationMismatchType.Children))
-        {
-            WarnNodeMismatch(reader, node, vnode);
-        }
-        vnode.El = null;
-        TNode? next;
-        if (isFragment)
-        {
-            // Collect the whole [ .. ] range from the reader BEFORE removing anything: a browser hydration
-            // reader is an immutable pre-walk snapshot, so re-reading NextSibling after a Remove would keep
-            // yielding the already-removed child (upstream mutates the live DOM and re-reads; Viu reads first).
-            // `end` is the node after the matching ] (honoring nesting); the collected chain is the children
-            // and the ] marker.
-            var end = LocateClosingAnchor(reader, node, HydrationMarkers.FragmentStart, HydrationMarkers.FragmentEnd);
-            var fragmentRange = new List<TNode>();
-            var scan = reader.NextSibling(node);
-            while (TryNode(scan, out var current)
-                && !(TryNode(end, out var endNode) && NodeComparer.Equals(current, endNode)))
-            {
-                fragmentRange.Add(current);
-                scan = reader.NextSibling(current);
-            }
-            foreach (var removed in fragmentRange)
-            {
-                _options.Remove(removed);
-            }
-            // The range (children + ]) is gone, so the walk resumes at `end` — NOT NextSibling(node), which
-            // the immutable snapshot would still report as the removed first child.
-            next = end;
-        }
-        else
-        {
-            next = reader.NextSibling(node);
-        }
-        if (!TryNode(reader.ParentNode(node), out var container))
-        {
-            container = node;
-        }
-        _options.Remove(node);
-        var anchor = TryNode(next, out var anchorNode) ? anchorNode : default(TNode?);
-        Patch(null, vnode, container, anchor, null, parentComponent);
-        // #12063: a mismatch may change the parent component's host element.
-        if (parentComponent is not null && ReferenceEquals(parentComponent.Subtree, vnode))
-        {
-            parentComponent.VirtualNode.El = vnode.El;
-        }
-        return next;
-    }
-
-    // The C# port of locateClosingAnchor: find the matching close comment for an open comment, honoring
-    // nesting, and return the node after it.
-    private TNode? LocateClosingAnchor(HydrationNodeReader<TNode> reader, TNode node, string open, string close)
-    {
-        var depth = 0;
-        TNode? cursor = node;
-        while (TryNode(cursor, out var current))
-        {
-            cursor = reader.NextSibling(current);
-            if (TryNode(cursor, out var candidate) && reader.Kind(candidate) == HydrationNodeKind.Comment)
-            {
-                var data = reader.Data(candidate);
-                if (string.Equals(data, open, StringComparison.Ordinal))
+                string data = reader.Data(current);
+                if (string.Equals(data, start, StringComparison.Ordinal))
                 {
                     depth++;
                 }
-                else if (string.Equals(data, close, StringComparison.Ordinal))
+                else if (string.Equals(data, end, StringComparison.Ordinal))
                 {
                     if (depth == 0)
                     {
-                        return reader.NextSibling(candidate);
+                        break;
                     }
+
                     depth--;
                 }
             }
+
+            cursor = reader.NextSibling(current);
         }
-        return cursor;
+
+        return nodes;
     }
 
-    private static bool ShouldHydrateProperty(string name, bool forcePatch, bool isCustomElement)
-    {
-        // Upstream hydrateElement prop qualification (v3.5, packages/runtime-core/src/hydration.ts) — the
-        // exact set of props actively patched during hydration:
-        //   (forcePatch && (endsWith "value" || "indeterminate")) || (isOn && !reserved) || key[0]=='.' || isCustomElement
-        // dynamicProps are deliberately NOT in this set: v3.5 does not re-patch dynamic attributes during
-        // hydration (that would spend interop per dynamic prop and, on a mismatch, overwrite the server value
-        // — e.g. re-setting a dynamic innerHTML and discarding the hydrated children). A dynamic-attribute
-        // mismatch is instead reported by ReportPropertyMismatch and the server value is left in place
-        // (warn-and-leave); the next reactive update patches it through the normal diff. The !reserved guard
-        // on the custom-element clause compensates for Viu keeping key/ref in the prop bag where upstream's
-        // props object never contains them — giving identical effective behavior.
-        if (forcePatch
-            && (name.EndsWith("value", StringComparison.Ordinal)
-                || string.Equals(name, "indeterminate", StringComparison.Ordinal)))
-        {
-            return true;
-        }
-        if (VirtualNodeFactory.IsEventListenerName(name) && !IsReservedProperty(name))
-        {
-            return true;
-        }
-        if (name.Length > 0 && name[0] == '.')
-        {
-            return true;
-        }
-        return isCustomElement && !IsReservedProperty(name);
-    }
-
-    private string ReadElementText(HydrationNodeReader<TNode> reader, TNode element)
-    {
-        // The element's text content is the concatenation of its child text nodes. SSR emits a single
-        // text child for a text-children element, so this is usually one read; a builder covers the
-        // general case without allocating for the common single-child one.
-        var child = reader.FirstChild(element);
-        if (!TryNode(child, out var first))
-        {
-            return string.Empty;
-        }
-        if (reader.Kind(first) == HydrationNodeKind.Text && !TryNode(reader.NextSibling(first), out _))
-        {
-            return reader.Data(first);
-        }
-        var builder = new StringBuilder();
-        var cursor = child;
-        while (TryNode(cursor, out var node))
-        {
-            if (reader.Kind(node) == HydrationNodeKind.Text)
-            {
-                builder.Append(reader.Data(node));
-            }
-            cursor = reader.NextSibling(node);
-        }
-        return builder.ToString();
-    }
-
-    private static string? NamespaceForTag(string? tag)
-        => string.Equals(tag, "svg", StringComparison.Ordinal) ? "svg"
-            : string.Equals(tag, "math", StringComparison.Ordinal) ? "mathml"
-            : null;
-
-    private TNode? LocateTeleportAnchor(TNode target)
-    {
-        // Best-effort scan for the <!--teleport anchor--> inside a disabled teleport's target using the
-        // write-side node-ops (the target is already resolved and its nodes registered). Rarely walked.
-        if (_options.CreateHydrationReader is null)
-        {
-            return default;
-        }
-        var reader = _options.CreateHydrationReader(target);
-        var cursor = reader.FirstChild(target);
-        while (TryNode(cursor, out var node))
-        {
-            if (reader.Kind(node) == HydrationNodeKind.Comment
-                && string.Equals(reader.Data(node), HydrationMarkers.TeleportAnchor, StringComparison.Ordinal))
-            {
-                return node;
-            }
-            cursor = reader.NextSibling(node);
-        }
-        return default;
-    }
-
-    // --- mismatch reporting + the data-allow-mismatch escape hatch -----------------------------
-
-    private void ReportPropertyMismatch(
+    private void HydrateAttributes(
+        MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
-        TNode element,
-        string name,
-        object? clientValue,
-        VirtualNode vnode)
+        TNode node,
+        IElementComponent component,
+        string? elementNamespace)
     {
-        // A focused port of propHasMismatch for the class/style/attribute bindings the AC names: compare
-        // the server-rendered value against the client vnode's and warn (honoring data-allow-mismatch).
-        // Directives, event listeners, reserved props, and DOM-property (.-prefixed) bindings never carry
-        // an observable attribute mismatch and are skipped.
-        if (VirtualNodeFactory.IsEventListenerName(name)
-            || IsReservedProperty(name)
-            || (name.Length > 0 && name[0] == '.')
-            || string.Equals(name, "value", StringComparison.Ordinal)
-            || string.Equals(name, "innerHTML", StringComparison.Ordinal)
+        bool forceValue = string.Equals(
+                component.Tag,
+                "input",
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                component.Tag,
+                "option",
+                StringComparison.OrdinalIgnoreCase);
+        bool customElement = component.Tag.Contains('-', StringComparison.Ordinal);
+        for (int index = 0; index < component.Attributes.Count; index++)
+        {
+            IComponentAttribute attribute = component.Attributes[index];
+            if (IsComponentNodeLifecycleName(attribute.Name))
+            {
+                continue;
+            }
+
+            ReportHydrationAttributeMismatch(
+                tree,
+                reader,
+                node,
+                attribute);
+            if (ShouldHydrateAttribute(
+                attribute.Name,
+                forceValue,
+                customElement))
+            {
+                _options.PatchAttribute(
+                    node,
+                    component.Tag,
+                    attribute.Name,
+                    previousValue: null,
+                    attribute.Value,
+                    elementNamespace);
+            }
+        }
+    }
+
+    private static bool ShouldHydrateAttribute(
+        string name,
+        bool forceValue,
+        bool customElement)
+    {
+        if (IsEventAttribute(name) || (name.Length > 0 && name[0] == '.'))
+        {
+            return true;
+        }
+
+        if (string.Equals(name, "innerHTML", StringComparison.Ordinal)
             || string.Equals(name, "textContent", StringComparison.Ordinal))
         {
-            return;
+            return true;
         }
-        if (string.Equals(name, "class", StringComparison.Ordinal))
-        {
-            var server = reader.Attribute(element, "class");
-            if (!ClassEquivalent(server, clientValue) && !IsMismatchAllowed(reader, element, HydrationMismatchType.Class))
-            {
-                WarnMismatch(
-                    reader,
-                    element,
-                    $"Hydration class mismatch: rendered on server \"{server}\", expected on client "
-                    + $"\"{clientValue}\".");
-            }
-            return;
-        }
-        var mismatchType = string.Equals(name, "style", StringComparison.Ordinal)
-            ? HydrationMismatchType.Style
-            : HydrationMismatchType.Attribute;
-        var serverValue = reader.Attribute(element, name);
-        var clientText = clientValue?.ToString();
-        // A boolean/absent attribute: a false/null client value with an absent server attribute matches.
-        if (clientValue is null or false)
-        {
-            if (serverValue is not null && !IsMismatchAllowed(reader, element, mismatchType))
-            {
-                WarnMismatch(reader, element, $"Hydration attribute mismatch on \"{name}\": server rendered \"{serverValue}\", client expected none.");
-            }
-            return;
-        }
-        if (!string.Equals(serverValue ?? string.Empty, clientText ?? string.Empty, StringComparison.Ordinal)
-            && !IsMismatchAllowed(reader, element, mismatchType))
-        {
-            WarnMismatch(
-                reader,
-                element,
-                $"Hydration {(mismatchType == HydrationMismatchType.Style ? "style" : "attribute")} mismatch on "
-                + $"\"{name}\": rendered on server \"{serverValue}\", expected on client \"{clientText}\".");
-        }
-    }
 
-    private static bool ClassEquivalent(string? server, object? clientValue)
-    {
-        var client = clientValue as string;
-        if (server is null && string.IsNullOrEmpty(client))
+        if (forceValue
+            && (name.EndsWith("value", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    name,
+                    "checked",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    name,
+                    "selected",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    name,
+                    "indeterminate",
+                    StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }
-        // Compare as unordered token sets so attribute-order differences are not reported as mismatches.
-        var serverTokens = Tokenize(server);
-        var clientTokens = Tokenize(client);
-        if (serverTokens.Count != clientTokens.Count)
+
+        return customElement;
+    }
+
+    private void ReportHydrationAttributeMismatch(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        IComponentAttribute attribute)
+    {
+        if (IsEventAttribute(attribute.Name)
+            || string.Equals(attribute.Name, "innerHTML", StringComparison.Ordinal)
+            || string.Equals(attribute.Name, "textContent", StringComparison.Ordinal)
+            || attribute.Value is null
+            || attribute.Value is bool
+            || IsMismatchAllowed(reader, node, AttributeMismatchCategory(attribute.Name)))
+        {
+            return;
+        }
+
+        string? actual = reader.Attribute(node, attribute.Name);
+        string category = AttributeMismatchCategory(attribute.Name);
+        bool equivalent;
+        string expected;
+        if (string.Equals(category, "class", StringComparison.Ordinal))
+        {
+            expected = StyleAndClassNormalization.NormalizeClass(attribute.Value);
+            equivalent = ClassEquivalent(actual, expected);
+        }
+        else if (string.Equals(category, "style", StringComparison.Ordinal))
+        {
+            object? normalized =
+                StyleAndClassNormalization.NormalizeStyle(attribute.Value);
+            expected = StyleAndClassNormalization.StringifyStyle(normalized);
+            equivalent = StyleEquivalent(actual, normalized);
+        }
+        else
+        {
+            expected = attribute.Value is IFormattable formattable
+                ? formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty
+                : attribute.Value.ToString() ?? string.Empty;
+            equivalent = string.Equals(actual, expected, StringComparison.Ordinal);
+        }
+
+        if (!equivalent)
+        {
+            Warn(
+                tree,
+                $"Hydration {category} mismatch for "
+                + $"\"{attribute.Name}\": the server rendered \"{actual}\", "
+                + $"but the client expected \"{expected}\".");
+        }
+    }
+
+    private static bool ClassEquivalent(string? serverValue, string clientValue)
+    {
+        HashSet<string> server = TokenizeClass(serverValue);
+        HashSet<string> client = TokenizeClass(clientValue);
+        return server.SetEquals(client);
+    }
+
+    private static HashSet<string> TokenizeClass(string? value)
+    {
+        HashSet<string> tokens = new(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return tokens;
+        }
+
+        string[] values = value.Split(
+            (char[]?)null,
+            StringSplitOptions.RemoveEmptyEntries);
+        for (int index = 0; index < values.Length; index++)
+        {
+            tokens.Add(values[index]);
+        }
+
+        return tokens;
+    }
+
+    private static bool StyleEquivalent(
+        string? serverValue,
+        object? clientValue)
+    {
+        Dictionary<string, object?> server =
+            StyleAndClassNormalization.ParseStringStyle(
+                serverValue ?? string.Empty);
+        object? normalized =
+            StyleAndClassNormalization.NormalizeStyle(clientValue);
+        Dictionary<string, object?> client =
+            StyleAndClassNormalization.ParseStringStyle(
+                StyleAndClassNormalization.StringifyStyle(normalized));
+        if (server.Count != client.Count)
         {
             return false;
         }
-        foreach (var token in clientTokens)
+
+        foreach (KeyValuePair<string, object?> declaration in client)
         {
-            if (!serverTokens.Contains(token))
+            if (!server.TryGetValue(declaration.Key, out object? actual)
+                || !string.Equals(
+                    actual?.ToString(),
+                    declaration.Value?.ToString(),
+                    StringComparison.Ordinal))
             {
                 return false;
             }
         }
+
         return true;
     }
 
-    private static HashSet<string> Tokenize(string? value)
+    private static string AttributeMismatchCategory(string name)
     {
-        var set = new HashSet<string>(StringComparer.Ordinal);
-        if (string.IsNullOrEmpty(value))
+        if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
         {
-            return set;
+            return "class";
         }
-        foreach (var token in value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+
+        if (string.Equals(name, "style", StringComparison.OrdinalIgnoreCase))
         {
-            set.Add(token);
+            return "style";
         }
-        return set;
+
+        return "attribute";
     }
 
-    private bool IsMismatchAllowed(HydrationNodeReader<TNode> reader, TNode element, HydrationMismatchType type)
+    private static bool IsEventAttribute(string name)
     {
-        // Upstream isMismatchAllowed: text/children mismatches consult the nearest ancestor carrying a
-        // data-allow-mismatch attribute; class/style/attribute mismatches consult only the element.
-        var target = element;
-        if (type is HydrationMismatchType.Text or HydrationMismatchType.Children)
+        return name.Length > 2
+            && name[0] == 'o'
+            && name[1] == 'n'
+            && !char.IsAsciiLetterLower(name[2]);
+    }
+
+    private static bool IsMismatchAllowed(
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        string category)
+    {
+        TNode? cursor = node;
+        while (HasHostNode(cursor))
         {
-            var found = false;
-            var cursor = (TNode?)element;
-            while (TryNode(cursor, out var current) && reader.Kind(current) == HydrationNodeKind.Element)
+            TNode current = cursor!;
+            if (reader.Kind(current) == HydrationNodeKind.Element)
             {
-                if (reader.Attribute(current, AllowMismatchAttribute) is not null)
+                string? value = reader.Attribute(
+                    current,
+                    AllowMismatchAttribute);
+                if (value is not null)
                 {
-                    target = current;
-                    found = true;
-                    break;
+                    if (value.Length == 0)
+                    {
+                        return true;
+                    }
+
+                    string[] categories = value.Split(
+                        [',', ' ', '\t', '\r', '\n'],
+                        StringSplitOptions.RemoveEmptyEntries);
+                    for (int index = 0; index < categories.Length; index++)
+                    {
+                        if (string.Equals(
+                                categories[index],
+                                category,
+                                StringComparison.OrdinalIgnoreCase)
+                            || (string.Equals(
+                                    category,
+                                    "text",
+                                    StringComparison.OrdinalIgnoreCase)
+                                && string.Equals(
+                                    categories[index],
+                                    "children",
+                                    StringComparison.OrdinalIgnoreCase)))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
                 }
-                cursor = reader.ParentNode(current);
             }
-            if (!found)
-            {
-                return false;
-            }
-        }
-        if (reader.Kind(target) != HydrationNodeKind.Element)
-        {
-            return false;
-        }
-        return IsMismatchAllowedByAttribute(reader.Attribute(target, AllowMismatchAttribute), type);
-    }
 
-    private static bool IsMismatchAllowedByAttribute(string? attribute, HydrationMismatchType type)
-    {
-        // Upstream isMismatchAllowed (v3.5, packages/runtime-core/src/hydration.ts): a null attribute allows
-        // nothing; an empty attribute allows every kind; otherwise the comma-split list must contain the
-        // type's token — with the single special case that a text mismatch is allowed by "children" ("text is
-        // a subset of children"). Matched exactly: the list is NOT trimmed, and there is no "attribute" token
-        // that covers class/style (each kind carries its own token).
-        if (attribute is null)
-        {
-            return false;
-        }
-        if (attribute.Length == 0)
-        {
-            return true;
-        }
-        var list = attribute.Split(',');
-        if (type == HydrationMismatchType.Text && Array.IndexOf(list, "children") >= 0)
-        {
-            return true;
-        }
-        return Array.IndexOf(list, MismatchTypeToken(type)) >= 0;
-    }
-
-    private static string MismatchTypeToken(HydrationMismatchType type) => type switch
-    {
-        HydrationMismatchType.Text => "text",
-        HydrationMismatchType.Children => "children",
-        HydrationMismatchType.Class => "class",
-        HydrationMismatchType.Style => "style",
-        _ => "attribute",
-    };
-
-    private void WarnNodeMismatch(HydrationNodeReader<TNode> reader, TNode node, VirtualNode vnode)
-    {
-        var kind = reader.Kind(node);
-        var served = kind switch
-        {
-            HydrationNodeKind.Text => "a text node",
-            HydrationNodeKind.Comment => string.Equals(reader.Data(node), HydrationMarkers.FragmentStart, StringComparison.Ordinal)
-                ? "the start of a fragment"
-                : "a comment node",
-            HydrationNodeKind.Element => $"<{reader.ElementTag(node)}>",
-            _ => "an unknown node",
-        };
-        WarnMismatch(
-            reader,
-            node,
-            $"Hydration node mismatch: rendered on server {served}, expected on client a {DescribeVirtualNode(vnode)}.");
-    }
-
-    private void WarnMismatch(HydrationNodeReader<TNode> reader, TNode node, string message)
-        => RuntimeWarnings.Warn($"{message} (at {DescribeNodePath(reader, node)})");
-
-    private string DescribeNodePath(HydrationNodeReader<TNode> reader, TNode node)
-    {
-        // Name the offending node's path from the root: html > body > div — enough for a developer to
-        // locate the mismatch (upstream passes the element to warn(); Viu materializes the tag chain).
-        var segments = new List<string>();
-        var cursor = (TNode?)node;
-        var guard = 0;
-        while (TryNode(cursor, out var current) && guard++ < 64)
-        {
-            var kind = reader.Kind(current);
-            if (kind == HydrationNodeKind.Element)
-            {
-                segments.Add(reader.ElementTag(current).ToLowerInvariant());
-            }
-            else if (segments.Count == 0)
-            {
-                segments.Add(kind == HydrationNodeKind.Comment ? "#comment" : "#text");
-            }
             cursor = reader.ParentNode(current);
         }
-        segments.Reverse();
-        return segments.Count == 0 ? "root" : string.Join(" > ", segments);
-    }
 
-    private static string DescribeVirtualNode(VirtualNode vnode) => vnode.Type switch
-    {
-        VirtualNodeType.Element => $"<{vnode.ElementTag}>",
-        VirtualNodeType.Text => "text node",
-        VirtualNodeType.Comment => "comment node",
-        VirtualNodeType.Fragment => "fragment",
-        VirtualNodeType.Component => "component",
-        VirtualNodeType.Teleport => "teleport",
-        VirtualNodeType.Static => "static block",
-        _ => "node",
-    };
-
-    private static bool TryNode(TNode? candidate, out TNode node)
-    {
-        // Uniform "is this a real node" test across a reference-type TNode (null == none) and a
-        // value-type TNode (default == the "no node" sentinel, e.g. the browser's 0 handle).
-        if (candidate is not null && !NodeComparer.Equals(candidate, default!))
-        {
-            node = candidate;
-            return true;
-        }
-        node = default!;
         return false;
     }
 
-    // Boxes a real node for storage on the object-typed VirtualNode.El/Anchor and TeleportState handles,
-    // collapsing the "no node" sentinel (null, or a value-type default) to null so those fields stay null
-    // when absent (matching how the mount path leaves them).
-    private static object? Box(TNode? node) => TryNode(node, out var value) ? value : null;
+    private static bool IsStructuralStartMarker(string data)
+    {
+        return string.Equals(data, FragmentStartMarker, StringComparison.Ordinal)
+            || string.Equals(data, TeleportStartMarker, StringComparison.Ordinal);
+    }
+
+    private static bool IsCommentMarker(
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        string marker)
+    {
+        return reader.Kind(node) == HydrationNodeKind.Comment
+            && string.Equals(
+                reader.Data(node),
+                marker,
+                StringComparison.Ordinal);
+    }
+
+    private static TNode? FindFirstMarker(
+        HydrationNodeReader<TNode> reader,
+        TNode? first,
+        string marker)
+    {
+        TNode? cursor = first;
+        while (HasHostNode(cursor))
+        {
+            if (IsCommentMarker(reader, cursor!, marker))
+            {
+                return cursor;
+            }
+
+            cursor = reader.NextSibling(cursor!);
+        }
+
+        return default;
+    }
+
+    private static TNode? FindClosingMarker(
+        HydrationNodeReader<TNode> reader,
+        TNode start,
+        string openingMarker,
+        string closingMarker)
+    {
+        int depth = 0;
+        TNode? cursor = reader.NextSibling(start);
+        while (HasHostNode(cursor))
+        {
+            TNode current = cursor!;
+            if (reader.Kind(current) == HydrationNodeKind.Comment)
+            {
+                string data = reader.Data(current);
+                if (string.Equals(
+                    data,
+                    openingMarker,
+                    StringComparison.Ordinal))
+                {
+                    depth++;
+                }
+                else if (string.Equals(
+                    data,
+                    closingMarker,
+                    StringComparison.Ordinal))
+                {
+                    if (depth == 0)
+                    {
+                        return current;
+                    }
+
+                    depth--;
+                }
+            }
+
+            cursor = reader.NextSibling(current);
+        }
+
+        return default;
+    }
+
+    private TNode? GetHydrationTargetCursor(
+        HydrationNodeReader<TNode> reader,
+        TNode target)
+    {
+        if (_hydrationTargetCursors is not null
+            && _hydrationTargetCursors.TryGetValue(target, out TNode? cursor))
+        {
+            return cursor;
+        }
+
+        return reader.FirstChild(target);
+    }
+
+    private void SetHydrationTargetCursor(TNode target, TNode? cursor)
+    {
+        if (_hydrationTargetCursors is not null)
+        {
+            _hydrationTargetCursors[target] = cursor;
+        }
+    }
+
+    private void RemoveExcessHydrationNodes(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode? first,
+        string warning)
+    {
+        if (!HasHostNode(first))
+        {
+            return;
+        }
+
+        List<TNode> excess = [];
+        TNode? cursor = first;
+        while (HasHostNode(cursor))
+        {
+            excess.Add(cursor!);
+            cursor = reader.NextSibling(cursor!);
+        }
+
+        Warn(tree, warning);
+        for (int index = 0; index < excess.Count; index++)
+        {
+            _options.Remove(excess[index]);
+        }
+    }
+
+    private static void Warn(MountedTree<TNode> tree, string message)
+    {
+        tree.Application?.WarnHandler?.Invoke(message);
+    }
 }

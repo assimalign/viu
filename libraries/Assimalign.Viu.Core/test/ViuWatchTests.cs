@@ -4,159 +4,352 @@ using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
-using Assimalign.Viu.Testing;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Tests;
 
-// Pins the runtime watch binding ([V01.01.03.12] wiring the [V01.01.02.06] IWatchScheduler seam,
-// upstream apiWatch.ts): the pre-flush default runs callbacks ahead of the render job, Post runs
-// them after, repeated triggers in one turn collapse to one delivery, and watcher errors route to
-// the app-level errorHandler (issue #28) instead of tearing down the flush.
-// https://vuejs.org/api/reactivity-core.html#watch
 public sealed class ViuWatchTests : IDisposable
 {
-    private readonly TestRenderer _renderer = new();
-    private readonly TestElement _container;
     private readonly TestSchedulerPump _pump;
 
     public ViuWatchTests()
     {
         Scheduler.Reset();
         _pump = TestSchedulerPump.Install();
-        _container = _renderer.CreateContainer();
     }
 
     public void Dispose()
     {
+        Scheduler.FlushBoundaryCallback = null;
         Scheduler.Reset();
         _pump.Dispose();
     }
 
     [Fact]
-    public void Watch_DefaultsToPreFlush_RunningBeforeTheRenderJob()
+    public void Watch_ReferenceDefaultsToPreFlushAndStopsWithComponentScope()
     {
-        var state = Reactive.Reference(0);
-        var order = new List<string>();
-        var component = new TestComponent
-        {
-            SetupFunction = (_, _) =>
-            {
-                ViuWatch.Watch(state, (value, _, _) => order.Add($"watch:{value}"));
-                return () =>
-                {
-                    order.Add($"render:{state.Value}");
-                    return VirtualNodeFactory.Text(state.Value.ToString());
-                };
-            },
-        };
+        IReactiveReference<int> count = Reactive.Reference(0);
+        List<(int Current, int Previous)> values = [];
+        MountedComponent mounted = CreateMounted(
+            () => ViuWatch.Watch(
+                count,
+                (current, previous, _) => values.Add((current, previous))));
 
-        _renderer.Render(VirtualNodeFactory.Component(component), _container);
-        order.ShouldBe(["render:0"]);
+        count.Value = 1;
+        count.Value = 2;
 
-        state.Value = 1;
+        values.ShouldBeEmpty();
+        _pump.PendingFlushCount.ShouldBe(1);
         _pump.RunUntilIdle();
+        values.ShouldBe([(2, 0)]);
 
-        // Upstream flush: 'pre' — the watcher callback runs in the same flush, before the render.
-        order.ShouldBe(["render:0", "watch:1", "render:1"]);
+        mounted.Unmount(static () => { });
+        count.Value = 3;
+        _pump.RunUntilIdle();
+        values.ShouldBe([(2, 0)]);
     }
 
     [Fact]
-    public void Watch_PostFlush_RunsAfterTheRenderJob()
+    public void Watch_ExplicitSyncOptionRunsInline()
     {
-        var state = Reactive.Reference(0);
-        var order = new List<string>();
-        var component = new TestComponent
-        {
-            SetupFunction = (_, _) =>
+        IReactiveReference<int> count = Reactive.Reference(0);
+        List<int> values = [];
+        MountedComponent mounted = CreateMounted(
+            () => ViuWatch.Watch(
+                count,
+                (current, _, _) => values.Add(current),
+                new WatchOptions { Flush = WatchFlushMode.Sync }));
+
+        count.Value = 1;
+
+        values.ShouldBe([1]);
+        _pump.PendingFlushCount.ShouldBe(0);
+        mounted.Unmount(static () => { });
+    }
+
+    [Fact]
+    public void Watch_ExplicitPostOptionRunsAfterRenderQueue()
+    {
+        IReactiveReference<int> count = Reactive.Reference(0);
+        List<string> order = [];
+        MountedComponent mounted = CreateMounted(
+            () => ViuWatch.Watch(
+                count,
+                (_, _, _) => order.Add("watch"),
+                new WatchOptions { Flush = WatchFlushMode.Post }));
+
+        count.Value = 1;
+        Scheduler.QueueJob(
+            new SchedulerJob(() => order.Add("render"))
+            {
+                Identifier = 1,
+            });
+        _pump.RunUntilIdle();
+
+        order.ShouldBe(["render", "watch"]);
+        mounted.Unmount(static () => { });
+    }
+
+    [Fact]
+    public void ApplicationWatchScheduler_ReusedAcrossWatchersMaintainsOneJobPerWatcher()
+    {
+        ApplicationWatchScheduler scheduler = new();
+        IReactiveReference<int> first = Reactive.Reference(0);
+        IReactiveReference<int> second = Reactive.Reference(0);
+        int firstRuns = 0;
+        int secondRuns = 0;
+        using WatchHandle firstWatch = Reactive.Watch(
+            first,
+            (_, _, _) => firstRuns++,
+            new WatchOptions
+            {
+                Flush = WatchFlushMode.Pre,
+                Scheduler = scheduler,
+            });
+        using WatchHandle secondWatch = Reactive.Watch(
+            second,
+            (_, _, _) => secondRuns++,
+            new WatchOptions
+            {
+                Flush = WatchFlushMode.Pre,
+                Scheduler = scheduler,
+            });
+
+        first.Value = 1;
+        first.Value = 2;
+        second.Value = 1;
+        _pump.RunUntilIdle();
+
+        firstRuns.ShouldBe(1);
+        secondRuns.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ApplicationWatchScheduler_ComponentIdentifierOrdersPreWatchBeforeOwnRender()
+    {
+        ApplicationWatchScheduler scheduler = new(componentIdentifier: 4);
+        IReactiveReference<int> count = Reactive.Reference(0);
+        List<string> order = [];
+        using WatchHandle watch = Reactive.Watch(
+            count,
+            (_, _, _) => order.Add("watch"),
+            new WatchOptions
+            {
+                Flush = WatchFlushMode.Pre,
+                Scheduler = scheduler,
+            });
+
+        Scheduler.QueueJob(
+            new SchedulerJob(() => order.Add("child-render"))
+            {
+                Identifier = 5,
+            });
+        Scheduler.QueueJob(
+            new SchedulerJob(() => order.Add("own-render"))
+            {
+                Identifier = 4,
+            });
+        Scheduler.QueueJob(
+            new SchedulerJob(() => order.Add("parent-render"))
+            {
+                Identifier = 3,
+            });
+        count.Value = 1;
+        _pump.RunUntilIdle();
+
+        order.ShouldBe(["parent-render", "watch", "own-render", "child-render"]);
+    }
+
+    [Fact]
+    public void Watch_MultipleReferencesAndGettersPreserveAlignedValues()
+    {
+        IReactiveReference<int> first = Reactive.Reference(1);
+        IReactiveReference<int> second = Reactive.Reference(2);
+        object?[]? referenceValues = null;
+        object?[]? getterValues = null;
+        MountedComponent mounted = CreateMounted(
+            () =>
             {
                 ViuWatch.Watch(
-                    state,
-                    (value, _, _) => order.Add($"watch:{value}"),
-                    new WatchOptions { Flush = WatchFlushMode.Post });
-                return () =>
-                {
-                    order.Add($"render:{state.Value}");
-                    return VirtualNodeFactory.Text(state.Value.ToString());
-                };
-            },
-        };
+                    new IReactiveReference[] { first, second },
+                    (current, _, _) => referenceValues = current);
+                ViuWatch.Watch(
+                    new Func<object?>[]
+                    {
+                        () => first.Value,
+                        () => second.Value,
+                    },
+                    (current, _, _) => getterValues = current);
+            });
 
-        _renderer.Render(VirtualNodeFactory.Component(component), _container);
-
-        state.Value = 1;
+        first.Value = 3;
         _pump.RunUntilIdle();
 
-        // Upstream flush: 'post' — the callback runs with the post-flush callbacks, after render.
-        order.ShouldBe(["render:0", "render:1", "watch:1"]);
+        referenceValues.ShouldBe([3, 2]);
+        getterValues.ShouldBe([3, 2]);
+        mounted.Unmount(static () => { });
     }
 
     [Fact]
-    public void Watch_RepeatedTriggersInOneTurn_DeliverOneCallbackWithTheLatestValue()
+    public void Watch_ReactiveObjectIsDeepByDefault()
     {
-        var state = Reactive.Reference(0);
-        var runs = 0;
-        var observed = (Value: -1, OldValue: -1);
-        ViuWatch.Watch(state, (value, oldValue, _) =>
-        {
-            runs++;
-            observed = (value, oldValue);
-        });
+        TestReactiveObject source = new();
+        int runs = 0;
+        MountedComponent mounted = CreateMounted(
+            () => ViuWatch.Watch(source, (_, _, _) => runs++));
 
-        state.Value = 1;
-        state.Value = 2;
+        source.Value = 1;
         _pump.RunUntilIdle();
 
-        // One WatchJob maps to one queued SchedulerJob: the turn's mutations collapse into a
-        // single delivery observing the final value against the pre-turn old value.
         runs.ShouldBe(1);
-        observed.ShouldBe((2, 0));
+        mounted.Unmount(static () => { });
     }
 
     [Fact]
-    public void WatcherCallbackError_RoutesToTheAppErrorHandler_AndTheFlushSurvives()
+    public void WatchEffect_RunsImmediatelyThenUsesPreFlushScheduling()
     {
-        var state = Reactive.Reference(0);
-        var captured = new List<(string Message, string Info)>();
-        var renderRuns = 0;
-        var root = new TestComponent
-        {
-            SetupFunction = (_, _) =>
-            {
-                ViuWatch.Watch(state, (_, _, _) => throw new InvalidOperationException("watcher boom"));
-                return () =>
+        IReactiveReference<int> count = Reactive.Reference(0);
+        int runs = 0;
+        MountedComponent mounted = CreateMounted(
+            () => ViuWatch.WatchEffect(
+                () =>
                 {
-                    renderRuns++;
-                    return VirtualNodeFactory.Text(state.Value.ToString());
-                };
-            },
-        };
-        var application = _renderer.Renderer.CreateApplication(root);
-        application.Context.ErrorHandler = (exception, _, info) => captured.Add((exception.Message, info));
-        application.Mount(_container);
+                    _ = count.Value;
+                    runs++;
+                }));
 
-        state.Value = 1;
+        runs.ShouldBe(1);
+        count.Value = 1;
+        count.Value = 2;
+        runs.ShouldBe(1);
         _pump.RunUntilIdle();
 
-        // Issue #28: watcher errors reach Config.ErrorHandler with the upstream info code, and the
-        // flush completes — the component still re-rendered after the failing pre-flush callback.
-        captured.ShouldBe([("watcher boom", "watcher callback")]);
-        renderRuns.ShouldBe(2);
+        runs.ShouldBe(2);
+        mounted.Unmount(static () => { });
     }
 
     [Fact]
-    public void WatchEffect_RunsImmediately_AndReRunsOnPreFlushTiming()
+    public void GetterCallbackAndEffectErrorsRouteThroughApplicationHandler()
     {
-        var state = Reactive.Reference(1);
-        var observed = new List<int>();
-        ViuWatch.WatchEffect(() => observed.Add(state.Value));
+        IReactiveReference<int> count = Reactive.Reference(0);
+        List<(string Message, string DiagnosticInformation)> errors = [];
+        MountedComponent mounted = CreateMounted(
+            () =>
+            {
+                ViuWatch.Watch<int>(
+                    () => throw new InvalidOperationException("getter failed"),
+                    static (_, _, _) => { });
+                ViuWatch.WatchEffect(
+                    () => throw new InvalidOperationException("effect failed"));
+                ViuWatch.Watch(
+                    count,
+                    static (_, _, _) =>
+                        throw new InvalidOperationException("callback failed"));
+            },
+            application =>
+                application.ErrorHandler = (exception, _, diagnosticInformation) =>
+                    errors.Add((exception.Message, diagnosticInformation)));
 
-        observed.ShouldBe([1]); // immediate first run (upstream watchEffect contract)
+        errors.ShouldBe(
+        [
+            ("getter failed", "watcher getter"),
+            ("effect failed", "watcher callback"),
+        ]);
 
-        state.Value = 2;
-        observed.Count.ShouldBe(1); // nothing synchronous — pre-flush timing
-
+        count.Value = 1;
         _pump.RunUntilIdle();
-        observed.ShouldBe([1, 2]);
+
+        errors.ShouldBe(
+        [
+            ("getter failed", "watcher getter"),
+            ("effect failed", "watcher callback"),
+            ("callback failed", "watcher callback"),
+        ]);
+        mounted.Unmount(static () => { });
+    }
+
+    private static MountedComponent CreateMounted(
+        Action setup,
+        Action<IApplicationContext>? configure = null)
+    {
+        DelegateTemplate template = new(setup);
+        ComponentFactory factory = new(
+        [
+            new ComponentRegistration(
+                typeof(DelegateTemplate),
+                () => template),
+        ]);
+        ITemplateComponent request = ComponentTree.Template<DelegateTemplate>();
+        IApplicationContext application = new ApplicationContext(
+            request,
+            factory,
+            new EmptyServiceProvider());
+        configure?.Invoke(application);
+        return MountedComponent.Create(application, request);
+    }
+
+    private sealed class DelegateTemplate : IComponentTemplate
+    {
+        private readonly Action _setup;
+
+        internal DelegateTemplate(Action setup)
+        {
+            _setup = setup;
+        }
+
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            _setup();
+            return () => ComponentTree.Comment();
+        }
+    }
+
+    private sealed class TestReactiveObject : IReactiveObject
+    {
+        private readonly Dependency _dependency = new();
+        private int _value;
+
+        internal int Value
+        {
+            get
+            {
+                _dependency.Track();
+                return _value;
+            }
+            set
+            {
+                if (_value == value)
+                {
+                    return;
+                }
+
+                _value = value;
+                _dependency.Trigger();
+            }
+        }
+
+        public object ToRaw()
+        {
+            return this;
+        }
+
+        public Dependency? GetDependency(string propertyName)
+        {
+            return propertyName == nameof(Value) ? _dependency : null;
+        }
+
+        public void Traverse(ReactiveTraversal traversal)
+        {
+            _ = Value;
+        }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            return null;
+        }
     }
 }

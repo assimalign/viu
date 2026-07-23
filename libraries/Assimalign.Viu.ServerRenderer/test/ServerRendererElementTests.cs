@@ -1,112 +1,141 @@
 using System.Threading.Tasks;
 
+using Assimalign.Viu.Components;
+
 using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
 /// <summary>
-/// End-to-end serialization of the element/text/comment/fragment/static vnode kinds through the
-/// runtime renderer, pinned to <c>@vue/server-renderer/src/render.ts</c> — including the void-element,
-/// child-override, and hydration-marker rules.
+/// Pins primitive component-tree serialization to Vue's server-renderer marker and escaping rules.
 /// </summary>
 public class ServerRendererElementTests
 {
     [Fact]
     public async Task Element_WithAttributesAndText_Serializes()
     {
-        var html = await Ssr.RenderAsync(() =>
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("id", "app")), "hello"));
+        string html = await Ssr.RenderAsync(
+            () => TestTree.Element(
+                "div",
+                TestTree.Attributes(("id", "app")),
+                ComponentTree.Text("hello")));
+
         html.ShouldBe("<div id=\"app\">hello</div>");
     }
 
     [Fact]
     public async Task Element_TextChildren_AreEscaped()
     {
-        var html = await Ssr.RenderAsync(() => VirtualNodeFactory.Element("p", "<b>&amp;</b>"));
+        string html = await Ssr.RenderAsync(
+            () => TestTree.Element("p", "<b>&amp;</b>"));
+
         html.ShouldBe("<p>&lt;b&gt;&amp;amp;&lt;/b&gt;</p>");
     }
 
     [Fact]
     public async Task VoidElement_HasNoClosingTagOrChildren()
     {
-        var html = await Ssr.RenderAsync(() =>
-            VirtualNodeFactory.Element("br"));
-        html.ShouldBe("<br>");
+        string lineBreak = await Ssr.RenderAsync(
+            () => ComponentTree.Element("br"));
+        string image = await Ssr.RenderAsync(
+            () => ComponentTree.Element(
+                "img",
+                TestTree.Attributes(("src", "a.png"))));
 
-        var image = await Ssr.RenderAsync(() =>
-            VirtualNodeFactory.Element("img", VirtualNodeFactory.Properties(("src", "a.png"))));
+        lineBreak.ShouldBe("<br>");
         image.ShouldBe("<img src=\"a.png\">");
     }
 
     [Fact]
     public async Task Element_InnerHtml_IsRawUnescaped()
     {
-        // v-html surfaces as the innerHTML prop and is written verbatim (the documented raw-HTML path).
-        var html = await Ssr.RenderAsync(() =>
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("innerHTML", "<b>bold</b>")), (string)null!));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Element(
+                "div",
+                TestTree.Attributes(("innerHTML", "<b>bold</b>"))));
+
         html.ShouldBe("<div><b>bold</b></div>");
     }
 
     [Fact]
     public async Task Element_TextContent_IsEscapedAndOverridesChildren()
     {
-        var html = await Ssr.RenderAsync(() =>
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("textContent", "<x>")), "ignored"));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Element(
+                "div",
+                TestTree.Attributes(("textContent", "<x>")),
+                [ComponentTree.Text("ignored")]));
+
         html.ShouldBe("<div>&lt;x&gt;</div>");
     }
 
     [Fact]
-    public async Task Textarea_ValueProp_BecomesEscapedTextContent()
+    public async Task Textarea_ValueAttribute_BecomesEscapedTextContent()
     {
-        var html = await Ssr.RenderAsync(() =>
-            VirtualNodeFactory.Element("textarea", VirtualNodeFactory.Properties(("value", "<hi>")), (string)null!));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Element(
+                "textarea",
+                TestTree.Attributes(("value", "<hi>"))));
+
         html.ShouldBe("<textarea>&lt;hi&gt;</textarea>");
     }
 
     [Fact]
     public async Task Comment_ContentIsSanitized()
     {
-        var html = await Ssr.RenderAsync(() => VirtualNodeFactory.Comment("note-->break"));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Comment("note-->break"));
+
         html.ShouldBe("<!--notebreak-->");
     }
 
     [Fact]
     public async Task Static_MarkupIsRaw()
     {
-        var html = await Ssr.RenderAsync(() => VirtualNodeFactory.Static("<i>raw</i>"));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Static("<i>raw</i>"));
+
         html.ShouldBe("<i>raw</i>");
     }
 
     [Fact]
     public async Task Fragment_WrapsChildrenInHydrationAnchors()
     {
-        var html = await Ssr.RenderAsync(() => VirtualNodeFactory.Fragment(
-            VirtualNodeFactory.Element("span", "a"),
-            VirtualNodeFactory.Element("span", "b")));
-        // Upstream fragment markers <!--[--> ... <!--]--> bound the child range for hydration.
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Fragment(
+                [
+                    TestTree.Element("span", "a"),
+                    TestTree.Element("span", "b"),
+                ]));
+
         html.ShouldBe("<!--[--><span>a</span><span>b</span><!--]-->");
     }
 
     [Fact]
     public async Task Element_NestedChildren_SerializeInOrder()
     {
-        var html = await Ssr.RenderAsync(() => VirtualNodeFactory.Element(
-            "ul",
-            VirtualNodeFactory.Element("li", "one"),
-            VirtualNodeFactory.Element("li", "two")));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Element(
+                "ul",
+                children:
+                [
+                    TestTree.Element("li", "one"),
+                    TestTree.Element("li", "two"),
+                ]));
+
         html.ShouldBe("<ul><li>one</li><li>two</li></ul>");
     }
 
     [Fact]
     public async Task Element_BooleanAttribute_RendersByPresence()
     {
-        var html = await Ssr.RenderAsync(() => VirtualNodeFactory.Element(
-            "input",
-            VirtualNodeFactory.Properties(("disabled", true), ("readonly", false))));
+        string html = await Ssr.RenderAsync(
+            () => ComponentTree.Element(
+                "input",
+                TestTree.Attributes(("disabled", true), ("readonly", false))));
+
         html.ShouldBe("<input disabled>");
     }
 }

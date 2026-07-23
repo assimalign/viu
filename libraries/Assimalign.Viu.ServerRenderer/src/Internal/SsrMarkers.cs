@@ -2,7 +2,7 @@ namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
 /// The comment-marker vocabulary the SSR output embeds so the client hydration walker
-/// ([V01.01.07.03]) can align the server DOM with the client vnode tree — the C# port of the
+/// ([V01.01.07.03]) can align the server DOM with the client component tree — the C# port of the
 /// literal marker strings in <c>@vue/server-renderer</c> (<c>packages/server-renderer/src/render.ts</c>
 /// and <c>helpers/ssrRenderTeleport.ts</c>) and the hydration counterparts in
 /// <c>@vue/runtime-core</c> (<c>packages/runtime-core/src/hydration.ts</c>). These byte sequences are
@@ -13,7 +13,7 @@ namespace Assimalign.Viu.ServerRenderer;
 internal static class SsrMarkers
 {
     /// <summary>
-    /// Opens a fragment's children (upstream: <c>&lt;!--[--&gt;</c>). A fragment vnode — a multi-root
+    /// Opens a fragment's children (upstream: <c>&lt;!--[--&gt;</c>). A fragment component — a multi-root
     /// component, a <c>v-for</c> block, a slot outlet — brackets its children with
     /// <see cref="FragmentStart"/>/<see cref="FragmentEnd"/> so the hydration walker knows the fragment's
     /// child range without an element wrapper.
@@ -25,7 +25,7 @@ internal static class SsrMarkers
 
     /// <summary>
     /// An empty comment node / comment anchor (upstream: <c>&lt;!----&gt;</c>). Emitted for a comment
-    /// vnode with empty content and as the <c>v-if</c>-false placeholder, giving hydration a stable
+    /// component with empty content and as the <c>v-if</c>-false placeholder, giving hydration a stable
     /// anchor node to adopt.
     /// </summary>
     public const string EmptyComment = "<!---->";

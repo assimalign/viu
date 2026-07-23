@@ -77,7 +77,7 @@ internal static class CompilerText
 
     /// <summary>
     /// Whether <paramref name="name"/> is a simple JavaScript identifier (upstream <c>isSimpleIdentifier</c>:
-    /// <c>nonIdentifierRE = /^\d|[^\$\w\xA0-￿]/</c>).
+    /// <c>nonIdentifierRE = /^\d|[^\$\w\xA0-\uFFFF]/</c>).
     /// </summary>
     /// <param name="name">The candidate identifier.</param>
     public static bool IsSimpleIdentifier(string name)

@@ -2,31 +2,29 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// A DOM-free harness that drives the real Core renderer + directive pipeline over int node
-// handles (as the browser does), recording element state in memory and routing events through the
-// real BrowserEventInvokerRegistry. It installs a recording BrowserDirectiveOperations so v-model /
-// v-show exercise their whole production path with no browser, WASM toolchain, or JS interop. The
-// browser-only remainder (real IME composition, real focus, actual selectedOptions reads) is
-// deferred to the e2e harness ([V01.01.11.03]).
+// Drives the redesigned Core renderer and Browser directive pipeline over in-memory integer
+// handles. Browser events still pass through the production invoker registry.
 internal sealed class BrowserDirectiveTestHarness : IDisposable
 {
     private readonly Dictionary<int, RecordingNode> _nodes = [];
     private readonly Dictionary<int, List<int>> _children = [];
     private readonly BrowserEventInvokerRegistry _registry;
     private readonly BrowserDirectiveOperations? _previousOperations;
-    private readonly TestSchedulerPump _pump;
     private readonly Renderer<int> _renderer;
+    private readonly IApplicationContext _application;
+    private readonly TestSchedulerPump _schedulerPump;
     private int _nextHandle = 1;
     private int _cssVariableCrossings;
 
-    public BrowserDirectiveTestHarness()
+    public BrowserDirectiveTestHarness(
+        IComponentFactory? componentFactory = null)
     {
-        Scheduler.Reset();
-        _pump = TestSchedulerPump.Install();
+        _schedulerPump = TestSchedulerPump.Install();
         _registry = new BrowserEventInvokerRegistry(
             static (_, _, _, _, _) => { },
             static (_, _, _) => { });
@@ -34,101 +32,136 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
         Leaf = new BrowserPropertyLeafOperations
         {
             SetAttribute = SetAttribute,
-            RemoveAttribute = (element, name) => Element(element).Attributes.Remove(name),
+            RemoveAttribute =
+                (element, name) => Element(element).Attributes.Remove(name),
             SetXlinkAttribute = SetAttribute,
-            RemoveXlinkAttribute = (element, name) => Element(element).Attributes.Remove(name),
-            SetClassName = (element, value) => Element(element).Attributes["class"] = value,
+            RemoveXlinkAttribute =
+                (element, name) => Element(element).Attributes.Remove(name),
+            SetClassName =
+                (element, value) => Element(element).Attributes["class"] = value,
             SetStringProperty = SetAttribute,
             SetBooleanProperty = SetBooleanProperty,
             SetValueGuarded = SetValueGuarded,
-            SetStyleText = (element, cssText) => Element(element).Attributes["style"] = cssText,
-            SetStyleProperty = (element, name, value, _) => Element(element).Style[name] = value,
-            RemoveStyleProperty = (element, name) => Element(element).Style.Remove(name),
-            SetEventListener = (element, rawPropertyName, listener) => _registry.SetListener(element, rawPropertyName, listener),
+            SetStyleText =
+                (element, cssText) => Element(element).Attributes["style"] = cssText,
+            SetStyleProperty =
+                (element, name, value, _) => Element(element).Style[name] = value,
+            RemoveStyleProperty =
+                (element, name) => Element(element).Style.Remove(name),
+            SetEventListener = (element, rawPropertyName, listener) =>
+                _registry.SetListener(element, rawPropertyName, listener),
         };
 
         _previousOperations = BrowserDirectiveOperations.Current;
         BrowserDirectiveOperations.Current = new BrowserDirectiveOperations
         {
-            SetModelListener = (element, rawPropertyName, handler) => _registry.SetModelListener(element, rawPropertyName, handler),
+            SetModelListener = (element, rawPropertyName, handler) =>
+                _registry.SetModelListener(element, rawPropertyName, handler),
             SetValueGuarded = SetValueGuarded,
             SetBooleanProperty = SetBooleanProperty,
-            SetStyleProperty = (element, name, value, _) => Element(element).Style[name] = value,
-            RemoveStyleProperty = (element, name) => Element(element).Style.Remove(name),
-            // One recorded crossing per UseCssVars pass: apply every custom property, and count the call so
-            // tests can pin the single-interop-crossing-per-pass batching AC ([V01.01.06.06]).
+            SetStyleProperty =
+                (element, name, value, _) => Element(element).Style[name] = value,
+            RemoveStyleProperty =
+                (element, name) => Element(element).Style.Remove(name),
             SetCssVariables = (element, names, values) =>
             {
                 _cssVariableCrossings++;
-                var style = Element(element).Style;
-                for (var index = 0; index < names.Length; index++)
+                Dictionary<string, string> style = Element(element).Style;
+                for (int index = 0; index < names.Length; index++)
                 {
                     style[names[index]] = values[index];
                 }
             },
         };
 
-        _renderer = RendererFactory.CreateRenderer(new RendererOptions<int>
-        {
-            Insert = Insert,
-            Remove = Remove,
-            CreateElement = (tag, _) => Create(new RecordingNode { Tag = tag }),
-            CreateText = text => Create(new RecordingNode { Tag = "#text", Value = text }),
-            CreateComment = text => Create(new RecordingNode { Tag = "#comment", Value = text }),
-            SetText = (node, text) => Element(node).Value = text,
-            SetElementText = (node, text) => Element(node).Value = text,
-            ParentNode = node => Element(node).Parent,
-            NextSibling = _ => 0,
-            PatchProperty = (element, elementTag, propertyName, previousValue, nextValue, elementNamespace) =>
-                BrowserPropertyPatcher.Patch(Leaf, element, elementTag, propertyName, previousValue, nextValue, elementNamespace),
-        });
+        _renderer = RendererFactory.CreateRenderer(
+            new RendererOptions<int>
+            {
+                Insert = Insert,
+                Remove = Remove,
+                CreateElement = (tag, _) =>
+                    Create(new RecordingNode { Tag = tag }),
+                CreateText = text =>
+                    Create(new RecordingNode { Tag = "#text", Value = text }),
+                CreateComment = text =>
+                    Create(new RecordingNode
+                    {
+                        Tag = "#comment",
+                        Value = text,
+                    }),
+                SetText = (node, text) => Element(node).Value = text,
+                ParentNode = node => Element(node).Parent,
+                NextSibling = NextSibling,
+                PatchAttribute =
+                    (
+                        element,
+                        elementTag,
+                        propertyName,
+                        previousValue,
+                        nextValue,
+                        elementNamespace) =>
+                        BrowserPropertyPatcher.Patch(
+                            Leaf,
+                            element,
+                            elementTag,
+                            propertyName,
+                            previousValue,
+                            nextValue,
+                            elementNamespace),
+            });
 
         Container = Create(new RecordingNode { Tag = "#container" });
+        _application = new ApplicationContext(
+            ComponentTree.Comment("directive-test-root"),
+            componentFactory
+                ?? new ComponentFactory(
+                    Array.Empty<ComponentRegistration>()),
+            new EmptyServiceProvider(),
+            directives: BrowserDirectiveResolver.Instance);
     }
 
-    /// <summary>The leaf operations the renderer's patchProp records through.</summary>
     public BrowserPropertyLeafOperations Leaf { get; }
 
-    /// <summary>The container handle to render into.</summary>
     public int Container { get; }
 
-    /// <summary>The live invoker count (for listener-cleanup assertions).</summary>
     public int InvokerCount => _registry.InvokerCount;
 
-    /// <summary>Renders a component's tree into the container.</summary>
-    public void Render(IComponent component)
-        => _renderer.Render(VirtualNodeFactory.Component(component), Container);
+    public IComponentContext? Render(IComponent component)
+        => _renderer.Render(component, Container, _application);
 
-    /// <summary>Unmounts everything from the container.</summary>
-    public void Unmount() => _renderer.Render(null, Container);
+    public void Unmount() => _renderer.Render(null, Container, _application);
 
-    /// <summary>Runs captured scheduler flushes until idle (post-flush mounted/updated hooks).</summary>
-    public int RunUntilIdle() => _pump.RunUntilIdle();
+    public int RunUntilIdle()
+    {
+        return _schedulerPump.RunUntilIdle();
+    }
 
-    /// <summary>The handle of the first recorded element with <paramref name="tag"/>, in creation order.</summary>
     public int FindElement(string tag)
     {
-        for (var handle = 1; handle < _nextHandle; handle++)
+        for (int handle = 1; handle < _nextHandle; handle++)
         {
-            if (_nodes.TryGetValue(handle, out var node) && string.Equals(node.Tag, tag, StringComparison.Ordinal))
+            if (_nodes.TryGetValue(handle, out RecordingNode? node)
+                && string.Equals(node.Tag, tag, StringComparison.Ordinal))
             {
                 return handle;
             }
         }
+
         throw new InvalidOperationException($"No <{tag}> was recorded.");
     }
 
-    /// <summary>Every recorded element handle with <paramref name="tag"/>, in creation order.</summary>
     public IReadOnlyList<int> FindElements(string tag)
     {
-        var matches = new List<int>();
-        for (var handle = 1; handle < _nextHandle; handle++)
+        List<int> matches = [];
+        for (int handle = 1; handle < _nextHandle; handle++)
         {
-            if (_nodes.TryGetValue(handle, out var node) && string.Equals(node.Tag, tag, StringComparison.Ordinal))
+            if (_nodes.TryGetValue(handle, out RecordingNode? node)
+                && string.Equals(node.Tag, tag, StringComparison.Ordinal))
             {
                 matches.Add(handle);
             }
         }
+
         return matches;
     }
 
@@ -140,75 +173,130 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
 
     public int ValueWriteCount(int handle) => Element(handle).ValueWriteCount;
 
-    /// <summary>The element's inline <c>display</c>, or null when there is no inline display.</summary>
     public string? Display(int handle)
-        => Element(handle).Style.TryGetValue("display", out var display) ? display : null;
+        => Element(handle).Style.TryGetValue(
+            "display",
+            out string? display)
+                ? display
+                : null;
 
-    /// <summary>The element's applied CSS custom property (e.g. <c>--abc12345</c>), or null when unset.</summary>
     public string? CssVariable(int handle, string name)
-        => Element(handle).Style.TryGetValue(name, out var value) ? value : null;
+        => Element(handle).Style.TryGetValue(name, out string? value)
+            ? value
+            : null;
 
-    /// <summary>The number of batched <c>UseCssVars</c> interop crossings recorded (one per applied element per pass).</summary>
     public int CssVariableCrossings => _cssVariableCrossings;
-
-    // --- event firing (routes through the real registry: property + model channels) ------------
 
     public int FireInput(int handle, string value)
     {
-        SimulateUserValue(handle, value); // the browser sets el.value before firing 'input'
-        return _registry.Dispatch(handle, capture: false, Event("input", targetValue: value));
+        SimulateUserValue(handle, value);
+        return _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("input", targetValue: value));
     }
 
     public int FireChange(int handle, string value)
     {
         SimulateUserValue(handle, value);
-        return _registry.Dispatch(handle, capture: false, Event("change", targetValue: value));
+        return _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("change", targetValue: value));
     }
 
     public int FireCheckboxChange(int handle, bool isChecked)
     {
-        Element(handle).Checked = isChecked; // the browser toggles el.checked before firing 'change'
-        return _registry.Dispatch(handle, capture: false, Event("change", targetChecked: isChecked));
+        Element(handle).Checked = isChecked;
+        return _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("change", targetChecked: isChecked));
     }
 
-    public int FireSelectChange(int handle, string singleValue, string[]? selectedValues = null)
+    public int FireSelectChange(
+        int handle,
+        string singleValue,
+        string[]? selectedValues = null)
     {
         SimulateUserValue(handle, singleValue);
-        return _registry.Dispatch(handle, capture: false, Event("change", targetValue: singleValue, selectedValues: selectedValues));
+        return _registry.Dispatch(
+            handle,
+            capture: false,
+            Event(
+                "change",
+                targetValue: singleValue,
+                selectedValues: selectedValues));
     }
 
-    /// <summary>
-    /// Dispatches a plain <c>click</c> to the element's property-channel handlers, returning the response
-    /// flags the bridge would apply to the live event (bit 0 <c>stopPropagation</c>, bit 1
-    /// <c>preventDefault</c>) — the seam a <c>@click.stop</c>/<c>.prevent</c> modifier handler records intents on.
-    /// </summary>
     public int FireClick(int handle)
-        => _registry.Dispatch(handle, capture: false, Event("click"));
+        => _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("click"));
 
     public int FireCompositionStart(int handle)
-        => _registry.Dispatch(handle, capture: false, Event("compositionstart"));
+        => _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("compositionstart"));
 
     public int FireCompositionEnd(int handle, string value)
     {
         SimulateUserValue(handle, value);
-        return _registry.Dispatch(handle, capture: false, Event("compositionend", targetValue: value));
+        return _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("compositionend", targetValue: value));
     }
 
-    // Simulate a user edit landing in the DOM (does not count as a directive write).
-    private void SimulateUserValue(int handle, string value) => Element(handle).Value = value;
+    public void FireFocus(int handle)
+        => _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("focus"));
 
-    public void FireFocus(int handle) => _registry.Dispatch(handle, capture: false, Event("focus"));
+    public void FireBlur(int handle)
+        => _registry.Dispatch(
+            handle,
+            capture: false,
+            Event("blur"));
 
-    public void FireBlur(int handle) => _registry.Dispatch(handle, capture: false, Event("blur"));
+    public void Dispose()
+    {
+        Unmount();
+        _schedulerPump.RunUntilIdle();
+        BrowserDirectiveOperations.Current = _previousOperations;
+        _schedulerPump.Dispose();
+    }
 
-    private static BrowserEvent Event(string eventName, string? targetValue = null, bool targetChecked = false, string[]? selectedValues = null)
-        => new(eventName, 1000, string.Empty, string.Empty, BrowserEventModifiers.None, -1, 0, 0, 0, 0, true, targetValue, targetChecked, selectedValues);
+    private static BrowserEvent Event(
+        string eventName,
+        string? targetValue = null,
+        bool targetChecked = false,
+        string[]? selectedValues = null)
+        => new(
+            eventName,
+            1000,
+            string.Empty,
+            string.Empty,
+            BrowserEventModifiers.None,
+            -1,
+            0,
+            0,
+            0,
+            0,
+            true,
+            targetValue,
+            targetChecked,
+            selectedValues);
 
-    // --- recording node-ops --------------------------------------------------------------------
+    private void SimulateUserValue(int handle, string value)
+        => Element(handle).Value = value;
 
     private int Create(RecordingNode node)
     {
-        var handle = _nextHandle++;
+        int handle = _nextHandle++;
         _nodes[handle] = node;
         return handle;
     }
@@ -217,22 +305,45 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
 
     private void Insert(int child, int parent, int anchor)
     {
-        Element(child).Parent = parent;
-        (_children.TryGetValue(parent, out var list) ? list : _children[parent] = []).Add(child);
+        RecordingNode childNode = Element(child);
+        if (childNode.Parent != 0
+            && _children.TryGetValue(
+                childNode.Parent,
+                out List<int>? previousSiblings))
+        {
+            previousSiblings.Remove(child);
+        }
+
+        childNode.Parent = parent;
+        List<int> siblings = _children.TryGetValue(
+            parent,
+            out List<int>? existing)
+                ? existing
+                : _children[parent] = [];
+        int anchorIndex = anchor == 0 ? -1 : siblings.IndexOf(anchor);
+        if (anchorIndex < 0)
+        {
+            siblings.Add(child);
+        }
+        else
+        {
+            siblings.Insert(anchorIndex, child);
+        }
     }
 
     private void Remove(int child)
     {
-        var parent = Element(child).Parent;
-        var released = new List<int>();
+        int parent = Element(child).Parent;
+        List<int> released = [];
         CollectSubtree(child, released);
         _registry.PurgeReleasedHandles(released.ToArray());
-        foreach (var handle in released)
+        foreach (int handle in released)
         {
             _nodes.Remove(handle);
             _children.Remove(handle);
         }
-        if (_children.TryGetValue(parent, out var siblings))
+
+        if (_children.TryGetValue(parent, out List<int>? siblings))
         {
             siblings.Remove(child);
         }
@@ -241,20 +352,37 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
     private void CollectSubtree(int handle, List<int> released)
     {
         released.Add(handle);
-        if (_children.TryGetValue(handle, out var childHandles))
+        if (!_children.TryGetValue(handle, out List<int>? childHandles))
         {
-            foreach (var child in childHandles)
-            {
-                CollectSubtree(child, released);
-            }
+            return;
+        }
+
+        foreach (int child in childHandles)
+        {
+            CollectSubtree(child, released);
         }
     }
 
-    private void SetAttribute(int handle, string name, string value) => Element(handle).Attributes[name] = value;
+    private int NextSibling(int node)
+    {
+        int parent = Element(node).Parent;
+        if (!_children.TryGetValue(parent, out List<int>? siblings))
+        {
+            return 0;
+        }
+
+        int index = siblings.IndexOf(node);
+        return index >= 0 && index + 1 < siblings.Count
+            ? siblings[index + 1]
+            : 0;
+    }
+
+    private void SetAttribute(int handle, string name, string value)
+        => Element(handle).Attributes[name] = value;
 
     private void SetBooleanProperty(int handle, string name, bool value)
     {
-        var node = Element(handle);
+        RecordingNode node = Element(handle);
         if (string.Equals(name, "checked", StringComparison.Ordinal))
         {
             node.Checked = value;
@@ -271,20 +399,23 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
 
     private void SetValueGuarded(int handle, string value)
     {
-        // Mirror the JS compare-and-set so tests can assert caret-safe no-writes.
-        var node = Element(handle);
-        if (!string.Equals(node.Value, value, StringComparison.Ordinal))
+        RecordingNode node = Element(handle);
+        if (string.Equals(node.Value, value, StringComparison.Ordinal))
         {
-            node.Value = value;
-            node.ValueWriteCount++;
+            return;
         }
+
+        node.Value = value;
+        node.ValueWriteCount++;
     }
 
-    public void Dispose()
+    private sealed class EmptyServiceProvider : IServiceProvider
     {
-        BrowserDirectiveOperations.Current = _previousOperations;
-        _pump.Dispose();
-        Scheduler.Reset();
+        public object? GetService(Type serviceType)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            return null;
+        }
     }
 
     private sealed class RecordingNode
@@ -295,7 +426,9 @@ internal sealed class BrowserDirectiveTestHarness : IDisposable
         public bool Selected;
         public int Parent;
         public int ValueWriteCount;
-        public readonly Dictionary<string, string> Attributes = new(StringComparer.Ordinal);
-        public readonly Dictionary<string, string> Style = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, string> Attributes =
+            new(StringComparer.Ordinal);
+        public readonly Dictionary<string, string> Style =
+            new(StringComparer.Ordinal);
     }
 }

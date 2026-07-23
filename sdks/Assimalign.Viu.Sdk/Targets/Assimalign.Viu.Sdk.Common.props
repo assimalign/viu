@@ -18,7 +18,7 @@
             in-repo default path (which needs $(ViuRepositoryDirectory))
             dormant.
         -->
-        <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Tooling.Tasks.dll</ViuBundleCssTaskAssembly>
+        <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuBundleCssTaskAssembly>
 
         <!--
             The Assimalign.Viu.App framework libraries opt into runtime preview

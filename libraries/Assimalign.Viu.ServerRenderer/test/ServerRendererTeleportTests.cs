@@ -1,34 +1,32 @@
 using System.Threading.Tasks;
 
+using Assimalign.Viu.Components;
+
 using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
 /// <summary>
-/// Teleport SSR: the origin gets the start/end anchor pair while content is buffered by target selector
-/// into <see cref="SsrContext.Teleports"/> — pinned to upstream <c>ssrRenderTeleport</c> and the
-/// <c>ssrContext.teleports</c> contract the hydration walker consumes.
+/// Pins teleport origin markers and per-target buffering for the unified component tree.
 /// </summary>
 public class ServerRendererTeleportTests
 {
-    private static InlineComponent TeleportHost(VirtualNodeProperties? teleportProperties, params VirtualNode?[] children) =>
-        new((_, _) => () => VirtualNodeFactory.Element(
-            "div",
-            VirtualNodeFactory.Teleport(teleportProperties, children)));
-
     [Fact]
     public async Task Enabled_BuffersContentByTarget_AndLeavesAnchorPairInPlace()
     {
-        var context = new SsrContext();
-        var component = TeleportHost(
-            VirtualNodeFactory.Properties(("to", "#modal")),
-            VirtualNodeFactory.Element("p", "hi"));
+        SsrContext context = new();
+        IComponent root = ComponentTree.Element(
+            "div",
+            children:
+            [
+                ComponentTree.Teleport(
+                    "#modal",
+                    [TestTree.Element("p", "hi")]),
+            ]);
 
-        var html = await ServerRenderer.RenderToStringAsync(component, null, context);
+        string html = await ServerRenderer.RenderToStringAsync(root, context);
 
         html.ShouldBe("<div><!--teleport start--><!--teleport end--></div>");
         context.Teleports["#modal"].ShouldBe("<p>hi</p><!--teleport anchor-->");
@@ -37,26 +35,37 @@ public class ServerRendererTeleportTests
     [Fact]
     public async Task Disabled_RendersContentInPlace_AndBuffersOnlyAnchor()
     {
-        var context = new SsrContext();
-        var component = TeleportHost(
-            VirtualNodeFactory.Properties(("to", "#modal"), ("disabled", true)),
-            VirtualNodeFactory.Element("p", "hi"));
+        SsrContext context = new();
+        IComponent root = ComponentTree.Element(
+            "div",
+            children:
+            [
+                ComponentTree.Teleport(
+                    "#modal",
+                    [TestTree.Element("p", "hi")],
+                    isDisabled: true),
+            ]);
 
-        var html = await ServerRenderer.RenderToStringAsync(component, null, context);
+        string html = await ServerRenderer.RenderToStringAsync(root, context);
 
         html.ShouldBe("<div><!--teleport start--><p>hi</p><!--teleport end--></div>");
         context.Teleports["#modal"].ShouldBe("<!--teleport anchor-->");
     }
 
     [Fact]
-    public async Task MissingTarget_SkipsContent_AndBuffersNothing()
+    public async Task NonStringTarget_SkipsContent_AndBuffersNothing()
     {
-        var context = new SsrContext();
-        var component = TeleportHost(
-            VirtualNodeFactory.Properties(("disabled", false)),
-            VirtualNodeFactory.Element("p", "hi"));
+        SsrContext context = new();
+        IComponent root = ComponentTree.Element(
+            "div",
+            children:
+            [
+                ComponentTree.Teleport(
+                    new object(),
+                    [TestTree.Element("p", "hi")]),
+            ]);
 
-        var html = await ServerRenderer.RenderToStringAsync(component, null, context);
+        string html = await ServerRenderer.RenderToStringAsync(root, context);
 
         html.ShouldBe("<div><!--teleport start--><!--teleport end--></div>");
         context.Teleports.Count.ShouldBe(0);
@@ -65,14 +74,18 @@ public class ServerRendererTeleportTests
     [Fact]
     public async Task MultipleTeleports_SameTarget_AccumulateInOrder()
     {
-        var context = new SsrContext();
-        var component = new InlineComponent((_, _) => () => VirtualNodeFactory.Element(
+        SsrContext context = new();
+        IComponent root = ComponentTree.Element(
             "div",
-            VirtualNodeFactory.Teleport(VirtualNodeFactory.Properties(("to", "#modal")), [VirtualNodeFactory.Element("p", "a")]),
-            VirtualNodeFactory.Teleport(VirtualNodeFactory.Properties(("to", "#modal")), [VirtualNodeFactory.Element("p", "b")])));
+            children:
+            [
+                ComponentTree.Teleport("#modal", [TestTree.Element("p", "a")]),
+                ComponentTree.Teleport("#modal", [TestTree.Element("p", "b")]),
+            ]);
 
-        await ServerRenderer.RenderToStringAsync(component, null, context);
+        await ServerRenderer.RenderToStringAsync(root, context);
 
-        context.Teleports["#modal"].ShouldBe("<p>a</p><!--teleport anchor--><p>b</p><!--teleport anchor-->");
+        context.Teleports["#modal"].ShouldBe(
+            "<p>a</p><!--teleport anchor--><p>b</p><!--teleport anchor-->");
     }
 }

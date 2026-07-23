@@ -4,6 +4,8 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 	<ItemGroup>
+		<ViuProjectReference Include="Assimalign.Viu.Components" />
 		<ViuProjectReference Include="Assimalign.Viu.Core" />
+		<ViuProjectReference Include="Assimalign.Viu.Reactivity" />
 	</ItemGroup>
 </Project>

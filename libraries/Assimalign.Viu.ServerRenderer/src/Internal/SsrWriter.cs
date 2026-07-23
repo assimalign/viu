@@ -12,7 +12,7 @@ namespace Assimalign.Viu.ServerRenderer;
 /// (<c>packages/server-renderer/src/render.ts</c>). One <see cref="StringBuilder"/> is threaded
 /// through the whole render (never per-node string concatenation, the throughput reason the area
 /// exists): <see cref="Append(string)"/> is the hot path and never allocates beyond the builder's own
-/// growth. In string mode (<paramref name="sink"/> null) the builder accumulates the whole document,
+/// growth. In string mode (<c>sink</c> null) the builder accumulates the whole document,
 /// returned by <see cref="ToStringResult"/>. In streaming mode the builder is a bounded chunk buffer:
 /// <see cref="FlushAsync"/> drains it to the backing <see cref="TextWriter"/> and awaits its
 /// <see cref="TextWriter.FlushAsync()"/>, so the caller's write cadence applies backpressure and the

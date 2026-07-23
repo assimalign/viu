@@ -1,6 +1,7 @@
 using System;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
@@ -40,7 +41,11 @@ public sealed class VModelText : IDirective
     /// <inheritdoc/>
     public DirectiveHook? BeforeUnmount => OnBeforeUnmount;
 
-    private static void OnCreated(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnCreated(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
     {
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
@@ -49,7 +54,7 @@ public sealed class VModelText : IDirective
         var lazy = BrowserModelDirective.HasModifier(binding, "lazy");
         var trim = BrowserModelDirective.HasModifier(binding, "trim");
         var castToNumber = BrowserModelDirective.HasModifier(binding, "number")
-            || BrowserModelDirective.IsNumberType(node);
+            || BrowserModelDirective.IsNumberType(component);
 
         if (lazy)
         {
@@ -76,7 +81,11 @@ public sealed class VModelText : IDirective
         operations.SetModelListener(handle, "onBlur", (Action)(() => operations.GetState(handle).Focused = false));
     }
 
-    private static void OnMounted(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnMounted(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
     {
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
@@ -86,7 +95,11 @@ public sealed class VModelText : IDirective
         operations.GetState(handle).CurrentValue = formatted;
     }
 
-    private static void OnBeforeUpdate(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnBeforeUpdate(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
     {
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
@@ -109,7 +122,10 @@ public sealed class VModelText : IDirective
             // input's guard nuance is deferred (uncommon; e2e harness [V01.01.11.03]).
             var lazy = BrowserModelDirective.HasModifier(binding, "lazy");
             var trim = BrowserModelDirective.HasModifier(binding, "trim");
-            if (lazy && LooseEquality.LooseEqual(model, BrowserModelDirective.ModelValue(binding.OldValue)))
+            if (lazy
+                && LooseEquality.LooseEqual(
+                    model,
+                    BrowserModelDirective.ModelValue(binding.PreviousValue)))
             {
                 return;
             }
@@ -122,7 +138,11 @@ public sealed class VModelText : IDirective
         state.CurrentValue = newValue;
     }
 
-    private static void OnBeforeUnmount(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnBeforeUnmount(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
         => BrowserDirectiveOperations.Require().ReleaseState(BrowserModelDirective.Handle(element));
 
     // The DOM value -> model commit shared by input/change/compositionend (upstream: the shared

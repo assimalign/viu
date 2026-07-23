@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Browser;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Router.Browser.Tests;
@@ -197,12 +198,33 @@ public class RouterLinkDomBridgeTests
 
     private static ComponentWrapper MountLink(Router router, string to)
     {
-        var options = new ComponentMountOptions();
-        options.Provide(RouterInjectionKeys.Router, router);
-        options.Properties = VirtualNodeFactory.Properties(("to", to));
-        var slots = new ComponentSlots();
-        slots["default"] = _ => [VirtualNodeFactory.Text("link")];
-        options.Slots = slots;
+        var options = new ComponentMountOptions
+        {
+            Services = new RouterServiceProvider(router),
+            Arguments = new ComponentArguments(
+                [
+                    new KeyValuePair<string, object?>("to", to),
+                ]),
+            Slots = new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+            {
+                ["default"] = _ => ComponentTree.Text("link"),
+            },
+        };
         return ViuTest.Mount(new RouterLink(), options);
+    }
+
+    private sealed class RouterServiceProvider : IServiceProvider
+    {
+        private readonly Router _router;
+
+        internal RouterServiceProvider(Router router)
+        {
+            _router = router;
+        }
+
+        public object? GetService(Type serviceType)
+        {
+            return serviceType == typeof(Router) ? _router : null;
+        }
     }
 }

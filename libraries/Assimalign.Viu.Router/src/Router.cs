@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Router;
 
@@ -101,7 +101,7 @@ public sealed class Router : IDisposable
     /// trigger per completed navigation drives every <see cref="RouterView"/> and the active-class
     /// computation of every <see cref="RouterLink"/> through the normal reactivity graph.
     /// </summary>
-    public ReactiveValue<RouteLocation> CurrentRoute => _currentRoute;
+    public IReactiveReference<RouteLocation> CurrentRoute => _currentRoute;
 
     /// <summary>
     /// The default active class applied to a <see cref="RouterLink"/> whose target is an inclusive
@@ -518,14 +518,15 @@ public sealed class Router : IDisposable
         return guards;
     }
 
-    // Entering records whose component contributes a beforeRouteEnter guard (interface-based
-    // discovery, no reflection; the component instance does not yet exist).
+    // Entering records with an explicitly registered component-associated beforeRouteEnter guard.
+    // The component instance does not yet exist, so route registration owns this metadata.
     private static List<NavigationGuard> CollectRouteEnterGuards(RouteLocation from, RouteLocation to)
     {
         var guards = new List<NavigationGuard>();
         foreach (var record in to.Matched)
         {
-            if (record.Component is IRouteEnterGuard enterGuard && !ContainsRecord(from.Matched, record))
+            if (record.RouteEnterGuard is { } enterGuard
+                && !ContainsRecord(from.Matched, record))
             {
                 guards.Add(enterGuard.BeforeRouteEnter);
             }

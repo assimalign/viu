@@ -1,828 +1,1748 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The runtime half of the by-name helper contract the render-function code generator emits against —
-/// the C# port of the render-helper exports of <c>@vue/runtime-core</c>
-/// (<c>packages/runtime-core/src/vnode.ts</c>, <c>helpers/renderList.ts</c>, <c>helpers/renderSlot.ts</c>,
-/// <c>helpers/resolveAssets.ts</c>, <c>componentRenderContext.ts</c>, and <c>@vue/shared</c>
-/// <c>toDisplayString</c>). Generated render bodies bind every helper through a single
-/// <c>using static global::Assimalign.Viu.RenderHelpers;</c> — the C# analogue of upstream's
-/// aliased helper import — so the members here carry the upstream-aliased spellings (<c>_openBlock</c>,
-/// <c>_createElementBlock</c>, …), the same names the emitter writes. The authoritative name/signature table
-/// is <c>Assimalign.Viu.Syntax.Templates/docs/DESIGN.md</c>; this surface satisfies every call shape the
-/// emitter (<c>Internal/RenderCodeWriter.cs</c>) can produce.
-/// <para>
-/// The <c>_</c>-prefixed lowercase member names are a deliberate, generated-code-only deviation from the
-/// repository whole-word C# naming rule (<c>.claude/rules/general-rules.md</c>) — the names <b>are</b> the
-/// upstream contract, and the compiler binds them literally. Deviates from the general-rules naming rule per
-/// design decision: the render-helper names are the upstream <c>helperNameMap</c> contract, pinned by the
-/// Templates <c>docs/DESIGN.md</c> table and <c>RenderFunctionEmitterTests</c>.
-/// </para>
-/// <para>
-/// This class references only <c>Assimalign.Viu</c>, <c>Assimalign.Viu</c>, and
-/// <c>Assimalign.Viu.Shared</c> — never any <c>Assimalign.Viu.Syntax.*</c> assembly. The contract flows one
-/// way (by name) so the runtime never depends on the compiler. DOM-only helpers (<c>_vShow</c>, the
-/// <c>_vModel*</c> directive values, <c>_withModifiers</c>/<c>_withKeys</c>, <c>_Transition</c>/
-/// <c>_TransitionGroup</c>) are <b>not</b> here: their behavior lives in <c>Assimalign.Viu.Browser</c>,
-/// which this platform-agnostic layer must not reference — see <c>docs/DESIGN.md</c> for that split.
-/// Not thread-safe (single-threaded JS event-loop model).
-/// </para>
+/// Implements the by-name runtime-helper contract emitted by the Viu template compiler and creates
+/// values in the unified <see cref="IComponent"/> tree.
 /// </summary>
+/// <remarks>
+/// Mirrors Vue 3.5's runtime-core render helpers:
+/// https://github.com/vuejs/core/tree/v3.5.29/packages/runtime-core/src.
+/// The underscore-prefixed names deliberately match the compiler's generated-code contract and are
+/// therefore a narrow exception to the repository naming rules. Deviates from the repository
+/// whole-word naming rule per design decision: generated render bodies bind these helper names
+/// literally. This type is not thread-safe; Viu's runtime executes on the single-threaded host event
+/// loop.
+/// </remarks>
 public static class RenderHelpers
 {
-    // ==== Block open / tracking (upstream openBlock / setBlockTracking, vnode.ts) ================
+    private static readonly List<BlockFrame> BlockFrames = new();
+    private static ConditionalWeakTable<IComponent, MemoMetadata> _memoMetadata = new();
+    private static int _blockTrackingDepth = 1;
+
+    /// <summary>Gets the compiler marker for a fragment tree value.</summary>
+    public static readonly object _Fragment = new BuiltInComponentType("Fragment");
+
+    /// <summary>Gets the compiler marker for a teleport tree value.</summary>
+    public static readonly object _Teleport = new BuiltInComponentType("Teleport");
+
+    /// <summary>Gets the registered template type for the host-neutral Suspense built-in.</summary>
+    public static readonly object _Suspense = typeof(Suspense);
+
+    /// <summary>Gets the registered template type for the host-neutral KeepAlive built-in.</summary>
+    public static readonly object _KeepAlive = typeof(KeepAlive);
+
+    /// <summary>Gets the registered template type for the host-neutral BaseTransition built-in.</summary>
+    public static readonly object _BaseTransition = typeof(BaseTransition);
 
     /// <summary>
-    /// Opens an optimization block so vnodes created until the matching block factory are collected as its
-    /// dynamic descendants (upstream: <c>openBlock</c>). Returns the opaque <see cref="BlockToken"/> the
-    /// emitter threads as the first argument of <see cref="_createElementBlock"/>/<see cref="_createBlock"/>
-    /// to sequence the open before any child argument is evaluated (C# has no comma operator).
+    /// Opens an optimization block and returns the token used to preserve generated evaluation order.
     /// </summary>
-    /// <param name="disableTracking">True for <c>v-for</c> fragments whose children come from the render list, not the block tree.</param>
-    /// <returns>The evaluation-order token.</returns>
+    /// <param name="disableTracking">
+    /// Whether descendants should be excluded from the block's dynamic-child collection.
+    /// </param>
+    /// <returns>An opaque block token.</returns>
     public static BlockToken _openBlock(bool disableTracking = false)
     {
-        VirtualNodeFactory.OpenBlock(disableTracking);
-        return default;
+        BlockFrames.Add(new BlockFrame(disableTracking));
+        return new BlockToken(0);
     }
 
-    /// <summary>
-    /// Suspends (<paramref name="value"/> &lt; 0) or resumes (&gt; 0) block-tree collection (upstream:
-    /// <c>setBlockTracking</c>); a <c>v-once</c> subtree brackets its cached content so the descendants are
-    /// created once and never collected. Returns the token <see cref="_setCache"/> uses to invert the
-    /// suspension. When <paramref name="inVOnce"/> is set on the suspending call, the enclosing block is
-    /// marked so unmount still tears down components nested in the cached content (upstream #5154).
-    /// </summary>
-    /// <param name="value">-1 suspends collection; +1 resumes it.</param>
-    /// <param name="inVOnce">True when the suspension brackets <c>v-once</c> content.</param>
-    /// <returns>A token recording the applied delta, accepted by <see cref="_setCache"/>.</returns>
+    /// <summary>Suspends or resumes block-tree collection.</summary>
+    /// <param name="value">A negative value suspends tracking; a positive value resumes it.</param>
+    /// <param name="inVOnce">Whether the suspension begins a <c>v-once</c> subtree.</param>
+    /// <returns>A token used by <see cref="_setCache"/> to apply the inverse change.</returns>
     public static BlockToken _setBlockTracking(int value, bool inVOnce = false)
     {
-        VirtualNodeFactory.SetBlockTracking(value, inVOnce);
+        _blockTrackingDepth += value;
+        if (inVOnce && value < 0 && BlockFrames.Count > 0)
+        {
+            BlockFrames[^1].HasOnce = true;
+        }
+
         return new BlockToken(value);
     }
 
-    // ==== VNode / block factories (upstream createVNode / createElementBlock / createBlock) ======
-
-    /// <summary>
-    /// Closes the open block onto an element or fragment vnode carrying patch hints (upstream:
-    /// <c>createElementBlock</c>). The block opened by the <paramref name="block"/> argument's
-    /// <see cref="_openBlock"/> is collected onto the result's <see cref="VirtualNode.DynamicChildren"/>.
-    /// </summary>
-    /// <param name="block">The token from <see cref="_openBlock"/> (sequences the open; value unused).</param>
-    /// <param name="tag">An element tag string or <see cref="_Fragment"/>.</param>
-    /// <param name="properties">The props (from <see cref="_createProps"/>), or null.</param>
-    /// <param name="children">Text, a single vnode, or a vnode/object array.</param>
-    /// <param name="patchFlag">The compiler patch hint (numeric parity with <see cref="PatchFlags"/>).</param>
-    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> carries <see cref="PatchFlags.Props"/>.</param>
-    public static VirtualNode _createElementBlock(
+    /// <summary>Creates an element or fragment block.</summary>
+    /// <param name="block">The token returned by <see cref="_openBlock"/>.</param>
+    /// <param name="tag">An element tag or <see cref="_Fragment"/>.</param>
+    /// <param name="properties">The generated property bag.</param>
+    /// <param name="children">The generated child value or values.</param>
+    /// <param name="patchFlag">The compiler patch flags.</param>
+    /// <param name="dynamicProperties">The selectively patchable property names.</param>
+    /// <returns>The block root.</returns>
+    public static IComponent _createElementBlock(
         BlockToken block,
         object? tag,
         object? properties = null,
         object? children = null,
         int patchFlag = 0,
         string[]? dynamicProperties = null)
-        => CreateBaseVNode(tag, properties, children, patchFlag, dynamicProperties, asBlock: true);
+    {
+        _ = block;
+        return CreateComponent(
+            tag,
+            properties,
+            children,
+            (PatchFlags)patchFlag,
+            dynamicProperties,
+            asBlock: true);
+    }
 
-    /// <summary>
-    /// Closes the open block onto a component, dynamic-component, or built-in vnode (upstream:
-    /// <c>createBlock</c>). Dispatches on <paramref name="tag"/>: an <see cref="IComponent"/> is a
-    /// component, a string is an element (dynamic-component element fallback), <see cref="_Fragment"/> is a
-    /// fragment, and null renders a comment placeholder.
-    /// </summary>
-    /// <param name="block">The token from <see cref="_openBlock"/> (sequences the open; value unused).</param>
-    /// <param name="tag">A component definition, an element tag string, a built-in, or null.</param>
-    /// <param name="properties">The props (from <see cref="_createProps"/>), or null.</param>
-    /// <param name="children">Component slots (from <see cref="_createProps"/>), text, or a vnode array.</param>
-    /// <param name="patchFlag">The compiler patch hint.</param>
-    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> carries <see cref="PatchFlags.Props"/>.</param>
-    public static VirtualNode _createBlock(
+    /// <summary>Creates a template, dynamic, or built-in block.</summary>
+    /// <param name="block">The token returned by <see cref="_openBlock"/>.</param>
+    /// <param name="tag">A template type, resolved name, element tag, or built-in marker.</param>
+    /// <param name="properties">The generated property bag.</param>
+    /// <param name="children">Children or component slots.</param>
+    /// <param name="patchFlag">The compiler patch flags.</param>
+    /// <param name="dynamicProperties">The selectively patchable property names.</param>
+    /// <returns>The block root.</returns>
+    public static IComponent _createBlock(
         BlockToken block,
         object? tag,
         object? properties = null,
         object? children = null,
         int patchFlag = 0,
         string[]? dynamicProperties = null)
-        => CreateBaseVNode(tag, properties, children, patchFlag, dynamicProperties, asBlock: true);
+    {
+        _ = block;
+        return CreateComponent(
+            tag,
+            properties,
+            children,
+            (PatchFlags)patchFlag,
+            dynamicProperties,
+            asBlock: true);
+    }
 
-    /// <summary>
-    /// Creates a plain (non-block) element or fragment vnode carrying patch hints (upstream:
-    /// <c>createElementVNode</c>/<c>createBaseVNode</c>). Collected into the enclosing block by patch flag.
-    /// </summary>
-    /// <param name="tag">An element tag string or <see cref="_Fragment"/>.</param>
-    /// <param name="properties">The props (from <see cref="_createProps"/>), or null.</param>
-    /// <param name="children">Text, a single vnode, or a vnode/object array.</param>
-    /// <param name="patchFlag">The compiler patch hint.</param>
-    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> carries <see cref="PatchFlags.Props"/>.</param>
-    public static VirtualNode _createElementVNode(
+    /// <summary>Creates a non-block element or fragment.</summary>
+    /// <param name="tag">An element tag or <see cref="_Fragment"/>.</param>
+    /// <param name="properties">The generated property bag.</param>
+    /// <param name="children">The generated child value or values.</param>
+    /// <param name="patchFlag">The compiler patch flags.</param>
+    /// <param name="dynamicProperties">The selectively patchable property names.</param>
+    /// <returns>The tree value.</returns>
+    public static IComponent _createElementVNode(
         object? tag,
         object? properties = null,
         object? children = null,
         int patchFlag = 0,
         string[]? dynamicProperties = null)
-        => CreateBaseVNode(tag, properties, children, patchFlag, dynamicProperties, asBlock: false);
+    {
+        return CreateComponent(
+            tag,
+            properties,
+            children,
+            (PatchFlags)patchFlag,
+            dynamicProperties,
+            asBlock: false);
+    }
 
-    /// <summary>
-    /// Creates a plain (non-block) component or element vnode carrying patch hints (upstream:
-    /// <c>createVNode</c>). Dispatches on <paramref name="tag"/> exactly as <see cref="_createBlock"/> does.
-    /// </summary>
-    /// <param name="tag">A component definition, an element tag string, a built-in, or null.</param>
-    /// <param name="properties">The props (from <see cref="_createProps"/>), or null.</param>
-    /// <param name="children">Component slots, text, a single vnode, or a vnode array.</param>
-    /// <param name="patchFlag">The compiler patch hint.</param>
-    /// <param name="dynamicProperties">The dynamic prop names when <paramref name="patchFlag"/> carries <see cref="PatchFlags.Props"/>.</param>
-    public static VirtualNode _createVNode(
+    /// <summary>Creates a non-block template, dynamic, or element value.</summary>
+    /// <param name="tag">A template type, resolved name, element tag, or built-in marker.</param>
+    /// <param name="properties">The generated property bag.</param>
+    /// <param name="children">Children or component slots.</param>
+    /// <param name="patchFlag">The compiler patch flags.</param>
+    /// <param name="dynamicProperties">The selectively patchable property names.</param>
+    /// <returns>The tree value.</returns>
+    public static IComponent _createVNode(
         object? tag,
         object? properties = null,
         object? children = null,
         int patchFlag = 0,
         string[]? dynamicProperties = null)
-        => CreateBaseVNode(tag, properties, children, patchFlag, dynamicProperties, asBlock: false);
+    {
+        return CreateComponent(
+            tag,
+            properties,
+            children,
+            (PatchFlags)patchFlag,
+            dynamicProperties,
+            asBlock: false);
+    }
 
-    /// <summary>Creates a text vnode (upstream: <c>createTextVNode</c>).</summary>
-    /// <param name="text">The text payload; coerced with <see cref="DisplayStringFormatter"/> when non-string.</param>
-    /// <param name="patchFlag">The compiler hint (<see cref="PatchFlags.Text"/> for dynamic text).</param>
-    public static VirtualNode _createTextVNode(object? text = null, int patchFlag = 0)
-        => VirtualNodeFactory.Text(CoerceText(text), (PatchFlags)patchFlag);
+    /// <summary>Creates a text tree value.</summary>
+    /// <param name="text">The text or value to display.</param>
+    /// <param name="patchFlag">The compiler patch flags.</param>
+    /// <returns>The text value.</returns>
+    public static ITextComponent _createTextVNode(object? text = null, int patchFlag = 0)
+    {
+        ITextComponent component = ComponentTree.Text(
+            CoerceText(text),
+            new ComponentOptimization((PatchFlags)patchFlag));
+        TrackDynamicComponent(component);
+        return component;
+    }
 
-    /// <summary>
-    /// Creates a comment vnode (upstream: <c>createCommentVNode</c>). With <paramref name="asBlock"/> the
-    /// comment is wrapped in its own block — the <c>v-if</c>/<c>v-else</c> chain terminator emits
-    /// <c>_createCommentVNode("v-if", true)</c> so the else branch patches consistently against the
-    /// block-form branches.
-    /// </summary>
+    /// <summary>Creates a comment or empty-render placeholder.</summary>
     /// <param name="text">The comment text.</param>
-    /// <param name="asBlock">True to open and close a block around the comment.</param>
-    public static VirtualNode _createCommentVNode(string? text = "", bool asBlock = false)
+    /// <param name="asBlock">Whether to create a block-form comment.</param>
+    /// <returns>The comment value.</returns>
+    public static ICommentComponent _createCommentVNode(string? text = "", bool asBlock = false)
     {
         if (!asBlock)
         {
-            return VirtualNodeFactory.Comment(text ?? string.Empty);
+            return ComponentTree.Comment(text ?? string.Empty);
         }
-        // Upstream: asBlock ? (openBlock(), createBlock(Comment, null, text)) : createVNode(Comment,...).
-        // The emitter writes _createCommentVNode(text, true) with no separate _openBlock, so the block is
-        // opened and closed here.
-        VirtualNodeFactory.OpenBlock();
-        return BlockStack.CloseBlockAndSetup(VirtualNodeFactory.Comment(text ?? string.Empty));
+
+        _openBlock();
+        return CompleteBlock(
+            optimization => new RuntimeCommentComponent(text ?? string.Empty, optimization),
+            default,
+            null);
     }
 
-    /// <summary>
-    /// Creates a static vnode whose raw markup the platform inserts in one operation (upstream:
-    /// <c>createStaticVNode</c>). Requires the renderer's <c>InsertStaticContent</c> node op.
-    /// </summary>
-    /// <param name="content">The raw markup.</param>
-    /// <param name="count">
-    /// The number of top-level nodes in <paramref name="content"/> (upstream hint for anchor tracking);
-    /// accepted for contract parity — this model derives the range from the inserted nodes, so the count is
-    /// unused.
-    /// </param>
-    public static VirtualNode _createStaticVNode(string content, int count) => VirtualNodeFactory.Static(content);
+    /// <summary>Creates a platform-specific static-content tree value.</summary>
+    /// <param name="content">The raw static content.</param>
+    /// <param name="count">The compiler's top-level-node count hint.</param>
+    /// <returns>The static tree value.</returns>
+    public static IStaticComponent _createStaticVNode(string content, int count)
+    {
+        _ = count;
+        return ComponentTree.Static(content);
+    }
 
-    // ==== Interpolation (upstream @vue/shared toDisplayString) ===================================
+    /// <summary>Formats an interpolation value for display.</summary>
+    /// <param name="value">The value to format.</param>
+    /// <returns>The display string.</returns>
+    public static string _toDisplayString(object? value)
+    {
+        return DisplayStringFormatter.ToDisplayString(value);
+    }
 
-    /// <summary>Stringifies an interpolation value (upstream: <c>toDisplayString</c>).</summary>
-    /// <param name="value">The interpolated value.</param>
-    /// <returns>The display string; never null.</returns>
-    public static string _toDisplayString(object? value) => DisplayStringFormatter.ToDisplayString(value);
-
-    // ==== v-for (upstream helpers/renderList.ts) =================================================
-
-    /// <summary>
-    /// Renders a list for <c>v-for</c> (upstream: <c>renderList</c> over an iterable). The generic parameter
-    /// gives the emitted <c>(item) =&gt; …</c> lambda its item type.
-    /// </summary>
-    /// <typeparam name="T">The item type, inferred from <paramref name="source"/>.</typeparam>
-    /// <param name="source">The iterated collection, or null.</param>
-    /// <param name="render">Produces one vnode per item.</param>
-    /// <returns>The per-item vnodes, in order.</returns>
-    public static VirtualNode?[] _renderList<T>(IEnumerable<T>? source, Func<T, VirtualNode?> render)
+    /// <summary>Renders each item in an enumerable.</summary>
+    /// <typeparam name="T">The item type.</typeparam>
+    /// <typeparam name="TResult">The generated result type.</typeparam>
+    /// <param name="source">The source values.</param>
+    /// <param name="render">The per-item renderer.</param>
+    /// <returns>The rendered values.</returns>
+    public static TResult[] _renderList<T, TResult>(
+        IEnumerable<T>? source,
+        Func<T, TResult> render)
     {
         ArgumentNullException.ThrowIfNull(render);
         if (source is null)
         {
-            return [];
+            return Array.Empty<TResult>();
         }
-        var result = new List<VirtualNode?>(source is ICollection<T> collection ? collection.Count : 4);
-        foreach (var item in source)
+
+        List<TResult> result =
+            new(source is ICollection<T> collection ? collection.Count : 4);
+        foreach (T item in source)
         {
             result.Add(render(item));
         }
+
         return result.ToArray();
     }
 
-    /// <summary>
-    /// Renders a list for <c>v-for</c> with the item index (upstream: <c>renderList</c>'s <c>(item, index)</c>
-    /// arm). The generics give the emitted <c>(item, index) =&gt; …</c> lambda its parameter types.
-    /// </summary>
-    /// <typeparam name="T">The item type, inferred from <paramref name="source"/>.</typeparam>
-    /// <param name="source">The iterated collection, or null.</param>
-    /// <param name="render">Produces one vnode per item and its zero-based index.</param>
-    /// <returns>The per-item vnodes, in order.</returns>
-    public static VirtualNode?[] _renderList<T>(IEnumerable<T>? source, Func<T, int, VirtualNode?> render)
+    /// <summary>Renders each item and its zero-based index.</summary>
+    /// <typeparam name="T">The item type.</typeparam>
+    /// <typeparam name="TResult">The generated result type.</typeparam>
+    /// <param name="source">The source values.</param>
+    /// <param name="render">The per-item renderer.</param>
+    /// <returns>The rendered values.</returns>
+    public static TResult[] _renderList<T, TResult>(
+        IEnumerable<T>? source,
+        Func<T, int, TResult> render)
     {
         ArgumentNullException.ThrowIfNull(render);
         if (source is null)
         {
-            return [];
+            return Array.Empty<TResult>();
         }
-        var result = new List<VirtualNode?>(source is ICollection<T> collection ? collection.Count : 4);
-        var index = 0;
-        foreach (var item in source)
+
+        List<TResult> result =
+            new(source is ICollection<T> collection ? collection.Count : 4);
+        int index = 0;
+        foreach (T item in source)
         {
-            result.Add(render(item, index++));
+            result.Add(render(item, index));
+            index++;
         }
+
         return result.ToArray();
     }
 
-    /// <summary>
-    /// Renders a numeric range for <c>v-for="n in count"</c> (upstream: <c>renderList</c>'s number arm,
-    /// one-based: <c>n</c> runs 1..<paramref name="count"/>).
-    /// </summary>
-    /// <param name="count">The upper bound (inclusive, one-based).</param>
-    /// <param name="render">Produces one vnode per number.</param>
-    /// <returns>The per-number vnodes.</returns>
-    public static VirtualNode?[] _renderList(int count, Func<int, VirtualNode?> render)
+    /// <summary>Renders a one-based numeric range.</summary>
+    /// <typeparam name="TResult">The generated result type.</typeparam>
+    /// <param name="count">The inclusive upper bound.</param>
+    /// <param name="render">The per-number renderer.</param>
+    /// <returns>The rendered values.</returns>
+    public static TResult[] _renderList<TResult>(int count, Func<int, TResult> render)
     {
         ArgumentNullException.ThrowIfNull(render);
-        var result = new VirtualNode?[count < 0 ? 0 : count];
-        for (var index = 0; index < result.Length; index++)
+        TResult[] result = new TResult[Math.Max(0, count)];
+        for (int index = 0; index < result.Length; index++)
         {
             result[index] = render(index + 1);
         }
+
         return result;
     }
 
-    /// <summary>
-    /// Renders a numeric range for <c>v-for="(n, index) in count"</c> (upstream: <c>renderList</c>'s number
-    /// arm with index; <c>n</c> one-based, <c>index</c> zero-based).
-    /// </summary>
-    /// <param name="count">The upper bound (inclusive, one-based).</param>
-    /// <param name="render">Produces one vnode per number and its zero-based index.</param>
-    /// <returns>The per-number vnodes.</returns>
-    public static VirtualNode?[] _renderList(int count, Func<int, int, VirtualNode?> render)
+    /// <summary>Renders a one-based numeric range with a zero-based index.</summary>
+    /// <typeparam name="TResult">The generated result type.</typeparam>
+    /// <param name="count">The inclusive upper bound.</param>
+    /// <param name="render">The per-number renderer.</param>
+    /// <returns>The rendered values.</returns>
+    public static TResult[] _renderList<TResult>(
+        int count,
+        Func<int, int, TResult> render)
     {
         ArgumentNullException.ThrowIfNull(render);
-        var result = new VirtualNode?[count < 0 ? 0 : count];
-        for (var index = 0; index < result.Length; index++)
+        TResult[] result = new TResult[Math.Max(0, count)];
+        for (int index = 0; index < result.Length; index++)
         {
             result[index] = render(index + 1, index);
         }
+
         return result;
     }
 
-    /// <summary>
-    /// Renders an object's entries for <c>v-for="(value, key, index) in object"</c> (upstream:
-    /// <c>renderList</c>'s object arm). The generics give the emitted lambda its <c>(value, key, index)</c>
-    /// parameter types.
-    /// </summary>
+    /// <summary>Renders key/value entries with their zero-based index.</summary>
     /// <typeparam name="TKey">The entry key type.</typeparam>
     /// <typeparam name="TValue">The entry value type.</typeparam>
-    /// <param name="source">The key/value entries, or null.</param>
-    /// <param name="render">Produces one vnode per value, key, and zero-based index.</param>
-    /// <returns>The per-entry vnodes, in order.</returns>
-    public static VirtualNode?[] _renderList<TKey, TValue>(
+    /// <typeparam name="TResult">The generated result type.</typeparam>
+    /// <param name="source">The entry source.</param>
+    /// <param name="render">The per-entry renderer.</param>
+    /// <returns>The rendered values.</returns>
+    public static TResult[] _renderList<TKey, TValue, TResult>(
         IEnumerable<KeyValuePair<TKey, TValue>>? source,
-        Func<TValue, TKey, int, VirtualNode?> render)
+        Func<TValue, TKey, int, TResult> render)
     {
         ArgumentNullException.ThrowIfNull(render);
         if (source is null)
         {
-            return [];
+            return Array.Empty<TResult>();
         }
-        var result = new List<VirtualNode?>(source is ICollection<KeyValuePair<TKey, TValue>> collection ? collection.Count : 4);
-        var index = 0;
-        foreach (var entry in source)
+
+        List<TResult> result =
+            new(source is ICollection<KeyValuePair<TKey, TValue>> collection
+                ? collection.Count
+                : 4);
+        int index = 0;
+        foreach (KeyValuePair<TKey, TValue> item in source)
         {
-            result.Add(render(entry.Value, entry.Key, index++));
+            result.Add(render(item.Value, item.Key, index));
+            index++;
         }
+
         return result.ToArray();
     }
 
-    // ==== Slots (upstream helpers/renderSlot.ts, componentRenderContext.ts) ======================
+    /// <summary>Wraps an unscoped generated slot function.</summary>
+    /// <param name="render">The generated slot renderer.</param>
+    /// <returns>The component-slot delegate.</returns>
+    public static ComponentSlot _withCtx(Func<object?[]?> render)
+    {
+        ArgumentNullException.ThrowIfNull(render);
+        return _ => NormalizeSlotResult(render());
+    }
 
-    /// <summary>
-    /// Renders a slot outlet (upstream: <c>renderSlot</c>). The compiled render passes the instance's slots
-    /// (spelled <c>_ctx.__slots</c> — <c>$</c> is not legal in C#), the outlet name, the scoped-slot props,
-    /// and an optional fallback factory.
-    /// </summary>
-    /// <param name="slots">The instance's slots (<see cref="ComponentInstance.Slots"/>), or null.</param>
+    /// <summary>Wraps a scoped generated slot function.</summary>
+    /// <param name="render">The generated slot renderer.</param>
+    /// <returns>The component-slot delegate.</returns>
+    public static ComponentSlot _withCtx(Func<object?, object?[]?> render)
+    {
+        ArgumentNullException.ThrowIfNull(render);
+        return arguments => NormalizeSlotResult(render(arguments));
+    }
+
+    /// <summary>Renders a named slot or its fallback content.</summary>
+    /// <param name="slots">The current component's slots.</param>
     /// <param name="name">The slot name.</param>
-    /// <param name="properties">The scoped-slot props to pass, or null.</param>
-    /// <param name="fallback">The fallback content factory, or null.</param>
-    public static VirtualNode _renderSlot(
-        ComponentSlots? slots,
+    /// <param name="properties">The scoped-slot arguments.</param>
+    /// <param name="fallback">The optional fallback renderer.</param>
+    /// <returns>The rendered slot subtree.</returns>
+    public static IComponent _renderSlot(
+        IReadOnlyDictionary<string, ComponentSlot>? slots,
         string name,
         object? properties = null,
         Func<object?[]?>? fallback = null)
     {
-        Func<VirtualNode?[]?>? adapted = fallback is null ? null : () => CoerceVirtualNodeArray(fallback());
-        return VirtualNodeFactory.RenderSlot(slots, name, properties, adapted);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        if (slots is not null && slots.TryGetValue(name, out ComponentSlot? slot))
+        {
+            IComponent? result = slot(BuildArguments(properties));
+            if (HasRenderableSlotContent(result))
+            {
+                return result!;
+            }
+        }
+
+        return fallback is null
+            ? ComponentTree.Comment()
+            : NormalizeSlotResult(fallback()) ?? ComponentTree.Comment();
     }
 
-    /// <summary>
-    /// Wraps a non-scoped slot function with the render context (upstream: <c>withCtx</c>). The emitted
-    /// <c>() =&gt; new object?[] { … }</c> slot body is target-typed by this overload.
-    /// </summary>
-    /// <param name="render">The slot body producing its vnodes.</param>
-    /// <returns>The wrapped <see cref="Slot"/>.</returns>
-    public static Slot _withCtx(Func<object?[]?> render)
+    /// <summary>Merges static and compiler-produced dynamic slots.</summary>
+    /// <param name="slots">The statically named slot property bag.</param>
+    /// <param name="dynamicSlots">Dynamic slot descriptors and rendered descriptor arrays.</param>
+    /// <returns>A merged slot property bag.</returns>
+    public static IReadOnlyDictionary<string, object?> _createSlots(
+        object? slots,
+        object?[] dynamicSlots)
     {
-        ArgumentNullException.ThrowIfNull(render);
-        return _ => CoerceVirtualNodeArray(render());
+        ArgumentNullException.ThrowIfNull(dynamicSlots);
+        Dictionary<string, object?> merged = CopyProperties(slots);
+        foreach (object? dynamicSlot in dynamicSlots)
+        {
+            MergeDynamicSlot(merged, dynamicSlot);
+        }
+
+        return new ReadOnlyDictionary<string, object?>(merged);
     }
 
     /// <summary>
-    /// Wraps a scoped slot function with the render context (upstream: <c>withCtx</c>). The emitted
-    /// <c>(slotProps) =&gt; new object?[] { … }</c> slot body is target-typed by this overload.
+    /// Creates a deferred named-template reference without resolving or activating a template.
     /// </summary>
-    /// <param name="render">The slot body producing its vnodes from the child-supplied scope.</param>
-    /// <returns>The wrapped <see cref="Slot"/>.</returns>
-    public static Slot _withCtx(Func<object?, object?[]?> render)
-    {
-        ArgumentNullException.ThrowIfNull(render);
-        return properties => CoerceVirtualNodeArray(render(properties));
-    }
-
-    // ==== Asset resolution (upstream helpers/resolveAssets.ts) ===================================
-
-    /// <summary>
-    /// Resolves a component by name against the current instance's app registry (upstream:
-    /// <c>resolveComponent</c>). Falls back to the raw <paramref name="name"/> (used as a late-resolved tag)
-    /// when unregistered, matching upstream's <c>resolveAsset</c> fallback.
-    /// </summary>
-    /// <param name="name">The component name.</param>
-    /// <returns>The resolved <see cref="IComponent"/>, or the name for element/late fallback.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public static object? _resolveComponent(string name)
+    /// <param name="name">The registered template name.</param>
+    /// <returns>An opaque name reference consumed by the tree factories.</returns>
+    public static object _resolveComponent(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
-        var resolved = ComponentInstance.Current?.AppContext?.ResolveComponent(name);
-        if (resolved is not null)
-        {
-            return resolved;
-        }
-        RuntimeWarnings.Warn($"Failed to resolve component: {name}");
-        return name;
+        return new NamedTemplateType(name);
     }
 
-    /// <summary>Resolves a directive by name (upstream: <c>resolveDirective</c>).</summary>
-    /// <param name="name">The directive name.</param>
-    /// <returns>The resolved directive, or null.</returns>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
-    public static IDirective? _resolveDirective(string name) => Directives.ResolveDirective(name);
-
-    /// <summary>Resolves a <c>&lt;component :is&gt;</c> value (upstream: <c>resolveDynamicComponent</c>).</summary>
-    /// <param name="value">The <c>is</c> value — a component definition, a name, or null.</param>
-    /// <returns>The resolved component, the element-tag string, or null.</returns>
-    public static object? _resolveDynamicComponent(object? value) => DynamicComponents.ResolveDynamicComponent(value);
-
-    // ==== Runtime directives (upstream directives.ts withDirectives) =============================
+    /// <summary>Creates a deferred directive-name reference.</summary>
+    /// <param name="name">The registered directive name.</param>
+    /// <returns>An opaque directive reference.</returns>
+    public static object _resolveDirective(string name)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return new DirectiveReference(name);
+    }
 
     /// <summary>
-    /// Applies runtime directives to a vnode (upstream: <c>withDirectives(vnode, [[dir, value, arg,
-    /// modifiers], …])</c>). Each entry of <paramref name="directives"/> is itself an
-    /// <c>object?[]</c> of <c>[directive, value?, argument?, modifiers?]</c> — the shape the emitter writes
-    /// as <c>new object?[] { new object?[] { dir, value } }</c>.
+    /// Preserves a dynamic component selector until the tree request is created.
     /// </summary>
-    /// <param name="vnode">The vnode to bind directives to.</param>
-    /// <param name="directives">The directive tuples.</param>
-    /// <returns><paramref name="vnode"/>, for chaining.</returns>
-    public static VirtualNode _withDirectives(VirtualNode vnode, object?[] directives)
+    /// <param name="value">
+    /// A template type, explicit <see cref="DynamicComponentName"/>, resolved name reference,
+    /// element name, asynchronous definition, or null. Plain strings remain element tags because
+    /// the application component factory intentionally has no probing API.
+    /// </param>
+    /// <returns>The unchanged selector.</returns>
+    public static object? _resolveDynamicComponent(object? value)
     {
-        ArgumentNullException.ThrowIfNull(directives);
-        var arguments = new DirectiveArgument[directives.Length];
-        var count = 0;
-        foreach (var entry in directives)
-        {
-            if (entry is object?[] tuple && tuple.Length > 0 && tuple[0] is IDirective directive)
-            {
-                arguments[count++] = new DirectiveArgument(
-                    directive,
-                    tuple.Length > 1 ? tuple[1] : null,
-                    tuple.Length > 2 ? tuple[2] as string : null,
-                    tuple.Length > 3 ? tuple[3] as IReadOnlyDictionary<string, bool> : null);
-            }
-        }
-        if (count != arguments.Length)
-        {
-            Array.Resize(ref arguments, count);
-        }
-        return Directives.WithDirectives(vnode, arguments);
+        return DynamicComponents.ResolveDynamicComponent(value);
     }
 
-    // ==== Prop normalization (upstream mergeProps / normalize* / vShared casings) ================
+    /// <summary>Attaches generated directive metadata to an element or template request.</summary>
+    /// <param name="component">The component tree value.</param>
+    /// <param name="directives">The generated directive tuples.</param>
+    /// <returns>A copy carrying the directive bindings.</returns>
+    public static IComponent _withDirectives(IComponent component, object?[] directives)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(directives);
 
-    /// <summary>Merges several props sources left-to-right per Vue's rules (upstream: <c>mergeProps</c>).</summary>
-    /// <param name="sources">The props sources (from <see cref="_createProps"/> or bindings); non-bag entries are skipped.</param>
-    /// <returns>The merged bag; never null.</returns>
-    public static VirtualNodeProperties _mergeProps(params object?[] sources)
+        List<IComponentDirectiveBinding> bindings = new();
+        switch (component)
+        {
+            case IElementComponent element:
+                bindings.AddRange(element.Directives);
+                break;
+            case ITemplateComponent template:
+                bindings.AddRange(template.Directives);
+                break;
+        }
+
+        foreach (object? entry in directives)
+        {
+            if (entry is not object?[] tuple || tuple.Length == 0 || tuple[0] is null)
+            {
+                continue;
+            }
+
+            bindings.Add(CreateDirectiveBinding(tuple));
+        }
+
+        IComponent result = component switch
+        {
+            IElementComponent element => new ElementComponent(
+                element.Tag,
+                element.Attributes,
+                element.Children,
+                element.Key,
+                element.Optimization,
+                bindings,
+                element.Reference),
+            ITemplateComponent { TemplateType: Type templateType } template => new TemplateComponent(
+                templateType,
+                template.Arguments,
+                template.Slots,
+                template.Key,
+                template.Optimization,
+                template.Listeners,
+                bindings,
+                template.Reference),
+            ITemplateComponent { TemplateName: string templateName } template => new TemplateComponent(
+                templateName,
+                template.Arguments,
+                template.Slots,
+                template.Key,
+                template.Optimization,
+                template.Listeners,
+                bindings,
+                template.Reference),
+            _ => throw new NotSupportedException(
+                $"Directives cannot be attached to component kind '{component.Kind}'."),
+        };
+
+        ReplaceTrackedComponent(component, result);
+        return result;
+    }
+
+    /// <summary>Merges generated property sources using Vue-compatible class, style, and event rules.</summary>
+    /// <param name="sources">The property sources.</param>
+    /// <returns>The merged property bag.</returns>
+    public static IReadOnlyDictionary<string, object?> _mergeProps(params object?[] sources)
     {
         ArgumentNullException.ThrowIfNull(sources);
-        var bags = new VirtualNodeProperties?[sources.Length];
-        for (var index = 0; index < sources.Length; index++)
+        Dictionary<string, object?> merged = new(StringComparer.Ordinal);
+        foreach (object? source in sources)
         {
-            bags[index] = sources[index] as VirtualNodeProperties;
+            foreach (KeyValuePair<string, object?> property in ReadProperties(source))
+            {
+                if (string.Equals(property.Key, "class", StringComparison.Ordinal)
+                    && merged.TryGetValue(property.Key, out object? existingClass))
+                {
+                    merged[property.Key] =
+                        StyleAndClassNormalization.NormalizeClass(
+                            new object?[] { existingClass, property.Value });
+                }
+                else if (string.Equals(property.Key, "style", StringComparison.Ordinal)
+                    && merged.TryGetValue(property.Key, out object? existingStyle))
+                {
+                    merged[property.Key] =
+                        StyleAndClassNormalization.NormalizeStyle(
+                            new object?[] { existingStyle, property.Value });
+                }
+                else if (IsEventListenerName(property.Key)
+                    && merged.TryGetValue(property.Key, out object? existingHandler)
+                    && existingHandler is Delegate existingDelegate
+                    && property.Value is Delegate incomingDelegate
+                    && existingDelegate.GetType() == incomingDelegate.GetType()
+                    && !ReferenceEquals(existingDelegate, incomingDelegate))
+                {
+                    merged[property.Key] = Delegate.Combine(existingDelegate, incomingDelegate);
+                }
+                else
+                {
+                    merged[property.Key] = property.Value;
+                }
+            }
         }
-        return VirtualNodeFactory.MergeProperties(bags);
+
+        return new ReadOnlyDictionary<string, object?>(merged);
     }
 
-    /// <summary>Normalizes a dynamic <c>class</c> binding to a class string (upstream: <c>normalizeClass</c>).</summary>
-    /// <param name="value">The class value (string, list, or name/flag map).</param>
-    public static string _normalizeClass(object? value) => StyleAndClassNormalization.NormalizeClass(value);
+    /// <summary>Normalizes a dynamic class binding.</summary>
+    /// <param name="value">The class binding.</param>
+    /// <returns>The normalized class string.</returns>
+    public static string _normalizeClass(object? value)
+    {
+        return StyleAndClassNormalization.NormalizeClass(value);
+    }
 
-    /// <summary>Normalizes a dynamic <c>style</c> binding (upstream: <c>normalizeStyle</c>).</summary>
-    /// <param name="value">The style value (string, list, or property map).</param>
-    public static object? _normalizeStyle(object? value) => StyleAndClassNormalization.NormalizeStyle(value);
+    /// <summary>Normalizes a dynamic style binding.</summary>
+    /// <param name="value">The style binding.</param>
+    /// <returns>The normalized style representation.</returns>
+    public static object? _normalizeStyle(object? value)
+    {
+        return StyleAndClassNormalization.NormalizeStyle(value);
+    }
 
-    /// <summary>
-    /// Normalizes a props object's <c>class</c>/<c>style</c> entries in place (upstream:
-    /// <c>normalizeProps</c>), returning it unchanged when it is not a props bag.
-    /// </summary>
-    /// <param name="properties">The props object.</param>
+    /// <summary>Normalizes the class and style entries in a generated property bag.</summary>
+    /// <param name="properties">The property source.</param>
+    /// <returns>A normalized snapshot of the source, or the original non-property value.</returns>
     public static object? _normalizeProps(object? properties)
     {
-        if (properties is VirtualNodeProperties bag)
+        if (!CanReadProperties(properties))
         {
-            if (bag.TryGetValue("class", out var cssClass) && cssClass is not null)
-            {
-                bag.Set("class", StyleAndClassNormalization.NormalizeClass(cssClass));
-            }
-            if (bag.TryGetValue("style", out var style) && style is not null)
-            {
-                bag.Set("style", StyleAndClassNormalization.NormalizeStyle(style));
-            }
+            return properties;
         }
+
+        Dictionary<string, object?> normalized = CopyProperties(properties);
+        if (normalized.TryGetValue("class", out object? cssClass))
+        {
+            normalized["class"] = StyleAndClassNormalization.NormalizeClass(cssClass);
+        }
+
+        if (normalized.TryGetValue("style", out object? style))
+        {
+            normalized["style"] = StyleAndClassNormalization.NormalizeStyle(style);
+        }
+
+        return new ReadOnlyDictionary<string, object?>(normalized);
+    }
+
+    /// <summary>Returns a property source unchanged because Viu does not use identity-swapping proxies.</summary>
+    /// <param name="properties">The property source.</param>
+    /// <returns><paramref name="properties"/>.</returns>
+    public static object? _guardReactiveProps(object? properties)
+    {
         return properties;
     }
 
-    /// <summary>
-    /// Guards a reactive props object before it is spread onto a vnode (upstream:
-    /// <c>guardReactiveProps</c>). Viu prop bags are not identity-swapping proxies, so this returns the
-    /// argument unchanged (documented C# divergence: there is no proxy to clone away).
-    /// </summary>
-    /// <param name="properties">The props object.</param>
-    public static object? _guardReactiveProps(object? properties) => properties;
-
-    /// <summary>
-    /// Converts a <c>v-on="{ event: handler }"</c> map to on-prefixed handler props (upstream:
-    /// <c>toHandlers</c>).
-    /// </summary>
-    /// <param name="value">The handlers map (a props bag), or null.</param>
-    /// <returns>A props bag keyed by <c>onEvent</c>; empty when <paramref name="value"/> is not a bag.</returns>
-    public static VirtualNodeProperties _toHandlers(object? value)
+    /// <summary>Prefixes a generated event map's keys with <c>on</c>.</summary>
+    /// <param name="value">The unprefixed event property source.</param>
+    /// <returns>The prefixed event property bag.</returns>
+    public static IReadOnlyDictionary<string, object?> _toHandlers(object? value)
     {
-        var result = new VirtualNodeProperties();
-        if (value is VirtualNodeProperties bag)
+        Dictionary<string, object?> handlers = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, object?> handler in ReadProperties(value))
         {
-            foreach (var (name, handler) in bag)
-            {
-                result.Set(_toHandlerKey(name), handler);
-            }
+            handlers[_toHandlerKey(handler.Key)] = handler.Value;
         }
-        return result;
+
+        return new ReadOnlyDictionary<string, object?>(handlers);
     }
 
-    /// <summary>Camel-cases a hyphenated name (upstream: <c>camelize</c>).</summary>
-    /// <param name="value">The name.</param>
+    /// <summary>Converts a hyphenated name to camel case.</summary>
+    /// <param name="value">The input name.</param>
+    /// <returns>The camel-cased name.</returns>
     public static string _camelize(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return ComponentInstance.Camelize(value);
+        if (value.IndexOf('-', StringComparison.Ordinal) < 0)
+        {
+            return value;
+        }
+
+        char[] buffer = new char[value.Length];
+        int length = 0;
+        bool capitalizeNext = false;
+        foreach (char character in value)
+        {
+            if (character == '-')
+            {
+                capitalizeNext = true;
+                continue;
+            }
+
+            buffer[length] = capitalizeNext
+                ? char.ToUpperInvariant(character)
+                : character;
+            length++;
+            capitalizeNext = false;
+        }
+
+        return new string(buffer, 0, length);
     }
 
-    /// <summary>Capitalizes the first character (upstream: <c>capitalize</c>).</summary>
-    /// <param name="value">The name.</param>
+    /// <summary>Capitalizes the first character of a string.</summary>
+    /// <param name="value">The input string.</param>
+    /// <returns>The capitalized string.</returns>
     public static string _capitalize(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return value.Length == 0 ? value : char.ToUpperInvariant(value[0]) + value[1..];
+        return value.Length == 0
+            ? value
+            : char.ToUpperInvariant(value[0]) + value[1..];
     }
 
-    /// <summary>Builds an <c>onXxx</c> handler key from an event name (upstream: <c>toHandlerKey</c>).</summary>
+    /// <summary>Builds an <c>onEvent</c> property name.</summary>
     /// <param name="value">The event name.</param>
+    /// <returns>The handler property name.</returns>
     public static string _toHandlerKey(object? value)
     {
-        var name = value as string ?? DisplayStringFormatter.ToDisplayString(value);
-        return name.Length == 0 ? string.Empty : "on" + _capitalize(ComponentInstance.Camelize(name));
+        string name = value as string ?? DisplayStringFormatter.ToDisplayString(value);
+        return name.Length == 0 ? string.Empty : "on" + _capitalize(_camelize(name));
     }
 
-    // ==== Reactivity bridge (upstream unref / isRef) ============================================
+    /// <summary>Unwraps a reactive reference or returns a non-reference unchanged.</summary>
+    /// <param name="value">The value to inspect.</param>
+    /// <returns>The current reference value or the original value.</returns>
+    public static object? _unref(object? value)
+    {
+        return value is IReactiveReference reference ? reference.Value : value;
+    }
+
+    /// <summary>Determines whether a value is a reactive reference.</summary>
+    /// <param name="value">The value to inspect.</param>
+    /// <returns>True when the value is a reactive reference.</returns>
+    public static bool _isRef(object? value)
+    {
+        return Reactive.IsRef(value);
+    }
+
+    /// <summary>Creates the generated property-bag representation.</summary>
+    /// <param name="entries">The ordered name/value entries.</param>
+    /// <returns>An immutable property snapshot.</returns>
+    public static IReadOnlyDictionary<string, object?> _createProps(
+        params (string Name, object? Value)[] entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        Dictionary<string, object?> properties =
+            new(entries.Length, StringComparer.Ordinal);
+        foreach ((string name, object? value) in entries)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(name);
+            properties[name] = value;
+        }
+
+        return new ReadOnlyDictionary<string, object?>(properties);
+    }
+
+    /// <summary>Target-types a value-returning event handler with a payload.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The unchanged handler.</returns>
+    public static Func<object?, object?> _withHandler(Func<object?, object?> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
+
+    /// <summary>Target-types a synchronous event handler with a payload.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The unchanged handler.</returns>
+    public static Action<object?> _withHandler(Action<object?> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
+
+    /// <summary>Target-types a parameterless synchronous event handler.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The unchanged handler.</returns>
+    public static Action _withHandler(Action handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
+
+    /// <summary>Target-types a parameterless value-returning event handler.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The unchanged handler.</returns>
+    public static Func<object?> _withHandler(Func<object?> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
+
+    /// <summary>Target-types a parameterless task-returning event handler.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The unchanged task-returning handler.</returns>
+    public static Func<Task> _withHandler(Func<Task> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
+
+    /// <summary>Target-types a task-returning event handler with an object payload.</summary>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The unchanged task-returning handler.</returns>
+    public static Func<object?, Task> _withHandler(Func<object?, Task> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
 
     /// <summary>
-    /// Unwraps a ref, or returns the argument itself when it is not a ref — the by-name bridge to
-    /// <c>Assimalign.Viu</c> (upstream: <c>unref</c>). Reading a ref's value tracks it.
+    /// Adapts a task-returning handler with a strongly typed payload to the component event contract.
     /// </summary>
-    /// <param name="value">The value that may be a ref.</param>
-    public static object? _unref(object? value) => value is ReactiveValue reference ? reference.BoxedValue : value;
-
-    /// <summary>Whether a value is a ref (upstream: <c>isRef</c>).</summary>
-    /// <param name="value">The value to test.</param>
-    public static bool _isRef(object? value) => Reactive.IsRef(value);
-
-    // ==== Viu-defined helpers (no upstream counterpart; see docs/DESIGN.md divergence table) ===
+    /// <typeparam name="TEvent">The payload type.</typeparam>
+    /// <param name="handler">The strongly typed handler.</param>
+    /// <returns>An object-payload task-returning handler.</returns>
+    public static Func<object?, Task> _withHandler<TEvent>(Func<TEvent, Task> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return value => handler((TEvent)value!);
+    }
 
     /// <summary>
-    /// Builds a props/slots object from name/value tuples (Viu-defined). JavaScript object literals
-    /// (<c>{ id: x, onClick: h }</c>) have no C# spelling, so the emitter writes
-    /// <c>_createProps(("id", x), ("onClick", _withHandler(h)))</c>; the empty <c>_createProps()</c> is the
-    /// <c>{}</c> placeholder (e.g. <c>renderSlot</c>'s empty props).
+    /// Adapts a synchronous handler with a strongly typed payload to the component event contract.
     /// </summary>
-    /// <param name="entries">The property entries.</param>
-    public static VirtualNodeProperties _createProps(params (string Name, object? Value)[] entries)
-        => VirtualNodeFactory.Properties(entries);
+    /// <typeparam name="TEvent">The payload type.</typeparam>
+    /// <param name="handler">The strongly typed handler.</param>
+    /// <returns>An object-payload synchronous handler.</returns>
+    public static Action<object?> _withHandler<TEvent>(Action<TEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return value => handler((TEvent)value!);
+    }
 
-    /// <summary>
-    /// Target-types an event-handler value expression (Viu-defined). A C# lambda or method group has no
-    /// natural type in the object-typed prop position, so the emitter wraps it —
-    /// <c>_withHandler(__event =&gt; (_ctx.count++))</c>, <c>_withHandler(_ctx.save)</c> — and this overload
-    /// supplies the delegate target type. The handler is returned unchanged (as the stored prop value);
-    /// <c>_withModifiers</c>/<c>_withKeys</c> guard wrappers are <b>not</b> re-wrapped (their own signatures
-    /// type the inner lambda).
-    /// </summary>
-    /// <param name="handler">The value-producing inline handler.</param>
-    public static object? _withHandler(Func<object?, object?> handler) => handler;
-
-    /// <summary>Target-types a void inline or method-group handler taking the event argument (Viu-defined).</summary>
+    /// <summary>Target-types a delegate shape not covered by a more specific overload.</summary>
     /// <param name="handler">The handler.</param>
-    public static object? _withHandler(Action<object?> handler) => handler;
+    /// <returns>The unchanged handler.</returns>
+    public static Delegate _withHandler(Delegate handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return handler;
+    }
 
-    /// <summary>Target-types a parameterless void method-group handler (Viu-defined).</summary>
-    /// <param name="handler">The handler.</param>
-    public static object? _withHandler(Action handler) => handler;
-
-    /// <summary>Target-types a parameterless value method-group handler (Viu-defined).</summary>
-    /// <param name="handler">The handler.</param>
-    public static object? _withHandler(Func<object?> handler) => handler;
-
-    /// <summary>Target-types any other delegate-shaped handler (Viu-defined catch-all for method groups).</summary>
-    /// <param name="handler">The handler.</param>
-    public static object? _withHandler(Delegate handler) => handler;
-
-    /// <summary>
-    /// Completes a <c>v-once</c> cache write (Viu-defined). Upstream's comma sequence
-    /// <c>(setBlockTracking(-1, true), (_cache[n] = v).cacheIndex = n, setBlockTracking(1), _cache[n])</c>
-    /// collapses into <c>_cache[n] ??= _setCache(n, _setBlockTracking(-1, true), v)</c>: argument evaluation
-    /// pauses tracking before <c>v</c> is created, then this call resumes tracking (inverting
-    /// <paramref name="tracking"/>) and returns <paramref name="value"/>. The cache index stamp is a
-    /// documented no-op — <see cref="VirtualNode"/> has no <c>cacheIndex</c>; <c>v-once</c> reuse works
-    /// purely through the <c>_cache</c> slot.
-    /// </summary>
-    /// <param name="index">The cache slot index (accepted for parity; not stamped onto the vnode).</param>
-    /// <param name="tracking">The token from the paired <see cref="_setBlockTracking"/> call.</param>
-    /// <param name="value">The freshly created (tracking-suspended) value to cache.</param>
+    /// <summary>Resumes block tracking after writing a generated cache slot.</summary>
+    /// <param name="index">The cache slot index.</param>
+    /// <param name="tracking">The suspension token.</param>
+    /// <param name="value">The cached value.</param>
     /// <returns><paramref name="value"/>.</returns>
     public static object? _setCache(int index, BlockToken tracking, object? value)
     {
-        VirtualNodeFactory.SetBlockTracking(-tracking.TrackingDelta);
         _ = index;
+        _blockTrackingDepth -= tracking.TrackingDelta;
         return value;
     }
 
-    /// <summary>
-    /// Clones a cached array so a block's children are a fresh array on reuse (Viu-defined). Upstream's
-    /// <c>[...(cacheExpr)]</c> spread has no C# counterpart, so the emitter writes
-    /// <c>_spreadCache(cacheExpr)</c>.
-    /// </summary>
-    /// <param name="value">The cached array (or any value; non-arrays pass through).</param>
-    public static object? _spreadCache(object? value) => value switch
+    /// <summary>Clones a cached array before it is reused as generated children.</summary>
+    /// <param name="value">The cached value.</param>
+    /// <returns>A shallow array clone, or the original non-array value.</returns>
+    public static object? _spreadCache(object? value)
     {
-        VirtualNode?[] virtualNodes => (VirtualNode?[])virtualNodes.Clone(),
-        object?[] array => (object?[])array.Clone(),
-        _ => value,
-    };
+        return value is Array array ? array.Clone() : value;
+    }
 
-    // ==== Built-in tags as values (upstream @vue/runtime-core exports) ===========================
-
-    /// <summary>The <c>Fragment</c> block type (upstream: <c>Fragment</c>).</summary>
-    public static readonly object _Fragment = new BuiltInVirtualNodeType("Fragment", isFragment: true);
-
-    /// <summary>
-    /// The <c>Teleport</c> built-in (upstream: <c>Teleport</c>), realized by the renderer's Teleport
-    /// patch/move/unmount paths ([V01.01.03.17]). The compiled render passes it as a vnode <c>tag</c>;
-    /// <see cref="CreateBaseVNode"/> routes it to <see cref="VirtualNodeFactory.Teleport"/>.
-    /// </summary>
-    public static readonly object _Teleport = new BuiltInVirtualNodeType("Teleport", isFragment: false, isTeleport: true);
-
-    /// <summary>The <c>Suspense</c> built-in marker (upstream: <c>Suspense</c>); renderer support is separate work.</summary>
-    public static readonly object _Suspense = new BuiltInVirtualNodeType("Suspense", isFragment: false);
-
-    /// <summary>
-    /// The <c>KeepAlive</c> built-in (upstream: <c>KeepAlive</c>), resolved to the real caching component
-    /// <see cref="KeepAlive"/> ([V01.01.03.18]). The compiled render passes it as a vnode
-    /// <c>tag</c>; <see cref="CreateBaseVNode"/>'s component arm mounts it, and the renderer's
-    /// activate/deactivate paths cache its child's subtree instead of unmounting it.
-    /// </summary>
-    public static readonly object _KeepAlive = KeepAlive.Instance;
-
-    /// <summary>
-    /// The <c>BaseTransition</c> built-in (upstream: <c>BaseTransition</c>), resolved to the real
-    /// transition state-machine component <see cref="BaseTransition"/> ([V01.01.04.07]).
-    /// The compiled render passes it as a vnode <c>tag</c>; the vnode factory's component-definition arm
-    /// mounts it (the DOM <c>&lt;Transition&gt;</c>/<c>&lt;TransitionGroup&gt;</c> wrap it with resolved
-    /// class hooks).
-    /// </summary>
-    public static readonly object _BaseTransition = BaseTransition.Instance;
-
-    // ==== Render-root normalization (upstream normalizeVNode over the render return) =============
-
-    /// <summary>
-    /// Normalizes a compiled render function's <c>object?</c> return into a vnode — the C# analogue of
-    /// upstream <c>normalizeVNode</c> applied to the render result (a single text/interpolation root returns
-    /// a raw string, so the generated <c>Render</c> return type is <c>object?</c>). Null and booleans become
-    /// a comment placeholder, a string becomes text, an array becomes a fragment, and a vnode passes through
-    /// (the renderer clones it if already mounted).
-    /// </summary>
-    /// <param name="renderResult">The value returned by a compiled <c>Render</c> function.</param>
-    /// <returns>The normalized root vnode.</returns>
-    public static VirtualNode NormalizeRoot(object? renderResult) => renderResult switch
+    /// <summary>Memoizes a generated subtree against a dependency array.</summary>
+    /// <param name="dependencies">The current memo dependencies.</param>
+    /// <param name="render">The subtree factory.</param>
+    /// <param name="cache">The component instance's render cache.</param>
+    /// <param name="index">The cache slot index.</param>
+    /// <returns>The cached or newly rendered subtree.</returns>
+    public static IComponent _withMemo(
+        object?[] dependencies,
+        Func<object?> render,
+        object?[] cache,
+        int index)
     {
-        null => VirtualNodeFactory.Comment(),
-        VirtualNode vnode => vnode,
-        string text => VirtualNodeFactory.Text(text),
-        bool => VirtualNodeFactory.Comment(),
-        VirtualNode?[] virtualNodes => VirtualNodeFactory.Fragment(virtualNodes),
-        object?[] array => VirtualNodeFactory.Fragment(CoerceChildrenArray(array)),
-        _ => VirtualNodeFactory.Text(DisplayStringFormatter.ToDisplayString(renderResult)),
-    };
+        ArgumentNullException.ThrowIfNull(dependencies);
+        ArgumentNullException.ThrowIfNull(render);
+        ArgumentNullException.ThrowIfNull(cache);
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        if (index >= cache.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
 
-    // ==== Internal dispatch / coercion ==========================================================
+        if (cache[index] is IComponent cached && _isMemoSame(cached, dependencies))
+        {
+            return cached;
+        }
 
-    private static VirtualNode CreateBaseVNode(
+        IComponent component = NormalizeRoot(render());
+        cache[index] = component;
+        _memoMetadata.Remove(component);
+        _memoMetadata.Add(component, new MemoMetadata(dependencies));
+        return component;
+    }
+
+    /// <summary>Compares a cached tree value's memo dependencies with the current dependencies.</summary>
+    /// <param name="cached">The cached value.</param>
+    /// <param name="dependencies">The current dependencies.</param>
+    /// <returns>True when every dependency is unchanged.</returns>
+    public static bool _isMemoSame(object? cached, object?[] dependencies)
+    {
+        ArgumentNullException.ThrowIfNull(dependencies);
+        if (cached is not IComponent component
+            || !_memoMetadata.TryGetValue(component, out MemoMetadata? metadata)
+            || metadata.Dependencies.Length != dependencies.Length)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < dependencies.Length; index++)
+        {
+            if (!Equals(metadata.Dependencies[index], dependencies[index]))
+            {
+                return false;
+            }
+        }
+
+        TrackBlockRoot(component);
+        return true;
+    }
+
+    /// <summary>Normalizes a generated render result into one component-tree root.</summary>
+    /// <param name="renderResult">The generated render result.</param>
+    /// <returns>The normalized tree root.</returns>
+    public static IComponent NormalizeRoot(object? renderResult)
+    {
+        return NormalizeChild(renderResult);
+    }
+
+    internal static void ClearBlockTrackingAfterRenderFailure()
+    {
+        BlockFrames.Clear();
+        _blockTrackingDepth = 1;
+    }
+
+    internal static void ResetBlockTrackingForTests()
+    {
+        ClearBlockTrackingAfterRenderFailure();
+        _memoMetadata = new ConditionalWeakTable<IComponent, MemoMetadata>();
+    }
+
+    private static IComponent CreateComponent(
         object? tag,
         object? properties,
         object? children,
-        int patchFlag,
+        PatchFlags patchFlags,
         string[]? dynamicProperties,
         bool asBlock)
     {
-        var bag = properties as VirtualNodeProperties;
-        var flag = (PatchFlags)patchFlag;
-        switch (tag)
+        return tag switch
         {
-            case string elementTag:
-                return CreateElement(elementTag, bag, children, flag, dynamicProperties, asBlock);
-            case BuiltInVirtualNodeType { IsFragment: true }:
-                var fragmentChildren = CoerceChildren(children);
-                var key = bag is not null && bag.TryGetValue("key", out var keyValue) ? keyValue : null;
-                return asBlock
-                    ? VirtualNodeFactory.FragmentBlock(fragmentChildren, key, flag)
-                    : VirtualNodeFactory.Fragment(fragmentChildren, key, flag);
-            case BuiltInVirtualNodeType { IsTeleport: true }:
-                // Teleport children are always an array (never built as slots — TransformElement excludes
-                // Teleport from the single-child collapse and the slot build), so coerce to the vnode array.
-                var teleportChildren = CoerceChildren(children);
-                return asBlock
-                    ? VirtualNodeFactory.TeleportBlock(bag, teleportChildren, flag, dynamicProperties)
-                    : VirtualNodeFactory.Teleport(bag, teleportChildren, flag, dynamicProperties);
-            case IComponent definition:
-                var slots = CoerceSlots(children);
-                return asBlock
-                    ? VirtualNodeFactory.ComponentBlock(definition, bag, slots, flag, dynamicProperties)
-                    : VirtualNodeFactory.Component(definition, bag, slots, flag, dynamicProperties);
-            case BuiltInVirtualNodeType builtIn:
-                throw new NotSupportedException(
-                    $"The built-in component <{builtIn.Name}> is not yet supported by the runtime renderer.");
-            case null:
-                // resolveDynamicComponent(null) or an absent :is renders a comment placeholder (upstream).
-                return VirtualNodeFactory.Comment();
-            default:
-                throw new NotSupportedException($"Unsupported vnode tag of type '{tag.GetType().Name}'.");
+            string elementTag => CreateElement(
+                elementTag,
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            NamedTemplateType namedTemplate => CreateTemplate(
+                namedTemplate.Name,
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            Type templateType => CreateTemplate(
+                templateType,
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            DynamicComponentName dynamicName => CreateTemplate(
+                dynamicName.Name,
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            AsynchronousComponentDefinition asynchronousDefinition => CreateTemplate(
+                asynchronousDefinition.ComponentType,
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            BuiltInComponentType { Name: "Fragment" } => CreateFragment(
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            BuiltInComponentType { Name: "Teleport" } => CreateTeleport(
+                properties,
+                children,
+                patchFlags,
+                dynamicProperties,
+                asBlock),
+            BuiltInComponentType builtIn => throw new NotSupportedException(
+                $"The built-in component <{builtIn.Name}> is not implemented."),
+            null => CreateComment(asBlock),
+            _ => throw new NotSupportedException(
+                $"Unsupported component tag of type '{tag.GetType().Name}'."),
+        };
+    }
+
+    private static IComponent CreateElement(
+        string tag,
+        object? properties,
+        object? children,
+        PatchFlags patchFlags,
+        string[]? dynamicProperties,
+        bool asBlock)
+    {
+        object? key = GetProperty(properties, "key");
+        IComponentReference? reference = ResolveTemplateReference(properties);
+        ComponentAttributes attributes = BuildAttributes(properties);
+        IReadOnlyList<IComponent> childComponents = CoerceChildren(children);
+        if (asBlock)
+        {
+            return CompleteBlock(
+                optimization => new ElementComponent(
+                    tag,
+                    attributes,
+                    childComponents,
+                    key,
+                    optimization,
+                    directives: null,
+                    reference: reference),
+                patchFlags,
+                dynamicProperties);
+        }
+
+        IComponent component = new ElementComponent(
+            tag,
+            attributes,
+            childComponents,
+            key,
+            new ComponentOptimization(patchFlags, dynamicProperties),
+            directives: null,
+            reference: reference);
+        TrackDynamicComponent(component);
+        return component;
+    }
+
+    private static IComponent CreateTemplate(
+        object template,
+        object? properties,
+        object? children,
+        PatchFlags patchFlags,
+        string[]? dynamicProperties,
+        bool asBlock)
+    {
+        object? key = GetProperty(properties, "key");
+        IComponentReference? reference = ResolveTemplateReference(properties);
+        ComponentArguments arguments = BuildTemplateArguments(properties);
+        IReadOnlyDictionary<string, ComponentEventListener>? listeners =
+            BuildComponentListeners(properties);
+        IReadOnlyDictionary<string, ComponentSlot>? slots = BuildSlots(children);
+
+        IComponent Factory(ComponentOptimization optimization)
+        {
+            return template switch
+            {
+                Type type => new TemplateComponent(
+                    type,
+                    arguments,
+                    slots,
+                    key,
+                    optimization,
+                    listeners,
+                    directives: null,
+                    reference: reference),
+                string name => new TemplateComponent(
+                    name,
+                    arguments,
+                    slots,
+                    key,
+                    optimization,
+                    listeners,
+                    directives: null,
+                    reference: reference),
+                _ => throw new InvalidOperationException("Unsupported template selector."),
+            };
+        }
+
+        if (asBlock)
+        {
+            return CompleteBlock(Factory, patchFlags, dynamicProperties);
+        }
+
+        IComponent component = Factory(
+            new ComponentOptimization(patchFlags, dynamicProperties));
+        TrackDynamicComponent(component);
+        return component;
+    }
+
+    private static IComponent CreateFragment(
+        object? properties,
+        object? children,
+        PatchFlags patchFlags,
+        string[]? dynamicProperties,
+        bool asBlock)
+    {
+        object? key = GetProperty(properties, "key");
+        IReadOnlyList<IComponent> childComponents = CoerceChildren(children);
+        if (asBlock)
+        {
+            return CompleteBlock(
+                optimization => new FragmentComponent(
+                    childComponents,
+                    key,
+                    optimization),
+                patchFlags,
+                dynamicProperties);
+        }
+
+        IComponent component = new FragmentComponent(
+            childComponents,
+            key,
+            new ComponentOptimization(patchFlags, dynamicProperties));
+        TrackDynamicComponent(component);
+        return component;
+    }
+
+    private static IComponent CreateTeleport(
+        object? properties,
+        object? children,
+        PatchFlags patchFlags,
+        string[]? dynamicProperties,
+        bool asBlock)
+    {
+        object? target = GetProperty(properties, "to")
+            ?? throw new InvalidOperationException("A Teleport requires a non-null 'to' property.");
+        object? key = GetProperty(properties, "key");
+        bool isDisabled = StyleAndClassNormalization.IsTruthy(
+            GetProperty(properties, "disabled"));
+        bool isDeferred = StyleAndClassNormalization.IsTruthy(
+            GetProperty(properties, "defer"));
+        IReadOnlyList<IComponent> childComponents = CoerceChildren(children);
+        if (asBlock)
+        {
+            return CompleteBlock(
+                optimization => new TeleportComponent(
+                    target,
+                    childComponents,
+                    isDisabled,
+                    key,
+                    optimization,
+                    isDeferred),
+                patchFlags,
+                dynamicProperties);
+        }
+
+        IComponent component = new TeleportComponent(
+            target,
+            childComponents,
+            isDisabled,
+            key,
+            new ComponentOptimization(patchFlags, dynamicProperties),
+            isDeferred);
+        TrackDynamicComponent(component);
+        return component;
+    }
+
+    private static IComponent CreateComment(bool asBlock)
+    {
+        if (!asBlock)
+        {
+            return ComponentTree.Comment();
+        }
+
+        return CompleteBlock(
+            optimization => new RuntimeCommentComponent(null, optimization),
+            default,
+            null);
+    }
+
+    private static IComponentReference? ResolveTemplateReference(
+        object? properties)
+    {
+        Action<string>? warningHandler =
+            ComponentContext.Current?.Application.WarnHandler;
+        return TemplateReference.FromValue(
+            GetProperty(properties, "ref"),
+            warningHandler);
+    }
+
+    private static TComponent CompleteBlock<TComponent>(
+        Func<ComponentOptimization, TComponent> factory,
+        PatchFlags patchFlags,
+        string[]? dynamicProperties)
+        where TComponent : IComponent
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        if (BlockFrames.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "A block factory was invoked without a matching _openBlock call.");
+        }
+
+        BlockFrame frame = BlockFrames[^1];
+        BlockFrames.RemoveAt(BlockFrames.Count - 1);
+        IReadOnlyList<IComponent>? dynamicChildren = _blockTrackingDepth > 0
+            ? frame.DynamicChildren is not null
+                ? frame.DynamicChildren
+                : Array.Empty<IComponent>()
+            : null;
+        ComponentOptimization optimization = new(
+            patchFlags,
+            dynamicProperties,
+            dynamicChildren,
+            frame.HasOnce);
+        TComponent component = factory(optimization);
+        TrackBlockRoot(component);
+        return component;
+    }
+
+    private static void TrackDynamicComponent(IComponent component)
+    {
+        PatchFlags patchFlags = component.Optimization.PatchFlags;
+        bool shouldTrack =
+            component.Kind == ComponentKind.Template
+            || (patchFlags > 0 && patchFlags != PatchFlags.NeedHydration);
+        if (shouldTrack)
+        {
+            TrackBlockRoot(component);
         }
     }
 
-    private static VirtualNode CreateElement(
-        string tag,
-        VirtualNodeProperties? properties,
-        object? children,
-        PatchFlags patchFlag,
-        string[]? dynamicProperties,
-        bool asBlock)
+    private static void TrackBlockRoot(IComponent component)
     {
+        if (_blockTrackingDepth <= 0 || BlockFrames.Count == 0)
+        {
+            return;
+        }
+
+        BlockFrames[^1].DynamicChildren?.Add(component);
+    }
+
+    private static void ReplaceTrackedComponent(IComponent existing, IComponent replacement)
+    {
+        if (BlockFrames.Count == 0)
+        {
+            return;
+        }
+
+        List<IComponent>? dynamicChildren = BlockFrames[^1].DynamicChildren;
+        if (dynamicChildren is null)
+        {
+            return;
+        }
+
+        for (int index = dynamicChildren.Count - 1; index >= 0; index--)
+        {
+            if (ReferenceEquals(dynamicChildren[index], existing))
+            {
+                dynamicChildren[index] = replacement;
+                return;
+            }
+        }
+    }
+
+    private static IReadOnlyList<IComponent> CoerceChildren(object? children)
+    {
+        if (children is null)
+        {
+            return Array.Empty<IComponent>();
+        }
+
         if (children is string text)
         {
-            return asBlock
-                ? VirtualNodeFactory.ElementBlock(tag, properties, text, patchFlag, dynamicProperties)
-                : VirtualNodeFactory.Element(tag, properties, text, patchFlag, dynamicProperties);
+            return new IComponent[] { ComponentTree.Text(text) };
         }
-        var childArray = CoerceChildren(children);
-        return asBlock
-            ? VirtualNodeFactory.ElementBlock(tag, properties, childArray, patchFlag, dynamicProperties)
-            : VirtualNodeFactory.Element(tag, properties, childArray, patchFlag, dynamicProperties);
-    }
 
-    // Coerces the untyped `children` argument the emitter writes (a single vnode, a string, a
-    // VirtualNode?[] from _renderList, or an object?[] literal) into the factory's VirtualNode?[] shape,
-    // per upstream normalizeVNode of each child. VirtualNode?[] is checked before object?[] because array
-    // covariance makes a VirtualNode?[] also match object?[].
-    private static VirtualNode?[]? CoerceChildren(object? children) => children switch
-    {
-        null => null,
-        VirtualNode?[] virtualNodes => virtualNodes,
-        object?[] array => CoerceChildrenArray(array),
-        VirtualNode single => [single],
-        string text => [VirtualNodeFactory.Text(text)],
-        _ => [CoerceChild(children)],
-    };
-
-    private static VirtualNode?[] CoerceChildrenArray(object?[] array)
-    {
-        var result = new VirtualNode?[array.Length];
-        for (var index = 0; index < array.Length; index++)
+        if (children is IComponent component)
         {
-            result[index] = CoerceChild(array[index]);
+            return new IComponent[] { component };
         }
-        return result;
+
+        if (children is IEnumerable enumerable && children is not IDictionary)
+        {
+            List<IComponent> result = new();
+            foreach (object? child in enumerable)
+            {
+                result.Add(NormalizeChild(child));
+            }
+
+            return result.Count == 0
+                ? Array.Empty<IComponent>()
+                : new ReadOnlyCollection<IComponent>(result);
+        }
+
+        return new IComponent[] { NormalizeChild(children) };
     }
 
-    private static VirtualNode? CoerceChild(object? child) => child switch
+    private static IComponent NormalizeChild(object? child)
     {
-        null => null,
-        VirtualNode vnode => vnode,
-        string text => VirtualNodeFactory.Text(text),
-        VirtualNode?[] virtualNodes => VirtualNodeFactory.Fragment(virtualNodes),
-        object?[] array => VirtualNodeFactory.Fragment(CoerceChildrenArray(array)),
-        _ => VirtualNodeFactory.Text(DisplayStringFormatter.ToDisplayString(child)),
-    };
+        return child switch
+        {
+            null => ComponentTree.Comment(),
+            bool => ComponentTree.Comment(),
+            IComponent component => component,
+            string text => ComponentTree.Text(text),
+            IEnumerable enumerable when child is not IDictionary => ComponentTree.Fragment(
+                CoerceEnumerableChildren(enumerable)),
+            _ => ComponentTree.Text(DisplayStringFormatter.ToDisplayString(child)),
+        };
+    }
 
-    private static VirtualNode?[]? CoerceVirtualNodeArray(object?[]? array)
+    private static IReadOnlyList<IComponent> CoerceEnumerableChildren(IEnumerable values)
     {
-        if (array is null)
+        List<IComponent> result = new();
+        foreach (object? value in values)
+        {
+            result.Add(NormalizeChild(value));
+        }
+
+        return result.Count == 0
+            ? Array.Empty<IComponent>()
+            : new ReadOnlyCollection<IComponent>(result);
+    }
+
+    private static IComponent? NormalizeSlotResult(object?[]? values)
+    {
+        if (values is null || values.Length == 0)
         {
             return null;
         }
-        return CoerceChildrenArray(array);
+
+        IReadOnlyList<IComponent> children = CoerceChildren(values);
+        return children.Count == 1
+            ? children[0]
+            : ComponentTree.Fragment(children);
     }
 
-    private static ComponentSlots? CoerceSlots(object? children)
+    private static ComponentAttributes BuildAttributes(object? properties)
     {
-        switch (children)
+        List<IComponentAttribute> attributes = new();
+        foreach (KeyValuePair<string, object?> property in ReadProperties(properties))
         {
-            case null:
-                return null;
-            case ComponentSlots slots:
-                return slots;
-            case VirtualNodeProperties bag:
-                return BuildSlots(bag);
-            case Slot slot:
-                return DefaultSlot(slot);
-            case VirtualNode?[] virtualNodes:
-                return DefaultSlot(_ => virtualNodes);
-            case object?[] array:
-                var coerced = CoerceChildrenArray(array);
-                return DefaultSlot(_ => coerced);
-            case VirtualNode single:
-                return DefaultSlot(_ => [single]);
-            default:
-                return null;
-        }
-    }
-
-    private static ComponentSlots BuildSlots(VirtualNodeProperties bag)
-    {
-        var slots = new ComponentSlots();
-        foreach (var (name, value) in bag)
-        {
-            if (string.Equals(name, "_", StringComparison.Ordinal))
+            if (!string.Equals(property.Key, "key", StringComparison.Ordinal)
+                && !string.Equals(property.Key, "ref", StringComparison.Ordinal))
             {
-                // The hidden slot-stability marker (upstream slots._): the emitter writes ("_", <flag>).
-                if (value is int flag)
-                {
-                    slots.Flag = (SlotFlags)flag;
-                }
+                attributes.Add(new ComponentAttribute(property.Key, property.Value));
+            }
+        }
+
+        return new ComponentAttributes(attributes);
+    }
+
+    private static ComponentArguments BuildTemplateArguments(object? properties)
+    {
+        List<KeyValuePair<string, object?>> arguments = new();
+        foreach (KeyValuePair<string, object?> property in ReadProperties(properties))
+        {
+            if (!string.Equals(property.Key, "key", StringComparison.Ordinal)
+                && !string.Equals(property.Key, "ref", StringComparison.Ordinal))
+            {
+                arguments.Add(property);
+            }
+        }
+
+        return new ComponentArguments(arguments);
+    }
+
+    private static IReadOnlyDictionary<string, ComponentEventListener>? BuildComponentListeners(
+        object? properties)
+    {
+        Dictionary<string, ComponentEventListener>? listeners = null;
+        foreach (KeyValuePair<string, object?> property in ReadProperties(properties))
+        {
+            if (!IsEventListenerName(property.Key)
+                || IsComponentNodeLifecycleName(property.Key)
+                || property.Value is null)
+            {
                 continue;
             }
-            switch (value)
+
+            listeners ??= new Dictionary<string, ComponentEventListener>(StringComparer.Ordinal);
+            listeners[ToEventName(property.Key)] = CreateComponentEventListener(property.Value);
+        }
+
+        return listeners;
+    }
+
+    private static ComponentEventListener CreateComponentEventListener(object handler)
+    {
+        return handler switch
+        {
+            ComponentEventListener listener => listener,
+            AsynchronousComponentEventArgumentsHandler asynchronousArguments =>
+                ComponentEventListener.ForAsynchronousArguments(asynchronousArguments),
+            ComponentEventArgumentsHandler synchronousArguments =>
+                ComponentEventListener.ForArguments(synchronousArguments),
+            AsynchronousComponentEventHandler asynchronous =>
+                new ComponentEventListener(asynchronous),
+            ComponentEventHandler synchronous =>
+                new ComponentEventListener(synchronous),
+            Func<object?, Task> asynchronous =>
+                new ComponentEventListener(value => InvokeAllAsync(asynchronous, value)),
+            Func<Task> asynchronous =>
+                new ComponentEventListener(_ => InvokeAllAsync(asynchronous)),
+            Action<object?> synchronous =>
+                new ComponentEventListener(value => synchronous(value)),
+            Action synchronous =>
+                new ComponentEventListener(_ => synchronous()),
+            Func<object?, object?> valueHandler =>
+                new ComponentEventListener(value => CoerceHandlerTask(valueHandler(value))),
+            Func<object?> valueHandler =>
+                new ComponentEventListener(_ => CoerceHandlerTask(valueHandler())),
+            _ => throw new NotSupportedException(
+                $"Component event handler type '{handler.GetType().Name}' is not supported. " +
+                "Wrap strongly typed handlers with _withHandler."),
+        };
+    }
+
+    private static Task InvokeAllAsync(Func<object?, Task> handler, object? value)
+    {
+        Delegate[] invocationList = handler.GetInvocationList();
+        if (invocationList.Length == 1)
+        {
+            return handler(value);
+        }
+
+        Task[] tasks = new Task[invocationList.Length];
+        for (int index = 0; index < invocationList.Length; index++)
+        {
+            tasks[index] = ((Func<object?, Task>)invocationList[index])(value);
+        }
+
+        return Task.WhenAll(tasks);
+    }
+
+    private static Task InvokeAllAsync(Func<Task> handler)
+    {
+        Delegate[] invocationList = handler.GetInvocationList();
+        if (invocationList.Length == 1)
+        {
+            return handler();
+        }
+
+        Task[] tasks = new Task[invocationList.Length];
+        for (int index = 0; index < invocationList.Length; index++)
+        {
+            tasks[index] = ((Func<Task>)invocationList[index])();
+        }
+
+        return Task.WhenAll(tasks);
+    }
+
+    private static Task CoerceHandlerTask(object? value)
+    {
+        return value as Task ?? Task.CompletedTask;
+    }
+
+    private static IReadOnlyDictionary<string, ComponentSlot>? BuildSlots(object? children)
+    {
+        if (children is null)
+        {
+            return null;
+        }
+
+        if (children is IReadOnlyDictionary<string, ComponentSlot> typedSlots)
+        {
+            return typedSlots;
+        }
+
+        if (CanReadProperties(children))
+        {
+            ComponentSlots slots = new(ReadSlotFlags(children));
+            foreach (KeyValuePair<string, object?> property in ReadProperties(children))
             {
-                case Slot slot:
-                    slots[name] = slot;
-                    break;
-                case Func<object?, object?[]?> scoped:
-                    slots[name] = properties => CoerceVirtualNodeArray(scoped(properties));
-                    break;
-                case Func<object?[]?> plain:
-                    slots[name] = _ => CoerceVirtualNodeArray(plain());
-                    break;
+                if (string.Equals(property.Key, "_", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (TryCoerceSlot(property.Value, out ComponentSlot? slot))
+                {
+                    slots[property.Key] = slot!;
+                }
+            }
+
+            return slots.Count == 0 ? null : slots;
+        }
+
+        IComponent? content = NormalizeSlotContent(children);
+        if (content is null)
+        {
+            return null;
+        }
+
+        return new ComponentSlots
+        {
+            ["default"] = _ => content,
+        };
+    }
+
+    private static SlotFlags ReadSlotFlags(object slots)
+    {
+        object? value = GetProperty(slots, "_");
+        if (value is SlotFlags flags)
+        {
+            return flags;
+        }
+
+        if (value is int number && Enum.IsDefined((SlotFlags)number))
+        {
+            return (SlotFlags)number;
+        }
+
+        return SlotFlags.Stable;
+    }
+
+    private static bool HasRenderableSlotContent(IComponent? component)
+    {
+        if (component is null || component.Kind == ComponentKind.Comment)
+        {
+            return false;
+        }
+
+        if (component is not IFragmentComponent fragment)
+        {
+            return true;
+        }
+
+        for (int index = 0; index < fragment.Children.Count; index++)
+        {
+            if (HasRenderableSlotContent(fragment.Children[index]))
+            {
+                return true;
             }
         }
-        return slots;
+
+        return false;
     }
 
-    private static ComponentSlots DefaultSlot(Slot slot)
+    private static bool TryCoerceSlot(object? value, out ComponentSlot? slot)
     {
-        var slots = new ComponentSlots();
-        slots["default"] = slot;
-        return slots;
+        switch (value)
+        {
+            case ComponentSlot componentSlot:
+                slot = componentSlot;
+                return true;
+            case Func<object?[]?> plain:
+                slot = _withCtx(plain);
+                return true;
+            case Func<object?, object?[]?> scoped:
+                slot = _withCtx(scoped);
+                return true;
+            default:
+                slot = null;
+                return false;
+        }
     }
 
-    private static string CoerceText(object? text) => text switch
+    private static IComponent? NormalizeSlotContent(object? content)
     {
-        null => string.Empty,
-        string value => value,
-        _ => DisplayStringFormatter.ToDisplayString(text),
-    };
+        if (content is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<IComponent> children = CoerceChildren(content);
+        return children.Count switch
+        {
+            0 => null,
+            1 => children[0],
+            _ => ComponentTree.Fragment(children),
+        };
+    }
+
+    private static void MergeDynamicSlot(
+        IDictionary<string, object?> destination,
+        object? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        if (CanReadProperties(value))
+        {
+            Dictionary<string, object?> descriptor = CopyProperties(value);
+            if (descriptor.TryGetValue("name", out object? nameValue)
+                && nameValue is string name
+                && descriptor.TryGetValue("fn", out object? function)
+                && TryCoerceSlot(function, out ComponentSlot? slot))
+            {
+                destination[name] = slot;
+            }
+
+            return;
+        }
+
+        if (value is IEnumerable enumerable && value is not string)
+        {
+            foreach (object? item in enumerable)
+            {
+                MergeDynamicSlot(destination, item);
+            }
+        }
+    }
+
+    private static ComponentArguments BuildArguments(object? properties)
+    {
+        return new ComponentArguments(ReadProperties(properties));
+    }
+
+    private static ComponentDirectiveBinding CreateDirectiveBinding(object?[] tuple)
+    {
+        string name;
+        object? source = tuple[0];
+        IComponentDirectiveBinding? existing = source as IComponentDirectiveBinding;
+        switch (source)
+        {
+            case DirectiveReference reference:
+                name = reference.Name;
+                break;
+            case string text:
+                name = text;
+                break;
+            case IComponentDirectiveBinding binding:
+                name = binding.DirectiveName;
+                break;
+            default:
+                throw new NotSupportedException(
+                    $"Directive reference type '{source?.GetType().Name}' is not supported.");
+        }
+
+        object? value = tuple.Length > 1 ? tuple[1] : existing?.Value;
+        string? argument = tuple.Length > 2 ? tuple[2] as string : existing?.Argument;
+        IReadOnlyDictionary<string, bool>? modifiers =
+            tuple.Length > 3
+                ? tuple[3] as IReadOnlyDictionary<string, bool>
+                : existing?.Modifiers;
+        return new ComponentDirectiveBinding(name, value, argument, modifiers);
+    }
+
+    private static Dictionary<string, object?> CopyProperties(object? source)
+    {
+        Dictionary<string, object?> result = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, object?> property in ReadProperties(source))
+        {
+            result[property.Key] = property.Value;
+        }
+
+        return result;
+    }
+
+    private static IEnumerable<KeyValuePair<string, object?>> ReadProperties(object? source)
+    {
+        switch (source)
+        {
+            case null:
+                yield break;
+            case IReadOnlyDictionary<string, object?> dictionary:
+                foreach (KeyValuePair<string, object?> property in dictionary)
+                {
+                    yield return property;
+                }
+
+                yield break;
+            case IEnumerable<KeyValuePair<string, object?>> values:
+                foreach (KeyValuePair<string, object?> property in values)
+                {
+                    yield return property;
+                }
+
+                yield break;
+            case IComponentAttributeCollection attributes:
+                foreach (IComponentAttribute attribute in attributes)
+                {
+                    yield return new KeyValuePair<string, object?>(
+                        attribute.Name,
+                        attribute.Value);
+                }
+
+                yield break;
+            default:
+                yield break;
+        }
+    }
+
+    private static bool CanReadProperties(object? value)
+    {
+        return value is IReadOnlyDictionary<string, object?>
+            || value is IEnumerable<KeyValuePair<string, object?>>
+            || value is IComponentAttributeCollection;
+    }
+
+    private static object? GetProperty(object? properties, string name)
+    {
+        foreach (KeyValuePair<string, object?> property in ReadProperties(properties))
+        {
+            if (string.Equals(property.Key, name, StringComparison.Ordinal))
+            {
+                return property.Value;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsEventListenerName(string name)
+    {
+        return name.Length > 2
+            && name[0] == 'o'
+            && name[1] == 'n'
+            && char.IsAsciiLetterUpper(name[2]);
+    }
+
+    private static bool IsComponentNodeLifecycleName(string name)
+    {
+        return name.StartsWith("onVnode", StringComparison.Ordinal);
+    }
+
+    private static string ToEventName(string listenerName)
+    {
+        string name = listenerName[2..];
+        return char.ToLowerInvariant(name[0]) + name[1..];
+    }
+
+    private static string CoerceText(object? text)
+    {
+        return text switch
+        {
+            null => string.Empty,
+            string value => value,
+            _ => DisplayStringFormatter.ToDisplayString(text),
+        };
+    }
+
+    private sealed class BlockFrame
+    {
+        internal BlockFrame(bool disableTracking)
+        {
+            DynamicChildren = disableTracking ? null : new List<IComponent>();
+        }
+
+        internal List<IComponent>? DynamicChildren { get; }
+
+        internal bool HasOnce { get; set; }
+    }
+
+    private sealed class BuiltInComponentType
+    {
+        internal BuiltInComponentType(string name)
+        {
+            Name = name;
+        }
+
+        internal string Name { get; }
+    }
+
+    private sealed class NamedTemplateType
+    {
+        internal NamedTemplateType(string name)
+        {
+            Name = name;
+        }
+
+        internal string Name { get; }
+    }
+
+    private sealed class DirectiveReference
+    {
+        internal DirectiveReference(string name)
+        {
+            Name = name;
+        }
+
+        internal string Name { get; }
+    }
+
+    private sealed class MemoMetadata
+    {
+        internal MemoMetadata(object?[] dependencies)
+        {
+            Dependencies = (object?[])dependencies.Clone();
+        }
+
+        internal object?[] Dependencies { get; }
+    }
+
+    private sealed class RuntimeCommentComponent : ICommentComponent
+    {
+        internal RuntimeCommentComponent(
+            string? text,
+            ComponentOptimization optimization)
+        {
+            Text = text;
+            Optimization = optimization;
+        }
+
+        public ComponentKind Kind => ComponentKind.Comment;
+
+        public object? Key => null;
+
+        public ComponentOptimization Optimization { get; }
+
+        public string? Text { get; }
+    }
 }

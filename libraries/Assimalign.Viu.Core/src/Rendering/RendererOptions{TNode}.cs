@@ -3,97 +3,75 @@ using System;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The platform node-ops a <see cref="Renderer{TNode}"/> is built over — the C# port of
-/// <c>RendererOptions</c> in <c>@vue/runtime-core</c>'s custom renderer API
-/// (https://vuejs.org/api/custom-renderer.html, <c>packages/runtime-core/src/renderer.ts</c>).
-/// The renderer never touches a platform node except through these delegates: the browser
-/// supplies JS-interop ops ([V01.01.04.01]), tests supply the in-memory tree
-/// ([V01.01.11.01]), and SSR supplies a string builder. Every op call may be a marshaled
-/// interop call on WASM, so the pipeline treats each invocation as costly.
-/// <para>
-/// For value-type <typeparamref name="TNode"/> (e.g. an <see cref="int"/> interop handle),
-/// <c>default(TNode)</c> stands in for "no node" anywhere an anchor or parent is optional — the
-/// platform must never issue <c>default</c> as a real node.
-/// </para>
+/// Supplies every platform operation used by <see cref="Renderer{TNode}"/>.
 /// </summary>
-/// <typeparam name="TNode">The platform node type.</typeparam>
+/// <remarks>
+/// This is the host-neutral counterpart of Vue 3.5's custom-renderer options:
+/// https://vuejs.org/api/custom-renderer.html. Core never performs browser or WebView2 work
+/// directly. A host package supplies these delegates and may batch their effects at its own
+/// commit boundary. The renderer is single-threaded and trimming safe.
+/// </remarks>
+/// <typeparam name="TNode">
+/// The platform node type. Hosts using a value-type handle reserve its default value for
+/// “no node.”
+/// </typeparam>
 public sealed class RendererOptions<TNode>
     where TNode : notnull
 {
-    /// <summary>
-    /// Inserts <c>child</c> into <c>parent</c> before <c>anchor</c>, appending when the anchor
-    /// is default (upstream: <c>insert(el, parent, anchor)</c>).
-    /// </summary>
+    /// <summary>Inserts or moves a child before an anchor, appending when the anchor is absent.</summary>
     public required Action<TNode, TNode, TNode?> Insert { get; init; }
 
-    /// <summary>Removes the node from its parent (upstream: <c>remove(el)</c>).</summary>
+    /// <summary>Removes a node from its host parent.</summary>
     public required Action<TNode> Remove { get; init; }
 
-    /// <summary>
-    /// Creates an element from a tag and namespace (<c>"svg"</c>, <c>"mathml"</c>, or null for
-    /// HTML) (upstream: <c>createElement(type, namespace)</c>).
-    /// </summary>
+    /// <summary>Creates an element for a tag and optional platform namespace.</summary>
     public required Func<string, string?, TNode> CreateElement { get; init; }
 
-    /// <summary>Creates a text node (upstream: <c>createText</c>).</summary>
+    /// <summary>Creates a text node.</summary>
     public required Func<string, TNode> CreateText { get; init; }
 
-    /// <summary>Creates a comment node (upstream: <c>createComment</c>).</summary>
+    /// <summary>Creates a comment node.</summary>
     public required Func<string, TNode> CreateComment { get; init; }
 
-    /// <summary>Sets a text node's content (upstream: <c>setText</c>).</summary>
+    /// <summary>Changes the content of an existing text node.</summary>
     public required Action<TNode, string> SetText { get; init; }
 
-    /// <summary>
-    /// Replaces an element's entire content with a text string (upstream:
-    /// <c>setElementText</c>).
-    /// </summary>
-    public required Action<TNode, string> SetElementText { get; init; }
-
-    /// <summary>Returns a node's parent, or default at a root (upstream: <c>parentNode</c>).</summary>
+    /// <summary>Returns a node's host parent, or default when it has none.</summary>
     public required Func<TNode, TNode?> ParentNode { get; init; }
 
-    /// <summary>Returns a node's next sibling, or default at the end (upstream: <c>nextSibling</c>).</summary>
+    /// <summary>Returns a node's next host sibling, or default at the end.</summary>
     public required Func<TNode, TNode?> NextSibling { get; init; }
 
-    /// <summary>Lands one prop change on an element (upstream: <c>patchProp</c>).</summary>
-    public required PatchPropertyDelegate<TNode> PatchProperty { get; init; }
-
-    /// <summary>Optional: resolves a selector to a node (upstream: <c>querySelector</c>).</summary>
-    public Func<string, TNode?>? QuerySelector { get; init; }
+    /// <summary>Applies one immutable attribute-snapshot difference.</summary>
+    public required PatchAttributeDelegate<TNode> PatchAttribute { get; init; }
 
     /// <summary>
-    /// Optional: stamps a scoped-style id attribute on an element (upstream: <c>setScopeId</c>;
-    /// consumed once scoped styles land with the compiler areas).
+    /// Optionally stamps a compiler-produced scoped-style identifier on an element.
     /// </summary>
-    public Action<TNode, string>? SetScopeId { get; init; }
+    public Action<TNode, string>? SetScopeIdentifier { get; init; }
 
     /// <summary>
-    /// Optional: clones a node — used to stamp out repeated static content cheaply (upstream:
-    /// <c>cloneNode</c>).
+    /// Optionally resolves a teleport target descriptor, such as a CSS selector, to a host
+    /// container. A target already assignable to <typeparamref name="TNode"/> is used directly.
     /// </summary>
-    public Func<TNode, TNode>? CloneNode { get; init; }
+    public Func<object, TNode?>? ResolveTeleportTarget { get; init; }
 
     /// <summary>
-    /// Optional: inserts a static markup chunk in one operation (upstream:
-    /// <c>insertStaticContent</c>). Required to mount <see cref="VirtualNodeType.Static"/>
-    /// vnodes.
+    /// Optionally commits host mutations accumulated by a buffered adapter. Core invokes it before
+    /// post-render callbacks and again when those callbacks enqueue additional host work.
+    /// </summary>
+    public Action? Commit { get; init; }
+
+    /// <summary>
+    /// Optionally inserts a static-content span. Rendering
+    /// <see cref="Assimalign.Viu.Components.IStaticComponent"/> requires this operation.
     /// </summary>
     public InsertStaticContentDelegate<TNode>? InsertStaticContent { get; init; }
 
     /// <summary>
-    /// Optional: opens a read-only view over the existing server-rendered subtree rooted at the
-    /// given node so the renderer can hydrate it instead of mounting fresh (upstream: the
-    /// <c>nodeOps</c> reads <c>createHydrationFunctions</c> closes over —
-    /// <c>packages/runtime-core/src/hydration.ts</c>). Required to hydrate through
-    /// <c>Renderer.Hydrate</c> / <c>CreateSSRApp</c>; a renderer without it can only mount.
-    /// <para>
-    /// The factory is where the interop-cost discipline lives: the browser adapter returns a reader
-    /// backed by a single batched snapshot of the whole subtree (one boundary crossing), so the walk
-    /// reads structure and node data without a marshaled call per node; the in-memory test adapter
-    /// reads the live tree directly. Called once per hydration root — and once per teleport target,
-    /// which lies outside the root's subtree — never per node.
-    /// </para>
+    /// Optionally creates a read-only view over an existing server-rendered subtree. Hydration
+    /// requires this operation. A browser or WebView2 host should return a reader backed by one
+    /// batched subtree snapshot.
     /// </summary>
     public Func<TNode, HydrationNodeReader<TNode>>? CreateHydrationReader { get; init; }
 }

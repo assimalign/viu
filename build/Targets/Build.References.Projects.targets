@@ -4,7 +4,7 @@
 
         Lets a library/example/analyzer csproj reference another project by its
         assembly name instead of by relative csproj path. Resolution walks
-        libraries/ once, matches each item's Include to the csproj whose filename
+        .redesign/ once, matches each item's Include to the csproj whose filename
         matches, and emits a regular <ProjectReference Include="<resolved-path>" />
         with the appropriate per-flavour metadata.
 
@@ -36,7 +36,7 @@
              code project) can take a normal compile reference to one by assembly name — the analyzer
              SDK's OutputItemType="Analyzer" reference (ViuAnalyzerReference) cannot be compiled
              against, so a generator's own snapshot tests resolve it as a ViuPrivateProjectReference. -->
-        <_ViuProject Include="$(ViuRepositoryDirectory).redesign\**\*.csproj" />
+        <_ViuProject Include="$(ViuRepositoryDirectory)libraries\**\*.csproj" />
         <_ViuProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
         <!-- Benchmarks are a first-class non-shipping code area ([V01.01.11.04], #88), like analyzers:
              indexing them lets the benchmark test project take a by-name compile reference to the

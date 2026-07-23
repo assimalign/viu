@@ -15,7 +15,7 @@ namespace Assimalign.Viu.Shared;
 /// <see cref="Bail"/> (<c>-2</c>) are whole-value sentinels, never bit combinations: because
 /// every negative <see cref="int"/> has most bits set, a naive bitwise test against a negative
 /// value would spuriously succeed. Always gate positive-bit checks on <c>flags &gt; 0</c> —
-/// the predicates in <see cref="PatchFlagsExtensions"/> do this for you.
+/// the predicates in <c>PatchFlagsExtensions</c> do this for you.
 /// </para>
 /// <para>
 /// This is the compiler &lt;-&gt; runtime contract that enables compiler-informed patching: every

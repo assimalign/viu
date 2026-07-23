@@ -21,6 +21,7 @@
          runtime-core surface it sits alongside, plus the reactivity types the hand-written half declares. -->
     <ViuProjectReference Include="Assimalign.Viu.Browser" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <!-- The compiler/generator appear ONLY in this test project, never in runtime code. A private compile
          reference so the test can instantiate and drive the generator; its transitive .viu-parser
          references copy into the test bin so the composed parser runs in-process. -->

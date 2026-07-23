@@ -23,9 +23,9 @@
                 $(ViuBundleCssTaskAssembly) to the packaged Tasks/ copy, so the
                 file's in-repo default path stays dormant).
         -->
-        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.props"
+        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Syntax.Generators.props"
               Pack="true" PackagePath="Targets\Assimalign.Viu.Syntax.Generators.props" Visible="false" />
-        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.targets"
+        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Syntax.Generators.targets"
               Pack="true" PackagePath="Targets\Assimalign.Viu.Syntax.Generators.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
@@ -54,8 +54,8 @@
     <Target Name="CopyTargetSdkFiles" AfterTargets="Build">
         <ItemGroup>
             <_ViuSdkTargetsFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))\Targets\*.*" />
-            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.props" />
-            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Syntax.Generators\build\Assimalign.Viu.Syntax.Generators.targets" />
+            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Syntax.Generators.props" />
+            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Syntax.Generators.targets" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkTargetsFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"

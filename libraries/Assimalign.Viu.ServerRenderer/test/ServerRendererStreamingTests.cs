@@ -5,47 +5,46 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Assimalign.Viu.Components;
+
 using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
-/// <summary>
-/// Streaming SSR: <see cref="ServerRenderer.RenderToStreamAsync(ServerApplication, TextWriter, SsrContext?, CancellationToken)"/>
-/// writes completed subtrees as chunks and awaits the writer's flush (backpressure), rather than
-/// buffering the whole document.
-/// </summary>
+/// <summary>Pins streaming output and completed-template subtree flush boundaries.</summary>
 public class ServerRendererStreamingTests
 {
     [Fact]
     public async Task RenderToStream_ProducesSameOutputAsRenderToString()
     {
-        var component = new InlineComponent((_, _) => () =>
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("id", "app")), "hello"));
+        IComponent root = ComponentTree.Element(
+            "div",
+            TestTree.Attributes(("id", "app")),
+            [ComponentTree.Text("hello")]);
+        using StringWriter writer = new();
 
-        using var stringWriter = new StringWriter();
-        await ServerRenderer.RenderToStreamAsync(component, stringWriter);
+        await ServerRenderer.RenderToStreamAsync(root, writer);
 
-        stringWriter.ToString().ShouldBe("<div id=\"app\">hello</div>");
+        writer.ToString().ShouldBe("<div id=\"app\">hello</div>");
     }
 
     [Fact]
-    public async Task RenderToStream_FlushesEachCompletedSubtree()
+    public async Task RenderToStream_FlushesEachCompletedTemplateSubtree()
     {
-        // A parent with two child components flushes at each subtree boundary, so the writer sees multiple
-        // chunks and multiple flushes instead of one buffered write.
-        var childA = new InlineComponent((_, _) => () => VirtualNodeFactory.Element("span", "a"));
-        var childB = new InlineComponent((_, _) => () => VirtualNodeFactory.Element("span", "b"));
-        var parent = new InlineComponent((_, _) => () => VirtualNodeFactory.Element(
-            "div",
-            VirtualNodeFactory.Component(childA),
-            VirtualNodeFactory.Component(childB)));
+        InlineComponent childA = new(
+            _ => () => TestTree.Element("span", "a"));
+        InlineComponent childB = new(
+            _ => () => TestTree.Element("span", "b"));
+        InlineComponent parent = new(
+            _ => () => ComponentTree.Element(
+                "div",
+                children: [childA.Request(), childB.Request()]));
+        ServerApplication application = Ssr.Application(parent.Request());
+        RecordingTextWriter writer = new();
 
-        var writer = new RecordingTextWriter();
-        await ServerRenderer.RenderToStreamAsync(parent, writer);
+        await ServerRenderer.RenderToStreamAsync(application, writer);
 
         writer.Text.ShouldBe("<div><span>a</span><span>b</span></div>");
         writer.Chunks.Count.ShouldBeGreaterThan(1);
@@ -66,9 +65,11 @@ public class ServerRendererStreamingTests
 
         public override void Write(char value) => _all.Append(value);
 
-        public override Task WriteAsync(ReadOnlyMemory<char> buffer, CancellationToken cancellationToken = default)
+        public override Task WriteAsync(
+            ReadOnlyMemory<char> buffer,
+            CancellationToken cancellationToken = default)
         {
-            var chunk = buffer.ToString();
+            string chunk = buffer.ToString();
             Chunks.Add(chunk);
             _all.Append(chunk);
             return Task.CompletedTask;

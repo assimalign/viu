@@ -58,7 +58,7 @@ internal sealed class DomTransitionOperations
     /// interop crossing (upstream reads <c>getBoundingClientRect</c> per child inside a same-process JS
     /// loop; a handle platform pays a boundary crossing per read, so the FLIP pass is batched — N
     /// children cost one crossing, not N — [V01.01.04.07.03]). Returns one
-    /// <see cref="TransitionRectangle"/> per handle, index-aligned with <paramref name="handles"/>.
+    /// <see cref="TransitionRectangle"/> per handle, index-aligned with <c>handles</c>.
     /// Decision logic (which children moved, the inverting delta) stays in .NET; the applier only reads
     /// rectangles, preserving the "policy in C#, dumb applier in JS" split the bridge documents.
     /// </summary>
@@ -98,6 +98,18 @@ internal sealed class DomTransitionOperations
     /// the leave's reflow ordering when a leave immediately follows a cancelled enter.
     /// </summary>
     public Dictionary<int, bool> EnterCancelledFlags { get; } = new();
+
+    /// <summary>
+    /// The current enter generation per element. A stale next-frame callback from an interrupted enter
+    /// must not mutate classes belonging to a newer enter.
+    /// </summary>
+    public Dictionary<int, int> EnterGenerations { get; } = new();
+
+    /// <summary>
+    /// The current leave generation per element. A stale next-frame callback from a cancelled leave
+    /// must not mutate classes belonging to a newer leave.
+    /// </summary>
+    public Dictionary<int, int> LeaveGenerations { get; } = new();
 
     /// <summary>The ambient instance, or a thrown <see cref="InvalidOperationException"/> when none is installed.</summary>
     /// <exception cref="InvalidOperationException">No operations are installed.</exception>

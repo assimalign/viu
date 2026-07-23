@@ -10,12 +10,17 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- The ViuBundleCss MSBuild task ([V01.01.12.12]) and its parser
-		     closure (Tooling.Css -> Syntax/SingleFileComponent/Templates/Css)
-		     CopyLocal into $(OutDir) and are swept into the package's Tasks/
-		     folder by CollectSdkTaskFiles. Private: the Tooling.Tasks project
-		     is IsPackable=false, so it must never surface as a .nuspec
-		     dependency of this package. -->
-		<ViuPrivateProjectReference Include="Assimalign.Viu.Tooling.Tasks" />
+		<!-- The shared build-time CSS composition core ([V01.01.12.12]): the task re-runs the SAME deterministic
+         @style compilation the generator runs, over the same .viu inputs, so the physical bundle is
+         byte-identical to the generated ExtractedStyles constant. Its transitive parser closure
+         (Syntax / SingleFileComponent / Templates / Css) copies to the task output for MSBuild to load. -->
+    	<ViuProjectReference Include="Assimalign.Viu.Tooling.Css" />
 	</ItemGroup>
+	 <ItemGroup>
+    <!-- MSBuild task API. Centrally versioned with ExcludeAssets=all (see
+         build/Targets/Build.References.Packages.targets) — compile against them but never copy them to
+         output; the hosting MSBuild engine supplies these assemblies at run time. -->
+    <ViuPackageReference Include="Microsoft.Build.Utilities.Core" />
+    <ViuPackageReference Include="Microsoft.Build.Framework" />
+  </ItemGroup>
 </Project>

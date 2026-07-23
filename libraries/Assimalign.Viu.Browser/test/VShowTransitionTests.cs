@@ -5,8 +5,8 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
-
-using static Assimalign.Viu.VirtualNodeFactory;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Browser.Tests;
 
@@ -28,7 +28,7 @@ public sealed class VShowTransitionTests : IDisposable
     [Fact]
     public void Show_RunsEnterChoreography_WithoutUnmountingTheElement()
     {
-        var show = Reactive.Reference<object?>(false);
+        Reference<object?> show = Reactive.Reference<object?>(false);
         _harness.Render(PersistedHost(show));
         var div = _harness.FindElement("div");
         // Initially falsy: beforeMount hides it directly (no enter/leave classes, no reflow).
@@ -58,7 +58,7 @@ public sealed class VShowTransitionTests : IDisposable
     [Fact]
     public void Hide_RunsLeaveChoreography_ThenHidesOnlyAfterItCompletes_WithoutUnmounting()
     {
-        var show = Reactive.Reference<object?>(true);
+        Reference<object?> show = Reactive.Reference<object?>(true);
         _harness.Render(PersistedHost(show));
         var div = _harness.FindElement("div");
         // Initially truthy, no appear -> no enter choreography and no display write at mount (visible).
@@ -91,7 +91,7 @@ public sealed class VShowTransitionTests : IDisposable
     [Fact]
     public void InitiallyHidden_IsHiddenAtMount_WithNoTransitionChoreography()
     {
-        var show = Reactive.Reference<object?>(false);
+        Reference<object?> show = Reactive.Reference<object?>(false);
         _harness.Render(PersistedHost(show));
         var div = _harness.FindElement("div");
         // beforeMount hides an initially-falsy element directly (upstream: transition && value is false, so
@@ -104,7 +104,7 @@ public sealed class VShowTransitionTests : IDisposable
     [Fact]
     public void OriginalInlineDisplay_IsCapturedOnce_AndRestoredAcrossRepeatedToggles()
     {
-        var show = Reactive.Reference<object?>(false);
+        Reference<object?> show = Reactive.Reference<object?>(false);
         _harness.Render(PersistedHost(show, inlineDisplay: "flex"));
         var div = _harness.FindElement("div");
         // Falsy at mount -> hidden; the author-supplied inline display ("flex") is captured for later.
@@ -138,7 +138,7 @@ public sealed class VShowTransitionTests : IDisposable
     [Fact]
     public void HideInterruptingEnter_CancelsTheEnter_ConvergesHidden_WithNoOrphanClasses()
     {
-        var show = Reactive.Reference<object?>(false);
+        Reference<object?> show = Reactive.Reference<object?>(false);
         _harness.Render(PersistedHost(show));
         var div = _harness.FindElement("div");
 
@@ -173,7 +173,7 @@ public sealed class VShowTransitionTests : IDisposable
     [Fact]
     public void ShowInterruptingLeave_CancelsTheLeave_ConvergesVisible_WithNoOrphanClasses()
     {
-        var show = Reactive.Reference<object?>(true);
+        Reference<object?> show = Reactive.Reference<object?>(true);
         _harness.Render(PersistedHost(show));
         var div = _harness.FindElement("div");
 
@@ -208,24 +208,50 @@ public sealed class VShowTransitionTests : IDisposable
 
     // <Transition name="fade" persisted><div key="a" v-show="show">content</div></Transition>. The
     // persisted flag simulates the compiler's transformTransition injection for a single v-show child.
-    private static RenderComponent PersistedHost(Reference<object?> show, string? inlineDisplay = null)
-        => new((_, _) => () =>
-        {
-            var divProperties = new VirtualNodeProperties();
-            divProperties.Set("key", "a");
-            if (inlineDisplay is not null)
+    private static ITemplateComponent PersistedHost(
+        Reference<object?> show,
+        string? inlineDisplay = null)
+    {
+        Dictionary<string, ComponentSlot> slots =
+            new(StringComparer.Ordinal)
             {
-                divProperties.Set("style", new Dictionary<string, object?>(StringComparer.Ordinal)
+                ["default"] = _ =>
                 {
-                    ["display"] = inlineDisplay,
-                });
-            }
-            var slots = new ComponentSlots();
-            slots["default"] = _ =>
-            [
-                Directives.WithDirectives(Element("div", divProperties, "content"), VShow.Instance, show.Value),
-            ];
-            var transitionProperties = Properties(("name", "fade"), ("persisted", true));
-            return Component(Transition.Instance, transitionProperties, slots);
-        });
+                    IComponentAttributeCollection? attributes = null;
+                    if (inlineDisplay is not null)
+                    {
+                        attributes = new ComponentAttributes(
+                        [
+                            new ComponentAttribute(
+                                "style",
+                                new Dictionary<string, object?>(
+                                    StringComparer.Ordinal)
+                                {
+                                    ["display"] = inlineDisplay,
+                                }),
+                        ]);
+                    }
+
+                    return ComponentTree.Element(
+                        "div",
+                        attributes,
+                        children: [ComponentTree.Text("content")],
+                        key: "a",
+                        directives:
+                        [
+                            new ComponentDirectiveBinding(
+                                "show",
+                                show.Value),
+                        ]);
+                },
+            };
+        ComponentArguments arguments = new(
+        [
+            new KeyValuePair<string, object?>("name", "fade"),
+            new KeyValuePair<string, object?>("persisted", true),
+        ]);
+        return ComponentTree.Template<Transition>(
+            arguments,
+            slots);
+    }
 }

@@ -1,105 +1,220 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Shared fixtures for the RouterView/RouterLink suites ([V01.01.08.03], issue #72): a tracking
-// component that pins setup/render run counts (the reactivity contract from testing.md), the small
-// view/layout factories the route tables render, and helpers that mount a built-in component against
-// the in-memory Testing renderer with the router provided app-wide.
+// Shared fixtures for RouterView/RouterLink against the unified component tree. Router resolution is
+// exclusively through the explicit IServiceProvider on IComponentContext; there is no hierarchical
+// component-dependency test path.
 internal static class RouterComponentsTestSupport
 {
-    // Mounts a RouterView outlet as the tree root with the router provided app-wide.
-    public static ComponentWrapper MountView(Router router)
-        => ViuTest.Mount(new RouterView(), OptionsFor(router));
-
-    // Mounts a RouterLink as the tree root with the given props/slot and the router provided app-wide.
-    public static ComponentWrapper MountLink(Router router, VirtualNodeProperties properties, ComponentSlots? slots = null)
+    public static ComponentWrapper MountView(
+        Router router,
+        params TrackingComponent[] components)
     {
-        var options = OptionsFor(router);
-        options.Properties = properties;
+        return ViuTest.Mount(
+            new RouterView(),
+            OptionsFor(router, components));
+    }
+
+    public static ComponentWrapper MountLink(
+        Router router,
+        IComponentArguments arguments,
+        IReadOnlyDictionary<string, ComponentSlot>? slots = null)
+    {
+        ComponentMountOptions options = OptionsFor(router);
+        options.Arguments = arguments;
         options.Slots = slots;
         return ViuTest.Mount(new RouterLink(), options);
     }
 
-    public static ComponentMountOptions OptionsFor(Router router)
+    public static ComponentMountOptions OptionsFor(
+        Router router,
+        params TrackingComponent[] components)
     {
-        var options = new ComponentMountOptions();
-        options.Provide(RouterInjectionKeys.Router, router);
-        return options;
+        return new ComponentMountOptions
+        {
+            Components = new RouterTestComponentFactory(components),
+            Services = new RouterServiceProvider(router),
+        };
     }
 
-    // A view rendering <div class="label">label</div>.
     public static TrackingComponent LabelView(string label)
-        => new(
-            label,
-            _ => VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("class", label)), label));
-
-    // A view rendering <span class="value">{prop}</span>, declaring the named prop.
-    public static TrackingComponent PropView(string propertyName)
-        => new(
-            "prop-" + propertyName,
-            properties => VirtualNodeFactory.Element(
-                "span",
-                VirtualNodeFactory.Properties(("class", "value")),
-                properties.Get<string>(propertyName) ?? string.Empty),
-            [new ComponentPropertyDefinition(propertyName)]);
-
-    // A layout rendering <div class="layout"><outlet/></div>; the outlet is a stable nested RouterView.
-    public static TrackingComponent LayoutView(RouterView outlet)
-        => new(
-            "layout",
-            _ => VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Properties(("class", "layout")),
-                VirtualNodeFactory.Component(outlet)));
-
-    // A single default slot rendering plain text (RouterLink label content).
-    public static ComponentSlots TextSlot(string text)
     {
-        var slots = new ComponentSlots();
-        slots["default"] = _ => [VirtualNodeFactory.Text(text)];
-        return slots;
+        return new TrackingComponent(
+            label,
+            _ => ComponentTree.Element(
+                "div",
+                Attributes(("class", label)),
+                [ComponentTree.Text(label)]));
+    }
+
+    public static TrackingComponent PropView(string parameterName)
+    {
+        return new TrackingComponent(
+            "parameter-" + parameterName,
+            context => ComponentTree.Element(
+                "span",
+                Attributes(("class", "value")),
+                [ComponentTree.Text(
+                    context.Arguments.Get<string>(parameterName)
+                    ?? string.Empty)]),
+            [new ComponentParameter(parameterName)]);
+    }
+
+    public static TrackingComponent LayoutView(int outletDepth = 1)
+    {
+        return new TrackingComponent(
+            "layout",
+            _ => ComponentTree.Element(
+                "div",
+                Attributes(("class", "layout")),
+                [
+                    ComponentTree.Template<RouterView>(
+                        Arguments(("depth", outletDepth))),
+                ]));
+    }
+
+    public static IReadOnlyDictionary<string, ComponentSlot> TextSlot(string text)
+    {
+        return new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+        {
+            ["default"] = _ => ComponentTree.Text(text),
+        };
+    }
+
+    public static ComponentArguments Arguments(
+        params (string Name, object? Value)[] entries)
+    {
+        List<KeyValuePair<string, object?>> values = new(entries.Length);
+        foreach ((string name, object? value) in entries)
+        {
+            values.Add(new KeyValuePair<string, object?>(name, value));
+        }
+
+        return new ComponentArguments(values);
+    }
+
+    public static ComponentAttributes Attributes(
+        params (string Name, object? Value)[] entries)
+    {
+        List<IComponentAttribute> attributes = new(entries.Length);
+        foreach ((string name, object? value) in entries)
+        {
+            attributes.Add(new ComponentAttribute(name, value));
+        }
+
+        return new ComponentAttributes(attributes);
+    }
+
+    private sealed class RouterServiceProvider : IServiceProvider
+    {
+        private readonly Router _router;
+
+        internal RouterServiceProvider(Router router)
+        {
+            _router = router;
+        }
+
+        public object? GetService(Type serviceType)
+        {
+            return serviceType == typeof(Router) ? _router : null;
+        }
+    }
+
+    private sealed class RouterTestComponentFactory : IComponentFactory
+    {
+        private readonly Dictionary<string, TrackingComponent> _components =
+            new(StringComparer.Ordinal);
+
+        internal RouterTestComponentFactory(
+            IReadOnlyList<TrackingComponent> components)
+        {
+            for (int index = 0; index < components.Count; index++)
+            {
+                TrackingComponent component = components[index];
+                _components.Add(component.RegistrationName, component);
+            }
+        }
+
+        public IComponentTemplate Create(Type componentType)
+        {
+            if (componentType == typeof(RouterView))
+            {
+                return new RouterView();
+            }
+
+            if (componentType == typeof(RouterLink))
+            {
+                return new RouterLink();
+            }
+
+            throw new InvalidOperationException(
+                $"Component type \"{componentType}\" is not registered for the router test.");
+        }
+
+        public IComponentTemplate Create(string name)
+        {
+            return _components.TryGetValue(name, out TrackingComponent? component)
+                ? component
+                : throw new InvalidOperationException(
+                    $"Component name \"{name}\" is not registered for the router test.");
+        }
     }
 }
 
-// A component definition that records how many times it was set up and rendered and captures its
-// instance, so the suites can assert re-render run counts and remount-vs-patch behavior.
-internal sealed class TrackingComponent : IComponent
+internal sealed class TrackingComponent : IComponentTemplate
 {
-    private readonly Func<ComponentProperties, VirtualNode?> _render;
+    private static int _nextIdentifier;
+    private readonly Func<IComponentContext, IComponent?> _render;
+    private readonly Action<IComponentContext>? _setup;
 
     public TrackingComponent(
         string name,
-        Func<ComponentProperties, VirtualNode?> render,
-        IReadOnlyList<ComponentPropertyDefinition>? properties = null)
+        Func<IComponentContext, IComponent?> render,
+        IReadOnlyList<IComponentParameter>? parameters = null,
+        Action<IComponentContext>? setup = null)
     {
         Name = name;
         _render = render;
-        Properties = properties;
+        _setup = setup;
+        Parameters = parameters;
+        RegistrationName =
+            name + "-" + Interlocked.Increment(ref _nextIdentifier).ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        Request = ComponentTree.Template(RegistrationName);
     }
 
     public string? Name { get; }
 
-    public IReadOnlyList<ComponentPropertyDefinition>? Properties { get; }
+    public IReadOnlyList<IComponentParameter>? Parameters { get; }
+
+    public string RegistrationName { get; }
+
+    public ITemplateComponent Request { get; }
 
     public int SetupCount { get; private set; }
 
     public int RenderCount { get; private set; }
 
-    public ComponentInstance? Instance { get; private set; }
+    public IComponentContext? Context { get; private set; }
 
-    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
+    public bool IsUnmounted { get; private set; }
+
+    public ComponentRenderer Setup(IComponentContext context)
     {
         SetupCount++;
-        Instance = ComponentInstance.Current;
+        Context = context;
+        context.Lifecycle.OnUnmounted(() => IsUnmounted = true);
+        _setup?.Invoke(context);
         return () =>
         {
             RenderCount++;
-            return _render(properties);
+            return _render(context);
         };
     }
 }

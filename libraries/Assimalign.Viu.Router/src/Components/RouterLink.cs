@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Router;
 
@@ -23,27 +23,27 @@ namespace Assimalign.Viu.Router;
 /// guard reads the link's own <c>target</c> attribute. Not thread-safe (single-threaded JS
 /// event-loop model).
 /// </remarks>
-public sealed class RouterLink : IComponent
+public sealed class RouterLink : IComponentTemplate
 {
-    private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
+    private static readonly IReadOnlyList<IComponentParameter> DeclaredParameters =
     [
-        new ComponentPropertyDefinition("to") { Required = true },
-        new ComponentPropertyDefinition("replace") { DefaultValue = false },
-        new ComponentPropertyDefinition("activeClass"),
-        new ComponentPropertyDefinition("exactActiveClass"),
+        new ComponentParameter("to", isRequired: true),
+        new ComponentParameter("replace", defaultFactory: static () => false),
+        new ComponentParameter("activeClass"),
+        new ComponentParameter("exactActiveClass"),
     ];
 
     /// <inheritdoc/>
     public string? Name => "RouterLink";
 
     /// <inheritdoc/>
-    public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
+    public IReadOnlyList<IComponentParameter>? Parameters => DeclaredParameters;
 
     /// <inheritdoc/>
-    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentRenderer Setup(IComponentContext context)
     {
-        // Resolve the router service-first-then-provide ([V01.01.03.24]).
-        var router = RouterResolution.Resolve();
+        ArgumentNullException.ThrowIfNull(context);
+        Router? router = RouterResolution.Resolve(context);
 
         // Built once and reused, so the anchor's onClick prop is a stable reference across renders
         // (no listener re-patch). Reads to/replace at click time — no active effect, so untracked.
@@ -68,7 +68,7 @@ public sealed class RouterLink : IComponent
                 }
                 click.PreventDefault();
             }
-            var to = properties.Get<string>("to");
+            string? to = context.Arguments.Get<string>("to");
             if (string.IsNullOrEmpty(to))
             {
                 return;
@@ -76,38 +76,61 @@ public sealed class RouterLink : IComponent
             // Push/Replace are awaitable, but a click handler is fire-and-forget; observe the returned
             // task so an unexpected guard exception (already routed to Router.OnError) never surfaces
             // as an unobserved task fault.
-            var navigation = properties.Get<bool>("replace") ? router.Replace(to) : router.Push(to);
+            Task<NavigationFailure?> navigation = context.Arguments.Get<bool>("replace")
+                ? router.Replace(to)
+                : router.Push(to);
             ObserveNavigation(navigation);
         }
 
         return () =>
         {
-            var children = VirtualNodeFactory.RenderSlot(context.Slots, "default");
+            IReadOnlyList<IComponent>? children = RenderDefaultSlot(context);
             if (router is null)
             {
-                return VirtualNodeFactory.Element("a", (VirtualNodeProperties?)null, children);
+                return ComponentTree.Element("a", children: children);
             }
-            var to = properties.Get<string>("to") ?? string.Empty;
-            var target = router.Resolve(to);
+
+            string to = context.Arguments.Get<string>("to") ?? string.Empty;
+            RouteLocation target = router.Resolve(to);
             // Tracked read: the render effect re-runs on navigation so the active classes stay current.
-            var current = router.CurrentRoute.Value;
+            RouteLocation current = router.CurrentRoute.Value;
             var (isActive, isExactActive) = ComputeActive(current, target);
 
-            var activeClass = properties.Get<string>("activeClass") ?? router.LinkActiveClass;
-            var exactActiveClass = properties.Get<string>("exactActiveClass") ?? router.LinkExactActiveClass;
-            var classValue = BuildClass(
+            string? activeClass =
+                context.Arguments.Get<string>("activeClass") ?? router.LinkActiveClass;
+            string? exactActiveClass =
+                context.Arguments.Get<string>("exactActiveClass") ?? router.LinkExactActiveClass;
+            string? classValue = BuildClass(
                 isActive ? activeClass : null,
                 isExactActive ? exactActiveClass : null);
 
-            var anchorProperties = new VirtualNodeProperties(3);
-            anchorProperties.Set("href", router.CreateHref(target));
+            List<IComponentAttribute> anchorAttributes =
+            [
+                new ComponentAttribute("href", router.CreateHref(target)),
+            ];
             if (classValue is not null)
             {
-                anchorProperties.Set("class", classValue);
+                anchorAttributes.Add(new ComponentAttribute("class", classValue));
             }
-            anchorProperties.Set("onClick", (Action<object?>)Navigate);
-            return VirtualNodeFactory.Element("a", anchorProperties, children);
+
+            anchorAttributes.Add(
+                new ComponentAttribute("onClick", (Action<object?>)Navigate));
+            return ComponentTree.Element(
+                "a",
+                new ComponentAttributes(anchorAttributes),
+                children);
         };
+    }
+
+    private static IReadOnlyList<IComponent>? RenderDefaultSlot(IComponentContext context)
+    {
+        if (!context.Slots.TryGetValue("default", out ComponentSlot? slot))
+        {
+            return null;
+        }
+
+        IComponent? content = slot(new ComponentArguments());
+        return content is null ? null : [content];
     }
 
     // Upstream RouterLink active model: the link is active when its target's leaf record appears in
@@ -165,9 +188,12 @@ public sealed class RouterLink : IComponent
         return exactActive is null ? active : active + " " + exactActive;
     }
 
-    private static bool IsBlankTarget(ComponentAttributes attributes)
-        => attributes["target"] is string target
+    private static bool IsBlankTarget(IComponentAttributeCollection attributes)
+    {
+        return attributes.TryGetValue("target", out object? value)
+            && value is string target
             && target.Contains("_blank", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void ObserveNavigation(Task<NavigationFailure?> navigation)
         => navigation.ContinueWith(

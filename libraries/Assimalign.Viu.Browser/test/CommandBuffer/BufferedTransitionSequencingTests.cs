@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.Versioning;
 
@@ -7,9 +6,9 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Testing;
-
-using static Assimalign.Viu.VirtualNodeFactory;
 
 namespace Assimalign.Viu.Browser.Tests;
 
@@ -31,7 +30,7 @@ public sealed class BufferedTransitionSequencingTests
     public void Enter_AppliesFromAndActiveInOneFrame_ThenSwapsToTheToClassInADistinctFrame()
     {
         using var world = new BufferedTransitionWorld();
-        var show = Reactive.Reference(false);
+        Reference<bool> show = Reactive.Reference(false);
         world.Render(Host(show, ("name", "fade")));
 
         // Toggle in: the mount flush commits create + enter-from + enter-active together (the element
@@ -61,7 +60,7 @@ public sealed class BufferedTransitionSequencingTests
     public void Leave_LandsTheReflowBarrierBetweenFromAndActive_WithinOneFrame_ThenSwapsInADistinctFrame()
     {
         using var world = new BufferedTransitionWorld();
-        var show = Reactive.Reference(true);
+        Reference<bool> show = Reactive.Reference(true);
         world.Render(Host(show, ("name", "fade")));
         var div = world.Dom.FindFirstElement("div");
         world.Dom.ReflowCount.ShouldBe(0); // no appear -> the initial mount runs no choreography or reflow
@@ -93,7 +92,7 @@ public sealed class BufferedTransitionSequencingTests
     public void ClassAndReflowOps_NeverReachTheDirectBridge_InBufferedMode()
     {
         using var world = new BufferedTransitionWorld();
-        var show = Reactive.Reference(false);
+        Reference<bool> show = Reactive.Reference(false);
         world.Render(Host(show, ("name", "fade")));
 
         show.Value = true;
@@ -111,7 +110,7 @@ public sealed class BufferedTransitionSequencingTests
     public void PersistedShow_AppliesEnterFromAndActiveInOneFrame_ThenSwapsToInADistinctFrame_WithoutUnmounting()
     {
         using var world = new BufferedTransitionWorld();
-        var show = Reactive.Reference(false);
+        Reference<bool> show = Reactive.Reference(false);
         world.Render(PersistedHost(show, ("name", "fade")));
         var div = world.Dom.FindFirstElement("div");
         world.Dom.IsMounted(div).ShouldBeTrue(); // v-show keeps the element mounted even while hidden
@@ -142,7 +141,7 @@ public sealed class BufferedTransitionSequencingTests
     public void PersistedHide_LandsTheReflowBarrierBetweenFromAndActive_ThenHidesAfterTheLeave_WithoutUnmounting()
     {
         using var world = new BufferedTransitionWorld();
-        var show = Reactive.Reference(true);
+        Reference<bool> show = Reactive.Reference(true);
         world.Render(PersistedHost(show, ("name", "fade")));
         var div = world.Dom.FindFirstElement("div");
         world.Dom.ReflowCount.ShouldBe(0); // no appear -> the initial mount runs no choreography or reflow
@@ -174,31 +173,72 @@ public sealed class BufferedTransitionSequencingTests
     }
 
     // A component rendering <Transition {props}> around a v-if div keyed "a" (mirrors TransitionTests.Host).
-    private static RenderComponent Host(Reference<bool> show, params (string Name, object? Value)[] transitionProperties)
-        => new((_, _) => () =>
-        {
-            var slots = new ComponentSlots();
-            slots["default"] = _ => show.Value
-                ? [Element("div", Properties(("key", "a")), "A")]
-                : [Comment()];
-            return Component(Transition.Instance, Properties(transitionProperties), slots);
-        });
+    private static ITemplateComponent Host(
+        Reference<bool> show,
+        params (string Name, object? Value)[] transitionProperties)
+    {
+        return ComponentTree.Template<Transition>(
+            Arguments(transitionProperties),
+            new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+            {
+                ["default"] = _ =>
+                    show.Value
+                        ? ComponentTree.Element(
+                            "div",
+                            children: [ComponentTree.Text("A")],
+                            key: "a")
+                        : ComponentTree.Comment(),
+            });
+    }
 
     // A component rendering <Transition {props} persisted> around a v-show div keyed "a" — the persisted
     // path (#161). The persisted flag stands in for the compiler's transformTransition injection for a
     // single v-show child, so the renderer skips its mount/remove enter/leave and v-show drives them.
-    private static RenderComponent PersistedHost(Reference<bool> show, params (string Name, object? Value)[] transitionProperties)
-        => new((_, _) => () =>
+    private static ITemplateComponent PersistedHost(
+        Reference<bool> show,
+        params (string Name, object? Value)[] transitionProperties)
+    {
+        List<KeyValuePair<string, object?>> argumentValues =
+            ArgumentValues(transitionProperties);
+        argumentValues.Add(
+            new KeyValuePair<string, object?>("persisted", true));
+        return ComponentTree.Template<Transition>(
+            new ComponentArguments(argumentValues),
+            new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+            {
+                ["default"] = _ =>
+                    ComponentTree.Element(
+                        "div",
+                        children: [ComponentTree.Text("A")],
+                        key: "a",
+                        directives:
+                        [
+                            new ComponentDirectiveBinding(
+                                "show",
+                                show.Value),
+                        ]),
+            });
+    }
+
+    private static ComponentArguments Arguments(
+        (string Name, object? Value)[] values)
+    {
+        return new ComponentArguments(ArgumentValues(values));
+    }
+
+    private static List<KeyValuePair<string, object?>> ArgumentValues(
+        (string Name, object? Value)[] values)
+    {
+        List<KeyValuePair<string, object?>> arguments =
+            new(values.Length);
+        foreach ((string name, object? value) in values)
         {
-            var slots = new ComponentSlots();
-            slots["default"] = _ =>
-            [
-                Directives.WithDirectives(Element("div", Properties(("key", "a")), "A"), VShow.Instance, show.Value),
-            ];
-            var properties = Properties(transitionProperties);
-            properties.Set("persisted", true);
-            return Component(Transition.Instance, properties, slots);
-        });
+            arguments.Add(
+                new KeyValuePair<string, object?>(name, value));
+        }
+
+        return arguments;
+    }
 
     // A DOM-free buffered world: the real renderer over BufferedBrowserNodeOperations, an in-memory
     // command-buffer applier that records each frame's transition-op sequence, and a recording "direct"
@@ -210,6 +250,7 @@ public sealed class BufferedTransitionSequencingTests
         private readonly InMemoryHandleDom _dom = new();
         private readonly BufferedBrowserNodeOperations _buffered;
         private readonly Renderer<int> _renderer;
+        private readonly IApplicationContext _application;
         private readonly TestSchedulerPump _pump;
         private readonly DomTransitionOperations? _previousTransitionOperations;
         private readonly int _container;
@@ -218,7 +259,6 @@ public sealed class BufferedTransitionSequencingTests
 
         public BufferedTransitionWorld()
         {
-            Scheduler.Reset();
             _pump = TestSchedulerPump.Install();
             _container = _dom.CreateElement("root", null);
 
@@ -251,6 +291,15 @@ public sealed class BufferedTransitionSequencingTests
             _buffered.Activate();
             _buffered.ObserveForeignHandle(_container);
             _renderer = RendererFactory.CreateRenderer(_buffered.Create());
+            _application = new ApplicationContext(
+                ComponentTree.Comment("buffered-transition-test-root"),
+                new ComponentFactory(
+                [
+                    Transition.Registration,
+                    BaseTransition.Registration,
+                ]),
+                new EmptyServiceProvider(),
+                directives: BrowserDirectiveResolver.Instance);
         }
 
         /// <summary>The per-frame transition-op sequences ("add:x"/"remove:x"/"reflow"), one list per apply that produced any.</summary>
@@ -267,7 +316,7 @@ public sealed class BufferedTransitionSequencingTests
 
         public void Render(IComponent component)
         {
-            _renderer.Render(Component(component), _container);
+            _renderer.Render(component, _container, _application);
             _pump.RunUntilIdle();
         }
 
@@ -304,10 +353,10 @@ public sealed class BufferedTransitionSequencingTests
 
         public void Dispose()
         {
+            _renderer.Render(null, _container, _application);
             _buffered.Deactivate();
             DomTransitionOperations.Current = _previousTransitionOperations;
             _pump.Dispose();
-            Scheduler.Reset();
         }
 
         private DomTransitionOperations BuildRecordingDirectOperations() => new()
@@ -328,5 +377,14 @@ public sealed class BufferedTransitionSequencingTests
             HasCssTransform = (_, _, _) => false,
             WhenMoveEnds = (_, resolve) => resolve(),
         };
+
+        private sealed class EmptyServiceProvider : IServiceProvider
+        {
+            public object? GetService(Type serviceType)
+            {
+                ArgumentNullException.ThrowIfNull(serviceType);
+                return null;
+            }
+        }
     }
 }

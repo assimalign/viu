@@ -1,0 +1,47 @@
+using System.Runtime.Versioning;
+
+using Assimalign.Viu;
+
+namespace Assimalign.Viu.Browser;
+
+/// <summary>
+/// The <see cref="IApplicationBuilder"/> for browser applications — created by
+/// <see cref="BrowserApplication.CreateBuilder(IComponent, VirtualNodeProperties?, bool)"/>
+/// or <see cref="BrowserApplication.CreateSsrBuilder(IComponent, VirtualNodeProperties?)"/>.
+/// Records plugins/provides/registrations on the base <see cref="ApplicationBuilder"/> and, on
+/// <see cref="Build"/>, constructs a <see cref="BrowserApplication"/> over the direct or
+/// command-buffered browser node-ops and replays the recorded configuration onto it in order.
+/// Not thread-safe (browser main thread only).
+/// </summary>
+[SupportedOSPlatform("browser")]
+public sealed class BrowserApplicationBuilder : ApplicationBuilder
+{
+    private readonly bool _useCommandBuffer;
+    private readonly bool _hydrate;
+
+    internal BrowserApplicationBuilder(
+        IComponent rootComponent,
+        VirtualNodeProperties? rootProperties,
+        bool useCommandBuffer,
+        bool hydrate)
+        : base(rootComponent, rootProperties)
+    {
+        _useCommandBuffer = useCommandBuffer;
+        _hydrate = hydrate;
+    }
+
+    /// <summary>
+    /// Builds the browser application, attaches the service provider, and applies the recorded
+    /// configuration in call order. Mount the returned app with <c>await app.MountAsync("#app")</c>.
+    /// </summary>
+    /// <returns>The configured <see cref="BrowserApplication"/>.</returns>
+    public override BrowserApplication Build()
+    {
+        var application = BrowserApplication.Create(RootComponent, RootProperties, _useCommandBuffer, _hydrate);
+        // Attach the built provider before ApplyConfiguration so a plugin install can resolve from the
+        // app service provider ([V01.01.03.24]); the app owns and disposes it.
+        application.Context.ServicesProvider = BuildServiceProvider();
+        ApplyConfiguration(application);
+        return application;
+    }
+}

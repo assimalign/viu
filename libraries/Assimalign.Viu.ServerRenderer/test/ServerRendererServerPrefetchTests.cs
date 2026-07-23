@@ -1,38 +1,34 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
+
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
-/// <summary>
-/// <see cref="Lifecycle.OnServerPrefetch"/> is awaited before a component's subtree serializes, runs
-/// once, and routes failures through the SSR error path — pinned to upstream
-/// <c>renderComponentSubTree</c>'s prefetch await.
-/// </summary>
+/// <summary>Pins the awaited server-prefetch lifecycle phase and its error/cancellation behavior.</summary>
 public class ServerRendererServerPrefetchTests
 {
     [Fact]
     public async Task ServerPrefetch_IsAwaitedBeforeSubtreeSerializes()
     {
-        // The render reads a value the prefetch sets asynchronously; seeing "loaded" proves the prefetch
-        // completed before the subtree rendered.
-        var component = new InlineComponent((_, _) =>
+        InlineComponent component = new(context =>
         {
-            var data = Reactive.Reference("loading");
-            Lifecycle.OnServerPrefetch(async () =>
+            IReactiveReference<string> data = Reactive.Reference("loading");
+            context.Lifecycle.OnServerPrefetch(async () =>
             {
                 await Task.Yield();
                 data.Value = "loaded";
             });
-            return () => VirtualNodeFactory.Element("div", data.Value);
+            return () => TestTree.Element("div", data.Value);
         });
 
-        var html = await Ssr.RenderAsync(component);
+        string html = await Ssr.RenderAsync(component);
 
         html.ShouldBe("<div>loaded</div>");
     }
@@ -40,15 +36,15 @@ public class ServerRendererServerPrefetchTests
     [Fact]
     public async Task ServerPrefetch_RunsExactlyOnce()
     {
-        var prefetchCount = 0;
-        var component = new InlineComponent((_, _) =>
+        int prefetchCount = 0;
+        InlineComponent component = new(context =>
         {
-            Lifecycle.OnServerPrefetch(() =>
+            context.Lifecycle.OnServerPrefetch(() =>
             {
                 prefetchCount++;
                 return Task.CompletedTask;
             });
-            return () => VirtualNodeFactory.Element("div", "x");
+            return () => TestTree.Element("div", "x");
         });
 
         await Ssr.RenderAsync(component);
@@ -59,32 +55,101 @@ public class ServerRendererServerPrefetchTests
     [Fact]
     public async Task ServerPrefetch_Failure_WithNoHandler_FaultsTheRender()
     {
-        var component = new InlineComponent((_, _) =>
+        InlineComponent component = new(context =>
         {
-            Lifecycle.OnServerPrefetch(() => throw new InvalidOperationException("prefetch failed"));
-            return () => VirtualNodeFactory.Element("div", "x");
+            context.Lifecycle.OnServerPrefetch(
+                () => throw new InvalidOperationException("prefetch failed"));
+            return () => TestTree.Element("div", "x");
         });
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(() => Ssr.RenderAsync(component));
+        InvalidOperationException exception =
+            await Should.ThrowAsync<InvalidOperationException>(
+                () => Ssr.RenderAsync(component));
+
         exception.Message.ShouldBe("prefetch failed");
     }
 
     [Fact]
-    public async Task ServerPrefetch_Failure_IsRoutedToAppErrorHandler()
+    public async Task ServerPrefetch_Failure_IsRoutedToApplicationErrorHandler()
     {
         Exception? captured = null;
-        var component = new InlineComponent((_, _) =>
+        InlineComponent component = new(context =>
         {
-            Lifecycle.OnServerPrefetch(() => throw new InvalidOperationException("boom"));
-            return () => VirtualNodeFactory.Element("div", "recovered");
+            context.Lifecycle.OnServerPrefetch(
+                () => throw new InvalidOperationException("boom"));
+            return () => TestTree.Element("div", "recovered");
         });
-        var application = new ServerApplication(component);
+        ServerApplication application = Ssr.Application(component.Request());
         application.Context.ErrorHandler = (exception, _, _) => captured = exception;
 
-        var html = await ServerRenderer.RenderToStringAsync(application);
+        string html = await ServerRenderer.RenderToStringAsync(application);
 
-        // The app-level handler consumed the error, so the render completed.
         captured.ShouldBeOfType<InvalidOperationException>();
         html.ShouldBe("<div>recovered</div>");
+    }
+
+    [Fact]
+    public async Task DescendantPrefetchFailure_IsCapturedByAncestor()
+    {
+        Exception? captured = null;
+        InlineComponent child = new(context =>
+        {
+            context.Lifecycle.OnServerPrefetch(
+                () => throw new InvalidOperationException("child failure"));
+            return () => TestTree.Element("span", "child");
+        });
+        InlineComponent parent = new(context =>
+        {
+            context.Lifecycle.OnErrorCaptured((exception, _, _) =>
+            {
+                captured = exception;
+                return false;
+            });
+            return () => ComponentTree.Element(
+                "div",
+                children: [child.Request()]);
+        });
+
+        string html = await Ssr.RenderAsync(parent);
+
+        captured.ShouldBeOfType<InvalidOperationException>();
+        html.ShouldBe("<div><span>child</span></div>");
+    }
+
+    [Fact]
+    public async Task RenderCancellation_CancelsComponentLifetimeToken()
+    {
+        TaskCompletionSource tokenCanceled =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource prefetchStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        InlineComponent component = new(context =>
+        {
+            context.Lifecycle.OnServerPrefetch(async cancellationToken =>
+            {
+                prefetchStarted.SetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    tokenCanceled.SetResult();
+                    throw;
+                }
+            });
+            return () => ComponentTree.Comment();
+        });
+        using CancellationTokenSource cancellation = new();
+        Task<string> render = ServerRenderer.RenderToStringAsync(
+            Ssr.Application(component.Request()),
+            cancellationToken: cancellation.Token);
+
+        await prefetchStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => render);
+        await tokenCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }

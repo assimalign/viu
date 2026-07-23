@@ -166,36 +166,39 @@ object graph (`BrowserHistorySnapshotMarshaller` pins the wire format).
 ## Components: depth, reactivity, and click guards
 
 `RouterView`/`RouterLink` (`[V01.01.08.03]`, the C# port of `RouterView.ts`/`RouterLink.ts`) are
-ordinary `IComponent`s in this assembly. Issue #72 places them here and lets the Router area
-reference Runtime Core and Reactivity; the matcher/history code keeps its own purity (the assembly
-references no DOM adapter, pinned by `RouterAssembly_DoesNotReferenceTheBrowserDomAdapter`). Component
-wiring lands on `RouteRecord` itself — `Component` and `PropertiesResolver` — mirroring vue-router's
+ordinary `IComponentTemplate`s in this assembly. Router references the standalone Components and
+Reactivity contracts, but not Core or a host renderer; the matcher/history code keeps its own purity
+(the assembly references no DOM adapter, pinned by
+`RouterAssembly_DoesNotReferenceTheBrowserDomAdapter`). Component wiring lands on `RouteRecord`
+itself — `Component` and `ArgumentsResolver` — mirroring vue-router's
 `RouteRecordRaw.component`/`props`; the matcher never reads them, so its ranking/resolution is
 unchanged.
 
-**Depth flows through provide/inject.** Each `RouterView` injects `RouterInjectionKeys.ViewDepth`
-(default 0), renders `route.matched[depth].Component`, and provides `depth + 1` for any view nested in
-that component — the C# realization of upstream's `viewDepthKey`. Because setup runs
-parent-before-child and inject reads the parent chain, a nested `RouterView` mounted inside a matched
-component resolves the next depth automatically. (Upstream additionally *skips* component-less records
-in the depth walk; Viu renders every matched record's component and treats a component-less record as
-a comment placeholder — sufficient for nested layouts, noted as a simplification.)
+**Depth is explicit.** The redesign deliberately has no hierarchical component dependency API, so
+`RouterView` declares a `depth` component argument (default `0`) and renders
+`route.matched[depth].Component`. A layout that contains another outlet supplies the next depth
+explicitly, for example `ComponentTree.Template<RouterView>(argumentsWithDepthOne)`. This is a
+deliberate ergonomic divergence from upstream's implicit `viewDepthKey`; it keeps component
+dependencies visible and avoids recreating an injection mechanism under a router-specific name.
+Viu renders every matched record's component and treats a component-less record as a comment
+placeholder.
 
-**The reactive route drives re-render; `shouldUpdateComponent` gates it.** A `RouterView`'s render
+**The reactive route drives re-render and template identity preserves instances.** A `RouterView`'s render
 reads `Router.CurrentRoute.Value` (a `shallowRef`), so every navigation re-runs every `RouterView`'s
-render — exactly as upstream reads `routeToDisplay.value`. The "only the affected view re-renders"
-contract is enforced one level down, at the *matched component*: the wrapper re-render produces
-`h(component, props)`, and the renderer's `shouldUpdateComponent` compares props by value, so a
-leaf-only change (the parent's component and props unchanged) leaves the parent's mounted component
-untouched, while a param-only change patches the same component with new props instead of remounting
-it. Pinned by run-count tests (`RouterView_LeafOnlyNavigation_ReRendersOnlyTheAffectedView`,
-`RouterView_ParameterOnlyNavigation_UpdatesPropsWithoutRemounting`).
+render — exactly as upstream reads `routeToDisplay.value`. The matched value is an `IComponent` in
+the unified tree. When it is an `ITemplateComponent`, RouterView copies the request only when route
+arguments must be merged. Core compares the template type/name and key, so a parameter-only
+navigation patches the existing mounted template rather than remounting it, and a leaf-only
+navigation preserves the parent layout instance. RouterView combines the matched `RouteRecord`
+identity with the stored request key. Different records that point at the same template therefore
+remount it, ensuring lifecycle-bound leave/update guard ownership moves to the new record; parameter
+changes on the same record retain the instance.
 
-**Per-route props: three forms, one resolver.** `RouteComponentProperties.FromParameters()` maps the
-resolved params to props (`props: true`), `FromValues(...)` returns a shared static bag (object form),
-and a hand-written `RouteComponentPropertiesResolver` receives the whole `RouteLocation` (function
-form). The static bag is shared by identity across renders, so a static-props component never
-re-renders for a prop change.
+**Per-route arguments: three forms, one resolver.** `RouteComponentArguments.FromParameters()` maps
+the resolved params to component arguments (`props: true`), `FromValues(...)` returns a shared static
+argument snapshot (object form), and a hand-written `RouteComponentArgumentsResolver` receives the
+whole `RouteLocation` (function form). Resolved route arguments override same-named arguments already
+present on the stored template request.
 
 **`RouterLink` click guards are DOM-free.** The anchor's `onClick` receives a `RouterLinkClickEvent`
 (button, system modifiers, `DefaultPrevented`) — the platform-agnostic stand-in for the `MouseEvent`
@@ -204,8 +207,10 @@ un-prevented click whose link is not `target="_blank"`; anything else falls thro
 Active/exact-active matching mirrors upstream: the link is *active* when its target's leaf record is in
 the current route's matched chain (an ancestor-or-self match) with the current params including the
 target's, and *exact-active* additionally when that record is the current leaf with equal params.
-Active classes are configurable per-link (the `activeClass`/`exactActiveClass` props) and globally
-(`Router.LinkActiveClass`/`LinkExactActiveClass`), the prop winning.
+Active classes are configurable per-link (the `activeClass`/`exactActiveClass` arguments) and
+globally (`Router.LinkActiveClass`/`LinkExactActiveClass`), the per-link argument winning. Both
+components resolve `Router` only through `IComponentContext.Services`; the application owns the
+provider and Router adds no container or builder-registration abstraction.
 
 ## Navigation guards: the async pipeline
 
@@ -289,20 +294,17 @@ URL (the classic `{ path: '/', redirect: '/x' }`) never fired for a page loaded 
 
 `beforeRouteLeave`/`beforeRouteUpdate` need per-instance state, so they are **registration-based**
 (`RouterGuards.OnBeforeRouteLeave`/`OnBeforeRouteUpdate`, the port of upstream's `onBeforeRouteLeave`/
-`onBeforeRouteUpdate` composables). Each `RouterView` provides a mutable `MatchedRecordScope` holding
-the record it renders (the port of upstream's `matchedRouteKey`) and updates it in its render *before*
-creating the child vnode, so a component reading it during its own `Setup` — which runs while that
-vnode mounts — always sees the record it is being rendered for, even when a reused view swaps leaves.
-The composable injects that record and registers the guard in a `RouteRecord`-keyed side-table on the
-router, with teardown bound to `Lifecycle.OnUnmounted` so a guard never outlives its instance. Because
-the join is registration through the runtime's lifecycle (not reflection over user types), a trimmer
-cannot strip a guard.
+`onBeforeRouteUpdate` composables). A route template passes its `IComponentContext` and explicit
+outlet depth. The helper resolves `Router` from `context.Services`, selects the current matched record
+at that depth, registers the guard in a `RouteRecord`-keyed side-table, and binds removal to
+`context.Lifecycle.OnUnmounted`. There is no ambient component accessor, hierarchical lookup, or
+reflection over user types, so a trimmer cannot strip a guard.
 
 `beforeRouteEnter` has no instance (the component is not yet mounted), so it is **interface-based**:
-a route component implements `IRouteEnterGuard` and the pipeline tests `record.Component is
-IRouteEnterGuard` for entering records. This mirrors upstream reading `beforeRouteEnter` off the
-component options, again with no reflection. Upstream's `next(vm => ...)` instance callback is not
-modelled — the same no-`next` divergence as the rest of the guard API.
+an `IRouteEnterGuard` is supplied explicitly through `RouteRecord.RouteEnterGuard`. This mirrors
+upstream reading `beforeRouteEnter` before component activation while avoiding reflection and early
+factory activation. Upstream's `next(vm => ...)` instance callback is not modelled — the same
+no-`next` divergence as the rest of the guard API.
 
 ### popstate runs the same pipeline
 

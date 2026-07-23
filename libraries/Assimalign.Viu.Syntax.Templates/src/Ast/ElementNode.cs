@@ -3,8 +3,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// An element with its resolved namespace, classification, properties, and children. The C# port of
 /// Vue 3.5's <c>ElementNode</c> (<c>@vue/compiler-core</c> <c>ast.ts</c>). <see cref="ElementType"/> is
-/// refined from <see cref="Compiler.ElementType.Element"/> to component/slot/template when the close
-/// tag is seen.
+/// refined from <see cref="Assimalign.Viu.Syntax.Templates.ElementType.Element"/> to
+/// component/slot/template when the close tag is seen.
 /// </summary>
 public sealed record ElementNode : TemplateChildNode
 {

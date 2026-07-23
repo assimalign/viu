@@ -2,16 +2,7 @@ using System;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// A directive expressed as a bundle of delegate hooks — the C# port of writing an upstream
-/// <c>ObjectDirective</c> as an object literal of hook functions
-/// (<c>packages/runtime-core/src/directives.ts</c>,
-/// https://vuejs.org/guide/reusability/custom-directives.html). Set only the hooks the directive
-/// needs; the rest stay null and are skipped. Use <see cref="FromFunction"/> for the shorthand
-/// where one function is both the <see cref="IDirective.Mounted"/> and <see cref="IDirective.Updated"/>
-/// hook (upstream's function-directive form). Allocation-light — a single reusable object shared
-/// across every use of the directive.
-/// </summary>
+/// <summary>A reusable runtime directive expressed as a bundle of delegate hooks.</summary>
 public sealed record Directive : IDirective
 {
     /// <inheritdoc/>
@@ -35,17 +26,16 @@ public sealed record Directive : IDirective
     /// <inheritdoc/>
     public DirectiveHook? Unmounted { get; init; }
 
-    /// <summary>
-    /// Creates a directive whose single <paramref name="hook"/> is invoked on both
-    /// <see cref="IDirective.Mounted"/> and <see cref="IDirective.Updated"/> (upstream: a
-    /// <c>FunctionDirective</c> normalizes to <c>{ mounted: fn, updated: fn }</c>).
-    /// </summary>
-    /// <param name="hook">The hook run on mount and update.</param>
+    /// <summary>Creates the function-directive shorthand used for mounted and updated.</summary>
+    /// <param name="hook">The shared hook.</param>
     /// <returns>The directive.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="hook"/> is null.</exception>
     public static Directive FromFunction(DirectiveHook hook)
     {
         ArgumentNullException.ThrowIfNull(hook);
-        return new Directive { Mounted = hook, Updated = hook };
+        return new Directive
+        {
+            Mounted = hook,
+            Updated = hook,
+        };
     }
 }

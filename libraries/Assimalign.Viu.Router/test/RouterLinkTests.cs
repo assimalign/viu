@@ -3,8 +3,6 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
-
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 
 namespace Assimalign.Viu.Router.Tests;
@@ -32,7 +30,7 @@ public class RouterLinkTests
     public void RouterLink_ResolvesHref_ThroughTheRouter()
     {
         var router = LinkRouter();
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         wrapper.Get("a").Attribute("href").ShouldBe("/users/1");
         wrapper.Text().ShouldBe("User 1");
@@ -42,7 +40,7 @@ public class RouterLinkTests
     public void RouterLink_IncludesBasePath_InHref()
     {
         var router = LinkRouter("/app");
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         wrapper.Get("a").Attribute("href").ShouldBe("/app/users/1");
     }
@@ -52,7 +50,7 @@ public class RouterLinkTests
     {
         var router = LinkRouter();
         _ = router.Push("/users/1");
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users")), TextSlot("Users"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users")), TextSlot("Users"));
 
         // /users is an ancestor of the current /users/1 -> active, but not the exact current route.
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active");
@@ -63,7 +61,7 @@ public class RouterLinkTests
     {
         var router = LinkRouter();
         _ = router.Push("/users/1");
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active router-link-exact-active");
     }
@@ -73,7 +71,7 @@ public class RouterLinkTests
     {
         var router = LinkRouter();
         _ = router.Push("/users/1");
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/")), TextSlot("Home"));
+        using var wrapper = MountLink(router, Arguments(("to", "/")), TextSlot("Home"));
 
         wrapper.Get("a").Attribute("class").ShouldBeNull();
     }
@@ -85,7 +83,7 @@ public class RouterLinkTests
         router.LinkActiveClass = "is-active";
         router.LinkExactActiveClass = "is-exact";
         _ = router.Push("/users/1");
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("is-active is-exact");
     }
@@ -95,7 +93,7 @@ public class RouterLinkTests
     {
         var router = LinkRouter();
         _ = router.Push("/users/1");
-        var properties = VirtualNodeFactory.Properties(
+        var properties = Arguments(
             ("to", "/users/1"),
             ("activeClass", "link-on"),
             ("exactActiveClass", "link-exact"));
@@ -109,7 +107,7 @@ public class RouterLinkTests
     {
         var router = LinkRouter();
         _ = router.Push("/users/1");
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active router-link-exact-active");
 
         // A different param than the link's target: the reactive route drives a re-render that drops
@@ -124,7 +122,7 @@ public class RouterLinkTests
     public async Task RouterLink_LeftClick_NavigatesClientSideAndPreventsDefault()
     {
         var router = LinkRouter();
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
         router.CurrentRoute.Value.Path.ShouldBe("/");
 
         var click = new RouterLinkClickEvent();
@@ -138,7 +136,7 @@ public class RouterLinkTests
     public async Task RouterLink_ModifierClick_FallsThroughToTheBrowser()
     {
         var router = LinkRouter();
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         var click = new RouterLinkClickEvent(controlKey: true);
         await wrapper.Trigger("click", click);
@@ -151,7 +149,7 @@ public class RouterLinkTests
     public async Task RouterLink_MiddleClick_FallsThroughToTheBrowser()
     {
         var router = LinkRouter();
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         await wrapper.Trigger("click", new RouterLinkClickEvent(button: 1));
 
@@ -162,7 +160,7 @@ public class RouterLinkTests
     public async Task RouterLink_RightClick_FallsThroughToTheBrowser()
     {
         var router = LinkRouter();
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         await wrapper.Trigger("click", new RouterLinkClickEvent(button: 2));
 
@@ -173,7 +171,7 @@ public class RouterLinkTests
     public async Task RouterLink_AlreadyPreventedClick_DoesNotNavigate()
     {
         var router = LinkRouter();
-        using var wrapper = MountLink(router, VirtualNodeFactory.Properties(("to", "/users/1")), TextSlot("User 1"));
+        using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         var click = new RouterLinkClickEvent();
         click.PreventDefault();
@@ -186,7 +184,7 @@ public class RouterLinkTests
     public async Task RouterLink_TargetBlank_FallsThroughToTheBrowser()
     {
         var router = LinkRouter();
-        var properties = VirtualNodeFactory.Properties(("to", "/users/1"), ("target", "_blank"));
+        var properties = Arguments(("to", "/users/1"), ("target", "_blank"));
         using var wrapper = MountLink(router, properties, TextSlot("User 1"));
 
         var click = new RouterLinkClickEvent();
@@ -209,7 +207,7 @@ public class RouterLinkTests
                     new RouteRecord(":id"),
                 ]),
             ]);
-        var properties = VirtualNodeFactory.Properties(("to", "/users/1"), ("replace", true));
+        var properties = Arguments(("to", "/users/1"), ("replace", true));
         using var wrapper = MountLink(router, properties, TextSlot("User 1"));
 
         await wrapper.Trigger("click", new RouterLinkClickEvent());

@@ -1,198 +1,373 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.Versioning;
 
 using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Browser.Tests;
 
 /// <summary>
-/// Pins the <c>UseCssVars</c> runtime (<see cref="CssVariables"/>, [V01.01.06.06]) — the C# port of Vue
-/// 3.5's <c>useCssVars</c> (<c>@vue/runtime-dom</c> <c>helpers/useCssVars.ts</c>,
-/// https://vuejs.org/api/sfc-css-features.html#v-bind-in-css). Exercised DOM-free through the in-memory
-/// adapter (<see cref="BrowserDirectiveTestHarness"/>): the evaluated <c>v-bind()</c> values are applied as
-/// custom properties on the component root after mount, re-applied reactively on the next post-flush pass
-/// without re-rendering, batched into one interop crossing per element per pass, and torn down on unmount.
+/// Pins the explicit-context <see cref="CssVariables.UseCssVariables"/> runtime — the C# port of
+/// Vue 3.5's <c>useCssVars</c>. Tests run DOM-free over the redesigned component tree.
 /// </summary>
-public sealed class CssVariablesTests : IDisposable
+[SupportedOSPlatform("browser")]
+public sealed class CssVariablesTests
 {
-    private readonly BrowserDirectiveTestHarness _harness = new();
-
-    public void Dispose() => _harness.Dispose();
-
     [Fact]
-    public void UseCssVars_AppliesCustomProperty_OnRootElement_AfterMount()
+    public void UseCssVariables_AfterMount_AppliesCustomPropertyToRoot()
     {
-        var color = Reactive.Reference("red");
-        _harness.Render(Component(() => new Dictionary<string, string> { ["abc12345"] = color.Value }));
-        _harness.RunUntilIdle();
+        Reference<string> color = Reactive.Reference("red");
+        CssVariableTemplate template =
+            new(() => Variables(("abc12345", color.Value)));
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
 
-        var div = _harness.FindElement("div");
-        // Applied with the leading '--' (upstream setVarsOnNode: style.setProperty('--' + key, value)).
-        _harness.CssVariable(div, "--abc12345").ShouldBe("red");
-        // One crossing on mount — the initial application (upstream's watch source runs once in onMounted).
-        _harness.CssVariableCrossings.ShouldBe(1);
+        harness.Render(Request());
+        harness.RunUntilIdle();
+
+        int element = harness.FindElement("div");
+        harness.CssVariable(element, "--abc12345").ShouldBe("red");
+        harness.CssVariableCrossings.ShouldBe(1);
     }
 
     [Fact]
-    public void UseCssVars_UpdatesReactively_OnNextFlush_WithoutReRendering()
+    public void UseCssVariables_ReactiveDependencyChanges_UpdatesWithoutRendering()
     {
-        var color = Reactive.Reference("red");
-        var renderCount = 0;
-        _harness.Render(Component(
-            () => new Dictionary<string, string> { ["abc12345"] = color.Value },
-            onRender: () => renderCount++));
-        _harness.RunUntilIdle();
+        Reference<string> color = Reactive.Reference("red");
+        int renderCount = 0;
+        CssVariableTemplate template =
+            new(
+                () => Variables(("abc12345", color.Value)),
+                onRender: () => renderCount++);
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
+        harness.Render(Request());
+        harness.RunUntilIdle();
+        int element = harness.FindElement("div");
 
-        renderCount.ShouldBe(1);
-        _harness.CssVariableCrossings.ShouldBe(1);
-
-        // A bound value changes: the property updates on the next flush and the crossing count ticks by one,
-        // but the render function does not re-run — the AC's "without re-rendering the component".
         color.Value = "blue";
-        _harness.RunUntilIdle();
+        harness.RunUntilIdle();
 
-        var div = _harness.FindElement("div");
-        _harness.CssVariable(div, "--abc12345").ShouldBe("blue");
-        _harness.CssVariableCrossings.ShouldBe(2);
+        harness.CssVariable(element, "--abc12345").ShouldBe("blue");
+        harness.CssVariableCrossings.ShouldBe(2);
         renderCount.ShouldBe(1);
     }
 
     [Fact]
-    public void UseCssVars_WithGeneratorEmittedReferenceGetter_UpdatesReactively_RunCountsPinned()
+    public void UseCssVariables_GeneratorShapedReferenceGetter_TracksRuns()
     {
-        // [V01.01.06.06.01] The exact getter shape the generator emits for `v-bind(count)` where `count` is a
-        // script Reference<int>: `Convert.ToString((object?)(count.Value), InvariantCulture)`. Because the
-        // auto-unwrap reads the ref's .Value inside the getter, the getter tracks the ref and re-applies on the
-        // next flush when it changes — the run-count proof that v-bind(count) (not v-bind(count.Value)) is
-        // reactive end to end. The getter never ran before the unwrap read a plain object with no tracking.
-        var count = Reactive.Reference(1);
-        var getterRuns = 0;
-        _harness.Render(Component(() =>
-        {
-            getterRuns++;
-            return new Dictionary<string, string>
-            {
-                ["w"] = Convert.ToString((object?)count.Value, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
-            };
-        }));
-        _harness.RunUntilIdle();
+        Reference<int> count = Reactive.Reference(1);
+        int getterRuns = 0;
+        CssVariableTemplate template =
+            new(
+                () =>
+                {
+                    getterRuns++;
+                    return Variables(
+                        (
+                            "width",
+                            Convert.ToString(
+                                (object?)count.Value,
+                                CultureInfo.InvariantCulture)
+                                ?? string.Empty));
+                });
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
+        harness.Render(Request());
+        harness.RunUntilIdle();
+        int element = harness.FindElement("div");
 
-        var div = _harness.FindElement("div");
-        _harness.CssVariable(div, "--w").ShouldBe("1");
-        _harness.CssVariableCrossings.ShouldBe(1);
+        harness.CssVariable(element, "--width").ShouldBe("1");
         getterRuns.ShouldBe(1);
-
-        // The ref changes: the getter re-runs (it tracked count.Value) and the property re-applies — one more
-        // crossing, one more getter run, and no re-render.
         count.Value = 42;
-        _harness.RunUntilIdle();
+        harness.RunUntilIdle();
 
-        _harness.CssVariable(div, "--w").ShouldBe("42");
-        _harness.CssVariableCrossings.ShouldBe(2);
+        harness.CssVariable(element, "--width").ShouldBe("42");
         getterRuns.ShouldBe(2);
+        harness.CssVariableCrossings.ShouldBe(2);
     }
 
     [Fact]
-    public void UseCssVars_DoesNotReapply_WhenNoBoundValueChanged()
+    public void UseCssVariables_UnrelatedReactiveChange_DoesNotReapply()
     {
-        var color = Reactive.Reference("red");
-        var unrelated = Reactive.Reference(0);
-        _harness.Render(Component(() => new Dictionary<string, string> { ["abc12345"] = color.Value }));
-        _harness.RunUntilIdle();
-        _harness.CssVariableCrossings.ShouldBe(1);
+        Reference<string> color = Reactive.Reference("red");
+        Reference<int> unrelated = Reactive.Reference(0);
+        CssVariableTemplate template =
+            new(() => Variables(("color", color.Value)));
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
+        harness.Render(Request());
+        harness.RunUntilIdle();
 
-        // Mutating state the getter never reads triggers no post-flush re-application (dependency tracking,
-        // not a blanket post-flush hook) — the run-count guard the testing rules require.
-        unrelated.Value = 5;
-        _harness.RunUntilIdle();
+        unrelated.Value = 1;
+        harness.RunUntilIdle();
 
-        _harness.CssVariableCrossings.ShouldBe(1);
+        harness.CssVariableCrossings.ShouldBe(1);
     }
 
     [Fact]
-    public void UseCssVars_BatchesEveryProperty_IntoOneCrossingPerPass()
+    public void UseCssVariables_MultipleProperties_BatchesOneOperationPerElement()
     {
-        var color = Reactive.Reference("red");
-        var size = Reactive.Reference("10px");
-        _harness.Render(Component(() => new Dictionary<string, string>
-        {
-            ["c"] = color.Value,
-            ["s"] = size.Value,
-        }));
-        _harness.RunUntilIdle();
+        Reference<string> color = Reactive.Reference("red");
+        Reference<string> size = Reactive.Reference("10px");
+        CssVariableTemplate template =
+            new(
+                () => Variables(
+                    ("color", color.Value),
+                    ("size", size.Value)));
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
 
-        var div = _harness.FindElement("div");
-        _harness.CssVariable(div, "--c").ShouldBe("red");
-        _harness.CssVariable(div, "--s").ShouldBe("10px");
-        // Both properties applied in a single crossing — never one interop call per property (the batching AC).
-        _harness.CssVariableCrossings.ShouldBe(1);
+        harness.Render(Request());
+        harness.RunUntilIdle();
+
+        int element = harness.FindElement("div");
+        harness.CssVariable(element, "--color").ShouldBe("red");
+        harness.CssVariable(element, "--size").ShouldBe("10px");
+        harness.CssVariableCrossings.ShouldBe(1);
     }
 
     [Fact]
-    public void UseCssVars_AppliesToEveryRoot_OfAFragmentComponent()
+    public void UseCssVariables_FragmentRoot_AppliesToEveryOutermostElement()
     {
-        var color = Reactive.Reference("red");
-        var component = new RenderComponent((_, _) =>
-        {
-            CssVariables.UseCssVars(() => new Dictionary<string, string> { ["v"] = color.Value });
-            return () => VirtualNodeFactory.Fragment(
-                VirtualNodeFactory.Element("div", "a"),
-                VirtualNodeFactory.Element("span", "b"));
-        });
+        Reference<string> color = Reactive.Reference("red");
+        CssVariableTemplate template =
+            new(
+                () => Variables(("value", color.Value)),
+                render: static () =>
+                    ComponentTree.Fragment(
+                    [
+                        ComponentTree.Element(
+                            "div",
+                            children: [ComponentTree.Text("first")]),
+                        ComponentTree.Element(
+                            "span",
+                            children: [ComponentTree.Text("second")]),
+                    ]));
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
 
-        _harness.Render(component);
-        _harness.RunUntilIdle();
+        harness.Render(Request());
+        harness.RunUntilIdle();
 
-        // A multi-root component applies the vars to each root element (upstream setVarsOnVNode descends the
-        // Fragment) — one crossing per root element.
-        _harness.CssVariable(_harness.FindElement("div"), "--v").ShouldBe("red");
-        _harness.CssVariable(_harness.FindElement("span"), "--v").ShouldBe("red");
-        _harness.CssVariableCrossings.ShouldBe(2);
+        harness.CssVariable(harness.FindElement("div"), "--value")
+            .ShouldBe("red");
+        harness.CssVariable(harness.FindElement("span"), "--value")
+            .ShouldBe("red");
+        harness.CssVariableCrossings.ShouldBe(2);
     }
 
     [Fact]
-    public void UseCssVars_StopsApplying_AfterUnmount()
+    public void UseCssVariables_ComponentRootChanges_ReappliesToReplacementElement()
     {
-        var color = Reactive.Reference("red");
-        _harness.Render(Component(() => new Dictionary<string, string> { ["abc12345"] = color.Value }));
-        _harness.RunUntilIdle();
-        _harness.CssVariableCrossings.ShouldBe(1);
+        Reference<bool> showAlternative = Reactive.Reference(false);
+        CssVariableTemplate template =
+            new(
+                () => Variables(("color", "red")),
+                render: () =>
+                    ComponentTree.Element(
+                        showAlternative.Value ? "span" : "div",
+                        children: [ComponentTree.Text("content")]));
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
+        harness.Render(Request());
+        harness.RunUntilIdle();
 
-        _harness.Unmount();
-        _harness.RunUntilIdle();
-        var afterUnmount = _harness.CssVariableCrossings;
+        showAlternative.Value = true;
+        harness.RunUntilIdle();
 
-        // The watcher stops with the component (onUnmounted -> handle.Stop), so a later mutation applies nothing.
+        int replacement = harness.FindElement("span");
+        harness.CssVariable(replacement, "--color").ShouldBe("red");
+        harness.CssVariableCrossings.ShouldBe(2);
+    }
+
+    [Fact]
+    public void UseCssVariables_ComponentUnmounts_StopsWatcher()
+    {
+        Reference<string> color = Reactive.Reference("red");
+        CssVariableTemplate template =
+            new(() => Variables(("color", color.Value)));
+        using BrowserDirectiveTestHarness harness = CreateHarness(template);
+        harness.Render(Request());
+        harness.RunUntilIdle();
+        harness.Unmount();
+        harness.RunUntilIdle();
+        int crossingsAfterUnmount = harness.CssVariableCrossings;
+
         color.Value = "blue";
-        _harness.RunUntilIdle();
+        harness.RunUntilIdle();
 
-        _harness.CssVariableCrossings.ShouldBe(afterUnmount);
+        harness.CssVariableCrossings.ShouldBe(crossingsAfterUnmount);
     }
 
     [Fact]
-    public void UseCssVars_WithoutActiveInstance_IsNoOp()
+    public void UseCssVariables_NullContext_Throws()
     {
-        // Called outside a component Setup there is no subtree to apply to; upstream warns and returns.
-        Should.NotThrow(() => CssVariables.UseCssVars(() => new Dictionary<string, string> { ["x"] = "1" }));
+        Should.Throw<ArgumentNullException>(
+            () => CssVariables.UseCssVariables(
+                null!,
+                () => Variables(("value", "1"))));
     }
 
     [Fact]
-    public void UseCssVars_NullGetter_Throws()
-        => Should.Throw<ArgumentNullException>(() => CssVariables.UseCssVars(null!));
+    public void UseCssVariables_NullGetter_Throws()
+    {
+        PlainTemplate template = new();
+        IComponentFactory factory =
+            new ComponentFactory(
+            [
+                new ComponentRegistration(
+                    typeof(PlainTemplate),
+                    () => template),
+            ]);
+        using BrowserDirectiveTestHarness harness = new(factory);
+        IComponentContext context =
+            harness.Render(ComponentTree.Template<PlainTemplate>())
+                .ShouldNotBeNull();
 
-    // A component whose setup registers UseCssVars and whose root is a single <div>, mirroring the shape the
-    // generator's ApplyCssVariables seam produces.
-    private static RenderComponent Component(Func<IReadOnlyDictionary<string, string>> getter, Action? onRender = null)
-        => new((_, _) =>
+        Should.Throw<ArgumentNullException>(
+            () => CssVariables.UseCssVariables(context, null!));
+    }
+
+    [Fact]
+    public void UseCssVariables_BufferedMode_PostFlushCommitsCssMutation()
+    {
+        using TestSchedulerPump pump = TestSchedulerPump.Install();
+        Reference<string> color = Reactive.Reference("red");
+        CssVariableTemplate template =
+            new(() => Variables(("color", color.Value)));
+        ITemplateComponent request = Request();
+        IComponentFactory factory =
+            new ComponentFactory(
+            [
+                new ComponentRegistration(
+                    typeof(CssVariableTemplate),
+                    () => template),
+            ]);
+        IApplicationContext application =
+            new ApplicationContext(
+                request,
+                factory,
+                new EmptyServiceProvider(),
+                directives: BrowserDirectiveResolver.Instance);
+        InMemoryHandleDom dom = new();
+        int container = dom.CreateElement("root", null);
+        BufferedBrowserNodeOperations buffered =
+            new(
+                (frame, length) =>
+                    CommandBufferDecoder.Apply(frame, length, dom),
+                static _ => 0,
+                dom.ParentNode,
+                dom.NextSibling,
+                dom.InsertStaticContent);
+        buffered.Activate();
+        buffered.ObserveForeignHandle(container);
+        Renderer<int> renderer =
+            RendererFactory.CreateRenderer(buffered.Create());
+
+        try
         {
-            CssVariables.UseCssVars(getter);
+            renderer.Render(request, container, application);
+            pump.RunUntilIdle();
+
+            dom.Serialize(container)
+                .ShouldContain("style.--color=\"red\"");
+            int crossingsAfterMount = buffered.InteropCallCount;
+            buffered.Buffer.HasPendingOperations.ShouldBeFalse();
+
+            color.Value = "blue";
+            pump.RunUntilIdle();
+
+            dom.Serialize(container)
+                .ShouldContain("style.--color=\"blue\"");
+            buffered.InteropCallCount.ShouldBe(crossingsAfterMount + 1);
+            buffered.Buffer.HasPendingOperations.ShouldBeFalse();
+
+            renderer.Render(null, container, application);
+            pump.RunUntilIdle();
+        }
+        finally
+        {
+            buffered.Deactivate();
+        }
+    }
+
+    private static BrowserDirectiveTestHarness CreateHarness(
+        CssVariableTemplate template)
+    {
+        IComponentFactory factory =
+            new ComponentFactory(
+            [
+                new ComponentRegistration(
+                    typeof(CssVariableTemplate),
+                    () => template),
+            ]);
+        return new BrowserDirectiveTestHarness(factory);
+    }
+
+    private static ITemplateComponent Request()
+        => ComponentTree.Template<CssVariableTemplate>();
+
+    private static IReadOnlyDictionary<string, string> Variables(
+        params (string Name, string Value)[] entries)
+    {
+        Dictionary<string, string> variables =
+            new(StringComparer.Ordinal);
+        for (int index = 0; index < entries.Length; index++)
+        {
+            variables[entries[index].Name] = entries[index].Value;
+        }
+
+        return variables;
+    }
+
+    private sealed class CssVariableTemplate : IComponentTemplate
+    {
+        private readonly Func<IReadOnlyDictionary<string, string>> _getter;
+        private readonly Action? _onRender;
+        private readonly Func<IComponent> _render;
+
+        internal CssVariableTemplate(
+            Func<IReadOnlyDictionary<string, string>> getter,
+            Action? onRender = null,
+            Func<IComponent>? render = null)
+        {
+            _getter = getter;
+            _onRender = onRender;
+            _render =
+                render
+                ?? (static () =>
+                    ComponentTree.Element(
+                        "div",
+                        children: [ComponentTree.Text("content")]));
+        }
+
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            CssVariables.UseCssVariables(context, _getter);
             return () =>
             {
-                onRender?.Invoke();
-                return VirtualNodeFactory.Element("div", "content");
+                _onRender?.Invoke();
+                return _render();
             };
-        });
+        }
+    }
+
+    private sealed class PlainTemplate : IComponentTemplate
+    {
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return static () => ComponentTree.Element("div");
+        }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            return null;
+        }
+    }
 }

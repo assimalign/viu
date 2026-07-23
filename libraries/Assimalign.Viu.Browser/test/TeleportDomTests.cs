@@ -4,52 +4,84 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
-
-using static Assimalign.Viu.VirtualNodeFactory;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Exercises Teleport ([V01.01.03.17]) over the browser-shaped int-handle node-ops (RendererOptions<int>
-// wired to the InMemoryHandleDom exactly as production BrowserNodeOperations wires the JS bridge), so the
-// value-type TNode path — boxing handles into the teleport state, the default(TNode)==0 "no node"
-// sentinel — is covered as well as the reference-type TestNode path is in Core. Browser-annotated
-// like the other tests touching the browser-only node-ops types; nothing crosses a real interop boundary.
+/// <summary>Tests teleport behavior through browser-shaped integer node handles.</summary>
 [SupportedOSPlatform("browser")]
 public sealed class TeleportDomTests
 {
     [Fact]
-    public void Teleport_MovesChildrenIntoDirectTargetHandle_ThroughIntHandleNodeOps()
+    public void Teleport_MovesChildrenIntoDirectTargetHandle()
     {
-        Scheduler.Reset();
-        var dom = new InMemoryHandleDom();
-        using var world = new DirectHandleDomWorld(dom);
-        var renderer = RendererFactory.CreateRenderer(world.Options);
-        var container = dom.CreateElement("root", null);
-        var target = dom.CreateElement("target", null);
+        InMemoryHandleDom dom = new();
+        using DirectHandleDomWorld world = new(dom);
+        Renderer<int> renderer =
+            RendererFactory.CreateRenderer(world.Options);
+        int container = dom.CreateElement("root", null);
+        int target = dom.CreateElement("target", null);
 
-        renderer.Render(Teleport(Properties(("to", target)), [Element("span", "boxed")]), container);
+        renderer.Render(
+            ComponentTree.Teleport(
+                target,
+                [ComponentTree.Element(
+                    "span",
+                    children: [ComponentTree.Text("boxed")])]),
+            container);
 
-        // The teleported <span> lands in the direct target handle; the main container keeps only the
-        // (empty) anchor pair.
-        dom.Serialize(target).ShouldBe("<target><span>boxed</span></target>");
-        dom.Serialize(container).ShouldBe("<root></root>");
+        dom.Serialize(target)
+            .ShouldBe("<target><span>boxed</span></target>");
+        dom.Serialize(container)
+            .ShouldBe(
+                "<root><!--teleport start--><!--teleport end--></root>");
     }
 
     [Fact]
-    public void Teleport_StringTargetResolvingToTheZeroHandle_IsTreatedAsNotFound_AndDoesNotThrow()
+    public void Teleport_UnresolvedStringTarget_DoesNotThrow()
     {
-        Scheduler.Reset();
-        var dom = new InMemoryHandleDom();
-        // DirectHandleDomWorld stubs querySelector to always return 0 — the "no node" sentinel for int
-        // handles. Without treating 0 as not-found the renderer would try to insert anchors into handle 0
-        // and throw; the sentinel guard in resolveTarget keeps the browser adapter safe.
-        using var world = new DirectHandleDomWorld(dom);
-        var renderer = RendererFactory.CreateRenderer(world.Options);
-        var container = dom.CreateElement("root", null);
+        InMemoryHandleDom dom = new();
+        using DirectHandleDomWorld world = new(dom);
+        Renderer<int> renderer =
+            RendererFactory.CreateRenderer(world.Options);
+        int container = dom.CreateElement("root", null);
 
-        Should.NotThrow(() => renderer.Render(Teleport(Properties(("to", "#anywhere")), [Element("span", "x")]), container));
+        Should.NotThrow(
+            () => renderer.Render(
+                ComponentTree.Teleport(
+                    "#anywhere",
+                    [ComponentTree.Element(
+                        "span",
+                        children: [ComponentTree.Text("x")])]),
+                container));
 
-        // Nothing is teleported (no valid target); the container holds only the anchor pair.
-        dom.Serialize(container).ShouldBe("<root></root>");
+        dom.Serialize(container)
+            .ShouldBe(
+                "<root><!--teleport start--><!--teleport end--></root>");
+    }
+
+    [Fact]
+    public void BufferedOperations_ResolveSelectorAndReserveForeignHandle()
+    {
+        const int target = 12;
+        InMemoryHandleDom dom = new();
+        BufferedBrowserNodeOperations buffered = new(
+            static (_, _) => [],
+            selector =>
+            {
+                selector.ShouldBe("#target");
+                return target;
+            },
+            dom.ParentNode,
+            dom.NextSibling,
+            dom.InsertStaticContent);
+        RendererOptions<int> options = buffered.Create();
+
+        int resolved =
+            options.ResolveTeleportTarget!.Invoke("#target");
+        int created = options.CreateElement("div", null);
+
+        resolved.ShouldBe(target);
+        created.ShouldBeGreaterThan(target);
     }
 }

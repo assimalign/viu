@@ -1,153 +1,197 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
-using Assimalign.Viu.Testing;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.Tests;
 
-namespace Assimalign.Viu.Tests;
+namespace Assimalign.Viu.Core.Tests;
 
-// Pins <component :is> resolution and replace-on-change against @vue/runtime-core's
-// resolveDynamicComponent (helpers/resolveAssets.ts) — https://vuejs.org/api/built-in-special-elements.html#component.
-public class DynamicComponentTests : IDisposable
+/// <summary>
+/// Pins dynamic selection against Vue 3.5's replace-on-identity-change behavior.
+/// </summary>
+public sealed class DynamicComponentTests : IDisposable
 {
-    private readonly TestRenderer _renderer = new();
-    private readonly TestElement _container;
-    private readonly TestSchedulerPump _pump;
-    private readonly List<string> _events = [];
-
     public DynamicComponentTests()
     {
         Scheduler.Reset();
-        _pump = TestSchedulerPump.Install();
-        _container = _renderer.CreateContainer();
     }
 
     public void Dispose()
     {
         Scheduler.Reset();
-        _pump.Dispose();
     }
 
-    private TestComponent LifecycleComponent(string name) => new()
+    [Fact]
+    public void DynamicComponent_SelectorKinds_CreateUnifiedTreeValuesWithoutActivation()
     {
-        Name = name,
-        SetupFunction = (_, _) =>
+        int activations = 0;
+        AsynchronousComponentDefinition asynchronous =
+            AsynchronousComponents.DefineAsynchronousComponent(
+                typeof(AsynchronousIdentity),
+                _ =>
+                {
+                    activations++;
+                    return Task.FromResult(
+                        AsynchronousComponentTarget.From<FirstTemplate>());
+                });
+
+        ITemplateComponent typed = DynamicComponents
+            .DynamicComponent(typeof(FirstTemplate))
+            .ShouldBeAssignableTo<ITemplateComponent>();
+        ITemplateComponent named = DynamicComponents
+            .DynamicComponent(DynamicComponents.Named("registered"))
+            .ShouldBeAssignableTo<ITemplateComponent>();
+        IElementComponent element = DynamicComponents
+            .DynamicComponent("article")
+            .ShouldBeAssignableTo<IElementComponent>();
+        ITemplateComponent asynchronousRequest = DynamicComponents
+            .DynamicComponent(asynchronous)
+            .ShouldBeAssignableTo<ITemplateComponent>();
+        ICommentComponent placeholder = DynamicComponents
+            .DynamicComponent(null)
+            .ShouldBeAssignableTo<ICommentComponent>();
+
+        typed.TemplateType.ShouldBe(typeof(FirstTemplate));
+        named.TemplateName.ShouldBe("registered");
+        element.Tag.ShouldBe("article");
+        asynchronousRequest.TemplateType.ShouldBe(typeof(AsynchronousIdentity));
+        placeholder.Kind.ShouldBe(ComponentKind.Comment);
+        activations.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ResolveDynamicComponent_PlainStringIsElement_ExplicitNameIsFactoryLookup()
+    {
+        DynamicComponents.ResolveDynamicComponent("registered")
+            .ShouldBe("registered");
+        DynamicComponentName named = DynamicComponents.Named("registered");
+        DynamicComponents.ResolveDynamicComponent(named).ShouldBe(named);
+
+        IElementComponent element = RenderHelpers
+            ._createVNode(
+                RenderHelpers._resolveDynamicComponent("registered"))
+            .ShouldBeAssignableTo<IElementComponent>();
+        ITemplateComponent template = RenderHelpers
+            ._createVNode(
+                RenderHelpers._resolveDynamicComponent(named))
+            .ShouldBeAssignableTo<ITemplateComponent>();
+
+        element.Tag.ShouldBe("registered");
+        template.TemplateName.ShouldBe("registered");
+    }
+
+    [Fact]
+    public void DynamicComponent_ReactiveTypeChange_UnmountsOldBeforeMountingNew()
+    {
+        using TestSchedulerPump pump = TestSchedulerPump.Install();
+        List<string> lifecycle = [];
+        Reference<object?> selector =
+            Reactive.Reference<object?>(typeof(FirstTemplate));
+        ITemplateComponent root = ComponentTree.Template<DynamicHostTemplate>();
+        ComponentFactory factory = new(
+        [
+            new ComponentRegistration(
+                typeof(DynamicHostTemplate),
+                () => new DynamicHostTemplate(selector)),
+            new ComponentRegistration(
+                typeof(FirstTemplate),
+                () => new LifecycleTemplate("first", lifecycle)),
+            new ComponentRegistration(
+                typeof(SecondTemplate),
+                () => new LifecycleTemplate("second", lifecycle)),
+        ]);
+        ApplicationContext application = new(
+            root,
+            factory,
+            new EmptyServiceProvider());
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Render(root, host.Root, application);
+        lifecycle.ShouldBe(["first:mounted"]);
+        host.Text(host.Root).ShouldBe("first");
+
+        selector.Value = typeof(SecondTemplate);
+        pump.RunUntilIdle();
+
+        lifecycle.ShouldBe(
+        [
+            "first:mounted",
+            "first:unmounted",
+            "second:mounted",
+        ]);
+        host.Text(host.Root).ShouldBe("second");
+    }
+
+    private sealed class AsynchronousIdentity
+    {
+    }
+
+    private sealed class FirstTemplate : IComponentTemplate
+    {
+        public ComponentRenderer Setup(IComponentContext context)
         {
-            Lifecycle.OnMounted(() => _events.Add($"{name}:mounted"));
-            Lifecycle.OnUnmounted(() => _events.Add($"{name}:unmounted"));
-            return () => VirtualNodeFactory.Element("div", name);
-        },
-    };
-
-    [Fact]
-    public void ResolveDynamicComponent_ReturnsAComponentDefinitionUnchanged()
-    {
-        var definition = LifecycleComponent("A");
-
-        DynamicComponents.ResolveDynamicComponent(definition).ShouldBeSameAs(definition);
+            return static () => ComponentTree.Text("first");
+        }
     }
 
-    [Fact]
-    public void ResolveDynamicComponent_UnresolvedString_FallsBackToTheTag_WithoutWarning()
+    private sealed class SecondTemplate : IComponentTemplate
     {
-        using var warnings = new WarningCapture();
-
-        // No active instance / no registration: the string is returned as an element tag, silently
-        // (upstream resolveDynamicComponent uses warnMissing=false).
-        DynamicComponents.ResolveDynamicComponent("div").ShouldBe("div");
-        warnings.Messages.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ResolveDynamicComponent_String_ResolvesAgainstTheAppRegistry_DuringRender()
-    {
-        var widget = LifecycleComponent("widget");
-        object? resolvedRegistered = null;
-        object? resolvedUnknown = null;
-
-        var root = new TestComponent
+        public ComponentRenderer Setup(IComponentContext context)
         {
-            SetupFunction = (_, _) =>
-            {
-                resolvedRegistered = DynamicComponents.ResolveDynamicComponent("my-widget");
-                resolvedUnknown = DynamicComponents.ResolveDynamicComponent("section");
-                return static () => VirtualNodeFactory.Element("div", "root");
-            },
-        };
-        var application = _renderer.Renderer.CreateApplication(root);
-        application.Component("my-widget", widget);
-
-        application.Mount(_container);
-
-        resolvedRegistered.ShouldBeSameAs(widget);       // registered name resolves to the definition
-        resolvedUnknown.ShouldBe("section");             // unregistered name falls back to a tag
+            return static () => ComponentTree.Text("second");
+        }
     }
 
-    [Fact]
-    public void DynamicComponent_BuildsComponentElementOrCommentVnodes()
+    private sealed class DynamicHostTemplate : IComponentTemplate
     {
-        var definition = LifecycleComponent("A");
+        private readonly Reference<object?> _selector;
 
-        var componentVnode = DynamicComponents.DynamicComponent(definition);
-        componentVnode.Type.ShouldBe(VirtualNodeType.Component);
-        componentVnode.ComponentType.ShouldBeSameAs(definition);
-
-        var elementVnode = DynamicComponents.DynamicComponent("span");
-        elementVnode.Type.ShouldBe(VirtualNodeType.Element);
-        elementVnode.ElementTag.ShouldBe("span");
-
-        var commentVnode = DynamicComponents.DynamicComponent(null);
-        commentVnode.Type.ShouldBe(VirtualNodeType.Comment);
-    }
-
-    [Fact]
-    public void ChangingIs_FullyUnmountsTheOldComponent_AndMountsTheNew_NoStateBleed()
-    {
-        var componentA = LifecycleComponent("A");
-        var componentB = LifecycleComponent("B");
-        var isValue = Reactive.Reference<object?>(componentA);
-
-        var host = new TestComponent
+        internal DynamicHostTemplate(Reference<object?> selector)
         {
-            SetupFunction = (_, _) => () => DynamicComponents.DynamicComponent(isValue.Value),
-        };
+            _selector = selector;
+        }
 
-        _renderer.Render(VirtualNodeFactory.Component(host), _container);
-        _events.ShouldBe(["A:mounted"]);
-        TestNodeSerializer.Serialize(_container).ShouldContain("A");
-
-        isValue.Value = componentB;
-        _pump.RunUntilIdle();
-
-        // The old component fully unmounts (its Unmounted hook fires) before the new one mounts —
-        // a keyed-swap-style replace, no lifecycle bleed.
-        _events.ShouldBe(["A:mounted", "A:unmounted", "B:mounted"]);
-        var html = TestNodeSerializer.Serialize(_container);
-        html.ShouldContain("B");
-        html.ShouldNotContain(">A<");
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            return () => DynamicComponents.DynamicComponent(_selector.Value);
+        }
     }
 
-    [Fact]
-    public void ChangingIs_FromComponentToElementTag_ReplacesTheTree()
+    private sealed class LifecycleTemplate : IComponentTemplate
     {
-        var componentA = LifecycleComponent("A");
-        var isValue = Reactive.Reference<object?>(componentA);
+        private readonly List<string> _lifecycle;
+        private readonly string _name;
 
-        var host = new TestComponent
+        internal LifecycleTemplate(
+            string name,
+            List<string> lifecycle)
         {
-            SetupFunction = (_, _) => () => DynamicComponents.DynamicComponent(isValue.Value),
-        };
+            _name = name;
+            _lifecycle = lifecycle;
+        }
 
-        _renderer.Render(VirtualNodeFactory.Component(host), _container);
-        _events.ShouldBe(["A:mounted"]);
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            context.Lifecycle.OnMounted(
+                () => _lifecycle.Add($"{_name}:mounted"));
+            context.Lifecycle.OnUnmounted(
+                () => _lifecycle.Add($"{_name}:unmounted"));
+            return () => ComponentTree.Text(_name);
+        }
+    }
 
-        isValue.Value = "hr"; // an element tag (no registered "hr")
-        _pump.RunUntilIdle();
-
-        _events.ShouldBe(["A:mounted", "A:unmounted"]);
-        TestNodeSerializer.Serialize(_container).ShouldContain("<hr>");
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            return null;
+        }
     }
 }

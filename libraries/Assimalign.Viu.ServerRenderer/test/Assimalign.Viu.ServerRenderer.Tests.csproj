@@ -12,9 +12,8 @@
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
-    <!-- The hydration round-trip tests ([V01.01.07.03]) render with the SSR renderer, then parse the
-         output into the in-memory tree and hydrate against it — pinning that the SSR marker output is the
-         exact contract the hydration walker consumes. -->
+    <!-- Round-trip tests parse real SSR output and hydrate it through Testing's live and immutable
+         snapshot readers, pinning the cross-package marker and adoption contract. -->
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>
 </Project>

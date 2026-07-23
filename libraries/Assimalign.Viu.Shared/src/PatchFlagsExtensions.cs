@@ -9,7 +9,7 @@ namespace Assimalign.Viu.Shared;
 /// representations have most bits set) never spuriously satisfy them from either side — matching
 /// upstream's <c>patchFlag &gt; 0</c> fast-path guard. Sentinels are tested with
 /// <see cref="IsCached"/>/<see cref="IsBail"/> instead. Every predicate is a plain inlineable
-/// bitwise/equality check; <see cref="Enum.HasFlag"/> is never used.
+/// bitwise/equality check; <see cref="System.Enum.HasFlag(System.Enum)"/> is never used.
 /// </summary>
 public static class PatchFlagsExtensions
 {

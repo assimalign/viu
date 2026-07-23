@@ -42,9 +42,6 @@ internal static class BrowserNodeOperations
             Invokers.SetListener(element, rawPropertyName, listener),
     };
 
-    // Installs the ambient operations the DOM v-model/v-show directives ([V01.01.04.06]) write
-    // through: model listeners ride the invoker registry's model channel, DOM writes reuse the same
-    // leaf ops as the patch engine. Runs once on first touch of this type (which precedes any render).
     static BrowserNodeOperations()
     {
         BrowserDirectiveOperations.Current = new BrowserDirectiveOperations
@@ -55,40 +52,57 @@ internal static class BrowserNodeOperations
             SetBooleanProperty = LeafOperations.SetBooleanProperty,
             SetStyleProperty = LeafOperations.SetStyleProperty,
             RemoveStyleProperty = LeafOperations.RemoveStyleProperty,
-            // One interop crossing per post-flush UseCssVars pass ([V01.01.06.06]): the whole custom-property
-            // batch for a root element crosses the boundary once.
-            SetCssVariables = static (element, names, values) => BrowserDomBridge.SetCssVariables(element, names, values),
+            SetCssVariables = static (element, names, values) =>
+                BrowserDomBridge.SetCssVariables(element, names, values),
         };
-        // Installs the browser-backed transition operations the DOM <Transition>/<TransitionGroup>
-        // choreography writes through ([V01.01.04.07]). This is the DIRECT-mode instance: each class/
-        // timing/FLIP op crosses the boundary immediately, and the JS side calls a single .NET resolve per
-        // completion. Buffered mode ([V01.01.04.07.02]) does NOT reuse these directly — it wraps this
-        // instance (BufferedBrowserNodeOperations.Activate) so class writes and the reflow ride the command
-        // buffer (ordered with the node ops, honoring the reflow + next-frame barriers) while the rAF/read/
-        // listener ops delegate here behind a forced flush.
         DomTransitionOperations.Current = new DomTransitionOperations
         {
-            AddTransitionClass = static (element, cssClass) => BrowserDomBridge.AddTransitionClass(element, cssClass),
-            RemoveTransitionClass = static (element, cssClass) => BrowserDomBridge.RemoveTransitionClass(element, cssClass),
-            NextFrame = static callback => BrowserDomBridge.NextFrame(callback),
-            ForceReflow = static () => BrowserDomBridge.ForceReflow(),
-            WhenTransitionEnds = static (element, expectedType, explicitTimeout, resolve) =>
-                BrowserDomBridge.WhenTransitionEnds(element, expectedType, explicitTimeout, resolve),
+            AddTransitionClass = static (element, cssClass) =>
+                BrowserDomBridge.AddTransitionClass(element, cssClass),
+            RemoveTransitionClass = static (element, cssClass) =>
+                BrowserDomBridge.RemoveTransitionClass(element, cssClass),
+            NextFrame = static callback =>
+                BrowserDomBridge.NextFrame(callback),
+            ForceReflow = static () =>
+                BrowserDomBridge.ForceReflow(),
+            WhenTransitionEnds =
+                static (element, expectedType, explicitTimeout, resolve) =>
+                    BrowserDomBridge.WhenTransitionEnds(
+                        element,
+                        expectedType,
+                        explicitTimeout,
+                        resolve),
             MeasurePositions = static handles =>
             {
-                // One crossing reads all rectangles; decode the flat [left, top, ...] pairs .NET-side.
-                var flat = BrowserDomBridge.MeasurePositions(handles);
-                var rectangles = new TransitionRectangle[handles.Length];
-                for (var index = 0; index < handles.Length; index++)
+                double[] flat =
+                    BrowserDomBridge.MeasurePositions(handles);
+                TransitionRectangle[] rectangles =
+                    new TransitionRectangle[handles.Length];
+                for (int index = 0; index < handles.Length; index++)
                 {
-                    rectangles[index] = new TransitionRectangle(flat[index * 2], flat[index * 2 + 1]);
+                    rectangles[index] = new TransitionRectangle(
+                        flat[index * 4],
+                        flat[(index * 4) + 1],
+                        flat[(index * 4) + 2],
+                        flat[(index * 4) + 3]);
                 }
+
                 return rectangles;
             },
-            SetMoveTransform = static (element, deltaX, deltaY) => BrowserDomBridge.SetMoveTransform(element, deltaX, deltaY),
-            ClearMoveStyles = static element => BrowserDomBridge.ClearMoveStyles(element),
-            HasCssTransform = static (element, root, moveClass) => BrowserDomBridge.HasCssTransform(element, root, moveClass),
-            WhenMoveEnds = static (element, resolve) => BrowserDomBridge.WhenMoveEnds(element, resolve),
+            SetMoveTransform = static (element, deltaX, deltaY) =>
+                BrowserDomBridge.SetMoveTransform(
+                    element,
+                    deltaX,
+                    deltaY),
+            ClearMoveStyles = static element =>
+                BrowserDomBridge.ClearMoveStyles(element),
+            HasCssTransform = static (element, root, moveClass) =>
+                BrowserDomBridge.HasCssTransform(
+                    element,
+                    root,
+                    moveClass),
+            WhenMoveEnds = static (element, resolve) =>
+                BrowserDomBridge.WhenMoveEnds(element, resolve),
         };
     }
 
@@ -100,20 +114,24 @@ internal static class BrowserNodeOperations
         CreateText = static text => BrowserDomBridge.CreateText(text),
         CreateComment = static text => BrowserDomBridge.CreateComment(text),
         SetText = static (node, text) => BrowserDomBridge.SetText(node, text),
-        SetElementText = static (node, text) => Invokers.PurgeReleasedHandles(BrowserDomBridge.SetElementText(node, text)),
         ParentNode = static node => BrowserDomBridge.ParentNode(node),
         NextSibling = static node => BrowserDomBridge.NextSibling(node),
-        PatchProperty = static (element, elementTag, propertyName, previousValue, nextValue, elementNamespace) =>
+        PatchAttribute = static (element, elementTag, propertyName, previousValue, nextValue, elementNamespace) =>
             BrowserPropertyPatcher.Patch(LeafOperations, element, elementTag, propertyName, previousValue, nextValue, elementNamespace),
-        QuerySelector = static selector => BrowserDomBridge.QuerySelector(selector),
+        SetScopeIdentifier = static (element, scopeIdentifier) =>
+            BrowserDomBridge.SetAttribute(element, scopeIdentifier, string.Empty),
+        ResolveTeleportTarget = static target =>
+            target is string selector
+                ? BrowserDomBridge.QuerySelector(selector)
+                : default,
         InsertStaticContent = static (content, parent, anchor, elementNamespace) =>
         {
             var span = BrowserDomBridge.InsertStaticContent(content, parent, anchor, elementNamespace);
             return (span[0], span[1]);
         },
-        // Hydration reads are answered from a single batched snapshot of the container subtree (one interop
-        // crossing), not per-node bridge calls ([V01.01.07.03]); see the package DESIGN.md.
-        CreateHydrationReader = static container => new BrowserHydrationReader(BrowserDomBridge.SnapshotHydration(container)),
+        CreateHydrationReader = static container =>
+            new BrowserHydrationReader(
+                BrowserDomBridge.SnapshotHydration(container)),
     };
 
     /// <summary>
@@ -130,6 +148,12 @@ internal static class BrowserNodeOperations
         => OverrideDispatcher is { } dispatcher
             ? dispatcher(nodeHandle, capture, browserEvent)
             : Invokers.Dispatch(nodeHandle, capture, browserEvent);
+
+    /// <summary>Routes direct-mode event faults to an application-owned error handler.</summary>
+    internal static Action<Exception> ErrorSink
+    {
+        set => Invokers.ErrorSink = value;
+    }
 
     /// <summary>Clears an element's content (pre-mount container reset), purging released handles.</summary>
     internal static void ClearElement(int nodeHandle)

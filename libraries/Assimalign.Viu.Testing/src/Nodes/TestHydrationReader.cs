@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 
 using Assimalign.Viu;
@@ -5,34 +6,41 @@ using Assimalign.Viu;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// The in-memory <see cref="HydrationNodeReader{TNode}"/> — the DOM-free stand-in for the browser's
-/// batched snapshot reader. It answers the hydration walk's reads directly off the live
-/// <see cref="TestNode"/> tree (the same tree the SSR renderer's output would be parsed into), so a
-/// green hydration test against it implies the same adoption walk against the browser DOM. Stateless
-/// and shared through <see cref="Instance"/>; reads any node in the tree, so one instance serves the
-/// hydration root and every teleport target.
+/// Reads hydration structure directly from the live in-memory test tree.
 /// </summary>
+/// <remarks>
+/// The reader is stateless and can inspect the main hydration container and registered Teleport
+/// targets. Use <see cref="FrozenTestHydrationReader"/> to reproduce a browser adapter's
+/// read-once snapshot semantics.
+/// </remarks>
 public sealed class TestHydrationReader : HydrationNodeReader<TestNode>
 {
-    /// <summary>The shared, stateless reader instance.</summary>
-    public static readonly TestHydrationReader Instance = new();
+    /// <summary>Gets the shared stateless reader.</summary>
+    public static TestHydrationReader Instance { get; } = new();
 
     private TestHydrationReader()
     {
     }
 
     /// <inheritdoc/>
-    public override HydrationNodeKind Kind(TestNode node) => node switch
+    public override HydrationNodeKind Kind(TestNode node)
     {
-        TestElement => HydrationNodeKind.Element,
-        TestText => HydrationNodeKind.Text,
-        TestComment => HydrationNodeKind.Comment,
-        _ => HydrationNodeKind.Other,
-    };
+        return node switch
+        {
+            TestElement => HydrationNodeKind.Element,
+            TestText => HydrationNodeKind.Text,
+            TestComment => HydrationNodeKind.Comment,
+            _ => HydrationNodeKind.Other,
+        };
+    }
 
     /// <inheritdoc/>
     public override TestNode? FirstChild(TestNode node)
-        => node is TestElement element && element.Children.Count > 0 ? element.Children[0] : null;
+    {
+        return node is TestElement { Children.Count: > 0 } element
+            ? element.Children[0]
+            : null;
+    }
 
     /// <inheritdoc/>
     public override TestNode? NextSibling(TestNode node)
@@ -41,32 +49,47 @@ public sealed class TestHydrationReader : HydrationNodeReader<TestNode>
         {
             return null;
         }
-        var siblings = node.Parent.Children;
-        var index = siblings.IndexOf(node);
-        return index >= 0 && index + 1 < siblings.Count ? siblings[index + 1] : null;
+
+        int index = node.Parent.Children.IndexOf(node);
+        return index >= 0 && index + 1 < node.Parent.Children.Count
+            ? node.Parent.Children[index + 1]
+            : null;
     }
 
     /// <inheritdoc/>
-    public override TestNode? ParentNode(TestNode node) => node.Parent;
-
-    /// <inheritdoc/>
-    public override string ElementTag(TestNode node) => ((TestElement)node).Tag;
-
-    /// <inheritdoc/>
-    public override string Data(TestNode node) => node switch
+    public override TestNode? ParentNode(TestNode node)
     {
-        TestText text => text.Text,
-        TestComment comment => comment.Text,
-        _ => string.Empty,
-    };
+        return node.Parent;
+    }
+
+    /// <inheritdoc/>
+    public override string ElementTag(TestNode node)
+    {
+        return ((TestElement)node).Tag;
+    }
+
+    /// <inheritdoc/>
+    public override string Data(TestNode node)
+    {
+        return node switch
+        {
+            TestText text => text.Text,
+            TestComment comment => comment.Text,
+            _ => string.Empty,
+        };
+    }
 
     /// <inheritdoc/>
     public override string? Attribute(TestNode node, string name)
     {
-        if (node is not TestElement element || !element.Properties.TryGetValue(name, out var value) || value is null)
+        if (node is not TestElement element
+            || !element.Properties.TryGetValue(name, out object? value)
+            || value is null)
         {
             return null;
         }
-        return value as string ?? System.Convert.ToString(value, CultureInfo.InvariantCulture);
+
+        return value as string
+            ?? Convert.ToString(value, CultureInfo.InvariantCulture);
     }
 }

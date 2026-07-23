@@ -1,63 +1,92 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Records component-emitted events per instance, in order, with their payloads — the capture
-/// behind a wrapper's <c>Emitted()</c> (the C# port of <c>@vue/test-utils</c>'s <c>emitted()</c>,
-/// https://test-utils.vuejs.org/api/#emitted). Installed as the app context's emit observer before
-/// mount, so events emitted during mount are captured too.
-/// </summary>
 internal sealed class EmittedEvents
 {
-    private static readonly IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyList<object?>>> EmptyByName
-        = new Dictionary<string, IReadOnlyList<IReadOnlyList<object?>>>(0, StringComparer.Ordinal);
+    private static readonly IReadOnlyDictionary<
+        string,
+        IReadOnlyList<IReadOnlyList<object?>>> Empty =
+        new Dictionary<string, IReadOnlyList<IReadOnlyList<object?>>>(
+            StringComparer.Ordinal);
 
-    private readonly Dictionary<ComponentInstance, Dictionary<string, List<IReadOnlyList<object?>>>> _events = [];
+    private readonly Dictionary<
+        IComponentContext,
+        Dictionary<string, List<IReadOnlyList<object?>>>> _events =
+        new(ReferenceEqualityComparer.Instance);
 
-    /// <summary>Records one emit (the observer callback signature).</summary>
-    /// <param name="instance">The emitting instance.</param>
-    /// <param name="eventName">The event name.</param>
-    /// <param name="arguments">The event payload.</param>
-    public void Record(ComponentInstance instance, string eventName, object?[] arguments)
+    internal void Record(
+        IComponentContext context,
+        string eventName,
+        IReadOnlyList<object?> arguments)
     {
-        if (!_events.TryGetValue(instance, out var byName))
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrEmpty(eventName);
+        ArgumentNullException.ThrowIfNull(arguments);
+        if (!_events.TryGetValue(context, out Dictionary<
+            string,
+            List<IReadOnlyList<object?>>>? eventsByName))
         {
-            byName = new Dictionary<string, List<IReadOnlyList<object?>>>(StringComparer.Ordinal);
-            _events[instance] = byName;
+            eventsByName = new Dictionary<
+                string,
+                List<IReadOnlyList<object?>>>(StringComparer.Ordinal);
+            _events.Add(context, eventsByName);
         }
-        if (!byName.TryGetValue(eventName, out var occurrences))
+
+        if (!eventsByName.TryGetValue(
+            eventName,
+            out List<IReadOnlyList<object?>>? occurrences))
         {
             occurrences = [];
-            byName[eventName] = occurrences;
+            eventsByName.Add(eventName, occurrences);
         }
-        occurrences.Add(arguments);
+
+        object?[] snapshot = new object?[arguments.Count];
+        for (int index = 0; index < arguments.Count; index++)
+        {
+            snapshot[index] = arguments[index];
+        }
+
+        occurrences.Add(snapshot);
     }
 
-    /// <summary>The ordered occurrences of one event on one instance (each is the argument list).</summary>
-    /// <param name="instance">The instance whose events to read.</param>
-    /// <param name="eventName">The event name.</param>
-    public IReadOnlyList<IReadOnlyList<object?>> Occurrences(ComponentInstance instance, string eventName)
-        => _events.TryGetValue(instance, out var byName) && byName.TryGetValue(eventName, out var occurrences)
-            ? occurrences
-            : Array.Empty<IReadOnlyList<object?>>();
-
-    /// <summary>All events emitted by one instance, keyed by event name.</summary>
-    /// <param name="instance">The instance whose events to read.</param>
-    public IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyList<object?>>> All(ComponentInstance instance)
+    internal IReadOnlyList<IReadOnlyList<object?>> Occurrences(
+        IComponentContext? context,
+        string eventName)
     {
-        if (!_events.TryGetValue(instance, out var byName))
+        return context is not null
+            && _events.TryGetValue(context, out Dictionary<
+                string,
+                List<IReadOnlyList<object?>>>? eventsByName)
+            && eventsByName.TryGetValue(
+                eventName,
+                out List<IReadOnlyList<object?>>? occurrences)
+                ? occurrences
+                : Array.Empty<IReadOnlyList<object?>>();
+    }
+
+    internal IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyList<object?>>> All(
+        IComponentContext? context)
+    {
+        if (context is null
+            || !_events.TryGetValue(context, out Dictionary<
+                string,
+                List<IReadOnlyList<object?>>>? eventsByName))
         {
-            return EmptyByName;
+            return Empty;
         }
-        var result = new Dictionary<string, IReadOnlyList<IReadOnlyList<object?>>>(byName.Count, StringComparer.Ordinal);
-        foreach (var (eventName, occurrences) in byName)
+
+        Dictionary<string, IReadOnlyList<IReadOnlyList<object?>>> result =
+            new(eventsByName.Count, StringComparer.Ordinal);
+        foreach (KeyValuePair<string, List<IReadOnlyList<object?>>> componentEvent
+            in eventsByName)
         {
-            result[eventName] = occurrences;
+            result.Add(componentEvent.Key, componentEvent.Value);
         }
+
         return result;
     }
 }

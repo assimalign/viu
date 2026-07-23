@@ -460,7 +460,7 @@ export const dom = {
     },
 
     // Batches the v-bind() CSS custom properties for one root element into a single crossing
-    // ([V01.01.06.06]): the .NET UseCssVars runtime passes index-aligned name/value arrays (names include
+    // ([V01.01.06.06]): the .NET UseCssVariables runtime passes index-aligned name/value arrays (names include
     // the leading '--') and this loops style.setProperty, matching upstream setVarsOnNode.
     setCssVars: (nodeHandle, names, values) => {
         const style = getNode('setCssVars', nodeHandle).style
@@ -618,14 +618,24 @@ export const dom = {
     },
 
     // Batched FLIP snapshot read ([V01.01.04.07.03]): N element handles cross the boundary once and the
-    // flat [left0, top0, left1, top1, ...] result returns once, so reordering N children costs a single
-    // interop crossing per pass rather than one per child. Decision logic (deltas, who moved) stays .NET-side.
+    // flat [left0, top0, scaleX0, scaleY0, ...] result returns once, so reordering N children costs a
+    // single interop crossing per pass rather than one per child. The scale terms preserve Vue 3.5's
+    // move distance under transformed ancestors. Decision logic (deltas, who moved) stays .NET-side.
     measurePositions: handles => {
-        const result = new Array(handles.length * 2)
+        const result = new Array(handles.length * 4)
         for (let index = 0; index < handles.length; index++) {
-            const rect = getNode('measurePositions', handles[index]).getBoundingClientRect()
-            result[index * 2] = rect.left
-            result[index * 2 + 1] = rect.top
+            const element = getNode('measurePositions', handles[index])
+            const rect = element.getBoundingClientRect()
+            let horizontalScale = element.offsetWidth ? rect.width / element.offsetWidth : 1
+            let verticalScale = element.offsetHeight ? rect.height / element.offsetHeight : 1
+            if (!Number.isFinite(horizontalScale) || horizontalScale === 0) horizontalScale = 1
+            if (!Number.isFinite(verticalScale) || verticalScale === 0) verticalScale = 1
+            if (Math.abs(horizontalScale - 1) < 0.01) horizontalScale = 1
+            if (Math.abs(verticalScale - 1) < 0.01) verticalScale = 1
+            result[index * 4] = rect.left
+            result[index * 4 + 1] = rect.top
+            result[index * 4 + 2] = horizontalScale
+            result[index * 4 + 3] = verticalScale
         }
         return result
     },

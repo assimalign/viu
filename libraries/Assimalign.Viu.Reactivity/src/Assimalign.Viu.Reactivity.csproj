@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ViuAnalyzerReference Include="Assimalign.Viu.Generators.Reactivity" />
+  </ItemGroup>
+</Project>

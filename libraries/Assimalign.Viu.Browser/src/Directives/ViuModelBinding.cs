@@ -10,10 +10,10 @@ namespace Assimalign.Viu.Browser;
 /// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts). Viu has
 /// no <c>this</c>-proxy and no reflection, so the compiler cannot stash a magic prop; instead the
 /// <c>v-model</c> transform ([V01.01.05.03]) emits, per render,
-/// <c>Directives.WithDirectives(vnode, VModelText.Instance, new ViuModelBinding(model, v =&gt; model = v))</c>
-/// — the getter is the value already read into <see cref="Value"/>, the setter is the write-back
-/// delegate. Both are plain delegates, never reflection over component members (AOT/trimming
-/// contract).
+/// <c>new ComponentDirectiveBinding("modelText", new ViuModelBinding(model, value =&gt; model = value))</c>.
+/// Core resolves that marker through the application directive resolver. The getter is the value
+/// already read into <see cref="Value"/> and the setter is the write-back delegate. Both are plain
+/// values/delegates, never reflection over component members (AOT/trimming contract).
 /// <para>
 /// The directive reads <see cref="Value"/> where upstream reads <c>binding.value</c>, calls
 /// <see cref="Setter"/> where upstream calls <c>el[assignKey](v)</c>, and reads the previous

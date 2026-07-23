@@ -1,11 +1,18 @@
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// A snapshotted element position for the <c>&lt;TransitionGroup&gt;</c> FLIP move — the two
-/// coordinates of upstream's <c>getBoundingClientRect()</c> the move delta is computed from
-/// (<c>packages/runtime-dom/src/components/TransitionGroup.ts</c>). Only the top-left corner matters:
-/// the move transform is <c>translate(oldLeft - newLeft, oldTop - newTop)</c>.
+/// A snapshotted element position and rendered scale for a <c>&lt;TransitionGroup&gt;</c> move.
 /// </summary>
 /// <param name="Left">The element's left offset (CSS pixels).</param>
 /// <param name="Top">The element's top offset (CSS pixels).</param>
-internal readonly record struct TransitionRectangle(double Left, double Top);
+/// <param name="HorizontalScale">
+/// The rendered width divided by the layout width, normalized to one when unavailable.
+/// </param>
+/// <param name="VerticalScale">
+/// The rendered height divided by the layout height, normalized to one when unavailable.
+/// </param>
+internal readonly record struct TransitionRectangle(
+    double Left,
+    double Top,
+    double HorizontalScale = 1,
+    double VerticalScale = 1);

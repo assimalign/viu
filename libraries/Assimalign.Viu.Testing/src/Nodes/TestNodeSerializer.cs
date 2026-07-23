@@ -1,8 +1,6 @@
 using System;
 using System.Text;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
@@ -51,7 +49,7 @@ public static class TestNodeSerializer
         builder.Append(padding).Append('<').Append(element.Tag);
         foreach (var (name, value) in element.Properties)
         {
-            if (value is null || value is Delegate || VirtualNodeFactory.IsEventListenerName(name))
+            if (value is null || value is Delegate || TestEventNames.IsListener(name))
             {
                 continue;
             }

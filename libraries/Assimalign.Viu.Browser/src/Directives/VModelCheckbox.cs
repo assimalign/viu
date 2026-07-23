@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
@@ -14,7 +15,7 @@ namespace Assimalign.Viu.Browser;
 /// <c>true-value</c>/<c>false-value</c>), or adds/removes the element's bound <c>:value</c> in a
 /// model <see cref="IList"/> (loose-equality membership, upstream <c>looseIndexOf</c>) or
 /// <see cref="ISet{T}"/> (strict membership, upstream <c>Set.has</c>). The bound <c>:value</c>,
-/// <c>true-value</c>, and <c>false-value</c> are read as raw vnode props, so object values
+/// <c>true-value</c>, and <c>false-value</c> are read as raw immutable component attributes, so object values
 /// round-trip. Reads <c>checked</c> from the dispatched <see cref="BrowserEvent"/> payload, never a
 /// follow-up interop read. Stateless singleton (<see cref="Instance"/>); per-element state lives in
 /// <see cref="BrowserModelState"/>.
@@ -43,7 +44,11 @@ public sealed class VModelCheckbox : IDirective
     /// <inheritdoc/>
     public DirectiveHook? BeforeUnmount => OnBeforeUnmount;
 
-    private static void OnCreated(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnCreated(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
     {
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
@@ -51,18 +56,34 @@ public sealed class VModelCheckbox : IDirective
         operations.SetModelListener(handle, "onChange", (Action<BrowserEvent>)(browserEvent => OnChange(operations, handle, browserEvent)));
     }
 
-    private static void OnMounted(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
-        => SetChecked(BrowserDirectiveOperations.Require(), BrowserModelDirective.Handle(element), binding, node);
+    private static void OnMounted(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
+        => SetChecked(
+            BrowserDirectiveOperations.Require(),
+            BrowserModelDirective.Handle(element),
+            binding,
+            component);
 
-    private static void OnBeforeUpdate(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnBeforeUpdate(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
     {
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
         operations.GetState(handle).Assign = BrowserModelDirective.Carrier(binding)?.Setter; // refresh assigner
-        SetChecked(operations, handle, binding, node);
+        SetChecked(operations, handle, binding, component);
     }
 
-    private static void OnBeforeUnmount(object? element, DirectiveBinding binding, VirtualNode node, VirtualNode? previousNode)
+    private static void OnBeforeUnmount(
+        object element,
+        DirectiveBinding binding,
+        IElementComponent component,
+        IElementComponent? previousComponent)
         => BrowserDirectiveOperations.Require().ReleaseState(BrowserModelDirective.Handle(element));
 
     private static void OnChange(BrowserDirectiveOperations operations, int handle, BrowserEvent browserEvent)
@@ -115,16 +136,20 @@ public sealed class VModelCheckbox : IDirective
     }
 
     // Reflect the model onto el.checked and refresh the change handler's inputs (upstream setChecked).
-    private static void SetChecked(BrowserDirectiveOperations operations, int handle, DirectiveBinding binding, VirtualNode node)
+    private static void SetChecked(
+        BrowserDirectiveOperations operations,
+        int handle,
+        DirectiveBinding binding,
+        IElementComponent component)
     {
         var state = operations.GetState(handle);
         var value = BrowserModelDirective.Carrier(binding)?.Value;
-        state.ElementValue = BrowserModelDirective.Property(node, "value");
-        state.TrueValue = node.Properties?.ContainsName("true-value") == true
-            ? BrowserModelDirective.Property(node, "true-value")
+        state.ElementValue = BrowserModelDirective.Property(component, "value");
+        state.TrueValue = BrowserModelDirective.HasProperty(component, "true-value")
+            ? BrowserModelDirective.Property(component, "true-value")
             : BoxedTrue;
-        state.FalseValue = node.Properties?.ContainsName("false-value") == true
-            ? BrowserModelDirective.Property(node, "false-value")
+        state.FalseValue = BrowserModelDirective.HasProperty(component, "false-value")
+            ? BrowserModelDirective.Property(component, "false-value")
             : BoxedFalse;
         state.ModelValue = value;
 
@@ -140,8 +165,9 @@ public sealed class VModelCheckbox : IDirective
         else
         {
             // Upstream: if (value === oldValue) return — no change to reflect.
-            var oldValue = BrowserModelDirective.ModelValue(binding.OldValue);
-            if (Equals(value, oldValue))
+            var previousValue =
+                BrowserModelDirective.ModelValue(binding.PreviousValue);
+            if (Equals(value, previousValue))
             {
                 return;
             }

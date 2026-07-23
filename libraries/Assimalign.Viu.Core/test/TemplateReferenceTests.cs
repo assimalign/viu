@@ -1,304 +1,317 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
-using Assimalign.Viu.Testing;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.Tests;
 
-namespace Assimalign.Viu.Tests;
+namespace Assimalign.Viu.Core.Tests;
 
-// Pins template refs against @vue/runtime-core's rendererTemplateRef.ts setRef and the template-refs
-// guide (https://vuejs.org/guide/essentials/template-refs.html): a ref-object receives the mounted
-// element or a component's exposed surface, a function ref is invoked with the element/instance and
-// nulled on unmount, application is post-flush (before user mounted hooks observe it), and a binding
-// change unsets the old ref before setting the new. String refs are intentionally excluded
-// ([V01.01.03.14]). Direct Render drains the post-flush queue synchronously, so a ref is observable
-// immediately after Render returns.
-public class TemplateReferenceTests : IDisposable
+public sealed class TemplateReferenceTests : IDisposable
 {
-    private readonly TestRenderer _renderer = new();
-    private readonly TestElement _container;
     private readonly TestSchedulerPump _pump;
 
     public TemplateReferenceTests()
     {
         Scheduler.Reset();
         _pump = TestSchedulerPump.Install();
-        _container = _renderer.CreateContainer();
     }
 
     public void Dispose()
     {
-        Scheduler.Reset();
         _pump.Dispose();
+        Scheduler.Reset();
     }
 
     [Fact]
-    public void ElementRefObject_IsSetToThePlatformNode_AfterMount()
+    public void Render_ElementReference_AssignsHostNodeAndClearsOnUnmount()
     {
-        var elementRef = new Reference<object?>(null);
+        Reference<object?> value = Reactive.Reference<object?>(null);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
 
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", elementRef)), "content"),
-            _container);
+        renderer.Render(
+            ComponentTree.Element(
+                "div",
+                reference: TemplateReference.FromReference(value)),
+            host.Root);
 
-        elementRef.Value.ShouldNotBeNull();
-        elementRef.Value.ShouldBeSameAs(_container.Children[0]);
+        value.Value.ShouldBeSameAs(host.Root.Children.Single());
+
+        renderer.Render(null, host.Root);
+
+        value.Value.ShouldBeNull();
     }
 
     [Fact]
-    public void ElementRefObject_IsClearedToNull_OnUnmount()
+    public void Render_ChangedCallbackReference_ClearsOldBeforeAssigningNew()
     {
-        var elementRef = new Reference<object?>(null);
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", elementRef)), "x"),
-            _container);
-        elementRef.Value.ShouldNotBeNull();
+        List<string> calls = [];
+        IComponentReference first = TemplateReference.FromCallback(
+            value => calls.Add(value is null ? "first:null" : "first:value"));
+        IComponentReference second = TemplateReference.FromCallback(
+            value => calls.Add(value is null ? "second:null" : "second:value"));
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
 
-        _renderer.Render(null, _container);
+        renderer.Render(
+            ComponentTree.Element("div", reference: first),
+            host.Root);
+        renderer.Render(
+            ComponentTree.Element("div", reference: second),
+            host.Root);
 
-        elementRef.Value.ShouldBeNull();
+        calls.ShouldBe(
+        [
+            "first:value",
+            "first:null",
+            "second:value",
+        ]);
     }
 
     [Fact]
-    public void ComponentRefObject_ReceivesTheExposedSurface_NotTheRawInstance()
+    public void Render_TemplateReference_ReceivesExplicitExposedSurface()
     {
-        var exposed = new object();
-        var component = new TestComponent
-        {
-            SetupFunction = (_, context) =>
+        object exposed = new();
+        Reference<object?> value = Reactive.Reference<object?>(null);
+        ExposingTemplate template = new(exposed);
+        ITemplateComponent root = ComponentTree.Template<ExposingTemplate>(
+            reference: TemplateReference.FromReference(value));
+        IApplicationContext application = CreateApplication(root, template);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Render(root, host.Root, application);
+
+        value.Value.ShouldBeSameAs(exposed);
+    }
+
+    [Fact]
+    public void Render_TemplateReferenceWithoutExpose_ReceivesComponentContext()
+    {
+        Reference<object?> value = Reactive.Reference<object?>(null);
+        PlainTemplate template = new();
+        ITemplateComponent root = ComponentTree.Template<PlainTemplate>(
+            reference: TemplateReference.FromReference(value));
+        IApplicationContext application = CreateApplication(root, template);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        IComponentContext context = renderer.Render(
+            root,
+            host.Root,
+            application)!;
+
+        value.Value.ShouldBeSameAs(context);
+    }
+
+    [Fact]
+    public void Render_ElementReference_IsAssignedBeforeMountedLifecycle()
+    {
+        Reference<object?> value = Reactive.Reference<object?>(null);
+        ObservingTemplate template = new(value);
+        ITemplateComponent root = ComponentTree.Template<ObservingTemplate>();
+        IApplicationContext application = CreateApplication(root, template);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Render(root, host.Root, application);
+
+        template.Observed.ShouldBeSameAs(value.Value);
+        template.Observed.ShouldBeSameAs(host.Root.Children.Single());
+    }
+
+    [Fact]
+    public void RenderHelpers_ReferenceProperty_BecomesMetadataNotHostAttribute()
+    {
+        Reference<object?> value = Reactive.Reference<object?>(null);
+        IElementComponent component = RenderHelpers._createElementVNode(
+            "input",
+            new Dictionary<string, object?>
             {
-                context.Expose(exposed);
-                return static () => VirtualNodeFactory.Element("input");
-            },
-        };
-        var componentRef = new Reference<object?>(null);
+                ["ref"] = value,
+                ["type"] = "text",
+            }).ShouldBeOfType<ElementComponent>();
 
-        _renderer.Render(
-            VirtualNodeFactory.Component(component, VirtualNodeFactory.Properties(("ref", componentRef))),
-            _container);
-
-        // Upstream getComponentPublicInstance: an exposed component surfaces only what it exposed.
-        componentRef.Value.ShouldBeSameAs(exposed);
+        component.Reference.ShouldNotBeNull();
+        component.Attributes.TryGetValue("ref", out _).ShouldBeFalse();
+        component.Attributes.TryGetValue("type", out object? type).ShouldBeTrue();
+        type.ShouldBe("text");
     }
 
     [Fact]
-    public void ComponentRefObject_FallsBackToTheInstance_WhenNothingIsExposed()
+    public void RenderHelpers_InvalidReferenceProperty_WarnsThroughCurrentApplication()
     {
-        ComponentInstance? instance = null;
-        var component = new TestComponent
+        List<string> warnings = [];
+        InvalidGeneratedReferenceTemplate template = new();
+        ITemplateComponent root =
+            ComponentTree.Template<InvalidGeneratedReferenceTemplate>();
+        IApplicationContext application = CreateApplication(root, template);
+        application.WarnHandler = warnings.Add;
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Render(root, host.Root, application);
+
+        warnings.ShouldContain(
+            message => message.Contains(
+                "Invalid template reference",
+                StringComparison.Ordinal));
+        host.Root.Children.Single().Attributes.ShouldNotContainKey("ref");
+    }
+
+    [Fact]
+    public void Render_CallbackReferenceThrowingOnUnmount_RoutesThroughOwnerErrorCapture()
+    {
+        ReferenceErrorParentTemplate parent = new();
+        ReferenceErrorChildTemplate child = new();
+        ITemplateComponent root =
+            ComponentTree.Template<ReferenceErrorParentTemplate>();
+        IApplicationContext application =
+            CreateApplication(root, parent, child);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Render(root, host.Root, application);
+
+        Should.NotThrow(() => renderer.Render(null, host.Root));
+        parent.CapturedException.ShouldNotBeNull();
+        parent.CapturedException.Message.ShouldBe("reference teardown failed");
+        parent.CapturedInformation.ShouldBe("template reference callback");
+        host.Root.Children.ShouldBeEmpty();
+    }
+
+    private static IApplicationContext CreateApplication(
+        ITemplateComponent root,
+        params IComponentTemplate[] templates)
+    {
+        ComponentRegistration[] registrations =
+            new ComponentRegistration[templates.Length];
+        for (int index = 0; index < templates.Length; index++)
         {
-            SetupFunction = (_, _) =>
-            {
-                instance = ComponentInstance.Current;
-                return static () => VirtualNodeFactory.Element("input");
-            },
-        };
-        var componentRef = new Reference<object?>(null);
+            IComponentTemplate template = templates[index];
+            registrations[index] = new ComponentRegistration(
+                template.GetType(),
+                () => template);
+        }
 
-        _renderer.Render(
-            VirtualNodeFactory.Component(component, VirtualNodeFactory.Properties(("ref", componentRef))),
-            _container);
-
-        // No Expose: the fallback surface is the component instance (Viu's stand-in for the
-        // upstream public instance proxy).
-        componentRef.Value.ShouldBeSameAs(instance);
+        return new ApplicationContext(
+            root,
+            new ComponentFactory(registrations),
+            new EmptyServiceProvider());
     }
 
-    [Fact]
-    public void ComponentRefObject_IsClearedToNull_OnUnmount()
+    private sealed class ExposingTemplate : IComponentTemplate
     {
-        var exposed = new object();
-        var component = new TestComponent
+        private readonly object _exposed;
+
+        internal ExposingTemplate(object exposed)
         {
-            SetupFunction = (_, context) =>
-            {
-                context.Expose(exposed);
-                return static () => VirtualNodeFactory.Element("input");
-            },
-        };
-        var componentRef = new Reference<object?>(null);
-        _renderer.Render(
-            VirtualNodeFactory.Component(component, VirtualNodeFactory.Properties(("ref", componentRef))),
-            _container);
-        componentRef.Value.ShouldBeSameAs(exposed);
+            _exposed = exposed;
+        }
 
-        _renderer.Render(null, _container);
-
-        componentRef.Value.ShouldBeNull();
-    }
-
-    [Fact]
-    public void FunctionRef_IsInvokedWithTheElementOnMount_AndNullOnUnmount()
-    {
-        var calls = new List<object?>();
-        Action<object?> functionRef = value => calls.Add(value);
-
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", functionRef)), "x"),
-            _container);
-
-        calls.Count.ShouldBe(1);
-        calls[0].ShouldBeSameAs(_container.Children[0]);
-
-        _renderer.Render(null, _container);
-
-        calls.Count.ShouldBe(2);
-        calls[1].ShouldBeNull();
-    }
-
-    [Fact]
-    public void FunctionRef_IsInvokedPerElement_TheVForCollectionPattern()
-    {
-        var collected = new List<object?>();
-        Action<object?> collector = value =>
+        public ComponentRenderer Setup(IComponentContext context)
         {
-            if (value is not null)
-            {
-                collected.Add(value);
-            }
-        };
-
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "ul",
-                (VirtualNodeProperties?)null,
-                VirtualNodeFactory.Element("li", VirtualNodeFactory.Properties(("ref", collector)), "a"),
-                VirtualNodeFactory.Element("li", VirtualNodeFactory.Properties(("ref", collector)), "b")),
-            _container);
-
-        // The same function ref is invoked once per element, enabling v-for-style collection.
-        collected.Count.ShouldBe(2);
+            context.Expose(_exposed);
+            return static () => ComponentTree.Element("div");
+        }
     }
 
-    [Fact]
-    public void PatchChangingTheBinding_UnsetsTheOldRefThenSetsTheNewInThatOrder()
+    private sealed class PlainTemplate : IComponentTemplate
     {
-        var firstRef = new Reference<object?>(null);
-        var secondRef = new Reference<object?>(null);
-
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", firstRef)), "x"),
-            _container);
-        firstRef.Value.ShouldNotBeNull();
-
-        // Same element, a different ref binding: the old ref is unset and the new one set.
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", secondRef)), "x"),
-            _container);
-
-        firstRef.Value.ShouldBeNull();
-        secondRef.Value.ShouldBeSameAs(_container.Children[0]);
-    }
-
-    [Fact]
-    public void ElementRef_IsPopulatedBeforeTheMountedHookObservesIt()
-    {
-        var elementRef = new Reference<object?>(null);
-        object? observedInMounted = null;
-        var component = new TestComponent
+        public ComponentRenderer Setup(IComponentContext context)
         {
-            SetupFunction = (_, _) =>
-            {
-                Lifecycle.OnMounted(() => observedInMounted = elementRef.Value);
-                return () => VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", elementRef)), "x");
-            },
-        };
-
-        _renderer.Render(VirtualNodeFactory.Component(component), _container);
-
-        // The ref (post-flush id -1) is applied before the user's OnMounted (post-flush, later id),
-        // so the hook observes a populated ref (upstream: refs set before mounted).
-        observedInMounted.ShouldNotBeNull();
-        observedInMounted.ShouldBeSameAs(elementRef.Value);
+            return static () => ComponentTree.Element("div");
+        }
     }
 
-    [Fact]
-    public void RefUpdate_IsScheduled_NotAppliedSynchronouslyOnMutation()
+    private sealed class ObservingTemplate : IComponentTemplate
     {
-        var swap = Reactive.Reference(false);
-        var firstRef = new Reference<object?>(null);
-        var secondRef = new Reference<object?>(null);
+        private readonly Reference<object?> _reference;
 
-        using var effect = _renderer.Renderer.CreateRenderEffect(
-            () => swap.Value
-                ? VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", secondRef)), "x")
-                : VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("ref", firstRef)), "x"),
-            _container);
+        internal ObservingTemplate(Reference<object?> reference)
+        {
+            _reference = reference;
+        }
 
-        firstRef.Value.ShouldNotBeNull();
-        secondRef.Value.ShouldBeNull();
+        internal object? Observed { get; private set; }
 
-        // Mutating the binding does not apply the ref synchronously — it is scheduled for the flush.
-        swap.Value = true;
-        firstRef.Value.ShouldNotBeNull();
-        secondRef.Value.ShouldBeNull();
-
-        _pump.RunUntilIdle();
-
-        // After the flush (patch + post-flush): the old ref is cleared and the new one set.
-        firstRef.Value.ShouldBeNull();
-        secondRef.Value.ShouldBeSameAs(_container.Children[0]);
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            context.Lifecycle.OnMounted(() => Observed = _reference.Value);
+            return () => ComponentTree.Element(
+                "div",
+                reference: TemplateReference.FromReference(_reference));
+        }
     }
 
-    [Fact]
-    public void StringRef_IsRejectedWithAWarning_AndCarriesNoBinding()
+    private sealed class InvalidGeneratedReferenceTemplate : IComponentTemplate
     {
-        // String refs need a component instance proxy and are intentionally not ported: an invalid
-        // ref value is reported (upstream dev warning) and treated as no ref.
-        using var warnings = new WarningCapture();
-
-        var node = VirtualNodeFactory.Element(
-            "div", VirtualNodeFactory.Properties(("ref", "stringRef")), "x");
-
-        node.Reference.ShouldBeNull();
-        warnings.Messages.ShouldContain(message => message.Contains("Invalid template ref"));
-    }
-
-    [Fact]
-    public void FunctionRefThrowingOnUnmount_RoutesThroughTheOwnersErrorChain()
-    {
-        // Upstream setRef routes a throwing function ref through callWithErrorHandling with the owning
-        // component as context. Viu now threads parentComponent through unmount, so an unmount-time
-        // throw reaches the owner's OnErrorCaptured chain instead of surfacing to the host — previously
-        // the unmount path passed owner: null and the throw escaped ([V01.01.03.15.01]).
-        Exception? captured = null;
-        string? capturedInfo = null;
-        Action<object?> throwingRef = value =>
+        public ComponentRenderer Setup(IComponentContext context)
         {
-            if (value is null)
-            {
-                throw new InvalidOperationException("ref teardown boom");
-            }
-        };
-        var child = new TestComponent
-        {
-            SetupFunction = (_, _) => () => VirtualNodeFactory.Element(
-                "div", VirtualNodeFactory.Properties(("ref", throwingRef)), "x"),
-        };
-        var parent = new TestComponent
-        {
-            SetupFunction = (_, _) =>
-            {
-                Lifecycle.OnErrorCaptured((exception, _, info) =>
+            return static () => RenderHelpers._createElementVNode(
+                "div",
+                new Dictionary<string, object?>
                 {
-                    captured = exception;
-                    capturedInfo = info;
-                    return false; // handled
+                    ["ref"] = "string-reference",
                 });
-                return () => VirtualNodeFactory.Element("section", VirtualNodeFactory.Component(child));
-            },
-        };
+        }
+    }
 
-        _renderer.Render(VirtualNodeFactory.Component(parent), _container); // mount: ref(element), no throw
+    private sealed class ReferenceErrorParentTemplate : IComponentTemplate
+    {
+        internal Exception? CapturedException { get; private set; }
 
-        // Unmount invokes the function ref with null (synchronous doSet); it throws and must be captured.
-        Should.NotThrow(() => _renderer.Render(null, _container));
+        internal string? CapturedInformation { get; private set; }
 
-        captured.ShouldBeOfType<InvalidOperationException>().Message.ShouldBe("ref teardown boom");
-        capturedInfo.ShouldNotBeNull();
-        capturedInfo.ShouldContain("template ref");
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            context.Lifecycle.OnErrorCaptured(
+                (exception, _, information) =>
+                {
+                    CapturedException = exception;
+                    CapturedInformation = information;
+                    return false;
+                });
+            return static () =>
+                ComponentTree.Template<ReferenceErrorChildTemplate>();
+        }
+    }
+
+    private sealed class ReferenceErrorChildTemplate : IComponentTemplate
+    {
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            return static () => ComponentTree.Element(
+                "div",
+                reference: TemplateReference.FromCallback(
+                    value =>
+                    {
+                        if (value is null)
+                        {
+                            throw new InvalidOperationException(
+                                "reference teardown failed");
+                        }
+                    }));
+        }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            return null;
+        }
     }
 }

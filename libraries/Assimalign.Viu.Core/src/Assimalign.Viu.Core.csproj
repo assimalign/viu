@@ -1,21 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Deviates from the repo namespace==assembly-name rule per the .NET reshape (R2, [V01.01.12.21],
-         docs/NET-RESHAPE-PLAN.md): the assembly/package id is Assimalign.Viu.Core, but every type roots
-         at the Assimalign.Viu namespace because the core IS the product. Recorded in general-rules.md;
-         every other library keeps namespace == assembly id. -->
     <RootNamespace>Assimalign.Viu</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.Shared" />
-  </ItemGroup>
-  <!-- The [Reactive] source generator ships inside this package (analyzers/dotnet/cs) so consumers
-       that add a package/project reference to this library get [Reactive] support without
-       referencing the generator directly. Merged in with the reactive core ([V01.01.12.21]). -->
-  <ItemGroup>
-    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="ValueTypes\" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+    <ViuProjectReference Include="Assimalign.Viu.State" />
   </ItemGroup>
 </Project>
+

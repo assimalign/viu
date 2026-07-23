@@ -7,10 +7,11 @@
          the memory history and the whole matcher stay interop-free. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
-  <!-- RouterView/RouterLink consume the component model and reactivity (issue #72 boundary: the
-       Router area may reference Runtime Core, Reactivity, and Shared). The matcher and history code
-       itself stays framework-free; only the components/Router facade touch these references. -->
+  <!-- RouterView/RouterLink consume the unified component model and the Router facade owns one
+       shallow reactive reference. The matcher and history implementation remain framework-free;
+       Router does not depend on a renderer or host application implementation. -->
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
 </Project>

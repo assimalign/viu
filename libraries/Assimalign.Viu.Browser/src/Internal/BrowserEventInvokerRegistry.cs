@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace Assimalign.Viu.Browser;
 
@@ -145,6 +146,19 @@ internal sealed class BrowserEventInvokerRegistry
             // and silently feed RouterLink the BrowserEvent instead of its RouterLinkClickEvent.
             switch (handler)
             {
+                case Func<object?, Task> asynchronousObjectHandler:
+                    InvokeAsynchronousObjectHandler(
+                        asynchronousObjectHandler,
+                        browserEvent);
+                    break;
+                case Func<BrowserEvent, Task> asynchronousTypedHandler:
+                    InvokeAsynchronousTypedHandler(
+                        asynchronousTypedHandler,
+                        browserEvent);
+                    break;
+                case Func<Task> asynchronousUntypedHandler:
+                    InvokeAsynchronousUntypedHandler(asynchronousUntypedHandler);
+                    break;
                 case Action<object?> objectHandler:
                     // A renderer-agnostic handler (e.g. RouterLink's onClick) expects a host-synthesized
                     // payload, not the BrowserEvent. The installed bridge builds that payload, invokes
@@ -174,13 +188,96 @@ internal sealed class BrowserEventInvokerRegistry
                 default:
                     throw new NotSupportedException(
                         $"Event handler for '{browserEvent.EventName}' is a "
-                        + $"{handler.GetType().Name}; handlers must be Action, Action<BrowserEvent>, "
-                        + "or Action<object?>.");
+                        + $"{handler.GetType().Name}; handlers must be Action, "
+                        + "Action<BrowserEvent>, Action<object?>, Func<Task>, "
+                        + "Func<BrowserEvent, Task>, or Func<object?, Task>.");
             }
         }
         catch (Exception exception)
         {
             // Never escape into the JS listener; route to the error seam ([V01.01.03.12]).
+            ErrorSink(exception);
+        }
+    }
+
+    private void InvokeAsynchronousObjectHandler(
+        Func<object?, Task> handler,
+        BrowserEvent browserEvent)
+    {
+        BrowserObjectEventInvoker objectInvoker =
+            BrowserObjectEvents.Invoker
+            ?? throw new NotSupportedException(
+                $"Event handler for '{browserEvent.EventName}' is a Func<object?, Task> but no "
+                + $"{nameof(BrowserObjectEvents)}.{nameof(BrowserObjectEvents.Invoker)} is "
+                + "installed.");
+
+        foreach (Delegate invocation in handler.GetInvocationList())
+        {
+            Task? task = null;
+            objectInvoker(
+                value => task = ((Func<object?, Task>)invocation)(value),
+                browserEvent);
+            ObserveTask(
+                task
+                ?? Task.FromException(
+                    new InvalidOperationException(
+                        "The asynchronous browser object-event bridge did not invoke the handler.")));
+        }
+    }
+
+    private void InvokeAsynchronousTypedHandler(
+        Func<BrowserEvent, Task> handler,
+        BrowserEvent browserEvent)
+    {
+        foreach (Delegate invocation in handler.GetInvocationList())
+        {
+            ObserveTask(((Func<BrowserEvent, Task>)invocation)(browserEvent));
+        }
+    }
+
+    private void InvokeAsynchronousUntypedHandler(Func<Task> handler)
+    {
+        foreach (Delegate invocation in handler.GetInvocationList())
+        {
+            ObserveTask(((Func<Task>)invocation)());
+        }
+    }
+
+    private void ObserveTask(Task? task)
+    {
+        if (task is null)
+        {
+            ErrorSink(
+                new InvalidOperationException(
+                    "A browser event handler returned a null Task."));
+            return;
+        }
+
+        if (task.IsCompleted)
+        {
+            if (task.IsFaulted)
+            {
+                ErrorSink(task.Exception?.InnerException ?? task.Exception!);
+            }
+
+            return;
+        }
+
+        _ = ObserveTaskAsync(task);
+    }
+
+    private async Task ObserveTaskAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Component/application teardown commonly cancels in-flight event work.
+        }
+        catch (Exception exception)
+        {
             ErrorSink(exception);
         }
     }

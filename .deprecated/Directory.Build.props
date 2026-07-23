@@ -1,0 +1,7 @@
+<Project>
+    <Import Project="..\Directory.Build.props" />
+    <PropertyGroup>
+		<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+        <IsAotCompatible>true</IsAotCompatible>
+    </PropertyGroup>
+</Project>

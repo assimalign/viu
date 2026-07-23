@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Shared;
 
@@ -56,6 +57,32 @@ public static class BrowserEvents
     }
 
     /// <summary>
+    /// Wraps a task-returning handler with Vue's event modifiers while preserving the returned task.
+    /// </summary>
+    /// <param name="handler">The task-returning handler to guard.</param>
+    /// <param name="modifiers">The modifier names, unprefixed.</param>
+    /// <returns>The guarded task-returning handler.</returns>
+    public static Func<BrowserEvent, Task> WithModifiers(
+        Func<BrowserEvent, Task> handler,
+        params string[] modifiers)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(modifiers);
+        return browserEvent =>
+        {
+            foreach (string modifier in modifiers)
+            {
+                if (!PassesModifierGuard(browserEvent, modifier, modifiers))
+                {
+                    return Task.CompletedTask;
+                }
+            }
+
+            return handler(browserEvent);
+        };
+    }
+
+    /// <summary>
     /// Wraps <paramref name="handler"/> to run only for the named keys (upstream:
     /// <c>withKeys</c>), matching Vue's key aliases (<c>enter</c>, <c>tab</c>, <c>delete</c>,
     /// <c>esc</c>, <c>space</c>, <c>up</c>, <c>down</c>, <c>left</c>, <c>right</c>) against
@@ -87,6 +114,51 @@ public static class BrowserEvents
                 }
             }
         };
+    }
+
+    /// <summary>
+    /// Wraps a task-returning handler with Vue's key guards while preserving the returned task.
+    /// </summary>
+    /// <param name="handler">The task-returning handler to guard.</param>
+    /// <param name="keys">The key names.</param>
+    /// <returns>The key-guarded task-returning handler.</returns>
+    public static Func<BrowserEvent, Task> WithKeys(
+        Func<BrowserEvent, Task> handler,
+        params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(keys);
+        return browserEvent =>
+        {
+            if (!MatchesKey(browserEvent, keys))
+            {
+                return Task.CompletedTask;
+            }
+
+            return handler(browserEvent);
+        };
+    }
+
+    private static bool MatchesKey(BrowserEvent browserEvent, string[] keys)
+    {
+        if (browserEvent.Key.Length == 0)
+        {
+            return false;
+        }
+
+        string eventKey =
+            StyleAndClassNormalization.Hyphenate(browserEvent.Key).ToLowerInvariant();
+        foreach (string key in keys)
+        {
+            if (string.Equals(key, eventKey, StringComparison.Ordinal)
+                || (KeyAliases.TryGetValue(key, out string? alias)
+                    && string.Equals(alias, eventKey, StringComparison.Ordinal)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool PassesModifierGuard(BrowserEvent browserEvent, string modifier, string[] allModifiers)

@@ -5,9 +5,8 @@ namespace Assimalign.Viu.Testing;
 /// <summary>
 /// The queryable, resettable record of every node operation the test adapter performed —
 /// parity with the op recording in <c>@vue/runtime-test</c>. Op counts are the CoreCLR-side
-/// proxy for JSImport call counts in the browser: a patch that logs one
-/// <see cref="TestNodeOperationType.SetElementText"/> and nothing structural would cost exactly
-/// one interop call on WASM.
+/// proxy for host-boundary call counts: one logged text or attribute operation corresponds to one
+/// host operation unless a platform adapter batches it.
 /// </summary>
 public sealed class TestNodeOperationLog
 {

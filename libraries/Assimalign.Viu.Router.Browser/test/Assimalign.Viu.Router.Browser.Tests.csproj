@@ -13,6 +13,7 @@
     <ViuProjectReference Include="Assimalign.Viu.Router.Browser" />
     <!-- Directly used to synthesize BrowserEvents (internal ctor via InternalsVisibleTo). -->
     <ViuProjectReference Include="Assimalign.Viu.Browser" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
     <!-- The in-memory renderer drives a real RouterLink through the bridge DOM-free. -->
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>

@@ -41,13 +41,15 @@ template compiler (`Assimalign.Viu.Syntax.Templates`, [V01.01.05.01]); the C# in
 
 A `.viu` with an `@template` compiles to a **mountable component**: the source generator emits the
 compiled render function ([V01.01.05.05]), merges the `@script` C# into the partial class ([V01.01.06.03]),
-and — as of [V01.01.06.07] — generates the `IComponent` bridge (a `Name` plus a `Setup` that
+and — as of [V01.01.06.07] — generates the `IComponentTemplate` bridge (metadata plus a `Setup` that
 allocates the render cache, wires slots, applies any `v-bind()` CSS custom properties, and returns the
-render delegate). So a `@template`-bearing `.viu` is passed straight to `BrowserApplication.CreateBuilder(...)` /
-`VirtualNodeFactory.Component(...)` with no hand-written wiring, and reactive `@script` members drive
-re-render. A `.viu` with **no** `@template` (a `@style`-only CSS-bundle unit, or a `@script`-only partial)
-stays a plain partial class — no component bridge — so it keeps compiling exactly as before. This library
-still only *slices*; the bridge is emitted by the generator that consumes the descriptor.
+render delegate). A `@template`-bearing `.viu` is registered with the application-selected
+`IComponentFactory` and requested through `ComponentTree.Template<TComponent>()`, including when
+that request is the root supplied to `BrowserApplication.CreateBuilder(...)`; reactive `@script`
+members then drive re-rendering with no hand-written component bridge. A `.viu` with **no**
+`@template` (a `@style`-only CSS-bundle unit, or a `@script`-only partial) stays a plain partial
+class — no component bridge — so it keeps compiling exactly as before. This library still only
+*slices*; the bridge is emitted by the generator that consumes the descriptor.
 
 ### Upstream-semantics mapping
 

@@ -1,103 +1,105 @@
 using System;
 
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu;
 
 /// <summary>
-/// A template-ref binding — the C# port of a normalized template ref in <c>@vue/runtime-core</c>
-/// (<c>packages/runtime-core/src/rendererTemplateRef.ts</c>,
-/// https://vuejs.org/guide/essentials/template-refs.html). A binding is exactly one of:
-/// <list type="bullet">
-/// <item>a reactive ref-object (<see cref="ReactiveValue{T}"/> of <see cref="object"/>) that receives
-/// the mounted element or a component's exposed surface — nulled on unmount;</item>
-/// <item>a function ref (<see cref="Action{T}"/> of <see cref="object"/>) invoked with the
-/// element/instance on mount and <c>null</c> on unmount, enabling custom collection (the v-for ref
-/// pattern).</item>
-/// </list>
-/// Vue's string-ref form — which resolves against a component instance proxy — is intentionally not
-/// ported: this model is reflection-free and has no string case. The renderer applies a binding
-/// through its <c>SetReference</c> in the post-flush phase (<see cref="Renderer{TNode}"/>).
-/// Element refs carry <see cref="object"/> at this TNode-generic layer (the boxed platform node);
-/// platform wrappers give typed access.
+/// Adapts a reactive object reference or callback to a component-tree template reference.
 /// </summary>
-public readonly struct TemplateReference : IEquatable<TemplateReference>
+/// <remarks>
+/// String references are intentionally unsupported because Viu has no reflection-backed component
+/// proxy. This mirrors Vue 3.5's object and function template-reference forms:
+/// https://vuejs.org/guide/essentials/template-refs.html.
+/// </remarks>
+public sealed class TemplateReference :
+    IComponentReference,
+    IEquatable<TemplateReference>
 {
-    private readonly ReactiveValue<object?>? _reference;
-    private readonly Action<object?>? _function;
+    private readonly IReactiveReference<object?>? _reference;
+    private readonly Action<object?>? _callback;
 
-    private TemplateReference(ReactiveValue<object?>? reference, Action<object?>? function)
+    private TemplateReference(
+        IReactiveReference<object?>? reference,
+        Action<object?>? callback)
     {
         _reference = reference;
-        _function = function;
+        _callback = callback;
     }
 
-    /// <summary>Creates a ref-object binding (upstream: a <c>Ref</c> template ref).</summary>
-    /// <param name="reference">The reactive ref that receives the element or exposed surface.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
-    public static TemplateReference FromReference(ReactiveValue<object?> reference)
+    /// <summary>Creates a binding backed by a reactive object reference.</summary>
+    /// <param name="reference">The reactive reference to assign.</param>
+    /// <returns>The template-reference binding.</returns>
+    public static TemplateReference FromReference(
+        IReactiveReference<object?> reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
-        return new TemplateReference(reference, null);
+        return new TemplateReference(reference, callback: null);
     }
 
-    /// <summary>Creates a function-ref binding (upstream: a function template ref).</summary>
-    /// <param name="function">Invoked with the element/instance on mount and null on unmount.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="function"/> is null.</exception>
-    public static TemplateReference FromFunction(Action<object?> function)
+    /// <summary>Creates a binding backed by a callback.</summary>
+    /// <param name="callback">The callback invoked with the mounted value and later null.</param>
+    /// <returns>The template-reference binding.</returns>
+    public static TemplateReference FromCallback(Action<object?> callback)
     {
-        ArgumentNullException.ThrowIfNull(function);
-        return new TemplateReference(null, function);
+        ArgumentNullException.ThrowIfNull(callback);
+        return new TemplateReference(reference: null, callback);
     }
 
-    /// <summary>Whether this binding is a ref-object (as opposed to a function ref).</summary>
-    public bool IsReferenceObject => _reference is not null;
-
-    /// <summary>The ref-object when <see cref="IsReferenceObject"/>; otherwise null.</summary>
-    internal ReactiveValue<object?>? ReferenceObject => _reference;
-
-    /// <summary>The function when this binding is a function ref; otherwise null.</summary>
-    internal Action<object?>? Function => _function;
-
-    /// <summary>
-    /// Classifies a raw <c>"ref"</c> prop value into a binding, or null when there is none. A value
-    /// that is neither an <see cref="ReactiveValue{T}"/> of <see cref="object"/> nor an
-    /// <see cref="Action{T}"/> of <see cref="object"/> is reported (upstream dev warning for an
-    /// invalid ref type) and treated as no ref.
-    /// </summary>
-    /// <param name="raw">The raw <c>"ref"</c> prop value.</param>
-    internal static TemplateReference? FromRaw(object? raw) => raw switch
+    /// <inheritdoc/>
+    public void Set(object? value)
     {
-        null => null,
-        ReactiveValue<object?> reference => new TemplateReference(reference, null),
-        Action<object?> function => new TemplateReference(null, function),
-        _ => Invalid(raw),
-    };
+        if (_reference is not null)
+        {
+            _reference.Value = value;
+        }
+        else
+        {
+            _callback!(value);
+        }
+    }
 
-    /// <inheritdoc />
-    public bool Equals(TemplateReference other)
-        => ReferenceEquals(_reference, other._reference) && Equals(_function, other._function);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is TemplateReference other && Equals(other);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(_reference, _function);
-
-    /// <summary>Whether two bindings wrap the same ref-object or the same function.</summary>
-    /// <param name="left">The left binding.</param>
-    /// <param name="right">The right binding.</param>
-    public static bool operator ==(TemplateReference left, TemplateReference right) => left.Equals(right);
-
-    /// <summary>Whether two bindings differ.</summary>
-    /// <param name="left">The left binding.</param>
-    /// <param name="right">The right binding.</param>
-    public static bool operator !=(TemplateReference left, TemplateReference right) => !left.Equals(right);
-
-    private static TemplateReference? Invalid(object raw)
+    /// <inheritdoc/>
+    public bool Equals(TemplateReference? other)
     {
-        RuntimeWarnings.Warn(
-            $"Invalid template ref of type {raw.GetType().Name}: a template ref must be an "
-            + "ReactiveValue<object?> or an Action<object?> (string refs are not supported).");
-        return null;
+        return other is not null
+            && ReferenceEquals(_reference, other._reference)
+            && Equals(_callback, other._callback);
+    }
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj)
+    {
+        return obj is TemplateReference other && Equals(other);
+    }
+
+    /// <inheritdoc/>
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(_reference, _callback);
+    }
+
+    internal static IComponentReference? FromValue(
+        object? value,
+        Action<string>? warningHandler = null)
+    {
+        switch (value)
+        {
+            case null:
+                return null;
+            case IComponentReference reference:
+                return reference;
+            case IReactiveReference<object?> reactiveReference:
+                return FromReference(reactiveReference);
+            case Action<object?> callback:
+                return FromCallback(callback);
+            default:
+                warningHandler?.Invoke(
+                    $"Invalid template reference of type \"{value.GetType().Name}\". "
+                    + "Use IComponentReference, IReactiveReference<object?>, or "
+                    + "Action<object?>.");
+                return null;
+        }
     }
 }

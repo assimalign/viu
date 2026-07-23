@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Browser.Tests;
@@ -24,6 +25,7 @@ internal sealed class VShowTransitionTestHarness : IDisposable
     private readonly Dictionary<int, RecordingNode> _nodes = [];
     private readonly Dictionary<int, List<int>> _children = [];
     private readonly Renderer<int> _renderer;
+    private readonly IApplicationContext _application;
     private readonly TestSchedulerPump _pump;
     private readonly DomTransitionOperations? _previousTransitionOperations;
     private readonly BrowserDirectiveOperations? _previousDirectiveOperations;
@@ -33,7 +35,6 @@ internal sealed class VShowTransitionTestHarness : IDisposable
 
     public VShowTransitionTestHarness()
     {
-        Scheduler.Reset();
         _pump = TestSchedulerPump.Install();
 
         _previousTransitionOperations = DomTransitionOperations.Current;
@@ -94,15 +95,23 @@ internal sealed class VShowTransitionTestHarness : IDisposable
             CreateText = text => Create(new RecordingNode { Tag = "#text", Value = text }),
             CreateComment = text => Create(new RecordingNode { Tag = "#comment", Value = text }),
             SetText = (node, text) => Node(node).Value = text,
-            SetElementText = (node, text) => Node(node).Value = text,
             ParentNode = node => Node(node).Parent,
             NextSibling = NextSibling,
             // v-show writes display through BrowserDirectiveOperations, not patchProp; no other bound
             // prop matters to these tests, so the patch leaf is a no-op.
-            PatchProperty = (_, _, _, _, _, _) => { },
+            PatchAttribute = (_, _, _, _, _, _) => { },
         });
 
         Container = Create(new RecordingNode { Tag = "#container" });
+        _application = new ApplicationContext(
+            ComponentTree.Comment("v-show-transition-test-root"),
+            new ComponentFactory(
+            [
+                Transition.Registration,
+                BaseTransition.Registration,
+            ]),
+            new EmptyServiceProvider(),
+            directives: BrowserDirectiveResolver.Instance);
     }
 
     /// <summary>The ordered transition class add/remove operations (the choreography sequence).</summary>
@@ -123,16 +132,16 @@ internal sealed class VShowTransitionTestHarness : IDisposable
 
     public void Dispose()
     {
+        _renderer.Render(null, Container, _application);
         DomTransitionOperations.Current = _previousTransitionOperations;
         BrowserDirectiveOperations.Current = _previousDirectiveOperations;
         _pump.Dispose();
-        Scheduler.Reset();
     }
 
     /// <summary>Renders a component's tree into the container and drains scheduled flushes.</summary>
     public void Render(IComponent component)
     {
-        _renderer.Render(VirtualNodeFactory.Component(component), Container);
+        _renderer.Render(component, Container, _application);
         _pump.RunUntilIdle();
     }
 
@@ -259,5 +268,14 @@ internal sealed class VShowTransitionTestHarness : IDisposable
         // value written ("none"/"flex"/…). Written by the v-show BrowserDirectiveOperations seam.
         public string? Display;
         public readonly HashSet<string> TransitionClasses = new(StringComparer.Ordinal);
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            return null;
+        }
     }
 }

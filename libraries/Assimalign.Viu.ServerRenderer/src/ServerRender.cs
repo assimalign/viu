@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.ServerRenderer;
@@ -15,9 +16,9 @@ namespace Assimalign.Viu.ServerRenderer;
 /// The by-name SSR helper library — the C# port of the <c>ssr*</c> runtime helpers the compiled SSR
 /// render bodies call into (<c>@vue/server-renderer</c>'s <c>helpers/*</c> plus <c>@vue/shared</c>'s
 /// <c>escapeHtml</c>). The pure-string members (<see cref="EscapeHtml(string)"/>,
-/// <see cref="SsrRenderAttrs(VirtualNodeProperties?, string?)"/>, <see cref="SsrRenderClass"/>,
+/// <see cref="SsrRenderAttrs(IComponentAttributeCollection?, string?)"/>, <see cref="SsrRenderClass"/>,
 /// <see cref="SsrRenderStyle"/>, <see cref="SsrInterpolate"/>, …) are the exact string-producing
-/// helpers upstream exposes and are used both by the vnode-walking runtime renderer
+/// helpers upstream exposes and are used both by the component-tree runtime renderer
 /// (<see cref="ServerRenderer"/>) and, later, by the compiler-generated <c>ssrRender</c> bodies
 /// ([V01.01.07.02]). The <c>*Async</c> members are the push-based helpers the generated code awaits,
 /// forwarding to the same engine the runtime renderer uses so both paths produce byte-identical output.
@@ -151,25 +152,31 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Serializes a vnode's props to an attribute string (upstream: <c>ssrRenderAttrs</c>). Skips the
+    /// Serializes an element's attributes to an attribute string (upstream: <c>ssrRenderAttrs</c>). Skips the
     /// reserved props (<c>key</c>, <c>ref</c>, <c>ref_for</c>, <c>ref_key</c>, <c>innerHTML</c>,
     /// <c>textContent</c>), event handlers (<c>onX</c>), <c>.</c>-prefixed force-property bindings, and
     /// <c>value</c> on a <c>&lt;textarea&gt;</c>; strips a leading <c>^</c> force-attribute marker; routes
     /// <c>class</c>/<c>style</c> through their normalizers and <c>className</c> to a direct string; and
     /// serializes the rest through <see cref="SsrRenderDynamicAttr"/>.
     /// </summary>
-    /// <param name="properties">The vnode's props, or null.</param>
+    /// <param name="attributes">The element attributes, or null.</param>
     /// <param name="tag">The owning element tag (drives the <c>textarea</c> and custom-element rules), or null.</param>
     /// <returns>The attribute string, each attribute preceded by a space; empty when there are none.</returns>
-    public static string SsrRenderAttrs(VirtualNodeProperties? properties, string? tag = null)
+    public static string SsrRenderAttrs(
+        IComponentAttributeCollection? attributes,
+        string? tag = null)
     {
-        if (properties is null || properties.Count == 0)
+        if (attributes is null || attributes.Count == 0)
         {
             return string.Empty;
         }
-        var builder = new StringBuilder();
-        foreach (var (rawName, value) in properties)
+
+        StringBuilder builder = new();
+        for (int index = 0; index < attributes.Count; index++)
         {
+            IComponentAttribute attribute = attributes[index];
+            string rawName = attribute.Name;
+            object? value = attribute.Value;
             if (ShouldIgnoreProperty(rawName)
                 || IsEventHandlerName(rawName)
                 || (string.Equals(tag, "textarea", StringComparison.Ordinal) && string.Equals(rawName, "value", StringComparison.Ordinal))
@@ -266,55 +273,64 @@ public static partial class ServerRender
     // ==== Push-based async helpers (the surface the compiled ssrRender bodies await) =============
 
     /// <summary>
-    /// Renders a child component (upstream: <c>ssrRenderComponent</c>). Builds the component vnode and runs
-    /// its full server lifecycle — setup, <c>ServerPrefetch</c>, subtree — appending to <paramref name="state"/>.
-    /// The child inherits <paramref name="parent"/>'s application context and provides.
+    /// Renders a child tree value (upstream: <c>ssrRenderComponent</c>). Template requests run their full
+    /// server lifecycle — setup, server prefetch, and subtree render — while primitive values serialize
+    /// directly. The child inherits <paramref name="parent"/>'s component context.
     /// </summary>
     /// <param name="state">The write surface.</param>
-    /// <param name="definition">The component definition.</param>
-    /// <param name="properties">The props passed to the child, or null.</param>
-    /// <param name="slots">The slot content, or null.</param>
-    /// <param name="parent">The rendering (parent) instance.</param>
+    /// <param name="component">The child tree value.</param>
+    /// <param name="parent">The rendering parent context, or null.</param>
     public static Task SsrRenderComponentAsync(
         SsrRenderState state,
-        IComponent definition,
-        VirtualNodeProperties? properties = null,
-        ComponentSlots? slots = null,
-        ComponentInstance? parent = null)
+        IComponent component,
+        IComponentContext? parent = null)
     {
         ArgumentNullException.ThrowIfNull(state);
-        ArgumentNullException.ThrowIfNull(definition);
-        var componentVirtualNode = VirtualNodeFactory.Component(definition, properties, slots);
-        return VirtualNodeSerializer.RenderComponentAsync(state, componentVirtualNode, parent);
+        ArgumentNullException.ThrowIfNull(component);
+        return ComponentTreeSerializer.RenderAsync(
+            state,
+            component,
+            RequireComponentContext(parent));
     }
 
     /// <summary>
     /// Renders a slot outlet, wrapped in the fragment hydration anchors (upstream: <c>ssrRenderSlot</c>,
     /// which brackets the content with <c>&lt;!--[--&gt;</c>/<c>&lt;!--]--&gt;</c>). Invokes the named slot with
-    /// <paramref name="slotProperties"/> (the scoped-slot scope), falling back to <paramref name="fallback"/>
+    /// <paramref name="slotArguments"/> (the scoped-slot scope), falling back to <paramref name="fallback"/>
     /// when the slot is absent or renders empty.
     /// </summary>
     /// <param name="state">The write surface.</param>
     /// <param name="slots">The rendering instance's slots, or null.</param>
     /// <param name="name">The slot name (<c>"default"</c> for the default slot).</param>
-    /// <param name="slotProperties">The scoped-slot props, or null.</param>
-    /// <param name="parent">The rendering instance (the slot content's descendants' parent).</param>
+    /// <param name="slotArguments">The scoped-slot arguments, or null for an empty argument set.</param>
+    /// <param name="parent">The rendering context (the slot content's descendants' parent).</param>
     /// <param name="fallback">The fallback content factory, or null.</param>
     public static async Task SsrRenderSlotAsync(
         SsrRenderState state,
-        ComponentSlots? slots,
+        IReadOnlyDictionary<string, ComponentSlot>? slots,
         string name,
-        object? slotProperties = null,
-        ComponentInstance? parent = null,
-        Func<VirtualNode?[]?>? fallback = null)
+        IComponentArguments? slotArguments = null,
+        IComponentContext? parent = null,
+        Func<IComponent?>? fallback = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentException.ThrowIfNullOrEmpty(name);
         state.Push(SsrMarkers.FragmentStart);
-        // RenderSlot invokes the slot delegate (or fallback) and returns a fragment; walk its children
-        // directly so the outer fragment anchors here are the only pair.
-        var fragment = VirtualNodeFactory.RenderSlot(slots, name, slotProperties, fallback);
-        await VirtualNodeSerializer.RenderChildrenAsync(state, fragment.ArrayChildren, parent).ConfigureAwait(false);
+
+        IComponent? content = null;
+        if (slots is not null && slots.TryGetValue(name, out ComponentSlot? slot))
+        {
+            content = slot(slotArguments ?? new ComponentArguments());
+        }
+
+        content ??= fallback?.Invoke();
+        if (content is not null)
+        {
+            await ComponentTreeSerializer
+                .RenderAsync(state, content, RequireComponentContext(parent))
+                .ConfigureAwait(false);
+        }
+
         state.Push(SsrMarkers.FragmentEnd);
     }
 
@@ -387,8 +403,13 @@ public static partial class ServerRender
         }
         else
         {
-            var bufferWriter = new SsrWriter();
-            var bufferState = new SsrRenderState(bufferWriter, state.Context, state.CancellationToken);
+            SsrWriter bufferWriter = new();
+            SsrRenderState bufferState = new(
+                bufferWriter,
+                state.Context,
+                state.Application,
+                state.CancellationToken,
+                state);
             await contentRenderer(bufferState).ConfigureAwait(false);
             bufferState.Push(SsrMarkers.TeleportAnchor);
             state.Context.AppendTeleport(target, bufferWriter.ToStringResult());
@@ -439,6 +460,18 @@ public static partial class ServerRender
     // Upstream includeBooleanAttr = !!value || value === '': any truthy value or the empty string.
     private static bool IncludeBooleanAttribute(object? value)
         => StyleAndClassNormalization.IsTruthy(value) || value is string { Length: 0 };
+
+    private static ComponentContext? RequireComponentContext(IComponentContext? context)
+    {
+        return context switch
+        {
+            null => null,
+            ComponentContext componentContext => componentContext,
+            _ => throw new ArgumentException(
+                "The parent context must be a context created by the Viu component runtime.",
+                nameof(context)),
+        };
+    }
 
     // Upstream commentStripRE = /^(?:-?>)+|<!--|-->|--!>|<!-$/g (JS [^] -> .NET . with no special flags
     // needed here). Applied repeatedly by EscapeHtmlComment so overlapping matches cannot re-form a

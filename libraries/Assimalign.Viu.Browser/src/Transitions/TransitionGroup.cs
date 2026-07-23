@@ -2,90 +2,25 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The DOM <c>&lt;TransitionGroup&gt;</c> built-in — the C# port of upstream's <c>TransitionGroup</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/components/TransitionGroup.ts,
-/// https://vuejs.org/guide/built-ins/transition-group.html). It renders a list of keyed children under
-/// a real <c>tag</c> (or a fragment), stamps each child with the same CSS-class enter/leave hooks
-/// <see cref="Transition"/> resolves, and animates reordering with a FLIP move: after each update it
-/// snapshots child positions (before via the render, after via <c>onUpdated</c>), applies an inverting
-/// transform to every element that moved, forces a reflow, adds the <c>v-move</c> class, and removes it
-/// on <c>transitionend</c>.
-/// <para>
-/// The position snapshots and the transform writes go through <see cref="DomTransitionOperations"/> in
-/// the exact order upstream uses (finish pending callbacks, read all positions, then write all
-/// transforms) so the read pass and the write pass never interleave — the documented synchronous layout
-/// seam the bridge-backed implementation fulfils. Because a handle platform crosses the interop boundary
-/// per read, the read pass is <b>batched</b>: <see cref="DomTransitionOperations.MeasurePositions"/> reads
-/// every child's rectangle in one crossing, so a reorder of N children costs one crossing per pass, not N
-/// ([V01.01.04.07.03]). Referenced by the compiled render through
-/// <see cref="DomRenderHelpers._TransitionGroup"/>. Not thread-safe (single-threaded JS event-loop model).
-/// </para>
-/// <para>
-/// Attribute fallthrough rides the standard single-root mechanism, not a parallel one ([V01.01.04.07.04]):
-/// <see cref="Properties"/> declares <c>tag</c>/<c>moveClass</c> and every transition prop, so those are
-/// consumed rather than emitted onto the wrapper, while <c>class</c>/<c>style</c>/arbitrary attributes —
-/// everything undeclared — fall through onto the rendered <c>tag</c> element through
-/// <c>renderComponentRoot</c>'s <c>mergeProps</c> (upstream
-/// <c>packages/runtime-core/src/componentAttrs.ts</c>, as applied by <c>TransitionGroup.ts</c>'s
-/// <c>createVNode(tag, null, children)</c>). The wrapper's fallthrough <c>class</c> and the children's
-/// enter/leave/<c>*-move</c> choreography classes land on separate elements, so neither contaminates the
-/// other. In fragment mode (no <c>tag</c>) the root is not an element, so there is no fallthrough target —
-/// the undeclared attributes are silently dropped with no warning, exactly as the shared mechanism treats
-/// any fragment/text root.
-/// </para>
+/// Animates insertion, removal, and keyed reordering for a group of browser-rendered children.
 /// </summary>
-public sealed class TransitionGroup : IComponent
+/// <remarks>
+/// This is Viu's browser-hosted port of Vue 3.5's <c>TransitionGroup</c>:
+/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/components/TransitionGroup.ts.
+/// Core supplies host-neutral keyed child snapshots and shared transition state; this component owns
+/// CSS transition resolution and the DOM-specific FLIP measurement and mutation sequence. Position
+/// reads are batched so each before/after pass crosses the browser interop boundary once. The
+/// component is intended for the browser's single-threaded event loop and is not thread-safe.
+/// </remarks>
+public sealed class TransitionGroup : IComponentTemplate
 {
-    /// <summary>The shared component instance the compiled render references via <see cref="DomRenderHelpers._TransitionGroup"/>.</summary>
-    public static readonly TransitionGroup Instance = new();
-
-    // The declared props — upstream TransitionGroup's props are TransitionPropsValidators plus tag and
-    // moveClass (packages/runtime-dom/src/components/TransitionGroup.ts). Declaring the full set is what
-    // makes class/style/arbitrary attributes — everything NOT here — fall through onto the rendered tag
-    // element via the standard single-root attrs merge (renderComponentRoot + mergeProps), while
-    // tag/moveClass and every transition prop are consumed and never leak onto the wrapper. This is
-    // BaseTransitionPropsValidators + DOMTransitionPropsValidators (the same set Transition consumes,
-    // read from the raw vnode by ResolveTransitionProperties) plus the two group props.
-    private static readonly IReadOnlyList<ComponentPropertyDefinition> DeclaredProperties =
-    [
-        // Group wrapper props (upstream: { tag: String, moveClass: String }).
-        new ComponentPropertyDefinition("tag"),
-        new ComponentPropertyDefinition("moveClass"),
-        // BaseTransition props (upstream BaseTransitionPropsValidators).
-        new ComponentPropertyDefinition("mode"),
-        new ComponentPropertyDefinition("appear"),
-        new ComponentPropertyDefinition("persisted"),
-        new ComponentPropertyDefinition("onBeforeEnter"),
-        new ComponentPropertyDefinition("onEnter"),
-        new ComponentPropertyDefinition("onAfterEnter"),
-        new ComponentPropertyDefinition("onEnterCancelled"),
-        new ComponentPropertyDefinition("onBeforeLeave"),
-        new ComponentPropertyDefinition("onLeave"),
-        new ComponentPropertyDefinition("onAfterLeave"),
-        new ComponentPropertyDefinition("onLeaveCancelled"),
-        new ComponentPropertyDefinition("onBeforeAppear"),
-        new ComponentPropertyDefinition("onAppear"),
-        new ComponentPropertyDefinition("onAfterAppear"),
-        new ComponentPropertyDefinition("onAppearCancelled"),
-        // DOM transition props (upstream DOMTransitionPropsValidators).
-        new ComponentPropertyDefinition("name"),
-        new ComponentPropertyDefinition("type"),
-        new ComponentPropertyDefinition("css"),
-        new ComponentPropertyDefinition("duration"),
-        new ComponentPropertyDefinition("enterFromClass"),
-        new ComponentPropertyDefinition("enterActiveClass"),
-        new ComponentPropertyDefinition("enterToClass"),
-        new ComponentPropertyDefinition("appearFromClass"),
-        new ComponentPropertyDefinition("appearActiveClass"),
-        new ComponentPropertyDefinition("appearToClass"),
-        new ComponentPropertyDefinition("leaveFromClass"),
-        new ComponentPropertyDefinition("leaveActiveClass"),
-        new ComponentPropertyDefinition("leaveToClass"),
-    ];
+    private static readonly IReadOnlyList<IComponentParameter>
+        DeclaredParameters = CreateParameterDefinitions();
 
     private TransitionGroup()
     {
@@ -94,252 +29,341 @@ public sealed class TransitionGroup : IComponent
     /// <inheritdoc/>
     public string? Name => "TransitionGroup";
 
-    /// <summary>
-    /// The declared props — <c>tag</c>/<c>moveClass</c> and the full transition prop set (upstream:
-    /// <c>extend({}, TransitionPropsValidators, { tag, moveClass })</c> in
-    /// <c>packages/runtime-dom/src/components/TransitionGroup.ts</c>). Declaring them keeps every one out
-    /// of the fallthrough attrs, so only <c>class</c>/<c>style</c>/arbitrary attributes fall through onto
-    /// the rendered <c>tag</c> element. <see cref="IComponent.InheritAttributes"/> stays at its
-    /// default (true) — unlike <c>Transition</c>/<c>KeepAlive</c>, the group owns a real root element to
-    /// inherit onto — so the standard single-root merge lands them (upstream never sets
-    /// <c>inheritAttrs: false</c> on TransitionGroup).
-    /// </summary>
-    public IReadOnlyList<ComponentPropertyDefinition>? Properties => DeclaredProperties;
+    /// <inheritdoc/>
+    public IReadOnlyList<IComponentParameter>? Parameters =>
+        DeclaredParameters;
+
+    /// <summary>Gets the AOT-safe registration for the browser transition-group built-in.</summary>
+    public static ComponentRegistration Registration =>
+        new(
+            typeof(TransitionGroup),
+            static () => new TransitionGroup(),
+            "TransitionGroup");
 
     /// <inheritdoc/>
-    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentRenderer Setup(IComponentContext context)
     {
-        var instance = ComponentInstance.Current!;
-        var state = BaseTransition.UseTransitionState();
-        var positionMap = new Dictionary<VirtualNode, TransitionRectangle>();
-        var moveCallbacks = new Dictionary<int, Action>();
-        // Captured per setup call: the render updates them before the patch, so onUpdated (post-patch)
-        // reads the correct outgoing set.
-        List<VirtualNode>? previousChildren = null;
-        List<VirtualNode>? currentChildren = null;
+        ArgumentNullException.ThrowIfNull(context);
+        ComponentTransitionScope transitionScope = new(context);
+        Dictionary<object, TransitionRectangle> previousPositions = new();
+        Dictionary<int, Action> moveCallbacks = new();
+        DomTransitionClassNames classNames =
+            Transition.ResolveClassNames(context.Arguments);
+        DomTransitionClassNames previousClassNames = classNames;
+        IReadOnlyList<KeyedComponentHostElement<int>> previousChildren =
+            Array.Empty<KeyedComponentHostElement<int>>();
 
-        Lifecycle.OnUpdated(() => RunFlipMove(instance, state, positionMap, moveCallbacks, previousChildren));
+        context.Lifecycle.OnBeforeUpdate(
+            () =>
+            {
+                previousClassNames = classNames;
+                previousChildren =
+                    RecordPreviousPositions(
+                        context,
+                        previousPositions);
+            });
+        context.Lifecycle.OnUpdated(
+            () => RunMoveTransition(
+                context,
+                transitionScope,
+                previousPositions,
+                previousChildren,
+                moveCallbacks,
+                previousClassNames));
+        context.Lifecycle.OnBeforeUnmount(
+            () => FinishMoveCallbacks(moveCallbacks));
 
         return () =>
         {
-            var raw = instance.VirtualNode.Properties;
-            var resolved = Transition.ResolveTransitionProperties(raw);
-            var tag = ReadString(raw, "tag");
-            previousChildren = currentChildren;
-            var children = GetGroupChildren(context);
-            currentChildren = children;
-
-            // Stamp per-item hooks on keyed children (upstream: setTransitionHooks for child.key != null).
-            foreach (var child in children)
+            BaseTransitionProperties properties =
+                Transition.ResolveTransitionProperties(context.Arguments);
+            classNames =
+                Transition.ResolveClassNames(context.Arguments);
+            IReadOnlyList<IComponent> children =
+                ResolveChildren(context);
+            List<IComponent> transitionedChildren =
+                new(children.Count);
+            for (int index = 0; index < children.Count; index++)
             {
+                IComponent child = children[index];
                 if (child.Key is not null)
                 {
-                    BaseTransition.SetTransitionHooks(
-                        child,
-                        BaseTransition.ResolveTransitionHooks(child, resolved, state, instance, null));
+                    transitionedChildren.Add(
+                        transitionScope.Attach(child, properties));
+                }
+                else
+                {
+                    if (child is not ITextComponent
+                        && context is IComponentWarningContext warningContext)
+                    {
+                        warningContext.Warn(
+                            "<TransitionGroup> children must be keyed.");
+                    }
+
+                    transitionedChildren.Add(child);
                 }
             }
 
-            // Snapshot the outgoing children's pre-patch positions and refresh their hooks (upstream:
-            // the prevChildren loop recording positionMap). The FLIP delta reads these in onUpdated. The
-            // whole snapshot is one batched read crossing rather than one per child ([V01.01.04.07.03]).
-            if (previousChildren is not null)
-            {
-                positionMap.Clear();
-                var operations = DomTransitionOperations.Current;
-                var measured = new List<VirtualNode>(previousChildren.Count);
-                foreach (var child in previousChildren)
-                {
-                    BaseTransition.SetTransitionHooks(
-                        child,
-                        BaseTransition.ResolveTransitionHooks(child, resolved, state, instance, null));
-                    if (operations is not null && child.El is not null)
-                    {
-                        measured.Add(child);
-                    }
-                }
-                if (operations is not null && measured.Count > 0)
-                {
-                    var rectangles = operations.MeasurePositions(HandlesOf(measured));
-                    for (var index = 0; index < measured.Count; index++)
-                    {
-                        positionMap[measured[index]] = rectangles[index];
-                    }
-                }
-            }
-
-            var childArray = children.ToArray();
-            return tag is not null
-                ? VirtualNodeFactory.Element(tag, null, childArray)
-                : VirtualNodeFactory.Fragment(childArray, null);
+            string? tag = ReadString(context.Arguments, "tag");
+            return string.IsNullOrEmpty(tag)
+                ? ComponentTree.Fragment(transitionedChildren)
+                : ComponentTree.Element(
+                    tag,
+                    children: transitionedChildren);
         };
     }
 
-    private static void RunFlipMove(
-        ComponentInstance instance,
-        TransitionState state,
-        Dictionary<VirtualNode, TransitionRectangle> positionMap,
-        Dictionary<int, Action> moveCallbacks,
-        List<VirtualNode>? previousChildren)
+    private static IReadOnlyList<KeyedComponentHostElement<int>>
+        RecordPreviousPositions(
+        IComponentContext context,
+        Dictionary<object, TransitionRectangle> previousPositions)
     {
-        if (previousChildren is null || previousChildren.Count == 0)
+        previousPositions.Clear();
+        IReadOnlyList<KeyedComponentHostElement<int>> children =
+            ComponentHost.GetKeyedChildElements<int>(context);
+        if (children.Count == 0)
         {
-            return;
-        }
-        var operations = DomTransitionOperations.Current;
-        if (operations is null)
-        {
-            return;
-        }
-        var raw = instance.VirtualNode.Properties;
-        var moveClass = ReadString(raw, "moveClass") ?? (ReadString(raw, "name") ?? "v") + "-move";
-
-        // hasCSSTransform gate: measure once against a clone to skip the whole FLIP when the move class
-        // adds no transform transition (upstream), avoiding pointless writes.
-        if (previousChildren[0].El is not { } firstElement
-            || (instance.VirtualNode.El ?? instance.Subtree?.El) is not { } rootElement
-            || !operations.HasCssTransform((int)firstElement, (int)rootElement, moveClass))
-        {
-            return;
+            return children;
         }
 
-        // No interleaving of reads and writes (upstream comment: prevent layout thrashing), and the reads
-        // and the whole write frame are each one interop crossing ([V01.01.04.07.03]).
-        // 1. finish any pending move/enter callbacks so a re-triggered FLIP measures settled positions.
-        foreach (var child in previousChildren)
+        DomTransitionOperations operations =
+            DomTransitionOperations.Require();
+        TransitionRectangle[] positions =
+            operations.MeasurePositions(GetHandles(children));
+        int count = Math.Min(children.Count, positions.Length);
+        for (int index = 0; index < count; index++)
         {
-            CallPendingCallbacks(state, moveCallbacks, child);
+            previousPositions[children[index].Key] =
+                positions[index];
         }
-        // 2. read every new position in ONE batched crossing (upstream: recordPosition per child, in a
-        //    same-process JS loop; here the whole pass is a single boundary crossing).
-        var measured = new List<VirtualNode>(previousChildren.Count);
-        foreach (var child in previousChildren)
+
+        return children;
+    }
+
+    private static void RunMoveTransition(
+        IComponentContext context,
+        ComponentTransitionScope transitionScope,
+        Dictionary<object, TransitionRectangle> previousPositions,
+        IReadOnlyList<KeyedComponentHostElement<int>> previousChildren,
+        Dictionary<int, Action> moveCallbacks,
+        DomTransitionClassNames previousClassNames)
+    {
+        if (previousPositions.Count == 0
+            || previousChildren.Count == 0)
         {
-            if (child.El is not null)
+            return;
+        }
+
+        IReadOnlyList<KeyedComponentHostElement<int>> children =
+            ComponentHost.GetKeyedChildElements<int>(context);
+        IReadOnlyList<int> rootElements =
+            ComponentHost.GetRootElements<int>(context);
+        if (rootElements.Count == 0)
+        {
+            return;
+        }
+
+        DomTransitionOperations operations =
+            DomTransitionOperations.Require();
+        string? configuredMoveClass =
+            ReadString(context.Arguments, "moveClass");
+        string? configuredName =
+            ReadString(context.Arguments, "name");
+        string moveClass =
+            !string.IsNullOrEmpty(configuredMoveClass)
+                ? configuredMoveClass
+                : (!string.IsNullOrEmpty(configuredName)
+                    ? configuredName
+                    : "v")
+                + "-move";
+        if (!operations.HasCssTransform(
+            previousChildren[0].Element,
+            rootElements[0],
+            moveClass))
+        {
+            return;
+        }
+
+        for (int index = 0;
+            index < previousChildren.Count;
+            index++)
+        {
+            int element = previousChildren[index].Element;
+            if (moveCallbacks.TryGetValue(
+                element,
+                out Action? finishMove))
             {
-                measured.Add(child);
+                finishMove();
+            }
+
+            if (transitionScope.FinishPendingEnter(element))
+            {
+                operations.EnterGenerations[element] =
+                    operations.EnterGenerations.GetValueOrDefault(element)
+                    + 1;
+                operations.RemoveTransitionClass(
+                    element,
+                    previousClassNames.EnterFrom);
+                operations.RemoveTransitionClass(
+                    element,
+                    previousClassNames.AppearFrom);
             }
         }
-        var newPositions = measured.Count > 0
-            ? operations.MeasurePositions(HandlesOf(measured))
-            : [];
-        // 3. write the inverting transforms for the children that moved (upstream applyTranslation).
-        var moved = new List<VirtualNode>();
-        for (var index = 0; index < measured.Count; index++)
+
+        if (children.Count == 0)
         {
-            var child = measured[index];
-            if (!positionMap.TryGetValue(child, out var oldPosition))
+            return;
+        }
+
+        TransitionRectangle[] currentPositions =
+            operations.MeasurePositions(GetHandles(children));
+        List<KeyedComponentHostElement<int>> moved = new();
+        int count = Math.Min(children.Count, currentPositions.Length);
+        for (int index = 0; index < count; index++)
+        {
+            KeyedComponentHostElement<int> child = children[index];
+            if (!previousPositions.TryGetValue(
+                child.Key,
+                out TransitionRectangle previousPosition))
             {
                 continue;
             }
-            var newPosition = newPositions[index];
-            var deltaX = oldPosition.Left - newPosition.Left;
-            var deltaY = oldPosition.Top - newPosition.Top;
-            if (deltaX != 0 || deltaY != 0)
+
+            TransitionRectangle currentPosition =
+                currentPositions[index];
+            double horizontalDelta =
+                (previousPosition.Left - currentPosition.Left)
+                / NormalizeScale(currentPosition.HorizontalScale);
+            double verticalDelta =
+                (previousPosition.Top - currentPosition.Top)
+                / NormalizeScale(currentPosition.VerticalScale);
+            if (horizontalDelta == 0 && verticalDelta == 0)
             {
-                operations.SetMoveTransform((int)child.El!, deltaX, deltaY);
-                moved.Add(child);
+                continue;
             }
+
+            operations.SetMoveTransform(
+                child.Element,
+                horizontalDelta,
+                verticalDelta);
+            moved.Add(child);
         }
 
-        // 4. force everything into position (upstream forceReflow, once), then add the move class and clear
-        //    the inverse transform so each moved child animates home. In buffered mode steps 3-4 are one
-        //    command-buffer frame: transforms, the reflow barrier, then move class + clear, in this order.
         operations.ForceReflow();
-        foreach (var child in moved)
+        for (int index = 0; index < moved.Count; index++)
         {
-            var element = (int)child.El!;
+            int element = moved[index].Element;
             operations.AddTransitionClass(element, moveClass);
             operations.ClearMoveStyles(element);
         }
-        // 5. register the move-end cleanup AFTER the write frame — the buffered WhenMoveEnds flushes the
-        //    frame committed in steps 3-4 as one crossing, then attaches the transitionend listener.
-        foreach (var child in moved)
+
+        for (int index = 0; index < moved.Count; index++)
         {
-            var element = (int)child.El!;
-            void MoveDone()
+            int element = moved[index].Element;
+            Action? finishMove = null;
+            finishMove = () =>
             {
-                if (!moveCallbacks.Remove(element))
+                if (!moveCallbacks.TryGetValue(
+                    element,
+                    out Action? current)
+                    || !ReferenceEquals(current, finishMove))
                 {
                     return;
                 }
-                operations.RemoveTransitionClass(element, moveClass);
-            }
-            moveCallbacks[element] = MoveDone;
-            operations.WhenMoveEnds(element, MoveDone);
+
+                moveCallbacks.Remove(element);
+                operations.RemoveTransitionClass(
+                    element,
+                    moveClass);
+            };
+            moveCallbacks[element] = finishMove;
+            operations.WhenMoveEnds(element, finishMove);
         }
     }
 
-    // Projects a child list to the int element handles the batched read/FLIP ops address them by.
-    private static int[] HandlesOf(List<VirtualNode> children)
+    private static IReadOnlyList<IComponent> ResolveChildren(
+        IComponentContext context)
     {
-        var handles = new int[children.Count];
-        for (var index = 0; index < children.Count; index++)
+        if (!context.Slots.TryGetValue(
+            "default",
+            out ComponentSlot? slot))
         {
-            handles[index] = (int)children[index].El!;
+            return Array.Empty<IComponent>();
         }
+
+        IComponent? rendered =
+            slot(new ComponentArguments());
+        return rendered switch
+        {
+            null => Array.Empty<IComponent>(),
+            IFragmentComponent fragment => fragment.Children,
+            _ => new[] { rendered },
+        };
+    }
+
+    private static int[] GetHandles(
+        IReadOnlyList<KeyedComponentHostElement<int>> children)
+    {
+        int[] handles = new int[children.Count];
+        for (int index = 0; index < children.Count; index++)
+        {
+            handles[index] = children[index].Element;
+        }
+
         return handles;
     }
 
-    // Upstream callPendingCbs: force-finish an in-flight move (moveCbKey) and enter (enterCbKey) so the
-    // element is measured at its settled position rather than mid-animation.
-    private static void CallPendingCallbacks(
-        TransitionState state,
-        Dictionary<int, Action> moveCallbacks,
-        VirtualNode child)
+    private static void FinishMoveCallbacks(
+        Dictionary<int, Action> moveCallbacks)
     {
-        if (child.El is not { } element)
+        Action[] callbacks =
+            new Action[moveCallbacks.Count];
+        moveCallbacks.Values.CopyTo(callbacks, 0);
+        for (int index = 0; index < callbacks.Length; index++)
         {
-            return;
-        }
-        if (moveCallbacks.TryGetValue((int)element, out var moveDone))
-        {
-            moveDone();
-        }
-        if (state.EnterCallbacks.TryGetValue(element, out var enterDone))
-        {
-            enterDone(false);
+            callbacks[index]();
         }
     }
 
-    private static List<VirtualNode> GetGroupChildren(ComponentSetupContext context)
+    private static IReadOnlyList<IComponentParameter>
+        CreateParameterDefinitions()
     {
-        var result = new List<VirtualNode>();
-        var slots = context.Slots;
-        if (slots is null || !slots.TryGetSlot("default", out var slot))
-        {
-            return result;
-        }
-        var rendered = slot(null);
-        if (rendered is null)
-        {
-            return result;
-        }
-        // Flatten one level of fragments (a v-for child renders a keyed-fragment of items).
-        foreach (var node in rendered)
-        {
-            if (node is null)
+        List<IComponentParameter> parameters =
+            new(Transition.ParameterDefinitions.Count + 1)
             {
-                continue;
-            }
-            if (node.Type == VirtualNodeType.Fragment && node.ArrayChildren is not null)
+                new ComponentParameter("tag"),
+                new ComponentParameter("moveClass"),
+            };
+        for (int index = 0;
+            index < Transition.ParameterDefinitions.Count;
+            index++)
+        {
+            IComponentParameter parameter =
+                Transition.ParameterDefinitions[index];
+            if (!string.Equals(
+                parameter.Name,
+                "mode",
+                StringComparison.Ordinal))
             {
-                foreach (var fragmentChild in node.ArrayChildren)
-                {
-                    if (fragmentChild is not null)
-                    {
-                        result.Add(fragmentChild);
-                    }
-                }
-            }
-            else
-            {
-                result.Add(node);
+                parameters.Add(parameter);
             }
         }
-        return result;
+
+        return parameters.AsReadOnly();
     }
 
-    private static string? ReadString(VirtualNodeProperties? raw, string name)
-        => raw is not null && raw.TryGetValue(name, out var value) ? value as string : null;
+    private static string? ReadString(
+        IComponentArguments arguments,
+        string name)
+    {
+        return arguments[name] as string;
+    }
+
+    private static double NormalizeScale(double scale)
+    {
+        return double.IsFinite(scale)
+            && scale != 0
+            ? scale
+            : 1;
+    }
 }

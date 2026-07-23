@@ -23,7 +23,17 @@ internal sealed class BrowserHydrationReader : HydrationNodeReader<int>
     internal BrowserHydrationReader(string snapshot)
     {
         _nodes = Parse(snapshot);
+        foreach (int handle in _nodes.Keys)
+        {
+            MaximumHandle = Math.Max(MaximumHandle, handle);
+        }
     }
+
+    /// <summary>
+    /// Gets the largest bridge handle in this snapshot so buffered allocation can advance beyond
+    /// every adopted server node before mismatch recovery creates a client node.
+    /// </summary>
+    internal int MaximumHandle { get; }
 
     /// <inheritdoc/>
     public override HydrationNodeKind Kind(int node)

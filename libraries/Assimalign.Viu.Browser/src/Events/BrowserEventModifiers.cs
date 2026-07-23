@@ -5,7 +5,7 @@ namespace Assimalign.Viu.Browser;
 /// <summary>
 /// The system-modifier state of a dispatched DOM event, extracted JS-side and marshaled as one
 /// integer (W3C UI Events <c>ctrlKey</c>/<c>shiftKey</c>/<c>altKey</c>/<c>metaKey</c>,
-/// https://www.w3.org/TR/uievents/). Consumed by <see cref="BrowserEvents.WithModifiers"/>'s
+/// https://www.w3.org/TR/uievents/). Consumed by <see cref="BrowserEvents"/>.<c>WithModifiers</c>'s
 /// system-modifier and <c>.exact</c> guards.
 /// </summary>
 [Flags]

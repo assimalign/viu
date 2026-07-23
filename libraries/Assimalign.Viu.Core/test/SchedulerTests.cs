@@ -5,8 +5,6 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.Testing;
-
 namespace Assimalign.Viu.Tests;
 
 // Pins the flush contract of @vue/runtime-core's scheduler.ts and nextTick —

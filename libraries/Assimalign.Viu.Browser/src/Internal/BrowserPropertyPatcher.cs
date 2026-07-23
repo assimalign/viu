@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
@@ -70,7 +68,7 @@ internal static class BrowserPropertyPatcher
         {
             PatchStyle(leafOperations, element, previousValue, nextValue);
         }
-        else if (VirtualNodeFactory.IsEventListenerName(propertyName))
+        else if (IsEventListenerName(propertyName))
         {
             // The raw prop name flows through: the invoker registry parses the
             // Once/Capture/Passive suffixes and event name ([V01.01.04.03]).
@@ -309,4 +307,12 @@ internal static class BrowserPropertyPatcher
     /// <summary>Whether <paramref name="attributeName"/> is a present/absent boolean attribute.</summary>
     internal static bool IsBooleanAttributeName(string attributeName)
         => BooleanPropertyNames.Contains(attributeName) || BooleanAttributeNames.Contains(attributeName);
+
+    private static bool IsEventListenerName(string attributeName)
+    {
+        return attributeName.Length > 2
+            && attributeName[0] == 'o'
+            && attributeName[1] == 'n'
+            && char.IsUpper(attributeName[2]);
+    }
 }

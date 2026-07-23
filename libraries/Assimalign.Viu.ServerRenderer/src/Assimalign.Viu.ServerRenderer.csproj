@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Shared" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
   </ItemGroup>
 </Project>

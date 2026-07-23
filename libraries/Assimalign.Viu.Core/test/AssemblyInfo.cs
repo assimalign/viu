@@ -1,5 +1,5 @@
 using Xunit;
 
-// The scheduler and reactivity engine use ambient static state (single-threaded JS event-loop
-// model), so tests must not run in parallel.
+// Core's scheduler and Reactivity use ambient state for the browser's single-threaded event-loop
+// model, so their tests must not execute concurrently.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]

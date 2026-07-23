@@ -26,6 +26,7 @@ public static class Scheduler
 
     private static readonly List<SchedulerJob> _queue = [];
     private static readonly List<SchedulerJob> _pendingPostFlushCallbacks = [];
+    private static readonly List<Action> _pendingHostCommits = [];
     private static List<SchedulerJob>? _activePostFlushCallbacks;
     private static List<SchedulerJob>? _executedInFlushChain;
     private static int _flushIndex = -1;
@@ -65,6 +66,24 @@ public static class Scheduler
     /// hosts leave it null and pay nothing. Ambient static, single-threaded — NOT thread-safe.
     /// </summary>
     internal static Action? FlushBoundaryCallback;
+
+    internal static void QueueHostCommit(Action? commit)
+    {
+        if (commit is null)
+        {
+            return;
+        }
+
+        for (int index = 0; index < _pendingHostCommits.Count; index++)
+        {
+            if (ReferenceEquals(_pendingHostCommits[index], commit))
+            {
+                return;
+            }
+        }
+
+        _pendingHostCommits.Add(commit);
+    }
 
     /// <summary>Whether a flush is executing right now.</summary>
     public static bool IsFlushing => _isFlushing;
@@ -220,8 +239,10 @@ public static class Scheduler
         // Commit batched interop mutations from this synchronous render (mount / direct Render)
         // before its post-flush callbacks run and again after (they may write the DOM). See
         // FlushBoundaryCallback.
+        FlushHostCommits();
         FlushBoundaryCallback?.Invoke();
         FlushPostFlushCallbacks();
+        FlushHostCommits();
         FlushBoundaryCallback?.Invoke();
         if (_isFlushPending && _queue.Count == 0 && _pendingPostFlushCallbacks.Count == 0)
         {
@@ -249,6 +270,7 @@ public static class Scheduler
             callback.Flags &= ~SchedulerJobFlags.Queued;
         }
         _pendingPostFlushCallbacks.Clear();
+        _pendingHostCommits.Clear();
         _activePostFlushCallbacks = null;
         ResetExecutionCounters();
         _flushIndex = -1;
@@ -343,8 +365,10 @@ public static class Scheduler
             // Commit batched interop mutations before post-flush (mounted/updated) callbacks, which
             // may read the DOM, and again after them, since those hooks may write it. See
             // FlushBoundaryCallback.
+            FlushHostCommits();
             FlushBoundaryCallback?.Invoke();
             FlushPostFlushCallbacks();
+            FlushHostCommits();
             FlushBoundaryCallback?.Invoke();
             _isFlushing = false;
             if (_queue.Count > 0 || _pendingPostFlushCallbacks.Count > 0)
@@ -381,6 +405,19 @@ public static class Scheduler
         var completion = _flushCompletion;
         _flushCompletion = null;
         completion?.TrySetResult();
+    }
+
+    private static void FlushHostCommits()
+    {
+        while (_pendingHostCommits.Count > 0)
+        {
+            Action[] commits = _pendingHostCommits.ToArray();
+            _pendingHostCommits.Clear();
+            for (int index = 0; index < commits.Length; index++)
+            {
+                commits[index]();
+            }
+        }
     }
 
     private static void ResetExecutionCounters()

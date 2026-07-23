@@ -44,7 +44,7 @@ internal sealed class BrowserDirectiveOperations
 
     /// <summary>
     /// Batches setting several CSS custom properties (index-aligned name/value arrays, the names including
-    /// the leading <c>--</c>) on an element into a single interop crossing — the <c>UseCssVars</c>
+    /// the leading <c>--</c>) on an element into a single interop crossing — the <c>UseCssVariables</c>
     /// application path ([V01.01.06.06]), which must never issue one interop call per property.
     /// </summary>
     public required Action<int, string[], string[]> SetCssVariables { get; init; }

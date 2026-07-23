@@ -1,133 +1,151 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu.Testing;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Tests;
 
-// Pins the reshape's application builder ([V01.01.03.23]): the ApplicationBuilder base records
-// plugins/provides/registrations and replays them onto the built application in call order, and the
-// built application is mountable. Exercised through a concrete test builder over the in-memory
-// renderer (Browser/ServerRenderer supply the real platform builders).
-public sealed class ApplicationBuilderTests : IDisposable
+public sealed class ApplicationBuilderTests
 {
-    private readonly TestRenderer _renderer = new();
-    private readonly TestElement _container;
-    private readonly TestSchedulerPump _pump;
-
-    public ApplicationBuilderTests()
+    [Fact]
+    public void Build_SuppliedResolvers_RemainIndependentBorrowedApplicationDecisions()
     {
-        Scheduler.Reset();
-        _pump = TestSchedulerPump.Install();
-        _container = _renderer.CreateContainer();
-    }
+        EmptyServiceProvider services = new();
+        ComponentFactory components = new(Array.Empty<ComponentRegistration>());
+        IComponent root = ComponentTree.Element("main");
+        TestApplicationBuilder builder = new();
 
-    public void Dispose()
-    {
-        Scheduler.Reset();
-        _pump.Dispose();
+        IApplication application = builder
+            .UseRootComponent(root)
+            .UseComponentFactory(components)
+            .UseServiceProvider(services)
+            .Build();
+
+        application.ShouldBeAssignableTo<IApplication<int>>();
+        application.Context.RootComponent.ShouldBeSameAs(root);
+        application.Context.Components.ShouldBeSameAs(components);
+        application.Context.Services.ShouldBeSameAs(services);
+        application.Context.Services.ShouldNotBeSameAs(components);
+        application.Context.State.ShouldBeNull();
     }
 
     [Fact]
-    public void Build_ProducesAMountableApplication_ThatRendersTheRoot()
+    public async Task MountAsync_InstallsPluginsBeforeHostInitializationAndRender()
     {
-        var root = new TestComponent { SetupFunction = static (_, _) => static () => VirtualNodeFactory.Text("root") };
-        var builder = new TestApplicationBuilder(_renderer.Renderer, root);
+        List<string> order = [];
+        RecordingPlugin plugin = new(order);
+        TestApplication application = (TestApplication)new TestApplicationBuilder(order)
+            .UseRootComponent(ComponentTree.Element("main"))
+            .UseComponentFactory(new ComponentFactory(Array.Empty<ComponentRegistration>()))
+            .UseServiceProvider(new EmptyServiceProvider())
+            .Use(plugin)
+            .Build();
 
-        var application = builder.Build();
-        var instance = application.Mount(_container);
+        await application.MountAsync(42);
 
+        order.ShouldBe(["plugin", "initialize", "mount:42"]);
         application.IsMounted.ShouldBeTrue();
-        instance.ShouldNotBeNull();
-        instance.ShouldBeSameAs(application.RootInstance);
-        TestNodeSerializer.Serialize(_container).ShouldContain("root");
+        plugin.Installations.ShouldBe(1);
+
+        await application.MountAsync(42);
+        plugin.Installations.ShouldBe(1);
     }
 
     [Fact]
-    public void Build_ReplaysRecordedConfiguration_InCallOrder()
+    public async Task UnmountAsync_UsesTheGenericHostLifecycle()
     {
-        var order = new List<string>();
-        var root = new TestComponent { SetupFunction = static (_, _) => static () => VirtualNodeFactory.Text("root") };
-        var builder = new TestApplicationBuilder(_renderer.Renderer, root);
+        TestApplication application = (TestApplication)new TestApplicationBuilder()
+            .UseRootComponent(ComponentTree.Element("main"))
+            .UseComponentFactory(new ComponentFactory(Array.Empty<ComponentRegistration>()))
+            .UseServiceProvider(new EmptyServiceProvider())
+            .Build();
+        await application.MountAsync(7);
 
-        // Interleave provides/plugins/config callbacks; every action must apply in the order recorded.
-        builder.ConfigureApplication(_ => order.Add("config-a"));
-        builder.Use(new RecordingPlugin(order, "plugin-a"));
-        builder.Provide("key", "value");
-        builder.Use(new RecordingPlugin(order, "plugin-b"));
-        builder.ConfigureApplication(_ => order.Add("config-b"));
+        await application.UnmountAsync();
 
-        order.ShouldBeEmpty(); // nothing runs until Build
+        application.IsMounted.ShouldBeFalse();
+        application.RootContext.ShouldBeNull();
+        application.UnmountCount.ShouldBe(1);
+    }
 
-        var application = builder.Build();
+    private sealed class TestApplicationBuilder : ApplicationBuilder
+    {
+        private readonly List<string> _order;
 
-        // Provides and config callbacks apply at Build in call order; plugins are queued on the app and
-        // install later, during the mount path ([V01.01.03.27]), so only the config callbacks ran so far.
-        order.ShouldBe(["config-a", "config-b"]);
-
-        using (var warnings = new WarningCapture())
+        internal TestApplicationBuilder(List<string>? order = null)
         {
-            application.Provide("key", "again"); // re-providing the same key warns -> the builder's provide landed
-            warnings.Messages.ShouldContain(message => message.Contains("already provides"));
+            _order = order ?? [];
         }
 
-        application.Mount(_container);
-
-        // Plugins install in Use order during mount, after the build-time provides/config callbacks.
-        order.ShouldBe(["config-a", "config-b", "plugin-a", "plugin-b"]);
-    }
-
-    [Fact]
-    public void Build_AppliesPluginRegistrations_ToTheBuiltApplication()
-    {
-        var key = new InjectionKey<string>("plugin");
-        var root = new TestComponent { SetupFunction = static (_, _) => static () => VirtualNodeFactory.Text("root") };
-        var builder = new TestApplicationBuilder(_renderer.Renderer, root);
-        builder.Use(new ProvidingPlugin(key, "installed"));
-
-        var application = builder.Build();
-        application.Mount(_container);
-
-        // The plugin installed during mount, registering a component and an app-level provide.
-        application.Component("plugin-widget").ShouldNotBeNull();
-        application.Context.Provides[key].ShouldBe("installed");
-    }
-
-    // A concrete builder over the in-memory renderer; Build creates the app and replays configuration.
-    private sealed class TestApplicationBuilder(Renderer<TestNode> renderer, IComponent root, VirtualNodeProperties? properties = null)
-        : ApplicationBuilder(root, properties)
-    {
-        public override Application<TestNode> Build()
+        public override IApplication Build()
         {
-            var application = renderer.CreateApplication(RootComponent, RootProperties);
+            TestApplication application = new(CreateContext(), _order);
             ApplyConfiguration(application);
             return application;
         }
     }
 
-    private sealed class RecordingPlugin(List<string> order, string name) : IApplicationPlugin
+    private sealed class TestApplication : Application<int>
     {
-        public ValueTask InstallAsync(IApplication application)
+        private readonly List<string> _order;
+
+        internal TestApplication(IApplicationContext context, List<string> order)
+            : base(context)
         {
-            order.Add(name);
+            _order = order;
+        }
+
+        internal int UnmountCount { get; private set; }
+
+        protected override ValueTask OnInitializeAsync(CancellationToken cancellationToken)
+        {
+            _order.Add("initialize");
+            return ValueTask.CompletedTask;
+        }
+
+        protected override IComponentContext? MountCore(int container)
+        {
+            _order.Add($"mount:{container}");
+            return null;
+        }
+
+        protected override void UnmountCore()
+        {
+            UnmountCount++;
+        }
+    }
+
+    private sealed class RecordingPlugin : IApplicationPlugin
+    {
+        private readonly List<string> _order;
+
+        internal RecordingPlugin(List<string> order)
+        {
+            _order = order;
+        }
+
+        internal int Installations { get; private set; }
+
+        public ValueTask InstallAsync(
+            IApplication application,
+            CancellationToken cancellationToken = default)
+        {
+            Installations++;
+            _order.Add("plugin");
             return ValueTask.CompletedTask;
         }
     }
 
-    private sealed class ProvidingPlugin(InjectionKey<string> key, string value) : IApplicationPlugin
+    private sealed class EmptyServiceProvider : IServiceProvider
     {
-        public ValueTask InstallAsync(IApplication application)
+        public object? GetService(Type serviceType)
         {
-            application.Component("plugin-widget", new TestComponent
-            {
-                SetupFunction = static (_, _) => static () => VirtualNodeFactory.Text("plugin-widget"),
-            });
-            application.Provide(key, value);
-            return ValueTask.CompletedTask;
+            return null;
         }
     }
 }

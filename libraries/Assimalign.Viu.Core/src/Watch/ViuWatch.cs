@@ -1,5 +1,6 @@
 using System;
 
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu;
 
@@ -14,7 +15,7 @@ namespace Assimalign.Viu;
 /// component <c>OnErrorCaptured</c> chain to the app-level
 /// <see cref="IApplicationContext.ErrorHandler"/> instead of tearing down the flush
 /// ([V01.01.03.12], issue #28). Call during <c>Setup</c> so the watcher joins the component's
-/// effect scope and stops automatically on unmount. Omitted <paramref name="options"/> mean
+/// effect scope and stops automatically on unmount. Omitted <c>options</c> mean
 /// <see cref="WatchFlushMode.Pre"/>; pass <see cref="WatchOptions"/> with an explicit
 /// <see cref="WatchOptions.Flush"/> to choose <see cref="WatchFlushMode.Sync"/> or
 /// <see cref="WatchFlushMode.Post"/> (a pre/post option without a scheduler gets the runtime
@@ -29,12 +30,15 @@ public static class ViuWatch
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
     /// <returns>The handle that stops, pauses, or resumes the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch<T>(ReactiveValue<T> source, WatchCallback<T> callback, WatchOptions? options = null)
+    public static WatchHandle Watch<T>(IReactiveReference<T> source, WatchCallback<T> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(callback);
-        var instance = ComponentInstance.Current;
-        return Reactive.Watch(source, WrapCallback(callback, instance), RuntimeOptions(options, instance));
+        var context = ComponentContext.Current;
+        return Reactive.Watch(
+            source,
+            WrapCallback(callback, context),
+            RuntimeOptions(options, context));
     }
 
     /// <summary>Watches a getter source (upstream: <c>watch(() =&gt; expr, callback)</c>).</summary>
@@ -48,8 +52,11 @@ public static class ViuWatch
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(callback);
-        var instance = ComponentInstance.Current;
-        return Reactive.Watch(WrapGetter(source, instance), WrapCallback(callback, instance), RuntimeOptions(options, instance));
+        var context = ComponentContext.Current;
+        return Reactive.Watch(
+            WrapGetter(source, context),
+            WrapCallback(callback, context),
+            RuntimeOptions(options, context));
     }
 
     /// <summary>
@@ -67,8 +74,11 @@ public static class ViuWatch
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(callback);
-        var instance = ComponentInstance.Current;
-        return Reactive.Watch(source, WrapCallback(callback, instance), RuntimeOptions(options, instance));
+        var context = ComponentContext.Current;
+        return Reactive.Watch(
+            source,
+            WrapCallback(callback, context),
+            RuntimeOptions(options, context));
     }
 
     /// <summary>Watches multiple reference sources (upstream: <c>watch([refA, refB], callback)</c>).</summary>
@@ -77,12 +87,15 @@ public static class ViuWatch
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
     /// <returns>The handle that stops, pauses, or resumes the watcher.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="sources"/> or <paramref name="callback"/> is null.</exception>
-    public static WatchHandle Watch(ReactiveValue[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
+    public static WatchHandle Watch(IReactiveReference[] sources, WatchCallback<object?[]> callback, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(callback);
-        var instance = ComponentInstance.Current;
-        return Reactive.Watch(sources, WrapCallback(callback, instance), RuntimeOptions(options, instance));
+        var context = ComponentContext.Current;
+        return Reactive.Watch(
+            sources,
+            WrapCallback(callback, context),
+            RuntimeOptions(options, context));
     }
 
     /// <summary>Watches multiple getter sources (upstream: <c>watch([() =&gt; a, () =&gt; b], callback)</c>).</summary>
@@ -95,15 +108,18 @@ public static class ViuWatch
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(callback);
-        var instance = ComponentInstance.Current;
+        var context = ComponentContext.Current;
         var wrappedSources = new Func<object?>[sources.Length];
         for (var index = 0; index < sources.Length; index++)
         {
             var source = sources[index];
             ArgumentNullException.ThrowIfNull(source, nameof(sources));
-            wrappedSources[index] = WrapGetter(source, instance);
+            wrappedSources[index] = WrapGetter(source, context);
         }
-        return Reactive.Watch(wrappedSources, WrapCallback(callback, instance), RuntimeOptions(options, instance));
+        return Reactive.Watch(
+            wrappedSources,
+            WrapCallback(callback, context),
+            RuntimeOptions(options, context));
     }
 
     /// <summary>
@@ -117,8 +133,10 @@ public static class ViuWatch
     public static WatchHandle WatchEffect(Action<OnCleanup> effect, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(effect);
-        var instance = ComponentInstance.Current;
-        return Reactive.WatchEffect(WrapEffect(effect, instance), RuntimeOptions(options, instance));
+        var context = ComponentContext.Current;
+        return Reactive.WatchEffect(
+            WrapEffect(effect, context),
+            RuntimeOptions(options, context));
     }
 
     /// <summary>Convenience <see cref="WatchEffect(Action{OnCleanup}, WatchOptions)"/> for an effect with no cleanup.</summary>
@@ -132,15 +150,20 @@ public static class ViuWatch
         return WatchEffect(_ => effect(), options);
     }
 
-    private static WatchOptions RuntimeOptions(WatchOptions? options, ComponentInstance? instance)
+    private static WatchOptions RuntimeOptions(
+        WatchOptions? options,
+        ComponentContext? context)
     {
-        // A fresh scheduler per watch: it owns the watcher's single SchedulerJob and carries the
-        // owning instance's uid so pre-flush callbacks order against component renders exactly as
-        // upstream's `job.id = instance.uid` does.
+        ApplicationWatchScheduler scheduler =
+            context?.WatchScheduler ?? new ApplicationWatchScheduler();
         if (options is null)
         {
             // Upstream default: flush 'pre' on the runtime scheduler.
-            return new WatchOptions { Flush = WatchFlushMode.Pre, Scheduler = new RuntimeWatchScheduler(instance?.Uid) };
+            return new WatchOptions
+            {
+                Flush = WatchFlushMode.Pre,
+                Scheduler = scheduler,
+            };
         }
         if (options.Flush != WatchFlushMode.Sync && options.Scheduler is null)
         {
@@ -152,13 +175,13 @@ public static class ViuWatch
                 Deep = options.Deep,
                 DeepDepth = options.DeepDepth,
                 Flush = options.Flush,
-                Scheduler = new RuntimeWatchScheduler(instance?.Uid),
+                Scheduler = scheduler,
             };
         }
         return options;
     }
 
-    private static WatchCallback<T> WrapCallback<T>(WatchCallback<T> callback, ComponentInstance? instance)
+    private static WatchCallback<T> WrapCallback<T>(WatchCallback<T> callback, ComponentContext? context)
         => (value, oldValue, onCleanup) =>
         {
             try
@@ -169,11 +192,11 @@ public static class ViuWatch
             {
                 // Upstream ErrorCodes.WATCH_CALLBACK: route up the captured chain to the app
                 // handler; with no handler the error rethrows with its original stack.
-                ComponentErrorHandling.Handle(exception, instance, "watcher callback");
+                ComponentErrorHandling.Handle(exception, context, "watcher callback");
             }
         };
 
-    private static Func<T> WrapGetter<T>(Func<T> getter, ComponentInstance? instance)
+    private static Func<T> WrapGetter<T>(Func<T> getter, ComponentContext? context)
         => () =>
         {
             try
@@ -184,12 +207,12 @@ public static class ViuWatch
             {
                 // Upstream ErrorCodes.WATCH_GETTER; a handled getter error yields default so the
                 // watcher stays alive, matching callWithErrorHandling returning undefined.
-                ComponentErrorHandling.Handle(exception, instance, "watcher getter");
+                ComponentErrorHandling.Handle(exception, context, "watcher getter");
                 return default!;
             }
         };
 
-    private static Action<OnCleanup> WrapEffect(Action<OnCleanup> effect, ComponentInstance? instance)
+    private static Action<OnCleanup> WrapEffect(Action<OnCleanup> effect, ComponentContext? context)
         => onCleanup =>
         {
             try
@@ -198,7 +221,7 @@ public static class ViuWatch
             }
             catch (Exception exception)
             {
-                ComponentErrorHandling.Handle(exception, instance, "watcher callback");
+                ComponentErrorHandling.Handle(exception, context, "watcher callback");
             }
         };
 }

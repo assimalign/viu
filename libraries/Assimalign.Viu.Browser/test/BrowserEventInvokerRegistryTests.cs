@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
@@ -227,6 +228,74 @@ public class BrowserEventInvokerRegistryTests
         _registry.Dispatch(Element, capture: false, Event());
 
         invoked.ShouldBe(["first", "second:click"]);
+    }
+
+    [Fact]
+    public async Task TaskReturningHandler_FaultRoutesToTheErrorSink()
+    {
+        TaskCompletionSource<Exception> observed =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _registry.ErrorSink = exception => observed.TrySetResult(exception);
+        _registry.SetListener(
+            Element,
+            "onClick",
+            (Func<BrowserEvent, Task>)(
+                async _ =>
+                {
+                    await Task.Yield();
+                    throw new InvalidOperationException("asynchronous boom");
+                }));
+
+        Should.NotThrow(
+            () => _registry.Dispatch(Element, capture: false, Event()));
+        Exception exception =
+            await observed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        exception.ShouldBeOfType<InvalidOperationException>()
+            .Message.ShouldBe("asynchronous boom");
+    }
+
+    [Fact]
+    public void MulticastTaskReturningHandlers_ObserveEveryReturnedTask()
+    {
+        List<string> invoked = [];
+        Func<BrowserEvent, Task> first =
+            _ =>
+            {
+                invoked.Add("first");
+                return Task.CompletedTask;
+            };
+        Func<BrowserEvent, Task> second =
+            browserEvent =>
+            {
+                invoked.Add("second:" + browserEvent.EventName);
+                return Task.CompletedTask;
+            };
+        Delegate merged = Delegate.Combine(first, second);
+        _registry.SetListener(Element, "onClick", merged);
+
+        _registry.Dispatch(Element, capture: false, Event());
+
+        invoked.ShouldBe(["first", "second:click"]);
+    }
+
+    [Fact]
+    public void ParameterlessTaskReturningHandler_IsInvoked()
+    {
+        int invocationCount = 0;
+        _registry.SetListener(
+            Element,
+            "onClick",
+            (Func<Task>)(
+                () =>
+                {
+                    invocationCount++;
+                    return Task.CompletedTask;
+                }));
+
+        _registry.Dispatch(Element, capture: false, Event());
+
+        invocationCount.ShouldBe(1);
     }
 
     // --- model channel ([V01.01.04.06]: v-model listeners coexist with template @event props;

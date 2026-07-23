@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<!-- Required by the [JSImport] interop source generator (SYSLIB1074). -->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<ItemGroup>
+		<ViuProjectReference Include="Assimalign.Viu.Core" />
+	</ItemGroup>
+</Project>

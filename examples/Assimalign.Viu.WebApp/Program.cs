@@ -29,7 +29,7 @@ if (DiagnosticsInterop.GetQuery().Contains("diagnostics", StringComparison.Ordin
 // A Viu WASM app's whole bootstrap ([V01.01.03.23]): build the app from a root component and mount it
 // by selector. MountAsync loads the browser bridge inside the mount path — there is no separate
 // initialization pre-call. The component tree owns its own state and timers from here on.
-await BrowserApplication.CreateBuilder(new StopwatchApplication()).Build().MountAsync("#app");
+await BrowserApplication.CreateBuilder().UseRootComponent(new StopwatchApplication()) .Build().MountAsync("#app");
 
 // Keep the WASM main loop alive; rendering is reactive from here.
 await Task.Delay(Timeout.Infinite);

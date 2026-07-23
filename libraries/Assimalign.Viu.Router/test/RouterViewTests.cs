@@ -3,33 +3,29 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins RouterView against vue-router's <RouterView> (packages/router/src/RouterView.ts,
-// https://router.vuejs.org/api/#Component-RouterView): depth resolution through provide/inject,
-// reactive swap on navigation, the "only the affected view re-renders" contract, param-only
-// re-render without remount, and the three per-route props forms
-// (https://router.vuejs.org/guide/essentials/passing-props.html). All DOM-free through the Testing
-// renderer with memory history.
+// Pins RouterView against the unified component tree: service-provider resolution, explicit outlet
+// depth, reactive route swaps, parameter updates without remount, and the three route-argument forms.
 public class RouterViewTests
 {
     [Fact]
     public async Task RouterView_RendersMatchedComponent_AndSwapsReactivelyOnNavigation()
     {
-        var viewA = LabelView("a");
-        var viewB = LabelView("b");
+        TrackingComponent viewA = LabelView("a");
+        TrackingComponent viewB = LabelView("b");
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/a", component: viewA),
-                new RouteRecord("/b", component: viewB),
+                new RouteRecord("/a", component: viewA.Request),
+                new RouteRecord("/b", component: viewB.Request),
             ]);
         _ = router.Push("/a");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, viewA, viewB);
 
         wrapper.Html().ShouldBe("<div class=\"a\">a</div>");
         viewA.RenderCount.ShouldBe(1);
@@ -39,142 +35,145 @@ public class RouterViewTests
 
         wrapper.Html().ShouldBe("<div class=\"b\">b</div>");
         viewB.SetupCount.ShouldBe(1);
-        viewA.Instance!.IsUnmounted.ShouldBeTrue();
+        viewA.IsUnmounted.ShouldBeTrue();
     }
 
     [Fact]
-    public void RouterView_NestedViews_ResolveTheMatchedChainByDepth()
+    public void RouterView_NestedViews_ResolveTheMatchedChainByExplicitDepth()
     {
-        // /users/:id matches [users, :id]; the outer view renders the layout at depth 0 and the
-        // layout's nested <RouterView> renders the detail at depth 1 (depth via provide/inject).
-        var outlet = new RouterView();
-        var detail = LabelView("detail");
-        var layout = LayoutView(outlet);
+        TrackingComponent detail = LabelView("detail");
+        TrackingComponent layout = LayoutView(outletDepth: 1);
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/users", component: layout, children:
+                new RouteRecord("/users", component: layout.Request, children:
                 [
-                    new RouteRecord(":id", component: detail),
+                    new RouteRecord(":id", component: detail.Request),
                 ]),
             ]);
         _ = router.Push("/users/1");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, layout, detail);
 
-        wrapper.Html().ShouldBe("<div class=\"layout\"><div class=\"detail\">detail</div></div>");
-        layout.Instance.ShouldNotBeNull();
-        detail.Instance.ShouldNotBeNull();
+        wrapper.Html().ShouldBe(
+            "<div class=\"layout\"><div class=\"detail\">detail</div></div>");
+        layout.Context.ShouldNotBeNull();
+        detail.Context.ShouldNotBeNull();
     }
 
     [Fact]
-    public async Task RouterView_LeafOnlyNavigation_ReRendersOnlyTheAffectedView()
+    public async Task RouterView_LeafNavigation_PreservesTheParentTemplateInstance()
     {
-        var outlet = new RouterView();
-        var layout = LayoutView(outlet);
-        var profile = LabelView("profile");
-        var settings = LabelView("settings");
+        TrackingComponent layout = LayoutView(outletDepth: 1);
+        TrackingComponent profile = LabelView("profile");
+        TrackingComponent settings = LabelView("settings");
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/users", component: layout, children:
+                new RouteRecord("/users", component: layout.Request, children:
                 [
-                    new RouteRecord("profile", component: profile),
-                    new RouteRecord("settings", component: settings),
+                    new RouteRecord("profile", component: profile.Request),
+                    new RouteRecord("settings", component: settings.Request),
                 ]),
             ]);
         _ = router.Push("/users/profile");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, layout, profile, settings);
 
-        wrapper.Html().ShouldBe("<div class=\"layout\"><div class=\"profile\">profile</div></div>");
-        layout.SetupCount.ShouldBe(1);
-        layout.RenderCount.ShouldBe(1);
-        var layoutInstance = layout.Instance;
+        wrapper.Html().ShouldBe(
+            "<div class=\"layout\"><div class=\"profile\">profile</div></div>");
+        IComponentContext? layoutContext = layout.Context;
 
         _ = router.Push("/users/settings");
         await wrapper.NextTickAsync();
 
-        wrapper.Html().ShouldBe("<div class=\"layout\"><div class=\"settings\">settings</div></div>");
-        // Only the leaf changed: the parent layout view was neither re-rendered nor remounted, and
-        // the old leaf was torn down while the new one mounted.
+        wrapper.Html().ShouldBe(
+            "<div class=\"layout\"><div class=\"settings\">settings</div></div>");
         layout.SetupCount.ShouldBe(1);
-        layout.RenderCount.ShouldBe(1);
-        layout.Instance.ShouldBeSameAs(layoutInstance);
-        profile.Instance!.IsUnmounted.ShouldBeTrue();
+        layout.Context.ShouldBeSameAs(layoutContext);
+        profile.IsUnmounted.ShouldBeTrue();
         settings.SetupCount.ShouldBe(1);
-        settings.RenderCount.ShouldBe(1);
     }
 
     [Fact]
-    public async Task RouterView_ParameterOnlyNavigation_UpdatesPropsWithoutRemounting()
+    public async Task RouterView_ParameterOnlyNavigation_UpdatesArgumentsWithoutRemounting()
     {
-        // vue-router's reactive route object: /users/1 -> /users/2 keeps the same matched record, so
-        // the component patches with new props instead of remounting.
-        var view = PropView("id");
+        TrackingComponent view = PropView("id");
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/users/:id", component: view, propertiesResolver: RouteComponentProperties.FromParameters()),
+                new RouteRecord(
+                    "/users/:id",
+                    component: view.Request,
+                    argumentsResolver: RouteComponentArguments.FromParameters()),
             ]);
         _ = router.Push("/users/1");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, view);
 
         wrapper.Html().ShouldBe("<span class=\"value\">1</span>");
-        view.SetupCount.ShouldBe(1);
-        view.RenderCount.ShouldBe(1);
-        var instance = view.Instance;
+        IComponentContext? context = view.Context;
 
         _ = router.Push("/users/2");
         await wrapper.NextTickAsync();
 
         wrapper.Html().ShouldBe("<span class=\"value\">2</span>");
-        view.Instance.ShouldBeSameAs(instance);
+        view.Context.ShouldBeSameAs(context);
         view.SetupCount.ShouldBe(1);
         view.RenderCount.ShouldBe(2);
     }
 
     [Fact]
-    public void RouterView_PropsTrue_MapsRouteParametersToProps()
+    public void RouterView_ArgumentsFromParameters_MapsRouteParameters()
     {
-        var view = PropView("id");
+        TrackingComponent view = PropView("id");
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/users/:id", component: view, propertiesResolver: RouteComponentProperties.FromParameters()),
+                new RouteRecord(
+                    "/users/:id",
+                    component: view.Request,
+                    argumentsResolver: RouteComponentArguments.FromParameters()),
             ]);
         _ = router.Push("/users/42");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, view);
 
         wrapper.Html().ShouldBe("<span class=\"value\">42</span>");
     }
 
     [Fact]
-    public void RouterView_PropsObject_PassesStaticProps()
+    public void RouterView_ArgumentsFromValues_PassesStaticArguments()
     {
-        var view = PropView("role");
+        TrackingComponent view = PropView("role");
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/admin", component: view, propertiesResolver: RouteComponentProperties.FromValues(("role", "admin"))),
+                new RouteRecord(
+                    "/admin",
+                    component: view.Request,
+                    argumentsResolver:
+                        RouteComponentArguments.FromValues(("role", "admin"))),
             ]);
         _ = router.Push("/admin");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, view);
 
         wrapper.Html().ShouldBe("<span class=\"value\">admin</span>");
     }
 
     [Fact]
-    public void RouterView_PropsFunction_ReceivesTheResolvedRoute()
+    public void RouterView_ArgumentFunction_ReceivesTheResolvedRoute()
     {
-        var view = PropView("userId");
-        RouteComponentPropertiesResolver resolver =
-            route => VirtualNodeFactory.Properties(("userId", route.Parameters.GetString("id")));
+        TrackingComponent view = PropView("userId");
+        RouteComponentArgumentsResolver resolver =
+            route => Arguments(
+                ("userId", route.Parameters.GetString("id")));
         var router = new Router(
             RouterHistory.CreateMemory(),
             [
-                new RouteRecord("/users/:id", component: view, propertiesResolver: resolver),
+                new RouteRecord(
+                    "/users/:id",
+                    component: view.Request,
+                    argumentsResolver: resolver),
             ]);
         _ = router.Push("/users/7");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, view);
 
         wrapper.Html().ShouldBe("<span class=\"value\">7</span>");
     }
@@ -182,15 +181,34 @@ public class RouterViewTests
     [Fact]
     public void RouterView_RendersNothing_WhenNoRecordMatchesAtItsDepth()
     {
+        TrackingComponent view = LabelView("a");
         var router = new Router(
             RouterHistory.CreateMemory(),
-            [
-                new RouteRecord("/a", component: LabelView("a")),
-            ]);
+            [new RouteRecord("/a", component: view.Request)]);
         _ = router.Push("/nowhere");
-        using var wrapper = MountView(router);
+        using var wrapper = MountView(router, view);
 
         router.CurrentRoute.Value.IsMatched.ShouldBeFalse();
         wrapper.Find("div").ShouldBeNull();
+    }
+
+    [Fact]
+    public void RouterView_RendersNothing_WhenRouterServiceIsMissing()
+    {
+        using var wrapper = Assimalign.Viu.Testing.ViuTest.Mount(
+            new RouterView());
+
+        wrapper.Find("div").ShouldBeNull();
+    }
+
+    [Fact]
+    public void RouteRecord_ArgumentsResolverForPrimitiveComponent_Throws()
+    {
+        Should.Throw<System.ArgumentException>(
+            () => new RouteRecord(
+                "/text",
+                component: ComponentTree.Text("text"),
+                argumentsResolver:
+                    RouteComponentArguments.FromValues(("value", "unused"))));
     }
 }

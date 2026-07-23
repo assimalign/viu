@@ -231,7 +231,7 @@ of each member:
 - `_createTextVNode(object? text = null, int patchFlag = 0)`, `_createCommentVNode(string? text = "", bool asBlock = false)`,
   `_createStaticVNode(string content, int count)` — text/comment/static vnodes.
 - `_toDisplayString(object?) : string` — interpolation stringification.
-- `_renderList(source, iterator) : VirtualNode?[]` — generic overloads whose type inference gives the
+- `_renderList(source, iterator) : TResult[]` — generic overloads whose type inference gives the
   emitted `(item)`, `(item, index)` lambdas their parameter types (list/count/object-entry sources).
 - `_renderSlot(ComponentSlots? slots, string name, object? props = null, Func<object?[]?>? fallback = null)`.
 - `_withCtx(fn) : Slot` — slot-function wrapper (0- and 1-parameter overloads); its delegate parameters
@@ -294,11 +294,10 @@ What code generation requires of each DOM member, mapped to the runtime machiner
   `_withKeys(_withModifiers(handler, ["prevent"]), ["enter"])` (the outer call resolves the inner result through
   the `Action<BrowserEvent>` arm). These are **not** wrapped in `_withHandler` — their own signatures type the
   inner lambda.
-- `_Transition` / `_TransitionGroup` — the DOM built-ins, typed `object` markers. Renderer support is deferred to
-  [V01.01.04.07], so they are honest placeholders: the compiled render passes one as a vnode `tag`, and because
-  the marker is neither an element string, a component definition, nor a runtime-core built-in, the vnode
-  factory's tag dispatch throws a clear `NotSupportedException` at render time rather than silently rendering
-  nothing (documented, not inert) — the DOM analogue of how `_Teleport`/`_Suspense` fail today.
+- `_Transition` / `_TransitionGroup` — named-template markers lowered to `TemplateComponent`
+  requests. Browser's component-factory wrapper resolves `Transition`, `TransitionGroup`, and the
+  Core `BaseTransition` dependency without service resolution. Core's keyed child-to-host-element
+  snapshots support `TransitionGroup`'s Browser-owned FLIP pass.
 
 The generated render method itself is the generator's contract:
 `internal static object? Render(<ComponentClass> _ctx, object?[] _cache)` plus

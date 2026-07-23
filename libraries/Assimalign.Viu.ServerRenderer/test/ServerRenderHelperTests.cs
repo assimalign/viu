@@ -7,6 +7,7 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
@@ -19,7 +20,14 @@ public class ServerRenderHelperTests
     private static (SsrRenderState State, SsrWriter Writer) NewState()
     {
         var writer = new SsrWriter();
-        return (new SsrRenderState(writer, new SsrContext(), CancellationToken.None), writer);
+        ServerApplication application = Ssr.Application(ComponentTree.Comment());
+        return (
+            new SsrRenderState(
+                writer,
+                new SsrContext(),
+                application.Context,
+                CancellationToken.None),
+            writer);
     }
 
     [Fact]
@@ -66,8 +74,8 @@ public class ServerRenderHelperTests
     public async Task SsrRenderComponentAsync_RendersChild()
     {
         var (state, writer) = NewState();
-        var child = new InlineComponent((_, _) => () => VirtualNodeFactory.Element("span", "x"));
-        await ServerRender.SsrRenderComponentAsync(state, child);
+        InlineComponent child = new(_ => () => TestTree.Element("span", "x"));
+        await ServerRender.SsrRenderComponentAsync(state, child.Request());
         writer.ToStringResult().ShouldBe("<span>x</span>");
     }
 
@@ -75,8 +83,10 @@ public class ServerRenderHelperTests
     public async Task SsrRenderSlotAsync_WrapsContentInFragmentAnchors()
     {
         var (state, writer) = NewState();
-        var slots = new ComponentSlots();
-        slots["default"] = _ => [VirtualNodeFactory.Element("b", "hi")];
+        Dictionary<string, ComponentSlot> slots = new()
+        {
+            ["default"] = _ => TestTree.Element("b", "hi"),
+        };
         await ServerRender.SsrRenderSlotAsync(state, slots, "default");
         writer.ToStringResult().ShouldBe("<!--[--><b>hi</b><!--]-->");
     }

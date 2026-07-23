@@ -1,83 +1,76 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
 using Xunit;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
-// Pins the server application's service surface ([V01.01.03.24]): the builder attaches an
-// IServiceProvider (IApplication.Services) reachable from Setup during render, providers are isolated
-// per request (per app), and Dispose cascades to owned disposable singletons.
+/// <summary>
+/// Pins the borrowed, independently supplied <see cref="IServiceProvider"/> application boundary.
+/// </summary>
 public class ServerRendererServiceTests
 {
-    private sealed class Greeting
-    {
-        public Greeting(string text) => Text = text;
-
-        public string Text { get; }
-    }
-
-    private sealed class TrackingDisposable : IDisposable
-    {
-        public bool IsDisposed { get; private set; }
-
-        public void Dispose() => IsDisposed = true;
-    }
-
     [Fact]
     public async Task Builder_AttachesServices_ReachableFromSetupDuringRender()
     {
-        var service = new Greeting("hello");
-        var component = new InlineComponent((_, _) =>
+        Greeting greeting = new("hello");
+        TestServiceProvider services = Services(greeting);
+        InlineComponent component = new(context =>
         {
-            var greeting = DependencyInjection.GetRequiredService<Greeting>();
-            return () => VirtualNodeFactory.Element("div", greeting.Text);
+            Greeting resolved =
+                (Greeting?)context.Services.GetService(typeof(Greeting))
+                ?? throw new InvalidOperationException("Greeting was not supplied.");
+            return () => TestTree.Element("div", resolved.Text);
         });
-        var builder = ServerApplication.CreateBuilder(component);
-        builder.Services.AddSingleton(service);
-        var application = builder.Build();
+        ServerApplication application = ServerApplication
+            .CreateBuilder(component.Request(), InlineComponentFactory.Instance, services)
+            .Build();
 
-        var html = await ServerRenderer.RenderToStringAsync(application);
+        string html = await ServerRenderer.RenderToStringAsync(application);
 
         html.ShouldBe("<div>hello</div>");
-        application.Context.ServicesProvider.ShouldNotBeNull();
-        application.Context.ServicesProvider!.GetRequiredService<Greeting>().ShouldBeSameAs(service);
+        application.Context.Services.ShouldBeSameAs(services);
     }
 
     [Fact]
-    public void TwoServerApplications_HaveIsolatedServiceSingletons()
+    public async Task ServerApplication_DoesNotDisposeBorrowedServiceProvider()
     {
-        ServerApplication BuildApp()
-        {
-            var builder = ServerApplication.CreateBuilder(
-                new InlineComponent((_, _) => static () => VirtualNodeFactory.Element("div", "x")));
-            builder.Services.AddSingleton(_ => new Greeting("g"));
-            return builder.Build();
-        }
+        TrackingServiceProvider services = new();
+        InlineComponent component = new(_ => () => TestTree.Element("div", "x"));
+        ServerApplication application = new(
+            component.Request(),
+            InlineComponentFactory.Instance,
+            services);
 
-        var appA = BuildApp();
-        var appB = BuildApp();
+        await ServerRenderer.RenderToStringAsync(application);
+        application.Unmount();
+        await application.UnmountAsync();
 
-        appA.Context.ServicesProvider!.GetRequiredService<Greeting>()
-            .ShouldNotBeSameAs(appB.Context.ServicesProvider!.GetRequiredService<Greeting>());
+        services.IsDisposed.ShouldBeFalse();
     }
 
-    [Fact]
-    public void Dispose_DisposesOwnedDisposableSingleton()
+    private static TestServiceProvider Services(Greeting greeting)
     {
-        var disposable = new TrackingDisposable();
-        var builder = ServerApplication.CreateBuilder(
-            new InlineComponent((_, _) => static () => VirtualNodeFactory.Element("div", "x")));
-        builder.Services.AddSingleton(disposable);
-        var application = builder.Build();
-        _ = application.Context.ServicesProvider!.GetRequiredService<TrackingDisposable>(); // realize the singleton
+        return new TestServiceProvider(
+            new Dictionary<Type, object>
+            {
+                [typeof(Greeting)] = greeting,
+            });
+    }
 
-        application.Dispose();
+    private sealed record Greeting(string Text);
 
-        disposable.IsDisposed.ShouldBeTrue();
+    private sealed class TrackingServiceProvider : IServiceProvider, IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public object? GetService(Type serviceType) => null;
+
+        public void Dispose() => IsDisposed = true;
     }
 }

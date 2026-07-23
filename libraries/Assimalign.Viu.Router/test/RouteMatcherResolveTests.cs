@@ -105,12 +105,10 @@ public class RouteMatcherResolveTests
         Justification = "Test-only reflection over assembly references to assert the Router dependency boundary; the test project is never trimmed or AOT-published.")]
     public void RouterAssembly_DoesNotReferenceTheBrowserDomAdapter()
     {
-        // [V01.01.08.03] (issue #72) places RouterView/RouterLink in this assembly, so it now
-        // references Assimalign.Viu.Core (the merged runtime core + reactivity) — a deliberate,
-        // documented relaxation of the [V01.01.08.01]/[V01.01.08.02] "no other Viu library"
-        // assertion. Deviates from that prior boundary per issue #72's stated architecture (the
-        // Router area may reference Runtime Core / Reactivity). The matcher and memory-history code
-        // still uses neither reference, so it stays runnable in a plain .NET host; the forbidden
+        // [V01.01.08.03] (issue #72) places RouterView/RouterLink in this assembly, so Router now
+        // references the unified Components contract and standalone Reactivity library, but not
+        // runtime Core. The matcher and memory-history code still uses neither reference, so it
+        // stays runnable in a plain .NET host; the forbidden
         // coupling is now the browser DOM adapter (Assimalign.Viu.Browser), because the components
         // must render through the injected node-ops abstraction to work against the in-memory test
         // renderer and the SSR renderer, never the DOM directly. The framework's
@@ -122,7 +120,9 @@ public class RouteMatcherResolveTests
             .ToArray();
 
         referenced.ShouldNotContain("Assimalign.Viu.Browser");
-        // Positive check: the component-model wiring the components depend on is actually in place.
-        referenced.ShouldContain("Assimalign.Viu.Core");
+        // Positive checks: the component model and reactive current-route wiring are in place.
+        referenced.ShouldContain("Assimalign.Viu.Components");
+        referenced.ShouldContain("Assimalign.Viu.Reactivity");
+        referenced.ShouldNotContain("Assimalign.Viu.Core");
     }
 }

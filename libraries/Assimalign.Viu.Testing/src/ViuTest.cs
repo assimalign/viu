@@ -2,77 +2,177 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// The entry point for component testing — the C# port of <c>@vue/test-utils</c>'s <c>mount</c>
-/// (https://test-utils.vuejs.org/api/#mount). Renders a component against the in-memory test
-/// renderer and returns a <see cref="ComponentWrapper"/> for querying, interacting, and asserting,
-/// all DOM-free in xUnit.
-/// </summary>
+/// <summary>Provides DOM-free mounting helpers over the in-memory test host.</summary>
 public static class ViuTest
 {
-    /// <summary>
-    /// Mounts <paramref name="component"/> with the given <paramref name="options"/> and returns its
-    /// wrapper. The caller supplies the component instance (source-generated component factories,
-    /// never reflection-based activation, construct definitions in an AOT/trimming-safe build).
-    /// Dispose the returned wrapper (a <c>using</c>) to unmount and reset the scheduler.
-    /// </summary>
-    /// <typeparam name="TComponent">The component definition type (for typed <c>FindComponent</c> matching).</typeparam>
-    /// <param name="component">The component definition to mount.</param>
-    /// <param name="options">Props, slots, and global config (provides, registered components, stubs), or null.</param>
-    /// <returns>The root component wrapper.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="component"/> is null.</exception>
-    public static ComponentWrapper Mount<TComponent>(TComponent component, ComponentMountOptions? options = null)
-        where TComponent : IComponent
+    /// <summary>Mounts an immutable component tree and returns its query wrapper.</summary>
+    /// <param name="component">The primitive component tree.</param>
+    /// <returns>The mounted wrapper.</returns>
+    public static ComponentWrapper Mount(IComponent component)
     {
-        ArgumentNullException.ThrowIfNull(component);
-        options ??= new ComponentMountOptions();
-
-        // The wrapper owns the scheduler lifecycle for the mount: reset, then capture flushes so
-        // async helpers stay deterministic (no ambient SynchronizationContext).
-        Scheduler.Reset();
-        var flush = new ScheduledFlush(TestSchedulerPump.Install());
-
-        var renderer = new TestRenderer();
-        var container = renderer.CreateContainer();
-
-        var context = BuildContext(options, out var emitted);
-        var rootVirtualNode = VirtualNodeFactory.Component(component, options.Properties, options.Slots);
-        rootVirtualNode.AppContext = context;
-        renderer.Render(rootVirtualNode, container);
-
-        var instance = (ComponentInstance)rootVirtualNode.Component!;
-        return new ComponentWrapper(instance, emitted, flush, renderer.Renderer, container, isRoot: true);
+        return MountTree(component, options: null);
     }
 
-    private static ApplicationContext BuildContext(ComponentMountOptions options, out EmittedEvents emitted)
+    /// <summary>
+    /// Mounts a component tree with application composition for template children, directives,
+    /// services, and state.
+    /// </summary>
+    /// <param name="component">The component tree.</param>
+    /// <param name="options">The application-level test mount options.</param>
+    /// <returns>The mounted wrapper.</returns>
+    public static ComponentWrapper Mount(
+        IComponent component,
+        ComponentMountOptions options)
     {
-        var context = new ApplicationContext();
-        foreach (var (key, value) in options.Provides)
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(options);
+        return MountTree(component, options);
+    }
+
+    private static ComponentWrapper MountTree(
+        IComponent component,
+        ComponentMountOptions? options)
+    {
+        EmittedEvents emitted = new();
+        Dictionary<Type, ComponentActivator?> emptyStubs = [];
+        TestComponentFactory components = new(
+            options?.Components,
+            options?.Stubs ?? emptyStubs);
+        ApplicationContext application = new(
+            component,
+            components,
+            options?.Services ?? EmptyServiceProvider.Instance,
+            options?.State,
+            options?.Directives);
+        options?.ConfigureApplication?.Invoke(application);
+        application.EventObserver = emitted.Record;
+
+        Scheduler.Reset();
+        ScheduledFlush flush = new(TestSchedulerPump.Install());
+        try
         {
-            context.Provides[key] = value;
+            TestRenderer renderer = new();
+            TestElement container = renderer.CreateContainer();
+            IComponentContext? context = renderer.Render(
+                component,
+                container,
+                application);
+            MountedTemplateNode<TestNode>? mountedTemplate =
+                FindMountedTemplate(
+                    renderer.Renderer,
+                    container,
+                    context);
+            return new ComponentWrapper(
+                component,
+                mountedTemplate,
+                emitted,
+                flush,
+                renderer.Renderer,
+                container,
+                ownsMount: true);
         }
-        foreach (var (name, definition) in options.Components)
+        catch
         {
-            context.Components[name] = definition;
+            flush.Dispose();
+            Scheduler.Reset();
+            throw;
         }
-        if (options.Stubs.Count > 0)
+    }
+
+    /// <summary>Mounts an authored component template and returns its query wrapper.</summary>
+    /// <param name="template">The authored component template.</param>
+    /// <param name="options">The arguments, slots, resolvers, and application configuration.</param>
+    /// <returns>The mounted wrapper.</returns>
+    public static ComponentWrapper Mount(
+        IComponentTemplate template,
+        ComponentMountOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        options ??= new ComponentMountOptions();
+
+        EmittedEvents emitted = new();
+        ITemplateComponent root = ComponentTree.Template(
+            template.GetType(),
+            options.Arguments,
+            options.Slots,
+            listeners: options.Listeners);
+        TestComponentFactory components = new(
+            template,
+            options.Components,
+            options.Stubs);
+        ApplicationContext application = new(
+            root,
+            components,
+            options.Services ?? EmptyServiceProvider.Instance,
+            options.State,
+            options.Directives);
+        options.ConfigureApplication?.Invoke(application);
+        application.EventObserver = emitted.Record;
+
+        Scheduler.Reset();
+        ScheduledFlush flush = new(TestSchedulerPump.Install());
+        try
         {
-            var stubs = new Dictionary<IComponent, IComponent>();
-            foreach (var (real, stub) in options.Stubs)
+            TestRenderer renderer = new();
+            TestElement container = renderer.CreateContainer();
+            IComponentContext? context = renderer.Render(
+                root,
+                container,
+                application);
+            if (context is null)
             {
-                stubs[real] = stub ?? StubComponent.For(real);
+                throw new InvalidOperationException(
+                    "Core did not return a context for the mounted root template.");
             }
-            context.ComponentStubs = stubs;
+
+            MountedTemplateNode<TestNode> mountedTemplate =
+                FindMountedTemplate(
+                    renderer.Renderer,
+                    container,
+                    context)
+                ?? throw new InvalidOperationException(
+                    "Core did not expose the mounted root template.");
+            return new ComponentWrapper(
+                root,
+                mountedTemplate,
+                emitted,
+                flush,
+                renderer.Renderer,
+                container,
+                ownsMount: true);
         }
-        options.ConfigureApplication?.Invoke(context);
-        // App-level DI provider ([V01.01.03.24]): reachable from the mounted tree's Setup through
-        // ComponentInstance.Services, independent of the component-tree provides above.
-        context.ServicesProvider = options.Services;
-        emitted = new EmittedEvents();
-        context.EmitObserver = emitted.Record;
-        return context;
+        catch
+        {
+            flush.Dispose();
+            Scheduler.Reset();
+            throw;
+        }
+    }
+
+    private static MountedTemplateNode<TestNode>? FindMountedTemplate(
+        Renderer<TestNode> renderer,
+        TestElement container,
+        IComponentContext? context)
+    {
+        if (context is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<MountedTemplateNode<TestNode>> templates =
+            renderer.GetMountedTemplates(container);
+        for (int index = 0; index < templates.Count; index++)
+        {
+            if (ReferenceEquals(templates[index].Instance.Context, context))
+            {
+                return templates[index];
+            }
+        }
+
+        return null;
     }
 }

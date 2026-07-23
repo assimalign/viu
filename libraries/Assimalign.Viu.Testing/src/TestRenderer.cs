@@ -1,89 +1,104 @@
+using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// The ready-to-use in-memory renderer for unit tests — the C# counterpart of
-/// <c>@vue/runtime-test</c>'s exported <c>render</c> + <c>nodeOps</c> pair
-/// (https://github.com/vuejs/core/tree/main/packages/runtime-test). Mount, patch, unmount, and
-/// scheduler-driven updates all run on a plain CoreCLR test host with no browser, WASM
-/// toolchain, or JS interop, and every node operation lands in <see cref="OperationLog"/>.
+/// A ready-to-use in-memory renderer for DOM-free component-tree tests.
 /// </summary>
+/// <remarks>
+/// This is the C# counterpart of Vue's runtime-test host:
+/// https://github.com/vuejs/core/tree/main/packages/runtime-test. Every host operation is recorded
+/// in <see cref="OperationLog"/>.
+/// </remarks>
 public sealed class TestRenderer
 {
-    // The live roots the querySelector node-op searches to resolve a <Teleport> string target; every
-    // render container is auto-registered, and RegisterQueryRoot adds detached target containers.
-    private readonly List<TestElement> _teleportTargetRoots = [];
+    private readonly List<TestElement> _queryRoots = [];
 
-    /// <summary>Creates a renderer over a fresh op log.</summary>
+    /// <summary>Creates an in-memory renderer.</summary>
     /// <param name="snapshotSemantics">
-    /// When true, hydration reads use an immutable <see cref="FrozenTestHydrationReader"/> and a double-remove
-    /// throws — mirroring the browser's batched snapshot reader so a hydration walk that re-reads structure
-    /// after mutating fails loudly (the snapshot-safety regression mode, [V01.01.07.03]). Default false
-    /// (live-tree reads).
+    /// Whether hydration uses an immutable pre-walk matching a batched browser snapshot.
     /// </param>
-    public TestRenderer(bool snapshotSemantics = false)
+    /// <param name="strictRemoval">
+    /// Whether duplicate host removals throw. Snapshot mode always enables this check.
+    /// </param>
+    public TestRenderer(
+        bool snapshotSemantics = false,
+        bool strictRemoval = false)
     {
         OperationLog = new TestNodeOperationLog();
         Renderer = RendererFactory.CreateRenderer(
-            TestNodeOperations.Create(OperationLog, _teleportTargetRoots, snapshotSemantics));
+            TestNodeOperations.Create(
+                OperationLog,
+                _queryRoots,
+                strictRemoval || snapshotSemantics,
+                snapshotSemantics));
     }
 
-    /// <summary>The underlying platform-agnostic renderer.</summary>
+    /// <summary>Gets the underlying host-neutral renderer.</summary>
     public Renderer<TestNode> Renderer { get; }
 
-    /// <summary>The log every node operation is recorded into.</summary>
+    /// <summary>Gets the recorded host operations.</summary>
     public TestNodeOperationLog OperationLog { get; }
 
-    /// <summary>
-    /// Creates a detached container element to render into. Container creation is not recorded —
-    /// the log isolates what the renderer did.
-    /// </summary>
-    /// <param name="tag">The container tag.</param>
-    public TestElement CreateContainer(string tag = "root") => new(tag, null);
+    /// <summary>Creates a detached render container without recording a host operation.</summary>
+    /// <param name="tag">The diagnostic container tag.</param>
+    /// <returns>The container.</returns>
+    public TestElement CreateContainer(string tag = "root")
+    {
+        return new TestElement(tag, elementNamespace: null);
+    }
 
     /// <summary>
-    /// Registers <paramref name="root"/> (and its subtree) as searchable by a <c>&lt;Teleport&gt;</c>
-    /// string <c>to</c> target — the in-memory analogue of an element being present in the document the
-    /// browser's <c>querySelector</c> searches. Render containers are registered automatically; use this
-    /// for a detached target container that a Teleport selects by <c>#id</c>/<c>.class</c>/tag rather than
-    /// by a direct node reference ([V01.01.03.17]).
+    /// Registers a root and its subtree for Teleport target selector queries.
     /// </summary>
-    /// <param name="root">The element to make findable.</param>
+    /// <param name="root">The query root.</param>
     public void RegisterQueryRoot(TestElement root)
     {
-        if (!_teleportTargetRoots.Contains(root))
+        ArgumentNullException.ThrowIfNull(root);
+        if (!_queryRoots.Contains(root))
         {
-            _teleportTargetRoots.Add(root);
+            _queryRoots.Add(root);
         }
     }
 
-    /// <summary>Renders <paramref name="node"/> into <paramref name="container"/> (null unmounts).</summary>
-    /// <param name="node">The tree to render, or null to unmount.</param>
-    /// <param name="container">The container element.</param>
-    public void Render(VirtualNode? node, TestElement container)
+    /// <summary>Renders an immutable component tree, or unmounts when null.</summary>
+    /// <param name="component">The component tree.</param>
+    /// <param name="container">The render container.</param>
+    /// <param name="application">
+    /// The application context used by templates and directives, or null for a primitive-only
+    /// tree.
+    /// </param>
+    /// <returns>The root template context, or null when the root is not a template.</returns>
+    public IComponentContext? Render(
+        IComponent? component,
+        TestElement container,
+        IApplicationContext? application = null)
     {
-        // A render container is a queryable root for Teleport string targets (an in-tree #id/.class/tag
-        // resolves against the tree the renderer just built).
+        ArgumentNullException.ThrowIfNull(container);
         RegisterQueryRoot(container);
-        Renderer.Render(node, container);
+        return Renderer.Render(component, container, application);
     }
 
-    /// <summary>
-    /// Hydrates <paramref name="node"/> against the existing server-rendered children already present in
-    /// <paramref name="container"/> — the DOM-free counterpart of a browser <c>CreateSSRApp(...).Mount</c>
-    /// (upstream: <c>createSSRApp</c>'s hydrating mount, https://vuejs.org/guide/scaling-up/ssr.html#client-hydration).
-    /// Populate <paramref name="container"/> with the server tree first (by hand or by parsing SSR output),
-    /// then hydrate: matching nodes are adopted with zero structural mutations, and a mismatch recovers per
-    /// subtree ([V01.01.07.03]).
-    /// </summary>
-    /// <param name="node">The client vnode tree to hydrate onto the server nodes.</param>
-    /// <param name="container">The container holding the pre-rendered server tree.</param>
-    public void Hydrate(VirtualNode node, TestElement container)
+    /// <summary>Hydrates a component tree over existing server-rendered host nodes.</summary>
+    /// <param name="component">The client component tree.</param>
+    /// <param name="container">The server-populated container.</param>
+    /// <param name="application">
+    /// The application context used by templates, directives, and warnings, or null for a
+    /// primitive-only tree.
+    /// </param>
+    /// <returns>The root template context, or null when the root is not a template.</returns>
+    public IComponentContext? Hydrate(
+        IComponent component,
+        TestElement container,
+        IApplicationContext? application = null)
     {
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(container);
         RegisterQueryRoot(container);
-        Renderer.Hydrate(node, container);
+        return Renderer.Hydrate(component, container, application);
     }
 }

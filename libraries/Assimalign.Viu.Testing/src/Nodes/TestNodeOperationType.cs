@@ -19,17 +19,17 @@ public enum TestNodeOperationType
     /// <summary>A text node's content was set.</summary>
     SetText,
 
-    /// <summary>An element's entire content was replaced with text.</summary>
-    SetElementText,
-
     /// <summary>A node was inserted into a parent (optionally before an anchor).</summary>
     Insert,
 
     /// <summary>A node was removed from its parent.</summary>
     Remove,
 
-    /// <summary>A single prop was patched on an element.</summary>
-    PatchProperty,
+    /// <summary>A single attribute, property, or event binding was patched on an element.</summary>
+    PatchAttribute,
+
+    /// <summary>A compiler-produced scoped-style identifier was stamped on an element.</summary>
+    SetScopeIdentifier,
 
     /// <summary>A raw static-markup chunk was inserted in one operation.</summary>
     InsertStaticContent,

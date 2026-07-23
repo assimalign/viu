@@ -5,7 +5,8 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Browser.Tests;
 
@@ -22,7 +23,8 @@ public sealed class TransitionGroupTests : IDisposable
     [Fact]
     public void Reorder_AppliesMoveClassAndInvertingTransform_OnlyToMovedItems()
     {
-        var list = Reactive.Reference<string[]>(["1", "2", "3"]);
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2", "3"]);
         _harness.Render(Group(list));
 
         var spans = _harness.FindElements("span");
@@ -61,10 +63,43 @@ public sealed class TransitionGroupTests : IDisposable
     }
 
     [Fact]
+    public void Render_UnkeyedNonTextChildren_WarnsPerChildButExemptsText()
+    {
+        Dictionary<string, ComponentSlot> slots =
+            new(StringComparer.Ordinal)
+            {
+                ["default"] = _ => ComponentTree.Fragment(
+                [
+                    ComponentTree.Text("text"),
+                    ComponentTree.Element(
+                        "span",
+                        children: [ComponentTree.Text("keyed")],
+                        key: "keyed"),
+                    ComponentTree.Element(
+                        "span",
+                        children: [ComponentTree.Text("unkeyed")]),
+                    ComponentTree.Comment("unkeyed-comment"),
+                ]),
+            };
+
+        _harness.Render(
+            ComponentTree.Template<TransitionGroup>(
+                new ComponentArguments(),
+                slots));
+
+        _harness.Warnings.ShouldBe(
+        [
+            "<TransitionGroup> children must be keyed.",
+            "<TransitionGroup> children must be keyed.",
+        ]);
+    }
+
+    [Fact]
     public void Reorder_WithoutCssTransform_SkipsTheFlipEntirely()
     {
         _harness.HasCssTransform = false;
-        var list = Reactive.Reference<string[]>(["1", "2"]);
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2"]);
         _harness.Render(Group(list));
         var spans = _harness.FindElements("span");
 
@@ -82,6 +117,33 @@ public sealed class TransitionGroupTests : IDisposable
         _harness.Classes(spans[0]).ShouldNotContain("v-move");
     }
 
+    [Fact]
+    public void Reorder_UnderRenderedScale_NormalizesTheMoveDistance()
+    {
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2"]);
+        _harness.Render(Group(list));
+        IReadOnlyList<int> spans = _harness.FindElements("span");
+        int one = spans[0];
+        int two = spans[1];
+
+        _harness.EnqueuePosition(one, 0, 0);
+        _harness.EnqueuePosition(
+            one,
+            100,
+            100,
+            horizontalScale: 2,
+            verticalScale: 4);
+        _harness.EnqueuePosition(two, 100, 100);
+        _harness.EnqueuePosition(two, 0, 0);
+
+        list.Value = ["2", "1"];
+        _harness.RunUntilIdle();
+
+        _harness.MoveLog.ShouldContain(
+            $"transform:{one}:-50,-25");
+    }
+
     [Theory]
     [InlineData(3)]
     [InlineData(9)]
@@ -92,7 +154,7 @@ public sealed class TransitionGroupTests : IDisposable
         {
             initial[index] = $"{index + 1}";
         }
-        var list = Reactive.Reference(initial);
+        Reference<string[]> list = Reactive.Reference(initial);
         _harness.Render(Group(list));
         var spans = _harness.FindElements("span");
 
@@ -123,9 +185,66 @@ public sealed class TransitionGroupTests : IDisposable
     }
 
     [Fact]
+    public void InsertedItem_KeepsItsEnterTransition_DuringTheMovePass()
+    {
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1"]);
+        _harness.Render(Group(list));
+        int one = _harness.FindElements("span")[0];
+
+        _harness.EnqueuePosition(one, 0, 0);
+        _harness.EnqueuePosition(one, 0, 0);
+
+        list.Value = ["1", "2"];
+        _harness.RunUntilIdle();
+
+        int two = _harness.FindElements("span")[1];
+        _harness.Classes(two).ShouldContain("v-enter-from");
+        _harness.Classes(two).ShouldContain("v-enter-active");
+
+        _harness.AdvanceFrame();
+        _harness.Classes(two).ShouldNotContain("v-enter-from");
+        _harness.Classes(two).ShouldContain("v-enter-to");
+
+        _harness.FireTransitionEnd(two);
+        _harness.Classes(two).ShouldNotContain("v-enter-active");
+        _harness.Classes(two).ShouldNotContain("v-enter-to");
+    }
+
+    [Fact]
+    public void RemovedItem_RunsItsLeaveTransition_BeforeHostRemoval()
+    {
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2"]);
+        _harness.Render(Group(list));
+        IReadOnlyList<int> spans = _harness.FindElements("span");
+        int one = spans[0];
+        int two = spans[1];
+
+        _harness.EnqueuePosition(one, 0, 0);
+        _harness.EnqueuePosition(one, 0, 0);
+        _harness.EnqueuePosition(two, 0, 20);
+
+        list.Value = ["1"];
+        _harness.RunUntilIdle();
+
+        _harness.IsMounted(two).ShouldBeTrue();
+        _harness.Classes(two).ShouldContain("v-leave-from");
+        _harness.Classes(two).ShouldContain("v-leave-active");
+
+        _harness.AdvanceFrame();
+        _harness.Classes(two).ShouldNotContain("v-leave-from");
+        _harness.Classes(two).ShouldContain("v-leave-to");
+
+        _harness.FireTransitionEnd(two);
+        _harness.IsMounted(two).ShouldBeFalse();
+    }
+
+    [Fact]
     public void InterruptedReorder_ForceFinishesTheInFlightMove_ThenConverges()
     {
-        var list = Reactive.Reference<string[]>(["1", "2", "3"]);
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2", "3"]);
         _harness.Render(Group(list));
         var spans = _harness.FindElements("span");
         int one = spans[0], two = spans[1], three = spans[2];
@@ -172,7 +291,8 @@ public sealed class TransitionGroupTests : IDisposable
     [Fact]
     public void CompletedReorder_LeavesNoResidue_OnceEveryMoveEnds()
     {
-        var list = Reactive.Reference<string[]>(["1", "2", "3"]);
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2", "3"]);
         _harness.Render(Group(list));
         var spans = _harness.FindElements("span");
         int one = spans[0], two = spans[1], three = spans[2];
@@ -216,15 +336,16 @@ public sealed class TransitionGroupTests : IDisposable
     [Fact]
     public void Tag_FallsThroughClassStyleAndArbitraryAttributes_OntoTheWrapperElement()
     {
-        _harness.Render(GroupWith(
-            () => ["1", "2"],
-            () => VirtualNodeFactory.Properties(
+        _harness.Render(
+            GroupWith(
+                () => ["1", "2"],
                 ("tag", "ul"),
                 ("name", "fade"),
+                ("mode", "out-in"),
                 ("class", "list-wrapper"),
                 ("style", "color:red"),
                 ("id", "grp"),
-                ("data-role", "list"))));
+                ("data-role", "list")));
 
         var wrapper = _harness.FindElement("ul");
         // class/style/arbitrary attributes fall through onto the rendered tag element.
@@ -235,43 +356,44 @@ public sealed class TransitionGroupTests : IDisposable
         // Declared props are consumed — tag/name never leak onto the wrapper as literal attributes.
         _harness.BoundProperty(wrapper, "tag").ShouldBeNull();
         _harness.BoundProperty(wrapper, "name").ShouldBeNull();
+        // Vue removes unsupported TransitionGroup.mode from its declared properties, so it follows the
+        // ordinary attribute-fallthrough path rather than affecting group sequencing.
+        _harness.BoundProperty(wrapper, "mode").ShouldBe("out-in");
     }
 
     [Fact]
-    public void Fragment_NoTag_HasNoFallthroughTarget_AndEmitsNoWarning()
+    public void Fragment_NoTag_HasNoFallthroughTarget_AndWarns()
     {
-        var warnings = new List<string>();
-        var previousSink = RuntimeWarnings.Sink;
-        RuntimeWarnings.Sink = warnings.Add;
-        try
-        {
-            _harness.Render(GroupWith(
+        _harness.Render(
+            GroupWith(
                 () => ["1", "2"],
-                () => VirtualNodeFactory.Properties(("class", "orphan"), ("id", "no-target"))));
+                ("class", "orphan"),
+                ("id", "no-target")));
 
-            // No tag -> a fragment root -> no single element to inherit onto: the only elements are the
-            // children, and the group's class/id land on none of them.
-            foreach (var span in _harness.FindElements("span"))
-            {
-                _harness.BoundProperty(span, "class").ShouldBeNull();
-                _harness.BoundProperty(span, "id").ShouldBeNull();
-            }
-            // The target-less fallthrough is silent — no "extraneous attributes" warning (AC).
-            warnings.ShouldBeEmpty();
-        }
-        finally
+        // No tag -> a fragment root -> no single element to inherit onto: the only elements are the
+        // children, and the group's class/id land on none of them.
+        foreach (var span in _harness.FindElements("span"))
         {
-            RuntimeWarnings.Sink = previousSink;
+            _harness.BoundProperty(span, "class").ShouldBeNull();
+            _harness.BoundProperty(span, "id").ShouldBeNull();
         }
+
+        _harness.Warnings.ShouldContain(
+            warning => warning.Contains(
+                "Extraneous fallthrough attributes",
+                StringComparison.Ordinal));
     }
 
     [Fact]
     public void FallthroughClass_LandsOnWrapper_WithoutContaminatingChildMoveClasses()
     {
-        var list = Reactive.Reference<string[]>(["1", "2", "3"]);
-        _harness.Render(GroupWith(
-            () => list.Value,
-            () => VirtualNodeFactory.Properties(("tag", "ul"), ("class", "list-wrapper"))));
+        Reference<string[]> list =
+            Reactive.Reference<string[]>(["1", "2", "3"]);
+        _harness.Render(
+            GroupWith(
+                () => list.Value,
+                ("tag", "ul"),
+                ("class", "list-wrapper")));
 
         var wrapper = _harness.FindElement("ul");
         var spans = _harness.FindElements("span");
@@ -305,67 +427,75 @@ public sealed class TransitionGroupTests : IDisposable
     [Fact]
     public void FallthroughAttributeUpdate_PatchesTheWrapper_OnReRender()
     {
-        var cssClass = Reactive.Reference("wrapper-a");
-        _harness.Render(GroupWith(
-            () => ["1", "2"],
-            () => VirtualNodeFactory.Properties(("tag", "ul"), ("class", cssClass.Value))));
+        Reference<string> cssClass = Reactive.Reference("wrapper-a");
+        _harness.Render(
+            GroupWith(
+                () => ["1", "2"],
+                ("tag", "ul"),
+                ("class", cssClass.Value)));
 
         var wrapper = _harness.FindElement("ul");
         _harness.BoundProperty(wrapper, "class").ShouldBe("wrapper-a");
 
-        // A reactive change to the fallthrough attr re-renders the group; renderComponentRoot re-merges
-        // the live attrs and the patch updates the same wrapper element in place.
+        // A parent rerender supplies the changed fallthrough attribute; Core re-merges the live
+        // attributes and patches the same wrapper element in place.
         cssClass.Value = "wrapper-b";
-        _harness.RunUntilIdle();
+        _harness.Render(
+            GroupWith(
+                () => ["1", "2"],
+                ("tag", "ul"),
+                ("class", cssClass.Value)));
 
         _harness.FindElement("ul").ShouldBe(wrapper);
         _harness.BoundProperty(wrapper, "class").ShouldBe("wrapper-b");
     }
 
     // A component rendering <TransitionGroup tag="div"> over a keyed list of <span>s.
-    private static RenderComponent Group(Reference<string[]> list)
-        => new((_, _) => () =>
-        {
-            var slots = new ComponentSlots { Flag = SlotFlags.Dynamic };
-            slots["default"] = _ =>
-            {
-                var items = list.Value;
-                var children = new VirtualNode?[items.Length];
-                for (var index = 0; index < items.Length; index++)
-                {
-                    children[index] = VirtualNodeFactory.Element(
-                        "span",
-                        VirtualNodeFactory.Properties(("key", items[index])),
-                        items[index]);
-                }
-                return children;
-            };
-            return VirtualNodeFactory.Component(
-                TransitionGroup.Instance,
-                VirtualNodeFactory.Properties(("tag", "div")),
-                slots);
-        });
+    private static ITemplateComponent Group(Reference<string[]> list)
+    {
+        return GroupWith(
+            () => list.Value,
+            ("tag", "div"));
+    }
 
-    // A component rendering a <TransitionGroup> (props from the factory, re-read each render so reactive
-    // values retrigger) over a keyed list of <span>s. Props with no "tag" entry render the fragment form;
-    // props beyond the declared set (class/style/arbitrary) exercise attribute fallthrough.
-    private static RenderComponent GroupWith(Func<string[]> items, Func<VirtualNodeProperties> properties)
-        => new((_, _) => () =>
+    // A component rendering a <TransitionGroup> over a keyed list of <span>s. Arguments with no
+    // "tag" entry render the fragment form; undeclared arguments exercise attribute fallthrough.
+    private static ITemplateComponent GroupWith(
+        Func<string[]> items,
+        params (string Name, object? Value)[] properties)
+    {
+        List<KeyValuePair<string, object?>> arguments =
+            new(properties.Length);
+        foreach ((string name, object? value) in properties)
         {
-            var slots = new ComponentSlots { Flag = SlotFlags.Dynamic };
-            slots["default"] = _ =>
+            arguments.Add(
+                new KeyValuePair<string, object?>(name, value));
+        }
+
+        Dictionary<string, ComponentSlot> slots =
+            new(StringComparer.Ordinal)
             {
-                var current = items();
-                var children = new VirtualNode?[current.Length];
-                for (var index = 0; index < current.Length; index++)
+                ["default"] = _ =>
                 {
-                    children[index] = VirtualNodeFactory.Element(
-                        "span",
-                        VirtualNodeFactory.Properties(("key", current[index])),
-                        current[index]);
-                }
-                return children;
+                    string[] current = items();
+                    IComponent[] children =
+                        new IComponent[current.Length];
+                    for (int index = 0; index < current.Length; index++)
+                    {
+                        children[index] = ComponentTree.Element(
+                            "span",
+                            children:
+                            [
+                                ComponentTree.Text(current[index]),
+                            ],
+                            key: current[index]);
+                    }
+
+                    return ComponentTree.Fragment(children);
+                },
             };
-            return VirtualNodeFactory.Component(TransitionGroup.Instance, properties(), slots);
-        });
+        return ComponentTree.Template<TransitionGroup>(
+            new ComponentArguments(arguments),
+            slots);
+    }
 }

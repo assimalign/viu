@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 
 using Shouldly;
 using Xunit;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Browser.Tests;
 
@@ -20,7 +23,7 @@ public sealed class TransitionTests : IDisposable
     [Fact]
     public void Enter_AppliesTheFullClassSequence_ThroughTheAdapter()
     {
-        var show = Reactive.Reference(false);
+        Reference<bool> show = Reactive.Reference(false);
         _harness.Render(Host(show, ("name", "fade")));
 
         // Toggle in: from+active classes land immediately (onBeforeEnter), then the next frame swaps
@@ -43,7 +46,7 @@ public sealed class TransitionTests : IDisposable
     [Fact]
     public void Leave_AppliesTheFullClassSequence_AndForcesReflow_BeforeRemoval()
     {
-        var show = Reactive.Reference(true);
+        Reference<bool> show = Reactive.Reference(true);
         _harness.Render(Host(show, ("name", "fade")));
         var div = _harness.FindElement("div");
         // No appear -> the initial mount runs no enter choreography.
@@ -66,7 +69,7 @@ public sealed class TransitionTests : IDisposable
     [Fact]
     public void Appear_RunsEnterChoreographyOnInitialMount()
     {
-        var show = Reactive.Reference(true);
+        Reference<bool> show = Reactive.Reference(true);
         _harness.Render(Host(show, ("name", "fade"), ("appear", true)));
 
         // appear -> the enter (appear) classes are applied on the very first mount.
@@ -81,7 +84,7 @@ public sealed class TransitionTests : IDisposable
     [Fact]
     public void LeaveInterruptingEnter_CancelsTheEnter_AndAppliesLeaveClasses()
     {
-        var show = Reactive.Reference(false);
+        Reference<bool> show = Reactive.Reference(false);
         _harness.Render(Host(show, ("name", "fade")));
 
         // Start entering, but do NOT advance the frame or fire the end.
@@ -97,12 +100,15 @@ public sealed class TransitionTests : IDisposable
         _harness.Classes(div).ShouldNotContain("fade-enter-active");
         _harness.Classes(div).ShouldContain("fade-leave-from");
         _harness.Classes(div).ShouldContain("fade-leave-active");
+
+        _harness.AdvanceFrame();
+        _harness.Classes(div).ShouldNotContain("fade-enter-to");
     }
 
     [Fact]
     public void CssFalse_SkipsAllClassAndEndDetectionWork()
     {
-        var show = Reactive.Reference(false);
+        Reference<bool> show = Reactive.Reference(false);
         _harness.Render(Host(show, ("name", "fade"), ("css", false)));
 
         show.Value = true;
@@ -116,14 +122,59 @@ public sealed class TransitionTests : IDisposable
         _harness.IsMounted(div).ShouldBeTrue();
     }
 
+    [Fact]
+    public void SynchronousEnterHook_DoesNotCompleteTheCssTransition()
+    {
+        Reference<bool> show = Reactive.Reference(false);
+        int invocationCount = 0;
+        _harness.Render(
+            Host(
+                show,
+                ("name", "fade"),
+                ("onEnter", (Action<object>)(_ => invocationCount++))));
+
+        show.Value = true;
+        _harness.RunUntilIdle();
+
+        int div = _harness.FindElement("div");
+        invocationCount.ShouldBe(1);
+        _harness.Classes(div).ShouldBe(
+            ["fade-enter-from", "fade-enter-active"],
+            ignoreOrder: true);
+
+        _harness.AdvanceFrame();
+        _harness.Classes(div).ShouldBe(
+            ["fade-enter-active", "fade-enter-to"],
+            ignoreOrder: true);
+        _harness.FireTransitionEnd(div);
+        _harness.Classes(div).ShouldBeEmpty();
+    }
+
     // A component rendering <Transition {props}> around a v-if div keyed "a".
-    private static RenderComponent Host(Reference<bool> show, params (string Name, object? Value)[] transitionProperties)
-        => new((_, _) => () =>
+    private static ITemplateComponent Host(
+        Reference<bool> show,
+        params (string Name, object? Value)[] transitionProperties)
+    {
+        List<KeyValuePair<string, object?>> arguments =
+            new(transitionProperties.Length);
+        foreach ((string name, object? value) in transitionProperties)
         {
-            var slots = new ComponentSlots();
-            slots["default"] = _ => show.Value
-                ? [VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("key", "a")), "A")]
-                : [VirtualNodeFactory.Comment()];
-            return VirtualNodeFactory.Component(Transition.Instance, VirtualNodeFactory.Properties(transitionProperties), slots);
-        });
+            arguments.Add(new KeyValuePair<string, object?>(name, value));
+        }
+
+        Dictionary<string, ComponentSlot> slots =
+            new(StringComparer.Ordinal)
+            {
+                ["default"] = _ =>
+                    show.Value
+                        ? ComponentTree.Element(
+                            "div",
+                            children: [ComponentTree.Text("A")],
+                            key: "a")
+                        : ComponentTree.Comment(),
+            };
+        return ComponentTree.Template<Transition>(
+            new ComponentArguments(arguments),
+            slots);
+    }
 }

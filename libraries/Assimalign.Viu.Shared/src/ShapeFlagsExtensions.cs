@@ -5,7 +5,8 @@ namespace Assimalign.Viu.Shared;
 /// <summary>
 /// Allocation-free bitwise predicates over <see cref="ShapeFlags"/>, mirroring the
 /// <c>shapeFlag &amp; ShapeFlags.X</c> checks used throughout the upstream renderer. Every
-/// predicate is a plain inlineable bitwise check; <see cref="Enum.HasFlag"/> is never used.
+/// predicate is a plain inlineable bitwise check;
+/// <see cref="System.Enum.HasFlag(System.Enum)"/> is never used.
 /// </summary>
 public static class ShapeFlagsExtensions
 {

@@ -8,10 +8,10 @@ namespace Assimalign.Viu.Browser;
 /// bridge's one JS listener per (element, event, options) forwards the complete typed payload
 /// as primitives in this one call — no per-field <c>JSObject</c> reads, no proxy retained per
 /// event — and applies the returned flags (bit 0 <c>stopPropagation</c>, bit 1
-/// <c>preventDefault</c>) to the live event. <paramref name="selectedValues"/> rides the same
+/// <c>preventDefault</c>) to the live event. <c>selectedValues</c> rides the same
 /// call for <c>&lt;select multiple&gt;</c> so <c>v-model</c> ([V01.01.04.06]) never issues a
 /// per-event follow-up read; it is null for every non-multi-select event.
-/// <paramref name="defaultPrevented"/> carries the live event's arrival-time
+/// <c>defaultPrevented</c> carries the live event's arrival-time
 /// <c>event.defaultPrevented</c> so a host bridge honors upstream RouterLink <c>guardEvent</c>'s
 /// already-prevented bail ([V01.01.08.03.01]).
 /// </summary>

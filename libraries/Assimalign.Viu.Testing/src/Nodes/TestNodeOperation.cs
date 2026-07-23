@@ -9,9 +9,11 @@ namespace Assimalign.Viu.Testing;
 /// <param name="TargetNode">The node the operation created or acted on.</param>
 /// <param name="ParentNode">The parent for insert/remove operations, when known.</param>
 /// <param name="AnchorNode">The insert-before anchor, or null when appending.</param>
-/// <param name="PropertyName">The prop name for <see cref="TestNodeOperationType.PatchProperty"/>.</param>
-/// <param name="PreviousValue">The prior prop value for <see cref="TestNodeOperationType.PatchProperty"/>.</param>
-/// <param name="NextValue">The new prop value for <see cref="TestNodeOperationType.PatchProperty"/>.</param>
+/// <param name="PropertyName">
+/// The attribute or scope-identifier name for the applicable operation.
+/// </param>
+/// <param name="PreviousValue">The prior value for <see cref="TestNodeOperationType.PatchAttribute"/>.</param>
+/// <param name="NextValue">The new value for <see cref="TestNodeOperationType.PatchAttribute"/>.</param>
 /// <param name="Text">The text payload for create/set-text/static operations.</param>
 public readonly record struct TestNodeOperation(
     TestNodeOperationType Type,

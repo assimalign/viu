@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
-using Assimalign.Viu;
-
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 
 namespace Assimalign.Viu.Router.Tests;
@@ -60,12 +58,12 @@ public class InitialNavigationTests
                 new RouteRecord(
                     "/",
                     name: "home",
-                    component: enterGuard,
                     beforeEnter: (_, _, _) =>
                     {
                         log.Add("beforeEnter");
                         return Task.FromResult(NavigationGuardResult.Allow);
-                    }),
+                    },
+                    routeEnterGuard: enterGuard),
             ]);
         router.BeforeEach((_, from, _) =>
         {
@@ -205,9 +203,11 @@ public class InitialNavigationTests
     {
         // Upstream renders nothing at START (empty matched). The outlet mounted before ReadyAsync shows
         // nothing, and the matched component renders exactly once after the initial navigation confirms.
-        var view = LabelView("home");
-        var router = new Router(RouterHistory.CreateMemory(), [new RouteRecord("/", component: view)]);
-        using var wrapper = MountView(router);
+        TrackingComponent view = LabelView("home");
+        var router = new Router(
+            RouterHistory.CreateMemory(),
+            [new RouteRecord("/", component: view.Request)]);
+        using var wrapper = MountView(router, view);
 
         wrapper.Find("div").ShouldBeNull();
         view.RenderCount.ShouldBe(0); // never rendered while the current route is START
@@ -220,23 +220,18 @@ public class InitialNavigationTests
         view.RenderCount.ShouldBe(1); // rendered once — no double resolution of the initial navigation
     }
 
-    // A route component that contributes a beforeRouteEnter guard (interface-based, no reflection) and
-    // logs when the pipeline invokes it. Never mounted here, so Setup is unused.
-    private sealed class EnterGuardComponent : IComponent, IRouteEnterGuard
+    // An explicitly registered component-associated enter guard. It is never activated as a
+    // component, matching beforeRouteEnter's lack of an instance.
+    private sealed class EnterGuardComponent : IRouteEnterGuard
     {
         private readonly List<string> _log;
 
         public EnterGuardComponent(List<string> log) => _log = log;
-
-        public string? Name => "enter";
 
         public Task<NavigationGuardResult> BeforeRouteEnter(RouteLocation to, RouteLocation from, CancellationToken cancellationToken)
         {
             _log.Add("beforeRouteEnter");
             return Task.FromResult(NavigationGuardResult.Allow);
         }
-
-        public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
-            => () => null;
     }
 }

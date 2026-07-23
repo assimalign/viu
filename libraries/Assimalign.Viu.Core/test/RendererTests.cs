@@ -1,480 +1,664 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Shared;
-using Assimalign.Viu.Testing;
+using Assimalign.Viu.Tests;
 
-namespace Assimalign.Viu.Tests;
+namespace Assimalign.Viu.Core.Tests;
 
-// Pins the mount/patch/unmount pipeline contract of @vue/runtime-core's renderer.ts
-// (createRenderer) — https://vuejs.org/api/custom-renderer.html — through the in-memory test
-// tree, asserting both final output and node-op counts (the CoreCLR proxy for interop cost).
-public class RendererTests : IDisposable
+public sealed class RendererTests
 {
-    private readonly TestRenderer _renderer = new();
-    private readonly TestElement _container;
-    private readonly TestSchedulerPump _pump;
-
-    public RendererTests()
+    [Fact]
+    public void Render_ComponentNodeLifecycleHooks_FireInPipelineOrder()
     {
         Scheduler.Reset();
-        // The pump captures scheduled flushes — without it the scheduler's thread-pool
-        // fallback would race these single-threaded assertions.
-        _pump = TestSchedulerPump.Install();
-        _container = _renderer.CreateContainer();
-    }
+        using TestSchedulerPump pump = TestSchedulerPump.Install();
+        List<string> events = [];
+        IElementComponent? mountedComponent = null;
+        IElementComponent? previousOnUpdate = null;
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
 
-    public void Dispose()
-    {
-        Scheduler.Reset();
-        _pump.Dispose();
-    }
-
-    [Fact]
-    public void Render_MountsAnElementTree_WithExpectedOps()
-    {
-        var tree = VirtualNodeFactory.Element(
+        IElementComponent initial = ComponentTree.Element(
             "div",
-            VirtualNodeFactory.Properties(("id", "app")),
-            VirtualNodeFactory.Element("span", "hello"));
-
-        _renderer.Render(tree, _container);
-
-        TestNodeSerializer.Serialize(_container)
-            .ShouldBe("<root><div id=\"app\"><span>hello</span></div></root>");
-        _renderer.OperationLog.Count(TestNodeOperationType.CreateElement).ShouldBe(2);
-        _renderer.OperationLog.Count(TestNodeOperationType.SetElementText).ShouldBe(1);
-        _renderer.OperationLog.Count(TestNodeOperationType.Insert).ShouldBe(2);
-        _renderer.OperationLog.Count(TestNodeOperationType.PatchProperty).ShouldBe(1);
-    }
-
-    [Fact]
-    public void Render_PatchesOnSubsequentCalls_AndUnmountsOnNull()
-    {
-        _renderer.Render(VirtualNodeFactory.Element("div", "a"), _container);
-        _renderer.Render(VirtualNodeFactory.Element("div", "b"), _container);
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div>b</div></root>");
-
-        _renderer.Render(null, _container);
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root></root>");
-        _container.Children.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Patch_TextOnlyChange_ProducesExactlyOneSetElementTextAndNoStructuralOps()
-    {
-        _renderer.Render(VirtualNodeFactory.Element("div", "a"), _container);
-        _renderer.OperationLog.Reset();
-
-        _renderer.Render(VirtualNodeFactory.Element("div", "b"), _container);
-
-        _renderer.OperationLog.Count(TestNodeOperationType.SetElementText).ShouldBe(1);
-        _renderer.OperationLog.StructuralOperationCount.ShouldBe(0);
-        _renderer.OperationLog.Count(TestNodeOperationType.CreateElement).ShouldBe(0);
-    }
-
-    [Fact]
-    public void Patch_MismatchedElementTags_UnmountAndRemountInPlace()
-    {
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Element("span", "first"),
-                VirtualNodeFactory.Element("b", "middle"),
-                VirtualNodeFactory.Element("span", "last")),
-            _container);
-        _renderer.OperationLog.Reset();
-
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Element("span", "first"),
-                VirtualNodeFactory.Element("i", "middle"),
-                VirtualNodeFactory.Element("span", "last")),
-            _container);
-
-        // The replacement lands in the middle position, not appended at the end.
-        TestNodeSerializer.Serialize(_container)
-            .ShouldBe("<root><div><span>first</span><i>middle</i><span>last</span></div></root>");
-        _renderer.OperationLog.Count(TestNodeOperationType.Remove).ShouldBe(1);
-        _renderer.OperationLog.Count(TestNodeOperationType.CreateElement).ShouldBe(1);
-    }
-
-    [Fact]
-    public void Patch_DifferentKeysAtTheSamePosition_Replace()
-    {
-        // Same-type check includes the key (upstream isSameVNodeType).
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("key", "a")), "content"),
-            _container);
-        var firstMounted = _container.Children[0];
-        _renderer.OperationLog.Reset();
-
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("key", "b")), "content"),
-            _container);
-
-        _container.Children[0].ShouldNotBeSameAs(firstMounted);
-        _renderer.OperationLog.Count(TestNodeOperationType.Remove).ShouldBe(1);
-    }
-
-    [Fact]
-    public void Fragment_MountsBetweenStartAndEndAnchors()
-    {
-        _renderer.Render(
-            VirtualNodeFactory.Fragment(
-                VirtualNodeFactory.Element("span", "a"),
-                VirtualNodeFactory.Element("span", "b")),
-            _container);
-
-        // Fragment anchors are empty text nodes (upstream parity): [start, a, b, end].
-        _container.Children.Count.ShouldBe(4);
-        _container.Children[0].ShouldBeOfType<TestText>().Text.ShouldBe(string.Empty);
-        _container.Children[3].ShouldBeOfType<TestText>().Text.ShouldBe(string.Empty);
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><span>a</span><span>b</span></root>");
-    }
-
-    [Fact]
-    public void Fragment_AppendedChildren_InsertBeforeTheEndAnchor()
-    {
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Fragment(VirtualNodeFactory.Element("span", "a")),
-                VirtualNodeFactory.Element("footer", "after")),
-            _container);
-
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Fragment(
-                    VirtualNodeFactory.Element("span", "a"),
-                    VirtualNodeFactory.Element("span", "b")),
-                VirtualNodeFactory.Element("footer", "after")),
-            _container);
-
-        // The grown fragment child lands inside the fragment range, before the footer.
-        TestNodeSerializer.Serialize(_container)
-            .ShouldBe("<root><div><span>a</span><span>b</span><footer>after</footer></div></root>");
-    }
-
-    [Fact]
-    public void Fragment_Unmount_RemovesExactlyItsOwnedRange()
-    {
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Text("before"),
-                VirtualNodeFactory.Fragment(
-                    VirtualNodeFactory.Element("span", "a"),
-                    VirtualNodeFactory.Element("span", "b")),
-                VirtualNodeFactory.Text("after")),
-            _container);
-
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "div",
-                VirtualNodeFactory.Text("before"),
-                VirtualNodeFactory.Text("after")),
-            _container);
-
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div>beforeafter</div></root>");
-        var divElement = (TestElement)_container.Children[0];
-        divElement.Children.Count.ShouldBe(2); // no anchor leftovers
-    }
-
-    [Fact]
-    public void Unmount_InvokesCleanupBeforeNodeRemoval()
-    {
-        var wasAttachedDuringHook = false;
-        var tree = VirtualNodeFactory.Element(
-            "div",
-            VirtualNodeFactory.Properties(
-                ("onVnodeBeforeUnmount", (VirtualNodeHook)((node, _) =>
+            LifecycleAttributes(
+                events,
+                (component, previous) =>
                 {
-                    // Cleanup order: the platform node is still attached when the hook runs.
-                    wasAttachedDuringHook = ((TestNode)node.El!).Parent is not null;
-                }))),
-            "content");
+                    events.Add("mounted");
+                    mountedComponent = component.ShouldBeAssignableTo<IElementComponent>();
+                    previous.ShouldBeNull();
+                }),
+            children: [ComponentTree.Text("before")]);
 
-        _renderer.Render(tree, _container);
-        _renderer.Render(null, _container);
+        renderer.Render(initial, host.Root);
+        pump.RunUntilIdle();
 
-        wasAttachedDuringHook.ShouldBeTrue();
-        _container.Children.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void VnodeHooks_FireInPipelineOrder()
-    {
-        var events = new List<string>();
-        VirtualNodeProperties HookProperties() => VirtualNodeFactory.Properties(
-            ("onVnodeBeforeMount", (VirtualNodeHook)((_, _) => events.Add("beforeMount"))),
-            ("onVnodeMounted", (VirtualNodeHook)((_, _) => events.Add("mounted"))),
-            ("onVnodeBeforeUpdate", (VirtualNodeHook)((_, _) => events.Add("beforeUpdate"))),
-            ("onVnodeUpdated", (VirtualNodeHook)((_, _) => events.Add("updated"))),
-            ("onVnodeBeforeUnmount", (VirtualNodeHook)((_, _) => events.Add("beforeUnmount"))),
-            ("onVnodeUnmounted", (VirtualNodeHook)((_, _) => events.Add("unmounted"))));
-
-        _renderer.Render(VirtualNodeFactory.Element("div", HookProperties(), "a"), _container);
-        events.ShouldBe(["beforeMount", "mounted"]);
+        events.ShouldBe(["before-mount", "mounted"]);
+        mountedComponent.ShouldBeSameAs(initial);
+        host.Root.Children.Single().Attributes.ShouldNotContainKey(
+            "onVnodeMounted");
 
         events.Clear();
-        _renderer.Render(VirtualNodeFactory.Element("div", HookProperties(), "b"), _container);
-        events.ShouldBe(["beforeUpdate", "updated"]);
+        IElementComponent next = ComponentTree.Element(
+            "div",
+            LifecycleAttributes(
+                events,
+                beforeUpdate: (component, previous) =>
+                {
+                    events.Add("before-update");
+                    previousOnUpdate =
+                        previous.ShouldBeAssignableTo<IElementComponent>();
+                    component.ShouldBeAssignableTo<IElementComponent>();
+                }),
+            children: [ComponentTree.Text("after")]);
+        renderer.Render(next, host.Root);
+        pump.RunUntilIdle();
+
+        events.ShouldBe(["before-update", "updated"]);
+        previousOnUpdate.ShouldBeSameAs(initial);
 
         events.Clear();
-        _renderer.Render(null, _container);
-        events.ShouldBe(["beforeUnmount", "unmounted"]);
+        FakeHostNode element = host.Root.Children.Single();
+        renderer.Render(null, host.Root);
+        pump.RunUntilIdle();
+
+        events.ShouldBe(["before-unmount", "unmounted"]);
+        element.Parent.ShouldBeNull();
+        Scheduler.Reset();
     }
 
     [Fact]
-    public void TextRoot_PatchesWithASingleSetTextOp()
+    public void Render_ElementMountPatchAndUnmount_PreservesHostIdentityAndPatchesAttributes()
     {
-        _renderer.Render(VirtualNodeFactory.Text("a"), _container);
-        _renderer.OperationLog.Reset();
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        IElementComponent current = ComponentTree.Element(
+            "main",
+            new ComponentAttributes(
+            [
+                new ComponentAttribute("class", "before"),
+                new ComponentAttribute("stale", true),
+            ]),
+            [
+                ComponentTree.Text("hello"),
+                ComponentTree.Comment("first"),
+            ]);
 
-        _renderer.Render(VirtualNodeFactory.Text("b"), _container);
+        renderer.Render(current, host.Root);
 
-        _renderer.OperationLog.Count(TestNodeOperationType.SetText).ShouldBe(1);
-        _renderer.OperationLog.StructuralOperationCount.ShouldBe(0);
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root>b</root>");
+        FakeHostNode element = host.Root.Children.Single();
+        FakeHostNode text = element.Children[0];
+        FakeHostNode comment = element.Children[1];
+        element.Attributes["class"].ShouldBe("before");
+        element.Attributes["stale"].ShouldBe(true);
+
+        host.Operations.Clear();
+        IElementComponent next = ComponentTree.Element(
+            "main",
+            new ComponentAttributes(
+            [
+                new ComponentAttribute("class", "after"),
+                new ComponentAttribute("title", "updated"),
+            ]),
+            [
+                ComponentTree.Text("goodbye"),
+                ComponentTree.Comment("second"),
+            ]);
+
+        renderer.Render(next, host.Root);
+
+        host.Root.Children.Single().ShouldBeSameAs(element);
+        element.Children[0].ShouldBeSameAs(text);
+        element.Children[1].ShouldBeSameAs(comment);
+        text.Content.ShouldBe("goodbye");
+        comment.Content.ShouldBe("first");
+        element.Attributes.ShouldNotContainKey("stale");
+        element.Attributes["class"].ShouldBe("after");
+        element.Attributes["title"].ShouldBe("updated");
+        host.Operations.ShouldContain(
+            $"attribute:{element.Identifier}:stale:True:null");
+        host.Operations.ShouldContain(
+            $"attribute:{element.Identifier}:class:before:after");
+        host.Operations.ShouldContain(
+            $"text:{text.Identifier}:hello:goodbye");
+        current.Attributes.TryGetValue("class", out object? oldClass).ShouldBeTrue();
+        oldClass.ShouldBe("before");
+
+        host.Operations.Clear();
+        renderer.Render(null, host.Root);
+
+        host.Root.Children.ShouldBeEmpty();
+        host.Operations.ShouldBe([$"remove:{element.Identifier}"]);
+    }
+
+    private static ComponentAttributes LifecycleAttributes(
+        List<string> events,
+        ComponentNodeLifecycleHook? mounted = null,
+        ComponentNodeLifecycleHook? beforeUpdate = null)
+    {
+        return new ComponentAttributes(
+        [
+            new ComponentAttribute(
+                "onVnodeBeforeMount",
+                (ComponentNodeLifecycleHook)(
+                    (_, _) => events.Add("before-mount"))),
+            new ComponentAttribute(
+                "onVnodeMounted",
+                mounted
+                    ?? ((_, _) => events.Add("mounted"))),
+            new ComponentAttribute(
+                "onVnodeBeforeUpdate",
+                beforeUpdate
+                    ?? ((_, _) => events.Add("before-update"))),
+            new ComponentAttribute(
+                "onVnodeUpdated",
+                (ComponentNodeLifecycleHook)(
+                    (_, _) => events.Add("updated"))),
+            new ComponentAttribute(
+                "onVnodeBeforeUnmount",
+                (ComponentNodeLifecycleHook)(
+                    (_, _) => events.Add("before-unmount"))),
+            new ComponentAttribute(
+                "onVnodeUnmounted",
+                (ComponentNodeLifecycleHook)(
+                    (_, _) => events.Add("unmounted"))),
+        ]);
     }
 
     [Fact]
-    public void Comment_ContentIsNeverPatched()
+    public void Render_KeyedChildren_ReordersExistingHostNodesWithMinimalMove()
     {
-        // Upstream parity: processCommentNode reuses the node and ignores content changes.
-        _renderer.Render(VirtualNodeFactory.Comment("one"), _container);
-        _renderer.OperationLog.Reset();
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                KeyedElement("a", "A"),
+                KeyedElement("b", "B"),
+                KeyedElement("c", "C"),
+            ]),
+            host.Root);
+        FakeHostNode[] original = Elements(host.Root);
+        Dictionary<string, FakeHostNode> byText = original.ToDictionary(host.Text);
 
-        _renderer.Render(VirtualNodeFactory.Comment("two"), _container);
+        host.Operations.Clear();
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                KeyedElement("c", "C"),
+                KeyedElement("a", "A"),
+                KeyedElement("b", "B"),
+            ]),
+            host.Root);
 
-        _renderer.OperationLog.Operations.ShouldBeEmpty();
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><!--one--></root>");
+        FakeHostNode[] reordered = Elements(host.Root);
+        reordered.Select(host.Text).ShouldBe(["C", "A", "B"]);
+        reordered[0].ShouldBeSameAs(byText["C"]);
+        reordered[1].ShouldBeSameAs(byText["A"]);
+        reordered[2].ShouldBeSameAs(byText["B"]);
+        host.Operations.Count(operation => operation.StartsWith("insert:", StringComparison.Ordinal))
+            .ShouldBe(1);
+        host.Operations.Single(operation => operation.StartsWith("insert:", StringComparison.Ordinal))
+            .ShouldStartWith($"insert:{byText["C"].Identifier}:");
     }
 
     [Fact]
-    public void CompiledTextFlag_TakesTheTargetedPath()
+    public void Render_UnkeyedFragment_PatchesChildrenPositionallyWithoutMoves()
     {
-        VirtualNode Compiled(string text) => VirtualNodeFactory.Element(
-            "div", null, text, PatchFlags.Text);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        renderer.Render(
+            ComponentTree.Fragment(
+                [
+                    ComponentTree.Element("li", children: [ComponentTree.Text("A")]),
+                    ComponentTree.Element("li", children: [ComponentTree.Text("B")]),
+                ],
+                optimization: new ComponentOptimization(PatchFlags.UnkeyedFragment)),
+            host.Root);
+        FakeHostNode[] original = Elements(host.Root);
 
-        _renderer.Render(Compiled("a"), _container);
-        _renderer.OperationLog.Reset();
+        host.Operations.Clear();
+        renderer.Render(
+            ComponentTree.Fragment(
+                [
+                    ComponentTree.Element("li", children: [ComponentTree.Text("B")]),
+                    ComponentTree.Element("li", children: [ComponentTree.Text("A")]),
+                ],
+                optimization: new ComponentOptimization(PatchFlags.UnkeyedFragment)),
+            host.Root);
 
-        _renderer.Render(Compiled("b"), _container);
-
-        // The compiled contract: one targeted set-text, nothing else (each avoided op is an
-        // avoided interop call on WASM).
-        _renderer.OperationLog.Count(TestNodeOperationType.SetElementText).ShouldBe(1);
-        _renderer.OperationLog.Operations.Count.ShouldBe(1);
+        FakeHostNode[] patched = Elements(host.Root);
+        patched[0].ShouldBeSameAs(original[0]);
+        patched[1].ShouldBeSameAs(original[1]);
+        patched.Select(host.Text).ShouldBe(["B", "A"]);
+        host.Operations.ShouldNotContain(
+            operation => operation.StartsWith("insert:", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void CompiledClassFlag_PatchesOnlyWhenTheClassChanged()
+    public void Render_KeyedChildren_MountsAtAnchorAndUnmountsRemovedIdentity()
     {
-        VirtualNode Compiled(string cssClass) => VirtualNodeFactory.Element(
-            "div",
-            VirtualNodeFactory.Properties(("class", cssClass), ("id", "stable")),
-            (VirtualNode?[]?)null,
-            PatchFlags.Class);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                KeyedElement("a", "A"),
+                KeyedElement("c", "C"),
+            ]),
+            host.Root);
+        FakeHostNode a = Elements(host.Root)[0];
+        FakeHostNode c = Elements(host.Root)[1];
 
-        _renderer.Render(Compiled("a"), _container);
-        _renderer.OperationLog.Reset();
+        host.Operations.Clear();
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                KeyedElement("a", "A"),
+                KeyedElement("b", "B"),
+                KeyedElement("c", "C"),
+            ]),
+            host.Root);
 
-        _renderer.Render(Compiled("a"), _container);
-        _renderer.OperationLog.Count(TestNodeOperationType.PatchProperty).ShouldBe(0);
+        FakeHostNode[] inserted = Elements(host.Root);
+        FakeHostNode b = inserted[1];
+        inserted.ShouldBe([a, b, c]);
+        host.Operations.ShouldContain(
+            $"insert:{b.Identifier}:{host.Root.Identifier}:{c.Identifier}");
 
-        _renderer.Render(Compiled("b"), _container);
-        var patches = _renderer.OperationLog.OfType(TestNodeOperationType.PatchProperty);
-        patches.Count.ShouldBe(1);
-        patches[0].PropertyName.ShouldBe("class");
+        host.Operations.Clear();
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                KeyedElement("c", "C"),
+                KeyedElement("b", "B"),
+            ]),
+            host.Root);
+
+        Elements(host.Root).ShouldBe([c, b]);
+        a.Parent.ShouldBeNull();
+        host.Operations.ShouldContain($"remove:{a.Identifier}");
     }
 
     [Fact]
-    public void CompiledPropsFlag_PatchesOnlyTheDeclaredDynamicProperties()
+    public void Render_KeyedStaticRange_MovePreservesEveryNodeAndFragmentAnchors()
     {
-        VirtualNode Compiled(string title) => VirtualNodeFactory.Element(
-            "div",
-            VirtualNodeFactory.Properties(("title", title), ("id", "stable")),
-            (VirtualNode?[]?)null,
-            PatchFlags.Props,
-            ["title"]);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                ComponentTree.Static("a1|a2", key: "a"),
+                ComponentTree.Static("b1|b2", key: "b"),
+            ]),
+            host.Root);
+        FakeHostNode startAnchor = host.Root.Children[0];
+        FakeHostNode endAnchor = host.Root.Children[^1];
+        FakeHostNode[] staticNodes = host.Root.Children
+            .Where(node => node.Kind == FakeHostNodeKind.Static)
+            .ToArray();
 
-        _renderer.Render(Compiled("a"), _container);
-        _renderer.OperationLog.Reset();
+        host.Operations.Clear();
+        renderer.Render(
+            ComponentTree.Fragment(
+            [
+                ComponentTree.Static("b1|b2", key: "b"),
+                ComponentTree.Static("a1|a2", key: "a"),
+            ]),
+            host.Root);
 
-        _renderer.Render(Compiled("b"), _container);
+        host.Root.Children[0].ShouldBeSameAs(startAnchor);
+        host.Root.Children[^1].ShouldBeSameAs(endAnchor);
+        FakeHostNode[] reordered = host.Root.Children
+            .Where(node => node.Kind == FakeHostNodeKind.Static)
+            .ToArray();
+        reordered.Select(node => node.Content).ShouldBe(["b1", "b2", "a1", "a2"]);
+        reordered.ShouldBe(
+        [
+            staticNodes[2],
+            staticNodes[3],
+            staticNodes[0],
+            staticNodes[1],
+        ]);
+        host.Operations.Count(operation => operation.StartsWith("insert:", StringComparison.Ordinal))
+            .ShouldBe(2);
 
-        var patches = _renderer.OperationLog.OfType(TestNodeOperationType.PatchProperty);
-        patches.Count.ShouldBe(1);
-        patches[0].PropertyName.ShouldBe("title");
-        patches[0].NextValue.ShouldBe("b");
+        renderer.Render(null, host.Root);
+        host.Root.Children.ShouldBeEmpty();
     }
 
     [Fact]
-    public void FullDiff_RemovesStaleAndPatchesChangedProperties()
+    public void Render_NullAndEmptyDynamicChildren_HaveDistinctPatchSemantics()
     {
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("a", "1"), ("b", "2")), "x"),
-            _container);
-        _renderer.OperationLog.Reset();
+        FakeHost unoptimizedHost = new();
+        Renderer<FakeHostNode> unoptimizedRenderer =
+            RendererFactory.CreateRenderer(unoptimizedHost.Options);
+        unoptimizedRenderer.Render(
+            ComponentTree.Element(
+                "section",
+                children: [ComponentTree.Text("before")]),
+            unoptimizedHost.Root);
 
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Properties(("a", "changed")), "x"),
-            _container);
+        Renderer<FakeHostNode>.PatchVisitCount = 0;
+        unoptimizedRenderer.Render(
+            ComponentTree.Element(
+                "section",
+                children: [ComponentTree.Text("after")]),
+            unoptimizedHost.Root);
 
-        var patches = _renderer.OperationLog.OfType(TestNodeOperationType.PatchProperty);
-        patches.Count.ShouldBe(2);
-        patches[0].PropertyName.ShouldBe("b");
-        patches[0].NextValue.ShouldBeNull(); // stale prop removed
-        patches[1].PropertyName.ShouldBe("a");
-        patches[1].NextValue.ShouldBe("changed");
+        unoptimizedHost.Text(unoptimizedHost.Root.Children.Single()).ShouldBe("after");
+        Renderer<FakeHostNode>.PatchVisitCount.ShouldBe(2);
+
+        FakeHost optimizedHost = new();
+        Renderer<FakeHostNode> optimizedRenderer =
+            RendererFactory.CreateRenderer(optimizedHost.Options);
+        optimizedRenderer.Render(
+            ComponentTree.Element(
+                "section",
+                new ComponentAttributes(
+                [
+                    new ComponentAttribute("class", "before"),
+                ]),
+                [ComponentTree.Text("fixed")],
+                optimization: new ComponentOptimization(
+                    PatchFlags.Class,
+                    dynamicChildren: Array.Empty<IComponent>())),
+            optimizedHost.Root);
+
+        Renderer<FakeHostNode>.PatchVisitCount = 0;
+        optimizedRenderer.Render(
+            ComponentTree.Element(
+                "section",
+                new ComponentAttributes(
+                [
+                    new ComponentAttribute("class", "after"),
+                ]),
+                [ComponentTree.Text("must-not-patch")],
+                optimization: new ComponentOptimization(
+                    PatchFlags.Class,
+                    dynamicChildren: Array.Empty<IComponent>())),
+            optimizedHost.Root);
+
+        FakeHostNode optimizedElement = optimizedHost.Root.Children.Single();
+        optimizedHost.Text(optimizedElement).ShouldBe("fixed");
+        optimizedElement.Attributes["class"].ShouldBe("after");
+        Renderer<FakeHostNode>.PatchVisitCount.ShouldBe(1);
     }
 
     [Fact]
-    public void ValueProperty_IsAlwaysRepatched()
+    public void Render_BlockWithDynamicDescendant_VisitsOnlyRootAndDynamicNode()
     {
-        // Upstream parity: the live platform value can drift from the vnode value (typing, IME),
-        // so "value" is forced through patchProp even when the vnode value is unchanged.
-        _renderer.Render(
-            VirtualNodeFactory.Element("input", VirtualNodeFactory.Properties(("value", "same"))),
-            _container);
-        _renderer.OperationLog.Reset();
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        ITextComponent currentDynamic = ComponentTree.Text(
+            "before",
+            new ComponentOptimization(PatchFlags.Text));
+        renderer.Render(
+            ComponentTree.Element(
+                "section",
+                children:
+                [
+                    ComponentTree.Text("fixed"),
+                    currentDynamic,
+                ],
+                optimization: new ComponentOptimization(
+                    dynamicChildren: new IComponent[] { currentDynamic })),
+            host.Root);
 
-        _renderer.Render(
-            VirtualNodeFactory.Element("input", VirtualNodeFactory.Properties(("value", "same"))),
-            _container);
+        ITextComponent nextDynamic = ComponentTree.Text(
+            "after",
+            new ComponentOptimization(PatchFlags.Text));
+        Renderer<FakeHostNode>.PatchVisitCount = 0;
+        renderer.Render(
+            ComponentTree.Element(
+                "section",
+                children:
+                [
+                    ComponentTree.Text("must-not-patch"),
+                    nextDynamic,
+                ],
+                optimization: new ComponentOptimization(
+                    dynamicChildren: new IComponent[] { nextDynamic })),
+            host.Root);
 
-        var patches = _renderer.OperationLog.OfType(TestNodeOperationType.PatchProperty);
-        patches.Count.ShouldBe(1);
-        patches[0].PropertyName.ShouldBe("value");
+        FakeHostNode element = host.Root.Children.Single();
+        element.Children.Select(node => node.Content).ShouldBe(["fixed", "after"]);
+        Renderer<FakeHostNode>.PatchVisitCount.ShouldBe(2);
     }
 
     [Fact]
-    public void UnkeyedChildren_GrowAndShrinkPositionally()
+    public void Render_BlockShapeMismatch_FallsBackToFullChildrenDiff()
     {
-        VirtualNode List(params string[] items)
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        renderer.Render(
+            ComponentTree.Element(
+                "section",
+                children: [ComponentTree.Text("before")],
+                optimization: new ComponentOptimization(
+                    dynamicChildren: Array.Empty<IComponent>())),
+            host.Root);
+
+        ITextComponent nextText = ComponentTree.Text("after");
+        Renderer<FakeHostNode>.PatchVisitCount = 0;
+        renderer.Render(
+            ComponentTree.Element(
+                "section",
+                children: [nextText],
+                optimization: new ComponentOptimization(
+                    dynamicChildren: new IComponent[] { nextText })),
+            host.Root);
+
+        host.Text(host.Root.Children.Single()).ShouldBe("after");
+        Renderer<FakeHostNode>.PatchVisitCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Render_BlockDynamicTypeReplacement_UnmountsTheReplacementReference()
+    {
+        using TestSchedulerPump pump = TestSchedulerPump.Install();
+        object? replacementReference = null;
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        IElementComponent currentDynamic = ComponentTree.Element("span");
+        renderer.Render(
+            ComponentTree.Element(
+                "section",
+                children: [currentDynamic],
+                optimization: new ComponentOptimization(
+                    dynamicChildren: new IComponent[] { currentDynamic })),
+            host.Root);
+        pump.RunUntilIdle();
+
+        IElementComponent nextDynamic = ComponentTree.Element(
+            "strong",
+            reference: TemplateReference.FromCallback(
+                value => replacementReference = value));
+        renderer.Render(
+            ComponentTree.Element(
+                "section",
+                children: [nextDynamic],
+                optimization: new ComponentOptimization(
+                    dynamicChildren: new IComponent[] { nextDynamic })),
+            host.Root);
+        pump.RunUntilIdle();
+
+        replacementReference.ShouldBeSameAs(
+            host.Root.Children.Single().Children.Single());
+
+        renderer.Render(null, host.Root);
+        pump.RunUntilIdle();
+
+        replacementReference.ShouldBeNull();
+        host.Root.Children.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Render_ValueTypeHostHandle_UsesDefaultAsMissingNode()
+    {
+        const int root = 1;
+        int nextIdentifier = root;
+        Dictionary<int, List<int>> children = new()
         {
-            var children = new VirtualNode?[items.Length];
-            for (var index = 0; index < items.Length; index++)
-            {
-                children[index] = VirtualNodeFactory.Element("li", items[index]);
-            }
-            return VirtualNodeFactory.Element("ul", null, children);
+            [root] = [],
+        };
+        Dictionary<int, int> parents = [];
+        Dictionary<int, string> content = [];
+
+        int Create(string value)
+        {
+            int identifier = ++nextIdentifier;
+            children[identifier] = [];
+            content[identifier] = value;
+            return identifier;
         }
 
-        _renderer.Render(List("a", "b"), _container);
-        _renderer.Render(List("a", "b", "c"), _container);
-        TestNodeSerializer.Serialize(_container)
-            .ShouldBe("<root><ul><li>a</li><li>b</li><li>c</li></ul></root>");
-
-        _renderer.Render(List("a"), _container);
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><ul><li>a</li></ul></root>");
-    }
-
-    [Fact]
-    public void StaticVnode_MountsThroughInsertStaticContent_InOneOperation()
-    {
-        _renderer.Render(
-            VirtualNodeFactory.Element("div", VirtualNodeFactory.Static("<b>chunk</b><i>tail</i>")),
-            _container);
-
-        _renderer.OperationLog.Count(TestNodeOperationType.InsertStaticContent).ShouldBe(1);
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div><b>chunk</b><i>tail</i></div></root>");
-    }
-
-    [Fact]
-    public void StaticVnode_WithoutTheOp_FailsWithAClearContractError()
-    {
-        var log = new TestNodeOperationLog();
-        var complete = TestNodeOperations.Create(log);
-        var withoutStatic = new RendererOptions<TestNode>
+        RendererOptions<int> options = new()
         {
-            Insert = complete.Insert,
-            Remove = complete.Remove,
-            CreateElement = complete.CreateElement,
-            CreateText = complete.CreateText,
-            CreateComment = complete.CreateComment,
-            SetText = complete.SetText,
-            SetElementText = complete.SetElementText,
-            ParentNode = complete.ParentNode,
-            NextSibling = complete.NextSibling,
-            PatchProperty = complete.PatchProperty,
+            Insert = (child, parent, anchor) =>
+            {
+                if (parents.TryGetValue(child, out int previousParent))
+                {
+                    children[previousParent].Remove(child);
+                }
+
+                int index = anchor == default
+                    ? children[parent].Count
+                    : children[parent].IndexOf(anchor);
+                children[parent].Insert(index, child);
+                parents[child] = parent;
+            },
+            Remove = node =>
+            {
+                if (parents.Remove(node, out int parent))
+                {
+                    children[parent].Remove(node);
+                }
+            },
+            CreateElement = (tag, _) => Create(tag),
+            CreateText = Create,
+            CreateComment = Create,
+            SetText = (node, value) => content[node] = value,
+            ParentNode = node => parents.GetValueOrDefault(node),
+            NextSibling = node =>
+            {
+                if (!parents.TryGetValue(node, out int parent))
+                {
+                    return default;
+                }
+
+                int index = children[parent].IndexOf(node);
+                return index + 1 < children[parent].Count
+                    ? children[parent][index + 1]
+                    : default;
+            },
+            PatchAttribute = (_, _, _, _, _, _) => { },
         };
-        var renderer = RendererFactory.CreateRenderer(withoutStatic);
+        Renderer<int> renderer = RendererFactory.CreateRenderer(options);
 
-        var exception = Should.Throw<NotSupportedException>(
-            () => renderer.Render(VirtualNodeFactory.Static("<b>x</b>"), _renderer.CreateContainer()));
-        exception.Message.ShouldContain("InsertStaticContent");
+        renderer.Render(ComponentTree.Text("before"), root);
+        int textHandle = children[root].Single();
+        renderer.Render(ComponentTree.Text("after"), root);
+
+        children[root].Single().ShouldBe(textHandle);
+        content[textHandle].ShouldBe("after");
+
+        renderer.Render(null, root);
+        children[root].ShouldBeEmpty();
     }
 
     [Fact]
-    public void SvgSubtree_SwitchesNamespace_AndForeignObjectChildrenReturnToHtml()
+    public void Render_Teleport_TogglesLogicalPlacementAndRetargetsExistingChildren()
     {
-        // Upstream namespace propagation: <svg> subtree is SVG; <foreignObject> children go back
-        // to HTML (renderer.ts mountElement + resolveChildrenNamespace).
-        _renderer.Render(
-            VirtualNodeFactory.Element(
-                "svg",
-                VirtualNodeFactory.Element(
-                    "foreignObject",
-                    VirtualNodeFactory.Element("div", "html-island")),
-                VirtualNodeFactory.Element("circle")),
-            _container);
+        FakeHost host = new();
+        FakeHostNode firstTarget = host.CreateContainer("first-target");
+        FakeHostNode secondTarget = host.CreateContainer("second-target");
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
 
-        var svg = (TestElement)_container.Children[0];
-        svg.Namespace.ShouldBe("svg");
-        var foreignObject = (TestElement)svg.Children[0];
-        foreignObject.Namespace.ShouldBe("svg");
-        ((TestElement)foreignObject.Children[0]).Namespace.ShouldBeNull();
-        ((TestElement)svg.Children[1]).Namespace.ShouldBe("svg");
+        renderer.Render(
+            ComponentTree.Teleport(
+                firstTarget,
+                [KeyedElement("content", "teleported")]),
+            host.Root);
+
+        host.Root.Children.Count.ShouldBe(2);
+        FakeHostNode teleported = Elements(firstTarget).Single();
+        host.Text(teleported).ShouldBe("teleported");
+
+        renderer.Render(
+            ComponentTree.Teleport(
+                firstTarget,
+                [KeyedElement("content", "teleported")],
+                isDisabled: true),
+            host.Root);
+
+        Elements(firstTarget).ShouldBeEmpty();
+        Elements(host.Root).Single().ShouldBeSameAs(teleported);
+
+        renderer.Render(
+            ComponentTree.Teleport(
+                secondTarget,
+                [KeyedElement("content", "teleported")]),
+            host.Root);
+
+        Elements(host.Root).ShouldBeEmpty();
+        Elements(secondTarget).Single().ShouldBeSameAs(teleported);
+
+        renderer.Render(null, host.Root);
+
+        host.Root.Children.ShouldBeEmpty();
+        firstTarget.Children.ShouldBeEmpty();
+        secondTarget.Children.ShouldBeEmpty();
     }
 
     [Fact]
-    public void MathSubtree_SwitchesToMathmlNamespace()
+    public void Render_UnresolvedTeleportTarget_KeepsLogicalAnchorsAndDefersChildren()
     {
-        _renderer.Render(
-            VirtualNodeFactory.Element("math", VirtualNodeFactory.Element("mi", "x")),
-            _container);
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
 
-        var math = (TestElement)_container.Children[0];
-        math.Namespace.ShouldBe("mathml");
-        ((TestElement)math.Children[0]).Namespace.ShouldBe("mathml");
+        Should.NotThrow(
+            () => renderer.Render(
+                ComponentTree.Teleport(
+                    "#missing",
+                    [ComponentTree.Element("span")]),
+                host.Root));
+
+        host.Root.Children.Count.ShouldBe(2);
+        Elements(host.Root).ShouldBeEmpty();
+        renderer.Render(null, host.Root);
+        host.Root.Children.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void RenderingTheSameVnodeInstance_IsANoOp()
+    private static IElementComponent KeyedElement(string key, string text)
     {
-        var tree = VirtualNodeFactory.Element("div", "a");
-        _renderer.Render(tree, _container);
-        _renderer.OperationLog.Reset();
-
-        _renderer.Render(tree, _container);
-
-        _renderer.OperationLog.Operations.ShouldBeEmpty();
+        return ComponentTree.Element(
+            "li",
+            children: [ComponentTree.Text(text)],
+            key: key);
     }
 
-    [Fact]
-    public void ReusingAMountedVnode_ClonesInsteadOfCorruptingTheOriginal()
+    private static FakeHostNode[] Elements(FakeHostNode root)
     {
-        // Upstream cloneIfMounted contract: an already-mounted vnode reused in another tree is
-        // cloned at mount, so the original keeps its own el.
-        var shared = VirtualNodeFactory.Element("span", "shared");
-        _renderer.Render(VirtualNodeFactory.Element("div", shared), _container);
-        var originalElement = shared.El;
-        originalElement.ShouldNotBeNull();
-
-        var secondContainer = _renderer.CreateContainer();
-        _renderer.Render(VirtualNodeFactory.Element("div", shared), secondContainer);
-
-        shared.El.ShouldBeSameAs(originalElement); // original untouched
-        TestNodeSerializer.Serialize(_container).ShouldBe("<root><div><span>shared</span></div></root>");
-        TestNodeSerializer.Serialize(secondContainer).ShouldBe("<root><div><span>shared</span></div></root>");
+        return root.Children
+            .Where(node => node.Kind == FakeHostNodeKind.Element)
+            .ToArray();
     }
-
 }

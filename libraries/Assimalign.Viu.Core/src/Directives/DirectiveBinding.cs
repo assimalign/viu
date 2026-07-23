@@ -1,61 +1,85 @@
+using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// The per-use state of a directive on one vnode — the C# port of upstream's
-/// <c>DirectiveBinding</c> (<c>packages/runtime-core/src/directives.ts</c>,
-/// https://vuejs.org/guide/reusability/custom-directives.html#directive-hooks). Passed to every
-/// hook so it can read the bound value, the argument, and the modifiers, and reach the component
-/// instance whose render attached it. Created by
-/// <see cref="Directives.WithDirectives(VirtualNode, DirectiveArgument[])"/>.
-/// </summary>
+/// <summary>Provides one resolved directive use to its lifecycle hooks.</summary>
 public sealed class DirectiveBinding
 {
-    /// <summary>The shared empty modifier set (upstream: <c>EMPTY_OBJ</c>).</summary>
-    internal static readonly IReadOnlyDictionary<string, bool> EmptyModifiers = ReadOnlyDictionary<string, bool>.Empty;
+    private Func<string, IReadOnlyList<DirectiveHostElement>>? _hostElements;
 
     internal DirectiveBinding(
+        string directiveName,
         IDirective directive,
-        ComponentInstance? instance,
+        IComponentContext? context,
         object? value,
+        object? previousValue,
         string? argument,
         IReadOnlyDictionary<string, bool> modifiers)
     {
+        DirectiveName = directiveName;
         Directive = directive;
-        Instance = instance;
+        Context = context;
         Value = value;
+        PreviousValue = previousValue;
         Argument = argument;
         Modifiers = modifiers;
     }
 
-    /// <summary>The directive whose hooks this binding drives (upstream: <c>binding.dir</c>).</summary>
+    /// <summary>Gets the application registration name used for this directive.</summary>
+    public string DirectiveName { get; }
+
+    /// <summary>Gets the resolved reusable directive.</summary>
     public IDirective Directive { get; }
 
-    /// <summary>
-    /// The component instance whose render attached the directive (upstream: <c>binding.instance</c>).
-    /// </summary>
-    public ComponentInstance? Instance { get; }
+    /// <summary>Gets the component context whose render attached this binding, when present.</summary>
+    public IComponentContext? Context { get; }
 
-    /// <summary>The current bound value (upstream: <c>binding.value</c>).</summary>
+    /// <summary>Gets the current bound value.</summary>
     public object? Value { get; }
 
-    /// <summary>
-    /// The value from the previous render, set on the update hooks (upstream: <c>binding.oldValue</c>);
-    /// null on the created/mount hooks.
-    /// </summary>
-    public object? OldValue { get; internal set; }
+    /// <summary>Gets the previous bound value on update, or null.</summary>
+    public object? PreviousValue { get; }
 
-    /// <summary>
-    /// The directive argument (upstream: <c>binding.arg</c> — the <c>foo</c> in <c>v-x:foo</c>),
-    /// or null.
-    /// </summary>
+    /// <summary>Gets the optional directive argument.</summary>
     public string? Argument { get; }
 
-    /// <summary>
-    /// The directive modifiers (upstream: <c>binding.modifiers</c> — the <c>bar</c> in
-    /// <c>v-x.bar</c>, present with value true); an empty set when there are none.
-    /// </summary>
+    /// <summary>Gets the immutable directive modifiers.</summary>
     public IReadOnlyDictionary<string, bool> Modifiers { get; }
+
+    /// <summary>
+    /// Gets the transition attached to the bound element, or null when the element is not inside a
+    /// transition.
+    /// </summary>
+    public ComponentTransition? Transition { get; private set; }
+
+    /// <summary>
+    /// Gets mounted descendant host elements with the supplied tag in document order.
+    /// </summary>
+    /// <remarks>
+    /// Descendants are available from the mounted hook through before-unmount. The created and
+    /// before-mount phases return an empty list because child mounting has not completed.
+    /// </remarks>
+    /// <param name="tag">The platform tag name.</param>
+    /// <returns>The matching component/host-element pairs.</returns>
+    public IReadOnlyList<DirectiveHostElement> GetDescendantElements(string tag)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(tag);
+        return _hostElements?.Invoke(tag)
+            ?? Array.Empty<DirectiveHostElement>();
+    }
+
+    internal void BindHostElements(
+        Func<string, IReadOnlyList<DirectiveHostElement>> hostElements)
+    {
+        ArgumentNullException.ThrowIfNull(hostElements);
+        _hostElements = hostElements;
+    }
+
+    internal void BindTransition(TransitionHooks? transition)
+    {
+        Transition = transition?.ComponentTransition;
+    }
 }

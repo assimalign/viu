@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
@@ -35,7 +36,10 @@ internal static class BrowserModelDirective
     public static ViuModelBinding? Carrier(DirectiveBinding binding) => binding.Value as ViuModelBinding;
 
     /// <summary>The model value from a binding's carrier, or null when the carrier is absent.</summary>
-    /// <param name="binding">The directive binding (its <see cref="DirectiveBinding.Value"/> or <see cref="DirectiveBinding.OldValue"/>).</param>
+    /// <param name="binding">
+    /// The directive binding value (its current <see cref="DirectiveBinding.Value"/> or
+    /// <see cref="DirectiveBinding.PreviousValue"/>).
+    /// </param>
     public static object? ModelValue(object? binding) => (binding as ViuModelBinding)?.Value;
 
     /// <summary>Formats a value for the DOM (null → empty; invariant scalar otherwise), matching the patch engine.</summary>
@@ -43,15 +47,35 @@ internal static class BrowserModelDirective
     public static string FormatValue(object? value)
         => value is null ? string.Empty : DisplayStringFormatter.FormatScalar(value);
 
-    /// <summary>Reads a raw vnode property (the bound <c>:value</c>, <c>true-value</c>, …), preserving object identity.</summary>
-    /// <param name="node">The element vnode.</param>
+    /// <summary>
+    /// Reads a raw component attribute (the bound <c>:value</c>, <c>true-value</c>, and similar
+    /// values), preserving object identity.
+    /// </summary>
+    /// <param name="component">The immutable element component.</param>
     /// <param name="name">The property name.</param>
-    public static object? Property(VirtualNode node, string name) => node.Properties?[name];
+    public static object? Property(IElementComponent component, string name)
+    {
+        component.Attributes.TryGetValue(name, out object? value);
+        return value;
+    }
 
-    /// <summary>Whether the vnode declares <c>type="number"</c> (upstream: <c>vnode.props.type === 'number'</c>).</summary>
-    /// <param name="node">The element vnode.</param>
-    public static bool IsNumberType(VirtualNode node)
-        => string.Equals(FormatValue(Property(node, "type")), "number", StringComparison.Ordinal);
+    /// <summary>Whether the component declares an attribute with the supplied name.</summary>
+    /// <param name="component">The immutable element component.</param>
+    /// <param name="name">The attribute name.</param>
+    /// <returns>True when the attribute is present, including when its value is null.</returns>
+    public static bool HasProperty(IElementComponent component, string name)
+        => component.Attributes.TryGetValue(name, out _);
+
+    /// <summary>
+    /// Whether the component declares <c>type="number"</c> (upstream:
+    /// <c>vnode.props.type === 'number'</c>).
+    /// </summary>
+    /// <param name="component">The immutable element component.</param>
+    public static bool IsNumberType(IElementComponent component)
+        => string.Equals(
+            FormatValue(Property(component, "type")),
+            "number",
+            StringComparison.Ordinal);
 
     /// <summary>Whether a model value is an ordered list (upstream: <c>isArray</c>) — array/set checkbox and multi-select semantics branch here first.</summary>
     /// <param name="value">The model value.</param>
