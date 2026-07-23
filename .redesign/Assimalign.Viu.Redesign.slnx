@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/Assimalign.Viu.Components/">
+    <Project Path="Assimalign.Viu.Components/src/Assimalign.Viu.Components.csproj" />
+    <Project Path="Assimalign.Viu.Components/test/Assimalign.Viu.Components.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Assimalign.Viu.Reactivity/">
+    <Project Path="Assimalign.Viu.Reactivity/src/Assimalign.Viu.Reactivity.csproj" />
+    <Project Path="Assimalign.Viu.Reactivity/test/Assimalign.Viu.Reactivity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Assimalign.Viu.State/">
+    <Project Path="Assimalign.Viu.State/src/Assimalign.Viu.State.csproj" />
+    <Project Path="Assimalign.Viu.State/test/Assimalign.Viu.State.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Assimalign.Viu.Core/">
+    <Project Path="Assimalign.Viu.Core/src/Assimalign.Viu.Core.csproj" />
+    <Project Path="Assimalign.Viu.Core/test/Assimalign.Viu.Core.Tests.csproj" />
+  </Folder>
+</Solution>

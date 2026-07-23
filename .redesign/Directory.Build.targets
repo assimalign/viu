@@ -1,0 +1,24 @@
+<Project>
+  <!--
+    The shipping by-name resolver intentionally indexes only libraries/, analyzers/, and benchmarks/.
+    This isolated design workspace extends the same ViuProjectReference convention locally so the
+    proposal can build without adding .redesign projects to the shipping resolver. Redesign
+    references are resolved before the shipping targets are imported so a proposed project whose
+    name matches a shipping project (currently Assimalign.Viu.Core) resolves to this workspace.
+  -->
+  <ItemGroup>
+    <_ViuRedesignProject Include="$(MSBuildThisFileDirectory)**\*.csproj" />
+    <_ViuRedesignProject Update="@(_ViuRedesignProject)"
+                         ProjectId="%(_ViuRedesignProject.Filename)"
+                         ProjectPath="%(_ViuRedesignProject.Identity)" />
+
+    <ViuProjectReference Update="@(_ViuRedesignProject->'%(ProjectId)')"
+                         ProjectPath="%(_ViuRedesignProject.ProjectPath)" />
+    <ProjectReference Include="@(ViuProjectReference->'%(ProjectPath)')" />
+    <ViuProjectReference Remove="@(ViuProjectReference->HasMetadata('ProjectPath'))" />
+
+    <_ViuRedesignProject Remove="@(_ViuRedesignProject)" />
+  </ItemGroup>
+
+  <Import Project="..\libraries\Directory.Build.targets" />
+</Project>
