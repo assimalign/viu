@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Assimalign.Viu.TodoMvc": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:60277;http://localhost:60279"
+    }
+  }
+}
