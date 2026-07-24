@@ -7,7 +7,7 @@ namespace Assimalign.Viu.Tooling.Css;
 /// <summary>
 /// The result of compiling one <c>.viu</c> file's <c>@style</c> blocks
 /// (<see cref="SingleFileComponentStyleCompiler.Compile"/>) — the shared, deterministic output both
-/// build-time hosts consume ([V01.01.12.12]). The <c>Assimalign.Viu.Syntax.Generators</c> generator maps it
+/// build-time hosts consume ([V01.01.12.12]). The <c>Assimalign.Viu.Generators.Syntax</c> generator maps it
 /// into its cached model to emit the <c>ScopeId</c>/<c>ExtractedStyles</c> constants, the <c>$style</c>
 /// accessors, and the <c>v-bind()</c> seam; the <c>ViuBundleCss</c> MSBuild task consumes only
 /// <see cref="ExtractedStyles"/> to write the physical bundle. Because both hosts call this one method over

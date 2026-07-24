@@ -1,4 +1,0 @@
-<Solution>
-	<Project Path="src/Assimalign.Viu.Core.Generators.csproj" />
-	<Project Path="test/Assimalign.Viu.Core.Generators.Tests.csproj" />
-</Solution>

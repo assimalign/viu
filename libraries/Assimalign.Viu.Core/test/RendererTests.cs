@@ -398,6 +398,33 @@ public sealed class RendererTests
     }
 
     [Fact]
+    public void Render_BlockWithTextFlagAndEmptyDynamicChildren_PatchesText()
+    {
+        FakeHost host = new();
+        Renderer<FakeHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+        renderer.Render(
+            ComponentTree.Element(
+                "button",
+                children: [ComponentTree.Text("Count: 0")],
+                optimization: new ComponentOptimization(
+                    PatchFlags.Text,
+                    dynamicChildren: Array.Empty<IComponent>())),
+            host.Root);
+
+        renderer.Render(
+            ComponentTree.Element(
+                "button",
+                children: [ComponentTree.Text("Count: 1")],
+                optimization: new ComponentOptimization(
+                    PatchFlags.Text,
+                    dynamicChildren: Array.Empty<IComponent>())),
+            host.Root);
+
+        host.Text(host.Root.Children.Single()).ShouldBe("Count: 1");
+    }
+
+    [Fact]
     public void Render_BlockWithDynamicDescendant_VisitsOnlyRootAndDynamicNode()
     {
         FakeHost host = new();

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- The 17.14 extensibility SDK carries .NET 9 implementation dependencies while the extension
+         itself targets Visual Studio's net8 host contract. Running tests on net9 avoids false
+         assembly-unification warnings without changing the shipped target. -->
+    <TargetFramework>$(TargetFrameworkForVisualStudioExtensionTests)</TargetFramework>
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <IsPackable>false</IsPackable>
+    <!-- Microsoft.VisualStudio.Extensibility brings the VS editor's WindowsBase 8 contract into
+         this standalone test host, while the current .NET reference pack exposes the facade as
+         version 4. The extension build itself resolves the VSIX closure; suppress only this known
+         test-host unification warning. -->
+    <NoWarn>$(NoWarn);MSB3277;VSEXT0004;VSEXTPREVIEW_TAGGERS</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk"
+                         PrivateAssets="all"
+                         IncludeAssets="compile;runtime" />
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.VisualStudio" />
+  </ItemGroup>
+</Project>

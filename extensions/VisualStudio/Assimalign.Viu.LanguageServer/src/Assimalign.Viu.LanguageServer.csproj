@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$(TargetFrameworkForLanguageServers)</TargetFramework>
+    <AssemblyName>Assimalign.Viu.LanguageServer</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!-- Keep trimming project-local. Passing PublishTrimmed as a global publish property would
+         incorrectly propagate it to the netstandard2.0 syntax project references. -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.LanguageService" />
+  </ItemGroup>
+</Project>

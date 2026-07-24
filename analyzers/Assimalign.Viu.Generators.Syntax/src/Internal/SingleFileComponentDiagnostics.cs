@@ -9,7 +9,7 @@ using SyntaxDiagnosticSeverity = Assimalign.Viu.Syntax.DiagnosticSeverity;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// Maps the base <c>Assimalign.Viu.Syntax</c> <see cref="SyntaxDiagnostic"/> surface onto stable,
@@ -26,12 +26,12 @@ namespace Assimalign.Viu.Syntax.Generators;
 /// </summary>
 internal static class SingleFileComponentDiagnostics
 {
-    private const string Category = "Assimalign.Viu.Syntax.Generators";
+    private const string Category = "Assimalign.Viu.Generators.Syntax";
 
     // The stable per-id help-link target: the VIU diagnostic catalog documents every descriptor's ID,
     // origin, severity, and configuration ([V01.01.05.08]). Each descriptor links its own heading anchor.
     private const string HelpLinkBase =
-        "https://github.com/assimalign/viu/blob/main/analyzers/Assimalign.Viu.Syntax.Generators/docs/DIAGNOSTICS.md";
+        "https://github.com/assimalign/viu/blob/main/analyzers/Assimalign.Viu.Generators.Syntax/docs/DIAGNOSTICS.md";
 
     private static string HelpLink(string id) => HelpLinkBase + "#" + id.ToLowerInvariant();
 

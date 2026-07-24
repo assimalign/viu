@@ -44,10 +44,9 @@ The staging application model is host-generic:
    server-render-to-hydrate coverage.
 2. Move the staged projects into the corresponding `libraries/Assimalign.Viu.*` locations without
    changing their public contracts.
-3. Atomically rename `Assimalign.Viu.Core.Generators` back to
-   `Assimalign.Viu.Reactivity.Generators`, retarget every shipping/analyzer/framework reference,
-   and update generated snapshots. Do not publish the staged Reactivity package with the
-   Core-named analyzer embedded in it.
+3. Keep the renamed `Assimalign.Viu.Generators.Reactivity` assembly, namespace,
+   shipping/analyzer/framework references, and generated snapshots synchronized. Do not publish
+   the Reactivity package with a stale Core-named analyzer embedded in it.
 4. Replace Store package references with State and decide whether a package-id compatibility shim
    is required for external consumers.
 5. Update framework manifests, SDK packaging, examples, solution files, CI entries, and

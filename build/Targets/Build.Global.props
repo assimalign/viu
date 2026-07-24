@@ -8,6 +8,7 @@
 		<ViuOutputPathForCli>$(ViuOutputPath)\dotnet</ViuOutputPathForCli>
 		<ViuOutputPathForPacks>$(ViuOutputPath)\dotnet\packs</ViuOutputPathForPacks>
 		<ViuOutputPathForLibraries>$(ViuOutputPath)\packages</ViuOutputPathForLibraries>
+		<ViuOutputPathForExtensions>$(ViuOutputPath)\extensions</ViuOutputPathForExtensions>
 		<ViuOutputPathForDevScripts>$(ViuRepositoryDirectory)scripts\modules</ViuOutputPathForDevScripts>
 	</PropertyGroup>
 

@@ -9,7 +9,7 @@ using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// Analyzes a parsed <c>@script</c> block's C# — the Viu analogue of <c>@vue/compiler-sfc</c>'s

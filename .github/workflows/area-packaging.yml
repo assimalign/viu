@@ -62,4 +62,124 @@ jobs:
           foreach ($pattern in $expected) {
             if (-not (Get-ChildItem $feed -Filter $pattern)) { throw "Missing package: $pattern" }
           }
+
+          $expectedFrameworkAssemblies = @(
+            'Assimalign.Viu.App',
+            'Assimalign.Viu.Browser',
+            'Assimalign.Viu.Components',
+            'Assimalign.Viu.Core',
+            'Assimalign.Viu.Reactivity',
+            'Assimalign.Viu.Shared',
+            'Assimalign.Viu.State'
+          )
+
+          function Assert-FrameworkPackage {
+            param(
+              [Parameter(Mandatory)]
+              [System.IO.FileInfo] $Package,
+              [Parameter(Mandatory)]
+              [string] $ManifestPath
+            )
+
+            $archive = [System.IO.Compression.ZipFile]::OpenRead($Package.FullName)
+            try {
+              $manifestEntry = $archive.GetEntry($ManifestPath)
+              if ($null -eq $manifestEntry) {
+                throw "$($Package.Name) is missing $ManifestPath"
+              }
+
+              $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
+              try {
+                [xml] $manifest = $reader.ReadToEnd()
+              }
+              finally {
+                $reader.Dispose()
+              }
+
+              $actualFrameworkAssemblies = @(
+                $manifest.DocumentElement.File |
+                  Where-Object Type -eq 'Managed' |
+                  ForEach-Object AssemblyName |
+                  Sort-Object
+              )
+              $difference = @(Compare-Object $expectedFrameworkAssemblies $actualFrameworkAssemblies)
+              if ($difference.Count -ne 0) {
+                throw "$($Package.Name) managed assembly manifest differs from the framework contract: $($difference | Out-String)"
+              }
+
+              foreach ($assemblyName in $expectedFrameworkAssemblies) {
+                $assemblyFileName = "$assemblyName.dll"
+                $matchingEntries = @($archive.Entries | Where-Object { $_.FullName.EndsWith("/$assemblyFileName", [System.StringComparison]::Ordinal) })
+                if ($matchingEntries.Count -ne 1) {
+                  throw "$($Package.Name) must contain exactly one $assemblyFileName, found $($matchingEntries.Count)"
+                }
+              }
+            }
+            finally {
+              $archive.Dispose()
+            }
+          }
+
+          $referencePackage = @(Get-ChildItem $feed -Filter 'Assimalign.Viu.App.Ref.*.nupkg')
+          $runtimePackage = @(Get-ChildItem $feed -Filter 'Assimalign.Viu.App.Runtime.browser-wasm.*.nupkg')
+          $sdkPackage = @(Get-ChildItem $feed -Filter 'Assimalign.Viu.Sdk.*.nupkg')
+          if ($referencePackage.Count -ne 1) { throw "Expected exactly one reference pack, found $($referencePackage.Count)" }
+          if ($runtimePackage.Count -ne 1) { throw "Expected exactly one browser-wasm runtime pack, found $($runtimePackage.Count)" }
+          if ($sdkPackage.Count -ne 1) { throw "Expected exactly one SDK package, found $($sdkPackage.Count)" }
+
+          Assert-FrameworkPackage -Package $referencePackage[0] -ManifestPath 'data/FrameworkList.xml'
+          Assert-FrameworkPackage -Package $runtimePackage[0] -ManifestPath 'data/RuntimeList.xml'
+
+          $sdkArchive = [System.IO.Compression.ZipFile]::OpenRead($sdkPackage[0].FullName)
+          try {
+            $requiredSdkEntries = @(
+              'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
+              'Tasks/Assimalign.Viu.Sdk.Tasks.deps.json',
+              'Targets/Assimalign.Viu.Generators.Syntax.props',
+              'Targets/Assimalign.Viu.Generators.Syntax.targets',
+              'Targets/Assimalign.Viu.Sdk.Css.Bundling.targets'
+            )
+            foreach ($entryName in $requiredSdkEntries) {
+              if ($null -eq $sdkArchive.GetEntry($entryName)) {
+                throw "$($sdkPackage[0].Name) is missing $entryName"
+              }
+            }
+
+            $forbiddenSdkEntries = @(
+              'Tasks/Assimalign.Viu.Tooling.Tasks.dll',
+              'Tasks/Microsoft.Build.dll',
+              'Tasks/Microsoft.Build.Framework.dll',
+              'Tasks/Microsoft.Build.Utilities.Core.dll',
+              'Tasks/Microsoft.NET.StringTools.dll',
+              'Targets/Assimalign.Viu.Syntax.Generators.props',
+              'Targets/Assimalign.Viu.Syntax.Generators.targets'
+            )
+            foreach ($entryName in $forbiddenSdkEntries) {
+              if ($null -ne $sdkArchive.GetEntry($entryName)) {
+                throw "$($sdkPackage[0].Name) must not contain stale or host-provided entry $entryName"
+              }
+            }
+
+            $nuspecEntry = @($sdkArchive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [System.StringComparison]::OrdinalIgnoreCase) })
+            if ($nuspecEntry.Count -ne 1) {
+              throw "$($sdkPackage[0].Name) must contain exactly one nuspec, found $($nuspecEntry.Count)"
+            }
+
+            $nuspecReader = [System.IO.StreamReader]::new($nuspecEntry[0].Open())
+            try {
+              [xml] $nuspec = $nuspecReader.ReadToEnd()
+            }
+            finally {
+              $nuspecReader.Dispose()
+            }
+
+            $dependencies = @($nuspec.SelectNodes("//*[local-name()='dependency']"))
+            if ($dependencies.Count -ne 0) {
+              throw "$($sdkPackage[0].Name) must not expose build-time implementation dependencies: $($dependencies.id -join ', ')"
+            }
+          }
+          finally {
+            $sdkArchive.Dispose()
+          }
+
           Get-ChildItem $feed -Filter 'Assimalign.Viu.*.nupkg' | ForEach-Object { Write-Host $_.Name }

@@ -6,7 +6,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// The deterministic FNV-1a hash the CSS Modules class-name rewrite (<see cref="CssModuleRewriter"/>) and
 /// the <c>v-bind()</c> custom-property rewrite (<see cref="CssBindingRewriter"/>) derive their local,
 /// component-scoped names from. It is the same FNV-1a scheme the generator's scope id uses
-/// (<c>Assimalign.Viu.Syntax.Generators.StyleScopeId</c>, [V01.01.06.04]) so all three families of hash
+/// (<c>Assimalign.Viu.Tooling.Css.StyleScopeId</c>, [V01.01.06.04]) so all three families of hash
 /// are consistent: culture-free, stable across machines and rebuilds (the asset-caching contract), and
 /// eight lowercase hex digits. String-only (no <c>System.IO</c>), so it stays inside the analyzer API
 /// surface (RS1035).

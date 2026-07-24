@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// The consuming project's properties the generated names depend on, extracted from the analyzer config

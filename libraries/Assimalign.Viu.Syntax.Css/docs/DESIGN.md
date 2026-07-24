@@ -206,7 +206,7 @@ only the scope-id string.
   `System.IO` is off-limits under RS1035), so the extracted CSS surfaces as the generated `ExtractedStyles`
   constant. Writing the CSS into `dotnet publish` output as a bundled stylesheet was deferred to an
   MSBuild-task follow-up on the [V01.01.06.02] pipeline side — **now landed as [V01.01.12.12]**: the
-  `ViuBundleCss` MSBuild task (`analyzers/Assimalign.Viu.Tooling.Tasks`) re-runs the *same* deterministic
+  `ViuBundleCss` MSBuild task (`sdks/Assimalign.Viu.Sdk/Tasks`) re-runs the *same* deterministic
   `@style` compilation — lifted into the shared `Assimalign.Viu.Tooling.Css` core, which the generator now
   delegates to — over the same `.viu` inputs, so the physical bundle is byte-identical to `ExtractedStyles`;
   it writes the bundle under `obj/…/viu/` and registers it as a `StaticWebAsset`. See that library's

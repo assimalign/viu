@@ -57,7 +57,14 @@ New-Item -ItemType Directory -Force $feed | Out-Null
 
 if (-not $SkipSdk) {
     Write-Host "[1/3] Packing Assimalign.Viu.Sdk" -ForegroundColor Green
-    dotnet pack (Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj') `
+    $sdkProject = Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj'
+    # CollectSdkTaskFiles intentionally packages the complete task output
+    # closure. Clean first so a same-worktree rename cannot leave an obsolete
+    # assembly in the SDK package.
+    dotnet clean $sdkProject --configuration $Configuration
+    if ($LASTEXITCODE -ne 0) { throw 'SDK clean failed.' }
+
+    dotnet pack $sdkProject `
         --configuration $Configuration -p:PackageOutputPath=$feed
     if ($LASTEXITCODE -ne 0) { throw 'SDK pack failed.' }
 }

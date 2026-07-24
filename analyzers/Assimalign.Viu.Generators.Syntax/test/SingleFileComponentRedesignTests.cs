@@ -3,7 +3,7 @@ using System.Linq;
 using Shouldly;
 using Xunit;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// Pins the generated surface selected by the approved Components/Reactivity redesign.

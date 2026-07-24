@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 using Assimalign.Viu.Reactivity;
 
-namespace Assimalign.Viu.Core.Generators.Tests;
+namespace Assimalign.Viu.Generators.Reactivity.Tests;
 
 /// <summary>
 /// Drives <see cref="ReactiveGenerator"/> over in-memory source for snapshot, diagnostic, and
@@ -34,7 +34,7 @@ internal static class GeneratorTestHarness
     {
         var trees = sources.Select(source => CSharpSyntaxTree.ParseText(source, ParseOptions));
         return CSharpCompilation.Create(
-            "Assimalign.Viu.Core.Generators.TestAssembly",
+            "Assimalign.Viu.Generators.Reactivity.TestAssembly",
             trees,
             References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));

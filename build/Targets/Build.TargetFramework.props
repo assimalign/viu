@@ -4,6 +4,11 @@
         <TargetFrameworkForAnalyzers>netstandard2.0</TargetFrameworkForAnalyzers>
         <TargetFrameworkForLibraries>$(TargetFrameworkLatest)</TargetFrameworkForLibraries>
         <TargetFrameworkForSdks>$(TargetFrameworkLatest)</TargetFrameworkForSdks>
+        <!-- VisualStudio.Extensibility executes out of process on the Visual Studio-supported
+             Windows runtime. The language server stays editor-neutral on the repository TFM. -->
+        <TargetFrameworkForVisualStudioExtensions>net8.0-windows8.0</TargetFrameworkForVisualStudioExtensions>
+        <TargetFrameworkForVisualStudioExtensionTests>net9.0-windows8.0</TargetFrameworkForVisualStudioExtensionTests>
+        <TargetFrameworkForLanguageServers>$(TargetFrameworkLatest)</TargetFrameworkForLanguageServers>
         <!--
             Alias consumed by the framework Ref/Runtime targets (frameworks\Assimalign.Viu.App.targets)
             in path construction. Kept derived from TargetFramework so bumping the TFM here continues to

@@ -3,7 +3,7 @@ using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-namespace Assimalign.Viu.Core.Generators;
+namespace Assimalign.Viu.Generators.Reactivity;
 
 /// <summary>
 /// A value-equatable snapshot of a <see cref="Location"/> — file path plus spans — so diagnostics can

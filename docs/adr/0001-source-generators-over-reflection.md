@@ -38,7 +38,7 @@ exception (see [`.claude/rules/deviations.md`](../../.claude/rules/deviations.md
 
 - `reactive()` becomes `[Reactive]`/`[ShallowReactive]` partial classes whose property wrappers are
   emitted by `Assimalign.Viu.Reactivity.Generators` (see [ADR-0002](0002-ref-first-reactivity.md)).
-- `.viu` single-file components and templates compile through `Assimalign.Viu.Syntax.Generators`
+- `.viu` single-file components and templates compile through `Assimalign.Viu.Generators.Syntax`
   (see [ADR-0005](0005-no-runtime-template-compilation.md)).
 - Generator inputs and outputs must be **value-equatable** so the incremental-generator cache holds
   — this shapes the whole `Assimalign.Viu.Syntax.*` cluster (immutable records, `SyntaxList<T>`; see

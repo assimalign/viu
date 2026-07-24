@@ -1,8 +1,14 @@
 <Project>
     <PropertyGroup>
         <Company>Assimalign</Company>
-        <Copyright>© Assimalign $([System.DateTime]::Now.ToString(`yyyy`))</Copyright>
+        <Copyright>© Assimalign 2025</Copyright>
         <RepositoryType>git</RepositoryType>
         <RepositoryUrl>https://github.com/assimalign/viu</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/assimalign/viu</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <Authors>Assimalign</Authors>
+        <Description>$(MSBuildProjectName) is part of Viu, a faithful C#/.NET implementation of Vue.js 3 for WebAssembly.</Description>
+        <PackageTags>Viu;Vue;WebAssembly;WASM;dotnet</PackageTags>
     </PropertyGroup>
 </Project>

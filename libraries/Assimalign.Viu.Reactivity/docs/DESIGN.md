@@ -96,11 +96,10 @@ The package owns the versioned dependency graph, linked subscriber edges, batchi
 watch traversal, and reactive collections. It remains single-threaded for the browser event-loop
 model.
 
-Reactive-object generation ships through the existing
-`Assimalign.Viu.Core.Generators` analyzer assembly during this migration wave. The analyzer now
-recognizes attributes and emits runtime contracts in `Assimalign.Viu.Reactivity`; its project and
-diagnostic identifiers remain unchanged for packaging compatibility. Generated `ToReferences()`
-members expose `IReactiveReference<T>`.
+Reactive-object generation ships through the
+`Assimalign.Viu.Generators.Reactivity` analyzer assembly. The analyzer recognizes attributes and
+emits runtime contracts in `Assimalign.Viu.Reactivity`; diagnostic identifiers remain stable.
+Generated `ToReferences()` members expose `IReactiveReference<T>`.
 
 Before promotion into `libraries/` or publication, the analyzer must be atomically renamed back to
 `Assimalign.Viu.Reactivity.Generators` together with every solution, framework-manifest, package,

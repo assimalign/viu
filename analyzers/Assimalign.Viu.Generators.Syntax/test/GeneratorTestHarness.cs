@@ -11,7 +11,7 @@ using Microsoft.CodeAnalysis.Text;
 // ambient and shadows Roslyn's; alias the Roslyn diagnostics the generator reports.
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// Drives <see cref="SingleFileComponentGenerator"/> over in-memory <c>.viu</c> additional files for
@@ -36,7 +36,7 @@ internal static class GeneratorTestHarness
         }
 
         return CSharpCompilation.Create(
-            "Assimalign.Viu.Syntax.Generators.TestAssembly",
+            "Assimalign.Viu.Generators.Syntax.TestAssembly",
             trees,
             new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));

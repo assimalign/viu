@@ -5,4 +5,5 @@
 	<Import Project="Targets\Build.References.Analyzers.targets" />
 	<Import Project="Targets\Build.StaticWebAssets.targets" />
 	<Import Project="Targets\Build.Css.Bundling.targets" />
+	<Import Project="Targets\Build.Packaging.targets" />
 </Project>

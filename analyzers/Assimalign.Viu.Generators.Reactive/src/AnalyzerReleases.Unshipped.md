@@ -5,7 +5,7 @@
 
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-VUER1001 | Assimalign.Viu.Core.Generators | Error | Reactive type must be partial
-VUER1002 | Assimalign.Viu.Core.Generators | Error | Reactive type must not be static
-VUER1003 | Assimalign.Viu.Core.Generators | Warning | Reactive property must have a getter and a settable setter
-VUER1004 | Assimalign.Viu.Core.Generators | Error | Conflicting reactive attributes
+VUER1001 | Assimalign.Viu.Generators.Reactivity | Error | Reactive type must be partial
+VUER1002 | Assimalign.Viu.Generators.Reactivity | Error | Reactive type must not be static
+VUER1003 | Assimalign.Viu.Generators.Reactivity | Warning | Reactive property must have a getter and a settable setter
+VUER1004 | Assimalign.Viu.Generators.Reactivity | Error | Conflicting reactive attributes

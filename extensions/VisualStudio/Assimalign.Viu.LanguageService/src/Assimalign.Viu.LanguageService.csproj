@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLanguageServers)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+  </ItemGroup>
+</Project>

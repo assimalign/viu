@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// A value-equatable snapshot of a source range in a <c>.viu</c> file — the file path plus zero-based

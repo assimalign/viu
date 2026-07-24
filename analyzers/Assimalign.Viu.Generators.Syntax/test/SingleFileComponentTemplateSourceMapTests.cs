@@ -12,12 +12,12 @@ using Assimalign.Viu.Syntax.Templates;
 using Shouldly;
 using Xunit;
 
-// The test namespace is nested under Assimalign.Viu.Syntax, so the base cluster's Diagnostic and
-// DiagnosticSeverity shadow Roslyn's; alias the Roslyn types the generated code compiles against.
+// Both the Viu syntax cluster and Roslyn expose Diagnostic and DiagnosticSeverity; alias the Roslyn
+// types that the generated code compiles against.
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// Tests for [V01.01.05.08] — the render-body source map: the compiled <c>@template</c> render function is
@@ -159,7 +159,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // lead a physical line; the mapping is composed onto the block's content-start position.
         var body = "        return _f(_ctx.a, _ctx.b);\n";
         var blockStart = new Position(Offset: 12, Line: 2, Column: 1); // @template content starts on file line 2
-        var mappings = new SyntaxList<RenderSourceMapping>(new[]
+        var mappings = new Assimalign.Viu.Syntax.SyntaxList<RenderSourceMapping>(new[]
         {
             // `b` further right on the same generated line (line 0), template col 10.
             new RenderSourceMapping
@@ -191,7 +191,11 @@ public sealed class SingleFileComponentTemplateSourceMapTests
     public void Mapper_WithNoMappings_ReturnsBodyUnchanged()
     {
         const string body = "        return null;\n";
-        RenderBodySourceMapper.Inject(body, SyntaxList<RenderSourceMapping>.Empty, new Position(0, 1, 1), "C:/proj/X.viu")
+        RenderBodySourceMapper.Inject(
+                body,
+                Assimalign.Viu.Syntax.SyntaxList<RenderSourceMapping>.Empty,
+                new Position(0, 1, 1),
+                "C:/proj/X.viu")
             .ShouldBe(body);
     }
 
@@ -261,7 +265,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
             .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path));
 
         return CSharpCompilation.Create(
-            "Assimalign.Viu.Syntax.Generators.TemplateSourceMapTestAssembly",
+            "Assimalign.Viu.Generators.Syntax.TemplateSourceMapTestAssembly",
             trees,
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable))

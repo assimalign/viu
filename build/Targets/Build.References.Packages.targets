@@ -12,18 +12,24 @@
         </_ViuPackage>
         <_ViuPackage Include="Microsoft.Build" Version="18.7.1">
             <PrivateAssets>all</PrivateAssets>
-            <ExcludeAssets>all</ExcludeAssets>
+            <!-- MSBuild supplies the task-host runtime; retain only compile assets. -->
+            <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
         <_ViuPackage Include="Microsoft.Build.Framework" Version="18.7.1">
             <PrivateAssets>all</PrivateAssets>
-            <ExcludeAssets>all</ExcludeAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
         <_ViuPackage Include="Microsoft.Build.Utilities.Core" Version="18.7.1">
             <PrivateAssets>all</PrivateAssets>
-            <ExcludeAssets>all</ExcludeAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
         <_ViuPackage Include="Microsoft.Build.Locator" Version="1.11.2" />
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" Version="1.1.4" />
+        <!-- The Visual Studio client remains a thin out-of-process adapter. Keep both packages on
+             the same release line because the build package generates the extension manifest for
+             the corresponding VisualStudio.Extensibility SDK surface. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" />
+        <_ViuPackage Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" />
     </ItemGroup>
 
     <!-- Benchmark Dependencies -->
@@ -50,7 +56,16 @@
 
     <!-- #region: Package Reference Update -->
     <ItemGroup>
-        <ViuPackageReference Update="@(_ViuPackage)" Version="%(_ViuPackage.Version)" />
+        <!--
+            Metadata declared on the central catalog does not flow through an Update automatically.
+            Copy every package-control field used above while preserving project-local metadata when
+            the catalog leaves that field unspecified.
+        -->
+        <ViuPackageReference Update="@(_ViuPackage)" Version="%(_ViuPackage.Version)">
+            <PrivateAssets Condition="'%(_ViuPackage.PrivateAssets)' != ''">%(_ViuPackage.PrivateAssets)</PrivateAssets>
+            <IncludeAssets Condition="'%(_ViuPackage.IncludeAssets)' != ''">%(_ViuPackage.IncludeAssets)</IncludeAssets>
+            <ExcludeAssets Condition="'%(_ViuPackage.ExcludeAssets)' != ''">%(_ViuPackage.ExcludeAssets)</ExcludeAssets>
+        </ViuPackageReference>
         <PackageReference Include="@(ViuPackageReference)" />
         <ViuPackageReference Remove="@(ViuPackageReference)" />
     </ItemGroup>

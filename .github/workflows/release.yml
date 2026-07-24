@@ -1,0 +1,642 @@
+# Official Viu release pipeline.
+#
+# main merge -> uniquely versioned beta packages in GitHub Packages, plus a
+#               Marketplace preview when extensions/VisualStudio changed.
+# GitHub
+# Release    -> stable packages in nuget.org through OIDC trusted publishing.
+name: release
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  detect-visual-studio-changes:
+    name: detect Visual Studio changes
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+    steps:
+      - name: Detect extension changes
+        id: changes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VIU_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          $changedFiles = @(
+            & gh api `
+              --paginate `
+              "repos/$($env:GITHUB_REPOSITORY)/pulls/$($env:VIU_PULL_REQUEST_NUMBER)/files?per_page=100" `
+              --jq '.[].filename'
+          )
+          if ($LASTEXITCODE -ne 0) {
+            throw "Reading pull request files failed with exit code $LASTEXITCODE."
+          }
+
+          $visualStudioChanged = @(
+            $changedFiles |
+              Where-Object {
+                $_.StartsWith(
+                  'extensions/VisualStudio/',
+                  [System.StringComparison]::Ordinal)
+              }
+          ).Count -gt 0
+          "changed=$($visualStudioChanged.ToString().ToLowerInvariant())" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Visual Studio extension changed: $visualStudioChanged"
+
+  pack-packages:
+    name: pack all NuGet packages
+    if: >-
+      (github.event_name == 'pull_request_target' &&
+      github.event.pull_request.merged == true) ||
+      (github.event_name == 'release' &&
+      github.event.release.draft == false &&
+      github.event.release.prerelease == false)
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
+
+      - name: Validate checked-out commit
+        shell: pwsh
+        run: |
+          & git fetch origin main --no-tags
+          if ($LASTEXITCODE -ne 0) {
+            throw "Fetching origin/main failed with exit code $LASTEXITCODE."
+          }
+
+          $checkedOutCommit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Resolving the checked-out commit failed.'
+          }
+          & git merge-base --is-ancestor $checkedOutCommit origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Release builds must use a commit reachable from main.'
+          }
+
+      - name: Set up .NET with WebAssembly tools
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      - name: Resolve package version
+        id: version
+        shell: pwsh
+        env:
+          VIU_EVENT_NAME: ${{ github.event_name }}
+          VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          VIU_RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
+          $canonicalVersion = (
+            & dotnet msbuild $sdkProject -nologo -getProperty:ViuVersionPrefix
+          ) -join [System.Environment]::NewLine
+          if ($LASTEXITCODE -ne 0) {
+            throw "Reading the canonical Viu version failed with exit code $LASTEXITCODE."
+          }
+          $canonicalVersion = $canonicalVersion.Trim()
+          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "Canonical Viu version '$canonicalVersion' is not a three-part numeric version."
+          }
+
+          if ($env:VIU_EVENT_NAME -eq 'pull_request_target') {
+            $releaseVersion = "$canonicalVersion-beta.$($env:VIU_RUN_NUMBER)"
+          }
+          elseif ($env:VIU_EVENT_NAME -eq 'release') {
+            $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
+              $env:VIU_RELEASE_TAG,
+              '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$',
+              [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+            if (-not $tagMatch.Success) {
+              throw 'Stable GitHub releases must use a vMAJOR.MINOR.PATCH tag.'
+            }
+
+            $releaseVersion = $tagMatch.Groups['version'].Value
+            if ($releaseVersion -ne $canonicalVersion) {
+              throw "Release tag version $releaseVersion does not match canonical Viu version $canonicalVersion."
+            }
+
+          }
+          else {
+            throw "Unsupported release event '$($env:VIU_EVENT_NAME)'."
+          }
+
+          "version=$releaseVersion" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release package version: $releaseVersion"
+
+      - name: Pack release
+        shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: ./scripts/Pack-Release.ps1 -Version $env:VIU_PACKAGE_VERSION
+
+      - name: Verify package checksums
+        shell: bash
+        working-directory: _out/release/packages
+        run: sha256sum --check checksums.sha256
+
+      - name: Upload package release artifact
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Assimalign.Viu.Packages
+          path: _out/release/packages
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-github-packages:
+    name: publish beta packages to GitHub Packages
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.merged == true
+    needs: pack-packages
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: viu-github-packages-beta
+      cancel-in-progress: false
+    steps:
+      - name: Download validated packages
+        # actions/download-artifact v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Assimalign.Viu.Packages
+          path: _release/packages
+
+      - name: Verify package checksums
+        shell: bash
+        working-directory: _release/packages
+        run: sha256sum --check checksums.sha256
+
+      - name: Publish beta packages
+        shell: pwsh
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ github.token }}
+          VIU_PACKAGE_VERSION: ${{ needs.pack-packages.outputs.version }}
+        run: |
+          $packageDirectory = '_release/packages'
+          $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
+          if ($packageFiles.Count -ne 20) {
+            throw "Expected 20 release packages, found $($packageFiles.Count)."
+          }
+
+          foreach ($packageFile in $packageFiles) {
+            $packagePath = Join-Path $packageDirectory $packageFile
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+              throw "The release artifact is missing $packageFile."
+            }
+
+            & dotnet nuget push $packagePath `
+              --source 'https://nuget.pkg.github.com/assimalign/index.json' `
+              --api-key $env:GITHUB_PACKAGES_TOKEN `
+              --skip-duplicate
+            if ($LASTEXITCODE -ne 0) {
+              throw "Publishing $packageFile to GitHub Packages failed with exit code $LASTEXITCODE."
+            }
+          }
+
+          @"
+          ## Published beta packages
+
+          Published all 20 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to the
+          Assimalign GitHub Packages feed.
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+  publish-nuget:
+    name: publish stable packages to nuget.org
+    if: >-
+      github.event_name == 'release' &&
+      github.event.release.draft == false &&
+      github.event.release.prerelease == false
+    needs: pack-packages
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: viu-nuget-org-release
+      cancel-in-progress: false
+    steps:
+      - name: Download validated packages
+        # actions/download-artifact v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Assimalign.Viu.Packages
+          path: _release/packages
+
+      - name: Verify package checksums
+        shell: bash
+        working-directory: _release/packages
+        run: sha256sum --check checksums.sha256
+
+      - name: Exchange GitHub OIDC token for a temporary NuGet API key
+        id: nuget_login
+        # NuGet/login v1.2.0
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish stable packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+          VIU_PACKAGE_VERSION: ${{ needs.pack-packages.outputs.version }}
+        run: |
+          $packageDirectory = '_release/packages'
+          $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
+          if ($packageFiles.Count -ne 20) {
+            throw "Expected 20 release packages, found $($packageFiles.Count)."
+          }
+
+          foreach ($packageFile in $packageFiles) {
+            $packagePath = Join-Path $packageDirectory $packageFile
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+              throw "The release artifact is missing $packageFile."
+            }
+
+            & dotnet nuget push $packagePath `
+              --source 'https://api.nuget.org/v3/index.json' `
+              --api-key $env:NUGET_API_KEY `
+              --skip-duplicate
+            if ($LASTEXITCODE -ne 0) {
+              throw "Publishing $packageFile to nuget.org failed with exit code $LASTEXITCODE."
+            }
+          }
+
+          @"
+          ## Published stable packages
+
+          Published all 20 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to
+          [nuget.org](https://www.nuget.org/profiles/Assimalign).
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+  publish-visual-studio-preview:
+    name: publish Visual Studio Marketplace preview
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.merged == true &&
+      needs.detect-visual-studio-changes.outputs.changed == 'true'
+    needs: detect-visual-studio-changes
+    runs-on: windows-latest
+    environment:
+      name: visual-studio-marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio
+    concurrency:
+      group: visual-studio-marketplace-preview
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Resolve next Marketplace preview version
+        id: marketplace-version
+        shell: pwsh
+        env:
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VS_MARKETPLACE_TOKEN)) {
+            throw 'Configure the organization secret VS_MARKETPLACE_TOKEN.'
+          }
+          Write-Host "::add-mask::$($env:VS_MARKETPLACE_TOKEN)"
+
+          $extensionProject = 'extensions/VisualStudio/Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj'
+          $canonicalVersionText = (
+            & dotnet msbuild $extensionProject -nologo -getProperty:ViuVersionPrefix
+          ) -join [System.Environment]::NewLine
+          if ($LASTEXITCODE -ne 0) {
+            throw "Reading the canonical Viu version failed with exit code $LASTEXITCODE."
+          }
+          $canonicalVersion = [System.Version]::Parse($canonicalVersionText.Trim())
+
+          $authorizationBytes = [System.Text.Encoding]::ASCII.GetBytes(
+            ":$($env:VS_MARKETPLACE_TOKEN)")
+          $headers = @{
+            Accept = 'application/json;api-version=7.1-preview.1'
+            Authorization = "Basic $([Convert]::ToBase64String($authorizationBytes))"
+          }
+          $query = @{
+            filters = @(
+              @{
+                criteria = @(
+                  @{
+                    filterType = 7
+                    value = 'Assimalign.Assimalign.Viu.VisualStudio'
+                  }
+                )
+                pageNumber = 1
+                pageSize = 1
+                sortBy = 0
+                sortOrder = 0
+              }
+            )
+            assetTypes = @()
+            # ExtensionQueryFlags.IncludeVersions
+            flags = 1
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          try {
+            $queryResult = Invoke-RestMethod `
+              -Method Post `
+              -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
+              -Headers $headers `
+              -ContentType 'application/json' `
+              -Body $query
+          }
+          catch {
+            throw "The Marketplace version query failed; refusing to publish. $($_.Exception.Message)"
+          }
+
+          $extensions = @(
+            $queryResult.results[0].extensions |
+              Where-Object { $null -ne $_ }
+          )
+          if ($extensions.Count -gt 1) {
+            throw 'The Marketplace returned more than one exact extension match.'
+          }
+
+          $nextRevision = 1
+          if ($extensions.Count -eq 1) {
+            $publishedVersions = @(
+              $extensions[0].versions |
+                ForEach-Object { [System.Version]::Parse($_.version) }
+            )
+            if ($publishedVersions.Count -gt 0) {
+              $latestVersion = $publishedVersions |
+                Sort-Object -Descending |
+                Select-Object -First 1
+              $latestCoreVersion = [System.Version]::new(
+                $latestVersion.Major,
+                $latestVersion.Minor,
+                $latestVersion.Build)
+              $coreComparison = $canonicalVersion.CompareTo($latestCoreVersion)
+              if ($coreComparison -lt 0) {
+                throw "Canonical version $canonicalVersion is lower than Marketplace version $latestVersion."
+              }
+              if ($coreComparison -eq 0) {
+                $latestRevision = [Math]::Max($latestVersion.Revision, 0)
+                $nextRevision = $latestRevision + 1
+              }
+            }
+          }
+
+          if ($nextRevision -gt 65534) {
+            throw 'The VSIX revision is exhausted; increment the canonical Viu version.'
+          }
+          $previewVersion = "$canonicalVersion.$nextRevision"
+          "version=$previewVersion" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Next Marketplace preview version: $previewVersion"
+
+      - name: Build extension preview
+        shell: pwsh
+        env:
+          VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
+        run: >-
+          ./extensions/VisualStudio/Build.ps1
+          -Configuration Release
+          -Version $env:VIU_VSIX_VERSION
+
+      - name: Test language tooling
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx --configuration Release
+
+      - name: Validate and stage Marketplace preview
+        shell: pwsh
+        env:
+          VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
+        run: |
+          $extensionPath = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
+          $extensionFile = Get-Item -LiteralPath $extensionPath
+          $maximumPackageSize = 50MB
+          if ($extensionFile.Length -gt $maximumPackageSize) {
+            throw "The VSIX is $($extensionFile.Length) bytes; Marketplace packages must remain at or below $maximumPackageSize bytes."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead(
+            $extensionFile.FullName)
+          try {
+            $manifestEntry = $extensionArchive.GetEntry('extension.vsixmanifest')
+            if ($null -eq $manifestEntry) {
+              throw 'The VSIX does not contain extension.vsixmanifest.'
+            }
+
+            $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+            try {
+              [xml] $manifest = $manifestReader.ReadToEnd()
+            }
+            finally {
+              $manifestReader.Dispose()
+            }
+
+            $namespaceManager = [System.Xml.XmlNamespaceManager]::new(
+              $manifest.NameTable)
+            $namespaceManager.AddNamespace(
+              'vsix',
+              'http://schemas.microsoft.com/developer/vsx-schema/2011')
+            $identity = $manifest.SelectSingleNode(
+              '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
+              $namespaceManager)
+            $preview = $manifest.SelectSingleNode(
+              '/vsix:PackageManifest/vsix:Metadata/vsix:Preview',
+              $namespaceManager)
+            if ($null -eq $identity) {
+              throw 'The VSIX manifest does not contain an Identity element.'
+            }
+            if ($identity.Id -ne 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c') {
+              throw "Unexpected VSIX identity: $($identity.Id)."
+            }
+            if ($identity.Publisher -ne 'Assimalign') {
+              throw "Unexpected VSIX publisher: $($identity.Publisher)."
+            }
+            if ($identity.Version -ne $env:VIU_VSIX_VERSION) {
+              throw "Expected VSIX version $($env:VIU_VSIX_VERSION), found $($identity.Version)."
+            }
+            if ($null -eq $preview -or $preview.InnerText -ne 'true') {
+              throw 'The Visual Studio extension must remain a Marketplace preview.'
+            }
+          }
+          finally {
+            $extensionArchive.Dispose()
+          }
+
+          $marketplaceDirectory = '_out/release/visual-studio'
+          New-Item -ItemType Directory -Path $marketplaceDirectory -Force | Out-Null
+          Copy-Item -LiteralPath $extensionPath -Destination $marketplaceDirectory
+          Copy-Item `
+            -LiteralPath 'extensions/VisualStudio/vs-publish.json' `
+            -Destination $marketplaceDirectory
+          Copy-Item `
+            -LiteralPath 'extensions/VisualStudio/Marketplace.md' `
+            -Destination $marketplaceDirectory
+
+          $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
+          Write-Host "Validated preview VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
+
+      - name: Upload Marketplace preview artifact
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Assimalign.Viu.VisualStudio.Preview
+          path: _out/release/visual-studio
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Confirm Marketplace version is still available
+        shell: pwsh
+        env:
+          VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: |
+          Write-Host "::add-mask::$($env:VS_MARKETPLACE_TOKEN)"
+          $authorizationBytes = [System.Text.Encoding]::ASCII.GetBytes(
+            ":$($env:VS_MARKETPLACE_TOKEN)")
+          $headers = @{
+            Accept = 'application/json;api-version=7.1-preview.1'
+            Authorization = "Basic $([Convert]::ToBase64String($authorizationBytes))"
+          }
+          $query = @{
+            filters = @(
+              @{
+                criteria = @(
+                  @{
+                    filterType = 7
+                    value = 'Assimalign.Assimalign.Viu.VisualStudio'
+                  }
+                )
+                pageNumber = 1
+                pageSize = 1
+                sortBy = 0
+                sortOrder = 0
+              }
+            )
+            assetTypes = @()
+            flags = 1
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          try {
+            $queryResult = Invoke-RestMethod `
+              -Method Post `
+              -Uri 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' `
+              -Headers $headers `
+              -ContentType 'application/json' `
+              -Body $query
+          }
+          catch {
+            throw "The Marketplace preflight failed; refusing to publish. $($_.Exception.Message)"
+          }
+
+          $targetVersion = [System.Version]::Parse($env:VIU_VSIX_VERSION)
+          $publishedVersions = @(
+            $queryResult.results[0].extensions[0].versions |
+              Where-Object { $null -ne $_ } |
+              ForEach-Object { [System.Version]::Parse($_.version) }
+          )
+          if ($publishedVersions -contains $targetVersion) {
+            throw "VSIX version $targetVersion is already published."
+          }
+          $latestVersion = $publishedVersions |
+            Sort-Object -Descending |
+            Select-Object -First 1
+          if ($null -ne $latestVersion -and $targetVersion -le $latestVersion) {
+            throw "VSIX version $targetVersion must be greater than published version $latestVersion."
+          }
+          Write-Host "Marketplace version preflight passed: $targetVersion > $latestVersion."
+
+      - name: Acquire pinned Microsoft VSIX publisher
+        id: vsix-publisher
+        shell: pwsh
+        env:
+          VSSDK_BUILD_TOOLS_VERSION: 18.9.820
+          VSSDK_BUILD_TOOLS_SHA256: ADB94EC5CF730264BEC92FA2F2A6FBF3ABE455FBE27F3E7737B9DF0176BB1E7A
+        run: |
+          $packageName = "microsoft.vssdk.buildtools.$($env:VSSDK_BUILD_TOOLS_VERSION).nupkg"
+          $packagePath = Join-Path $env:RUNNER_TEMP $packageName
+          $packageUri = "https://api.nuget.org/v3-flatcontainer/microsoft.vssdk.buildtools/$($env:VSSDK_BUILD_TOOLS_VERSION)/$packageName"
+          Invoke-WebRequest -Uri $packageUri -OutFile $packagePath -UseBasicParsing
+
+          $actualHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
+          if (-not [string]::Equals(
+              $actualHash,
+              $env:VSSDK_BUILD_TOOLS_SHA256,
+              [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Microsoft.VSSDK.BuildTools package hash verification failed.'
+          }
+
+          & dotnet nuget verify $packagePath --all
+          if ($LASTEXITCODE -ne 0) {
+            throw "Microsoft.VSSDK.BuildTools signature verification failed with exit code $LASTEXITCODE."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $toolDirectory = Join-Path `
+            $env:RUNNER_TEMP `
+            "microsoft.vssdk.buildtools-$($env:VSSDK_BUILD_TOOLS_VERSION)"
+          [System.IO.Compression.ZipFile]::ExtractToDirectory(
+            $packagePath,
+            $toolDirectory)
+          $publisherPath = Join-Path $toolDirectory 'tools/vssdk/bin/VsixPublisher.exe'
+          if (-not (Test-Path -LiteralPath $publisherPath -PathType Leaf)) {
+            throw 'The pinned package does not contain VsixPublisher.exe at the expected path.'
+          }
+
+          "path=$publisherPath" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Verified Microsoft VsixPublisher $($env:VSSDK_BUILD_TOOLS_VERSION)."
+
+      - name: Publish to Visual Studio Marketplace
+        shell: pwsh
+        env:
+          VIU_VSIX_PUBLISHER: ${{ steps.vsix-publisher.outputs.path }}
+          VIU_VSIX_VERSION: ${{ steps.marketplace-version.outputs.version }}
+          VS_MARKETPLACE_TOKEN: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: |
+          Write-Host "::add-mask::$($env:VS_MARKETPLACE_TOKEN)"
+          & $env:VIU_VSIX_PUBLISHER publish `
+            -payload '_out/release/visual-studio/Assimalign.Viu.VisualStudio.vsix' `
+            -publishManifest '_out/release/visual-studio/vs-publish.json' `
+            -personalAccessToken $env:VS_MARKETPLACE_TOKEN
+          if ($LASTEXITCODE -ne 0) {
+            throw "VsixPublisher failed with exit code $LASTEXITCODE."
+          }
+
+          @"
+          ## Published Visual Studio Marketplace preview
+
+          Viu for Visual Studio ``$($env:VIU_VSIX_VERSION)`` was published as a preview.
+
+          [View the Marketplace listing](https://marketplace.visualstudio.com/items?itemName=Assimalign.Assimalign.Viu.VisualStudio)
+          "@ |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

@@ -10,7 +10,7 @@ using Xunit;
 // ambient and shadows Roslyn's; alias the Roslyn enum the reported diagnostics carry.
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// Snapshot, diagnostic, and incremental-cache tests for <see cref="SingleFileComponentGenerator"/>.

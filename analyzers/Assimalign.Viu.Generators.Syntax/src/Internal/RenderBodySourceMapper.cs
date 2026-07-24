@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
+using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// Injects C# <c>#line</c> span directives into a compiled <c>@template</c> render body so a C# compile

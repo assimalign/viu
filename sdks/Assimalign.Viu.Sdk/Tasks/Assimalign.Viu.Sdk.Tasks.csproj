@@ -6,6 +6,16 @@
 		     Sdk/, Targets/, Tasks/, and assets/ at the nupkg root - the shape
 		     NuGet's MSBuild SDK resolver expects. -->
 		<PackageId>Assimalign.Viu.Sdk</PackageId>
+		<!--
+			Deviates from the repo SDK target-framework rule per design decision:
+			an MSBuild task must load in-process under both Visual Studio's .NET
+			Framework MSBuild and the dotnet CLI's .NET MSBuild. A net10.0 task
+			cannot load in Visual Studio's full-framework process, while the
+			cross-runtime task-host workaround fails on ARM64 (MSB4216). The
+			shared tooling closure already targets this netstandard2.0 alias.
+		-->
+		<TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+		<GenerateDependencyFile>true</GenerateDependencyFile>
 		<OutDir>$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Tasks</OutDir>
 	</PropertyGroup>
 
@@ -14,10 +24,10 @@
          @style compilation the generator runs, over the same .viu inputs, so the physical bundle is
          byte-identical to the generated ExtractedStyles constant. Its transitive parser closure
          (Syntax / SingleFileComponent / Templates / Css) copies to the task output for MSBuild to load. -->
-    	<ViuProjectReference Include="Assimalign.Viu.Tooling.Css" />
+		<ViuPrivateProjectReference Include="Assimalign.Viu.Tooling.Css" />
 	</ItemGroup>
 	 <ItemGroup>
-    <!-- MSBuild task API. Centrally versioned with ExcludeAssets=all (see
+    <!-- MSBuild task API. Centrally versioned with ExcludeAssets=runtime (see
          build/Targets/Build.References.Packages.targets) — compile against them but never copy them to
          output; the hosting MSBuild engine supplies these assemblies at run time. -->
     <ViuPackageReference Include="Microsoft.Build.Utilities.Core" />

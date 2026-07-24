@@ -8,7 +8,7 @@ using Xunit;
 
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// End-to-end tests for the <c>@style</c> registration seam ([V01.01.06.04]): the composition root routes

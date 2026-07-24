@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace Assimalign.Viu.Core.Generators;
+namespace Assimalign.Viu.Generators.Reactivity;
 
 /// <summary>
 /// Stable diagnostic descriptors for <c>[Reactive]</c> misuse. IDs are frozen (they may appear in
@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Core.Generators;
 /// </summary>
 internal static class ReactiveDiagnostics
 {
-    private const string Category = "Assimalign.Viu.Core.Generators";
+    private const string Category = "Assimalign.Viu.Generators.Reactivity";
 
     /// <summary>The attributed type is not <c>partial</c>, so the generator cannot add the implementation part.</summary>
     internal static readonly DiagnosticDescriptor NotPartial = new(

@@ -4,7 +4,7 @@
 - **Date:** 2026-07-17 (the build-time `.viu` compilation container was decided this date, `docs/PLAN.md`
   founding decision 3; formally recorded as an ADR under [V01.01.13.01], #98, on 2026-07-19)
 - **Scope:** `Assimalign.Viu.Syntax.Templates`, `Assimalign.Viu.Syntax.SingleFileComponent`, and the
-  `Assimalign.Viu.Syntax.Generators` composition root.
+  `Assimalign.Viu.Generators.Syntax` composition root.
 
 ## Context
 
@@ -19,7 +19,7 @@ build step so the runtime ships without the compiler; Viu makes the build step m
 generators; there is no runtime compilation path.**
 
 - The template front end (`Assimalign.Viu.Syntax.Templates`) tokenizes, parses, transforms, and
-  emits a C# render method; `Assimalign.Viu.Syntax.Generators` is the incremental generator that
+  emits a C# render method; `Assimalign.Viu.Generators.Syntax` is the incremental generator that
   drives it and stitches the output into the component's partial class.
 - There is no runtime `compile(templateString)` API — a template that is not present at build time
   cannot be rendered.

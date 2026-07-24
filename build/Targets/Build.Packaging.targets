@@ -1,0 +1,16 @@
+<Project>
+    <!--
+        NuGet recommends a package README. Individual package families can set
+        PackageReadmeFile and pack their own file before this targets-phase
+        fallback runs; the SDK does so with sdks/README.md.
+    -->
+    <PropertyGroup Condition="'$(IsPackable)' != 'false' and '$(PackageReadmeFile)' == ''">
+        <_ViuUseRepositoryPackageReadme>true</_ViuUseRepositoryPackageReadme>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(_ViuUseRepositoryPackageReadme)' == 'true'">
+        <None Include="$(ViuRepositoryDirectory)README.md"
+              Pack="true"
+              PackagePath="\" />
+    </ItemGroup>
+</Project>

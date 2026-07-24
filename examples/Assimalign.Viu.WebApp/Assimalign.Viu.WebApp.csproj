@@ -22,6 +22,6 @@
          $(ViuUseSingleFileComponents) above (the buildTransitive analyzer wiring only flows to packaged
          consumers); packaged consumers get it from the Viu SDK's shared framework. This makes the WASM
          sample the trimmed + AOT canary for the generated component bridge (budget-gates.yml). -->
-    <ViuAnalyzerReference Include="Assimalign.Viu.Syntax.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Generators.Syntax" />
   </ItemGroup>
 </Project>

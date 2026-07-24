@@ -59,45 +59,45 @@
     <!-- The in-repo dogfood path to the built ViuBundleCss task assembly. Packaged consumers override this
          to the task shipped in the package. Configuration-aware so a Debug or Release build resolves its
          matching task build. -->
-    <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\bin\$(Configuration)\netstandard2.0\Assimalign.Viu.Tooling.Tasks.dll</ViuBundleCssTaskAssembly>
+    <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuBundleCssTaskAssembly>
 
     <!-- LINK INJECTION master switch ([V01.01.12.12.01], #167): auto-inject the bundle's <link
          rel="stylesheet"> into the WASM host page (wwwroot/index.html) so a consuming app needs no
          hand-authored link tag. Defaults ON wherever bundling is on. Set to false to keep bundling but author
          the <link> by hand (the injector is idempotent, so a hand-authored link is also a working opt-out —
-         it simply suppresses injection). The ViuInjectCssBundleLink task ships in the same Tooling.Tasks
+         it simply suppresses injection). The ViuInjectCssBundleLink task ships in the same Sdk.Tasks
          assembly as ViuBundleCss, so it resolves through $(ViuBundleCssTaskAssembly) with no extra wiring. -->
     <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == '' and '$(ViuBundleSingleFileComponentCss)' == 'true'">true</ViuInjectSingleFileComponentCssLink>
     <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == ''">false</ViuInjectSingleFileComponentCssLink>
   </PropertyGroup>
 
-  <!-- The task lives in analyzers/Assimalign.Viu.Tooling.Tasks; it re-runs the shared Tooling.Css core
+  <!-- The task lives in sdks/Assimalign.Viu.Sdk/Tasks; it re-runs the shared Tooling.Css core
        OUTSIDE the analyzer sandbox so it may write files. Declared whenever bundling is on — NOT gated on
        Exists($(ViuBundleCssTaskAssembly)). A UsingTask condition is evaluated at static import time, which
-       for the in-repo dogfood path can precede the Tooling.Tasks build (the assembly is loaded through
+       for the in-repo dogfood path can precede the Sdk.Tasks build (the assembly is loaded through
        AssemblyFile, not a ProjectReference, so nothing ordered its build first). Gating on Exists there
        raced the build: the target could run after the DLL appeared while the UsingTask, evaluated earlier
        against a not-yet-built DLL, was never declared — MSB4036 "task not found". UsingTask resolves its
        AssemblyFile lazily (only when the task is first invoked), and the invoking target keeps its own
        Exists gate, so declaring it unconditionally is safe when the task is genuinely absent. The in-repo
        build-order edge below guarantees the DLL exists by the time the target runs. -->
-  <UsingTask TaskName="Assimalign.Viu.Tooling.Tasks.ViuBundleCss"
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuBundleCss"
              AssemblyFile="$(ViuBundleCssTaskAssembly)"
              Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'" />
 
-  <!-- The host-page <link> injector ([V01.01.12.12.01]) ships in the same Tooling.Tasks assembly. Declared
+  <!-- The host-page <link> injector ([V01.01.12.12.01]) ships in the same Sdk.Tasks assembly. Declared
        unconditionally-of-Exists for the same reason ViuBundleCss is (see above): a UsingTask AssemblyFile is
        resolved lazily on first invocation, and the invoking targets keep their own Exists gate, so the
        in-repo build-order edge is what guarantees the DLL is present by the time the injector runs. -->
-  <UsingTask TaskName="Assimalign.Viu.Tooling.Tasks.ViuInjectCssBundleLink"
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink"
              AssemblyFile="$(ViuBundleCssTaskAssembly)"
              Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'" />
 
   <!-- In-repo dogfooding build-order edge ([V01.01.12.12.03]): a consuming project loads ViuBundleCss via
        <UsingTask AssemblyFile=...>, which is NOT a project reference, so the solution/dependency scheduler
-       has no reason to build Tooling.Tasks before this project. A WASM sample (the first in-repo consumer of
+       has no reason to build Sdk.Tasks before this project. A WASM sample (the first in-repo consumer of
        CSS bundling) therefore raced the task build and failed with MSB4036 on a clean build. This
-       reference-output-free edge forces Tooling.Tasks to build first. Guarded to the in-repo path
+       reference-output-free edge forces Sdk.Tasks to build first. Guarded to the in-repo path
        ($(ViuRepositoryDirectory) set); the packaged SDK ships the task inside the package (Sdk.Common.props
        presets $(ViuBundleCssTaskAssembly) to the packaged copy), so an external consumer never takes this
        edge and never sees a raw ProjectReference.
@@ -105,8 +105,8 @@
        edge the ViuProjectReference transform cannot express — a netstandard2.0 task referenced with
        ReferenceOutputAssembly=false and UndefineProperties to cross the app's TFM/RID boundary, mirroring
        frameworks/Assimalign.Viu.App.Refs. -->
-  <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\Assimalign.Viu.Tooling.Tasks.csproj')">
-    <ProjectReference Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Tooling.Tasks\src\Assimalign.Viu.Tooling.Tasks.csproj"
+  <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
                       PrivateAssets="all"

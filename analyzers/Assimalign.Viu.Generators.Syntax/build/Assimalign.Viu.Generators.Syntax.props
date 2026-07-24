@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    Single-file component (.viu) build integration ([V01.01.06.02]). Delivered to a project that consumes
+    a Viu package hosting the Assimalign.Viu.Generators.Syntax analyzer. This is the MSBuild half of the
+    generator: it flows every .viu file to the generator with no per-project wiring, the C# analog of how
+    @vitejs/plugin-vue auto-includes .vue files (https://github.com/vitejs/vite-plugin-vue). The item
+    wiring itself lives in the paired .targets; these properties must be set before it runs.
+  -->
+  <PropertyGroup>
+    <!-- Master switch. Set to false to disable .viu compilation for a project entirely. -->
+    <EnableSingleFileComponentGeneration Condition="'$(EnableSingleFileComponentGeneration)' == ''">true</EnableSingleFileComponentGeneration>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableSingleFileComponentGeneration)' == 'true'">
+    <!-- The generator derives each component's namespace, class name, and hint name from the file path
+         relative to the project directory, so surface both properties to the analyzer config. -->
+    <CompilerVisibleProperty Include="RootNamespace" />
+    <CompilerVisibleProperty Include="ProjectDir" />
+  </ItemGroup>
+</Project>

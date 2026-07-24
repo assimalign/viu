@@ -26,8 +26,8 @@ Build and test the staging solution with:
 ```powershell
 dotnet build .redesign/Assimalign.Viu.Redesign.slnx
 dotnet test .redesign/Assimalign.Viu.Redesign.slnx
-dotnet test analyzers/Assimalign.Viu.Core.Generators/test
-dotnet test analyzers/Assimalign.Viu.Syntax.Generators/test
+dotnet test analyzers/Assimalign.Viu.Generators.Reactive/test
+dotnet test analyzers/Assimalign.Viu.Generators.Syntax/test
 ```
 
 The repository-level `examples/Assimalign.Viu.WebApp` remains on the pre-redesign API and is not

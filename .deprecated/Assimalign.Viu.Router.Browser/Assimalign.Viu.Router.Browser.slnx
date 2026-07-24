@@ -1,4 +1,0 @@
-<Solution>
-	<Project Path="src/Assimalign.Viu.Router.Browser.csproj" />
-	<Project Path="test/Assimalign.Viu.Router.Browser.Tests.csproj" />
-</Solution>

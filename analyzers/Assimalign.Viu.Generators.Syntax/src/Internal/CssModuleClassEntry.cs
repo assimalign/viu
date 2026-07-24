@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// One entry of a component's CSS Modules map ([V01.01.06.06]): the <see cref="Accessor"/> the class

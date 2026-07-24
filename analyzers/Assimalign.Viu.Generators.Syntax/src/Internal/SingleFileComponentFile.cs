@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// The value-equatable read of one <c>.viu</c> additional file: its path, full text, and the resolved

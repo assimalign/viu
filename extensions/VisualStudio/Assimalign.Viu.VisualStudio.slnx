@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/Visual Studio/">
+    <File Path="README.md" />
+    <File Path="Build.ps1" />
+  </Folder>
+  <Folder Name="/Visual Studio/Language Service/">
+    <Project Path="Assimalign.Viu.LanguageService/src/Assimalign.Viu.LanguageService.csproj" />
+    <Project Path="Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Visual Studio/Language Server/">
+    <Project Path="Assimalign.Viu.LanguageServer/src/Assimalign.Viu.LanguageServer.csproj" />
+    <Project Path="Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Visual Studio/Extension/">
+    <Project Path="Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj">
+      <Deploy />
+    </Project>
+    <Project Path="Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -3,8 +3,8 @@
         Project Reference By Name Only.
 
         Lets a library/example/analyzer csproj reference another project by its
-        assembly name instead of by relative csproj path. Resolution walks
-        .redesign/ once, matches each item's Include to the csproj whose filename
+        assembly name instead of by relative csproj path. Resolution walks the
+        repository's code areas once, matches each item's Include to the csproj whose filename
         matches, and emits a regular <ProjectReference Include="<resolved-path>" />
         with the appropriate per-flavour metadata.
 
@@ -38,6 +38,9 @@
              against, so a generator's own snapshot tests resolve it as a ViuPrivateProjectReference. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)libraries\**\*.csproj" />
         <_ViuProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <!-- Visual Studio hosts and their editor-neutral language services are developed together
+             under extensions/ and use the same by-name reference conventions as other code areas. -->
+        <_ViuProject Include="$(ViuRepositoryDirectory)extensions\**\*.csproj" />
         <!-- Benchmarks are a first-class non-shipping code area ([V01.01.11.04], #88), like analyzers:
              indexing them lets the benchmark test project take a by-name compile reference to the
              benchmark app, and lets both resolve the runtime libraries they measure. -->

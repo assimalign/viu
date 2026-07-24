@@ -4,7 +4,7 @@
 	<Import Project="..\Targets\Assimalign.Viu.Sdk.WebAssembly.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.WebAssembly.targets')" />
 	<!-- .viu -> AdditionalFiles glob (evaluated after the consumer's items and
 	     default excludes are known). -->
-	<Import Project="..\Targets\Assimalign.Viu.Syntax.Generators.targets" Condition="Exists('..\Targets\Assimalign.Viu.Syntax.Generators.targets')" />
+	<Import Project="..\Targets\Assimalign.Viu.Generators.Syntax.targets" Condition="Exists('..\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
 	<!-- CSS bundling for .viu @style blocks: the in-repo
 	     build/Targets/Build.Css.Bundling.targets packed verbatim;
 	     Assimalign.Viu.Sdk.Common.props preset $(ViuBundleCssTaskAssembly) to

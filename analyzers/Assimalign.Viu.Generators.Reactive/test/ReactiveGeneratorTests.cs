@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using Xunit;
 
-namespace Assimalign.Viu.Core.Generators.Tests;
+namespace Assimalign.Viu.Generators.Reactivity.Tests;
 
 /// <summary>
 /// Snapshot, diagnostic, and incremental-cache tests for <see cref="ReactiveGenerator"/>. The

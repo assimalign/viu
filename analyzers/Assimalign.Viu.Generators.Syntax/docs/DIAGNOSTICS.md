@@ -1,6 +1,6 @@
 # Viu compiler diagnostics (VIU catalog)
 
-The `Assimalign.Viu.Syntax.Generators` source generator surfaces every `.viu` compile problem as a
+The `Assimalign.Viu.Generators.Syntax` source generator surfaces every `.viu` compile problem as a
 first-class Roslyn diagnostic with a stable `VIU####` ID, so developers see squiggles at the offending
 template line/column in the IDE and precise `file:line:col` entries in `dotnet build` output — never opaque
 errors inside generated code. Work item **[V01.01.05.08]** (issue #55).
@@ -53,7 +53,7 @@ diagnostics participate in `TreatWarningsAsErrors`.
 
 ## Descriptor catalog
 
-All descriptors carry category `Assimalign.Viu.Syntax.Generators`. The three-way origin split gives each
+All descriptors carry category `Assimalign.Viu.Generators.Syntax`. The three-way origin split gives each
 severity tier its own stable ID.
 
 | Origin | Error | Warning | Information |

@@ -19,12 +19,14 @@ runs:
   using: composite
   steps:
     - name: Set up .NET SDK
-      uses: actions/setup-dotnet@v4
+      # actions/setup-dotnet v4
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
       with:
         global-json-file: global.json
 
     - name: Cache NuGet packages (includes workload packs)
-      uses: actions/cache@v4
+      # actions/cache v4
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
       with:
         path: ~/.nuget/packages
         # Central package versions live in the build targets; global.json pins the SDK.

@@ -21,7 +21,7 @@ namespace Assimalign.Viu.Tooling.Css;
 /// </summary>
 /// <remarks>
 /// This factory lives in the Tooling core because it is reused by <b>two build-time hosts</b>
-/// ([V01.01.12.12]): the <c>Assimalign.Viu.Syntax.Generators</c> incremental source generator, and the
+/// ([V01.01.12.12]): the <c>Assimalign.Viu.Generators.Syntax</c> incremental source generator, and the
 /// <c>ViuBundleCss</c> MSBuild task that re-runs the same deterministic CSS compilation over the same
 /// <c>.viu</c> inputs to write the bundled stylesheet. Both hosts constructing the parser from this one
 /// factory is what makes the generated <c>ExtractedStyles</c> constant and the physical bundle

@@ -19,5 +19,5 @@
 	     The file's own EnableSingleFileComponentGeneration gate honors
 	     consumer-body overrides because item evaluation sees final property
 	     values. -->
-	<Import Project="..\Targets\Assimalign.Viu.Syntax.Generators.props" Condition="Exists('..\Targets\Assimalign.Viu.Syntax.Generators.props')" />
+	<Import Project="..\Targets\Assimalign.Viu.Generators.Syntax.props" Condition="Exists('..\Targets\Assimalign.Viu.Generators.Syntax.props')" />
 </Project>

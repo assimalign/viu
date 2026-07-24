@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForVisualStudioExtensions)</TargetFramework>
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <IsPackable>false</IsPackable>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)\LanguageServer</ViuLanguageServerPublishPath>
+    <ViuLanguageServerExecutableName>Assimalign.Viu.LanguageServer.exe</ViuLanguageServerExecutableName>
+    <ViuLanguageServerX64ExecutablePath>$(ViuLanguageServerPublishPath)\win-x64\$(ViuLanguageServerExecutableName)</ViuLanguageServerX64ExecutablePath>
+    <ViuLanguageServerArm64ExecutablePath>$(ViuLanguageServerPublishPath)\win-arm64\$(ViuLanguageServerExecutableName)</ViuLanguageServerArm64ExecutablePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" PrivateAssets="all" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Extensibility.Build" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="language-server.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Build.ps1 publishes the standalone server here before building this project. Keeping the
+       server out of this process is what preserves Visual Studio's fault isolation. The property
+       remains overridable for CI or an alternate publish layout. -->
+  <ItemGroup Condition="'$(ViuLanguageServerPublishPath)' != '' And Exists('$(ViuLanguageServerPublishPath)')">
+    <Content Include="$(ViuLanguageServerPublishPath)\**\*"
+             Link="LanguageServer\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="ViuValidateLanguageServerPayload"
+          BeforeTargets="GetVsixSourceItems;PrepareForBuild"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(ViuLanguageServerX64ExecutablePath)')"
+           Text="The win-x64 Viu language-server payload is missing at '$(ViuLanguageServerX64ExecutablePath)'. Run extensions\VisualStudio\Build.ps1 before building or debugging the Visual Studio extension." />
+    <Error Condition="!Exists('$(ViuLanguageServerArm64ExecutablePath)')"
+           Text="The win-arm64 Viu language-server payload is missing at '$(ViuLanguageServerArm64ExecutablePath)'. Run extensions\VisualStudio\Build.ps1 before building or debugging the Visual Studio extension." />
+  </Target>
+</Project>

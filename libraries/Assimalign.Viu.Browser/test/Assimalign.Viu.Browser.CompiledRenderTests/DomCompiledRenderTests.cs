@@ -18,7 +18,7 @@ using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.Syntax.Generators;
+using Assimalign.Viu.Generators.Syntax;
 
 namespace Assimalign.Viu.Browser.CompiledRenderTests;
 

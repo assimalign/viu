@@ -63,9 +63,9 @@ runtime template compilation. They never ship in the runtime assemblies.
 
 | Project | Role |
 | --- | --- |
-| `Assimalign.Viu.Core.Generators` | Emits the property wrappers for `[Reactive]`/`[ShallowReactive]` partial classes (Vue's `reactive()`, source-generated). |
-| `Assimalign.Viu.Syntax.Generators` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
-| `Assimalign.Viu.Tooling.Tasks` | The `ViuBundleCss` MSBuild task that writes the compiled `.viu` `@style` output to a physical stylesheet (outside the analyzer sandbox). |
+| `Assimalign.Viu.Generators.Reactivity` | Emits the property wrappers for `[Reactive]`/`[ShallowReactive]` partial classes (Vue's `reactive()`, source-generated). |
+| `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
+| `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `@style` output to a physical stylesheet outside the analyzer sandbox. |
 
 ### Examples (`examples/`)
 
@@ -136,6 +136,8 @@ dotnet run --project examples/Assimalign.Viu.WebApp
   live, what belongs in each, and when they must be updated.
 - [Getting started guide](docs/guide/getting-started.md) — build, run, and publish a Viu app with the
   packaged `Assimalign.Viu.Sdk` (prerequisites → first component → reactivity → publish).
+- [Release guide](docs/RELEASING.md) — beta and stable package channels, NuGet trusted publishing,
+  GitHub Packages, and the Visual Studio Marketplace preview.
 - [Project board](https://github.com/orgs/assimalign/projects/15) — the authoritative backlog
   (`[V01.01.*]` WBS items: program → area epics → features → tasks).
 - Work-item intake: [`.claude/skills/viu-work-items`](.claude/skills/viu-work-items/SKILL.md).

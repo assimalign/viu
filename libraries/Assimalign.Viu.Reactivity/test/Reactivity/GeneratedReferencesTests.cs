@@ -4,7 +4,7 @@ using Xunit;
 namespace Assimalign.Viu.Reactivity.Tests;
 
 // The generated ToReferences() bundle (ReactiveValue<T> refs) and the IReactiveObject.IsReadOnly
-// readonly flag are emitted by the Assimalign.Viu.Core.Generators source generator (wired into this
+// readonly flag are emitted by the Assimalign.Viu.Generators.Reactivity source generator (wired into this
 // test project). These tests
 // consume the real generated output. Upstream parity: https://vuejs.org/api/reactivity-utilities.html
 // (toRefs, isReadonly).
@@ -143,4 +143,3 @@ public sealed class GeneratedReferencesTests
         seen.ShouldBe("Hopper");
     }
 }
-

@@ -79,10 +79,11 @@ until reviewed.
     deliberate exception — `Assimalign.Viu.Core` roots at `Assimalign.Viu` (record rationale: the
     core IS the product; every other library keeps namespace == assembly id). Also update the
     rule's `Subscriber` example path and any Reactivity references.
-  - Rename `analyzers/Assimalign.Viu.Reactivity.Generators` → `Assimalign.Viu.Core.Generators`
-    (assembly, namespace, `ViuAnalyzerReference` names, generator emitted `global::` qualifiers —
-    note `Assimalign.Viu.Syntax.Generators` emits `global::Assimalign.Viu.RuntimeCore.*` today,
-    from the #216 bridge — becomes `global::Assimalign.Viu.*`).
+  - The later package-boundary redesign supersedes the original analyzer rename: the current
+    reactivity analyzer assembly and namespace are `Assimalign.Viu.Generators.Reactivity`
+    (`ViuAnalyzerReference` names and generated `global::` qualifiers move with it). The
+    `Assimalign.Viu.Generators.Syntax` generator emits the corresponding current runtime
+    qualifiers.
   - Cascade (checklist, none optional): every `ViuProjectReference`; `InternalsVisibleTo` strings
     (grantors and grantees); `frameworks/Assimalign.Viu.App.props` `@(ViuFrameworkAssembly)` +
     analyzer manifest + FrameworkList entries; root + per-area `slnx` (delete Reactivity's, rename

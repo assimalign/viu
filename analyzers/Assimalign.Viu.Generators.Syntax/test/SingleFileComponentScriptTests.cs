@@ -7,19 +7,19 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
+using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
 
 using Shouldly;
 using Xunit;
 
-// The test namespace is nested under Assimalign.Viu.Syntax, so the base cluster's Diagnostic and
-// DiagnosticSeverity shadow Roslyn's; alias the Roslyn types the generated code and consumer compile
-// against.
+// Both the Viu syntax cluster and Roslyn expose Diagnostic and DiagnosticSeverity; alias the Roslyn
+// types that the generated code and consumer compile against.
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// Tests for [V01.01.06.03] — merging the <c>@script</c> block's C# into the generated partial class:
@@ -498,7 +498,7 @@ public sealed class SingleFileComponentScriptTests
         return new SingleFileComponentScriptBlock
         {
             Name = "script",
-            Options = SyntaxList<SingleFileComponentBlockOption>.Empty,
+            Options = Assimalign.Viu.Syntax.SyntaxList<SingleFileComponentBlockOption>.Empty,
             Content = content,
             Location = location,
             ContentLocation = location,
@@ -517,7 +517,7 @@ public sealed class SingleFileComponentScriptTests
             .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path));
 
         return CSharpCompilation.Create(
-            "Assimalign.Viu.Syntax.Generators.ScriptMergeTestAssembly",
+            "Assimalign.Viu.Generators.Syntax.ScriptMergeTestAssembly",
             trees,
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable))

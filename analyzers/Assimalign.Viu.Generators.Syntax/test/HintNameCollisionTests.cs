@@ -7,7 +7,7 @@ using Shouldly;
 
 using Xunit;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 // End-to-end pins for hint-name uniqueness through the real generator driver: Roslyn's AddSource
 // throws on a duplicate hint name and the exception kills the entire generator run, so colliding

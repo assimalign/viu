@@ -10,9 +10,9 @@ C#, not content files).
 The `.viu` `@style` compilation — parse the component, run the scoped / CSS-Modules / `v-bind()` rewrites,
 serialize deterministically — must be run by **two build-time hosts**:
 
-1. the `Assimalign.Viu.Syntax.Generators` incremental **source generator**, which emits the `ExtractedStyles`
+1. the `Assimalign.Viu.Generators.Syntax` incremental **source generator**, which emits the `ExtractedStyles`
    constant inside the Roslyn analyzer sandbox (no I/O), and
-2. the `ViuBundleCss` **MSBuild task** (`analyzers/Assimalign.Viu.Tooling.Tasks`), which runs *outside* the
+2. the `ViuBundleCss` **MSBuild task** (`sdks/Assimalign.Viu.Sdk/Tasks`), which runs *outside* the
    analyzer sandbox and writes the bundled stylesheet to publish output.
 
 If each host had its own copy of that logic, the generated constant and the physical file could drift. So the
@@ -85,7 +85,7 @@ blocks — matching the generator's constant exactly.
 - **Host-page `<link>` injection ([V01.01.12.12.01], #167) — implemented.** A consuming WASM app needs no
   hand-authored link tag: `Build.Css.Bundling.targets` injects `<link rel="stylesheet"
   href="<AssemblyName>.viu.css">` into the host page (`wwwroot/index.html`) via the `ViuInjectCssBundleLink`
-  MSBuild task (shipped in the same `Tooling.Tasks` assembly as `ViuBundleCss`). The injector is idempotent —
+  MSBuild task (shipped in the same `Assimalign.Viu.Sdk.Tasks` assembly as `ViuBundleCss`). The injector is idempotent —
   a hand-authored link, or a re-run, suppresses a second link — so keeping a manual `<link>` is a supported
   opt-out (`ViuInjectSingleFileComponentCssLink=false` opts out entirely).
 

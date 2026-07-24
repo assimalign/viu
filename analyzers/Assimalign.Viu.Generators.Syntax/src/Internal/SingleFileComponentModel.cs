@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// The value-equatable description of the partial-class scaffold the generator emits for one <c>.viu</c>

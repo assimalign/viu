@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// One <c>v-bind()</c> CSS binding recorded in the generated component metadata ([V01.01.06.06]): the

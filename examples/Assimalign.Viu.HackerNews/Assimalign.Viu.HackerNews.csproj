@@ -29,6 +29,6 @@
        In-repo the generator attaches only through a direct analyzer reference (it is not transitive via
        ViuProjectReference); packaged consumers instead get it from the Reactivity nupkg's analyzers/. -->
   <ItemGroup>
-    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Generators.Reactivity" />
   </ItemGroup>
 </Project>

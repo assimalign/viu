@@ -4,7 +4,7 @@ using Xunit;
 namespace Assimalign.Viu.Reactivity.Tests;
 
 // These [Reactive]/[ShallowReactive] partial classes are implemented by the
-// Assimalign.Viu.Core.Generators source generator (wired into this test project via
+// Assimalign.Viu.Generators.Reactivity source generator (wired into this test project via
 // ViuAnalyzerReference). The tests below consume the generated output to pin track/trigger
 // semantics end to end. Upstream parity: https://vuejs.org/api/reactivity-core.html#reactive
 
@@ -181,4 +181,3 @@ public sealed class GeneratedReactiveObjectTests
         runs.ShouldBe(2);
     }
 }
-

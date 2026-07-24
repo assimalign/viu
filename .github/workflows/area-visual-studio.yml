@@ -1,0 +1,122 @@
+# Windows-only build and test for the out-of-process Visual Studio client and
+# its editor-neutral Viu language server. Publishing belongs to release.yml.
+name: area-visual-studio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'extensions/VisualStudio/**'
+      - 'libraries/Assimalign.Viu.Syntax*/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-visual-studio.yml'
+      - '.github/workflows/release.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'extensions/VisualStudio/**'
+      - 'libraries/Assimalign.Viu.Syntax*/**'
+      - 'build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/actions/**'
+      - '.github/workflows/area-visual-studio.yml'
+      - '.github/workflows/release.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build and test Visual Studio extension
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build extension
+        shell: pwsh
+        run: ./extensions/VisualStudio/Build.ps1 -Configuration Release
+
+      - name: Test language tooling
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx --configuration Release
+
+      - name: Inspect packaged VSIX
+        shell: pwsh
+        run: |
+          $extensionPath = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
+          $extensionFile = Get-Item -LiteralPath $extensionPath
+          $maximumPackageSize = 50MB
+          if ($extensionFile.Length -gt $maximumPackageSize) {
+            throw "The VSIX is $($extensionFile.Length) bytes; Marketplace packages must remain at or below $maximumPackageSize bytes."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $extensionArchive = [System.IO.Compression.ZipFile]::OpenRead(
+            $extensionFile.FullName)
+          try {
+            $manifestEntry = $extensionArchive.GetEntry('extension.vsixmanifest')
+            if ($null -eq $manifestEntry) {
+              throw 'The VSIX does not contain extension.vsixmanifest.'
+            }
+
+            $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+            try {
+              [xml] $manifest = $manifestReader.ReadToEnd()
+            }
+            finally {
+              $manifestReader.Dispose()
+            }
+
+            $namespaceManager = [System.Xml.XmlNamespaceManager]::new(
+              $manifest.NameTable)
+            $namespaceManager.AddNamespace(
+              'vsix',
+              'http://schemas.microsoft.com/developer/vsx-schema/2011')
+            $identity = $manifest.SelectSingleNode(
+              '/vsix:PackageManifest/vsix:Metadata/vsix:Identity',
+              $namespaceManager)
+            $preview = $manifest.SelectSingleNode(
+              '/vsix:PackageManifest/vsix:Metadata/vsix:Preview',
+              $namespaceManager)
+            if ($null -eq $identity) {
+              throw 'The VSIX manifest does not contain an Identity element.'
+            }
+            if ($identity.Id -ne 'Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c') {
+              throw "Unexpected VSIX identity: $($identity.Id)."
+            }
+            if ($identity.Publisher -ne 'Assimalign') {
+              throw "Unexpected VSIX publisher: $($identity.Publisher)."
+            }
+            if ($null -eq $preview -or $preview.InnerText -ne 'true') {
+              throw 'The Visual Studio extension must remain a Marketplace preview.'
+            }
+          }
+          finally {
+            $extensionArchive.Dispose()
+          }
+
+          $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
+          Write-Host "Validated VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
+
+      - name: Upload VSIX build artifact
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Assimalign.Viu.VisualStudio
+          path: _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
+          if-no-files-found: error
+          retention-days: 7

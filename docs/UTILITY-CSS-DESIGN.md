@@ -339,7 +339,7 @@ implementation task in [§7](#7-work-item-breakdown).
 | CSS AST, parsing, **construction, and deterministic serialization** | `Assimalign.Viu.Syntax.Css` | `Assimalign.Viu.Syntax` (base) only |
 | Utility candidate grammar, variant model, theme model, resolver, generation | **Tooling-owned engine core** (a netstandard2.0 library in the analyzer layer — see OQ-2) | `Assimalign.Viu.Syntax` (base) **and** `Assimalign.Viu.Syntax.Css` (for emission) |
 | Candidate extraction scanner | Tooling-owned engine core | `Assimalign.Viu.Syntax` (base) only — no CSS or theme dependency |
-| Composition + incremental pipeline wiring, constants, diagnostics | `Assimalign.Viu.Syntax.Generators` (the composition root generator) | the engine core, `Assimalign.Viu.Syntax.Css`, the language parsers — as it already does |
+| Composition + incremental pipeline wiring, constants, diagnostics | `Assimalign.Viu.Generators.Syntax` (the composition root generator) | the engine core, `Assimalign.Viu.Syntax.Css`, the language parsers — as it already does |
 | Physical bundling to publish output | `ViuBundleCss` MSBuild task (Tooling) | the engine core |
 
 **Invariant — no language library references another.** `Assimalign.Viu.Syntax.Css` stays a leaf: it
@@ -799,7 +799,7 @@ the catalog extensible by table. Zero runtime CSS work.
 ### Architectural boundaries
 
 - Project: resolver/generation in the Tooling-owned engine core; pipeline wiring in
-  `Assimalign.Viu.Syntax.Generators` (composition root). References `Assimalign.Viu.Syntax.Css` for
+  `Assimalign.Viu.Generators.Syntax` (composition root). References `Assimalign.Viu.Syntax.Css` for
   emission — allowed because it is the composition root, not a peer language library. Css never
   references back.
 - netstandard2.0; no I/O in the analyzer (bundling is [V01.01.12.12]'s task); no reflection; no dynamic
@@ -867,7 +867,7 @@ implementation is not blocked.
   run over the same compilation.
 
 - **OQ-2 — Engine-core packaging.** Fold the netstandard2.0 engine core into
-  `Assimalign.Viu.Syntax.Generators`, or ship it as a dedicated analyzer-layer library the generator
+  `Assimalign.Viu.Generators.Syntax`, or ship it as a dedicated analyzer-layer library the generator
   *and* the `ViuBundleCss` task both reference? **Recommendation:** a dedicated library — the MSBuild
   task must reuse the core outside the analyzer sandbox, and a separate library gives clean test
   isolation and a single generation implementation. Confirm the exact assembly name/location with the

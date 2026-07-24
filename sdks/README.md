@@ -35,7 +35,7 @@ dotnet CLI with no installer and no admin rights.
 | Piece | Mechanism |
 | --- | --- |
 | WASM browser app model | `Sdk.props`/`Sdk.targets` chain `Microsoft.NET.Sdk.WebAssembly` |
-| The framework libraries (`Assimalign.Viu.Shared`, `.Core`, `.Browser`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
+| The framework libraries (`Assimalign.Viu.Shared`, `.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
 | The `[Reactive]` and `.viu` source generators | Shipped inside the `Assimalign.Viu.App.Ref` targeting pack at `analyzers/dotnet/cs/` and listed as `<File Type="Analyzer">` in its `data/FrameworkList.xml` |
 | `.viu` single-file component compilation | The generator's AdditionalFiles/CompilerVisibleProperty wiring, packed into the SDK's `Targets/` from its in-repo source |
 | `.viu` `@style` CSS bundling | The `ViuBundleCss` MSBuild task (+ parser closure) in the SDK package's `Tasks/`, driven by the packed `Assimalign.Viu.Sdk.Css.Bundling.targets`. The bundle registers as a **content-fingerprinted** static web asset ([V01.01.12.12.03]) |

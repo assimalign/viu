@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
          per design decision: this is the shared build-time CSS composition core ([V01.01.12.12]). It runs
-         in TWO build-time hosts that are both netstandard2.0 — the Assimalign.Viu.Syntax.Generators Roslyn
+         in TWO build-time hosts that are both netstandard2.0 — the Assimalign.Viu.Generators.Syntax Roslyn
          source generator (analyzer sandbox) AND the ViuBundleCss MSBuild task — so it targets the analyzer
          TFM alias, the same central property the Assimalign.Viu.Syntax.* parsers use, never a hardcoded
          string. Its net10.0 test project references it normally. -->

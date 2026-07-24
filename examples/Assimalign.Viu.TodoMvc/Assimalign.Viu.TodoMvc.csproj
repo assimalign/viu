@@ -14,6 +14,6 @@
          Assimalign.Viu.Core as a PrivateAssets=all analyzer, so it does not flow through the
          (transitive) project reference; an in-repo consumer opts in explicitly, exactly as the
          Core test project does. -->
-    <ViuAnalyzerReference Include="Assimalign.Viu.Core.Generators" />
+    <ViuAnalyzerReference Include="Assimalign.Viu.Generators.Reactivity" />
   </ItemGroup>
 </Project>

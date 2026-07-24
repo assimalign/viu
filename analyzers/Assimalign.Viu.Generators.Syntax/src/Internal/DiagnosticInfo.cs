@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis;
 // ambient and shadows Roslyn's; alias the Roslyn type this plumbing produces.
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// A value-equatable diagnostic to emit, carried inside the generator's cached model. Deferring the

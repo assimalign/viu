@@ -17,7 +17,7 @@ namespace Assimalign.Viu.Tooling.Css;
 /// <see cref="CssStylesheetWriter"/>, and untouched non-scoped blocks verbatim — concatenated in source order.
 /// <para>
 /// This is the exact logic that produced the generator's <c>ExtractedStyles</c> constant when it lived inside
-/// <c>Assimalign.Viu.Syntax.Generators</c>; it was lifted here unchanged so the generator and the
+/// <c>Assimalign.Viu.Generators.Syntax</c>; it was lifted here unchanged so the generator and the
 /// <c>ViuBundleCss</c> MSBuild task run <em>one</em> deterministic implementation over the same inputs. That
 /// single-path design is what makes the emitted constant and the physical bundle byte-identical — there is no
 /// second, divergent generation path (see <c>docs/UTILITY-CSS-DESIGN.md</c> §2.4). No I/O, no reflection, no

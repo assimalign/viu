@@ -9,7 +9,7 @@ using SyntaxDiagnostic = Assimalign.Viu.Syntax.Diagnostic;
 using SyntaxDiagnosticSeverity = Assimalign.Viu.Syntax.DiagnosticSeverity;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
-namespace Assimalign.Viu.Syntax.Generators.Tests;
+namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
 /// Pins the generator-surfacing conventions ([V01.01.05.08]): the stable VIU descriptor shape (ID,
@@ -21,7 +21,7 @@ namespace Assimalign.Viu.Syntax.Generators.Tests;
 /// </summary>
 public sealed class SingleFileComponentDiagnosticMappingTests
 {
-    private const string Category = "Assimalign.Viu.Syntax.Generators";
+    private const string Category = "Assimalign.Viu.Generators.Syntax";
 
     [Fact]
     public void EveryDescriptor_CarriesStableIdCategoryHelpLinkAndSeverity()

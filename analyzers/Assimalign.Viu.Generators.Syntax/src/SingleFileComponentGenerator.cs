@@ -7,7 +7,7 @@ using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
 using Assimalign.Viu.Tooling.Css;
 
-namespace Assimalign.Viu.Syntax.Generators;
+namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// The incremental source generator for <c>.viu</c> single-file components — the composition root of the

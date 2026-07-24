@@ -1340,6 +1340,19 @@ public sealed partial class Renderer<TNode>
                 next.Attributes,
                 nextOptimization,
                 ownNamespace);
+            // Vue's patchElement applies the TEXT fast path even after patchBlockChildren:
+            // https://github.com/vuejs/core/blob/v3.5.25/packages/runtime-core/src/renderer.ts
+            if ((patchFlags & PatchFlags.Text) != 0)
+            {
+                mounted.Children = PatchUnkeyedChildren(
+                    tree,
+                    mounted.Children,
+                    next.Children,
+                    mounted.HostNode,
+                    default,
+                    childNamespace,
+                    mounted.Owner);
+            }
         }
         else if (currentOptimization.IsBlock || nextOptimization.IsBlock)
         {

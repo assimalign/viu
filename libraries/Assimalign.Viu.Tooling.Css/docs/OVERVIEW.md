@@ -3,7 +3,7 @@
 The shared, build-time CSS composition core for `.viu` `@style` blocks. It compiles a component's
 styles (scoped CSS, CSS Modules, and `v-bind()` rewrites) and bundles a project's components into one
 deterministic stylesheet. It exists so the two build-time hosts that need this logic — the
-`Assimalign.Viu.Syntax.Generators` source generator (which emits the styles as a C# constant) and the
+`Assimalign.Viu.Generators.Syntax` source generator (which emits the styles as a C# constant) and the
 `ViuBundleCss` MSBuild task (which writes the physical file) — run **one** implementation and cannot
 drift. Area: `V01.01.12.12`.
 
