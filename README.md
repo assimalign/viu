@@ -25,9 +25,8 @@ reactive core, the platform-agnostic renderer with scheduler and component model
 bridge, the template compiler front end, the `.viu` single-file-component pipeline, the router's
 DOM-free route table and matcher, and the store's setup-style `defineStore`/`createPinia` definition
 API are all in the tree at varying maturity; each library's `docs/OVERVIEW.md` states what it
-currently provides.
-The demo is a reactively re-rendering stopwatch in
-[`examples/Assimalign.Viu.WebApp`](examples/Assimalign.Viu.WebApp).
+currently provides. The packaged-consumer showcase lives in the separate
+[`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) repository.
 
 ## Repository map
 
@@ -67,14 +66,12 @@ runtime template compilation. They never ship in the runtime assemblies.
 | `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
 | `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `@style` output to a physical stylesheet outside the analyzer sandbox. |
 
-### Examples (`examples/`)
+### Packaged SDK showcase
 
-| Sample | What it shows |
-| --- | --- |
-| [`Assimalign.Viu.WebApp`](examples/Assimalign.Viu.WebApp) | A browser WASM app: a stopwatch rendered from C# through the handle-based DOM bridge. Its `?diagnostics=1` mode runs the interop marshaling benchmark behind [Browser ADR-0001](libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md). |
-| [`Assimalign.Viu.TodoMvc`](examples/Assimalign.Viu.TodoMvc) | The canonical [TodoMVC](https://github.com/tastejs/todomvc/blob/master/app-spec.md) app built from components: `[Reactive]` source-generated state, a `ReactiveList<T>` with computed filtered/remaining views, keyed list rendering, and typed provide/inject. DOM-free tests in [`Assimalign.Viu.TodoMvc.Tests`](examples/Assimalign.Viu.TodoMvc.Tests). |
-| [`Assimalign.Viu.Forms`](examples/Assimalign.Viu.Forms) | A registration form exercising every implemented `v-model` flavor (text, number, checkbox, checkbox-list, radio, single/multiple `<select>`, textarea) and the `.trim`/`.number`/`.lazy` modifiers, with a `ref`-per-field composition model and a live preview. DOM-free tests in [`Assimalign.Viu.Forms.Tests`](examples/Assimalign.Viu.Forms.Tests). |
-| [`Assimalign.Viu.HackerNews`](examples/Assimalign.Viu.HackerNews) | The Wave-4 exit demo — a routed, stored HackerNews client. Composes the router (+ the browser click bridge), a Pinia-style store, async route views, keyed `TransitionGroup` story lists, source-generated `System.Text.Json` over the HackerNews API, and the auto-injected `.viu` CSS bundle. See its [README](examples/Assimalign.Viu.HackerNews/README.md). |
+[`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) contains the complete
+browser showcase. It consumes `Assimalign.Viu.Sdk`, `Assimalign.Viu.Router`, and
+`Assimalign.Viu.Router.Browser` from a local NuGet feed, so it exercises the same package boundary
+as an external application rather than relying on project references into this repository.
 
 ### Packaging (`sdks/`, `frameworks/`)
 
@@ -121,11 +118,10 @@ Each library's tests live beside it under `test/`:
 dotnet test libraries/Assimalign.Viu.Core/test/
 ```
 
-### Run the demo
+### Run the showcase
 
-```sh
-dotnet run --project examples/Assimalign.Viu.WebApp
-```
+Pack the local SDK and framework, then follow the
+[`viu-examples` README](https://github.com/assimalign/viu-examples#run-locally).
 
 ## Plan and tracking
 

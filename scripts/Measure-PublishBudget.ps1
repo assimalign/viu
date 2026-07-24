@@ -16,12 +16,11 @@
     with the in-box .NET compression APIs, so it needs no external tooling beyond
     the .NET SDK and the wasm-tools workload.
 
-    Trimming is configured by the samples themselves (examples/Directory.Build.props)
-    rather than a global publish property, because a global -p:PublishTrimmed=true
-    flows to the netstandard2.0 generator projects in the build graph and fails with
-    NETSDK1124. The gate publishes with -warnaserror, so any ILLink/trim-analyzer
-    warning fails the publish across the sample and every shipping library it pulls
-    in -- this is also the trimming-validation gate.
+    Trimming is configured by each packaged-consumer sample project rather than a
+    global publish property, because a global -p:PublishTrimmed=true can flow to
+    netstandard2.0 generator projects and fail with NETSDK1124. The gate publishes
+    with -warnaserror, so any ILLink/trim-analyzer warning fails the publish across
+    the sample and its package closure -- this is also the trimming-validation gate.
 
     Budgets only ever change through an explicit edit to the manifest
     (scripts/budgets/PublishBudgets.json) in the pull request under review. This
@@ -31,8 +30,7 @@
 .PARAMETER ManifestPath
     Path to the budget manifest. Defaults to scripts/budgets/PublishBudgets.json
     alongside this script (i.e. the manifest of the tree that owns this script,
-    even when -RepositoryRoot points at a different checkout for base-branch delta
-    measurement).
+    even when -RepositoryRoot points at a different checkout).
 
 .PARAMETER SampleName
     One or more sample names (matching the manifest) to measure. Defaults to every
@@ -49,13 +47,13 @@
     with -SampleName when the manifest holds more than one sample.
 
 .PARAMETER RepositoryRoot
-    Root of the source tree whose sample projects are published. Defaults to the
-    parent of this script's directory. Overridden by CI to point at a base-branch
-    checkout so the head manifest/method can measure base sources for the delta.
+    Root against which project paths in the manifest are resolved. Defaults to the
+    parent of this script's directory. A project may live in a sibling repository
+    (for example ../viu-examples) while publish output remains under this root.
 
 .PARAMETER ResultsPath
-    When supplied, writes the machine-readable measurement results as JSON. CI uses
-    this to hand a base-branch measurement to a later head-branch run.
+    When supplied, writes the machine-readable measurement results as JSON for CI
+    artifacts or later comparison.
 
 .PARAMETER BaselineResultsPath
     When supplied, a prior results JSON (typically the base branch) whose per-sample
@@ -199,8 +197,8 @@ function Invoke-SamplePublish {
     }
     New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
 
-    # Trimming is enabled by examples/Directory.Build.props. -warnaserror doubles as
-    # the trimming-validation gate: any ILLink/trim-analyzer warning fails here.
+    # Trimming is enabled by the packaged-consumer project. -warnaserror doubles
+    # as the trimming-validation gate: any ILLink/trim-analyzer warning fails here.
     Write-Report "  publishing $ProjectPath (trimmed, $Configuration)"
     & dotnet publish $ProjectPath `
         --configuration $Configuration `
@@ -247,8 +245,7 @@ foreach ($sample in $samples) {
     else {
         $projectPath = Join-Path $RepositoryRoot $sample.project
         if (-not (Test-Path $projectPath)) {
-            Write-Report "  skipping $($sample.name): project not present in this tree ($projectPath)"
-            continue
+            Exit-WithError "Sample project not found: $projectPath"
         }
         $outputDirectory = Join-Path $PublishOutputRoot $sample.name
         try {

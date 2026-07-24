@@ -30,10 +30,9 @@ dotnet test analyzers/Assimalign.Viu.Generators.Reactive/test
 dotnet test analyzers/Assimalign.Viu.Generators.Syntax/test
 ```
 
-The repository-level `examples/Assimalign.Viu.WebApp` remains on the pre-redesign API and is not
-part of this isolated staging solution. Migrating examples and SDK/framework packaging is an atomic
-promotion step described in [MIGRATION.md](MIGRATION.md); the Browser compiled-render test project
-is the current `.viu` plus renderer integration canary.
+The packaged-consumer showcase is maintained in
+[`assimalign/viu-examples`](https://github.com/assimalign/viu-examples). The Browser
+compiled-render test project remains the in-repository `.viu` plus renderer integration canary.
 
 Read [DESIGN.md](DESIGN.md) for the implemented boundaries,
 [DEVELOPER-EXAMPLES.md](DEVELOPER-EXAMPLES.md) for consumption examples, and

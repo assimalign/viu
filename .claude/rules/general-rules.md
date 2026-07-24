@@ -17,9 +17,9 @@ win** — link the reference in the code, test, or issue that pins the behavior.
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
   folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
   `assimalign/viu`).
-- Examples live in `examples/`; repo planning docs in `docs/`; the consumer-facing MSBuild SDK in
-  `sdks/` and the `Assimalign.Viu.App` shared-framework pack producers in `frameworks/` (see
-  [build-system.md](build-system.md)).
+- Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
+  `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
+  shared-framework pack producers live in `frameworks/` (see [build-system.md](build-system.md)).
 
 ## Namespaces
 

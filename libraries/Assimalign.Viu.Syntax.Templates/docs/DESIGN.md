@@ -275,10 +275,12 @@ mapping + v-show / `.prevent` execution through the in-memory adapter).
 
 What code generation requires of each DOM member, mapped to the runtime machinery it forwards to:
 
-- `_vShow`, `_vModelText`, `_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic` — the runtime
-  directive values, typed `IDirective`, mapped to `VShow.Instance` / `VModelText.Instance` / … . The emitter
-  writes each as a `withDirectives` tuple element (`new object?[] { new object?[] { _vShow, exp } }`), which
-  `RenderHelpers._withDirectives` binds through its `tuple[0] is IDirective` check.
+- `_vShow`, `_vModelText`, `_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic` — unresolved
+  directive markers mapped by Browser's resolver to `VShow.Instance` / `VModelText.Instance` / … . The emitter
+  writes each as a `withDirectives` tuple element. Native `v-model` values are emitted as
+  `new ViuModelBinding(exp, value => { exp = value; })`, carrying the current value and reflection-free
+  write-back action together; `RenderHelpers._withDirectives` preserves the carrier when it converts the
+  generated tuple into a component directive binding.
 - `_withModifiers(...)` / `_withKeys(...)` — the `v-on` modifier / key guard wrappers (upstream
   `withModifiers` / `withKeys`), each **returning `Action<BrowserEvent>`** (the dispatchable handler the event
   invoker registry understands) and forwarding to `BrowserEvents.WithModifiers` / `BrowserEvents.WithKeys`. The

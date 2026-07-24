@@ -43,7 +43,7 @@ Closes #
 <!-- How was this verified? Commands run, tests added, manual checks. -->
 
 - [ ] `dotnet build` and the affected `dotnet test` projects pass locally.
-- [ ] The sample WASM app(s) still build and run where the change touches runtime/interop code.
+- [ ] The external `assimalign/viu-examples` showcase still builds and runs where the change touches runtime/interop code.
 -
 
 ## Checklist

@@ -12,7 +12,7 @@ AOT/trimming territory, so reflection-based serialization and dynamic code gener
 - `libraries/` — framework libraries, inverted layout: `libraries/Assimalign.Viu.<Name>/{src|test}`
   (the folder name is the assembly/package id; `src/` holds the shipping project, `test/` its tests —
   no area wrapper folders)
-- `examples/` — sample WASM apps (`Assimalign.Viu.WebApp` is the current demo)
+- `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
 - `.claude/rules/` — the canonical working conventions for this repo (auto-load by path):
   `general-rules` (C# style, Abstraction/Internal folders, whole-word naming, explicit usings, AOT),
@@ -23,7 +23,7 @@ AOT/trimming territory, so reflection-based serialization and dynamic code gener
 
 - `dotnet build Assimalign.Viu.slnx`
 - `dotnet test <project>/tests/`
-- Run the demo: `dotnet run --project examples/Assimalign.Viu.WebApp`
+- Run the showcase from the sibling `viu-examples` repository after packing `_out/packages`
 
 ## Work tracking
 

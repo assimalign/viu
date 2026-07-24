@@ -14,4 +14,19 @@
     <ViuProjectReference Include="Assimalign.Viu.Components" />
     <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
+  <!--
+    The non-Blazor WebAssembly host serves the consuming app's source wwwroot. Package the
+    browser-history module with a buildTransitive target that flows it to the standard
+    /_content/Assimalign.Viu.Router/ URL consumed by RouterHistory.InitializeAsync().
+  -->
+  <ItemGroup>
+    <None Update="wwwroot\viu-history.js"
+          Pack="true"
+          PackagePath="assets\Assimalign.Viu.Router\viu-history.js"
+          Visible="false" />
+    <None Include="..\build\Assimalign.Viu.Router.targets"
+          Pack="true"
+          PackagePath="buildTransitive\Assimalign.Viu.Router.targets"
+          Visible="false" />
+  </ItemGroup>
 </Project>

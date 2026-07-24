@@ -19,7 +19,7 @@ performance cost. .NET offers two ways to identify a DOM node across it:
 ## Measurement
 
 Measured with the repeatable harness in the example app (`/?diagnostics=1`,
-`examples/Assimalign.Viu.WebApp/ViuDiagnostics.cs`), identical loops per strategy against the
+the original sample's diagnostics harness (now superseded by the external `viu-examples` app), identical loops per strategy against the
 same live browser DOM. Dev build (interpreted mono-wasm, no AOT), Chromium, 2026-07-17; the
 tracked benchmark suite that will re-measure this under AOT is [V01.01.11.04] (#88).
 

@@ -12,7 +12,7 @@ AOT/trimming territory, so reflection-based serialization and dynamic code gener
 - `libraries/` — framework libraries, inverted layout: `libraries/Assimalign.Viu.<Name>/{src|test}`
   (the folder name is the assembly/package id; `src/` holds the shipping project, `test/` its tests —
   no area wrapper folders)
-- `examples/` — sample WASM apps (`Assimalign.Viu.WebApp` is the current demo)
+- `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
 - `.Codex/rules/` — the canonical working conventions for this repo (auto-load by path):
   `general-rules` (C# style, Abstraction/Internal folders, whole-word naming, explicit usings, AOT),
@@ -23,7 +23,7 @@ AOT/trimming territory, so reflection-based serialization and dynamic code gener
 
 - `dotnet build Assimalign.Viu.slnx`
 - `dotnet test <project>/tests/`
-- Run the demo: `dotnet run --project examples/Assimalign.Viu.WebApp`
+- Run the showcase from the sibling `viu-examples` repository after packing `_out/packages`
 
 ## Work tracking
 
@@ -54,9 +54,9 @@ win** — link the reference in the code, test, or issue that pins the behavior.
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
   folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
   `assimalign/viu`).
-- Examples live in `examples/`; repo planning docs in `docs/`; the consumer-facing MSBuild SDK in
-  `sdks/` and the `Assimalign.Viu.App` shared-framework pack producers in `frameworks/` (see
-  [build-system.md](build-system.md)).
+- Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
+  `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
+  shared-framework pack producers live in `frameworks/` (see [build-system.md](build-system.md)).
 
 ### Namespaces
 
@@ -213,9 +213,8 @@ Test project (`test/`):
 </Project>
 ```
 
-Sample apps (`examples/`) keep their own SDK (e.g. `Microsoft.NET.Sdk.WebAssembly`), set
-`<TargetFramework>$(TargetFrameworkLatest)</TargetFramework>`, use `ViuProjectReference`, and do **not**
-set `IsAotCompatible` (they are not shipping libraries).
+Sample apps live in `assimalign/viu-examples` and consume the packaged
+`Assimalign.Viu.Sdk`/framework from `_out/packages`; they must not use `ViuProjectReference`.
 
 ### Versioning and packaging
 

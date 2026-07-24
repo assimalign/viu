@@ -70,9 +70,14 @@ internal static class BrowserPropertyPatcher
         }
         else if (IsEventListenerName(propertyName))
         {
-            // The raw prop name flows through: the invoker registry parses the
-            // Once/Capture/Passive suffixes and event name ([V01.01.04.03]).
-            leafOperations.SetEventListener(element, propertyName, nextValue as Delegate);
+            // Vue keeps component v-model's onUpdate:* assigners as virtual-node metadata; they
+            // are not native DOM events (runtime-dom patchProp's isModelListener exclusion).
+            if (!IsModelListenerName(propertyName))
+            {
+                // The raw prop name flows through: the invoker registry parses the
+                // Once/Capture/Passive suffixes and event name ([V01.01.04.03]).
+                leafOperations.SetEventListener(element, propertyName, nextValue as Delegate);
+            }
         }
         else if (ShouldSetAsProperty(elementTag, propertyName, elementNamespace))
         {
@@ -315,4 +320,9 @@ internal static class BrowserPropertyPatcher
             && attributeName[1] == 'n'
             && char.IsUpper(attributeName[2]);
     }
+
+    // @vue/shared isModelListener: component v-model assigners remain vnode metadata and never
+    // become inert "update:*" listeners on a native element.
+    private static bool IsModelListenerName(string attributeName)
+        => attributeName.StartsWith("onUpdate:", StringComparison.Ordinal);
 }

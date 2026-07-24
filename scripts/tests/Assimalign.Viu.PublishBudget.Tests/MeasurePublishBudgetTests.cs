@@ -132,6 +132,17 @@ public sealed class MeasurePublishBudgetTests : IDisposable
         run.ExitCode.ShouldBe(2);
     }
 
+    [Fact]
+    public void Gate_MissingSampleProject_ExitsTwoInsteadOfPassingWithoutMeasurement()
+    {
+        var manifest = CreateManifest(budgetBytes: 100_000_000);
+
+        var run = RunGate(manifest, "-RepositoryRoot", CreateTemporaryDirectory());
+
+        run.ExitCode.ShouldBe(2);
+        run.Output.ShouldContain("Sample project not found");
+    }
+
     // --- fixtures ---------------------------------------------------------------
 
     private static byte[] CompressibleBytes(int count)

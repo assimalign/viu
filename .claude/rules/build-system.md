@@ -76,9 +76,8 @@ Test project (`test/`):
 </Project>
 ```
 
-Sample apps (`examples/`) keep their own SDK (e.g. `Microsoft.NET.Sdk.WebAssembly`), set
-`<TargetFramework>$(TargetFrameworkLatest)</TargetFramework>`, use `ViuProjectReference`, and do **not**
-set `IsAotCompatible` (they are not shipping libraries).
+Sample apps live in `assimalign/viu-examples` and consume the packaged
+`Assimalign.Viu.Sdk`/framework from `_out/packages`; they must not use `ViuProjectReference`.
 
 ## Versioning and packaging
 

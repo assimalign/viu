@@ -15,9 +15,10 @@ The current code proves the rendering seam end to end and nothing more:
   keyed), a generic `VirtualDomRenderer<TNode>` over an `IVirtualDomAdapter<TNode>` (mount /
   in-place patch / unmount, fragments via comment markers), a standalone diff producing patch
   records, and an HTML string renderer.
-- `examples/Assimalign.Viu.WebApp` — a browser WASM app with a handle-based DOM bridge in
-  `main.js` (`JSImport` node ops, GUID-keyed event callbacks dispatched back through `JSExport`),
-  rendering a stopwatch.
+- The original in-repository browser WASM stopwatch proved the handle-based DOM bridge
+  (`JSImport` node operations and callbacks dispatched through `JSExport`). Current packaged SDK
+  behavior is exercised by the separate
+  [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) showcase.
 
 What it validates: the adapter-injected renderer design (identical in spirit to Vue's
 `createRenderer(RendererOptions)`), and that C#-driven DOM patching through interop works. What it

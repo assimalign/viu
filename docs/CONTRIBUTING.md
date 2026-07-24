@@ -10,7 +10,7 @@ and complements [`.claude/rules/documentation.md`](../.claude/rules/documentatio
 
 | Document | Location | What it holds |
 | --- | --- | --- |
-| Root `README.md` | repository root | The project mission, the repository map (every project under `libraries/`, `analyzers/`, `examples/`, `sdks/`, `frameworks/`), and clone/build/run instructions. |
+| Root `README.md` | repository root | The project mission, the repository map (every project under `libraries/`, `analyzers/`, `sdks/`, `frameworks/`), the external showcase link, and clone/build instructions. |
 | `PLAN.md` | [`docs/PLAN.md`](PLAN.md) | The authoritative narrative: the Vue 3 → Viu architecture map, the founding design decisions, and the wave strategy. The GitHub [Project #15](https://github.com/orgs/assimalign/projects/15) board is the authoritative *backlog*. |
 | Architecture decision records | [`docs/adr/`](adr/) | The append-only log of repo-wide, cross-cutting decisions (see [`adr/README.md`](adr/README.md)). |
 | Per-library `OVERVIEW.md` | `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` | What the library **is**. |
@@ -62,8 +62,10 @@ The rationale and the divergences — why the shape, not the shape itself.
   no area wrapper folders). Seed `docs/OVERVIEW.md` and `docs/DESIGN.md` with the code. Wire the
   csprojs per [`.claude/rules/build-system.md`](../.claude/rules/build-system.md) ("Adding a new
   library") and add a row to the root `README.md` repository map.
-- **A new sample** — `examples/Assimalign.Viu.<Name>/`, referenced from the root `README.md`
-  Examples table; keep the demo's own `README` or in-code notes describing what it shows.
+- **A new sample** — add it to
+  [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples), where samples consume
+  packaged Viu artifacts rather than project references. Update this repository's showcase link
+  only when the external entry point changes.
 - **A new ADR** — copy [`adr/template.md`](adr/template.md) to `adr/NNNN-kebab-title.md` (next number),
   and add it to the [`adr/README.md`](adr/README.md) index.
 - **Work items** — every change traces to a `[V01.01.NN…]` WBS item on Project #15; capture

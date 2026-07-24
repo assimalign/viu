@@ -292,6 +292,36 @@ public class BrowserPropertyPatcherTests
         ]);
     }
 
+    [Theory]
+    [InlineData("onUpdate:modelValue")]
+    [InlineData("onUpdate:title")]
+    public void ModelUpdateListeners_RemainVirtualNodeMetadataAndNeverReachTheDom(
+        string propertyName)
+    {
+        // Vue runtime-dom excludes isModelListener keys from patchEvent. Native v-model keeps
+        // its assigner in vnode props for directive use, but no "update:*" DOM event exists.
+        var handler = (Action<object?>)(_ => { });
+
+        Patch("input", propertyName, null, handler);
+        Patch("input", propertyName, handler, null);
+
+        _calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void EventNameBeginningWithUpdateWithoutTheModelSeparator_RemainsADomEvent()
+    {
+        // isModelListener is specifically the "onUpdate:" prefix, not every update-like event.
+        var handler = (Action)(() => { });
+
+        Patch("div", "onUpdateComplete", null, handler);
+
+        _calls.ShouldBe(
+        [
+            $"setEventListener({Element},onUpdateComplete,delegate)",
+        ]);
+    }
+
     // --- SVG general routing ------------------------------------------------------------------
 
     [Fact]

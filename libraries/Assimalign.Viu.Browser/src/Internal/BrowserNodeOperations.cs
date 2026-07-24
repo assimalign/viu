@@ -135,19 +135,24 @@ internal static class BrowserNodeOperations
     };
 
     /// <summary>
-    /// Overrides the invoker registry the single <c>[JSExport]</c> dispatch entry
-    /// (<see cref="BrowserEventDispatch"/>) routes to. Buffered mode ([V01.01.04.05]) sets this to its
-    /// own registry — whose add/remove callbacks encode listener ops into the command buffer rather
-    /// than call the bridge directly — so a live event reaches the handlers registered on the buffered
-    /// renderer. Null selects the direct-path registry. Ambient static (single active renderer per
-    /// process, single-threaded JS event-loop model).
+    /// Overrides the invoker registry used by the single <c>[JSExport]</c> dispatch entry
+    /// (<see cref="BrowserEventDispatch"/>) and registry diagnostics. Buffered mode
+    /// ([V01.01.04.05]) sets this to its own registry — whose add/remove callbacks encode listener
+    /// operations into the command buffer rather than call the bridge directly — so live events and
+    /// diagnostics both address the handlers registered on the buffered renderer. Null selects the
+    /// direct-path registry. Ambient static (single active renderer per process, single-threaded JS
+    /// event-loop model).
     /// </summary>
-    internal static Func<int, bool, BrowserEvent, int>? OverrideDispatcher;
+    internal static BrowserEventInvokerRegistry? OverrideInvokerRegistry;
 
     internal static int DispatchEvent(int nodeHandle, bool capture, BrowserEvent browserEvent)
-        => OverrideDispatcher is { } dispatcher
-            ? dispatcher(nodeHandle, capture, browserEvent)
-            : Invokers.Dispatch(nodeHandle, capture, browserEvent);
+        => ActiveInvokerRegistry.Dispatch(nodeHandle, capture, browserEvent);
+
+    /// <summary>The number of listeners in the registry selected by the active renderer.</summary>
+    internal static int ActiveInvokerCount => ActiveInvokerRegistry.InvokerCount;
+
+    /// <summary>The number of listeners in the direct renderer's registry.</summary>
+    internal static int DirectInvokerCount => Invokers.InvokerCount;
 
     /// <summary>Routes direct-mode event faults to an application-owned error handler.</summary>
     internal static Action<Exception> ErrorSink
@@ -163,6 +168,9 @@ internal static class BrowserNodeOperations
     internal static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
     {
         var sizes = BrowserDomBridge.GetRegistrySizes();
-        return (sizes[0], sizes[1], Invokers.InvokerCount);
+        return (sizes[0], sizes[1], ActiveInvokerCount);
     }
+
+    private static BrowserEventInvokerRegistry ActiveInvokerRegistry
+        => OverrideInvokerRegistry ?? Invokers;
 }

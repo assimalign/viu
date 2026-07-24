@@ -137,7 +137,7 @@ internal static class VModelTransform
         var eventName = BuildEventName(argument);
 
         // eventArg is "$event" in the opaque (non-TS) build.
-        var assignment = Ir.CompoundExpression("$event => ((", expression, ") = $event)");
+        var assignment = CreateAssignment(expression);
 
         var properties = new List<Property>
         {
@@ -168,6 +168,40 @@ internal static class VModelTransform
 
         return new DirectiveTransformResult { Properties = properties };
     }
+
+    /// <summary>
+    /// Builds the write-back lambda shared by the native directive carrier and the
+    /// <c>onUpdate:modelValue</c> property.
+    /// </summary>
+    /// <param name="expression">The writable model expression.</param>
+    /// <returns>The generated assignment lambda.</returns>
+    internal static CompoundExpressionNode CreateAssignment(ExpressionNode expression)
+        => Ir.CompoundExpression("$event => ((", expression, ") = $event)");
+
+    /// <summary>
+    /// Builds the statement-bodied assignment lambda required by <c>Action&lt;object?&gt;</c>. The
+    /// expression-bodied form is retained for the virtual node property because it may bind as a
+    /// value-returning handler; a parenthesized assignment is not a valid C# statement expression.
+    /// </summary>
+    /// <param name="expression">The writable model expression.</param>
+    /// <returns>The generated assignment action.</returns>
+    private static CompoundExpressionNode CreateAssignmentAction(ExpressionNode expression)
+        => Ir.CompoundExpression("$event => { ", expression, " = $event; }");
+
+    /// <summary>
+    /// Builds the Browser runtime carrier for a native <c>v-model</c>. Unlike JavaScript, Viu cannot
+    /// recover a setter from a virtual node property through reflection, so generated code carries the
+    /// current value and its assignment lambda together.
+    /// </summary>
+    /// <param name="expression">The writable model expression.</param>
+    /// <returns>The generated <c>ViuModelBinding</c> construction.</returns>
+    internal static CompoundExpressionNode CreateNativeBinding(ExpressionNode expression)
+        => Ir.CompoundExpression(
+            "new global::Assimalign.Viu.Browser.ViuModelBinding(",
+            expression,
+            ", ",
+            CreateAssignmentAction(expression),
+            ")");
 
     private static ExpressionNode BuildEventName(ExpressionNode? argument)
     {

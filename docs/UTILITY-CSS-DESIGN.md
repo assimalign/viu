@@ -123,7 +123,7 @@ compiler `AdditionalFiles`, so the engine never performs its own file discovery 
 | --- | --- | --- |
 | **`.viu` template class attributes** | Static `class="…"` attribute text on elements, and the static string operands of `:class` / `v-bind:class` bindings | The `@template` block is already dispatched to `TemplateSyntaxParser` by the SFC composition root; the extractor walks the resulting template AST (`ElementNode` → `AttributeNode` where `Name == "class"`, plus `DirectiveNode` class bindings) — see [§2.2](#22-candidate-extraction-through-the-seam) |
 | **`.viu` other blocks** | Custom blocks that opt in (a documented predicate, e.g. a `@markup`/raw block a host tool registers) | Registered on the seam by predicate, same as `@style`/`@template` |
-| **Host pages** | `class` attributes in static host HTML (`examples/Assimalign.Viu.WebApp/wwwroot/index.html` and equivalents) | Flow in as `AdditionalFiles` (`.html`/`.htm`); the utility scanner registers a `SyntaxSourcePredicate` matching them — nothing else in the cluster claims host HTML, so first-match-wins is uncontended here |
+| **Host pages** | `class` attributes in static consumer host HTML (for example, the `viu-examples` showcase's `wwwroot/index.html`) | Flow in as `AdditionalFiles` (`.html`/`.htm`); the utility scanner registers a `SyntaxSourcePredicate` matching them — nothing else in the cluster claims host HTML, so first-match-wins is uncontended here |
 
 Only **statically determinable** class tokens are extractable — this is a deliberate, Tailwind-parity
 constraint (Tailwind scans raw text and cannot see runtime-computed strings). A class produced only by

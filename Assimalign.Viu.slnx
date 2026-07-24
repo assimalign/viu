@@ -62,7 +62,6 @@
 		<File Path=".github/workflows/area-visual-studio.yml" />
 		<File Path=".github/workflows/benchmarks.yml" />
 		<File Path=".github/workflows/budget-gates.yml" />
-		<File Path=".github/workflows/webapp.yml" />
 	</Folder>
 	<Folder Name="/viu/analyzers/" />
 	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.Reactive/">
@@ -151,30 +150,6 @@
 	</Folder>
 	<Folder Name="/viu/scripts/tests/Assimalign.Viu.PublishBudget.Tests/">
 		<Project Path="scripts/tests/Assimalign.Viu.PublishBudget.Tests/Assimalign.Viu.PublishBudget.Tests.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/">
-		<File Path="examples/Directory.Build.props" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.WebApp/">
-		<Project Path="examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.TodoMvc/">
-		<Project Path="examples/Assimalign.Viu.TodoMvc/Assimalign.Viu.TodoMvc.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.TodoMvc.Tests/">
-		<Project Path="examples/Assimalign.Viu.TodoMvc.Tests/Assimalign.Viu.TodoMvc.Tests.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.Forms/">
-		<Project Path="examples/Assimalign.Viu.Forms/Assimalign.Viu.Forms.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.Forms.Tests/">
-		<Project Path="examples/Assimalign.Viu.Forms.Tests/Assimalign.Viu.Forms.Tests.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.HackerNews/">
-		<Project Path="examples/Assimalign.Viu.HackerNews/Assimalign.Viu.HackerNews.csproj" />
-	</Folder>
-	<Folder Name="/viu/examples/Assimalign.Viu.HackerNews.Tests/">
-		<Project Path="examples/Assimalign.Viu.HackerNews.Tests/Assimalign.Viu.HackerNews.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx" />

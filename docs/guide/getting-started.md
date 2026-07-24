@@ -274,9 +274,9 @@ and the renderer's batched updates rather than imperative DOM access
 `ComponentProperties`, and `ComponentSetupContext` all live in
 [`Assimalign.Viu.Core`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md); the
 browser entry point `BrowserApplication` lives in
-[`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a larger
-component — props, emitted events, and lifecycle hooks (`Lifecycle.OnMounted`/`OnUnmounted`) — read the
-[`Assimalign.Viu.WebApp`](../../examples/Assimalign.Viu.WebApp) sample.
+[`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a complete
+application with props, emitted events, lifecycle hooks, routing, forms, state, and built-ins, read
+the external [`viu-examples` showcase](https://github.com/assimalign/viu-examples).
 
 ## Reactivity basics
 
@@ -444,8 +444,10 @@ That folder is a static site — host it on any static web host.
   `docs/DESIGN.md` (why it is shaped that way). Start with
   [Core](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md) and
   [Browser](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md).
-- **The sample app** — [`examples/Assimalign.Viu.WebApp`](../../examples/Assimalign.Viu.WebApp) is a
-  component tree with props, emits, and lifecycle hooks, and it dogfoods the `.viu` CSS pipeline.
+- **The sample app** — the external
+  [`viu-examples` showcase](https://github.com/assimalign/viu-examples) consumes the packaged SDK
+  and demonstrates components, routing, reactivity, state, browser directives, built-ins, and the
+  `.viu` CSS pipeline.
 - **The delivery plan** — [`docs/PLAN.md`](../PLAN.md) maps each Vue 3 package to its Viu library and
   records the founding decisions; the [architecture decisions](../adr/) log the C#/WASM divergences.
 - **The Vue 3 guides this parallels** — [Quick Start](https://vuejs.org/guide/quick-start.html) and

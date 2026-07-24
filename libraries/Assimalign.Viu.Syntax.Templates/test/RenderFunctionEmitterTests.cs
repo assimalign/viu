@@ -291,10 +291,11 @@ return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _wit
     {
         // The v-model assignment handler is authored by the transform with Vue's $event variable;
         // serialization maps it to the Viu __event spelling, and the vModelText runtime directive
-        // rides in the withDirectives array.
+        // carries both the current value and the same write-back lambda. The carrier is Viu's
+        // reflection-free equivalent of Vue reading vnode.props["onUpdate:modelValue"].
         EmitPrefixed("<input v-model=\"name\" />").Code.ShouldBeCode(
 """
-return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] { _vModelText, _ctx.name } });
+return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] { _vModelText, new global::Assimalign.Viu.Browser.ViuModelBinding(_ctx.name, __event => { _ctx.name = __event; }) } });
 
 """);
     }

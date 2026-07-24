@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "webapp",
+      "name": "viu-examples showcase",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "examples/Assimalign.Viu.WebApp", "--launch-profile", "Assimalign.Viu.WebApp"],
-      "port": 5229
+      "runtimeArgs": ["run", "--project", "../viu-examples/examples/Assimalign.Viu.Showcase"],
+      "port": 5178
     }
   ]
 }

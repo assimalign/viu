@@ -52,7 +52,7 @@ internal sealed class BufferedBrowserNodeOperations
     private readonly Func<string, int, int, string?, (int First, int Last)> _insertStaticContent;
     private readonly Func<int, string>? _snapshotHydration;
 
-    private Func<int, bool, BrowserEvent, int>? _previousDispatcher;
+    private BrowserEventInvokerRegistry? _previousInvokerRegistry;
     private BrowserDirectiveOperations? _previousDirectiveOperations;
     private DomTransitionOperations? _previousTransitionOperations;
     private bool _isActive;
@@ -190,10 +190,10 @@ internal sealed class BufferedBrowserNodeOperations
             return;
         }
         _isActive = true;
-        _previousDispatcher = BrowserNodeOperations.OverrideDispatcher;
+        _previousInvokerRegistry = BrowserNodeOperations.OverrideInvokerRegistry;
         _previousDirectiveOperations = BrowserDirectiveOperations.Current;
         _previousTransitionOperations = DomTransitionOperations.Current;
-        BrowserNodeOperations.OverrideDispatcher = _invokers.Dispatch;
+        BrowserNodeOperations.OverrideInvokerRegistry = _invokers;
         DomTransitionOperations.Current = BuildBufferedTransitionOperations(
             _previousTransitionOperations
                 ?? throw new InvalidOperationException(
@@ -228,7 +228,7 @@ internal sealed class BufferedBrowserNodeOperations
             return;
         }
         _isActive = false;
-        BrowserNodeOperations.OverrideDispatcher = _previousDispatcher;
+        BrowserNodeOperations.OverrideInvokerRegistry = _previousInvokerRegistry;
         BrowserDirectiveOperations.Current = _previousDirectiveOperations;
         DomTransitionOperations.Current = _previousTransitionOperations;
     }

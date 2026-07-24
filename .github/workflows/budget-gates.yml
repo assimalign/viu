@@ -1,16 +1,14 @@
 # WASM size, trimming, and AOT budget gates ([V01.01.12.06], #95): the Viu analog of
 # vuejs/core's size-check job (https://github.com/vuejs/core/blob/main/.github/workflows/size-data.yml).
-# Every published byte is network payload and every retained type is trimmer input, so these
-# gates enforce the framework's source-generator-first, reflection-free cost profile. Path-filtered
-# like the other area workflows; because the sample app pulls in every runtime area transitively, a
-# change to any library, the build system, or the gate's own files re-runs the gates.
+# The packaged-consumer showcase lives in assimalign/viu-examples. Consumer lanes check both
+# repositories out as siblings so its nuget.config resolves only the packages built into
+# viu/_out/packages, exactly like the supported local development loop.
 name: budget-gates
 
 on:
   push:
     branches: [main, 'release/**']
     paths:
-      - 'examples/**'
       - 'libraries/**'
       - 'frameworks/**'
       - 'sdks/**'
@@ -28,7 +26,6 @@ on:
   pull_request:
     branches: [main, 'release/**']
     paths:
-      - 'examples/**'
       - 'libraries/**'
       - 'frameworks/**'
       - 'sdks/**'
@@ -44,6 +41,9 @@ on:
       - '.github/actions/**'
       - '.github/workflows/budget-gates.yml'
 
+permissions:
+  contents: read
+
 jobs:
   gate-tests:
     name: budget gate tests
@@ -55,7 +55,7 @@ jobs:
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
 
-      # Fast, hermetic coverage of the gate's measurement/exclusion/gating/delta logic.
+      # Fast, hermetic coverage of the gate's measurement/exclusion/gating logic.
       # No publish here, so this lane needs no wasm-tools workload.
       - name: Build + test the budget gate
         run: dotnet test scripts/tests/Assimalign.Viu.PublishBudget.Tests/Assimalign.Viu.PublishBudget.Tests.csproj --configuration Release -warnaserror
@@ -64,102 +64,158 @@ jobs:
     name: publish-size + trimming gate
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Base-branch checkout is measured with the head script + head manifest so the delta is
-      # apples-to-apples. Informational only (best-effort): the head-vs-manifest budget below is
-      # the authoritative gate.
-      - name: Checkout base branch (for size delta)
-        if: github.event_name == 'pull_request'
+      - name: Checkout Viu
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base-tree
+          path: viu
+
+      - name: Checkout packaged-consumer showcase
+        uses: actions/checkout@v4
+        with:
+          repository: assimalign/viu-examples
+          path: viu-examples
+
+      # This conditional exists only to make the initial cross-repository migration mergeable:
+      # Viu lands first, then viu-examples can consume it. Once the external showcase is on main,
+      # this probe remains true and every subsequent Viu run enforces the gate normally.
+      - name: Detect packaged-consumer showcase
+        id: showcase
+        shell: pwsh
+        run: |
+          $project = Join-Path $env:GITHUB_WORKSPACE `
+            'viu-examples/examples/Assimalign.Viu.Showcase/Assimalign.Viu.Showcase.csproj'
+          $available = Test-Path -LiteralPath $project
+          "available=$($available.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if (-not $available) {
+            Write-Warning 'The external showcase has not landed yet; skipping this migration run.'
+          }
 
       - name: Set up .NET (with wasm-tools)
-        uses: ./.github/actions/setup-dotnet-wasm
+        if: steps.showcase.outputs.available == 'true'
+        uses: ./viu/.github/actions/setup-dotnet-wasm
         with:
+          repository-path: viu
           install-wasm-tools: 'true'
 
-      - name: Measure base branch (informational delta)
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
+      # The SDK target packs every shipping library so the showcase's opt-in Router
+      # PackageReferences also resolve from the local feed. The framework packs provide
+      # the implicit Assimalign.Viu.App framework reference used by the app SDK.
+      - name: Pack local SDK, libraries, and framework
+        if: steps.showcase.outputs.available == 'true'
         shell: pwsh
-        run: >-
-          ./scripts/Measure-PublishBudget.ps1
-          -RepositoryRoot base-tree
-          -NoGate
-          -ResultsPath _out/budgets/base-results.json
+        run: |
+          $feed = Join-Path $env:GITHUB_WORKSPACE 'viu/_out/packages'
+          dotnet pack ./viu/sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj `
+            --configuration Release `
+            -p:PackViuProjects=true `
+            "-p:PackageOutputPath=$feed"
+          if ($LASTEXITCODE -ne 0) { throw 'SDK and library pack failed.' }
 
-      # Publishes each sample trimmed and measures the brotli-compressed wwwroot payload against
-      # the manifest. This step is BOTH the size gate (fails on any exceedance) and the trimming
-      # gate: the samples publish with PublishTrimmed=true + TrimmerSingleWarn=false
-      # (examples/Directory.Build.props) and the script publishes with -warnaserror, so any
-      # ILLink/trim-analyzer warning across the sample and every shipping library in its closure
-      # fails the build. Budgets change only through an explicit edit to
-      # scripts/budgets/PublishBudgets.json (no silent ratcheting).
+          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj `
+            --configuration Release `
+            -p:RuntimeIdentifier=browser-wasm `
+            "-p:PackageOutputPath=$feed"
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime pack failed.' }
+
+          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj `
+            --configuration Release `
+            "-p:PackageOutputPath=$feed"
+          if ($LASTEXITCODE -ne 0) { throw 'Reference pack failed.' }
+
+      # Publishing with warnings as errors makes this both the payload-size gate and
+      # the trimming gate. The external project enables PublishTrimmed and full
+      # per-warning reporting; the manifest is the only place budgets are raised.
       - name: Publish (trimmed), measure size, enforce budget
+        if: steps.showcase.outputs.available == 'true'
         shell: pwsh
         run: >-
-          ./scripts/Measure-PublishBudget.ps1
-          -ResultsPath _out/budgets/head-results.json
-          -BaselineResultsPath _out/budgets/base-results.json
+          ./viu/scripts/Measure-PublishBudget.ps1
+          -RepositoryRoot ./viu
+          -ResultsPath ./viu/_out/budgets/head-results.json
 
       - name: Upload measurement results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: publish-budget-results
-          path: _out/budgets/*-results.json
+          path: viu/_out/budgets/head-results.json
           if-no-files-found: ignore
 
   aot:
     name: AOT compilation lane (optional)
-    # Optional cost-control lane. Runs on pushes to main and release branches (where branch
-    # protection can mark it a REQUIRED check), and on pull requests only when labelled
-    # 'aot-gate'. AOT relink is minutes-long, so it is not run on every PR by default.
+    # Optional cost-control lane. Runs on pushes to main and release branches, and
+    # on pull requests only when labelled 'aot-gate'.
     if: >-
       github.event_name == 'push' ||
       contains(github.event.pull_request.labels.*.name, 'aot-gate')
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
+      - name: Checkout Viu
         uses: actions/checkout@v4
+        with:
+          path: viu
+
+      - name: Checkout packaged-consumer showcase
+        uses: actions/checkout@v4
+        with:
+          repository: assimalign/viu-examples
+          path: viu-examples
+
+      - name: Detect packaged-consumer showcase
+        id: showcase
+        shell: pwsh
+        run: |
+          $project = Join-Path $env:GITHUB_WORKSPACE `
+            'viu-examples/examples/Assimalign.Viu.Showcase/Assimalign.Viu.Showcase.csproj'
+          $available = Test-Path -LiteralPath $project
+          "available=$($available.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if (-not $available) {
+            Write-Warning 'The external showcase has not landed yet; skipping this migration run.'
+          }
 
       - name: Set up .NET (with wasm-tools)
-        uses: ./.github/actions/setup-dotnet-wasm
+        if: steps.showcase.outputs.available == 'true'
+        uses: ./viu/.github/actions/setup-dotnet-wasm
         with:
+          repository-path: viu
           install-wasm-tools: 'true'
 
-      # RunAOTCompilation is enabled via the scoped -p:ViuRunAotCompilation=true property
-      # (examples/Directory.Build.props) so it does not flow to the netstandard2.0 generators.
-      # -warnaserror fails the build on any AOT compiler error or warning.
-      - name: Publish sample with AOT compilation
+      - name: Pack local SDK, libraries, and framework
+        if: steps.showcase.outputs.available == 'true'
+        shell: pwsh
+        run: |
+          $feed = Join-Path $env:GITHUB_WORKSPACE 'viu/_out/packages'
+          dotnet pack ./viu/sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj `
+            --configuration Release `
+            -p:PackViuProjects=true `
+            "-p:PackageOutputPath=$feed"
+          if ($LASTEXITCODE -ne 0) { throw 'SDK and library pack failed.' }
+
+          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj `
+            --configuration Release `
+            -p:RuntimeIdentifier=browser-wasm `
+            "-p:PackageOutputPath=$feed"
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime pack failed.' }
+
+          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj `
+            --configuration Release `
+            "-p:PackageOutputPath=$feed"
+          if ($LASTEXITCODE -ne 0) { throw 'Reference pack failed.' }
+
+      - name: Publish showcase with AOT compilation
+        if: steps.showcase.outputs.available == 'true'
         run: >-
-          dotnet publish examples/Assimalign.Viu.WebApp/Assimalign.Viu.WebApp.csproj
+          dotnet publish
+          ./viu-examples/examples/Assimalign.Viu.Showcase/Assimalign.Viu.Showcase.csproj
           --configuration Release
           -p:ViuRunAotCompilation=true
           -warnaserror
-          --output _out/budgets/aot
+          --output ./viu/_out/budgets/aot
 
   startup:
     name: startup-time gate (deferred, #87)
-    # WIRED-BUT-SKIPPED. The startup budget (time-to-first-render in a real headless browser) is
-    # a genuine gate requirement of [V01.01.12.06], but it depends on the Playwright end-to-end
-    # harness [V01.01.11.03] (#87), which is not built yet. A pure .NET timing harness is NOT an
-    # acceptable substitute (JS-interop initialization cost is part of what is budgeted), so no
-    # measurement is faked here. The job is skipped by default and turns on once the harness lands
-    # by setting the repository variable ENABLE_STARTUP_GATE=true.
-    #
-    # TODO([V01.01.11.03], #87): replace the placeholder step below with the real lane:
-    #   1. publish the sample trimmed (as the size job does);
-    #   2. serve wwwroot from a static file server;
-    #   3. drive it in headless Chromium/Firefox/WebKit via Microsoft.Playwright, measuring
-    #      time-to-first-render (navigation start -> first mounted DOM node) over enough
-    #      repetitions to be stable (e.g. median of >= 10 runs after a warm-up);
-    #   4. compare the median against startupBudgetMilliseconds in scripts/budgets/PublishBudgets.json
-    #      and fail on exceedance, mirroring the size gate's report + base-branch delta.
+    # WIRED-BUT-SKIPPED. Real startup timing must include browser and JS-interop
+    # initialization, so this remains disabled until the Playwright harness lands.
     if: ${{ vars.ENABLE_STARTUP_GATE == 'true' }}
     runs-on: ubuntu-24.04
     steps:

@@ -116,6 +116,56 @@ public sealed class DomCompiledRenderTests
         assembly.Length.ShouldBeGreaterThan(0);
     }
 
+    [Fact]
+    public void NativeVModel_CompiledRenderCarriesCurrentValueAndWorkingSetter()
+    {
+        // Browser v-model cannot use reflection to recover Vue's vnode.props["onUpdate:modelValue"]
+        // assigner. The generated directive tuple therefore carries the current value and assignment
+        // lambda explicitly. This executes the real generated render and proves the carrier writes a DOM
+        // edit back to the component model; a raw directive value compiled but left every runtime
+        // directive's Assign delegate null.
+        const string template = "@template {\n<input v-model=\"model\" />\n}\n";
+        const string handWritten =
+            "#nullable enable\n" +
+            "namespace Demo\n" +
+            "{\n" +
+            "    partial class NativeModelWidget\n" +
+            "    {\n" +
+            "        public object? model { get; set; } = \"initial\";\n" +
+            "    }\n" +
+            "}\n";
+
+        var generated = CompiledRenderSupport.Generate("NativeModelWidget", template);
+        generated.ShouldContain(
+            "new global::Assimalign.Viu.Browser.ViuModelBinding(_ctx.model, __event => { _ctx.model = __event; })");
+
+        var type = Assembly.Load(CompiledRenderSupport.CompileToAssembly(generated, handWritten))
+            .GetType("Demo.NativeModelWidget")
+            ?? throw new InvalidOperationException(
+                "The compiled assembly did not contain Demo.NativeModelWidget.");
+        var instance = Activator.CreateInstance(type, nonPublic: true)!;
+        var cacheSize = (int)type.GetField(
+            "RenderCacheSize",
+            BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetRawConstantValue()!;
+        var render = type.GetMethod(
+            "Render",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        object rendered =
+            render.Invoke(
+                null,
+                new object?[] { instance, new object?[cacheSize] })
+            ?? throw new InvalidOperationException(
+                "The generated render returned null.");
+        var element = rendered.ShouldBeAssignableTo<IElementComponent>();
+        var carrier = element.Directives.Single().Value.ShouldBeOfType<ViuModelBinding>();
+
+        carrier.Value.ShouldBe("initial");
+        carrier.Setter("updated");
+        type.GetProperty("model")!.GetValue(instance).ShouldBe("updated");
+    }
+
     // A template using the <Transition> built-in around a v-if element — the compiled-render proof for
     // [V01.01.04.07]: the compiler resolves <Transition> to the _Transition helper (DomRenderHelpers), and
     // the generated render binds and compiles against the real component.

@@ -265,7 +265,7 @@ public sealed class BufferedTransitionSequencingTests
             // Force BrowserNodeOperations' static constructor (which installs the bridge-backed transition
             // ops) to run BEFORE we install the recording fake, so buffered Activate captures the fake
             // rather than the bridge — the ctor would otherwise clobber Current mid-Activate.
-            _ = BrowserNodeOperations.OverrideDispatcher;
+            _ = BrowserNodeOperations.OverrideInvokerRegistry;
             _previousTransitionOperations = DomTransitionOperations.Current;
             DomTransitionOperations.Current = BuildRecordingDirectOperations();
 
