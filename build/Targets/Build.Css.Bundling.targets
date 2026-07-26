@@ -1,8 +1,9 @@
 <Project>
   <!--
-    Static-web-asset CSS bundling for .viu single-file components ([V01.01.12.12]) — the MSBuild half that
-    completes the RS1035 deferral recorded in libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source
-    generator emits C#, not content files; this task does the I/O a generator cannot).
+    Static-web-asset CSS bundling for canonical .viu and compatible .vue single-file components
+    ([V01.01.12.12]/[V01.01.06.09]) — the MSBuild half that completes the RS1035 deferral recorded in
+    libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
+    this task does the I/O a generator cannot).
 
     Imported LATE (via build/Build.targets -> Directory.Build.targets), after the consuming csproj has set
     $(ViuUseSingleFileComponents) — the same seam the generator's build props/targets rely on, so the
@@ -10,12 +11,19 @@
 
     Flow, gated on $(ViuBundleSingleFileComponentCss) (defaults to $(ViuUseSingleFileComponents)):
       1. _ViuResolveSingleFileComponentCssConfiguration — derive the intermediate bundle path/name.
-      2. _ViuBundleSingleFileComponentCss — Inputs/Outputs-incremental; runs the ViuBundleCss task,
-         which re-runs the shared deterministic core over the same **/*.viu inputs and writes the bundle
-         (only when its content actually changed).
-      3. ResolveViuSingleFileComponentCssAssets — registers the bundle as a Computed StaticWebAsset (the
+      2. _ViuCleanSingleFileComponentCssBundleWithoutInputs — removes an obsolete bundle when the final
+         component file itself was deleted and the incremental target therefore has no Inputs.
+      3. _ViuBundleSingleFileComponentCss — Inputs/Outputs-incremental; runs the ViuBundleCss task,
+         which re-runs the shared deterministic core over the same **/*.viu and **/*.vue inputs, writes the
+         bundle only when its content actually changed, and deletes an obsolete bundle after the final style
+         block is removed. A same-directory, same-base .viu input shadows its .vue peer.
+      4. ResolveViuSingleFileComponentCssAssets — registers the bundle as a Computed StaticWebAsset (the
          same DefineStaticWebAssets path Blazor scoped CSS uses for <App>.styles.css), so build/publish copy
          and fingerprint it and the dev host serves it. Runs just before ResolveStaticWebAssetsInputs.
+
+    Both component formats also flow to @(Watch), so dotnet watch observes edits and rebuilds the
+    generator/bundle pipeline. This target repeats the analyzer build-target wiring deliberately: either
+    integration may be consumed independently, and KeepDuplicates=false keeps their shared input set singular.
 
     FINGERPRINTING ([V01.01.12.12.03]): when the SDK's static-web-asset fingerprinting is on (the WASM /
     Blazor default, $(StaticWebAssetFingerprintingEnabled) == 'true') the bundle's logical URL carries the
@@ -49,10 +57,10 @@
   -->
 
   <PropertyGroup>
-    <!-- Master switch: bundle the .viu @style CSS into a static web asset. Defaults ON wherever single-file
+    <!-- Master switch: bundle single-file-component styles into a static web asset. Defaults ON wherever
          component generation is on, so the same one property opts a project into both. Set to false to keep
-         .viu compilation but skip physical bundling. Evaluated here (late) so $(ViuUseSingleFileComponents)
-         — set in the consuming csproj — is already known. -->
+         component compilation but skip physical bundling. Evaluated here (late) so
+         $(ViuUseSingleFileComponents) — set in the consuming csproj — is already known. -->
     <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == '' and '$(ViuUseSingleFileComponents)' == 'true'">true</ViuBundleSingleFileComponentCss>
     <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == ''">false</ViuBundleSingleFileComponentCss>
 
@@ -113,6 +121,23 @@
                       UndefineProperties="TargetFramework;RuntimeIdentifier" />
   </ItemGroup>
 
+  <!-- dotnet watch invokes $(CustomCollectWatchItems) after its core items are available. Extend that hook
+       instead of evaluating @(Watch) here so source-item metadata can be batched legally. The analyzer's
+       paired target adds the same files for generator-only consumers; KeepDuplicates=false makes the overlap
+       harmless for SDK consumers. -->
+  <PropertyGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'">
+    <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectSingleFileComponentCssWatchItems</CustomCollectWatchItems>
+  </PropertyGroup>
+
+  <Target Name="_ViuCollectSingleFileComponentCssWatchItems"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'">
+    <ItemGroup>
+      <Watch Include="%(ViuSingleFileComponent.FullPath)"
+             Condition="'%(ViuSingleFileComponent.Watch)' != 'false'"
+             KeepDuplicates="false" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="_ViuResolveSingleFileComponentCssConfiguration"
           Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'"
           DependsOnTargets="ResolveStaticWebAssetsConfiguration">
@@ -141,25 +166,70 @@
       <ViuSingleFileComponentCssBundleFingerprintExpression Condition="'$(ViuSingleFileComponentCssBundleFingerprintExpression)' == ''">$(ViuSingleFileComponentCssBundleBaseName)#[.{fingerprint}]?$(ViuSingleFileComponentCssBundleExtension)</ViuSingleFileComponentCssBundleFingerprintExpression>
       <_ViuCssBundleContentRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)viu\'))</_ViuCssBundleContentRoot>
       <_ViuCssBundlePath>$(_ViuCssBundleContentRoot)$(ViuSingleFileComponentCssBundleName)</_ViuCssBundlePath>
+      <_ViuCssHotReloadEmptyBundleMarkerPath>$(_ViuCssBundlePath).hot-reload-empty</_ViuCssHotReloadEmptyBundleMarkerPath>
+      <_ViuPreserveCssHotReloadEmptyBundle>false</_ViuPreserveCssHotReloadEmptyBundle>
+      <_ViuPreserveCssHotReloadEmptyBundle Condition="'$(ViuCssHotReloadWorker)' == 'true'">true</_ViuPreserveCssHotReloadEmptyBundle>
+      <!-- Seed the availability state before the incremental target runs. If MSBuild skips that target
+           because its Inputs/Outputs are current, this preserves the existing bundle's registration. When
+           the task does run, its BundleExists output replaces this value after a write, no-op, or deletion. -->
+      <_ViuCssBundleExists Condition="Exists('$(_ViuCssBundlePath)')">true</_ViuCssBundleExists>
+      <_ViuCssBundleExists Condition="!Exists('$(_ViuCssBundlePath)')">false</_ViuCssBundleExists>
     </PropertyGroup>
+  </Target>
+
+  <!-- A zero-byte bundle is retained only long enough for dotnet watch to send the final-rule removal
+       through its static-file update transport. Ordinary build/publish semantics delete that tombstone
+       before the incremental Inputs/Outputs decision, then either rebuild real CSS or leave no asset. -->
+  <Target Name="_ViuRemoveSingleFileComponentCssHotReloadTombstone"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuCssHotReloadWorker)' != 'true' and Exists('$(_ViuCssHotReloadEmptyBundleMarkerPath)')"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration">
+    <Delete Files="$(_ViuCssBundlePath);$(_ViuCssHotReloadEmptyBundleMarkerPath)" />
+    <PropertyGroup>
+      <_ViuCssBundleExists>false</_ViuCssBundleExists>
+    </PropertyGroup>
+  </Target>
+
+  <!-- MSBuild skips an Inputs/Outputs target outright when its Inputs list is empty, even if an output from
+       an earlier build still exists. Dependency targets run before that incremental decision, so this
+       deliberately ungated cleanup pass handles the zero-component transition. It invokes ViuBundleCss only
+       when a stale file actually exists; normal projects with inputs and already-clean empty projects remain
+       no-ops, while the deletion and output-state contract stays centralized in the task. -->
+  <Target Name="_ViuCleanSingleFileComponentCssBundleWithoutInputs"
+          Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration;_ViuRemoveSingleFileComponentCssHotReloadTombstone">
+    <ViuBundleCss Condition="'@(ViuSingleFileComponent)' == '' and Exists('$(_ViuCssBundlePath)')"
+                  SingleFileComponents="@(ViuSingleFileComponent)"
+                  ProjectDirectory="$(ProjectDir)"
+                  BundleOutputPath="$(_ViuCssBundlePath)"
+                  PreserveEmptyBundleOnRemoval="$(_ViuPreserveCssHotReloadEmptyBundle)"
+                  EmptyBundleMarkerPath="$(_ViuCssHotReloadEmptyBundleMarkerPath)">
+      <Output TaskParameter="BundlePath" PropertyName="_ViuCssBundleWrittenPath" />
+      <Output TaskParameter="BundleWritten" PropertyName="_ViuCssBundleWasWritten" />
+      <Output TaskParameter="BundleExists" PropertyName="_ViuCssBundleExists" />
+    </ViuBundleCss>
   </Target>
 
   <!-- Run the task. Inputs/Outputs make a no-input-change rebuild a no-op at the MSBuild level; the task
        ALSO content-compares and skips the write when the bytes are unchanged, so the timestamp only moves on
-       a real change. Both layers satisfy the incremental acceptance criterion. -->
+       a real change. The dependency cleanup above runs before MSBuild makes its zero-Inputs skip decision.
+       Both layers satisfy the incremental acceptance criterion. -->
   <Target Name="_ViuBundleSingleFileComponentCss"
           Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
-          DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration"
+          DependsOnTargets="_ViuCleanSingleFileComponentCssBundleWithoutInputs"
           Inputs="@(ViuSingleFileComponent)"
           Outputs="$(_ViuCssBundlePath)">
     <ViuBundleCss SingleFileComponents="@(ViuSingleFileComponent)"
                     ProjectDirectory="$(ProjectDir)"
-                    BundleOutputPath="$(_ViuCssBundlePath)">
+                    BundleOutputPath="$(_ViuCssBundlePath)"
+                    PreserveEmptyBundleOnRemoval="$(_ViuPreserveCssHotReloadEmptyBundle)"
+                    EmptyBundleMarkerPath="$(_ViuCssHotReloadEmptyBundleMarkerPath)">
       <Output TaskParameter="BundlePath" PropertyName="_ViuCssBundleWrittenPath" />
       <Output TaskParameter="BundleWritten" PropertyName="_ViuCssBundleWasWritten" />
+      <Output TaskParameter="BundleExists" PropertyName="_ViuCssBundleExists" />
     </ViuBundleCss>
     <ItemGroup>
-      <FileWrites Include="$(_ViuCssBundlePath)" Condition="Exists('$(_ViuCssBundlePath)')" />
+      <FileWrites Include="$(_ViuCssBundlePath)"
+                  Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')" />
     </ItemGroup>
   </Target>
 
@@ -172,7 +242,7 @@
           Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
           BeforeTargets="ResolveStaticWebAssetsInputs"
           DependsOnTargets="_ViuBundleSingleFileComponentCss">
-    <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
+    <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
       <_ViuCssBundleStaticWebAssetCandidate Include="$(_ViuCssBundlePath)">
         <!-- Fingerprint the served URL when the SDK's static-web-asset fingerprinting is on (the WASM/Blazor
              default). DefineStaticWebAssets replaces the #[.{fingerprint}] token with a deterministic content
@@ -276,7 +346,7 @@
           Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
           BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
           DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkBuildRewriteDependency)">
-    <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
+    <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
       <_ViuCssLinkHostPageBuild Include="@(StaticWebAsset)"
                                 Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Publish'" />
     </ItemGroup>
@@ -340,7 +410,7 @@
           Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
           BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
           DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkPublishRewriteDependency)">
-    <ItemGroup Condition="Exists('$(_ViuCssBundlePath)')">
+    <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
       <_ViuCssLinkHostPagePublish Include="@(StaticWebAsset)"
                                   Condition="'%(Extension)' == '.html' and '%(AssetKind)' != 'Build'" />
     </ItemGroup>

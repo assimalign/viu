@@ -1,6 +1,13 @@
 <Project>
     <PropertyGroup>
         <_ViuSdk>true</_ViuSdk>
+        <!--
+            Public project-system marker used by the Visual Studio extension's activation
+            constraint. This keeps the .vue compatibility document filter dormant in solutions
+            that do not contain a Viu SDK project. A consumer may opt out without disabling the
+            build-time SDK by setting the property to false in the project body.
+        -->
+        <ViuVisualStudioLanguageServiceEnabled Condition="'$(ViuVisualStudioLanguageServiceEnabled)' == ''">true</ViuVisualStudioLanguageServiceEnabled>
 
         <!--
             Single-file components on by default: <Project Sdk="Assimalign.Viu.Sdk">
@@ -19,6 +26,18 @@
             dormant.
         -->
         <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuBundleCssTaskAssembly>
+        <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(MSBuildThisFileDirectory)..\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
+
+        <!--
+            Microsoft.NET.Sdk.WebAssembly defaults PublishTrimmed to true for every
+            configuration. Microsoft.NET.ILLink consequently defaults metadata updates
+            off even though the base SDK deliberately leaves the Debug default enabled,
+            which leaves MetadataUpdater.IsSupported false under dotnet watch. Keep the Debug
+            interpreter updateable while preserving the WebAssembly SDK's trimmed
+            Release and AOT defaults. A consumer assignment in the project body remains
+            authoritative because it is evaluated after this SDK prop.
+        -->
+        <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>
 
         <!--
             The Assimalign.Viu.App framework libraries opt into runtime preview

@@ -1,0 +1,389 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Threading;
+
+using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
+
+namespace Assimalign.Viu.Sdk.Tasks;
+
+/// <summary>
+/// Starts the development-only Viu CSS regeneration worker for a
+/// <c>dotnet watch</c> session.
+/// </summary>
+/// <remarks>
+/// The task waits until the worker records its process identity before returning. This lets the worker
+/// capture the owning <c>dotnet watch</c> process while the short-lived watch-list MSBuild process is
+/// still alive. A project-scoped state file and the worker's named mutex prevent duplicate workers.
+/// </remarks>
+public sealed class ViuStartCssHotReloadWorker : Microsoft.Build.Utilities.Task
+{
+    /// <summary>
+    /// Gets or sets the absolute path to the worker assembly.
+    /// </summary>
+    [Required]
+    public string WorkerAssemblyPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the absolute path to the consuming project.
+    /// </summary>
+    [Required]
+    public string ProjectPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the consuming project's absolute directory.
+    /// </summary>
+    [Required]
+    public string ProjectDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the project-scoped worker state file.
+    /// </summary>
+    [Required]
+    public string StateFilePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets an optional diagnostic event-log path used by deterministic integration tests.
+    /// </summary>
+    public string EventLogPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the optional compiler-produced utility dependency manifest.
+    /// </summary>
+    public string DependencyManifestPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the .NET host used to run the worker and nested MSBuild regeneration.
+    /// </summary>
+    public string DotNetHostPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the active build configuration.
+    /// </summary>
+    public string Configuration { get; set; } = "Debug";
+
+    /// <summary>
+    /// Gets or sets the active target framework, when one was selected.
+    /// </summary>
+    public string TargetFramework { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the active runtime identifier, when one was selected.
+    /// </summary>
+    public string RuntimeIdentifier { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets whether component <c>.viu</c> and <c>.vue</c> inputs are watched.
+    /// </summary>
+    public bool WatchComponents { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether utility candidates are discovered from markup files.
+    /// </summary>
+    public bool WatchUtilityMarkup { get; set; }
+
+    /// <summary>
+    /// Gets or sets exact additional input files watched by the worker.
+    /// </summary>
+    public ITaskItem[] WatchFiles { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>
+    /// Gets or sets project directories excluded from recursive observation.
+    /// </summary>
+    public ITaskItem[] ExcludedDirectories { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>
+    /// Gets or sets the quiet-period duration used to coalesce one editor save into one regeneration.
+    /// </summary>
+    public int DebounceMilliseconds { get; set; } = 100;
+
+    /// <inheritdoc />
+    public override bool Execute()
+    {
+        if (TryReadLiveWorker(StateFilePath, out var existingProcessIdentifier))
+        {
+            Log.LogMessage(
+                MessageImportance.Low,
+                "Viu CSS Hot Reload worker {0} is already active for {1}.",
+                existingProcessIdentifier,
+                ProjectPath);
+            return true;
+        }
+
+        try
+        {
+            if (File.Exists(StateFilePath))
+            {
+                File.Delete(StateFilePath);
+            }
+
+            if (!File.Exists(WorkerAssemblyPath))
+            {
+                Log.LogError(
+                    "Viu CSS Hot Reload worker assembly was not found at '{0}'.",
+                    WorkerAssemblyPath);
+                return false;
+            }
+
+            if (!File.Exists(ProjectPath))
+            {
+                Log.LogError(
+                    "Viu CSS Hot Reload project was not found at '{0}'.",
+                    ProjectPath);
+                return false;
+            }
+
+            var stateDirectory = Path.GetDirectoryName(StateFilePath);
+            if (!string.IsNullOrEmpty(stateDirectory))
+            {
+                Directory.CreateDirectory(stateDirectory);
+            }
+
+            var startInfo = CreateStartInfo();
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                Log.LogError("Viu CSS Hot Reload worker could not be started.");
+                return false;
+            }
+
+            var readyDeadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < readyDeadline)
+            {
+                if (TryReadLiveWorker(StateFilePath, out var workerProcessIdentifier))
+                {
+                    Log.LogMessage(
+                        MessageImportance.Normal,
+                        "Viu CSS Hot Reload worker {0} is watching {1}.",
+                        workerProcessIdentifier,
+                        ProjectDirectory);
+                    return true;
+                }
+
+                if (process.HasExited)
+                {
+                    Log.LogError(
+                        "Viu CSS Hot Reload worker exited before initialization with code {0}.",
+                        process.ExitCode);
+                    return false;
+                }
+
+                Thread.Sleep(25);
+            }
+
+            Log.LogError(
+                "Viu CSS Hot Reload worker did not initialize within five seconds.");
+            return false;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or
+                InvalidOperationException or
+                IOException or
+                UnauthorizedAccessException)
+        {
+            Log.LogErrorFromException(exception, showStackTrace: false);
+            return false;
+        }
+    }
+
+    private ProcessStartInfo CreateStartInfo()
+    {
+        var dotNetHostPath = DotNetHostPath;
+        if (string.IsNullOrWhiteSpace(dotNetHostPath))
+        {
+            dotNetHostPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        }
+
+        if (string.IsNullOrWhiteSpace(dotNetHostPath))
+        {
+            dotNetHostPath = "dotnet";
+        }
+
+        var arguments = new List<string>
+        {
+            WorkerAssemblyPath,
+            "--project",
+            ProjectPath,
+            "--project-directory",
+            ProjectDirectory,
+            "--dotnet-host",
+            dotNetHostPath,
+            "--configuration",
+            Configuration,
+            "--state-file",
+            StateFilePath,
+            "--launcher-process-id",
+            GetCurrentProcessIdentifier().ToString(CultureInfo.InvariantCulture),
+            "--debounce-milliseconds",
+            Math.Max(1, DebounceMilliseconds).ToString(CultureInfo.InvariantCulture),
+        };
+
+        AddOptionalArgument(arguments, "--target-framework", TargetFramework);
+        AddOptionalArgument(arguments, "--runtime-identifier", RuntimeIdentifier);
+        AddOptionalArgument(arguments, "--event-log", EventLogPath);
+        AddOptionalArgument(
+            arguments,
+            "--dependency-manifest",
+            DependencyManifestPath);
+        if (WatchComponents)
+        {
+            arguments.Add("--watch-components");
+        }
+
+        if (WatchUtilityMarkup)
+        {
+            arguments.Add("--watch-utility-markup");
+        }
+
+        AddItemArguments(arguments, "--watch-file", WatchFiles);
+        AddItemArguments(arguments, "--exclude-directory", ExcludedDirectories);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = dotNetHostPath,
+            Arguments = JoinArguments(arguments),
+            WorkingDirectory = ProjectDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        startInfo.EnvironmentVariables["VIU_CSS_HOT_RELOAD_WORKER"] = "1";
+        return startInfo;
+    }
+
+    private static int GetCurrentProcessIdentifier()
+    {
+        using var process = Process.GetCurrentProcess();
+        return process.Id;
+    }
+
+    private static bool TryReadLiveWorker(
+        string stateFilePath,
+        out int processIdentifier)
+    {
+        processIdentifier = 0;
+        try
+        {
+            if (!File.Exists(stateFilePath))
+            {
+                return false;
+            }
+
+            var processStartTicks = 0L;
+            foreach (var line in File.ReadAllLines(stateFilePath))
+            {
+                if (line.StartsWith("worker=", StringComparison.Ordinal))
+                {
+                    int.TryParse(
+                        line.Substring("worker=".Length),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out processIdentifier);
+                }
+                else if (line.StartsWith("worker-start=", StringComparison.Ordinal))
+                {
+                    long.TryParse(
+                        line.Substring("worker-start=".Length),
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out processStartTicks);
+                }
+            }
+
+            if (processIdentifier <= 0 || processStartTicks <= 0)
+            {
+                return false;
+            }
+
+            using var process = Process.GetProcessById(processIdentifier);
+            return !process.HasExited &&
+                process.StartTime.ToUniversalTime().Ticks == processStartTicks;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or
+                InvalidOperationException or
+                IOException or
+                UnauthorizedAccessException)
+        {
+            processIdentifier = 0;
+            return false;
+        }
+    }
+
+    private static void AddOptionalArgument(
+        ICollection<string> arguments,
+        string option,
+        string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            arguments.Add(option);
+            arguments.Add(value);
+        }
+    }
+
+    private static void AddItemArguments(
+        ICollection<string> arguments,
+        string option,
+        IEnumerable<ITaskItem> items)
+    {
+        foreach (var item in items)
+        {
+            if (item is null || string.IsNullOrWhiteSpace(item.ItemSpec))
+            {
+                continue;
+            }
+
+            arguments.Add(option);
+            arguments.Add(item.ItemSpec);
+        }
+    }
+
+    private static string JoinArguments(IEnumerable<string> arguments)
+    {
+        var builder = new StringBuilder();
+        foreach (var argument in arguments)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append(' ');
+            }
+
+            AppendQuotedArgument(builder, argument);
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendQuotedArgument(StringBuilder builder, string argument)
+    {
+        builder.Append('"');
+        var backslashCount = 0;
+        foreach (var character in argument)
+        {
+            if (character == '\\')
+            {
+                backslashCount++;
+                continue;
+            }
+
+            if (character == '"')
+            {
+                builder.Append('\\', (backslashCount * 2) + 1);
+                builder.Append('"');
+                backslashCount = 0;
+                continue;
+            }
+
+            builder.Append('\\', backslashCount);
+            builder.Append(character);
+            backslashCount = 0;
+        }
+
+        builder.Append('\\', backslashCount * 2);
+        builder.Append('"');
+    }
+}

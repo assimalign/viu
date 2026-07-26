@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.LanguageService;
 
 /// <summary>
-/// Provides editor-neutral language features for open <c>.viu</c> documents.
+/// Provides editor-neutral language features for open Viu single-file-component documents.
 /// </summary>
 public interface IViuLanguageService
 {

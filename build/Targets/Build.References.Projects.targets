@@ -2,7 +2,7 @@
     <!--
         Project Reference By Name Only.
 
-        Lets a library/example/analyzer csproj reference another project by its
+        Lets a library/example/analyzer/SDK csproj reference another project by its
         assembly name instead of by relative csproj path. Resolution walks the
         repository's code areas once, matches each item's Include to the csproj whose filename
         matches, and emits a regular <ProjectReference Include="<resolved-path>" />
@@ -38,6 +38,10 @@
              against, so a generator's own snapshot tests resolve it as a ViuPrivateProjectReference. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)libraries\**\*.csproj" />
         <_ViuProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <!-- SDK tasks and development tools are code projects too. Indexing them lets an SDK
+             pack producer express build-order-only edges by assembly name while retaining any
+             explicit ReferenceOutputAssembly/SkipGetTargetFrameworkProperties metadata. -->
+        <_ViuProject Include="$(ViuRepositoryDirectory)sdks\**\*.csproj" />
         <!-- Visual Studio hosts and their editor-neutral language services are developed together
              under extensions/ and use the same by-name reference conventions as other code areas. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)extensions\**\*.csproj" />

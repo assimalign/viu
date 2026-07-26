@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.LanguageServer" />
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.UtilityCss" />
   </ItemGroup>
 </Project>

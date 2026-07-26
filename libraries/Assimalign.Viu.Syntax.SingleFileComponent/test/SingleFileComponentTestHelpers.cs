@@ -40,6 +40,35 @@ internal static class SingleFileComponentTestHelpers
         }
     }
 
+    /// <summary>Enumerates every tag-based block, including ordinary and setup script slots.</summary>
+    public static IEnumerable<SingleFileComponentBlock> AllBlocks(VueSingleFileComponentDescriptor descriptor)
+    {
+        if (descriptor.Template is not null)
+        {
+            yield return descriptor.Template;
+        }
+
+        if (descriptor.Script is not null)
+        {
+            yield return descriptor.Script;
+        }
+
+        if (descriptor.ScriptSetup is not null)
+        {
+            yield return descriptor.ScriptSetup;
+        }
+
+        foreach (var style in descriptor.Styles)
+        {
+            yield return style;
+        }
+
+        foreach (var custom in descriptor.CustomBlocks)
+        {
+            yield return custom;
+        }
+    }
+
     /// <summary>
     /// Asserts the [V01.01.06.01] span contract for every span the parser emits: for every block (whole
     /// and content region), every option, and every diagnostic, <c>Location.Source</c> equals the exact
@@ -48,8 +77,21 @@ internal static class SingleFileComponentTestHelpers
     /// </summary>
     public static void AssertAllSpansExact(SingleFileComponentParseResult result)
     {
-        var source = result.Descriptor.Source;
-        foreach (var block in AllBlocks(result.Descriptor))
+        AssertAllSpansExact(result.Descriptor.Source, AllBlocks(result.Descriptor), result.Errors);
+    }
+
+    /// <summary>Asserts the exact-span contract for a tag-based parser result.</summary>
+    public static void AssertAllSpansExact(VueSingleFileComponentParseResult result)
+    {
+        AssertAllSpansExact(result.Descriptor.Source, AllBlocks(result.Descriptor), result.Errors);
+    }
+
+    private static void AssertAllSpansExact(
+        string source,
+        IEnumerable<SingleFileComponentBlock> blocks,
+        IEnumerable<SingleFileComponentError> errors)
+    {
+        foreach (var block in blocks)
         {
             AssertSpan(block.Location, source);
             AssertSpan(block.ContentLocation, source);
@@ -60,7 +102,7 @@ internal static class SingleFileComponentTestHelpers
             }
         }
 
-        foreach (var error in result.Errors)
+        foreach (var error in errors)
         {
             AssertSpan(error.Location, source);
         }

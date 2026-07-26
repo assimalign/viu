@@ -12,7 +12,7 @@ internal static class SingleFileComponentErrorMessages
     private static readonly Dictionary<SingleFileComponentErrorCode, string> Messages = new()
     {
         [SingleFileComponentErrorCode.StrayTopLevelContent] =
-            "Stray content outside any block. Text must live inside an @template, @script, @style, or custom block.",
+            "Stray content outside any single-file-component block.",
         [SingleFileComponentErrorCode.MalformedBlockHeader] =
             "Malformed block header. A block opens with '@<name>' at column 0.",
         [SingleFileComponentErrorCode.MissingOpeningBrace] =
@@ -22,11 +22,23 @@ internal static class SingleFileComponentErrorMessages
         [SingleFileComponentErrorCode.MalformedOptionValue] =
             "Malformed option value. Option values must be double-quoted, e.g. lang=\"scss\".",
         [SingleFileComponentErrorCode.DuplicateTemplateBlock] =
-            "Duplicate @template block. A .viu file may contain at most one @template.",
+            "Duplicate template block. A single-file component may contain at most one template block.",
         [SingleFileComponentErrorCode.DuplicateScriptBlock] =
-            "Duplicate @script block. A .viu file may contain at most one @script.",
+            "Duplicate script block. A single-file component may contain at most one script block.",
         [SingleFileComponentErrorCode.UnterminatedBlock] =
             "Unterminated block. Expected a closing '}' at column 0 before end of file.",
+        [SingleFileComponentErrorCode.MalformedTagBlock] =
+            "Malformed tag-based block. Expected a complete top-level opening tag.",
+        [SingleFileComponentErrorCode.MalformedTagAttribute] =
+            "Malformed top-level block attribute. Expected a name with an optional quoted or unquoted value.",
+        [SingleFileComponentErrorCode.UnexpectedClosingTag] =
+            "Unexpected top-level closing tag without a corresponding opening block.",
+        [SingleFileComponentErrorCode.UnterminatedTagBlock] =
+            "Unterminated tag-based block. Expected a matching closing tag before end of file.",
+        [SingleFileComponentErrorCode.DuplicateTagAttribute] =
+            "Duplicate attribute on a top-level tag-based block.",
+        [SingleFileComponentErrorCode.DuplicateScriptSetupBlock] =
+            "Duplicate script setup block. A .vue single-file component may contain at most one script setup block.",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>

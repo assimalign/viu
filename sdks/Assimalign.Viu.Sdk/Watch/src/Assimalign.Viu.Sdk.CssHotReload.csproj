@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <!-- The SDK launches this worker through `dotnet <assembly>`. Suppressing the native apphost
+         keeps one platform-neutral Watch payload when the SDK is packed on Linux or Windows. -->
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <OutDir>$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Watch\</OutDir>
+  </PropertyGroup>
+</Project>

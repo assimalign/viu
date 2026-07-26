@@ -7,8 +7,8 @@ Area workflows only build and test their part of the repository; they never publ
 
 | Event | NuGet packages | Visual Studio extension |
 | --- | --- | --- |
-| Merged pull request into `main` | All 20 packages publish to the Assimalign GitHub Packages feed as `X.Y.Z-beta.<run-number>` | Publishes the next numeric VSIX version only when `extensions/VisualStudio/` changed |
-| Published stable GitHub Release | All 20 packages publish to nuget.org as the stable release version | No publication |
+| Merged pull request into `main` | All 21 packages publish to the Assimalign GitHub Packages feed as `X.Y.Z-beta.<run-number>` | Publishes the next numeric VSIX version when the extension or an embedded language-engine dependency changed |
+| Published stable GitHub Release | All 21 packages publish to nuget.org as the stable release version | No publication |
 | Draft or prerelease GitHub Release | No publication | No publication |
 
 The two source generators remain embedded in the SDK and targeting pack. Their projects are

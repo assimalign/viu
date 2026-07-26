@@ -15,6 +15,8 @@ internal sealed class MountedComponent : IDisposable
 {
     private readonly IComponentTemplate _template;
     private readonly ComponentRenderer _renderer;
+    private readonly IComponentHotReloadMetadata? _hotReloadMetadata;
+    private IDisposable? _hotReloadRegistration;
     private bool _isDisposed;
 
     private MountedComponent(
@@ -25,6 +27,7 @@ internal sealed class MountedComponent : IDisposable
         _template = template;
         Context = context;
         _renderer = renderer;
+        _hotReloadMetadata = template as IComponentHotReloadMetadata;
     }
 
     internal ComponentContext Context { get; }
@@ -133,7 +136,8 @@ internal sealed class MountedComponent : IDisposable
         try
         {
             IComponent? component = Context.Scope.Run(
-                () => Context.Run(() => _renderer()));
+                () => Context.Run(
+                    () => _renderer()));
             return ApplyRootBehavior(component ?? ComponentTree.Comment());
         }
         catch (Exception exception)
@@ -240,6 +244,21 @@ internal sealed class MountedComponent : IDisposable
             });
     }
 
+    internal void RegisterHotReload(Action resetComponentUpdate)
+    {
+        ArgumentNullException.ThrowIfNull(resetComponentUpdate);
+        if (_hotReloadMetadata is not { } metadata)
+        {
+            return;
+        }
+
+        _hotReloadRegistration?.Dispose();
+        _hotReloadRegistration = ComponentHotReload.Register(
+            _template.GetType(),
+            metadata,
+            resetComponentUpdate);
+    }
+
     internal void Update(ITemplateComponent request)
     {
         Context.Update(request);
@@ -339,6 +358,8 @@ internal sealed class MountedComponent : IDisposable
         }
 
         _isDisposed = true;
+        _hotReloadRegistration?.Dispose();
+        _hotReloadRegistration = null;
         Context.Lifecycle.Dispose();
         if (_template is IDisposable disposable)
         {

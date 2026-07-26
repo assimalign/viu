@@ -715,6 +715,8 @@ public sealed partial class Renderer<TNode>
             instance.Context.KeyedChildElementResolver =
                 () => GetKeyedChildElementSnapshots(mounted.Subtree);
             instance.Context.HostCommitScheduler = QueueHostCommit;
+            instance.RegisterHotReload(
+                () => ResetTemplateForHotReload(tree, mounted));
             Register(tree, component, mounted);
             UpdateReference(
                 tree,

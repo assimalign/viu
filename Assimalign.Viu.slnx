@@ -59,6 +59,7 @@
 		<File Path=".github/workflows/area-shared.yml" />
 		<File Path=".github/workflows/area-syntax.yml" />
 		<File Path=".github/workflows/area-testing.yml" />
+		<File Path=".github/workflows/area-utility-css.yml" />
 		<File Path=".github/workflows/area-visual-studio.yml" />
 		<File Path=".github/workflows/benchmarks.yml" />
 		<File Path=".github/workflows/budget-gates.yml" />
@@ -132,6 +133,10 @@
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Tasks/">
 		<Project Path="sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj" />
 	</Folder>
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Watch/">
+		<Project Path="sdks/Assimalign.Viu.Sdk/Watch/src/Assimalign.Viu.Sdk.CssHotReload.csproj" />
+		<Project Path="sdks/Assimalign.Viu.Sdk/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.Benchmarks/">
 		<Project Path="benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj" />
 	</Folder>
@@ -144,6 +149,7 @@
 	<Folder Name="/viu/scripts/">
 		<File Path="scripts/Install-Local.ps1" />
 		<File Path="scripts/Measure-PublishBudget.ps1" />
+		<File Path="scripts/Test-UtilityCssIndependence.ps1" />
 	</Folder>
 	<Folder Name="/viu/scripts/budgets/">
 		<File Path="scripts/budgets/PublishBudgets.json" />
@@ -245,6 +251,17 @@
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.Css/test/">
 		<Project Path="libraries/Assimalign.Viu.Tooling.Css/test/Assimalign.Viu.Tooling.Css.Tests.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.UtilityCss/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.UtilityCss/docs/">
+		<File Path="libraries/Assimalign.Viu.Tooling.UtilityCss/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Tooling.UtilityCss/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.UtilityCss/src/">
+		<Project Path="libraries/Assimalign.Viu.Tooling.UtilityCss/src/Assimalign.Viu.Tooling.UtilityCss.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.UtilityCss/test/">
+		<Project Path="libraries/Assimalign.Viu.Tooling.UtilityCss/test/Assimalign.Viu.Tooling.UtilityCss.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/docs/">

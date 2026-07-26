@@ -112,8 +112,10 @@ internal static class ScriptBlockAnalyzer
 
         string? usingRegion = null;
         var usingRegionStartLine = 0;
+        var usingRegionStartColumn = 0;
         var memberRegionText = content;
         var memberRegionStartLine = contentStart.Line;
+        var memberRegionStartColumn = contentStart.Column;
         var memberRegionOffset = 0;
 
         if (leadingUsings.Count > 0)
@@ -131,8 +133,10 @@ internal static class ScriptBlockAnalyzer
 
             usingRegion = content.Substring(0, splitOffset);
             usingRegionStartLine = contentStart.Line;
+            usingRegionStartColumn = contentStart.Column;
             memberRegionText = content.Substring(splitOffset);
             memberRegionStartLine = contentStart.Line + memberLineIndex;
+            memberRegionStartColumn = 1;
             memberRegionOffset = splitOffset;
 
             // Validate the hoisted using region. Parsed bare (no probe wrapper), its Roslyn positions are
@@ -151,7 +155,10 @@ internal static class ScriptBlockAnalyzer
         {
             // The member region begins at a .viu line boundary (column 1); compose diagnostics and the
             // classification against that position through the synthetic partial-class probe.
-            var memberRegionStart = new Position(contentStart.Offset + memberRegionOffset, memberRegionStartLine, 1);
+            var memberRegionStart = new Position(
+                contentStart.Offset + memberRegionOffset,
+                memberRegionStartLine,
+                memberRegionStartColumn);
             bindings = ClassifyMembers(
                 memberRegion,
                 filePath,
@@ -163,8 +170,10 @@ internal static class ScriptBlockAnalyzer
         var regions = new ScriptRegions(
             usingRegion,
             usingRegionStartLine,
+            usingRegionStartColumn,
             memberRegion,
-            memberRegion is null ? 0 : memberRegionStartLine);
+            memberRegion is null ? 0 : memberRegionStartLine,
+            memberRegion is null ? 0 : memberRegionStartColumn);
         return new ScriptAnalysis(regions, bindings);
     }
 

@@ -31,10 +31,32 @@ internal sealed class ViuLanguageServerProvider : LanguageServerProvider
         BaseDocumentType = LanguageServerBaseDocumentType,
     };
 
+    /// <summary>
+    /// Gets the tag-based <c>.vue</c> compatibility document type required by Visual Studio's
+    /// language-server provider contract.
+    /// </summary>
+    /// <remarks>
+    /// Visual Studio requires an applicable document type and cannot express an owning-project
+    /// build-property condition in that filter. The language server performs the final
+    /// per-document Viu-project check before opening or serving the document.
+    /// </remarks>
+    [VisualStudioContribution]
+    public static DocumentTypeConfiguration VueCompatibilityDocumentType => new("viu-vue")
+    {
+        FileExtensions = [".vue"],
+        BaseDocumentType = LanguageServerBaseDocumentType,
+    };
+
     /// <inheritdoc />
     public override LanguageServerProviderConfiguration LanguageServerProviderConfiguration => new(
         "%Assimalign.Viu.VisualStudio.LanguageServer.DisplayName%",
-        [DocumentFilter.FromDocumentType(ViuDocumentType)]);
+        [
+            DocumentFilter.FromDocumentType(ViuDocumentType),
+            // [V01.01.06.09] is a narrow format deviation. Visual Studio applies this document type
+            // solution-wide; the server's owning-project gate prevents non-Viu Vue documents from
+            // reaching any Viu language feature.
+            DocumentFilter.FromDocumentType(VueCompatibilityDocumentType),
+        ]);
 
     /// <inheritdoc />
     public override Task<IDuplexPipe?> CreateServerConnectionAsync(

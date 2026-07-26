@@ -118,6 +118,7 @@ $libraryPackageIds = @(
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',
     'Assimalign.Viu.Tooling.Css',
+    'Assimalign.Viu.Tooling.UtilityCss',
     'Assimalign.Viu.Core',
     'Assimalign.Viu.Browser',
     'Assimalign.Viu.ServerRenderer',

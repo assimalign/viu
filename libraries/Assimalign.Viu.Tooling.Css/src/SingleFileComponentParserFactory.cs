@@ -9,8 +9,9 @@ namespace Assimalign.Viu.Tooling.Css;
 
 /// <summary>
 /// The shared composition root of the <c>Assimalign.Viu.Syntax.*</c> cluster ([V01.01.05.09]/[V01.01.06.02]):
-/// the one place the language parsers meet. It constructs the <c>.viu</c>
-/// <see cref="SingleFileComponentSyntaxParser"/> and registers per-block parsers on the aggregate
+/// the one place the language parsers meet. It constructs the canonical <c>.viu</c>
+/// <see cref="SingleFileComponentSyntaxParser"/> or tag-based <c>.vue</c>
+/// <see cref="VueSingleFileComponentSyntaxParser"/> and registers per-block parsers on the aggregate
 /// registration seam — pairing a <see cref="SyntaxSourcePredicate"/> over each block's embedded
 /// <see cref="SyntaxSource"/> (content, block name, <c>lang</c>) with the parser that understands it.
 /// The <see cref="TemplateSyntaxParser"/> is registered for <c>@template</c> blocks and the
@@ -23,11 +24,10 @@ namespace Assimalign.Viu.Tooling.Css;
 /// This factory lives in the Tooling core because it is reused by <b>two build-time hosts</b>
 /// ([V01.01.12.12]): the <c>Assimalign.Viu.Generators.Syntax</c> incremental source generator, and the
 /// <c>ViuBundleCss</c> MSBuild task that re-runs the same deterministic CSS compilation over the same
-/// <c>.viu</c> inputs to write the bundled stylesheet. Both hosts constructing the parser from this one
-/// factory is what makes the generated <c>ExtractedStyles</c> constant and the physical bundle
-/// byte-identical (a single, non-divergent generation path). The constructed parser is stateless and
-/// recoverable (malformed input yields diagnostics, never throws), so a single instance is shared across
-/// every <c>.viu</c> parse.
+/// <c>.viu</c> and <c>.vue</c> inputs to write the bundled stylesheet. Both hosts constructing their
+/// format-appropriate parser from this one factory is what makes the generated <c>ExtractedStyles</c>
+/// constant and the physical bundle byte-identical (a single, non-divergent generation path). The
+/// constructed parsers are stateless and recoverable (malformed input yields diagnostics, never throws).
 /// </remarks>
 public static class SingleFileComponentParserFactory
 {
@@ -56,6 +56,20 @@ public static class SingleFileComponentParserFactory
     }
 
     /// <summary>
+    /// Builds the tag-based <c>.vue</c> compatibility parser with the same template and stylesheet
+    /// registrations as <see cref="Create"/>. Only the outer container parser differs; embedded block
+    /// languages follow the single shared compilation path.
+    /// </summary>
+    /// <returns>The composed tag-based single-file-component parser.</returns>
+    public static VueSingleFileComponentSyntaxParser CreateVue()
+    {
+        var options = new AggregateSyntaxParserOptions<SingleFileComponentBlock>();
+        options.RegisterParser(IsTemplateBlock, new TemplateSyntaxParser());
+        options.RegisterParser(IsStyleBlock, new CssSyntaxParser());
+        return new VueSingleFileComponentSyntaxParser(options);
+    }
+
+    /// <summary>
     /// Builds a <c>.viu</c> parser that dispatches <b>only</b> <c>@style</c> blocks to the CSS parser — the
     /// parser the <c>ViuBundleCss</c> task uses when it only needs the compiled styles ([V01.01.12.12]).
     /// <para>
@@ -74,6 +88,19 @@ public static class SingleFileComponentParserFactory
         var options = new AggregateSyntaxParserOptions<SingleFileComponentBlock>();
         options.RegisterParser(IsStyleBlock, new CssSyntaxParser());
         return new SingleFileComponentSyntaxParser(options);
+    }
+
+    /// <summary>
+    /// Builds a tag-based <c>.vue</c> parser that dispatches only <c>&lt;style&gt;</c> blocks to the CSS
+    /// parser. This is the compatibility counterpart of <see cref="CreateForStyleExtraction"/> used by
+    /// the physical component-style bundler.
+    /// </summary>
+    /// <returns>The tag-based parser with only the stylesheet registration.</returns>
+    public static VueSingleFileComponentSyntaxParser CreateVueForStyleExtraction()
+    {
+        var options = new AggregateSyntaxParserOptions<SingleFileComponentBlock>();
+        options.RegisterParser(IsStyleBlock, new CssSyntaxParser());
+        return new VueSingleFileComponentSyntaxParser(options);
     }
 
     /// <summary>Whether <paramref name="source"/> is a <c>@template</c> block's embedded source.</summary>

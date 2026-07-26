@@ -6,11 +6,12 @@ namespace Assimalign.Viu.Tooling.Css;
 /// <summary>
 /// Derives a component's scoped-CSS scope id — the <c>data-v-&lt;hash&gt;</c> attribute the renderer stamps
 /// on the component's elements and the scoped rewrite appends to selectors ([V01.01.06.04]). The hash is a
-/// deterministic FNV-1a over the component's <b>project-relative</b> <c>.viu</c> path (normalized to
+/// deterministic FNV-1a over the component's <b>project-relative</b> <c>.viu</c> or <c>.vue</c> path (normalized to
 /// forward slashes), mirroring Vue's dev-mode scheme of hashing the short file path
 /// (<c>@vitejs/plugin-vue</c>): stable across machines and rebuilds for asset caching, and unique per
-/// component file. String-only (no <c>System.IO</c>), so it stays inside the analyzer API surface (RS1035)
-/// and produces identical output on every platform.
+/// component file. String-only (no <c>System.IO</c>), so it stays inside the analyzer API surface (RS1035).
+/// Project containment follows the host operating system: ordinal-ignore-case on Windows and ordinal
+/// elsewhere.
 /// </summary>
 /// <remarks>
 /// Lives in the Tooling core because both build-time hosts need the identical id ([V01.01.12.12]): the
@@ -27,7 +28,7 @@ public static class StyleScopeId
     private const string Prefix = "data-v-";
 
     /// <summary>Resolves the <c>data-v-&lt;hash&gt;</c> scope id for <paramref name="filePath"/>.</summary>
-    /// <param name="filePath">The <c>.viu</c> file path.</param>
+    /// <param name="filePath">The single-file-component path.</param>
     /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
     /// <returns>The scope id (e.g. <c>data-v-7ba5bd90</c>).</returns>
     public static string Resolve(string filePath, string? projectDirectory)
@@ -41,7 +42,9 @@ public static class StyleScopeId
         {
             var normalizedDirectory = projectDirectory!.Replace('\\', '/').TrimEnd('/');
             var prefix = normalizedDirectory + "/";
-            if (normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (normalizedPath.StartsWith(
+                    prefix,
+                    SingleFileComponentPathComparison.Comparison))
             {
                 return normalizedPath.Substring(prefix.Length);
             }

@@ -65,6 +65,16 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1003"));
 
+    /// <summary>A compatibility <c>.vue</c> file is shadowed by its canonical same-base <c>.viu</c> source.</summary>
+    internal static readonly DiagnosticDescriptor ConflictingComponentFormats = new(
+        id: "VIU1004",
+        title: "Conflicting single-file component formats",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1004"));
+
     /// <summary>A recoverable error reported by the dispatched <c>@template</c> parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateError = new(
         id: "VIU1101",
@@ -144,6 +154,16 @@ internal static class SingleFileComponentDiagnostics
         defaultSeverity: RoslynDiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1205"));
+
+    /// <summary>A tag-based script block does not explicitly select Viu's C# script language.</summary>
+    internal static readonly DiagnosticDescriptor UnsupportedScriptLanguage = new(
+        id: "VIU1206",
+        title: "Unsupported single-file component script language",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1206"));
 
     /// <summary>A recoverable error reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
     internal static readonly DiagnosticDescriptor StyleError = new(
@@ -256,6 +276,30 @@ internal static class SingleFileComponentDiagnostics
             + ")";
         return new DiagnosticInfo(descriptor, location, message);
     }
+
+    /// <summary>Creates a generator-owned rule diagnostic on an exact source location.</summary>
+    /// <param name="descriptor">The stable generator diagnostic descriptor.</param>
+    /// <param name="message">The diagnostic message.</param>
+    /// <param name="filePath">The originating single-file-component path.</param>
+    /// <param name="location">The exact file-relative source location.</param>
+    /// <returns>The value-equatable located diagnostic.</returns>
+    public static DiagnosticInfo CreateRule(
+        DiagnosticDescriptor descriptor,
+        string message,
+        string filePath,
+        SourceLocation location)
+        => new(descriptor, BuildLocation(filePath, location, blockContentStart: null), message);
+
+    /// <summary>Creates a generator-owned file-level rule diagnostic at the start of a source file.</summary>
+    /// <param name="descriptor">The stable generator diagnostic descriptor.</param>
+    /// <param name="message">The diagnostic message.</param>
+    /// <param name="filePath">The originating single-file-component path.</param>
+    /// <returns>The value-equatable file-start diagnostic.</returns>
+    public static DiagnosticInfo CreateFileRule(
+        DiagnosticDescriptor descriptor,
+        string message,
+        string filePath)
+        => new(descriptor, new LocationInfo(filePath, 0, 0, 0, 0, 0, 0), message);
 
     /// <summary>
     /// Creates a generator-owned script-rule diagnostic from a token located in the synthetic script

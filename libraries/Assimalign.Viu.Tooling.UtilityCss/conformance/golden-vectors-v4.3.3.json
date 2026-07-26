@@ -1,0 +1,413 @@
+{
+  "$schema": "./golden-vectors.schema.json",
+  "schemaVersion": 1,
+  "compatibilityVersion": "4.3.3",
+  "vectors": [
+    {
+      "id": "compiler-canonical-property-order",
+      "kind": "compiler",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts",
+      "modes": [
+        "static",
+        "named-value"
+      ],
+      "candidates": [
+        "bg-blue-500",
+        "p-4",
+        "block"
+      ],
+      "expectedMetadataCandidates": [
+        "block",
+        "p-4",
+        "bg-blue-500"
+      ],
+      "expectedCssExact": "@layer utilities {\n  .block {\n    display: block;\n  }\n  .p-4 {\n    padding: calc(var(--spacing) * 4);\n  }\n  .bg-blue-500 {\n    background-color: var(--color-blue-500);\n  }\n}\n"
+    },
+    {
+      "id": "compiler-value-grammar",
+      "kind": "compiler",
+      "officialReference": "https://tailwindcss.com/docs/adding-custom-styles#using-arbitrary-values",
+      "modes": [
+        "arbitrary-property",
+        "arbitrary-value",
+        "bare-value",
+        "css-variable",
+        "fraction",
+        "important",
+        "modifier",
+        "negative"
+      ],
+      "candidates": [
+        "grid-cols-3",
+        "w-1/2",
+        "w-[calc(100%-2rem)]",
+        "w-(--panel)",
+        "-mt-4",
+        "bg-red-500/50",
+        "[mask-type:luminance]",
+        "bg-blue-500!"
+      ],
+      "expectedCssFragments": [
+        "grid-template-columns: repeat(3, minmax(0, 1fr));",
+        "width: calc(1 / 2 * 100%);",
+        "width: calc(100% - 2rem);",
+        "width: var(--panel);",
+        "margin-top: calc(calc(var(--spacing) * 4) * -1);",
+        "background-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);",
+        "mask-type: luminance;",
+        "background-color: var(--color-blue-500) !important;"
+      ]
+    },
+    {
+      "id": "compiler-variant-grammar",
+      "kind": "compiler",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/variants.ts",
+      "modes": [
+        "arbitrary-variant",
+        "compound-variant",
+        "responsive-variant"
+      ],
+      "candidates": [
+        "md:hover:block",
+        "group-data-[state=open]/card:block",
+        "[&>p]:block"
+      ],
+      "expectedCssFragments": [
+        "@media (width >= 48rem)",
+        ":hover",
+        ":where(.group\\/card)[data-state=\"open\"]",
+        ">p"
+      ]
+    },
+    {
+      "id": "compiler-v433-fractional-shadow-opacity",
+      "kind": "compiler",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.test.ts",
+      "modes": [
+        "modifier"
+      ],
+      "candidates": [
+        "shadow-sm/12.5",
+        "inset-shadow-sm/12.5",
+        "text-shadow-sm/12.5",
+        "drop-shadow-sm/12.5"
+      ],
+      "expectedCssFragments": [
+        "--tw-shadow-alpha: 12.5%;",
+        "--tw-inset-shadow-alpha: 12.5%;",
+        "--tw-text-shadow-alpha: 12.5%;",
+        "--tw-drop-shadow-alpha: 12.5%;",
+        "--tw-shadow:",
+        "--tw-inset-shadow:",
+        "--tw-drop-shadow-size: drop-shadow(",
+        "--tw-drop-shadow: var(--tw-drop-shadow-size);",
+        "box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);",
+        "oklab(from rgb(0 0 0 / 0.1) l a b / 12.5%)",
+        "oklab(from rgb(0 0 0 / 0.15) l a b / 12.5%)"
+      ]
+    },
+    {
+      "id": "compiler-v433-shadow-color-composition",
+      "kind": "compiler",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.test.ts",
+      "candidates": [
+        "shadow-sm",
+        "shadow-red-500",
+        "inset-shadow-sm",
+        "text-shadow-sm",
+        "drop-shadow-sm",
+        "drop-shadow-red-500"
+      ],
+      "expectedCssFragments": [
+        "var(--tw-shadow-color,",
+        "--tw-shadow-color: color-mix(in oklab, var(--color-red-500) var(--tw-shadow-alpha), transparent);",
+        "var(--tw-inset-shadow-color,",
+        "var(--tw-text-shadow-color,",
+        "var(--tw-drop-shadow-color,",
+        "--tw-drop-shadow: var(--tw-drop-shadow-size);"
+      ]
+    },
+    {
+      "id": "compiler-v433-invalid-form-guards",
+      "kind": "compiler",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.test.ts",
+      "candidates": [],
+      "expectedRejectedCandidates": [
+        "absolute/foo",
+        "flex/foo",
+        "grid-cols-12/foo",
+        "-order-first",
+        "rotate--2",
+        "px-.75",
+        "opacity-1.125",
+        "outline/foo",
+        "table-auto/foo",
+        "group-[@media_foo]:flex",
+        "group-not-hover:flex",
+        "not-*:flex"
+      ]
+    },
+    {
+      "id": "compiler-container-and-sibling-families",
+      "kind": "compiler",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts",
+      "modes": [
+        "bare-value",
+        "modifier",
+        "negative"
+      ],
+      "candidates": [
+        "container",
+        "@container-size/sidebar",
+        "-space-x-4",
+        "divide-x-2",
+        "ring-2",
+        "ring-blue-500/50"
+      ],
+      "expectedCssFragments": [
+        "width: 100%;",
+        "@media (width >= 40rem)",
+        "@media (width >= 96rem)",
+        "container-type: size;",
+        "container-name: sidebar;",
+        ":where(.-space-x-4 > :not(:last-child))",
+        ":where(.divide-x-2 > :not(:last-child))",
+        "--tw-ring-shadow:",
+        "--tw-ring-color: color-mix(in oklab, var(--color-blue-500) 50%, transparent);"
+      ],
+      "expectedCssOrder": [
+        "@media (width >= 40rem)",
+        "@media (width >= 48rem)",
+        "@media (width >= 64rem)",
+        "@media (width >= 80rem)",
+        "@media (width >= 96rem)"
+      ]
+    },
+    {
+      "id": "compiler-documented-area-cross-section",
+      "kind": "compiler",
+      "officialReference": "https://tailwindcss.com/docs",
+      "modes": [
+        "named-value",
+        "static"
+      ],
+      "candidates": [
+        "aspect-square",
+        "flex",
+        "grid-cols-3",
+        "p-4",
+        "size-8",
+        "text-lg",
+        "bg-blue-500",
+        "border-2",
+        "opacity-50",
+        "blur-sm",
+        "table-fixed",
+        "duration-150",
+        "rotate-45",
+        "cursor-pointer",
+        "fill-blue-500",
+        "forced-color-adjust-none"
+      ],
+      "expectedCssFragments": [
+        "aspect-ratio: 1 / 1;",
+        "display: flex;",
+        "padding: calc(var(--spacing) * 4);",
+        "font-size: var(--text-lg);",
+        "border-width: 2px;",
+        "opacity: 0.5;",
+        "filter:",
+        "table-layout: fixed;",
+        "transition-duration: 150ms;",
+        "rotate: 45deg;",
+        "cursor: pointer;",
+        "fill: var(--color-blue-500);",
+        "forced-color-adjust: none;"
+      ]
+    },
+    {
+      "id": "theme-normal-usage-closure",
+      "kind": "theme",
+      "officialReference": "https://tailwindcss.com/docs/theme#generating-all-css-variables",
+      "modes": [
+        "theme-normal"
+      ],
+      "stylesheet": "@theme {\n  --color-brand: var(--color-source);\n  --color-source: #123456;\n  --color-unused: #abcdef;\n}",
+      "candidates": [
+        "bg-brand"
+      ],
+      "emissionOptions": "None",
+      "expectedCompilationFragments": [
+        "background-color: var(--color-brand);"
+      ],
+      "expectedEmissionFragments": [
+        "--color-brand: var(--color-source);",
+        "--color-source: #123456;"
+      ],
+      "unexpectedEmissionFragments": [
+        "--color-unused:"
+      ]
+    },
+    {
+      "id": "theme-static-import",
+      "kind": "theme",
+      "officialReference": "https://tailwindcss.com/docs/theme#generating-all-css-variables",
+      "modes": [
+        "theme-static"
+      ],
+      "stylesheet": "@theme { --color-unused: #abcdef; }",
+      "candidates": [],
+      "emissionOptions": "Static",
+      "expectedEmissionFragments": [
+        "--color-unused: #abcdef;"
+      ]
+    },
+    {
+      "id": "theme-inline-substitution",
+      "kind": "theme",
+      "officialReference": "https://tailwindcss.com/docs/theme#referencing-other-variables",
+      "modes": [
+        "theme-inline"
+      ],
+      "stylesheet": "@theme inline { --color-brand: var(--application-brand); }",
+      "candidates": [
+        "bg-brand"
+      ],
+      "emissionOptions": "None",
+      "expectedCompilationFragments": [
+        "background-color: var(--application-brand);"
+      ],
+      "unexpectedEmissionFragments": [
+        "--color-brand:"
+      ]
+    },
+    {
+      "id": "theme-import-prefix",
+      "kind": "theme",
+      "officialReference": "https://tailwindcss.com/docs/styling-with-utility-classes#using-the-prefix-option",
+      "modes": [
+        "prefix"
+      ],
+      "stylesheet": "@theme { --color-brand: rebeccapurple; }",
+      "parsePrefix": "vu",
+      "candidates": [
+        "vu:bg-brand"
+      ],
+      "emissionOptions": "None",
+      "expectedCompilationFragments": [
+        "background-color: var(--vu-color-brand);"
+      ],
+      "expectedEmissionFragments": [
+        "--vu-color-brand: rebeccapurple;"
+      ]
+    },
+    {
+      "id": "theme-import-global-important",
+      "kind": "theme",
+      "officialReference": "https://tailwindcss.com/docs/styling-with-utility-classes#using-the-important-flag",
+      "modes": [
+        "important"
+      ],
+      "stylesheet": "",
+      "parseImportant": true,
+      "candidates": [
+        "p-4"
+      ],
+      "emissionOptions": "None",
+      "expectedCompilationFragments": [
+        "padding: calc(var(--spacing) * 4) !important;"
+      ]
+    },
+    {
+      "id": "source-import-and-expansion-forms",
+      "kind": "source",
+      "officialReference": "https://tailwindcss.com/docs/detecting-classes-in-source-files",
+      "forms": [
+        "import-source-path",
+        "source-include-path",
+        "source-exclude-path",
+        "source-inline",
+        "source-not-inline",
+        "source-brace-expansion",
+        "source-numeric-range"
+      ],
+      "stylesheet": "@import \"viu-utilities\" source(\"../Components\");\n@source \"../Shared\";\n@source not \"../Shared/Legacy\";\n@source inline(\"{hover:,}bg-red-{100..300..100}\");\n@source not inline(\"hover:bg-red-100\");",
+      "expectedBasePath": "../Components",
+      "expectedAutomaticDetection": true,
+      "expectedIncludedPaths": [
+        "../Shared"
+      ],
+      "expectedExcludedPaths": [
+        "../Shared/Legacy"
+      ],
+      "expectedIncludedCandidates": [
+        "hover:bg-red-100",
+        "hover:bg-red-200",
+        "hover:bg-red-300",
+        "bg-red-100",
+        "bg-red-200",
+        "bg-red-300"
+      ],
+      "expectedExcludedCandidates": [
+        "hover:bg-red-100"
+      ]
+    },
+    {
+      "id": "source-none-form",
+      "kind": "source",
+      "officialReference": "https://tailwindcss.com/docs/detecting-classes-in-source-files#disabling-automatic-detection",
+      "forms": [
+        "import-source-none"
+      ],
+      "stylesheet": "@import \"viu-utilities\" source(none);",
+      "expectedAutomaticDetection": false
+    },
+    {
+      "id": "stylesheet-directives-and-functions",
+      "kind": "stylesheet",
+      "officialReference": "https://tailwindcss.com/docs/functions-and-directives",
+      "directives": [
+        "Apply",
+        "CustomVariant",
+        "Reference",
+        "Utility",
+        "Variant"
+      ],
+      "functions": [
+        "Alpha",
+        "Default",
+        "Modifier",
+        "Spacing",
+        "Value"
+      ],
+      "stylesheet": "@reference \"./application.css\";\n@custom-variant theme-midnight (&:where([data-theme=\"midnight\"] *));\n@utility card-* {\n  padding: --spacing(4);\n  color: --alpha(var(--color-brand) / 50%);\n  width: --value(--size-*, [length], --default(1rem));\n  line-height: --modifier(--leading-*, [length], --default(1));\n}\n.card {\n  @apply block;\n  @variant hover {\n    display: grid;\n  }\n}",
+      "expectedDirectiveIdentifiers": [
+        "./application.css",
+        "theme-midnight",
+        "card-*",
+        "block",
+        "hover"
+      ]
+    },
+    {
+      "id": "design-system-layer-order",
+      "kind": "layer",
+      "officialReference": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/index.css",
+      "expectedLayerOrder": "@layer theme, base, components, utilities;\n",
+      "expectedCssFragments": [
+        "@property --tw-translate-x {",
+        "syntax: \"<percentage>\";",
+        "inherits: false;",
+        "initial-value: 100%;",
+        "@layer theme {",
+        "@layer base {",
+        "[hidden]:where(:not([hidden='until-found']))"
+      ],
+      "expectedCssOrder": [
+        "@property --tw-translate-x {",
+        "@layer theme {",
+        "@layer base {"
+      ]
+    }
+  ]
+}

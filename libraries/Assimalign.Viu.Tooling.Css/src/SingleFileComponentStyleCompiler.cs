@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 
+using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.Css;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 
 namespace Assimalign.Viu.Tooling.Css;
 
 /// <summary>
-/// Compiles a <c>.viu</c> file's <c>@style</c> blocks into the component's extracted CSS — the shared,
-/// deterministic core reused by <b>both</b> build-time hosts ([V01.01.12.12]). Each block is run through the
+/// Compiles a single-file component's style blocks into extracted CSS — the shared, deterministic core
+/// reused by <b>both</b> build-time hosts ([V01.01.12.12]/[V01.01.06.09]). Each block is run through the
 /// CSS-Modules class rename (<c>module</c> blocks, <see cref="CssModuleRewriter"/>), the <c>v-bind()</c>
 /// custom-property rewrite (<see cref="CssBindingRewriter"/>), and then serialized — <c>scoped</c> blocks via
 /// <see cref="CssScopedRewriter"/> with the component's stable scope id, rewritten non-scoped blocks via
@@ -35,7 +36,7 @@ public static class SingleFileComponentStyleCompiler
     /// Parses <paramref name="viuText"/> with <paramref name="parser"/>, resolves the scope id from the path,
     /// and compiles the component's <c>@style</c> blocks. The convenience entry point for the
     /// <c>ViuBundleCss</c> task, which starts from raw file text; the generator uses
-    /// <see cref="Compile(SingleFileComponentSyntaxParserResult, string, CancellationToken)"/> directly
+    /// <see cref="Compile(AggregateSyntaxParserResult{SingleFileComponentBlock}, string, CancellationToken)"/> directly
     /// because it already holds the shared parse. Both routes run the identical compilation.
     /// </summary>
     /// <param name="parser">The composed parser from <see cref="SingleFileComponentParserFactory.Create"/>.</param>
@@ -62,17 +63,17 @@ public static class SingleFileComponentStyleCompiler
     }
 
     /// <summary>
-    /// Compiles the <c>@style</c> blocks in an already-dispatched <paramref name="parse"/> using
+    /// Compiles the style blocks in an already-dispatched <paramref name="parse"/> using
     /// <paramref name="componentScopeId"/> (the component's <c>data-v-&lt;hash&gt;</c>, from
     /// <see cref="StyleScopeId.Resolve"/>). The generator host calls this directly with the parse and scope id
-    /// it already computed for template compilation, so the <c>.viu</c> is parsed once.
+    /// it already computed for template compilation, so the component is parsed once.
     /// </summary>
-    /// <param name="parse">The dispatched <c>.viu</c> parse (its <c>@style</c> source results are read).</param>
+    /// <param name="parse">The dispatched <c>.viu</c> or <c>.vue</c> parse; its style source results are read.</param>
     /// <param name="componentScopeId">The component's <c>data-v-&lt;hash&gt;</c> scope id.</param>
     /// <param name="cancellationToken">Cancels the compilation.</param>
     /// <returns>The component's style compilation.</returns>
     public static SingleFileComponentStyleCompilation Compile(
-        SingleFileComponentSyntaxParserResult parse,
+        AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         string componentScopeId,
         CancellationToken cancellationToken = default)
     {

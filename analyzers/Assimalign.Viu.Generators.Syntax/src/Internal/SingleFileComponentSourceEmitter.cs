@@ -90,10 +90,15 @@ internal static class SingleFileComponentSourceEmitter
         // remaining @script members stay in the class body (see AppendScriptSeam). C# permits using /
         // using static / using-alias directives in any order, so these follow the render-helper preamble
         // without reordering it.
-        if (model.Script.UsingRegion is { } usingRegion)
+        if (model.IsScriptSetupFirst)
         {
-            AppendLineMappedRegion(builder, model.FilePath, model.Script.UsingRegionStartLine, usingRegion);
-            builder.Append('\n');
+            AppendScriptUsingRegion(builder, model.FilePath, model.ScriptSetup);
+            AppendScriptUsingRegion(builder, model.FilePath, model.Script);
+        }
+        else
+        {
+            AppendScriptUsingRegion(builder, model.FilePath, model.Script);
+            AppendScriptUsingRegion(builder, model.FilePath, model.ScriptSetup);
         }
 
         var indent = 0;
@@ -129,6 +134,15 @@ internal static class SingleFileComponentSourceEmitter
             // partial class — no interface and no Setup. Named by global:: reference, never an assembly
             // reference.
             builder.Append(" : ").Append(ComponentsNamespace).Append(".IComponentTemplate");
+            if (model.HotReloadMetadata is not null)
+            {
+                builder.Append(", ").Append(ComponentsNamespace)
+                    .Append(".IComponentHotReloadMetadata");
+            }
+        }
+        else if (model.HotReloadMetadata is not null)
+        {
+            builder.Append(" : ").Append(ComponentsNamespace).Append(".IComponentHotReloadMetadata");
         }
 
         builder.Append('\n');
@@ -136,6 +150,12 @@ internal static class SingleFileComponentSourceEmitter
         builder.Append("{\n");
 
         var bodyIndent = indent + 1;
+        AppendHotReloadMetadata(builder, bodyIndent, model);
+        if (model.HotReloadMetadata is not null)
+        {
+            builder.Append('\n');
+        }
+
         if (model.RenderBody is { } renderBody)
         {
             // [V01.01.05.05] The compiled @template render function. The body was serialized by the
@@ -150,7 +170,14 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, bodyIndent);
             builder.Append("/// </summary>\n");
             AppendIndent(builder, bodyIndent);
-            builder.Append("internal const int RenderCacheSize = ").Append(Count(model.RenderCacheSize)).Append(";\n");
+            if (model.HotReloadMetadata is null)
+            {
+                builder.Append("internal const int RenderCacheSize = ").Append(Count(model.RenderCacheSize)).Append(";\n");
+            }
+            else
+            {
+                builder.Append("internal static int RenderCacheSize => ").Append(Count(model.RenderCacheSize)).Append(";\n");
+            }
             builder.Append('\n');
             AppendIndent(builder, bodyIndent);
             builder.Append("/// <summary>\n");
@@ -193,6 +220,131 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         return builder.ToString();
+    }
+
+    // [V01.01.06.05] One isolated generated API surface for hot-reload tooling. It is emitted only
+    // when the AnalyzerConfig/MSBuild gate selected Debug metadata (or an explicit opt-in), and is
+    // absent from ordinary Release output. Static getter bodies make the four values available to
+    // generated tooling without reflection while remaining patchable by .NET Hot Reload; changing a
+    // const/static-field initializer is an ENC0011 rude edit. Three stable nested marker types each
+    // contain one hash-dependent method body. The runtime-provided updated-type set therefore
+    // identifies the changed block without invoking a patched generated method. The explicit Core
+    // contract keeps compiler-owned member names out of the authored class surface.
+    private static void AppendHotReloadMetadata(
+        StringBuilder builder,
+        int indent,
+        in SingleFileComponentModel model)
+    {
+        if (model.HotReloadMetadata is not { } metadata)
+        {
+            return;
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>The path-stable development hot-reload component identifier.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal static string HotReloadComponentIdentifier => ")
+            .Append(Literal(metadata.ComponentIdentifier)).Append(";\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>The template block content hash carried by its generated change marker.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal static string HotReloadTemplateContentHash => ")
+            .Append(Literal(metadata.TemplateContentHash)).Append(";\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>The script block content hash used for component-reload decisions.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal static string HotReloadScriptContentHash => ")
+            .Append(Literal(metadata.ScriptContentHash)).Append(";\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>The style block content hash used for stylesheet-swap decisions.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal static string HotReloadStyleContentHash => ")
+            .Append(Literal(metadata.StyleContentHash)).Append(";\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("string ").Append(ComponentsNamespace)
+            .Append(".IComponentHotReloadMetadata.ComponentIdentifier\n");
+        AppendIndent(builder, indent);
+        builder.Append("    => ").Append(Literal(metadata.ComponentIdentifier)).Append(";\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Type ").Append(ComponentsNamespace)
+            .Append(".IComponentHotReloadMetadata.TemplateUpdateMarkerType\n");
+        AppendIndent(builder, indent);
+        builder.Append("    => typeof(SingleFileComponentTemplateUpdateMarker);\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Type ").Append(ComponentsNamespace)
+            .Append(".IComponentHotReloadMetadata.ScriptUpdateMarkerType\n");
+        AppendIndent(builder, indent);
+        builder.Append("    => typeof(SingleFileComponentScriptUpdateMarker);\n");
+        builder.Append('\n');
+
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Type ").Append(ComponentsNamespace)
+            .Append(".IComponentHotReloadMetadata.StyleUpdateMarkerType\n");
+        AppendIndent(builder, indent);
+        builder.Append("    => typeof(SingleFileComponentStyleUpdateMarker);\n");
+
+        AppendHotReloadMarker(
+            builder,
+            indent,
+            "SingleFileComponentTemplateUpdateMarker",
+            metadata.TemplateContentHash);
+        AppendHotReloadMarker(
+            builder,
+            indent,
+            "SingleFileComponentScriptUpdateMarker",
+            metadata.ScriptContentHash);
+        AppendHotReloadMarker(
+            builder,
+            indent,
+            "SingleFileComponentStyleUpdateMarker",
+            metadata.StyleContentHash);
+
+        if (model.RenderBody is not null)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>The instance render cache retained across ordinary reactive updates and recreated when Hot Reload remounts the component.</summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("private object?[] _hotReloadRenderCache = new object?[")
+                .Append(Count(model.RenderCacheSize)).Append("];\n");
+        }
+    }
+
+    private static void AppendHotReloadMarker(
+        StringBuilder builder,
+        int indent,
+        string markerName,
+        string contentHash)
+    {
+        builder.Append('\n');
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("private static class ").Append(markerName).Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("internal static void TrackContentRevision()\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("{\n");
+        AppendIndent(builder, indent + 2);
+        builder.Append("global::System.GC.KeepAlive(")
+            .Append(Literal(contentHash)).Append(");\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("}\n");
+        AppendIndent(builder, indent);
+        builder.Append("}\n");
     }
 
     // [V01.01.06.07] The IComponentTemplate bridge turns a compiled @template/@script partial into a
@@ -304,12 +456,22 @@ internal static class SingleFileComponentSourceEmitter
         builder.Append("OnSetup();\n");
         builder.Append('\n');
 
-        AppendIndent(builder, indent + 1);
-        builder.Append("// The per-instance render cache (v-once subtrees and cached handlers), allocated once and\n");
-        AppendIndent(builder, indent + 1);
-        builder.Append("// captured by the render delegate so cached slots persist across re-renders.\n");
-        AppendIndent(builder, indent + 1);
-        builder.Append("var _cache = new object?[RenderCacheSize];\n");
+        if (model.HotReloadMetadata is null)
+        {
+            AppendIndent(builder, indent + 1);
+            builder.Append("// The per-instance render cache (v-once subtrees and cached handlers), allocated once and\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("// captured by the render delegate so cached slots persist across re-renders.\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("var _cache = new object?[RenderCacheSize];\n");
+        }
+        else
+        {
+            AppendIndent(builder, indent + 1);
+            builder.Append("// Debug/opt-in renders read the instance cache tracked with the hot-reload metadata contract;\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("// managed template/script updates recreate it when Core remounts the component.\n");
+        }
 
         if (appliesCssVariables)
         {
@@ -322,7 +484,15 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         AppendIndent(builder, indent + 1);
-        builder.Append("return () => ").Append(RenderHelperSurface).Append(".NormalizeRoot(Render(this, _cache));\n");
+        if (model.HotReloadMetadata is null)
+        {
+            builder.Append("return () => ").Append(RenderHelperSurface).Append(".NormalizeRoot(Render(this, _cache));\n");
+        }
+        else
+        {
+            builder.Append("return () => ").Append(RenderHelperSurface)
+                .Append(".NormalizeRoot(Render(this, _hotReloadRenderCache));\n");
+        }
         AppendIndent(builder, indent);
         builder.Append("}\n");
     }
@@ -334,46 +504,138 @@ internal static class SingleFileComponentSourceEmitter
     // stays a placeholder.
     private static void AppendScriptSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
-        if (model.Script.MemberRegion is not { } memberRegion)
+        bool emittedOrdinaryScript;
+        bool emittedSetupScript;
+        if (model.IsScriptSetupFirst)
         {
-            AppendIndent(builder, indent);
-            if (model.HasScript)
-            {
-                builder.Append("// [V01.01.06.03.01] The @script block contributes no class-body members; any leading\n");
-                AppendIndent(builder, indent);
-                builder.Append("// using directives are hoisted into the file's using region above the namespace.\n");
-            }
-            else
-            {
-                builder.Append("// [V01.01.06.03] Script merge seam. This component declares no @script block, so no C#\n");
-                AppendIndent(builder, indent);
-                builder.Append("// body is merged into the partial class.\n");
-            }
+            emittedSetupScript = AppendScriptMemberRegion(
+                builder,
+                indent,
+                model.FilePath,
+                model.ScriptSetup,
+                isSetup: true);
+            emittedOrdinaryScript = AppendScriptMemberRegion(
+                builder,
+                indent,
+                model.FilePath,
+                model.Script,
+                isSetup: false);
+        }
+        else
+        {
+            emittedOrdinaryScript = AppendScriptMemberRegion(
+                builder,
+                indent,
+                model.FilePath,
+                model.Script,
+                isSetup: false);
+            emittedSetupScript = AppendScriptMemberRegion(
+                builder,
+                indent,
+                model.FilePath,
+                model.ScriptSetup,
+                isSetup: true);
+        }
 
+        if (emittedOrdinaryScript || emittedSetupScript)
+        {
             return;
         }
 
         AppendIndent(builder, indent);
-        builder.Append("// [V01.01.06.03] Merged @script block. The block's C# is emitted verbatim below, wrapped in\n");
+        if (model.HasScript)
+        {
+            builder.Append("// [V01.01.06.03.01] The script block(s) contribute no class-body members; any leading\n");
+            AppendIndent(builder, indent);
+            builder.Append("// using directives are hoisted into the file's using region above the namespace.\n");
+        }
+        else
+        {
+            builder.Append("// [V01.01.06.03] Script merge seam. This component declares no C# script block, so no\n");
+            AppendIndent(builder, indent);
+            builder.Append("// body is merged into the partial class.\n");
+        }
+    }
+
+    private static void AppendScriptUsingRegion(
+        StringBuilder builder,
+        string filePath,
+        in ScriptRegions regions)
+    {
+        if (regions.UsingRegion is not { } usingRegion)
+        {
+            return;
+        }
+
+        AppendLineMappedRegion(
+            builder,
+            filePath,
+            regions.UsingRegionStartLine,
+            regions.UsingRegionStartColumn,
+            usingRegion);
+        builder.Append('\n');
+    }
+
+    private static bool AppendScriptMemberRegion(
+        StringBuilder builder,
+        int indent,
+        string filePath,
+        in ScriptRegions regions,
+        bool isSetup)
+    {
+        if (regions.MemberRegion is not { } memberRegion)
+        {
+            return false;
+        }
+
         AppendIndent(builder, indent);
-        builder.Append("// #line directives that map every line back to the .viu source, so compiler errors and\n");
-        AppendIndent(builder, indent);
-        builder.Append("// debugger stepping land in the .viu file rather than this generated file.\n");
-        AppendLineMappedRegion(builder, model.FilePath, model.Script.MemberRegionStartLine, memberRegion);
+        if (isSetup)
+        {
+            builder.Append("// [V01.01.06.09] Merged C# <script setup> block. Its partial-class members are emitted\n");
+            AppendIndent(builder, indent);
+            builder.Append("// verbatim under #line directives, preserving exact diagnostics and debugger stepping.\n");
+        }
+        else
+        {
+            builder.Append("// [V01.01.06.03] Merged @script block. The block's C# is emitted verbatim below, wrapped in\n");
+            AppendIndent(builder, indent);
+            builder.Append("// #line directives that map every line back to the .viu source, so compiler errors and\n");
+            AppendIndent(builder, indent);
+            builder.Append("// debugger stepping land in the .viu file rather than this generated file.\n");
+        }
+
+        AppendLineMappedRegion(
+            builder,
+            filePath,
+            regions.MemberRegionStartLine,
+            regions.MemberRegionStartColumn,
+            memberRegion);
+        return true;
     }
 
     // Emits a verbatim @script region flush against column 0 (no scaffold indentation added), wrapped in a
     // #line map. The C# #line directive remaps the LINE of the following text but takes each token's COLUMN
-    // verbatim from this generated file; because a .viu block's content begins at column 1 (docs/FORMAT.md
-    // §3) and both regions split on a line boundary (column 1), emitting each region line un-indented
-    // preserves its original column, so a reported (line, column) lands on the exact .viu coordinate — the
-    // same block-to-file mapping SingleFileComponentDiagnostics composes. The trailing #line default
-    // restores this generated file's own line mapping for whatever follows (the namespace, or the class
-    // close). Shared by the hoisted using region (above the namespace) and the merged member region.
-    private static void AppendLineMappedRegion(StringBuilder builder, string filePath, int startLine, string content)
+    // verbatim from this generated file. Canonical .viu content and line-split regions begin at column 1;
+    // inline .vue content can begin later, so the first emitted line is padded to the region's source
+    // column. Subsequent source lines already begin at column 1. A reported (line, column) therefore lands
+    // on the exact component coordinate — the same block-to-file mapping
+    // SingleFileComponentDiagnostics composes. The trailing #line default restores this generated file's
+    // own line mapping for whatever follows (the namespace or class close). Shared by the hoisted using
+    // region (above the namespace) and the merged member region.
+    private static void AppendLineMappedRegion(
+        StringBuilder builder,
+        string filePath,
+        int startLine,
+        int startColumn,
+        string content)
     {
         builder.Append("#line ").Append(startLine.ToString(CultureInfo.InvariantCulture))
             .Append(" \"").Append(filePath).Append("\"\n");
+        if (startColumn > 1)
+        {
+            builder.Append(' ', startColumn - 1);
+        }
+
         builder.Append(content);
         if (content.Length == 0 || content[content.Length - 1] != '\n')
         {
@@ -385,7 +647,7 @@ internal static class SingleFileComponentSourceEmitter
 
     // [V01.01.06.04] The @style seam — emitted at the tail of the class body so it never interleaves with
     // the @script merge region. When the component declares @style blocks, their compiled CSS rides as an
-    // ExtractedStyles constant and, for scoped components, the ScopeId constant carries the data-v-<hash>
+    // ExtractedStyles value and, for scoped components, the ScopeId constant carries the data-v-<hash>
     // the renderer stamps on elements (the C# analogue of Vue's component __scopeId). No @style block
     // leaves the seam as a documenting comment, matching the render/script seams.
     private static void AppendStyleSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
@@ -431,7 +693,14 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// </summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("internal const string ExtractedStyles = ").Append(Literal(styles)).Append(";\n");
+        if (model.HotReloadMetadata is null)
+        {
+            builder.Append("internal const string ExtractedStyles = ").Append(Literal(styles)).Append(";\n");
+        }
+        else
+        {
+            builder.Append("internal static string ExtractedStyles => ").Append(Literal(styles)).Append(";\n");
+        }
 
         AppendModuleAccessors(builder, indent, model);
         AppendCssVariableSeam(builder, indent, model);

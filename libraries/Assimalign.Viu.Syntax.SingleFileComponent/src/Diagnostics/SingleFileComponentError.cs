@@ -6,8 +6,9 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// A recoverable parse diagnostic: its code, human-readable message, and source location. Modeled on
 /// <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerError</c> but carrying the SingleFileComponent
 /// area's own <see cref="SingleFileComponentErrorCode"/> catalog. The parser reports these through
-/// <see cref="SingleFileComponentParseResult.Errors"/> and never throws for malformed input, matching
-/// Vue's recoverable-parsing model (<c>@vue/compiler-sfc</c> <c>parse().errors</c>). A
+/// <see cref="SingleFileComponentParseResult.Errors"/> or
+/// <see cref="VueSingleFileComponentParseResult.Errors"/> and never throws for malformed input,
+/// matching Vue's recoverable-parsing model (<c>@vue/compiler-sfc</c> <c>parse().errors</c>). A
 /// <see cref="Diagnostic"/> whose Viu-defined code catalog and result-errors delivery stay
 /// distinct from the template compiler's, per the shared base's per-language contract.
 /// </summary>

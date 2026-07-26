@@ -19,6 +19,8 @@ internal sealed class LanguageServerHost
     private const int InternalErrorCode = -32603;
 
     private readonly IViuLanguageService languageService;
+    private readonly HashSet<string> openSupportedDocuments =
+        new(StringComparer.OrdinalIgnoreCase);
     private bool shutdownRequested;
 
     internal LanguageServerHost()
@@ -235,7 +237,17 @@ internal sealed class LanguageServerHost
         var text = GetRequiredString(textDocument, "text");
         var version = GetOptionalInteger(textDocument, "version");
 
-        languageService.OpenDocument(documentUri, text, version);
+        if (ViuDocumentSupport.IsSupported(documentUri))
+        {
+            openSupportedDocuments.Add(documentUri);
+            ConfigureUtilityStylesheet(documentUri);
+            languageService.OpenDocument(documentUri, text, version);
+        }
+        else if (openSupportedDocuments.Remove(documentUri))
+        {
+            languageService.CloseDocument(documentUri);
+        }
+
         await PublishDiagnosticsAsync(writer, documentUri, cancellationToken).ConfigureAwait(false);
     }
 
@@ -247,6 +259,13 @@ internal sealed class LanguageServerHost
         var textDocument = GetRequiredObject(parameters, "textDocument");
         var documentUri = GetRequiredString(textDocument, "uri");
         var version = GetOptionalInteger(textDocument, "version");
+
+        if (!IsOpenAndSupported(documentUri))
+        {
+            await PublishDiagnosticsAsync(writer, documentUri, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         var contentChanges = GetRequiredArray(parameters, "contentChanges");
         var changes = new List<LanguageDocumentChange>();
 
@@ -280,7 +299,11 @@ internal sealed class LanguageServerHost
         var textDocument = GetRequiredObject(parameters, "textDocument");
         var documentUri = GetRequiredString(textDocument, "uri");
 
-        languageService.CloseDocument(documentUri);
+        if (openSupportedDocuments.Remove(documentUri))
+        {
+            languageService.CloseDocument(documentUri);
+        }
+
         await WriteNotificationAsync(
                 writer,
                 "textDocument/publishDiagnostics",
@@ -296,36 +319,59 @@ internal sealed class LanguageServerHost
     private JsonObject HandleCompletion(JsonElement parameters)
     {
         var (documentUri, position) = GetDocumentPosition(parameters);
+        if (!IsOpenAndSupported(documentUri))
+        {
+            return CreateCompletionList(new JsonArray());
+        }
+
+        ConfigureUtilityStylesheet(documentUri);
         var items = new JsonArray();
         foreach (var completion in languageService.GetCompletions(documentUri, position))
         {
-            items.Add(
-                (JsonNode)new JsonObject
+            var item = new JsonObject
+            {
+                ["label"] = completion.Label,
+                ["kind"] = (int)completion.Kind,
+                ["detail"] = completion.Detail,
+                ["documentation"] = new JsonObject
                 {
-                    ["label"] = completion.Label,
-                    ["kind"] = (int)completion.Kind,
-                    ["detail"] = completion.Detail,
-                    ["documentation"] = new JsonObject
-                    {
-                        ["kind"] = "markdown",
-                        ["value"] = completion.Documentation,
-                    },
-                    ["insertText"] = completion.InsertText,
-                    ["insertTextFormat"] = completion.IsSnippet ? 2 : 1,
-                    ["sortText"] = completion.SortText,
-                });
+                    ["kind"] = "markdown",
+                    ["value"] = completion.Documentation,
+                },
+                ["insertText"] = completion.InsertText,
+                ["insertTextFormat"] = completion.IsSnippet ? 2 : 1,
+                ["sortText"] = completion.SortText,
+            };
+
+            if (!string.IsNullOrEmpty(completion.FilterText))
+            {
+                item["filterText"] = completion.FilterText;
+            }
+
+            if (completion.EditRange is { } editRange)
+            {
+                item["textEdit"] = new JsonObject
+                {
+                    ["range"] = ToJsonRange(editRange),
+                    ["newText"] = completion.InsertText,
+                };
+            }
+
+            items.Add((JsonNode)item);
         }
 
-        return new JsonObject
-        {
-            ["isIncomplete"] = false,
-            ["items"] = items,
-        };
+        return CreateCompletionList(items);
     }
 
     private JsonNode? HandleHover(JsonElement parameters)
     {
         var (documentUri, position) = GetDocumentPosition(parameters);
+        if (!IsOpenAndSupported(documentUri))
+        {
+            return null;
+        }
+
+        ConfigureUtilityStylesheet(documentUri);
         var hover = languageService.GetHover(documentUri, position);
         if (hover is null)
         {
@@ -349,17 +395,20 @@ internal sealed class LanguageServerHost
         CancellationToken cancellationToken)
     {
         var diagnostics = new JsonArray();
-        foreach (var diagnostic in languageService.GetDiagnostics(documentUri))
+        if (IsOpenAndSupported(documentUri))
         {
-            diagnostics.Add(
-                (JsonNode)new JsonObject
-                {
-                    ["range"] = ToJsonRange(diagnostic.Range),
-                    ["severity"] = (int)diagnostic.Severity,
-                    ["code"] = diagnostic.Code,
-                    ["source"] = diagnostic.Source,
-                    ["message"] = diagnostic.Message,
-                });
+            foreach (var diagnostic in languageService.GetDiagnostics(documentUri))
+            {
+                diagnostics.Add(
+                    (JsonNode)new JsonObject
+                    {
+                        ["range"] = ToJsonRange(diagnostic.Range),
+                        ["severity"] = (int)diagnostic.Severity,
+                        ["code"] = diagnostic.Code,
+                        ["source"] = diagnostic.Source,
+                        ["message"] = diagnostic.Message,
+                    });
+            }
         }
 
         await WriteNotificationAsync(
@@ -373,6 +422,30 @@ internal sealed class LanguageServerHost
                 cancellationToken)
             .ConfigureAwait(false);
     }
+
+    private bool IsOpenAndSupported(string documentUri)
+    {
+        if (!openSupportedDocuments.Contains(documentUri))
+        {
+            return false;
+        }
+
+        if (ViuDocumentSupport.IsSupported(documentUri))
+        {
+            return true;
+        }
+
+        openSupportedDocuments.Remove(documentUri);
+        languageService.CloseDocument(documentUri);
+        return false;
+    }
+
+    private static JsonObject CreateCompletionList(JsonArray items)
+        => new()
+        {
+            ["isIncomplete"] = false,
+            ["items"] = items,
+        };
 
     private static JsonObject CreateInitializeResult()
         => new()
@@ -388,7 +461,18 @@ internal sealed class LanguageServerHost
                 ["completionProvider"] = new JsonObject
                 {
                     ["resolveProvider"] = false,
-                    ["triggerCharacters"] = new JsonArray("@", "<", ":", ".", "v"),
+                    ["triggerCharacters"] = new JsonArray(
+                        "@",
+                        "<",
+                        ":",
+                        ".",
+                        "v",
+                        " ",
+                        "-",
+                        "[",
+                        "(",
+                        "/",
+                        "!"),
                 },
                 ["hoverProvider"] = true,
             },
@@ -398,6 +482,29 @@ internal sealed class LanguageServerHost
                 ["version"] = "0.1.0",
             },
         };
+
+    private void ConfigureUtilityStylesheet(string documentUri)
+    {
+        if (languageService is IUtilityCssLanguageService utilityCssLanguageService)
+        {
+            var configuration =
+                ViuUtilityStylesheetContext.ReadForDocument(documentUri);
+            if (configuration is null)
+            {
+                utilityCssLanguageService.ConfigureUtilityStylesheet(
+                    documentUri,
+                    null);
+            }
+            else
+            {
+                utilityCssLanguageService.ConfigureUtilityStylesheet(
+                    documentUri,
+                    configuration.StylesheetText,
+                    configuration.StylesheetIdentity,
+                    configuration.ReferenceGraph);
+            }
+        }
+    }
 
     private static (string DocumentUri, LanguagePosition Position) GetDocumentPosition(
         JsonElement parameters)

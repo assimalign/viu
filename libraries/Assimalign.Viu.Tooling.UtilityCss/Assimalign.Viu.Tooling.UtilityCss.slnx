@@ -1,0 +1,4 @@
+<Solution>
+	<Project Path="src/Assimalign.Viu.Tooling.UtilityCss.csproj" />
+	<Project Path="test/Assimalign.Viu.Tooling.UtilityCss.Tests.csproj" />
+</Solution>

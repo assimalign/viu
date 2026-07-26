@@ -80,9 +80,12 @@ These are deliberate, recorded divergences from upstream — everything else tra
    types, not proxied BCL types. The dependency engine ports Vue 3.5's version-counter +
    doubly-linked-list design.
 3. **No runtime template compilation.** Vue's full build compiles templates with `new Function` —
-   impossible in WASM. Templates and `.viu` SFCs compile at build time (the `.viu` container uses `@template`/`@script`/`@style` @-block syntax — a deliberate divergence from Vue's tag-based SFC container, decided 2026-07-17, defined by `V01.01.06.01`; the markup inside `@template` remains standard Vue template syntax) via Roslyn source
-   generators; that is the only path, and it is also how the tooling story (diagnostics, IDE
-   integration) gets Razor-grade.
+   impossible in WASM. Templates and SFCs compile at build time via Roslyn source generators; that
+   is the only path, and it is also how the tooling story (diagnostics, IDE integration) gets
+   Razor-grade. The canonical `.viu` container uses `@template`/`@script`/`@style` @-block syntax
+   (the deliberate `V01.01.06.01` divergence decided 2026-07-17), while `V01.01.06.09` adds an
+   explicitly scoped tag-based `.vue` compatibility input. Template markup remains standard Vue
+   template syntax in both containers.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
    applied by one JS call per flush; events use one delegated JS listener forwarding into .NET;
    static content is stringified aggressively into `innerHTML` inserts.
@@ -243,6 +246,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.06.04` | Implement scoped CSS compilation | W04 | P004 |
 | `V01.01.06.05` | Emit hot-reload metadata for per-block updates | W05 | P005 |
 | `V01.01.06.06` | Implement CSS Modules and v-bind() in CSS | W04 | P004 |
+| `V01.01.06.09` | Add tag-based .vue single-file-component compatibility | W05 | P005 |
 
 ### [V01.01.07] Framework - ServerRenderer (W05, P004)
 
@@ -307,10 +311,10 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.12.11` | CSS construction/emission surface in Assimalign.Viu.Syntax.Css | W04 | P004 |
 | `V01.01.12.12` | ViuBundleCss MSBuild task for CSS bundling | W04 | P004 |
 | `V01.01.12.13` | Utility-class candidate grammar and variant model | W05 | P005 |
-| `V01.01.12.14` | AOT-safe utility theme configuration model | W05 | P005 |
-| `V01.01.12.15` | Build-time utility candidate extraction pass | W05 | P005 |
+| `V01.01.12.14` | CSS-first utility theme and design-token model | W05 | P005 |
+| `V01.01.12.15` | Plain-text utility source detection and extraction | W05 | P005 |
 | `V01.01.12.16` | Utility-to-CSS resolver and incremental pipeline | W05 | P005 |
-| `V01.01.12.17` | @apply and utility composition inside @style | W06 | P006 |
+| `V01.01.12.17` | CSS-first utility directives and style composition | W06 | P006 |
 | `V01.01.12.18` | Rename product naming from Vue/Vuecs to Viu repo-wide | W04 | P002 |
 | `V01.01.12.19` | Adopt Cohesion SDK/shared-framework packaging (Assimalign.Viu.Sdk + Assimalign.Viu.App) | W05 | P003 |
 

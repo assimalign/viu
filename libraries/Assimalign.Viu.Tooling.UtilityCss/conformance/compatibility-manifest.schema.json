@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://assimalign.github.io/viu/schemas/utility-css-compatibility-manifest.json",
+  "title": "Viu Utilities compatibility manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "compatibilityVersion",
+    "officialReferences",
+    "utilityRoots",
+    "documentedUtilityFamilies",
+    "variants",
+    "themeNamespaces",
+    "directives",
+    "functions",
+    "sourceForms",
+    "promisedModes",
+    "goldenVectorFile",
+    "knownIntegrationGaps"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "compatibilityVersion": { "const": "4.3.3" },
+    "utilityRoots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "variants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [ "root", "kind", "category" ]
+      }
+    },
+    "knownIntegrationGaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    }
+  }
+}

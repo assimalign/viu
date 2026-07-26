@@ -26,6 +26,34 @@ internal static class ViuCompletionCatalog
             "03"),
     ];
 
+    internal static IReadOnlyList<LanguageCompletionItem> VueBlockHeaders { get; } =
+    [
+        Snippet(
+            "template",
+            "Vue-format template block",
+            "Contains the component's Vue-compatible template markup.",
+            "<template>\n\t$0\n</template>",
+            "01"),
+        Snippet(
+            "script",
+            "Viu C# script block",
+            "Contains C# members merged into the generated partial component class. The explicit csharp language is required.",
+            "<script lang=\"csharp\">\n\t$0\n</script>",
+            "02"),
+        Snippet(
+            "script setup",
+            "Viu C# setup script block",
+            "Contains C# members merged into the generated partial component class alongside an optional ordinary script.",
+            "<script setup lang=\"csharp\">\n\t$0\n</script>",
+            "03"),
+        Snippet(
+            "style",
+            "Vue-format CSS style block",
+            "Contains component CSS and supports scoped, module, and CSS language attributes.",
+            "<style>\n\t$0\n</style>",
+            "04"),
+    ];
+
     internal static IReadOnlyList<LanguageCompletionItem> TemplateHeaderOptions { get; } =
     [
         Text("lang=\"html\"", LanguageCompletionItemKind.Property, "Template language", "Selects HTML template syntax.", "01"),
@@ -34,6 +62,12 @@ internal static class ViuCompletionCatalog
     internal static IReadOnlyList<LanguageCompletionItem> ScriptHeaderOptions { get; } =
     [
         Text("lang=\"csharp\"", LanguageCompletionItemKind.Property, "Script language", "Selects the C# script language.", "01"),
+    ];
+
+    internal static IReadOnlyList<LanguageCompletionItem> VueScriptHeaderOptions { get; } =
+    [
+        Text("lang=\"csharp\"", LanguageCompletionItemKind.Property, "Script language", "Selects the C# script language.", "01"),
+        Text("setup", LanguageCompletionItemKind.Keyword, "Setup script", "Selects the second C# script slot and merges its members into the generated partial component.", "02"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> StyleHeaderOptions { get; } =

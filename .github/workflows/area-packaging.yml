@@ -10,6 +10,8 @@ on:
       - 'sdks/**'
       - 'frameworks/**'
       - 'scripts/Install-Local.ps1'
+      - 'scripts/Test-UtilityCssArtifactShape.ps1'
+      - 'scripts/Test-UtilityCssIndependence.ps1'
       - 'libraries/**'
       - 'analyzers/**'
       - 'build/**'
@@ -25,6 +27,8 @@ on:
       - 'sdks/**'
       - 'frameworks/**'
       - 'scripts/Install-Local.ps1'
+      - 'scripts/Test-UtilityCssArtifactShape.ps1'
+      - 'scripts/Test-UtilityCssIndependence.ps1'
       - 'libraries/**'
       - 'analyzers/**'
       - 'build/**'
@@ -53,6 +57,25 @@ jobs:
       - name: Pack SDK, runtime pack, and ref pack
         shell: pwsh
         run: ./scripts/Install-Local.ps1
+
+      - name: Verify standalone utility dependency boundary
+        shell: pwsh
+        run: >-
+          ./scripts/Test-UtilityCssIndependence.ps1
+          -Artifact (Get-ChildItem _out/packages -Filter '*.nupkg' | ForEach-Object FullName)
+
+      - name: Verify SDK utility payload
+        shell: pwsh
+        run: |
+          $sdkPackages = @(
+            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.Sdk.*.nupkg'
+          )
+          if ($sdkPackages.Count -ne 1) {
+            throw "Expected exactly one SDK package, found $($sdkPackages.Count)."
+          }
+
+          ./scripts/Test-UtilityCssArtifactShape.ps1 `
+            -SdkPackage $sdkPackages[0].FullName
 
       - name: Assert package shapes
         shell: pwsh
@@ -135,9 +158,16 @@ jobs:
             $requiredSdkEntries = @(
               'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
               'Tasks/Assimalign.Viu.Sdk.Tasks.deps.json',
+              'Tasks/Assimalign.Viu.Syntax.dll',
+              'Tasks/Assimalign.Viu.Syntax.Css.dll',
+              'Tasks/Assimalign.Viu.Syntax.SingleFileComponent.dll',
+              'Tasks/Assimalign.Viu.Syntax.Templates.dll',
+              'Tasks/Assimalign.Viu.Tooling.Css.dll',
+              'Tasks/Assimalign.Viu.Tooling.UtilityCss.dll',
               'Targets/Assimalign.Viu.Generators.Syntax.props',
               'Targets/Assimalign.Viu.Generators.Syntax.targets',
-              'Targets/Assimalign.Viu.Sdk.Css.Bundling.targets'
+              'Targets/Assimalign.Viu.Sdk.Css.Bundling.targets',
+              'Targets/Assimalign.Viu.Sdk.UtilityCss.targets'
             )
             foreach ($entryName in $requiredSdkEntries) {
               if ($null -eq $sdkArchive.GetEntry($entryName)) {

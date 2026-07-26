@@ -80,6 +80,26 @@ internal readonly record struct SingleFileComponentModel(
     EquatableArray<CssVariableBindingEntry> CssVariableBindings)
 {
     /// <summary>
+    /// The tag-based C# <c>&lt;script setup&gt;</c> block's emission regions. Viu treats this explicitly
+    /// C# block as partial-class member shorthand; JavaScript setup macros and runtime evaluation remain
+    /// unsupported. <see cref="ScriptRegions.None"/> for canonical <c>.viu</c> files and tag-based
+    /// components without a setup script.
+    /// </summary>
+    public ScriptRegions ScriptSetup { get; init; }
+
+    /// <summary>
+    /// Whether the tag-based setup script precedes the ordinary script in the authored source. The
+    /// emitter preserves this order because C# field-initializer order is observable.
+    /// </summary>
+    public bool IsScriptSetupFirst { get; init; }
+
+    /// <summary>
+    /// The [V01.01.06.05] development identity and independent block hashes, or
+    /// <see langword="null"/> when Debug metadata emission is disabled.
+    /// </summary>
+    public SingleFileComponentHotReloadMetadata? HotReloadMetadata { get; init; }
+
+    /// <summary>
     /// Materializes the template compiler's <see cref="BindingMetadata"/> from the classified
     /// <see cref="Bindings"/>. This is the consumable form the render-code-generation path
     /// ([V01.01.05.04]/[V01.01.05.05]) reads to decide where a <c>Reference&lt;T&gt;.Value</c> unwrap

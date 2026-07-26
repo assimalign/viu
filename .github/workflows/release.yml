@@ -1,7 +1,8 @@
 # Official Viu release pipeline.
 #
 # main merge -> uniquely versioned beta packages in GitHub Packages, plus a
-#               Marketplace preview when extensions/VisualStudio changed.
+#               Marketplace preview when the Visual Studio extension or one of its embedded
+#               language-engine dependencies changed.
 # GitHub
 # Release    -> stable packages in nuget.org through OIDC trusted publishing.
 name: release
@@ -51,6 +52,12 @@ jobs:
               Where-Object {
                 $_.StartsWith(
                   'extensions/VisualStudio/',
+                  [System.StringComparison]::Ordinal) -or
+                $_.StartsWith(
+                  'libraries/Assimalign.Viu.Syntax',
+                  [System.StringComparison]::Ordinal) -or
+                $_.StartsWith(
+                  'libraries/Assimalign.Viu.Tooling.UtilityCss/',
                   [System.StringComparison]::Ordinal)
               }
           ).Count -gt 0
@@ -152,6 +159,25 @@ jobs:
           VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/Pack-Release.ps1 -Version $env:VIU_PACKAGE_VERSION
 
+      - name: Verify utility release artifacts
+        shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $packageDirectory = '_out/release/packages'
+          $sdkPackage = Join-Path `
+            $packageDirectory `
+            "Assimalign.Viu.Sdk.$($env:VIU_PACKAGE_VERSION).nupkg"
+          $utilityPackage = Join-Path `
+            $packageDirectory `
+            "Assimalign.Viu.Tooling.UtilityCss.$($env:VIU_PACKAGE_VERSION).nupkg"
+
+          ./scripts/Test-UtilityCssArtifactShape.ps1 `
+            -SdkPackage $sdkPackage `
+            -UtilityCssPackage $utilityPackage
+          ./scripts/Test-UtilityCssIndependence.ps1 `
+            -Artifact (Get-ChildItem $packageDirectory -Filter '*.nupkg' | ForEach-Object FullName)
+
       - name: Verify package checksums
         shell: bash
         working-directory: _out/release/packages
@@ -200,8 +226,8 @@ jobs:
         run: |
           $packageDirectory = '_release/packages'
           $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
-          if ($packageFiles.Count -ne 20) {
-            throw "Expected 20 release packages, found $($packageFiles.Count)."
+          if ($packageFiles.Count -ne 21) {
+            throw "Expected 21 release packages, found $($packageFiles.Count)."
           }
 
           foreach ($packageFile in $packageFiles) {
@@ -222,7 +248,7 @@ jobs:
           @"
           ## Published beta packages
 
-          Published all 20 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to the
+          Published all 21 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to the
           Assimalign GitHub Packages feed.
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -269,8 +295,8 @@ jobs:
         run: |
           $packageDirectory = '_release/packages'
           $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
-          if ($packageFiles.Count -ne 20) {
-            throw "Expected 20 release packages, found $($packageFiles.Count)."
+          if ($packageFiles.Count -ne 21) {
+            throw "Expected 21 release packages, found $($packageFiles.Count)."
           }
 
           foreach ($packageFile in $packageFiles) {
@@ -291,7 +317,7 @@ jobs:
           @"
           ## Published stable packages
 
-          Published all 20 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to
+          Published all 21 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to
           [nuget.org](https://www.nuget.org/profiles/Assimalign).
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -504,6 +530,15 @@ jobs:
 
           $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
           Write-Host "Validated preview VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
+
+      - name: Verify Marketplace utility payload
+        shell: pwsh
+        run: |
+          $extensionPath = '_out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix'
+          ./scripts/Test-UtilityCssArtifactShape.ps1 `
+            -VisualStudioExtension $extensionPath
+          ./scripts/Test-UtilityCssIndependence.ps1 `
+            -Artifact $extensionPath
 
       - name: Upload Marketplace preview artifact
         # actions/upload-artifact v4

@@ -415,7 +415,7 @@ public sealed class SingleFileComponentScriptTests
             StyleCount: 0,
             CustomBlockCount: 0,
             FilePath: "C:/proj/Counter.viu",
-            Script: new ScriptRegions(null, 0, "    public Reference<int> Count = default!;\n", 1),
+            Script: new ScriptRegions(null, 0, 0, "    public Reference<int> Count = default!;\n", 1, 1),
             Bindings: bindings,
             RenderBody: null,
             RenderCacheSize: 0,

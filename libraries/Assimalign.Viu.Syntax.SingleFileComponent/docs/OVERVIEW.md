@@ -1,21 +1,29 @@
 # Assimalign.Viu.Syntax.SingleFileComponent — overview
 
-The build-time parser for the `.viu` single-file component (SFC) — the Viu counterpart of Vue's
-`.vue` files and the role [`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/main/packages/compiler-sfc)
-`parse()` plays: it slices a `.viu` file into its blocks and records their source spans. It does
-**not** parse the contents of a block — the template markup, C#, and CSS inside are parsed by other
-libraries. Area: `V01.01.06`.
+The build-time parsers for Viu single-file components. `SingleFileComponentParser` owns the canonical
+`.viu` `@`-block container; the isolated [V01.01.06.09] `VueSingleFileComponentParser` compatibility
+entry point slices tag-based `.vue` containers according to Vue 3.5's SFC-root rules. Both record exact
+source spans and **do not** parse block contents — template markup, C#, and CSS are parsed by other
+libraries. They fill the role
+[`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/v3.5.34/packages/compiler-sfc) `parse()`
+plays at the block boundary. Area: `V01.01.06`.
 
-Downstream, the source generator turns a `@template`-bearing `.viu` into a **mountable component** — the
-compiled render function, the merged `@script`, and the `IComponentTemplate` bridge
-([V01.01.06.07]). Applications register the generated type with their `IComponentFactory` and
-request it through `ComponentTree.Template<TComponent>()`, either as the root supplied to
-`BrowserApplication.CreateBuilder` or as a child. A `@style`-only `.viu` stays a CSS-bundle unit.
+Downstream, the source generator turns a template-bearing `.viu` or `.vue` file into a **mountable
+component** — the compiled render function, merged C# script, compiled styles, and the
+`IComponentTemplate` bridge ([V01.01.06.07], [V01.01.06.09]). Both ordinary and setup `.vue` scripts
+must explicitly use `lang="csharp"`; each is merged as C# partial-class members with an exact source
+map, while JavaScript and Vue's JavaScript compiler macros are never executed. Applications register
+the generated type with their `IComponentFactory` and request it through
+`ComponentTree.Template<TComponent>()`, either as the root supplied to
+`BrowserApplication.CreateBuilder` or as a child. A style-only component stays a CSS-bundle unit.
 This library owns none of that; it only produces the descriptor those consumers read.
 
-The exact container syntax (the `@template`/`@script`/`@style` `@`-block grammar, the column-0
+The canonical container syntax (the `@template`/`@script`/`@style` `@`-block grammar, the column-0
 termination rule, options, diagnostics) is specified in [FORMAT.md](FORMAT.md) — the authoritative
-spec that the test suite pins.
+spec that the test suite pins. The packaged analyzer targets discover both formats, flow them through
+`AdditionalFiles` and the `dotnet watch` item graph, and feed their styles to the physical component
+bundle. Same-directory, same-base `.viu` takes deterministic precedence over `.vue` in both generator
+and bundle output. Visual Studio content-type routing remains a separate extension boundary.
 
 ## Public surface
 
@@ -24,12 +32,20 @@ spec that the test suite pins.
   `@vue/compiler-sfc`-parity entry point.
 - **`SingleFileComponentDescriptor`** — the parsed file, mirroring Vue's `SFCDescriptor`: `Template`
   (0/1), `Script` (0/1), `Styles` (0..n, source order), `CustomBlocks`, and `Source`.
+- **`VueSingleFileComponentParser`** (static) — parses a tag-based `.vue` source into
+  `VueSingleFileComponentParseResult`, with recoverable structural diagnostics.
+- **`VueSingleFileComponentDescriptor`** — the compatibility descriptor. It keeps distinct `Script`
+  and `ScriptSetup` slots, plus `Template`, repeated `Styles`, `CustomBlocks`, and `Source`, matching
+  Vue's valid one-ordinary-plus-one-setup-script shape without changing canonical `.viu` semantics.
 - **The block model** (`Blocks/`) — `SingleFileComponentBlock` and its
   `Template`/`Script`/`Style`/`CustomBlock` kinds, `SingleFileComponentBlockKind`, and
   `SingleFileComponentBlockOption`. Each block carries its raw content and exact-slice source spans.
 - **`SingleFileComponentSyntaxParser`** — the `AggregateSyntaxParser<SingleFileComponentBlock>`
   adapter (`ParseComponent`): same slicing, but each block is exposed to the registration seam as a
   `SyntaxSource` so build tooling can attach the template/style/custom parsers.
+- **`VueSingleFileComponentSyntaxParser`** — the equivalent aggregate adapter for tag-based `.vue`
+  sources. It dispatches template, ordinary script, setup script, repeated style, and custom blocks
+  through the same registered parser contracts while preserving their original block nodes and spans.
 - **Diagnostics** (`Diagnostics/`) — `SingleFileComponentError` and the Viu-defined
   `SingleFileComponentErrorCode` (1000-based).
 

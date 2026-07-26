@@ -5,5 +5,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+    <!-- Viu Utilities IntelliSense ([V01.01.12.07.01], #247) consumes the same candidate grammar,
+         variant registry, and eventual design-system catalog as build-time CSS generation. Keeping the
+         engine out of this project would force an editor-only catalog that can drift from emitted CSS. -->
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.UtilityCss" />
   </ItemGroup>
 </Project>

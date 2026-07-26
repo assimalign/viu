@@ -1,0 +1,4 @@
+<Project>
+  <!-- See Directory.Build.props: bypass the SDK package project's pack/copy targets. -->
+  <Import Project="..\..\..\Directory.Build.targets" />
+</Project>

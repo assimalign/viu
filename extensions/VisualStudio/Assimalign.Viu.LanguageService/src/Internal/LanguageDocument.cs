@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+
 using Assimalign.Viu.Syntax.SingleFileComponent;
 
 namespace Assimalign.Viu.LanguageService;
@@ -8,12 +11,12 @@ internal sealed class LanguageDocument
         string documentUri,
         string text,
         int? version,
-        SingleFileComponentParseResult parseResult)
+        LanguageDocumentSyntax syntax)
     {
         DocumentUri = documentUri;
         Text = text;
         Version = version;
-        ParseResult = parseResult;
+        Syntax = syntax;
     }
 
     internal string DocumentUri { get; }
@@ -22,8 +25,55 @@ internal sealed class LanguageDocument
 
     internal int? Version { get; }
 
-    internal SingleFileComponentParseResult ParseResult { get; }
+    internal LanguageDocumentSyntax Syntax { get; }
 
     internal static LanguageDocument Create(string documentUri, string text, int? version)
-        => new(documentUri, text, version, SingleFileComponentParser.Parse(text));
+    {
+        if (HasVueExtension(documentUri))
+        {
+            var result = VueSingleFileComponentParser.Parse(text);
+            return new LanguageDocument(
+                documentUri,
+                text,
+                version,
+                new LanguageDocumentSyntax(
+                    LanguageDocumentFormat.Vue,
+                    result.Descriptor.Template,
+                    result.Descriptor.Script,
+                    result.Descriptor.ScriptSetup,
+                    result.Descriptor.Styles,
+                    result.Descriptor.CustomBlocks,
+                    result.Errors));
+        }
+
+        var viuResult = SingleFileComponentParser.Parse(text);
+        return new LanguageDocument(
+            documentUri,
+            text,
+            version,
+            new LanguageDocumentSyntax(
+                LanguageDocumentFormat.Viu,
+                viuResult.Descriptor.Template,
+                viuResult.Descriptor.Script,
+                null,
+                viuResult.Descriptor.Styles,
+                viuResult.Descriptor.CustomBlocks,
+                viuResult.Errors));
+    }
+
+    private static bool HasVueExtension(string documentUri)
+    {
+        if (Uri.TryCreate(documentUri, UriKind.Absolute, out var uri) &&
+            uri.IsFile)
+        {
+            return string.Equals(
+                Path.GetExtension(uri.LocalPath),
+                ".vue",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return documentUri.EndsWith(
+            ".vue",
+            StringComparison.OrdinalIgnoreCase);
+    }
 }

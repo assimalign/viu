@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// A <c>@style</c> block — the component's CSS. Mirrors Vue 3.5's <c>SFCStyleBlock</c>
-/// (<c>@vue/compiler-sfc</c>), including the <c>scoped</c> and <c>module</c> options. A <c>.viu</c> file
-/// may contain several <c>@style</c> blocks (as Vue allows several <c>&lt;style&gt;</c> tags). See
+/// A style block — the component's CSS. Mirrors Vue 3.5's <c>SFCStyleBlock</c>
+/// (<c>@vue/compiler-sfc</c>), including the <c>scoped</c> and <c>module</c> options. A single-file
+/// component may contain several style blocks, as Vue allows several <c>&lt;style&gt;</c> tags. See
 /// https://vuejs.org/api/sfc-spec.html#style and https://vuejs.org/api/sfc-css-features.html.
 /// </summary>
 public sealed record SingleFileComponentStyleBlock : SingleFileComponentBlock

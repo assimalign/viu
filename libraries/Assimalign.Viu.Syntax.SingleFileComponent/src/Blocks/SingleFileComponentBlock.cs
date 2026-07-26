@@ -3,30 +3,29 @@ using System;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The base of every parsed <c>.viu</c> block: its name, options, raw content, and precise source
+/// The base of every parsed single-file-component block: its name, options, raw content, and precise source
 /// spans. Mirrors Vue 3.5's <c>SFCBlock</c> (<c>@vue/compiler-sfc</c> <c>parse.ts</c>) — one immutable,
 /// value-comparable record per block, deriving from the shared <see cref="SyntaxNode"/> for its
 /// <see cref="SyntaxNode.Location"/> span. The block <em>semantics</em> follow the Vue SFC specification
-/// (https://vuejs.org/api/sfc-spec.html); the <c>@name { }</c> container is the documented Viu
-/// divergence from Vue's tag wrappers. The inherited <see cref="SyntaxNode.Location"/> covers the whole
-/// block, from the <c>@</c> through the closing <c>}</c>.
+/// (https://vuejs.org/api/sfc-spec.html). The inherited <see cref="SyntaxNode.Location"/> covers the
+/// whole block, including either its <c>@name { }</c> or matching tag container.
 /// </summary>
 /// <remarks>
 /// Records give the block structural equality — the incremental-caching contract of [V01.01.06.01]:
 /// identical file content yields equal blocks (and equal descriptors), so [V01.01.06.02] can cache on
-/// the parse output. <see cref="Content"/> is the exact raw slice between the header line and the
-/// closing brace; it is never re-parsed here — the template compiler ([V01.01.05.01]) and script
-/// analysis ([V01.01.06.03]) consume it downstream.
+/// the parse output. <see cref="Content"/> is the exact raw slice inside the block container; it is
+/// never re-parsed here — the template compiler ([V01.01.05.01]) and script analysis
+/// ([V01.01.06.03]) consume it downstream.
 /// </remarks>
 public abstract record SingleFileComponentBlock : SyntaxNode
 {
-    /// <summary>The block name exactly as authored (e.g. <c>template</c>, <c>style</c>, <c>docs</c>).</summary>
+    /// <summary>The block name exactly as authored (for example, <c>template</c>, <c>style</c>, or <c>docs</c>).</summary>
     public required string Name { get; init; }
 
     /// <summary>The options on the block header, in source order.</summary>
     public required SyntaxList<SingleFileComponentBlockOption> Options { get; init; }
 
-    /// <summary>The raw block content — the exact source between the header line and the closing brace.</summary>
+    /// <summary>The raw block content — the exact source between the opening and closing container boundaries.</summary>
     public required string Content { get; init; }
 
     /// <summary>The source range covering the content region only (exactly what <see cref="Content"/> holds).</summary>
@@ -40,7 +39,7 @@ public abstract record SingleFileComponentBlock : SyntaxNode
 
     /// <summary>
     /// The <c>lang</c> option's value, or <see langword="null"/> when absent. Mirrors Vue's block
-    /// <c>lang</c> attribute (e.g. <c>@style lang="scss"</c>, <c>@script lang="csharp"</c>).
+    /// <c>lang</c> attribute (for example, <c>lang="scss"</c> on a style block).
     /// </summary>
     public string? Lang => GetOptionValue("lang");
 

@@ -11,6 +11,11 @@ internal sealed class ViuExtension : Extension
     /// <inheritdoc />
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
+        LoadedWhen = ActivationConstraint.Or(
+            ActivationConstraint.EditorContentType("viu"),
+            ActivationConstraint.SolutionHasProjectBuildProperty(
+                "ViuVisualStudioLanguageServiceEnabled",
+                "^[Tt]rue$")),
         Metadata = new(
             id: "Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c",
             version: this.ExtensionAssemblyVersion,

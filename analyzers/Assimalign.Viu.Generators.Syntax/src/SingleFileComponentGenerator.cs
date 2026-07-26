@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 using Microsoft.CodeAnalysis;
 
+using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
 using Assimalign.Viu.Tooling.Css;
@@ -10,7 +12,8 @@ using Assimalign.Viu.Tooling.Css;
 namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
-/// The incremental source generator for <c>.viu</c> single-file components — the composition root of the
+/// The incremental source generator for canonical <c>.viu</c> and compatible tag-based <c>.vue</c>
+/// single-file components — the composition root of the
 /// <c>Assimalign.Viu.Syntax.*</c> cluster ([V01.01.06.02]). It is the C# analog of consuming
 /// <c>@vue/compiler-sfc</c> through <c>@vitejs/plugin-vue</c>: MSBuild flows every <c>.viu</c> file in as
 /// an <see cref="AdditionalText"/>, this generator parses each one with the composed
@@ -24,13 +27,22 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// tests pin. The scaffold body is intentionally a shell: the render function is [V01.01.05.05]'s output
 /// and the merged <c>@script</c> C# is [V01.01.06.03]'s; this generator emits their seams only.
 /// </para>
+/// <para>
+/// For Debug builds, or when explicitly enabled by <c>ViuEmitHotReloadMetadata</c>, the generator also
+/// emits [V01.01.06.05]'s path-stable component identity, independent template/script/style hashes, and
+/// one consumer-assembly <c>MetadataUpdateHandler</c> that forwards applied deltas to Core. Ordinary
+/// Release builds omit that entire development surface.
+/// </para>
 /// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 {
     private const string ViuExtension = ".viu";
+    private const string VueExtension = ".vue";
     private const string RootNamespaceProperty = "build_property.RootNamespace";
     private const string ProjectDirectoryProperty = "build_property.ProjectDir";
+    private const string ConfigurationProperty = "build_property.Configuration";
+    private const string EmitHotReloadMetadataProperty = "build_property.ViuEmitHotReloadMetadata";
 
     /// <summary>Pipeline step tracking name for the file-read transform (used by incremental-cache tests).</summary>
     public const string FileTrackingName = "SingleFileComponentFile";
@@ -42,6 +54,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     // composition lives in the shared Tooling core ([V01.01.12.12]) so the ViuBundleCss task builds the
     // identical parser and reproduces this generator's ExtractedStyles byte-for-byte.
     private static readonly SingleFileComponentSyntaxParser Parser = SingleFileComponentParserFactory.Create();
+    private static readonly VueSingleFileComponentSyntaxParser VueParser = SingleFileComponentParserFactory.CreateVue();
 
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -52,63 +65,376 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         {
             provider.GlobalOptions.TryGetValue(RootNamespaceProperty, out var rootNamespace);
             provider.GlobalOptions.TryGetValue(ProjectDirectoryProperty, out var projectDirectory);
-            return new ProjectOptions(rootNamespace, projectDirectory);
+            provider.GlobalOptions.TryGetValue(ConfigurationProperty, out var configuration);
+            provider.GlobalOptions.TryGetValue(EmitHotReloadMetadataProperty, out var emitHotReloadMetadata);
+            return new ProjectOptions(
+                rootNamespace,
+                projectDirectory,
+                ShouldEmitHotReloadMetadata(configuration, emitHotReloadMetadata));
         });
 
-        var files = context.AdditionalTextsProvider
+        var canonicalFileKeys = context.AdditionalTextsProvider
             .Where(static text => IsViuFile(text.Path))
+            .Select(static (text, _) => ComponentBasePath(text.Path))
+            .Collect();
+
+        var files = context.AdditionalTextsProvider
+            .Where(static text => IsSingleFileComponentFile(text.Path))
             .Combine(projectOptions)
-            .Select(static (pair, cancellationToken) => ReadFile(pair.Left, pair.Right, cancellationToken))
+            .Combine(canonicalFileKeys)
+            .Select(static (pair, cancellationToken) => ReadFile(
+                pair.Left.Left,
+                pair.Left.Right,
+                pair.Right,
+                cancellationToken))
             .WithTrackingName(FileTrackingName);
 
         var results = files
+            .Where(static file => !file.HasCanonicalPeer)
             .Select(static (file, cancellationToken) => BuildResult(file, cancellationToken))
             .WithTrackingName(ModelTrackingName);
 
+        var collisions = files
+            .Where(static file => file.HasCanonicalPeer)
+            .Select(static (file, _) => SingleFileComponentDiagnostics.CreateFileRule(
+                SingleFileComponentDiagnostics.ConflictingComponentFormats,
+                "The compatibility .vue source is shadowed by a same-directory, same-base .viu source. " +
+                "The canonical .viu component takes precedence.",
+                file.FilePath));
+
         context.RegisterSourceOutput(results, static (production, result) => Execute(production, result));
+        context.RegisterSourceOutput(collisions, static (production, diagnostic) =>
+            production.ReportDiagnostic(diagnostic.ToDiagnostic()));
+        context.RegisterSourceOutput(
+            projectOptions,
+            static (production, options) =>
+            {
+                if (options.EmitHotReloadMetadata)
+                {
+                    production.AddSource(
+                        SingleFileComponentHotReloadHandlerEmitter.HintName,
+                        SingleFileComponentHotReloadHandlerEmitter.Emit());
+                }
+            });
     }
+
+    private static bool IsSingleFileComponentFile(string path)
+        => IsViuFile(path) || IsVueFile(path);
 
     private static bool IsViuFile(string path)
         => path.EndsWith(ViuExtension, StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsVueFile(string path)
+        => path.EndsWith(VueExtension, StringComparison.OrdinalIgnoreCase);
+
     private static SingleFileComponentFile ReadFile(
         AdditionalText additionalText,
         ProjectOptions options,
+        ImmutableArray<string> canonicalFileKeys,
         System.Threading.CancellationToken cancellationToken)
     {
         var text = additionalText.GetText(cancellationToken);
         var content = text?.ToString() ?? string.Empty;
         var names = SingleFileComponentNameResolver.Resolve(additionalText.Path, options.ProjectDirectory, options.RootNamespace);
         var scopeId = StyleScopeId.Resolve(additionalText.Path, options.ProjectDirectory);
+        var format = IsVueFile(additionalText.Path)
+            ? SingleFileComponentFormat.Vue
+            : SingleFileComponentFormat.Viu;
         return new SingleFileComponentFile(
+            format,
             additionalText.Path,
             LeafFileName(additionalText.Path),
             content,
             names.Namespace,
             names.ClassName,
             names.HintName,
-            scopeId);
+            scopeId,
+            options.EmitHotReloadMetadata
+                ? SingleFileComponentHotReloadMetadataFactory.ResolveComponentIdentifier(
+                    additionalText.Path,
+                    options.ProjectDirectory)
+                : null,
+            HasCanonicalPeer(format, additionalText.Path, canonicalFileKeys));
+    }
+
+    private static bool ShouldEmitHotReloadMetadata(
+        string? configuration,
+        string? configuredValue)
+    {
+        if (!string.IsNullOrEmpty(configuredValue))
+        {
+            return string.Equals(configuredValue, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(configuration, "Debug", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasCanonicalPeer(
+        SingleFileComponentFormat format,
+        string filePath,
+        ImmutableArray<string> canonicalFileKeys)
+    {
+        if (format != SingleFileComponentFormat.Vue)
+        {
+            return false;
+        }
+
+        var key = ComponentBasePath(filePath);
+        foreach (var canonicalKey in canonicalFileKeys)
+        {
+            if (string.Equals(
+                    key,
+                    canonicalKey,
+                    SingleFileComponentPathComparison.Comparison))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string ComponentBasePath(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        return normalized.Length >= ViuExtension.Length
+            ? normalized.Substring(0, normalized.Length - ViuExtension.Length)
+            : normalized;
     }
 
     private static SingleFileComponentGeneratorResult BuildResult(
         SingleFileComponentFile file,
         System.Threading.CancellationToken cancellationToken)
     {
-        var parse = Parser.ParseComponent(file.Text, cancellationToken);
-        var descriptor = parse.Descriptor;
-
-        var diagnostics = new List<DiagnosticInfo>();
-
-        // Container diagnostics: the .viu block parser reports file-relative positions.
-        foreach (var diagnostic in parse.Diagnostics)
+        if (file.Format == SingleFileComponentFormat.Vue)
         {
-            diagnostics.Add(SingleFileComponentDiagnostics.Create(file.FilePath, diagnostic, fromTemplate: false, blockContentStart: null));
+            var parse = VueParser.ParseComponent(file.Text, cancellationToken);
+            var diagnostics = new List<DiagnosticInfo>();
+            AddParseDiagnostics(file, parse, diagnostics);
+
+            SingleFileComponentScriptBlock? script = null;
+            if (parse.Descriptor.Script is { } ordinaryScript
+                && ValidateVueScriptLanguage(file, ordinaryScript, diagnostics))
+            {
+                script = ordinaryScript;
+            }
+
+            SingleFileComponentScriptBlock? scriptSetup = null;
+            if (parse.Descriptor.ScriptSetup is { } authoredScriptSetup
+                && ValidateVueScriptLanguage(file, authoredScriptSetup, diagnostics))
+            {
+                scriptSetup = authoredScriptSetup;
+            }
+
+            return BuildResult(
+                file,
+                parse,
+                parse.Descriptor.Template,
+                script,
+                scriptSetup,
+                parse.Descriptor.Styles.Count,
+                parse.Descriptor.CustomBlocks.Count,
+                diagnostics,
+                CreateHotReloadMetadata(
+                    file,
+                    parse.Descriptor.Template,
+                    parse.Descriptor.Script,
+                    parse.Descriptor.ScriptSetup,
+                    parse.Descriptor.Styles),
+                cancellationToken);
         }
 
-        // Dispatched-block diagnostics: each registered parser reports positions relative to the block's
-        // content, so compose them with the block's content-start position to reach file coordinates. The
-        // origin (template vs style) selects the diagnostic envelope so a CSS error lands under the style
-        // descriptors ([V01.01.06.04]).
+        var viuParse = Parser.ParseComponent(file.Text, cancellationToken);
+        var viuDiagnostics = new List<DiagnosticInfo>();
+        AddParseDiagnostics(file, viuParse, viuDiagnostics);
+        return BuildResult(
+            file,
+            viuParse,
+            viuParse.Descriptor.Template,
+            viuParse.Descriptor.Script,
+            scriptSetup: null,
+            viuParse.Descriptor.Styles.Count,
+            viuParse.Descriptor.CustomBlocks.Count,
+            viuDiagnostics,
+            CreateHotReloadMetadata(
+                file,
+                viuParse.Descriptor.Template,
+                viuParse.Descriptor.Script,
+                scriptSetup: null,
+                viuParse.Descriptor.Styles),
+            cancellationToken);
+    }
+
+    private static SingleFileComponentGeneratorResult BuildResult(
+        SingleFileComponentFile file,
+        AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
+        SingleFileComponentTemplateBlock? template,
+        SingleFileComponentScriptBlock? script,
+        SingleFileComponentScriptBlock? scriptSetup,
+        int styleCount,
+        int customBlockCount,
+        List<DiagnosticInfo> diagnostics,
+        SingleFileComponentHotReloadMetadata? hotReloadMetadata,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        var scriptRegions = ScriptRegions.None;
+        var scriptBindings = EquatableArray<ScriptBinding>.Empty;
+        if (script is not null)
+        {
+            var analysis = ScriptBlockAnalyzer.Analyze(
+                file.FilePath,
+                script,
+                diagnostics,
+                reservesGeneratedMembers: template is not null);
+            scriptRegions = analysis.Regions;
+            scriptBindings = analysis.Bindings;
+        }
+
+        var scriptSetupRegions = ScriptRegions.None;
+        var scriptSetupBindings = EquatableArray<ScriptBinding>.Empty;
+        if (scriptSetup is not null)
+        {
+            var analysis = ScriptBlockAnalyzer.Analyze(
+                file.FilePath,
+                scriptSetup,
+                diagnostics,
+                reservesGeneratedMembers: template is not null);
+            scriptSetupRegions = analysis.Regions;
+            scriptSetupBindings = analysis.Bindings;
+        }
+
+        var bindings = MergeBindingsInSourceOrder(
+            script,
+            scriptBindings,
+            scriptSetup,
+            scriptSetupBindings);
+        var hasScript = script is not null || scriptSetup is not null;
+        var bindingMetadata = SingleFileComponentModel.BuildBindingMetadata(hasScript, bindings);
+
+        var moduleClasses = new List<CssModuleClassEntry>();
+        var cssVariableBindings = new List<CssVariableBindingEntry>();
+        var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        var (scopeId, extractedStyles) = CompileStyles(
+            file, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken);
+
+        var model = new SingleFileComponentModel(
+            file.Namespace,
+            file.ClassName,
+            file.FileName,
+            file.HintName,
+            HasTemplate: template is not null,
+            HasScript: hasScript,
+            StyleCount: styleCount,
+            CustomBlockCount: customBlockCount,
+            FilePath: file.FilePath,
+            Script: scriptRegions,
+            Bindings: bindings,
+            RenderBody: null,
+            RenderCacheSize: 0,
+            ScopeId: scopeId,
+            ExtractedStyles: extractedStyles,
+            ModuleClasses: moduleClasses.Count == 0
+                ? EquatableArray<CssModuleClassEntry>.Empty
+                : new EquatableArray<CssModuleClassEntry>(moduleClasses.ToArray()),
+            CssVariableBindings: cssVariableBindings.Count == 0
+                ? EquatableArray<CssVariableBindingEntry>.Empty
+                : new EquatableArray<CssVariableBindingEntry>(cssVariableBindings.ToArray()))
+        {
+            ScriptSetup = scriptSetupRegions,
+            IsScriptSetupFirst =
+                scriptSetup is not null &&
+                script is not null &&
+                scriptSetup.ContentLocation.Start.Offset < script.ContentLocation.Start.Offset,
+            HotReloadMetadata = hotReloadMetadata,
+        };
+
+        var cssModules = BuildCssModuleAccessors(moduleClasses, moduleTemplateNames);
+        var render = CompileRenderFunction(file, parse, bindingMetadata, cssModules, diagnostics, cancellationToken);
+        model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
+
+        var array = diagnostics.Count == 0
+            ? EquatableArray<DiagnosticInfo>.Empty
+            : new EquatableArray<DiagnosticInfo>(diagnostics.ToArray());
+
+        return new SingleFileComponentGeneratorResult(model, array);
+    }
+
+    private static SingleFileComponentHotReloadMetadata? CreateHotReloadMetadata(
+        SingleFileComponentFile file,
+        SingleFileComponentTemplateBlock? template,
+        SingleFileComponentScriptBlock? script,
+        SingleFileComponentScriptBlock? scriptSetup,
+        IReadOnlyList<SingleFileComponentStyleBlock> styles)
+    {
+        if (file.HotReloadComponentIdentifier is not { } componentIdentifier)
+        {
+            return null;
+        }
+
+        return SingleFileComponentHotReloadMetadataFactory.Create(
+            componentIdentifier,
+            template,
+            script,
+            scriptSetup,
+            styles);
+    }
+
+    private static EquatableArray<ScriptBinding> MergeBindingsInSourceOrder(
+        SingleFileComponentScriptBlock? script,
+        EquatableArray<ScriptBinding> scriptBindings,
+        SingleFileComponentScriptBlock? scriptSetup,
+        EquatableArray<ScriptBinding> scriptSetupBindings)
+    {
+        if (scriptBindings.Count == 0)
+        {
+            return scriptSetupBindings;
+        }
+
+        if (scriptSetupBindings.Count == 0)
+        {
+            return scriptBindings;
+        }
+
+        var merged = new List<ScriptBinding>(scriptBindings.Count + scriptSetupBindings.Count);
+        if (scriptSetup is not null &&
+            (script is null || scriptSetup.ContentLocation.Start.Offset < script.ContentLocation.Start.Offset))
+        {
+            AppendBindings(merged, scriptSetupBindings);
+            AppendBindings(merged, scriptBindings);
+        }
+        else
+        {
+            AppendBindings(merged, scriptBindings);
+            AppendBindings(merged, scriptSetupBindings);
+        }
+
+        return new EquatableArray<ScriptBinding>(merged.ToArray());
+    }
+
+    private static void AppendBindings(
+        ICollection<ScriptBinding> destination,
+        EquatableArray<ScriptBinding> source)
+    {
+        foreach (var binding in source)
+        {
+            destination.Add(binding);
+        }
+    }
+
+    private static void AddParseDiagnostics(
+        SingleFileComponentFile file,
+        AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
+        List<DiagnosticInfo> diagnostics)
+    {
+        foreach (var diagnostic in parse.Diagnostics)
+        {
+            diagnostics.Add(SingleFileComponentDiagnostics.Create(
+                file.FilePath,
+                diagnostic,
+                fromTemplate: false,
+                blockContentStart: null));
+        }
+
         foreach (var sourceResult in parse.SourceResults)
         {
             var blockContentStart = sourceResult.Node.ContentLocation.Start;
@@ -128,76 +454,52 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 diagnostics.Add(SingleFileComponentDiagnostics.Create(file.FilePath, diagnostic, fromTemplate, blockContentStart));
             }
         }
+    }
 
-        // [V01.01.06.03]/[V01.01.06.03.01] @script integration: when the component declares a script,
-        // split it into a hoisted using region and a class-body member region, validate both, and extract
-        // binding metadata (routing any Roslyn parse diagnostics onto the .viu file). The regions carry
-        // their own #line anchors so the emitter maps each back to the .viu source. This runs before @style
-        // compilation because the v-bind() CSS rewriting ([V01.01.06.06.01]) needs the same binding metadata.
-        var scriptRegions = ScriptRegions.None;
-        var bindings = EquatableArray<ScriptBinding>.Empty;
-        if (descriptor.Script is { } script)
+    private static bool ValidateVueScriptLanguage(
+        SingleFileComponentFile file,
+        SingleFileComponentScriptBlock script,
+        List<DiagnosticInfo> diagnostics)
+    {
+        if (string.Equals(script.Lang, "csharp", StringComparison.Ordinal))
         {
-            var analysis = ScriptBlockAnalyzer.Analyze(
-                file.FilePath,
-                script,
-                diagnostics,
-                reservesGeneratedMembers: descriptor.Template is not null);
-            scriptRegions = analysis.Regions;
-            bindings = analysis.Bindings;
+            return true;
         }
 
-        var bindingMetadata = SingleFileComponentModel.BuildBindingMetadata(descriptor.Script is not null, bindings);
+        var languageOption = FindOption(script, "lang");
+        var authoredLanguage = script.Lang is null ? "an implicit JavaScript language" : $"'{script.Lang}'";
+        diagnostics.Add(SingleFileComponentDiagnostics.CreateRule(
+            SingleFileComponentDiagnostics.UnsupportedScriptLanguage,
+            $"The .vue script uses {authoredLanguage}. Viu accepts only an explicit lang=\"csharp\" " +
+            "attribute and never executes JavaScript.",
+            file.FilePath,
+            languageOption?.Location ?? OpeningTagLocation(file.Text, script)));
+        return false;
+    }
 
-        // [V01.01.06.04]/[V01.01.06.06] @style compilation: scoped blocks are rewritten with the component's
-        // scope id, `module` blocks have their class names locally hashed, `v-bind()` usages become
-        // component-scoped custom properties (with their expressions routed through the same binding-metadata
-        // rewriting the render path uses, [V01.01.06.06.01]), and non-scoped/non-module/non-v-bind blocks pass
-        // through unmodified. The scope id, extracted CSS, module class map, and v-bind bindings surface in the model.
-        var moduleClasses = new List<CssModuleClassEntry>();
-        var cssVariableBindings = new List<CssVariableBindingEntry>();
-        var moduleTemplateNames = new Dictionary<string, string>(StringComparer.Ordinal);
-        var (scopeId, extractedStyles) = CompileStyles(
-            file, parse, diagnostics, moduleClasses, cssVariableBindings, moduleTemplateNames, bindingMetadata, cancellationToken);
+    private static SingleFileComponentBlockOption? FindOption(
+        SingleFileComponentBlock block,
+        string name)
+    {
+        foreach (var option in block.Options)
+        {
+            if (string.Equals(option.Name, name, StringComparison.Ordinal))
+            {
+                return option;
+            }
+        }
 
-        var model = new SingleFileComponentModel(
-            file.Namespace,
-            file.ClassName,
-            file.FileName,
-            file.HintName,
-            HasTemplate: descriptor.Template is not null,
-            HasScript: descriptor.Script is not null,
-            StyleCount: descriptor.Styles.Count,
-            CustomBlockCount: descriptor.CustomBlocks.Count,
-            FilePath: file.FilePath,
-            Script: scriptRegions,
-            Bindings: bindings,
-            RenderBody: null,
-            RenderCacheSize: 0,
-            ScopeId: scopeId,
-            ExtractedStyles: extractedStyles,
-            ModuleClasses: moduleClasses.Count == 0
-                ? EquatableArray<CssModuleClassEntry>.Empty
-                : new EquatableArray<CssModuleClassEntry>(moduleClasses.ToArray()),
-            CssVariableBindings: cssVariableBindings.Count == 0
-                ? EquatableArray<CssVariableBindingEntry>.Empty
-                : new EquatableArray<CssVariableBindingEntry>(cssVariableBindings.ToArray()));
+        return null;
+    }
 
-        // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the script's classified bindings drive the
-        // template compiler's ref-unwrapping decisions, so an IReactiveReference<T> member reads as
-        // `.Value` in
-        // the emitted render body instead of falling back to `_ctx.`. The CSS module accessors
-        // ([V01.01.05.04.01] -> [V01.01.06.06]) let a `$style.<class>` template reference resolve to the
-        // emitted accessor class instead of a phantom `_ctx` member.
-        var cssModules = BuildCssModuleAccessors(moduleClasses, moduleTemplateNames);
-        var render = CompileRenderFunction(file, parse, bindingMetadata, cssModules, diagnostics, cancellationToken);
-        model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
-
-        var array = diagnostics.Count == 0
-            ? EquatableArray<DiagnosticInfo>.Empty
-            : new EquatableArray<DiagnosticInfo>(diagnostics.ToArray());
-
-        return new SingleFileComponentGeneratorResult(model, array);
+    private static SourceLocation OpeningTagLocation(string source, SingleFileComponentBlock block)
+    {
+        var start = block.Location.Start;
+        var end = block.ContentLocation.Start;
+        return new SourceLocation(
+            start,
+            end,
+            source.Substring(start.Offset, end.Offset - start.Offset));
     }
 
     /// <summary>
@@ -209,7 +511,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     /// </summary>
     private static (string? Body, int CacheSize) CompileRenderFunction(
         SingleFileComponentFile file,
-        SingleFileComponentSyntaxParserResult parse,
+        AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         BindingMetadata bindingMetadata,
         CssModuleAccessors cssModules,
         List<DiagnosticInfo> diagnostics,
@@ -277,7 +579,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     /// </summary>
     private static (string? ScopeId, string? ExtractedStyles) CompileStyles(
         SingleFileComponentFile file,
-        SingleFileComponentSyntaxParserResult parse,
+        AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         List<DiagnosticInfo> diagnostics,
         List<CssModuleClassEntry> moduleClasses,
         List<CssVariableBindingEntry> cssVariableBindings,

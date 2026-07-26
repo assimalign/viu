@@ -1,7 +1,7 @@
 <Project>
     <Import Project="..\Directory.Build.targets" />
     <PropertyGroup>
-        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectSdkWatchFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
     </PropertyGroup>
     <ItemGroup>
         <!-- The SDK-shaped nupkg layout: Sdk/ and Targets/ at package root -
@@ -29,6 +29,10 @@
               Pack="true" PackagePath="Targets\Assimalign.Viu.Generators.Syntax.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
+        <None Include="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
+              Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.UtilityCss.targets" Visible="false" />
+        <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
+              Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.HotReload.targets" Visible="false" />
 
         <!--
             Framework static web assets. A FrameworkReference delivers DLLs
@@ -60,6 +64,10 @@
         <Copy SourceFiles="@(_ViuSdkTargetsFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" />
+        <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
+              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.UtilityCss.targets" />
+        <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
+              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Css.HotReload.targets" />
         <ItemGroup>
             <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*" />
         </ItemGroup>
@@ -114,8 +122,23 @@
 
     <Target Name="CollectSdkTaskFiles">
         <ItemGroup>
-            <TfmSpecificPackageFile Include="$(OutDir)**\*" Exclude="$(OutDir)**\*.nupkg;$(OutDir)**\*.snupkg;$(OutDir)**\*.nuspec">
+            <TfmSpecificPackageFile Include="$(OutDir)**\*"
+                                    Exclude="$(OutDir)**\*.nupkg;$(OutDir)**\*.snupkg;$(OutDir)**\*.nuspec;$(OutDir)Assimalign.Viu.Sdk.CssHotReload.*">
                 <PackagePath>Tasks\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+
+    <Target Name="CollectSdkWatchFiles">
+        <ItemGroup>
+            <!-- Keep the SDK archive platform-neutral and immune to stale apphosts or symbols in
+                 the shared output directory. ViuStartCssHotReloadWorker launches the DLL through
+                 dotnet, so these three managed-host files are the complete shipping contract. -->
+            <_ViuSdkWatchFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Watch\Assimalign.Viu.Sdk.CssHotReload.dll" />
+            <_ViuSdkWatchFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Watch\Assimalign.Viu.Sdk.CssHotReload.deps.json" />
+            <_ViuSdkWatchFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Watch\Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json" />
+            <TfmSpecificPackageFile Include="@(_ViuSdkWatchFile)">
+                <PackagePath>Watch\%(_ViuSdkWatchFile.RecursiveDir)%(_ViuSdkWatchFile.Filename)%(_ViuSdkWatchFile.Extension)</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
     </Target>

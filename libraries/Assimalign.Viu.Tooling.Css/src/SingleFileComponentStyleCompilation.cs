@@ -5,7 +5,7 @@ using Assimalign.Viu.Syntax.Css;
 namespace Assimalign.Viu.Tooling.Css;
 
 /// <summary>
-/// The result of compiling one <c>.viu</c> file's <c>@style</c> blocks
+/// The result of compiling one <c>.viu</c> or compatible <c>.vue</c> file's style blocks
 /// (<see cref="SingleFileComponentStyleCompiler.Compile"/>) — the shared, deterministic output both
 /// build-time hosts consume ([V01.01.12.12]). The <c>Assimalign.Viu.Generators.Syntax</c> generator maps it
 /// into its cached model to emit the <c>ScopeId</c>/<c>ExtractedStyles</c> constants, the <c>$style</c>
@@ -31,11 +31,11 @@ namespace Assimalign.Viu.Tooling.Css;
 /// <param name="VariableBindings">
 /// The <c>v-bind()</c> CSS bindings ([V01.01.06.06]) — one entry per distinct <c>(hash, expression)</c>, in
 /// first-seen source order, each paired with its block-content-start position so a host can compose
-/// per-binding diagnostics onto <c>.viu</c> coordinates. Empty when no <c>@style</c> block uses <c>v-bind()</c>.
+/// per-binding diagnostics onto component coordinates. Empty when no style block uses <c>v-bind()</c>.
 /// </param>
 /// <param name="Diagnostics">
 /// Recoverable diagnostics from the <c>@style</c> rewrites (malformed <c>v-bind()</c>), each paired with its
-/// block-content-start position so the host can locate it on the <c>.viu</c> file. Empty when every block
+/// block-content-start position so the host can locate it on the component file. Empty when every block
 /// compiled cleanly.
 /// </param>
 public sealed record SingleFileComponentStyleCompilation(

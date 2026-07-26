@@ -8,7 +8,10 @@ on:
     paths:
       - 'extensions/VisualStudio/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
+      - 'libraries/Assimalign.Viu.Tooling.UtilityCss/**'
       - 'build/**'
+      - 'scripts/Test-UtilityCssArtifactShape.ps1'
+      - 'scripts/Test-UtilityCssIndependence.ps1'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'global.json'
@@ -21,7 +24,10 @@ on:
     paths:
       - 'extensions/VisualStudio/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
+      - 'libraries/Assimalign.Viu.Tooling.UtilityCss/**'
       - 'build/**'
+      - 'scripts/Test-UtilityCssArtifactShape.ps1'
+      - 'scripts/Test-UtilityCssIndependence.ps1'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'global.json'
@@ -111,6 +117,18 @@ jobs:
 
           $extensionHash = Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256
           Write-Host "Validated VSIX $($identity.Version), $($extensionFile.Length) bytes, SHA256 $($extensionHash.Hash)."
+
+      - name: Verify Visual Studio utility payload
+        shell: pwsh
+        run: >-
+          ./scripts/Test-UtilityCssArtifactShape.ps1
+          -VisualStudioExtension _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
+
+      - name: Verify standalone utility dependency boundary
+        shell: pwsh
+        run: >-
+          ./scripts/Test-UtilityCssIndependence.ps1
+          -Artifact _out/extensions/VisualStudio/Release/Assimalign.Viu.VisualStudio.vsix
 
       - name: Upload VSIX build artifact
         # actions/upload-artifact v4

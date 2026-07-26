@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
+using Assimalign.Viu.Tooling.UtilityCss;
 
 namespace Assimalign.Viu.LanguageService;
 
-internal sealed class ViuLanguageService : IViuLanguageService
+internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLanguageService
 {
+    private static readonly UtilityCssRegistry UtilityRegistry = UtilityCssRegistry.BuiltIn;
+
     private static readonly IReadOnlyDictionary<string, string> HoverDocumentation =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -37,6 +41,39 @@ internal sealed class ViuLanguageService : IViuLanguageService
 
     private readonly object synchronization = new();
     private readonly LanguageDocumentStore documents = new();
+    private readonly Dictionary<string, UtilityStylesheetLanguageContext> utilityContexts =
+        new(StringComparer.Ordinal);
+
+    public void ConfigureUtilityStylesheet(
+        string documentUri,
+        string? stylesheetText)
+    {
+        ConfigureUtilityStylesheet(
+            documentUri,
+            stylesheetText,
+            documentUri + "#utility-css",
+            UtilityStylesheetReferenceGraph.Empty);
+    }
+
+    public void ConfigureUtilityStylesheet(
+        string documentUri,
+        string? stylesheetText,
+        string stylesheetIdentity,
+        UtilityStylesheetReferenceGraph referenceGraph)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stylesheetIdentity);
+        ArgumentNullException.ThrowIfNull(referenceGraph);
+
+        lock (synchronization)
+        {
+            utilityContexts[documentUri] =
+                UtilityStylesheetLanguageContext.Create(
+                    stylesheetText,
+                    stylesheetIdentity,
+                    referenceGraph);
+        }
+    }
 
     public void OpenDocument(string documentUri, string text, int? version)
     {
@@ -69,6 +106,7 @@ internal sealed class ViuLanguageService : IViuLanguageService
 
         lock (synchronization)
         {
+            utilityContexts.Remove(documentUri);
             return documents.Close(documentUri);
         }
     }
@@ -84,9 +122,11 @@ internal sealed class ViuLanguageService : IViuLanguageService
                 return Array.Empty<LanguageDiagnostic>();
             }
 
-            return document.ParseResult.Errors
+            var diagnostics = document.Syntax.Errors
                 .Select(ToLanguageDiagnostic)
-                .ToArray();
+                .ToList();
+            AddVueCompatibilityDiagnostics(document.Syntax, diagnostics);
+            return diagnostics;
         }
     }
 
@@ -104,20 +144,35 @@ internal sealed class ViuLanguageService : IViuLanguageService
                 return Array.Empty<LanguageCompletionItem>();
             }
 
+            var block = FindBlock(document.Syntax, offset);
+            if (block is SingleFileComponentTemplateBlock template &&
+                UtilityClassCompletionContext.TryCreate(
+                    template.Content,
+                    template.ContentLocation.Start.Offset,
+                    offset,
+                    out var utilityContext))
+            {
+                return GetUtilityClassCompletions(
+                    document.Text,
+                    utilityContext,
+                    GetUtilityContext(documentUri));
+            }
+
             var linePrefix = TextCoordinateConverter.GetLinePrefix(document.Text, offset);
-            var headerCompletions = GetHeaderOptionCompletions(linePrefix);
+            var headerCompletions = GetHeaderOptionCompletions(
+                linePrefix,
+                document.Syntax.Format);
             if (headerCompletions.Count > 0)
             {
                 return headerCompletions;
             }
 
-            var block = FindBlock(document.ParseResult.Descriptor, offset);
             return block?.Kind switch
             {
                 SingleFileComponentBlockKind.Template => GetTemplateCompletions(linePrefix),
                 SingleFileComponentBlockKind.Script => GetScriptCompletions(linePrefix),
                 SingleFileComponentBlockKind.Style => ViuCompletionCatalog.StyleProperties,
-                _ => GetRootCompletions(document.ParseResult.Descriptor),
+                _ => GetRootCompletions(document.Syntax),
             };
         }
     }
@@ -132,6 +187,24 @@ internal sealed class ViuLanguageService : IViuLanguageService
                 !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
             {
                 return null;
+            }
+
+            var block = FindBlock(document.Syntax, offset);
+            if (block is SingleFileComponentTemplateBlock template &&
+                UtilityClassCompletionContext.TryCreate(
+                    template.Content,
+                    template.ContentLocation.Start.Offset,
+                    offset,
+                    out var utilityContext))
+            {
+                var utilityHover = GetUtilityClassHover(
+                    document.Text,
+                    utilityContext,
+                    GetUtilityContext(documentUri));
+                if (utilityHover is not null)
+                {
+                    return utilityHover;
+                }
             }
 
             var tokenRange = GetTokenRange(document.Text, offset);
@@ -157,17 +230,28 @@ internal sealed class ViuLanguageService : IViuLanguageService
     }
 
     private static IReadOnlyList<LanguageCompletionItem> GetRootCompletions(
-        SingleFileComponentDescriptor descriptor)
+        LanguageDocumentSyntax syntax)
     {
         var completions = new List<LanguageCompletionItem>();
-        foreach (var completion in ViuCompletionCatalog.BlockHeaders)
+        var blockHeaders = syntax.Format == LanguageDocumentFormat.Vue
+            ? ViuCompletionCatalog.VueBlockHeaders
+            : ViuCompletionCatalog.BlockHeaders;
+        foreach (var completion in blockHeaders)
         {
-            if (completion.Label == "@template" && descriptor.Template is not null)
+            if ((completion.Label == "@template" || completion.Label == "template") &&
+                syntax.Template is not null)
             {
                 continue;
             }
 
-            if (completion.Label == "@script" && descriptor.Script is not null)
+            if ((completion.Label == "@script" || completion.Label == "script") &&
+                syntax.Script is not null)
+            {
+                continue;
+            }
+
+            if (completion.Label == "script setup" &&
+                syntax.ScriptSetup is not null)
             {
                 continue;
             }
@@ -178,25 +262,36 @@ internal sealed class ViuLanguageService : IViuLanguageService
         return completions;
     }
 
-    private static IReadOnlyList<LanguageCompletionItem> GetHeaderOptionCompletions(string linePrefix)
+    private static IReadOnlyList<LanguageCompletionItem> GetHeaderOptionCompletions(
+        string linePrefix,
+        LanguageDocumentFormat format)
     {
         var trimmed = linePrefix.TrimStart();
-        if (trimmed.Contains('{', StringComparison.Ordinal))
+        if (format == LanguageDocumentFormat.Viu &&
+            trimmed.Contains('{', StringComparison.Ordinal))
         {
             return Array.Empty<LanguageCompletionItem>();
         }
 
-        if (trimmed.StartsWith("@template ", StringComparison.Ordinal))
+        if (trimmed.StartsWith(
+                format == LanguageDocumentFormat.Vue ? "<template " : "@template ",
+                StringComparison.Ordinal))
         {
             return ViuCompletionCatalog.TemplateHeaderOptions;
         }
 
-        if (trimmed.StartsWith("@script ", StringComparison.Ordinal))
+        if (trimmed.StartsWith(
+                format == LanguageDocumentFormat.Vue ? "<script " : "@script ",
+                StringComparison.Ordinal))
         {
-            return ViuCompletionCatalog.ScriptHeaderOptions;
+            return format == LanguageDocumentFormat.Vue
+                ? ViuCompletionCatalog.VueScriptHeaderOptions
+                : ViuCompletionCatalog.ScriptHeaderOptions;
         }
 
-        if (trimmed.StartsWith("@style ", StringComparison.Ordinal))
+        if (trimmed.StartsWith(
+                format == LanguageDocumentFormat.Vue ? "<style " : "@style ",
+                StringComparison.Ordinal))
         {
             return ViuCompletionCatalog.StyleHeaderOptions;
         }
@@ -234,6 +329,262 @@ internal sealed class ViuLanguageService : IViuLanguageService
         return completions;
     }
 
+    private static IReadOnlyList<LanguageCompletionItem> GetUtilityClassCompletions(
+        string documentText,
+        UtilityClassCompletionContext context,
+        UtilityStylesheetLanguageContext stylesheetContext)
+    {
+        var editRange = new LanguageRange(
+            TextCoordinateConverter.GetPosition(documentText, context.TokenStart),
+            TextCoordinateConverter.GetPosition(documentText, context.TokenEnd));
+        var metadataByCandidate =
+            new Dictionary<string, UtilityClassMetadata>(
+                StringComparer.Ordinal);
+        foreach (var metadata in UtilityRegistry.GetCompletions(
+                     context.Prefix,
+                     stylesheetContext.Theme))
+        {
+            metadataByCandidate[metadata.CandidateText] = metadata;
+        }
+
+        AddProjectUtilityCompletions(
+            context.Prefix,
+            stylesheetContext,
+            metadataByCandidate);
+        AddProjectVariantCompletions(
+            context.Prefix,
+            stylesheetContext,
+            metadataByCandidate);
+
+        return metadataByCandidate.Values
+            .OrderBy(metadata => metadata.SortOrder)
+            .ThenBy(metadata => metadata.CandidateText, StringComparer.Ordinal)
+            .Select(
+                metadata => CreateUtilityCompletion(
+                    metadata,
+                    editRange))
+            .ToArray();
+    }
+
+    private static void AddProjectUtilityCompletions(
+        string typedPrefix,
+        UtilityStylesheetLanguageContext stylesheetContext,
+        IDictionary<string, UtilityClassMetadata> metadataByCandidate)
+    {
+        SplitCandidatePrefix(
+            typedPrefix,
+            out var variantPrefix,
+            out var baseFragment);
+        var candidates = new List<string>();
+        foreach (var definition in
+                 stylesheetContext.ProjectCompilation.Utilities)
+        {
+            var baseCandidate = definition.IsFunctional
+                ? definition.Name.Substring(
+                    0,
+                    definition.Name.Length - "-*".Length)
+                : definition.Name;
+            if (!baseCandidate.StartsWith(
+                    baseFragment,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var candidate = ComposeProjectCandidate(
+                variantPrefix,
+                stylesheetContext.Theme.Prefix,
+                baseCandidate);
+            candidates.Add(candidate);
+        }
+
+        foreach (var metadata in
+                 stylesheetContext.Compile(candidates).Rules)
+        {
+            metadataByCandidate[metadata.CandidateText] = metadata;
+        }
+    }
+
+    private static void AddProjectVariantCompletions(
+        string typedPrefix,
+        UtilityStylesheetLanguageContext stylesheetContext,
+        IDictionary<string, UtilityClassMetadata> metadataByCandidate)
+    {
+        SplitCandidatePrefix(
+            typedPrefix,
+            out var variantPrefix,
+            out var baseFragment);
+        if (variantPrefix.Length == 0 ||
+            !ContainsProjectVariant(
+                variantPrefix,
+                stylesheetContext.ProjectCompilation.Variants))
+        {
+            return;
+        }
+
+        var themePrefix = stylesheetContext.Theme.Prefix;
+        if (!string.IsNullOrEmpty(themePrefix) &&
+            !variantPrefix.StartsWith(
+                themePrefix + ":",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var builtInLookupPrefix =
+            string.IsNullOrEmpty(themePrefix)
+                ? baseFragment
+                : themePrefix + ":" + baseFragment;
+        var candidates = new List<string>();
+        foreach (var builtIn in UtilityRegistry.GetCompletions(
+                     builtInLookupPrefix,
+                     stylesheetContext.Theme))
+        {
+            var baseCandidate = builtIn.CandidateText;
+            if (!string.IsNullOrEmpty(themePrefix))
+            {
+                baseCandidate = baseCandidate.Substring(
+                    themePrefix.Length + 1);
+            }
+
+            var candidate = variantPrefix + baseCandidate;
+            candidates.Add(candidate);
+        }
+
+        foreach (var metadata in
+                 stylesheetContext.Compile(candidates).Rules)
+        {
+            metadataByCandidate[metadata.CandidateText] = metadata;
+        }
+    }
+
+    private static LanguageCompletionItem CreateUtilityCompletion(
+        UtilityClassMetadata metadata,
+        LanguageRange editRange) =>
+        new(
+            metadata.CandidateText,
+            LanguageCompletionItemKind.Property,
+            "Viu utility class",
+            GetUtilityDocumentation(metadata),
+            metadata.CandidateText,
+            IsSnippet: false,
+            SortText: $"{metadata.SortOrder:D5}:{metadata.CandidateText}",
+            EditRange: editRange,
+            FilterText: metadata.CandidateText);
+
+    private static UtilityClassMetadata? FindProjectRule(
+        UtilityProjectStylesheetCompilationResult compilation,
+        string candidate)
+    {
+        foreach (var rule in compilation.Rules)
+        {
+            if (string.Equals(
+                    rule.CandidateText,
+                    candidate,
+                    StringComparison.Ordinal))
+            {
+                return rule;
+            }
+        }
+
+        return null;
+    }
+
+    private static string ComposeProjectCandidate(
+        string variantPrefix,
+        string? themePrefix,
+        string baseCandidate)
+    {
+        if (variantPrefix.Length > 0)
+        {
+            return variantPrefix + baseCandidate;
+        }
+
+        return string.IsNullOrEmpty(themePrefix)
+            ? baseCandidate
+            : themePrefix + ":" + baseCandidate;
+    }
+
+    private static bool ContainsProjectVariant(
+        string variantPrefix,
+        UtilityCollection<UtilityCustomVariantDefinition> definitions)
+    {
+        var segments = variantPrefix.Split(':');
+        foreach (var segment in segments)
+        {
+            foreach (var definition in definitions)
+            {
+                if (string.Equals(
+                        segment,
+                        definition.Name,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static void SplitCandidatePrefix(
+        string typedPrefix,
+        out string variantPrefix,
+        out string baseFragment)
+    {
+        var separator = typedPrefix.LastIndexOf(':');
+        if (separator < 0)
+        {
+            variantPrefix = string.Empty;
+            baseFragment = typedPrefix;
+            return;
+        }
+
+        variantPrefix = typedPrefix.Substring(0, separator + 1);
+        baseFragment = typedPrefix.Substring(separator + 1);
+    }
+
+    private static LanguageHover? GetUtilityClassHover(
+        string documentText,
+        UtilityClassCompletionContext context,
+        UtilityStylesheetLanguageContext stylesheetContext)
+    {
+        if (string.IsNullOrEmpty(context.TokenText))
+        {
+            return null;
+        }
+
+        var resolution = UtilityRegistry.Resolve(
+            context.TokenText,
+            stylesheetContext.Theme,
+            CancellationToken.None);
+        var metadata = resolution.Metadata;
+        if (metadata is null)
+        {
+            metadata = FindProjectRule(
+                stylesheetContext.Compile(context.TokenText),
+                context.TokenText);
+            if (metadata is null)
+            {
+                return null;
+            }
+        }
+
+        return new LanguageHover(
+            GetUtilityDocumentation(metadata),
+            new LanguageRange(
+                TextCoordinateConverter.GetPosition(documentText, context.TokenStart),
+                TextCoordinateConverter.GetPosition(documentText, context.TokenEnd)));
+    }
+
+    private static string GetUtilityDocumentation(UtilityClassMetadata metadata)
+        => $"**`{metadata.CandidateText}`** — {metadata.Description}\n\n```css\n{metadata.Css}\n```";
+
+    private UtilityStylesheetLanguageContext GetUtilityContext(string documentUri)
+        => utilityContexts.TryGetValue(documentUri, out var context)
+            ? context
+            : UtilityStylesheetLanguageContext.Default;
+
     private static IReadOnlyList<LanguageCompletionItem> GetScriptCompletions(string linePrefix)
     {
         if (linePrefix.Contains("Context.", StringComparison.Ordinal))
@@ -250,20 +601,25 @@ internal sealed class ViuLanguageService : IViuLanguageService
     }
 
     private static SingleFileComponentBlock? FindBlock(
-        SingleFileComponentDescriptor descriptor,
+        LanguageDocumentSyntax syntax,
         int offset)
     {
-        if (ContainsOffset(descriptor.Template, offset))
+        if (ContainsOffset(syntax.Template, offset))
         {
-            return descriptor.Template;
+            return syntax.Template;
         }
 
-        if (ContainsOffset(descriptor.Script, offset))
+        if (ContainsOffset(syntax.Script, offset))
         {
-            return descriptor.Script;
+            return syntax.Script;
         }
 
-        foreach (var style in descriptor.Styles)
+        if (ContainsOffset(syntax.ScriptSetup, offset))
+        {
+            return syntax.ScriptSetup;
+        }
+
+        foreach (var style in syntax.Styles)
         {
             if (ContainsOffset(style, offset))
             {
@@ -271,7 +627,7 @@ internal sealed class ViuLanguageService : IViuLanguageService
             }
         }
 
-        foreach (var customBlock in descriptor.CustomBlocks)
+        foreach (var customBlock in syntax.CustomBlocks)
         {
             if (ContainsOffset(customBlock, offset))
             {
@@ -302,6 +658,62 @@ internal sealed class ViuLanguageService : IViuLanguageService
             $"VIU{error.RawCode}",
             error.Message,
             "viu");
+
+    private static void AddVueCompatibilityDiagnostics(
+        LanguageDocumentSyntax syntax,
+        ICollection<LanguageDiagnostic> diagnostics)
+    {
+        if (syntax.Format != LanguageDocumentFormat.Vue)
+        {
+            return;
+        }
+
+        AddVueScriptLanguageDiagnostic(syntax.Script, diagnostics);
+        AddVueScriptLanguageDiagnostic(syntax.ScriptSetup, diagnostics);
+    }
+
+    private static void AddVueScriptLanguageDiagnostic(
+        SingleFileComponentScriptBlock? script,
+        ICollection<LanguageDiagnostic> diagnostics)
+    {
+        if (script is null ||
+            string.Equals(script.Lang, "csharp", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var languageOption = FindOption(script, "lang");
+        var authoredLanguage = script.Lang is null
+            ? "an implicit JavaScript language"
+            : $"'{script.Lang}'";
+        diagnostics.Add(
+            new LanguageDiagnostic(
+                ToLanguageRange(languageOption?.Location ?? script.Location),
+                LanguageDiagnosticSeverity.Error,
+                "VIU1206",
+                $"The .vue script uses {authoredLanguage}. Viu accepts only an explicit lang=\"csharp\" attribute and never executes JavaScript.",
+                "viu"));
+    }
+
+    private static SingleFileComponentBlockOption? FindOption(
+        SingleFileComponentBlock block,
+        string name)
+    {
+        foreach (var option in block.Options)
+        {
+            if (string.Equals(option.Name, name, StringComparison.Ordinal))
+            {
+                return option;
+            }
+        }
+
+        return null;
+    }
+
+    private static LanguageRange ToLanguageRange(SourceLocation location)
+        => new(
+            ToLanguagePosition(location.Start),
+            ToLanguagePosition(location.End));
 
     private static LanguagePosition ToLanguagePosition(Position position)
         => new(

@@ -2,23 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+using Assimalign.Viu.Tooling.Css;
+
 namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
-/// Derives the deterministic, trimming-safe C# names for a generated component from its <c>.viu</c>
+/// Derives the deterministic, trimming-safe C# names for a generated component from its <c>.viu</c> or
+/// <c>.vue</c>
 /// file path: the containing namespace (root namespace plus the file's directory segments), the class
 /// name (the file name), and the Roslyn <c>AddSource</c> hint name (path-qualified so two same-named
 /// files in different folders never collide). Uses only string operations — no <c>System.IO</c> — so it
-/// stays inside the analyzer API surface (RS1035) and produces identical output on every platform.
+/// stays inside the analyzer API surface (RS1035). Path containment follows the host operating system:
+/// ordinal-ignore-case on Windows and ordinal elsewhere.
 /// </summary>
 internal static class SingleFileComponentNameResolver
 {
-    private const string Extension = ".viu";
+    private const string ViuExtension = ".viu";
+    private const string VueExtension = ".vue";
 
     /// <summary>
     /// Resolves the namespace, class name, and hint name for <paramref name="filePath"/>.
     /// </summary>
-    /// <param name="filePath">The absolute <c>.viu</c> file path.</param>
+    /// <param name="filePath">The absolute <c>.viu</c> or <c>.vue</c> file path.</param>
     /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
     /// <param name="rootNamespace">The consuming project's root namespace, or <see langword="null"/> when unknown.</param>
     /// <returns>The resolved names.</returns>
@@ -51,7 +56,9 @@ internal static class SingleFileComponentNameResolver
 
         var normalizedDirectory = projectDirectory!.Replace('\\', '/').TrimEnd('/');
         var prefix = normalizedDirectory + "/";
-        if (!normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        if (!normalizedPath.StartsWith(
+                prefix,
+                SingleFileComponentPathComparison.Comparison))
         {
             return null;
         }
@@ -139,9 +146,16 @@ internal static class SingleFileComponentNameResolver
             : "@" + identifier;
 
     private static string StripExtension(string fileName)
-        => fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase)
-            ? fileName.Substring(0, fileName.Length - Extension.Length)
+    {
+        if (fileName.EndsWith(ViuExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            return fileName.Substring(0, fileName.Length - ViuExtension.Length);
+        }
+
+        return fileName.EndsWith(VueExtension, StringComparison.OrdinalIgnoreCase)
+            ? fileName.Substring(0, fileName.Length - VueExtension.Length)
             : fileName;
+    }
 
     private static string Sanitize(string candidate)
     {

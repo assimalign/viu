@@ -1,0 +1,91 @@
+<Project>
+  <!--
+    Development-only stylesheet regeneration for dotnet watch ([V01.01.12.05.01], #248).
+
+    The .NET 10 watch host can hot-swap CSS only after a watched static file changes; it does not
+    invoke arbitrary MSBuild targets for changes to .viu/.vue/HTML AdditionalFiles. A small SDK
+    sidecar therefore observes only the CSS inputs, debounces one editor save, and invokes the
+    narrow _ViuRegenerateCssHotReloadBundles target once. The generated files themselves are
+    registered as static Watch items under wwwroot/, allowing the platform browser-refresh client
+    to cache-bust and replace each stylesheet without remounting application state.
+
+    Nothing here is a runtime or publish asset. Worker launch is limited to the design-time
+    GenerateWatchList build performed by dotnet watch and defaults off outside Debug.
+  -->
+
+  <PropertyGroup>
+    <ViuCssHotReloadEnabled Condition="'$(ViuCssHotReloadEnabled)' == '' and '$(Configuration)' == 'Debug'">true</ViuCssHotReloadEnabled>
+    <ViuCssHotReloadEnabled Condition="'$(ViuCssHotReloadEnabled)' == ''">false</ViuCssHotReloadEnabled>
+    <ViuCssHotReloadLaunchWorker Condition="'$(ViuCssHotReloadLaunchWorker)' == ''">true</ViuCssHotReloadLaunchWorker>
+    <ViuCssHotReloadDebounceMilliseconds Condition="'$(ViuCssHotReloadDebounceMilliseconds)' == ''">100</ViuCssHotReloadDebounceMilliseconds>
+    <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuBundleCssTaskAssembly)</ViuCssHotReloadTaskAssembly>
+    <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
+    <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)viu\css-hot-reload\worker.state'))</ViuCssHotReloadStateFile>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker"
+             AssemblyFile="$(ViuCssHotReloadTaskAssembly)"
+             Condition="'$(ViuCssHotReloadEnabled)' == 'true'" />
+
+  <PropertyGroup Condition="'$(ViuCssHotReloadEnabled)' == 'true' and ('$(ViuBundleSingleFileComponentCss)' == 'true' or '$(ViuBundleUtilityCss)' == 'true')">
+    <CustomCollectWatchItems>$(CustomCollectWatchItems);_ViuCollectCssHotReloadWatchItems</CustomCollectWatchItems>
+  </PropertyGroup>
+
+  <Target Name="_ViuCollectCssHotReloadWatchItems"
+          Condition="'$(ViuCssHotReloadEnabled)' == 'true' and '$(DotNetWatchBuild)' == 'true' and '$(DesignTimeBuild)' == 'true' and '$(ViuCssHotReloadWorker)' != 'true' and ('$(ViuBundleSingleFileComponentCss)' == 'true' or '$(ViuBundleUtilityCss)' == 'true')"
+          DependsOnTargets="_ViuResolveSingleFileComponentCssConfiguration;_ViuResolveUtilityCssConfiguration;_ViuBundleUtilityCss">
+    <PropertyGroup>
+      <_ViuCssHotReloadWatchUtilityMarkup>false</_ViuCssHotReloadWatchUtilityMarkup>
+      <_ViuCssHotReloadWatchUtilityMarkup Condition="'$(ViuBundleUtilityCss)' == 'true' and '$(ViuUtilityCssAutomaticSourceDiscovery)' == 'true'">true</_ViuCssHotReloadWatchUtilityMarkup>
+    </PropertyGroup>
+    <ItemGroup>
+      <!-- StaticWebAssetPath deliberately starts at wwwroot/: dotnet watch strips that prefix and
+           sends UpdateStaticFile for the same stable route injected into the host page. -->
+      <Watch Include="$(_ViuCssBundlePath)"
+             StaticWebAssetPath="wwwroot/$(ViuSingleFileComponentCssBundleName)"
+             Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'"
+             KeepDuplicates="false" />
+      <Watch Include="$(_ViuUtilityCssBundlePath)"
+             StaticWebAssetPath="wwwroot/$(ViuUtilityCssBundleName)"
+             Condition="'$(ViuBundleUtilityCss)' == 'true'"
+             KeepDuplicates="false" />
+
+      <_ViuCssHotReloadInput Include="%(ViuSingleFileComponent.FullPath)"
+                             Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '%(ViuSingleFileComponent.Watch)' != 'false'" />
+      <_ViuCssHotReloadInput Include="%(_ViuUtilityCssResolvedSource.FullPath)"
+                             Condition="'$(ViuBundleUtilityCss)' == 'true' and '%(_ViuUtilityCssResolvedSource.Watch)' != 'false'" />
+      <_ViuCssHotReloadInput Include="%(_ViuUtilityCssResolvedEntry.FullPath)"
+                             Condition="'$(ViuBundleUtilityCss)' == 'true' and '%(_ViuUtilityCssResolvedEntry.Watch)' != 'false'" />
+
+      <_ViuCssHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)'))" />
+      <_ViuCssHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(BaseOutputPath)'))" />
+      <_ViuCssHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir).git'))" />
+      <_ViuCssHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir).vs'))" />
+      <_ViuCssHotReloadExcludedDirectory Include="$([System.IO.Path]::GetFullPath('$(ProjectDir)node_modules'))" />
+    </ItemGroup>
+
+    <ViuStartCssHotReloadWorker
+      Condition="'$(ViuCssHotReloadLaunchWorker)' == 'true'"
+      WorkerAssemblyPath="$(ViuCssHotReloadWorkerAssembly)"
+      ProjectPath="$(MSBuildProjectFullPath)"
+      ProjectDirectory="$(MSBuildProjectDirectory)"
+      StateFilePath="$(ViuCssHotReloadStateFile)"
+      EventLogPath="$(ViuCssHotReloadEventLog)"
+      DependencyManifestPath="$(_ViuUtilityCssHotReloadDependencyManifestPath)"
+      DotNetHostPath="$(DotNetHostPath)"
+      Configuration="$(Configuration)"
+      TargetFramework="$(TargetFramework)"
+      RuntimeIdentifier="$(RuntimeIdentifier)"
+      WatchComponents="$(ViuBundleSingleFileComponentCss)"
+      WatchUtilityMarkup="$(_ViuCssHotReloadWatchUtilityMarkup)"
+      WatchFiles="@(_ViuCssHotReloadInput)"
+      ExcludedDirectories="@(_ViuCssHotReloadExcludedDirectory)"
+      DebounceMilliseconds="$(ViuCssHotReloadDebounceMilliseconds)" />
+  </Target>
+
+  <!-- Called only by the SDK sidecar. Both existing bundlers retain their deterministic input
+       discovery and content comparison; this target merely batches them into one nested MSBuild. -->
+  <Target Name="_ViuRegenerateCssHotReloadBundles"
+          Condition="'$(ViuCssHotReloadWorker)' == 'true'"
+          DependsOnTargets="_ViuBundleSingleFileComponentCss;_ViuBundleUtilityCss" />
+</Project>

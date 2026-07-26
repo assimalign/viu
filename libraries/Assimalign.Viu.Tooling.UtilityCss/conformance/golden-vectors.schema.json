@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://assimalign.github.io/viu/schemas/utility-css-golden-vectors.json",
+  "title": "Viu Utilities golden conformance vectors",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "compatibilityVersion",
+    "vectors"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "compatibilityVersion": {
+      "const": "4.3.3"
+    },
+    "vectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "officialReference"
+        ]
+      }
+    }
+  }
+}
