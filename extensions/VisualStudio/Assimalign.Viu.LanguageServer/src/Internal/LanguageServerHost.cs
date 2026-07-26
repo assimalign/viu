@@ -321,12 +321,13 @@ internal sealed class LanguageServerHost
         var (documentUri, position) = GetDocumentPosition(parameters);
         if (!IsOpenAndSupported(documentUri))
         {
-            return CreateCompletionList(new JsonArray());
+            return CreateCompletionList(new JsonArray(), isIncomplete: false);
         }
 
         ConfigureUtilityStylesheet(documentUri);
+        var completions = languageService.GetCompletions(documentUri, position);
         var items = new JsonArray();
-        foreach (var completion in languageService.GetCompletions(documentUri, position))
+        foreach (var completion in completions)
         {
             var item = new JsonObject
             {
@@ -360,7 +361,11 @@ internal sealed class LanguageServerHost
             items.Add((JsonNode)item);
         }
 
-        return CreateCompletionList(items);
+        // A truncated utility result must be advertised as incomplete, otherwise the client filters
+        // its cached page instead of re-requesting and the narrower candidate is never offered.
+        return CreateCompletionList(
+            items,
+            completions.Count >= LanguageCompletionLimits.MaximumItems);
     }
 
     private JsonNode? HandleHover(JsonElement parameters)
@@ -440,10 +445,10 @@ internal sealed class LanguageServerHost
         return false;
     }
 
-    private static JsonObject CreateCompletionList(JsonArray items)
+    private static JsonObject CreateCompletionList(JsonArray items, bool isIncomplete)
         => new()
         {
-            ["isIncomplete"] = false,
+            ["isIncomplete"] = isIncomplete,
             ["items"] = items,
         };
 

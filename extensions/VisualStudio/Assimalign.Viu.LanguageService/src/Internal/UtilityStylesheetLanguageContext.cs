@@ -12,12 +12,16 @@ internal sealed class UtilityStylesheetLanguageContext
 {
     private UtilityStylesheetLanguageContext(
         string stylesheetText,
+        string sourceIdentity,
+        UtilityStylesheetReferenceGraph referenceGraph,
         UtilitySourceConfiguration sourceConfiguration,
         UtilityTheme theme,
         UtilityProjectStylesheetCompilationOptions projectOptions,
         UtilityProjectStylesheetCompilationResult projectCompilation)
     {
         StylesheetText = stylesheetText;
+        SourceIdentity = sourceIdentity;
+        ReferenceGraph = referenceGraph;
         SourceConfiguration = sourceConfiguration;
         Theme = theme;
         ProjectOptions = projectOptions;
@@ -32,6 +36,12 @@ internal sealed class UtilityStylesheetLanguageContext
 
     /// <summary>Gets the complete authored project stylesheet.</summary>
     public string StylesheetText { get; }
+
+    /// <summary>Gets the normalized identity of the authored project stylesheet.</summary>
+    public string SourceIdentity { get; }
+
+    /// <summary>Gets the host-resolved graph this context was built from.</summary>
+    public UtilityStylesheetReferenceGraph ReferenceGraph { get; }
 
     /// <summary>Gets virtual-import and source behavior parsed from the stylesheet.</summary>
     public UtilitySourceConfiguration SourceConfiguration { get; }
@@ -79,11 +89,34 @@ internal sealed class UtilityStylesheetLanguageContext
                 projectOptions);
         return new UtilityStylesheetLanguageContext(
             css,
+            sourceIdentity,
+            projectOptions.ReferenceGraph,
             sourceConfiguration,
             theme,
             projectOptions,
             projectCompilation);
     }
+
+    /// <summary>
+    /// Determines whether this context was already built from the supplied host inputs.
+    /// </summary>
+    /// <param name="stylesheetText">The authored project stylesheet, or null.</param>
+    /// <param name="sourceIdentity">The normalized stylesheet identity.</param>
+    /// <param name="referenceGraph">The host-resolved reference graph.</param>
+    /// <returns><see langword="true"/> when recreating the context would be redundant.</returns>
+    public bool Matches(
+        string? stylesheetText,
+        string sourceIdentity,
+        UtilityStylesheetReferenceGraph referenceGraph) =>
+        string.Equals(
+            StylesheetText,
+            stylesheetText ?? string.Empty,
+            StringComparison.Ordinal) &&
+        string.Equals(
+            SourceIdentity,
+            sourceIdentity,
+            StringComparison.Ordinal) &&
+        ReferenceEquals(ReferenceGraph, referenceGraph);
 
     /// <summary>Compiles editor candidates through project utility and variant definitions.</summary>
     public UtilityProjectStylesheetCompilationResult Compile(

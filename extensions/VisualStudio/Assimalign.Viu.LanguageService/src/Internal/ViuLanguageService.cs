@@ -41,8 +41,11 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
 
     private readonly object synchronization = new();
     private readonly LanguageDocumentStore documents = new();
+    // Document URIs must compare exactly as they do in the server host's open-document set, or a
+    // client that varies casing (a Windows drive letter, most commonly) reports a document as open
+    // while the workspace fails to find it and every language feature silently returns nothing.
     private readonly Dictionary<string, UtilityStylesheetLanguageContext> utilityContexts =
-        new(StringComparer.Ordinal);
+        new(StringComparer.OrdinalIgnoreCase);
 
     public void ConfigureUtilityStylesheet(
         string documentUri,
@@ -67,6 +70,15 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
 
         lock (synchronization)
         {
+            // The server host reconfigures the stylesheet on every completion and hover request.
+            // Rebuilding the context re-parses the theme and recompiles the project stylesheet, so
+            // unchanged host inputs must not pay that cost once per keystroke.
+            if (utilityContexts.TryGetValue(documentUri, out var existing) &&
+                existing.Matches(stylesheetText, stylesheetIdentity, referenceGraph))
+            {
+                return;
+            }
+
             utilityContexts[documentUri] =
                 UtilityStylesheetLanguageContext.Create(
                     stylesheetText,
@@ -359,6 +371,7 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
         return metadataByCandidate.Values
             .OrderBy(metadata => metadata.SortOrder)
             .ThenBy(metadata => metadata.CandidateText, StringComparer.Ordinal)
+            .Take(LanguageCompletionLimits.MaximumItems)
             .Select(
                 metadata => CreateUtilityCompletion(
                     metadata,

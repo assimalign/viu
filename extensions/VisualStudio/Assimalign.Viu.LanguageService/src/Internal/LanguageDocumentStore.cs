@@ -5,8 +5,10 @@ namespace Assimalign.Viu.LanguageService;
 
 internal sealed class LanguageDocumentStore
 {
+    // Matches the server host's open-document comparer so a casing difference in the client's
+    // document URI cannot make an open document unreachable.
     private readonly Dictionary<string, LanguageDocument> documents =
-        new(StringComparer.Ordinal);
+        new(StringComparer.OrdinalIgnoreCase);
 
     internal void Open(string documentUri, string text, int? version)
         => documents[documentUri] = LanguageDocument.Create(documentUri, text, version);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Assimalign.Viu.Tooling.UtilityCss;
@@ -15,6 +16,16 @@ namespace Assimalign.Viu.Tooling.UtilityCss;
 public sealed class UtilityCssRegistry
 {
     private readonly Dictionary<string, UtilityRegisteredDefinition> definitionsByRoot;
+
+    // Expanding the themed catalog walks every definition against every theme token and breakpoint,
+    // which is far too expensive to repeat per completion request. Themes are immutable and an
+    // editor host holds one per project snapshot, so the expansion is memoized against the theme
+    // instance and released with it.
+    private readonly ConditionalWeakTable<UtilityTheme, StrongBox<UtilityCollection<UtilityClassMetadata>>>
+        completionItemsByTheme = new();
+
+    private readonly ConditionalWeakTable<UtilityTheme, StrongBox<UtilityCollection<UtilityClassMetadata>>>
+        .CreateValueCallback createCompletionItemsForTheme;
 
     private UtilityCssRegistry(
         IEnumerable<UtilityRegisteredDefinition> registrations)
@@ -41,6 +52,9 @@ public sealed class UtilityCssRegistry
             orderedRegistrations.Select(registration => registration.Definition));
 
         CompletionItems = CreateCompletionItems(UtilityTheme.Default);
+        createCompletionItemsForTheme =
+            theme => new StrongBox<UtilityCollection<UtilityClassMetadata>>(
+                CreateCompletionItems(theme));
     }
 
     /// <summary>
@@ -157,7 +171,9 @@ public sealed class UtilityCssRegistry
 
         var completionItems = ReferenceEquals(theme, UtilityTheme.Default)
             ? CompletionItems
-            : CreateCompletionItems(theme);
+            : completionItemsByTheme
+                .GetValue(theme, createCompletionItemsForTheme)
+                .Value;
         if (string.IsNullOrEmpty(prefix))
         {
             return completionItems;
