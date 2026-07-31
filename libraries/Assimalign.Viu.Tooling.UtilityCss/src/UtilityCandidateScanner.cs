@@ -100,4 +100,34 @@ public static class UtilityCandidateScanner
             position,
             options ?? UtilityCandidateScanOptions.Default,
             cancellationToken);
+
+    /// <summary>
+    /// Determines whether <paramref name="position"/> falls inside a markup attribute value.
+    /// </summary>
+    /// <param name="text">The supplied template or host-markup text.</param>
+    /// <param name="position">
+    /// The zero-based cursor position in <paramref name="text"/>, between zero and its length.
+    /// </param>
+    /// <param name="cancellationToken">The cancellation boundary for editor hosts.</param>
+    /// <returns>
+    /// <see langword="true"/> when the cursor is inside any attribute value, including the directive,
+    /// event, and binding values this scanner does not treat as class contexts; otherwise
+    /// <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// Editor hosts pair this with <see cref="FindTokenAtPosition(string?, int)"/>: a null token
+    /// together with a true result means the cursor sits in an attribute value that carries no utility
+    /// candidate, which must not fall back to markup-name completion.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken"/> was canceled.
+    /// </exception>
+    public static bool IsInsideAttributeValue(
+        string? text,
+        int position,
+        CancellationToken cancellationToken = default) =>
+        UtilityCandidateScanEngine.IsInsideAttributeValue(
+            text,
+            position,
+            cancellationToken);
 }

@@ -466,6 +466,8 @@ internal sealed class LanguageServerHost
                 ["completionProvider"] = new JsonObject
                 {
                     ["resolveProvider"] = false,
+                    // The quote characters open the list on `class="` itself. Without them nothing
+                    // appears until the author types a `-`, which reads as a broken feature.
                     ["triggerCharacters"] = new JsonArray(
                         "@",
                         "<",
@@ -477,7 +479,9 @@ internal sealed class LanguageServerHost
                         "[",
                         "(",
                         "/",
-                        "!"),
+                        "!",
+                        "\"",
+                        "'"),
                 },
                 ["hoverProvider"] = true,
             },

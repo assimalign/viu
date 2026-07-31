@@ -107,8 +107,50 @@ internal static class UtilityCandidateScanEngine
         return null;
     }
 
+    internal static bool IsInsideAttributeValue(
+        string? text,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrEmpty(text) ||
+            position < 0 ||
+            position > text!.Length)
+        {
+            return false;
+        }
+
+        var attributeValues = new List<UtilityCandidateTextSpan>();
+        CollectRegions(
+            text!,
+            attributeValues,
+            cancellationToken);
+
+        foreach (var attributeValue in attributeValues)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (position >= attributeValue.Start &&
+                position <= attributeValue.End)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static List<UtilityCandidateScanRegion> CollectRegions(
         string text,
+        CancellationToken cancellationToken) =>
+        CollectRegions(
+            text,
+            null,
+            cancellationToken);
+
+    private static List<UtilityCandidateScanRegion> CollectRegions(
+        string text,
+        ICollection<UtilityCandidateTextSpan>? attributeValues,
         CancellationToken cancellationToken)
     {
         var regions = new List<UtilityCandidateScanRegion>();
@@ -267,6 +309,15 @@ internal static class UtilityCandidateScanEngine
                         text,
                         valueStart,
                         cancellationToken);
+                // Every attribute value this walk resolves is an editor context in which markup-name
+                // completion is wrong, including the values that carry no utility candidate. Recording
+                // the span here reuses the single tag/attribute walk instead of adding a second markup
+                // parser to the language service.
+                attributeValues?.Add(
+                    new UtilityCandidateTextSpan(
+                        valueStart,
+                        valueEnd - valueStart));
+
                 if (IsStaticClassAttribute(attributeName))
                 {
                     regions.Add(

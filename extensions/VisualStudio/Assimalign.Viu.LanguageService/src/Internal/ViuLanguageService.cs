@@ -157,7 +157,8 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             }
 
             var block = FindBlock(document.Syntax, offset);
-            if (block is SingleFileComponentTemplateBlock template &&
+            var template = block as SingleFileComponentTemplateBlock;
+            if (template is not null &&
                 UtilityClassCompletionContext.TryCreate(
                     template.Content,
                     template.ContentLocation.Start.Offset,
@@ -170,13 +171,30 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
                     GetUtilityContext(documentUri));
             }
 
-            var linePrefix = TextCoordinateConverter.GetLinePrefix(document.Text, offset);
-            var headerCompletions = GetHeaderOptionCompletions(
-                linePrefix,
-                document.Syntax.Format);
-            if (headerCompletions.Count > 0)
+            // docs/UTILITY-CSS-DESIGN.md section 10: completion activates only in supported static
+            // class attributes and literal class-binding strings. Every other attribute value and
+            // every interpolation is a C# expression this service cannot complete, and the line-prefix
+            // heuristics below cannot see the quote: `:class="Shell"` reads as the single token
+            // `:class="Shell` and answers with attribute names while the cursor is inside the value.
+            if (template is not null &&
+                IsExpressionContext(document.Text, template, offset))
             {
-                return headerCompletions;
+                return Array.Empty<LanguageCompletionItem>();
+            }
+
+            var linePrefix = TextCoordinateConverter.GetLinePrefix(document.Text, offset);
+            if (template is null)
+            {
+                // Block header options describe a block header, never markup inside a template block.
+                // Gating on the template block keeps the recovered `@style ` header working, whose
+                // block does contain the cursor.
+                var headerCompletions = GetHeaderOptionCompletions(
+                    linePrefix,
+                    document.Syntax.Format);
+                if (headerCompletions.Count > 0)
+                {
+                    return headerCompletions;
+                }
             }
 
             return block?.Kind switch
@@ -202,7 +220,8 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             }
 
             var block = FindBlock(document.Syntax, offset);
-            if (block is SingleFileComponentTemplateBlock template &&
+            var template = block as SingleFileComponentTemplateBlock;
+            if (template is not null &&
                 UtilityClassCompletionContext.TryCreate(
                     template.Content,
                     template.ContentLocation.Start.Offset,
@@ -217,6 +236,14 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
                 {
                     return utilityHover;
                 }
+            }
+
+            // A C# expression inside an attribute value or interpolation must not be documented as if
+            // it were markup: without this gate `title="v-if"` hovers as the v-if directive.
+            if (template is not null &&
+                IsExpressionContext(document.Text, template, offset))
+            {
+                return null;
             }
 
             var tokenRange = GetTokenRange(document.Text, offset);
@@ -309,6 +336,23 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
         }
 
         return Array.Empty<LanguageCompletionItem>();
+    }
+
+    private static bool IsExpressionContext(
+        string documentText,
+        SingleFileComponentTemplateBlock template,
+        int offset)
+    {
+        if (UtilityCandidateScanner.IsInsideAttributeValue(
+                template.Content,
+                offset - template.ContentLocation.Start.Offset))
+        {
+            return true;
+        }
+
+        // Mustache interpolations do not nest, so the nearest unmatched opener decides.
+        var prefix = documentText.AsSpan(0, offset);
+        return prefix.LastIndexOf("{{".AsSpan()) > prefix.LastIndexOf("}}".AsSpan());
     }
 
     private static IReadOnlyList<LanguageCompletionItem> GetTemplateCompletions(string linePrefix)
@@ -610,7 +654,40 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             return ViuCompletionCatalog.ReactiveMembers;
         }
 
-        return ViuCompletionCatalog.ScriptGeneral;
+        // The Viu scaffold items and the C# keywords are both offered, then filtered by the partially
+        // typed word. Returning the unfiltered scaffold list answered `u` with "mounted callback"
+        // and never with `using`, which reads as the editor ignoring what was typed.
+        var word = GetTrailingIdentifier(linePrefix);
+        var completions = new List<LanguageCompletionItem>(
+            ViuCompletionCatalog.ScriptGeneral.Count +
+            ViuCompletionCatalog.ScriptKeywords.Count);
+        completions.AddRange(ViuCompletionCatalog.ScriptGeneral);
+        completions.AddRange(ViuCompletionCatalog.ScriptKeywords);
+
+        if (word.Length == 0)
+        {
+            return completions;
+        }
+
+        var matches = completions
+            .Where(
+                completion => completion.Label.StartsWith(
+                    word,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return matches.Length > 0 ? matches : completions;
+    }
+
+    private static string GetTrailingIdentifier(string linePrefix)
+    {
+        var start = linePrefix.Length;
+        while (start > 0 &&
+               (char.IsLetterOrDigit(linePrefix[start - 1]) || linePrefix[start - 1] == '_'))
+        {
+            start--;
+        }
+
+        return linePrefix.Substring(start);
     }
 
     private static SingleFileComponentBlock? FindBlock(

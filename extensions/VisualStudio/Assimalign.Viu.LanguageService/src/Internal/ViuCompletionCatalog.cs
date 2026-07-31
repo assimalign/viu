@@ -164,6 +164,48 @@ internal static class ViuCompletionCatalog
             "06"),
     ];
 
+    /// <summary>
+    /// C# language keywords offered inside an <c>@script</c> block.
+    /// </summary>
+    /// <remarks>
+    /// This is a lexical aid, not C# IntelliSense: the language service hosts no compilation, so it
+    /// knows nothing about types, members, or namespaces in scope. Keywords are offered because the
+    /// alternative — answering a partially typed <c>using</c> with a Viu snippet list — is actively
+    /// misleading. Real declaration-aware completion is tracked separately.
+    /// </remarks>
+    internal static IReadOnlyList<LanguageCompletionItem> ScriptKeywords { get; } =
+        CreateScriptKeywords();
+
+    private static IReadOnlyList<LanguageCompletionItem> CreateScriptKeywords()
+    {
+        string[] keywords =
+        [
+            "abstract", "as", "async", "await", "base", "bool", "break", "byte", "case", "catch",
+            "char", "checked", "class", "const", "continue", "decimal", "default", "delegate", "do",
+            "double", "else", "enum", "event", "explicit", "extern", "false", "finally", "fixed",
+            "float", "for", "foreach", "get", "global", "goto", "if", "implicit", "in", "init", "int",
+            "interface", "internal", "is", "lock", "long", "nameof", "namespace", "new", "nint",
+            "not", "null", "object", "operator", "out", "override", "params", "private", "protected",
+            "public", "readonly", "record", "ref", "required", "return", "sbyte", "sealed", "set",
+            "short", "sizeof", "stackalloc", "static", "string", "struct", "switch", "this", "throw",
+            "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using",
+            "var", "virtual", "void", "volatile", "when", "where", "while", "with", "yield",
+        ];
+
+        var items = new LanguageCompletionItem[keywords.Length];
+        for (var index = 0; index < keywords.Length; index++)
+        {
+            items[index] = Text(
+                keywords[index],
+                LanguageCompletionItemKind.Keyword,
+                "C# keyword",
+                $"The C# `{keywords[index]}` keyword.",
+                "90");
+        }
+
+        return items;
+    }
+
     internal static IReadOnlyList<LanguageCompletionItem> ContextMembers { get; } =
     [
         Member("Arguments", "IComponentArguments", "Gets arguments declared and supplied by the parent.", "01"),
