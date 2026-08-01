@@ -4,10 +4,19 @@
     <EnablePreviewFeatures>false</EnablePreviewFeatures>
     <IsPackable>false</IsPackable>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)\LanguageServer</ViuLanguageServerPublishPath>
-    <ViuLanguageServerExecutableName>Assimalign.Viu.LanguageServer.exe</ViuLanguageServerExecutableName>
-    <ViuLanguageServerX64ExecutablePath>$(ViuLanguageServerPublishPath)\win-x64\$(ViuLanguageServerExecutableName)</ViuLanguageServerX64ExecutablePath>
-    <ViuLanguageServerArm64ExecutablePath>$(ViuLanguageServerPublishPath)\win-arm64\$(ViuLanguageServerExecutableName)</ViuLanguageServerArm64ExecutablePath>
+
+    <!-- Opts into build\Targets\Build.LanguageServer.targets: the single source of truth that
+         publishes, packages, and validates the standalone server payload. The publish arguments
+         deliberately do not live here, so pressing F5 and running Build.ps1 cannot drift apart.
+         Before that target existed this project only asserted the payload was present and shipped
+         whatever happened to be on disk, which silently redeployed a months-old language server. -->
+    <ViuLanguageServerPublishEnabled>true</ViuLanguageServerPublishEnabled>
+
+    <!-- The payload is produced by a target, so the design-time build cannot see it and Visual
+         Studio's fast up-to-date check has no reliable view of this project's real inputs. Packaging
+         the extension already costs tens of seconds; skipping MSBuild is not a saving worth a stale
+         language server. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,22 +27,4 @@
   <ItemGroup>
     <Content Include="language-server.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-
-  <!-- Build.ps1 publishes the standalone server here before building this project. Keeping the
-       server out of this process is what preserves Visual Studio's fault isolation. The property
-       remains overridable for CI or an alternate publish layout. -->
-  <ItemGroup Condition="'$(ViuLanguageServerPublishPath)' != '' And Exists('$(ViuLanguageServerPublishPath)')">
-    <Content Include="$(ViuLanguageServerPublishPath)\**\*"
-             Link="LanguageServer\%(RecursiveDir)%(Filename)%(Extension)"
-             CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <Target Name="ViuValidateLanguageServerPayload"
-          BeforeTargets="GetVsixSourceItems;PrepareForBuild"
-          Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="!Exists('$(ViuLanguageServerX64ExecutablePath)')"
-           Text="The win-x64 Viu language-server payload is missing at '$(ViuLanguageServerX64ExecutablePath)'. Run extensions\VisualStudio\Build.ps1 before building or debugging the Visual Studio extension." />
-    <Error Condition="!Exists('$(ViuLanguageServerArm64ExecutablePath)')"
-           Text="The win-arm64 Viu language-server payload is missing at '$(ViuLanguageServerArm64ExecutablePath)'. Run extensions\VisualStudio\Build.ps1 before building or debugging the Visual Studio extension." />
-  </Target>
 </Project>

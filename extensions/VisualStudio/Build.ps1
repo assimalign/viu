@@ -41,9 +41,6 @@ $extensionOutputDirectory = Join-Path $repositoryDirectory `
     "_out\extensions\VisualStudio\$Configuration"
 $languageServerPublishDirectory = Join-Path $extensionOutputDirectory `
     'LanguageServer'
-$languageServerRuntimeIdentifiers = @('win-x64', 'win-arm64')
-$publishDebugType = if ($Configuration -eq 'Debug') { 'embedded' } else { 'none' }
-
 $normalizedExtensionOutputDirectory =
     [System.IO.Path]::GetFullPath($extensionOutputDirectory)
 $normalizedLanguageServerPublishDirectory =
@@ -64,25 +61,18 @@ if (Test-Path -LiteralPath $normalizedLanguageServerPublishDirectory) {
     Remove-Item -LiteralPath $normalizedLanguageServerPublishDirectory -Recurse -Force
 }
 
-foreach ($runtimeIdentifier in $languageServerRuntimeIdentifiers) {
-    $runtimePublishDirectory = Join-Path `
-        $normalizedLanguageServerPublishDirectory `
-        $runtimeIdentifier
-
-    Write-Host "Publishing $runtimeIdentifier Viu language server to $runtimePublishDirectory"
-    & dotnet publish $languageServerProject `
-        --configuration $Configuration `
-        --runtime $runtimeIdentifier `
-        --output $runtimePublishDirectory `
-        --self-contained true `
-        "-p:PublishSingleFile=true" `
-        "-p:IncludeNativeLibrariesForSelfExtract=true" `
-        "-p:EnableCompressionInSingleFile=true" `
-        "-p:DebugType=$publishDebugType" `
-        @versionBuildArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Publishing the $runtimeIdentifier Viu language server failed with exit code $LASTEXITCODE."
-    }
+# The publish recipe lives in build\Targets\Build.LanguageServer.targets so that this script and an
+# in-IDE F5 cannot drift apart. Driving the shared target here keeps one implementation; the extension
+# build below re-enters the same target and finds it already up to date.
+Write-Host 'Publishing the Viu language server through the shared MSBuild target'
+& dotnet msbuild $extensionProject `
+    -target:ViuPublishLanguageServer `
+    "-p:Configuration=$Configuration" `
+    "-p:ViuLanguageServerPublishPath=$normalizedLanguageServerPublishDirectory" `
+    -nologo `
+    @versionBuildArguments
+if ($LASTEXITCODE -ne 0) {
+    throw "Publishing the Viu language server failed with exit code $LASTEXITCODE."
 }
 
 Write-Host 'Cleaning the Visual Studio extension output'

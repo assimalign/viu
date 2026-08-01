@@ -1,0 +1,171 @@
+<Project>
+  <!--
+    Single source of truth for producing, packaging, and validating the standalone Viu language
+    server payload that the Visual Studio extension ships.
+
+    Before this existed the extension project only ASSERTED the payload was present and copied
+    whatever sat in the output directory, while extensions\VisualStudio\Build.ps1 was the sole
+    producer and a separate manual step. Pressing F5 therefore rebuilt the extension assembly and
+    redeployed a months-old language server, so utility-CSS IntelliSense was tested against a binary
+    that predated the utility engine. Both callers now drive the SAME target:
+
+      * extensions\VisualStudio\Build.ps1 -> dotnet msbuild <extension csproj> -t:ViuPublishLanguageServer
+      * the extension build itself        -> ViuIncludeLanguageServerPayload depends on it
+
+    Everything here is inert unless a project opts in with ViuLanguageServerPublishEnabled=true.
+  -->
+
+  <PropertyGroup>
+    <ViuLanguageServerPublishEnabled Condition="'$(ViuLanguageServerPublishEnabled)' == ''">false</ViuLanguageServerPublishEnabled>
+
+    <!-- Escape hatch: a CI job (or an earlier Build.ps1 pass) already produced the payload and the
+         in-build hook must not publish again. Validation deliberately still runs. -->
+    <ViuSkipLanguageServerPublish Condition="'$(ViuSkipLanguageServerPublish)' == ''">false</ViuSkipLanguageServerPublish>
+    <ViuSkipLanguageServerStalenessCheck Condition="'$(ViuSkipLanguageServerStalenessCheck)' == ''">false</ViuSkipLanguageServerStalenessCheck>
+
+    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)extensions\VisualStudio\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj</ViuLanguageServerProjectPath>
+    <ViuLanguageServerPublishRoot Condition="'$(ViuLanguageServerPublishRoot)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)</ViuLanguageServerPublishRoot>
+    <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuLanguageServerPublishRoot)\LanguageServer</ViuLanguageServerPublishPath>
+    <ViuLanguageServerExecutableName Condition="'$(ViuLanguageServerExecutableName)' == ''">Assimalign.Viu.LanguageServer.exe</ViuLanguageServerExecutableName>
+    <ViuLanguageServerX64ExecutablePath>$(ViuLanguageServerPublishPath)\win-x64\$(ViuLanguageServerExecutableName)</ViuLanguageServerX64ExecutablePath>
+    <ViuLanguageServerArm64ExecutablePath>$(ViuLanguageServerPublishPath)\win-arm64\$(ViuLanguageServerExecutableName)</ViuLanguageServerArm64ExecutablePath>
+
+    <!-- The incrementality stamp is a SIBLING of LanguageServer\, never inside it, so it can never be
+         swept into the payload glob and shipped in the VSIX. -->
+    <ViuLanguageServerPublishStampFile>$(ViuLanguageServerPublishRoot)\.languageserver-publish.stamp</ViuLanguageServerPublishStampFile>
+
+    <!-- Both Windows architectures ship; language-server.json selects one at runtime. Narrowing this
+         halves inner-loop publish cost but produces a VSIX that only runs on that architecture, so
+         it must never be narrowed for packaging. -->
+    <ViuLanguageServerRuntimeIdentifiers Condition="'$(ViuLanguageServerRuntimeIdentifiers)' == ''">win-x64;win-arm64</ViuLanguageServerRuntimeIdentifiers>
+
+    <!-- Debug keeps symbols inside the single file; Release ships none. This mirrors Build.ps1's
+         former $publishDebugType and is now the only place that decision is made. -->
+    <ViuLanguageServerPublishDebugType Condition="'$(ViuLanguageServerPublishDebugType)' == '' and '$(Configuration)' == 'Debug'">embedded</ViuLanguageServerPublishDebugType>
+    <ViuLanguageServerPublishDebugType Condition="'$(ViuLanguageServerPublishDebugType)' == ''">none</ViuLanguageServerPublishDebugType>
+
+    <_ViuLanguageServerVersionArguments Condition="'$(VersionPrefix)' != ''"> -p:VersionPrefix=$(VersionPrefix) -p:VersionSuffix=$(VersionSuffix)</_ViuLanguageServerVersionArguments>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
+    <ViuLanguageServerRuntimeIdentifier Include="$(ViuLanguageServerRuntimeIdentifiers)" />
+  </ItemGroup>
+
+  <!--
+    Visual Studio's fast up-to-date check decides whether to invoke MSBuild for this project at all.
+    Left alone it only knows this project's own sources, so editing the utility-CSS engine would leave
+    the extension "up to date", the publish hook would never run, and the stale payload would deploy
+    again. These items are harvested from DESIGN-TIME builds, so they must be evaluation-time items.
+  -->
+  <ItemGroup Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
+    <UpToDateCheckInput Include="$(ViuRepositoryDirectory)extensions\VisualStudio\**\src\**\*.cs"
+                        Exclude="$(ViuRepositoryDirectory)extensions\VisualStudio\**\bin\**\*;$(ViuRepositoryDirectory)extensions\VisualStudio\**\obj\**\*" />
+    <UpToDateCheckInput Include="$(ViuRepositoryDirectory)libraries\**\src\**\*.cs"
+                        Exclude="$(ViuRepositoryDirectory)libraries\**\bin\**\*;$(ViuRepositoryDirectory)libraries\**\obj\**\*" />
+    <UpToDateCheckBuilt Include="$(ViuLanguageServerX64ExecutablePath);$(ViuLanguageServerArm64ExecutablePath);$(ViuLanguageServerPublishStampFile)" />
+  </ItemGroup>
+
+  <!--
+    Publish inputs are deliberately over-approximated to the whole library and extension source
+    surface rather than hand-tracking the reference closure. Over-approximating costs at worst one
+    extra publish; under-approximating silently reintroduces the stale-payload bug the moment someone
+    adds a ViuProjectReference. bin\ and obj\ must be excluded, because obj\ regenerates
+    AssemblyInfo.cs on every build and would leave the payload permanently out of date.
+  -->
+  <Target Name="_ViuCollectLanguageServerPublishInputs"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
+    <ItemGroup>
+      <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)extensions\VisualStudio\**\src\**\*.cs;$(ViuRepositoryDirectory)extensions\VisualStudio\**\src\**\*.csproj;$(ViuRepositoryDirectory)extensions\VisualStudio\**\src\**\*.json"
+                                      Exclude="$(ViuRepositoryDirectory)extensions\VisualStudio\**\bin\**\*;$(ViuRepositoryDirectory)extensions\VisualStudio\**\obj\**\*" />
+      <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)libraries\**\src\**\*.cs;$(ViuRepositoryDirectory)libraries\**\src\**\*.csproj"
+                                      Exclude="$(ViuRepositoryDirectory)libraries\**\bin\**\*;$(ViuRepositoryDirectory)libraries\**\obj\**\*" />
+      <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)build\Build.props;$(ViuRepositoryDirectory)build\Build.targets;$(ViuRepositoryDirectory)build\Targets\*.props;$(ViuRepositoryDirectory)build\Targets\*.targets" />
+      <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)Directory.Build.props;$(ViuRepositoryDirectory)Directory.Build.targets;$(ViuRepositoryDirectory)global.json" />
+    </ItemGroup>
+  </Target>
+
+  <!-- The stamp must never claim freshness while a payload is missing: a wiped output directory, a
+       partially failed publish, or a hand-deleted runtime folder all have to force a republish. -->
+  <Target Name="_ViuInvalidateLanguageServerPublishStamp"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
+    <ItemGroup>
+      <_ViuLanguageServerExpectedPayload Include="@(ViuLanguageServerRuntimeIdentifier->'$(ViuLanguageServerPublishPath)\%(Identity)\$(ViuLanguageServerExecutableName)')" />
+      <_ViuLanguageServerMissingPayload Include="@(_ViuLanguageServerExpectedPayload)"
+                                        Condition="!Exists('%(_ViuLanguageServerExpectedPayload.Identity)')" />
+    </ItemGroup>
+    <Delete Files="$(ViuLanguageServerPublishStampFile)" Condition="'@(_ViuLanguageServerMissingPayload)' != ''" />
+  </Target>
+
+  <!--
+    The producer. Outputs is the stamp only, never the executables: the .NET SDK can internally no-op
+    a publish without refreshing the executable timestamps, which would re-run this target forever.
+    The stamp is touched after a successful publish, and _ViuInvalidateLanguageServerPublishStamp
+    deletes it whenever a payload is actually absent.
+  -->
+  <Target Name="ViuPublishLanguageServer"
+          DependsOnTargets="_ViuInvalidateLanguageServerPublishStamp;_ViuCollectLanguageServerPublishInputs"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'
+                     and '$(ViuSkipLanguageServerPublish)' != 'true'
+                     and '$(DesignTimeBuild)' != 'true'
+                     and '$(BuildingProject)' != 'false'"
+          Inputs="@(_ViuLanguageServerPublishInput)"
+          Outputs="$(ViuLanguageServerPublishStampFile)">
+
+    <Message Importance="high"
+             Text="Publishing the Viu language server (%(ViuLanguageServerRuntimeIdentifier.Identity)) to $(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)" />
+
+    <!-- A devenv-hosted build exports MSBUILD_EXE_PATH and MSBuildSDKsPath pointing at Visual
+         Studio's own MSBuild. Left inherited, the nested dotnet CLI resolves the wrong SDK and the
+         net10.0 server fails to build. Only those two are unset: clearing the MSBuildExtensionsPath
+         family as well breaks Microsoft.NET.Sdk resolution outright. -->
+    <Exec Command="dotnet publish &quot;$(ViuLanguageServerProjectPath)&quot; --nologo --configuration $(Configuration) --runtime %(ViuLanguageServerRuntimeIdentifier.Identity) --self-contained true --output &quot;$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)&quot; -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=$(ViuLanguageServerPublishDebugType)$(_ViuLanguageServerVersionArguments)"
+          WorkingDirectory="$(ViuRepositoryDirectory)" />
+
+    <Touch Files="$(ViuLanguageServerPublishStampFile)" AlwaysCreate="true" />
+  </Target>
+
+  <!--
+    This glob lives inside a target on purpose. A project-scope ItemGroup is expanded during
+    evaluation, before any target runs, so it can never observe files this build just published, and
+    its Exists() guard collapses to zero items on a clean tree. Expanding here, after the publish and
+    before AssignTargetPaths computes the target path, is what makes the FIRST build on a clean tree
+    correct rather than "correct on the second build".
+
+    Link is load-bearing: Microsoft.VsSDK.targets derives the VSIX subpath from the directory name of
+    the Link metadata, which must yield LanguageServer\<runtime identifier> to match the paths in
+    language-server.json.
+  -->
+  <Target Name="ViuIncludeLanguageServerPayload"
+          DependsOnTargets="ViuPublishLanguageServer"
+          BeforeTargets="AssignTargetPaths;GetVsixSourceItems"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true' and Exists('$(ViuLanguageServerPublishPath)')">
+    <ItemGroup>
+      <Content Include="$(ViuLanguageServerPublishPath)\**\*"
+               Link="LanguageServer\%(RecursiveDir)%(Filename)%(Extension)"
+               CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Backstop 1: absence. -->
+  <Target Name="ViuValidateLanguageServerPayload"
+          AfterTargets="ViuIncludeLanguageServerPayload"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)\$(ViuLanguageServerExecutableName)')"
+           Text="The %(ViuLanguageServerRuntimeIdentifier.Identity) Viu language-server payload is missing at '$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)\$(ViuLanguageServerExecutableName)'. It is normally produced automatically by the ViuPublishLanguageServer target; if you set ViuSkipLanguageServerPublish=true, run extensions\VisualStudio\Build.ps1 first." />
+  </Target>
+
+  <!-- Backstop 2: staleness. The same Inputs/Outputs pair the producer uses is handed to MSBuild's
+       incremental engine, and the build errors if it decides the payload is out of date. With
+       auto-publish on this is always skipped; it fires only when the escape hatch suppressed the
+       publish, or a publish silently failed to touch the stamp. -->
+  <Target Name="ViuValidateLanguageServerPayloadFreshness"
+          DependsOnTargets="_ViuCollectLanguageServerPublishInputs"
+          AfterTargets="ViuIncludeLanguageServerPayload"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'
+                     and '$(DesignTimeBuild)' != 'true'
+                     and '$(ViuSkipLanguageServerStalenessCheck)' != 'true'"
+          Inputs="@(_ViuLanguageServerPublishInput)"
+          Outputs="$(ViuLanguageServerPublishStampFile)">
+    <Error Text="The Viu language-server payload under '$(ViuLanguageServerPublishPath)' is STALE: language-server or library sources have changed since it was published ('$(ViuLanguageServerPublishStampFile)'). Re-run extensions\VisualStudio\Build.ps1, or clear ViuSkipLanguageServerPublish so the build republishes it." />
+  </Target>
+</Project>
