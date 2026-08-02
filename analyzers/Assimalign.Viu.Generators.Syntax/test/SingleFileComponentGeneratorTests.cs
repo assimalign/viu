@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// Snapshot, diagnostic, and incremental-cache tests for <see cref="SingleFileComponentGenerator"/>.
 /// The snapshot locks the emitted partial-class scaffold and its two clearly-marked seams
 /// ([V01.01.05.05] render, [V01.01.06.03] script merge); the diagnostic tests pin that both the
-/// <c>.viu</c> block container and the dispatched <c>@template</c> parse (the registration seam) surface
+/// <c>.viu</c> block container and the dispatched template parse (the registration seam) surface
 /// as Roslyn diagnostics on the <c>.viu</c> file; the cache tests pin that untouched input reuses cached
 /// outputs and a structural edit regenerates.
 /// </summary>
@@ -26,29 +26,29 @@ public sealed class SingleFileComponentGeneratorTests
     private const string RootNamespace = "Demo";
 
     private const string CounterSource =
-        "@template {\n" +
+        "<template>\n" +
         "    <div>{{ message }}</div>\n" +
-        "}\n" +
+        "</template>\n" +
         "\n" +
         "@script {\n" +
         "    public string Message = \"Hello\";\n" +
         "}\n" +
         "\n" +
-        "@style scoped {\n" +
+        "<style scoped>\n" +
         "    .box { color: red; }\n" +
-        "}\n";
+        "</style>\n";
 
     [Fact]
     public void Generates_PartialClassWithCompiledRender_ForWellFormedComponent()
     {
         // Snapshot lock: a well-formed .viu produces a deterministic partial class whose header reflects
-        // the composed parse (template + script + one style), whose @template block compiles into the
+        // the composed parse (template + script + one style), whose <template> block compiles into the
         // [V01.01.05.05] render function (helpers bound BY NAME through the file-level using static of
         // the runtime render-helper surface) wrapped in the [V01.01.05.08] #line span map (the dynamic
         // {{ message }} access anchors a directive that points a C# error at the .viu template line 2,
         // column 13), whose [V01.01.06.07] IComponentTemplate bridge (base list + explicit Name +
         // ScopeIdentifier + Setup) makes it mountable and exposes Context/OnSetup to @script, whose
-        // @script seam ([V01.01.06.03]) stays untouched, and whose scoped @style block
+        // @script seam ([V01.01.06.03]) stays untouched, and whose <style scoped> block
         // ([V01.01.06.04]) compiles to the ScopeId + ExtractedStyles constants at the class tail. This
         // template needs no Browser-only render helpers, so it imports only the host-neutral Core surface.
         const string expected =
@@ -63,7 +63,7 @@ namespace Demo
     // Generated partial-class scaffold for the "Counter" single-file component, compiled from
     // "Counter.viu" by the Assimalign.Viu.Syntax source generator ([V01.01.06.02]).
     //
-    // Parsed blocks: @template=present, @script=present, @style=1, custom=0.
+    // Parsed blocks: template=present, @script=present, style=1, custom=0.
     partial class Counter : global::Assimalign.Viu.Components.IComponentTemplate
     {
         /// <summary>
@@ -73,7 +73,7 @@ namespace Demo
         internal const int RenderCacheSize = 0;
 
         /// <summary>
-        /// The compiled render function for the <c>@template</c> block ([V01.01.05.05]) — the C#
+        /// The compiled render function for the component's template block ([V01.01.05.05]) — the C#
         /// analogue of the component's compiled <c>render</c> in Vue 3.5 (vuejs/core
         /// packages/compiler-core/src/codegen.ts). The runtime normalizes the returned value.
         /// </summary>
@@ -85,7 +85,7 @@ namespace Demo
         }
 
         // [V01.01.06.07] The IComponentTemplate bridge: the generated context and Setup make this
-        // compiled @template component activatable and mountable with no hand-written wiring.
+        // compiled template component activatable and mountable with no hand-written wiring.
         /// <summary>
         /// The component's display name (upstream: the component <c>name</c> option, inferred from the
         /// <c>.viu</c> file name) — surfaced to runtime warnings and devtools.
@@ -103,7 +103,7 @@ namespace Demo
 
         /// <summary>
         /// The component setup entry point (upstream: <c>setup(props, context)</c>,
-        /// https://vuejs.org/api/composition-api-setup.html) generated for this <c>@template</c> component
+        /// https://vuejs.org/api/composition-api-setup.html) generated for this template component
         /// ([V01.01.06.07]). It runs once per mount, assigns <see cref="Context"/>, invokes
         /// <see cref="OnSetup"/>, allocates the per-instance render cache, and returns the renderer.
         /// The renderer re-executes the
@@ -131,7 +131,7 @@ namespace Demo
     public string Message = "Hello";
 #line default
 
-        // [V01.01.06.04] Compiled @style blocks: scoped blocks are rewritten with the component's
+        // [V01.01.06.04] Compiled style blocks: scoped blocks are rewritten with the component's
         // data-v-<hash> scope id and non-scoped blocks pass through unmodified. The renderer stamps
         // ScopeId on the component's elements; static-web-asset bundling is the MSBuild follow-up.
         /// <summary>
@@ -141,7 +141,7 @@ namespace Demo
         internal const string ScopeId = "data-v-9d968641";
 
         /// <summary>
-        /// The component's compiled CSS — scoped <c>@style</c> blocks rewritten with <see cref="ScopeId"/>,
+        /// The component's compiled CSS — scoped style blocks rewritten with <see cref="ScopeId"/>,
         /// non-scoped blocks verbatim — extracted at build time (the WASM runtime does zero CSS work).
         /// </summary>
         internal const string ExtractedStyles = ".box[data-v-9d968641] {\n  color: red;\n}\n";
@@ -159,7 +159,7 @@ namespace Demo
     [Fact]
     public void ComponentWithoutTemplate_EmitsNoRenderFunction()
     {
-        // The render seam degrades gracefully: no @template block means no render method, no cache
+        // The render seam degrades gracefully: no template block means no render method, no cache
         // constant, and no using static of the runtime helper surface.
         const string source =
             "@script {\n" +
@@ -169,7 +169,7 @@ namespace Demo
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Bare.viu", source, RootNamespace, ProjectDirectory);
 
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Bare.SingleFileComponent.g.cs");
-        generated.ShouldContain("// [V01.01.05.05] No @template block: no render function is emitted for this component.");
+        generated.ShouldContain("// [V01.01.05.05] No template block: no render function is emitted for this component.");
         generated.ShouldNotContain("using static");
         generated.ShouldNotContain("internal static object? Render(");
     }
@@ -177,14 +177,14 @@ namespace Demo
     [Fact]
     public void RenderlessComponent_StaysAPlainPartialClass_WithNoComponentBridge()
     {
-        // [V01.01.06.07] The bridge is emitted ONLY for a @template-bearing .viu: a @style-only .viu (the
+        // [V01.01.06.07] The bridge is emitted ONLY for a template-bearing .viu: a style-only .viu (the
         // AppStyles.viu / HackerNews CSS-bundle shape) must keep compiling as a plain partial class — no
         // IComponentTemplate base list, no Setup — so it never suddenly demands a template or a runtime
-        // reference. Pins the "keep @style-only files compiling exactly as today" requirement.
+        // reference. Pins the "keep style-only files compiling exactly as today" requirement.
         const string source =
-            "@style scoped {\n" +
+            "<style scoped>\n" +
             "    .box { color: red; }\n" +
-            "}\n";
+            "</style>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/AppStyles.viu", source, RootNamespace, ProjectDirectory);
 
@@ -194,7 +194,7 @@ namespace Demo
         generated.ShouldNotContain("IComponent");
         generated.ShouldNotContain(".Setup(");
         generated.ShouldNotContain("using static");
-        // The @style seam still compiles to the scope id + extracted CSS exactly as before.
+        // The style seam still compiles to the scope id + extracted CSS exactly as before.
         generated.ShouldContain("internal const string ExtractedStyles = ");
     }
 
@@ -205,11 +205,11 @@ namespace Demo
         // and event handlers must produce syntactically valid C# (semantic binding to the runtime helper
         // surface is the runtime-side integration deliverable pinned in the Templates DESIGN.md).
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <MyButton :kind=\"kind\" @press=\"onPress\">\n" +
             "        <li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>\n" +
             "    </MyButton>\n" +
-            "}\n";
+            "</template>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Rich.viu", source, RootNamespace, ProjectDirectory);
 
@@ -244,9 +244,9 @@ namespace Demo
         // A stray top-level line is StrayTopLevelContent in the .viu block container; it maps to the
         // VIU1001 error located on the .viu file, and the scaffold is still produced (recoverable).
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>ok</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "this is stray top-level content\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
@@ -260,16 +260,69 @@ namespace Demo
     }
 
     [Fact]
+    public void LegacyTemplateContainer_StillCompiles_AndSurfacesMigrationWarningAsVIU1002()
+    {
+        // [V01.01.06.10] The legacy @-container transition window needs no dedicated Roslyn descriptor:
+        // the parser's Warning-severity LegacyTemplateBlockSyntax (SingleFileComponentErrorCode 1015)
+        // flows through the severity-based container mapping as VIU1002 with the parser message
+        // verbatim, and the legacy block still slices — the component compiles to the same render
+        // function a canonical <template> block produces.
+        const string source =
+            "@template {\n" +
+            "    <div>legacy</div>\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Legacy.viu", source, RootNamespace, ProjectDirectory);
+
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VIU1002");
+        diagnostic.Severity.ShouldBe(RoslynDiagnosticSeverity.Warning);
+        diagnostic.GetMessage().ShouldContain("'@template { }' block container is legacy syntax");
+        diagnostic.Location.GetLineSpan().Path.ShouldBe($"{ProjectDirectory}/Legacy.viu");
+
+        // Still compiled: the scaffold carries the render function and reports the template present.
+        var generated = GeneratorTestHarness.GeneratedSource(outcome, "Legacy.SingleFileComponent.g.cs");
+        generated.ShouldContain("internal static object? Render(");
+        generated.ShouldContain("template=present");
+    }
+
+    [Fact]
+    public void ScriptTagContainer_SurfacesNeverExecutedDiagnosticAsVIU1001()
+    {
+        // [V01.01.06.10] A top-level <script> tag in a .viu file is rejected by the parser with the
+        // Error-severity ScriptTagBlockNotSupported code (SingleFileComponentErrorCode 1017) and never
+        // contributes a block. Like the legacy warnings, it needs no dedicated Roslyn descriptor: the
+        // severity-based container mapping surfaces it as VIU1001 with the parser message verbatim —
+        // this test pins that Roslyn seam, which DIAGNOSTICS.md documents.
+        const string source =
+            "<template>\n" +
+            "    <div>hi</div>\n" +
+            "</template>\n" +
+            "<script>\n" +
+            "console.log(\"never runs\");\n" +
+            "</script>\n";
+
+        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Tagged.viu", source, RootNamespace, ProjectDirectory);
+
+        var diagnostic = outcome.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("VIU1001");
+        diagnostic.Severity.ShouldBe(RoslynDiagnosticSeverity.Error);
+        diagnostic.GetMessage().ShouldContain("never compiled or executed");
+        diagnostic.GetMessage().ShouldContain("'@script { }'");
+        diagnostic.Location.GetLineSpan().Path.ShouldBe($"{ProjectDirectory}/Tagged.viu");
+    }
+
+    [Fact]
     public void MalformedTemplate_SurfacesTemplateDiagnostic_ViaRegistrationSeam()
     {
-        // The @template block is dispatched to the registered TemplateSyntaxParser (the composition
+        // The template block is dispatched to the registered TemplateSyntaxParser (the composition
         // root's registration seam). An unterminated interpolation is XMissingInterpolationEnd upstream;
         // it maps to the VIU1101 template error on the .viu file, proving the seam actually parses the
         // block content (the .viu container parser never would on its own).
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    {{ message\n" +
-            "}\n";
+            "</template>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
 
@@ -296,9 +349,9 @@ namespace Demo
     }
 
     private const string StaticContentSource =
-        "@template {\n" +
+        "<template>\n" +
         "    <section><span>static</span></section>\n" +
-        "}\n";
+        "</template>\n";
 
     [Fact]
     public void StaticSubtree_CompilesToCachedRender_WithCacheSlot()
@@ -355,13 +408,13 @@ namespace Demo
         // A structural edit (removing the @script block) changes the model, so the model step re-runs
         // and the regenerated scaffold reflects the change.
         const string edited =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>{{ message }}</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "\n" +
-            "@style scoped {\n" +
+            "<style scoped>\n" +
             "    .box { color: red; }\n" +
-            "}\n";
+            "</style>\n";
 
         var file = new InMemoryAdditionalText($"{ProjectDirectory}/Counter.viu", CounterSource);
         var compilation = GeneratorTestHarness.CreateCompilation();
@@ -394,16 +447,16 @@ namespace Demo
     [Fact]
     public void TemplateDiagnostic_ComposesBlockPositionIntoFileCoordinates()
     {
-        // The block-to-file coordinate mapping: the @template content starts on file line 2, and the
-        // unterminated interpolation sits on content line 2, so the reported (zero-based) position is
-        // file line 2 (= one-based line 3, the "{{ message" line) at column 0 — pinning the
-        // Compose() arithmetic, not just the location path.
+        // The block-to-file coordinate mapping: the <template> tag closes on file line 1, so the block
+        // content starts with that line break and the unterminated interpolation sits on file line 3;
+        // the reported (zero-based) position is file line 2 (= one-based line 3, the "{{ message" line)
+        // at column 0 — pinning the Compose() arithmetic, not just the location path.
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "<b>\n" +
             "{{ message\n" +
             "</b>\n" +
-            "}\n";
+            "</template>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
 
@@ -434,9 +487,9 @@ namespace Demo
         // offset onto the .viu file — the issue's "expression-level errors remap Roslyn sub-expression spans"
         // acceptance criterion, surfaced as VIU1101.
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "<div>{{ a + }}</div>\n" +   // `a + ` is missing its right operand
-            "}\n";
+            "</template>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
 

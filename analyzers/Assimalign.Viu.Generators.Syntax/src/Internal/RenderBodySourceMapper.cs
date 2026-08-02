@@ -8,14 +8,14 @@ using Assimalign.Viu.Syntax.Templates;
 namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
-/// Injects C# <c>#line</c> span directives into a compiled <c>@template</c> render body so a C# compile
+/// Injects C# <c>#line</c> span directives into a compiled template render body so a C# compile
 /// error inside an emitted template expression resolves to the offending <c>.viu</c> template line and
 /// column ([V01.01.05.08]) — the render-body analogue of the <c>@script</c> merge's <c>#line</c> map in
 /// <see cref="SingleFileComponentSourceEmitter"/>. Each dynamic expression's
 /// <see cref="RenderSourceMapping"/> (its position in the emitted body plus the template location it came
 /// from) becomes a directive that aligns the emitted text to its template span through
 /// <see cref="SingleFileComponentDiagnostics.ComposeToFilePosition"/> — the same block-to-file arithmetic
-/// the <c>@template</c>/<c>@script</c> diagnostic paths use, so the emitted map and the reported
+/// the template/<c>@script</c> diagnostic paths use, so the emitted map and the reported
 /// diagnostics agree exactly.
 /// </summary>
 /// <remarks>
@@ -40,7 +40,7 @@ internal static class RenderBodySourceMapper
     /// </summary>
     /// <param name="renderBody">The emitted render-method body (LF-terminated lines).</param>
     /// <param name="mappings">The render source map from the template compiler.</param>
-    /// <param name="blockContentStart">The <c>.viu</c> file position where the <c>@template</c> block content begins.</param>
+    /// <param name="blockContentStart">The <c>.viu</c> file position where the template block content begins.</param>
     /// <param name="filePath">The originating <c>.viu</c> file path (the <c>#line</c> target).</param>
     /// <returns>The render body with source-mapping directives.</returns>
     public static string Inject(

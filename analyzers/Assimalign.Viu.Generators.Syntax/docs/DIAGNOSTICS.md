@@ -29,7 +29,7 @@ enum. The generator is a **mapping over that shape** (`SingleFileComponentDiagno
   parse time, not re-derived here. `Error`/`Warning`/`Information` map to the same-tier descriptor; `Hidden`
   collapses into the informational descriptor (surfaced, never dropped).
 - **Template `SourceLocation` → Roslyn `Location`.** Block-relative positions are composed with the block's
-  content-start position (`ComposeToFilePosition`, the same arithmetic the `@script`/`@template` paths and the
+  content-start position (`ComposeToFilePosition`, the same arithmetic the `@script`/template paths and the
   render `#line` map share) and rebuilt as a `Location` on the originating `AdditionalText`, so the
   squiggle lands on the exact template span.
 
@@ -61,19 +61,36 @@ severity tier its own stable ID.
 | --- | --- | --- | --- |
 | `.viu` or `.vue` block container | `VIU1001` | `VIU1002` | `VIU1003` |
 | conflicting `.viu` and `.vue` sources | `VIU1004` | — | — |
-| dispatched `@template` parse | `VIU1101` | `VIU1102` | `VIU1103` |
+| dispatched template parse | `VIU1101` | `VIU1102` | `VIU1103` |
 | `@script` C# parse | `VIU1201` | `VIU1202` | `VIU1203` |
 | script generated-member and compatibility contract | `VIU1204`–`VIU1206` | — | — |
-| dispatched `@style` CSS parse | `VIU1301` | `VIU1302` | `VIU1303` |
+| dispatched style CSS parse | `VIU1301` | `VIU1302` | `VIU1303` |
 
 ### VIU1001
 
 Single-file component parse error — a recoverable error reported by the `.viu` block-container parser
 (a `SingleFileComponentErrorCode`, e.g. stray top-level content). The scaffold is still emitted.
 
+Since the [V01.01.06.10] hybrid-container pivot this includes `ScriptTagBlockNotSupported`
+(`SingleFileComponentErrorCode` 1017): a top-level `<script>` tag in a `.viu` file is rejected — its
+content is never compiled or executed — because a component's C# lives in `@script { }` only. The
+parser message rides verbatim: *"A top-level '&lt;script&gt;' tag is not supported in a .viu file and
+its content is never compiled or executed. Declare the component's C# with '@script { }'."*
+
 ### VIU1002
 
 Single-file component parse warning — a warning reported by the `.viu` block-container parser.
+
+The legacy-container migration diagnostics of the [V01.01.06.10] hybrid-container pivot surface here
+(the parser messages ride verbatim):
+
+- `LegacyTemplateBlockSyntax` (`SingleFileComponentErrorCode` 1015) — a legacy `@template { }`
+  container parsed; rewrite it as `<template>…</template>`.
+- `LegacyStyleBlockSyntax` (`SingleFileComponentErrorCode` 1016) — a legacy `@style … { }` container
+  parsed; rewrite it as `<style …>…</style>` (block options become tag attributes).
+
+Both are Warning severity: the legacy blocks still slice and compile during the transition window, so
+a legacy component builds with warnings instead of breaking.
 
 ### VIU1003
 
@@ -88,18 +105,18 @@ second partial class.
 
 ### VIU1101
 
-Single-file component template parse error — a recoverable error from the dispatched `@template` parse
+Single-file component template parse error — a recoverable error from the dispatched template parse
 (a `CompilerErrorCode` numerically pinned to `@vue/compiler-core` `ErrorCodes` — parse errors such as an
 unterminated interpolation, and transform errors such as `v-if`/`v-for`/`v-slot`/`v-on`/`v-bind` misuse).
 
 ### VIU1102
 
-Single-file component template parse warning — a warning from the dispatched `@template` parse.
+Single-file component template parse warning — a warning from the dispatched template parse.
 
 ### VIU1103
 
 Single-file component template parse information — an informational message (or `Hidden`) from the dispatched
-`@template` parse.
+template parse.
 
 ### VIU1201
 
@@ -135,7 +152,7 @@ merged or executed.
 
 ### VIU1301
 
-Single-file component style parse error — a recoverable error from the dispatched `@style` CSS parse
+Single-file component style parse error — a recoverable error from the dispatched style CSS parse
 ([V01.01.06.04]), a Viu-defined `CssErrorCode` following CSS Syntax Module Level 3 error recovery
 (e.g. an unterminated block, a stray `}`, or a declaration missing its `:`). The CSS-Modules and `v-bind()`
 rewrites ([V01.01.06.06]) surface here too through the same style-origin envelope — a malformed
@@ -145,9 +162,9 @@ offending declaration. The CSS parser and rewrites never throw; the scaffold is 
 
 ### VIU1302
 
-Single-file component style parse warning — a warning from the dispatched `@style` CSS parse.
+Single-file component style parse warning — a warning from the dispatched style CSS parse.
 
 ### VIU1303
 
 Single-file component style parse information — an informational message (or `Hidden`) from the dispatched
-`@style` CSS parse.
+style CSS parse.

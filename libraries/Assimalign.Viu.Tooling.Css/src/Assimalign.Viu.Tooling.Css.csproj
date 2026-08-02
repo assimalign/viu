@@ -19,7 +19,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- The composition-root libraries this shared core reuses: the .viu block parser
-         ([V01.01.06.02]), the @template parser it dispatches ([V01.01.05.05]), and the CSS AST + scoped /
+         ([V01.01.06.02]), the template parser it dispatches ([V01.01.05.05]), and the CSS AST + scoped /
          module / v-bind rewriters ([V01.01.06.04]/[V01.01.06.06]). Like the generator, this Tooling core is
          the one place these language libraries meet — they never reference each other. -->
     <ViuProjectReference Include="Assimalign.Viu.Syntax" />

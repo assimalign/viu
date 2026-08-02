@@ -237,7 +237,7 @@ public sealed class VueSingleFileComponentGeneratorTests
     [Fact]
     public void Generate_SameBaseViuAndVue_CanonicalViuWinsAndVueReportsCollision()
     {
-        const string viuSource = "@template {\n<div>canonical</div>\n}\n";
+        const string viuSource = "<template>\n<div>canonical</div>\n</template>\n";
         const string vueSource = "<template><div>compatibility</div></template>";
         var viu = new InMemoryAdditionalText($"{ProjectDirectory}/Card.viu", viuSource);
         var vue = new InMemoryAdditionalText($"{ProjectDirectory}/Card.vue", vueSource);

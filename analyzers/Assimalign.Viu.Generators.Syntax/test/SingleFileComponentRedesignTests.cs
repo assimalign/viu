@@ -17,9 +17,9 @@ public sealed class SingleFileComponentRedesignTests
     public void Template_GeneratesComponentTemplateContextAndSynchronousSetupHook()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>ready</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    partial void OnSetup()\n" +
             "    {\n" +
@@ -53,9 +53,9 @@ public sealed class SingleFileComponentRedesignTests
     public void HostNeutralTemplate_DoesNotImportBrowserHelpers()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>host neutral</div>\n" +
-            "}\n";
+            "</template>\n";
 
         var outcome = GeneratorTestHarness.Run(
             $"{ProjectDirectory}/Neutral.viu",
@@ -75,9 +75,9 @@ public sealed class SingleFileComponentRedesignTests
     public void DomModifierTemplate_ImportsBrowserHelpersAsARequiredCapability()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <button @click.stop=\"Save\">Save</button>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    private void Save() { }\n" +
             "}\n";
@@ -100,9 +100,9 @@ public sealed class SingleFileComponentRedesignTests
     public void SlotOutlet_ReadsCurrentSlotsFromGeneratedContext()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <slot />\n" +
-            "}\n";
+            "</template>\n";
 
         var outcome = GeneratorTestHarness.Run(
             $"{ProjectDirectory}/SlotHost.viu",
@@ -123,9 +123,9 @@ public sealed class SingleFileComponentRedesignTests
     public void ReactiveReferenceInterface_IsUnwrappedInTemplate()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>{{ Count }}</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    public global::Assimalign.Viu.Reactivity.IReactiveReference<int> Count = default!;\n" +
             "}\n";
@@ -145,9 +145,9 @@ public sealed class SingleFileComponentRedesignTests
     public void GeneratedMemberConflicts_ReportReservedMemberDiagnostic()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div />\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    private object Context = new();\n" +
             "    private void OnSetup() { }\n" +
@@ -214,9 +214,9 @@ public sealed class SingleFileComponentRedesignTests
     public void TaskReturningNamedEventHandler_RemainsADelegateForCoreToObserve()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <button @click=\"SaveAsync\">Save</button>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    private global::System.Threading.Tasks.Task SaveAsync()\n" +
             "        => global::System.Threading.Tasks.Task.CompletedTask;\n" +
@@ -240,9 +240,9 @@ public sealed class SingleFileComponentRedesignTests
     public void TaskReturningInlineLambda_RemainsTaskReturningForCoreToObserve()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <button @click=\"async () => await SaveAsync()\">Save</button>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    private global::System.Threading.Tasks.Task SaveAsync()\n" +
             "        => global::System.Threading.Tasks.Task.CompletedTask;\n" +

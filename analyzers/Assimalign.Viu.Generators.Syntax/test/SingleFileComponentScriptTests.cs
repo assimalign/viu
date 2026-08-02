@@ -40,9 +40,9 @@ public sealed class SingleFileComponentScriptTests
         // auto-increment, so every script line maps back to its own .viu line. The @script content here
         // begins on file line 6, and #line default restores the generated file's mapping afterward.
         const string source =
-            "@template {\n" +          // line 1
+            "<template>\n" +            // line 1
             "    <div></div>\n" +       // line 2
-            "}\n" +                     // line 3
+            "</template>\n" +           // line 3
             "\n" +                      // line 4
             "@script {\n" +             // line 5
             "    public int First = 1;\n" +   // line 6
@@ -115,7 +115,7 @@ public sealed class SingleFileComponentScriptTests
     {
         // A syntactically broken member is recoverable: the generator still emits the scaffold and
         // surfaces a VIU1201 script error mapped onto the .viu file, at the exact line/column of the
-        // offending token - the same block-to-file composition the @template path uses.
+        // offending token - the same block-to-file composition the template path uses.
         const string source =
             "@script {\n" +                 // line 1
             "    public int Broken = ;\n" +  // line 2  (the ';' at column 25 / index 24 is the invalid term)
@@ -273,14 +273,14 @@ public sealed class SingleFileComponentScriptTests
     public void HoistedUsings_CoexistWithRenderHelperPreamble_ProducingValidCSharp()
     {
         // Guards the [V01.01.06.03.01] + [V01.01.05.05] seam interaction: when a component has BOTH a
-        // @template (emitting the `using static` render-helper preamble) and an @script with leading
+        // <template> (emitting the `using static` render-helper preamble) and an @script with leading
         // usings, the hoisted usings follow the preamble in the file's using region and the whole file
         // stays syntactically valid C#. Semantic binding to the runtime helper surface is the runtime-side
         // deliverable, so this parses rather than compiles (cf. GeneratedRenderFile_ParsesAsValidCSharp).
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>{{ message }}</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    using System.Text;\n" +
             "    public string message = \"Hello\";\n" +
@@ -353,13 +353,13 @@ public sealed class SingleFileComponentScriptTests
     public void DesignSampleScriptShape_CompilesThroughTheGenerator_WithoutDiagnostics()
     {
         // [V01.01.06.03.01] The .designing/SampleApp/App.viu sample's script shape: two leading usings
-        // (unqualified, at column 1) followed by blank lines, alongside an empty @template. It must
+        // (unqualified, at column 1) followed by blank lines, alongside an empty <template>. It must
         // compile through the generator with no diagnostics — the usings are hoisted and the whitespace
         // member region is dropped.
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "\n" +
-            "}\n" +
+            "</template>\n" +
             "\n" +
             "@script {\n" +
             "using Assimalign.Viu;\n" +
@@ -531,13 +531,13 @@ public sealed class SingleFileComponentScriptTests
     public void ScriptReference_DrivesRenderUnwrap_EndToEnd()
     {
         // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the @script block declares a Reference<int>
-        // member, so the @template's use of it compiles to a _ctx-routed .Value unwrap in the emitted
+        // member, so the template's use of it compiles to a _ctx-routed .Value unwrap in the emitted
         // render body — the whole point of feeding script-classified BindingMetadata into the template
         // compiler (upstream analogue: SETUP_REF resolving through $setup in function mode).
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>{{ Count }}</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    public Assimalign.Viu.Reactivity.IReactiveReference<int> Count = default!;\n" +
             "}\n";

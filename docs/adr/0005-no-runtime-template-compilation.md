@@ -1,6 +1,6 @@
 # ADR-0005: No runtime template compilation (build-time source generators only)
 
-- **Status:** Accepted
+- **Status:** Accepted (container framing partially superseded on 2026-08-02 — see the Decision note)
 - **Date:** 2026-07-17 (the build-time `.viu` compilation container was decided this date, `docs/PLAN.md`
   founding decision 3; formally recorded as an ADR under [V01.01.13.01], #98, on 2026-07-19)
 - **Scope:** `Assimalign.Viu.Syntax.Templates`, `Assimalign.Viu.Syntax.SingleFileComponent`, and the
@@ -23,9 +23,15 @@ generators; there is no runtime compilation path.**
   drives it and stitches the output into the component's partial class.
 - There is no runtime `compile(templateString)` API — a template that is not present at build time
   cannot be rendered.
-- The `.viu` container uses `@template`/`@script`/`@style` `@`-block syntax — a deliberate divergence
-  from Vue's tag-based SFC container (decided 2026-07-17). The **markup inside `@template` remains
-  standard Vue template syntax**; only the container framing differs. The container is specified in
+- The `.viu` container framing has changed once, and the core decision of this ADR (build-time
+  compilation only) was unaffected both times. As decided 2026-07-17, the container used
+  `@template`/`@script`/`@style` `@`-block syntax — a deliberate divergence from Vue's tag-based SFC
+  container. On 2026-08-02 that framing was **partially reversed by user direction**
+  ([V01.01.06.10], #257): the canonical container is now the hybrid `<template>`/`<style>` tag form
+  with the C# `@script { }` block retained as the remaining divergence; legacy `@`-blocks parse with
+  a warning-severity migration diagnostic during a transition window. The **markup inside the
+  template container remains standard Vue template syntax** throughout; only the container framing
+  differs. The container is specified in
   [`Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md).
 
 ## Consequences

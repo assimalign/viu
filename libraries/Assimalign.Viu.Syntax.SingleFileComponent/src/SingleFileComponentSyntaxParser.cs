@@ -11,8 +11,9 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// <c>@vue/compiler-sfc</c>-parity static entry point stays authoritative and this parser never looks
 /// inside a block's content <em>itself</em> — but each block is exposed to the aggregate registration
 /// seam as a <see cref="SyntaxSource"/> (content, block name, <c>lang</c> option), so build tooling
-/// can attach the template parser to <c>@template</c>, a stylesheet parser to <c>@style</c>, or a
-/// custom tool's parser to a custom block, incremental-generator style, without this library
+/// can attach the template parser to <c>&lt;template&gt;</c>, a stylesheet parser to
+/// <c>&lt;style&gt;</c>, or a custom tool's parser to a custom block (registration is by block name,
+/// so legacy @-containers dispatch identically), incremental-generator style, without this library
 /// referencing any of them.
 /// </summary>
 public sealed class SingleFileComponentSyntaxParser : AggregateSyntaxParser<SingleFileComponentBlock>

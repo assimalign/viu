@@ -440,15 +440,15 @@ public sealed class SingleFileComponentHotReloadMetadataTests
         }
 
         return
-            "@template {\n" +
+            "<template>\n" +
             "    <div>" + templateValue + "</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    public string Value = \"" + scriptValue + "\";\n" +
             "}\n" +
-            "@style scoped {\n" +
+            "<style scoped>\n" +
             "    .box { color: " + styleValue + "; }\n" +
-            "}\n";
+            "</style>\n";
     }
 
     private static string GetterValue(string generated, string name)

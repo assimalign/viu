@@ -4,11 +4,12 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
-// The column-0 termination rule (docs/FORMAT.md): a block closes at the first line whose first column is
-// '}'. Because the parser only slices — it never looks inside content — braces in C# strings, nested CSS
-// braces, HTML text with braces, and lines that resemble a block opener are all preserved verbatim as
-// long as content is indented. The final test pins the flip side: an un-indented '}' closes the block
-// early, which is exactly why the rule requires content to be indented.
+// The two termination rules of the [V01.01.06.10] hybrid container (docs/FORMAT.md): an @-block
+// (@script, custom, legacy) closes at the first line whose first column is '}' — column 0 is
+// structural, so indented content with braces never closes early — while a tag block
+// (<template>/<style>) closes at its matching end tag anywhere, indentation-free, using the .vue
+// boundary rules. The last @-test pins the flip side: an un-indented '}' closes the @-block early,
+// which is exactly why the @-rule requires content to be indented.
 public class TerminationRuleTests
 {
     [Fact]
@@ -28,55 +29,71 @@ public class TerminationRuleTests
     }
 
     [Fact]
-    public void Parse_StyleWithNestedIndentedBraces_DoesNotCloseEarly()
+    public void Parse_TagStyleWithUnindentedBraces_DoesNotCloseEarly()
     {
+        // A tag style is raw text to its matching </style> — CSS braces at column 0 are irrelevant,
+        // unlike inside an @-block. This is the authoring hazard the tag container removes.
         var source =
-            "@style {\n" +
-            "    .a {\n" +
-            "        color: red;\n" +
-            "    }\n" +
-            "    .b { color: blue; }\n" +
-            "}\n";
+            "<style>\n" +
+            ".a {\n" +
+            "color: red;\n" +
+            "}\n" +
+            ".b { color: blue; }\n" +
+            "</style>\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
         descriptor.Styles.Count.ShouldBe(1);
-        descriptor.Styles[0].Content.ShouldBe("    .a {\n        color: red;\n    }\n    .b { color: blue; }\n");
+        descriptor.Styles[0].Content.ShouldBe("\n.a {\ncolor: red;\n}\n.b { color: blue; }\n");
         SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
     }
 
     [Fact]
-    public void Parse_TemplateWithBracesInText_DoesNotCloseEarly()
+    public void Parse_TagTemplateWithBracesInText_DoesNotCloseEarly()
     {
         var source =
-            "@template {\n" +
+            "<template>\n" +
             "    <p>Use { and } carefully</p>\n" +
             "    <pre>function() { return {}; }</pre>\n" +
-            "}\n";
+            "</template>\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
         descriptor.Template.ShouldNotBeNull();
         descriptor.Template!.Content.ShouldBe(
-            "    <p>Use { and } carefully</p>\n    <pre>function() { return {}; }</pre>\n");
+            "\n    <p>Use { and } carefully</p>\n    <pre>function() { return {}; }</pre>\n");
+        SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Parse_TagBlockClosingTag_MayBeIndented()
+    {
+        // Tag blocks close at their matching end tag anywhere — the column-0 rule applies only to
+        // @-blocks, matching .vue semantics.
+        var source = "<template>\n    <div/>\n    </template>\n";
+
+        var descriptor = SingleFileComponentTestHelpers.Parse(source);
+
+        descriptor.Template.ShouldNotBeNull();
+        descriptor.Template!.Content.ShouldBe("\n    <div/>\n    ");
         SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
     }
 
     [Fact]
     public void Parse_IndentedContentResemblingABlockOpener_IsPreservedAsContent()
     {
-        // An indented "@template {" is content, not a new block: inside a block the parser only looks for a
-        // column-0 '}'. So there is exactly one template and no duplicate diagnostic.
+        // An indented "@script {" is content, not a new block: inside an @-block the parser only looks
+        // for a column-0 '}'. So there is exactly one script and no duplicate diagnostic.
         var source =
-            "@template {\n" +
-            "    @template {\n" +
-            "    <div>x</div>\n" +
+            "@script {\n" +
+            "    @script {\n" +
+            "    var x = 1;\n" +
             "}\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
-        descriptor.Template.ShouldNotBeNull();
-        descriptor.Template!.Content.ShouldBe("    @template {\n    <div>x</div>\n");
+        descriptor.Script.ShouldNotBeNull();
+        descriptor.Script!.Content.ShouldBe("    @script {\n    var x = 1;\n");
         descriptor.CustomBlocks.Count.ShouldBe(0);
         SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
     }
@@ -96,34 +113,39 @@ public class TerminationRuleTests
     }
 
     [Fact]
-    public void Parse_IndentedHeaderAtTopLevel_IsStrayNotABlock()
+    public void Parse_IndentedHeadersAtTopLevel_AreStrayNotBlocks()
     {
-        // Headers are recognised only at column 0 (symmetric with the column-0 closer). An indented
-        // "@template {" at the top level is therefore stray content, not a block opener.
-        var source = "    @template {\n    <x/>\n}\n";
+        // Both containers open at column 0 only (symmetric with the column-0 @-closer). Indented
+        // "@script {" and "<template>" at the top level are therefore stray content, not block openers.
+        var atSource = "    @script {\n    x\n}\n";
+        var tagSource = "    <template>\n    <x/>\n    </template>\n";
 
-        var result = SingleFileComponentParser.Parse(source);
+        var atResult = SingleFileComponentParser.Parse(atSource);
+        var tagResult = SingleFileComponentParser.Parse(tagSource);
 
-        result.Descriptor.Template.ShouldBeNull();
-        result.Errors.ShouldContain(error => error.Code == SingleFileComponentErrorCode.StrayTopLevelContent);
+        atResult.Descriptor.Script.ShouldBeNull();
+        atResult.Errors.ShouldContain(error => error.Code == SingleFileComponentErrorCode.StrayTopLevelContent);
+        tagResult.Descriptor.Template.ShouldBeNull();
+        tagResult.Errors.ShouldContain(error => error.Code == SingleFileComponentErrorCode.StrayTopLevelContent);
     }
 
     [Fact]
     public void Parse_UnindentedContentBrace_ClosesEarly_DocumentingTheIndentRequirement()
     {
-        // A CSS rule whose own '}' sits at column 0 terminates the block prematurely; the real closing '}'
-        // then becomes stray top-level content. This is the documented reason content must be indented.
+        // C# whose own '}' sits at column 0 terminates the @-block prematurely; the real closing '}'
+        // then becomes stray top-level content. This is the documented reason @-block content must be
+        // indented (tag blocks have no such requirement — see the tag tests above).
         var source =
-            "@style {\n" +
-            ".a {\n" +
-            "color: red;\n" +
+            "@script {\n" +
+            "if (ready) {\n" +
+            "Go();\n" +
             "}\n" +
             "}\n";
 
         var result = SingleFileComponentParser.Parse(source);
 
-        result.Descriptor.Styles.Count.ShouldBe(1);
-        result.Descriptor.Styles[0].Content.ShouldBe(".a {\ncolor: red;\n");
+        result.Descriptor.Script.ShouldNotBeNull();
+        result.Descriptor.Script!.Content.ShouldBe("if (ready) {\nGo();\n");
         result.Errors.Count.ShouldBe(1);
         result.Errors[0].Code.ShouldBe(SingleFileComponentErrorCode.StrayTopLevelContent);
     }

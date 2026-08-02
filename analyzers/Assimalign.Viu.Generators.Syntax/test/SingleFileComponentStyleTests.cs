@@ -11,8 +11,8 @@ using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
-/// End-to-end tests for the <c>@style</c> registration seam ([V01.01.06.04]): the composition root routes
-/// <c>@style</c> block content to the CSS parser, scoped blocks are rewritten with the component's stable
+/// End-to-end tests for the style registration seam ([V01.01.06.04]): the composition root routes
+/// style block content to the CSS parser, scoped blocks are rewritten with the component's stable
 /// <c>data-v-&lt;hash&gt;</c> scope id and surface as the <c>ScopeId</c>/<c>ExtractedStyles</c> constants,
 /// non-scoped blocks pass through unmodified, and CSS parse diagnostics flow through the style-origin
 /// envelope onto exact <c>.viu</c> coordinates. The scoped-selector semantics themselves are pinned in the
@@ -27,13 +27,13 @@ public sealed class SingleFileComponentStyleTests
     public void ScopedStyle_EmitsScopeIdAndRewrittenCss()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div class=\"box\">hi</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "\n" +
-            "@style scoped {\n" +
+            "<style scoped>\n" +
             "    .box .inner { color: red; }\n" +
-            "}\n";
+            "</style>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
 
@@ -48,7 +48,7 @@ public sealed class SingleFileComponentStyleTests
     [Fact]
     public void ScopeId_IsStableAcrossRuns_ForTheSamePath()
     {
-        const string source = "@style scoped {\n    .a { color: red; }\n}\n";
+        const string source = "<style scoped>\n    .a { color: red; }\n</style>\n";
 
         var first = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
         var second = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
@@ -63,7 +63,7 @@ public sealed class SingleFileComponentStyleTests
     [Fact]
     public void ScopeId_DiffersByComponentPath()
     {
-        const string source = "@style scoped {\n    .a { color: red; }\n}\n";
+        const string source = "<style scoped>\n    .a { color: red; }\n</style>\n";
 
         var a = GeneratorTestHarness.Run($"{ProjectDirectory}/A.viu", source, RootNamespace, ProjectDirectory);
         var b = GeneratorTestHarness.Run($"{ProjectDirectory}/B.viu", source, RootNamespace, ProjectDirectory);
@@ -76,9 +76,9 @@ public sealed class SingleFileComponentStyleTests
     public void NonScopedStyle_PassesThroughUnmodified_AndEmitsNoScopeId()
     {
         const string source =
-            "@style {\n" +
+            "<style>\n" +
             "    .box .inner { color: red; }\n" +
-            "}\n";
+            "</style>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Plain.viu", source, RootNamespace, ProjectDirectory);
 
@@ -94,12 +94,12 @@ public sealed class SingleFileComponentStyleTests
     [Fact]
     public void ComponentWithoutStyle_EmitsStyleSeamComment_NoConstants()
     {
-        const string source = "@template {\n    <div>ok</div>\n}\n";
+        const string source = "<template>\n    <div>ok</div>\n</template>\n";
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Bare.viu", source, RootNamespace, ProjectDirectory);
 
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Bare.SingleFileComponent.g.cs");
-        generated.ShouldContain("[V01.01.06.04] Style seam. This component declares no @style block");
+        generated.ShouldContain("[V01.01.06.04] Style seam. This component declares no style block");
         generated.ShouldNotContain("internal const string ScopeId");
         generated.ShouldNotContain("internal const string ExtractedStyles");
     }
@@ -107,18 +107,18 @@ public sealed class SingleFileComponentStyleTests
     [Fact]
     public void MalformedCss_SurfacesStyleDiagnostic_OnExactViuCoordinates()
     {
-        // The @style block is dispatched to the CSS parser (the registration seam). A declaration missing
+        // The style block is dispatched to the CSS parser (the registration seam). A declaration missing
         // its colon is MissingDeclarationColon; it maps to the VIU1301 style error composed onto the .viu
         // file — proving the seam parses the block content and routes CSS diagnostics through the style
         // origin envelope on exact coordinates.
         const string source =
-            "@template {\n" +   // line 1
+            "<template>\n" +   // line 1
             "    <div>ok</div>\n" +  // line 2
-            "}\n" +            // line 3
+            "</template>\n" +  // line 3
             "\n" +             // line 4
-            "@style scoped {\n" +  // line 5
+            "<style scoped>\n" +  // line 5
             "    .a { color red; }\n" +  // line 6 — the CSS error line
-            "}\n";             // line 7
+            "</style>\n";      // line 7
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
 
@@ -139,8 +139,8 @@ public sealed class SingleFileComponentStyleTests
         // The style compilation is deterministic and value-equatable, so it must not break the incremental
         // cache: an unchanged component leaves the model step strictly Cached.
         const string source =
-            "@template {\n    <div>hi</div>\n}\n" +
-            "@style scoped {\n    .box { color: red; }\n}\n";
+            "<template>\n    <div>hi</div>\n</template>\n" +
+            "<style scoped>\n    .box { color: red; }\n</style>\n";
 
         var file = new InMemoryAdditionalText($"{ProjectDirectory}/Card.viu", source);
         var compilation = GeneratorTestHarness.CreateCompilation();

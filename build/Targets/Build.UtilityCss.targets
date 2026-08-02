@@ -4,7 +4,7 @@
     [V01.01.12.05.01], #248).
 
     This target intentionally does not depend on $(ViuBundleSingleFileComponentCss): utility
-    generation and component @style bundling are separate features and produce separate assets.
+    generation and component style-block bundling are separate features and produce separate assets.
     MSBuild owns source discovery; ViuBundleUtilityCss owns template slicing, plain-text candidate
     scanning, deterministic compilation, content comparison, and stale-output deletion.
   -->

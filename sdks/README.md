@@ -153,7 +153,7 @@ The executable customization surface is:
   definitions and authored CSS.
 
 Candidate detection remains intentionally plain-text and markup-only. Automatic discovery scans
-`.viu` `@template` content, `.vue` `<template>` content, and `.html`/`.htm`; it never scans
+`.viu` and `.vue` `<template>` content, and `.html`/`.htm`; it never scans
 `.viu`/`.vue` scripts, component style blocks, ordinary `.css`, or `.cs`. Runtime interpolation
 cannot create a discoverable class, so place every complete alternative in template text or add it
 with `@source inline(...)`. Code-first C# utility discovery is deferred to a separate feature.

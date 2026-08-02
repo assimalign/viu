@@ -64,11 +64,11 @@ The mounted context exposes:
 ### 2.1 Component-local state
 
 ```text
-@template {
+<template>
     <button type="button" @click="Increment">
         Count: {{ Count }}
     </button>
-}
+</template>
 
 @script {
     using Assimalign.Viu.Reactivity;
@@ -95,12 +95,12 @@ and assigning `Count.Value` schedules the necessary patch.
 ### 2.2 Parameters, services, and emitted events
 
 ```text
-@template {
+<template>
     <article>
         <h2>{{ Title }}</h2>
         <button type="button" @click="SaveAsync">Save</button>
     </article>
-}
+</template>
 
 @script {
     using System;
@@ -151,7 +151,7 @@ Setup itself remains synchronous. It creates the render closure and registers as
 with the lifecycle that owns that work:
 
 ```text
-@template {
+<template>
     <section>
         <button type="button" @click="RefreshAsync">Refresh</button>
 
@@ -160,7 +160,7 @@ with the lifecycle that owns that work:
             <li v-for="item in Items" :key="item.Id">{{ item.Title }}</li>
         </ul>
     </section>
-}
+</template>
 
 @script {
     using System;
@@ -273,11 +273,11 @@ public static class ApplicationState
 Consume the application registry from a mounted component:
 
 ```text
-@template {
+<template>
     <button type="button" @click="Increment">
         {{ Counter.Count }} / doubled: {{ Counter.Double }}
     </button>
-}
+</template>
 
 @script {
     using Assimalign.Viu.State;

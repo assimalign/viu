@@ -15,18 +15,18 @@ namespace Assimalign.Viu.Tooling.Css;
 /// </summary>
 /// <param name="ScopeId">
 /// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
-/// <c>scoped</c> <c>@style</c> block, otherwise <see langword="null"/> ([V01.01.06.04]).
+/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]).
 /// </param>
 /// <param name="ExtractedStyles">
 /// The component's compiled CSS — <c>scoped</c> blocks rewritten with <see cref="ScopeId"/>, <c>module</c>
 /// class names locally hashed, <c>v-bind()</c> rewritten to custom properties, and untouched non-scoped
 /// blocks passed through verbatim, concatenated in source order — or <see langword="null"/> when the
-/// component declares no <c>@style</c> block. This is the exact text the generator emits as its
+/// component declares no style block. This is the exact text the generator emits as its
 /// <c>ExtractedStyles</c> constant and the task writes into the bundle.
 /// </param>
 /// <param name="ModuleClasses">
 /// The CSS Modules class map ([V01.01.06.06]) — one entry per <c>original → hashed</c> class, grouped by its
-/// accessor. Empty when no <c>@style module</c> block is declared.
+/// accessor. Empty when no <c>module</c> style block is declared.
 /// </param>
 /// <param name="VariableBindings">
 /// The <c>v-bind()</c> CSS bindings ([V01.01.06.06]) — one entry per distinct <c>(hash, expression)</c>, in
@@ -34,7 +34,7 @@ namespace Assimalign.Viu.Tooling.Css;
 /// per-binding diagnostics onto component coordinates. Empty when no style block uses <c>v-bind()</c>.
 /// </param>
 /// <param name="Diagnostics">
-/// Recoverable diagnostics from the <c>@style</c> rewrites (malformed <c>v-bind()</c>), each paired with its
+/// Recoverable diagnostics from the style rewrites (malformed <c>v-bind()</c>), each paired with its
 /// block-content-start position so the host can locate it on the component file. Empty when every block
 /// compiled cleanly.
 /// </param>
@@ -45,7 +45,7 @@ public sealed record SingleFileComponentStyleCompilation(
     IReadOnlyList<SingleFileComponentStyleVariableBinding> VariableBindings,
     IReadOnlyList<SingleFileComponentStyleDiagnostic> Diagnostics)
 {
-    /// <summary>An empty compilation — no <c>@style</c> block was declared.</summary>
+    /// <summary>An empty compilation — no style block was declared.</summary>
     public static readonly SingleFileComponentStyleCompilation Empty = new(
         ScopeId: null,
         ExtractedStyles: null,

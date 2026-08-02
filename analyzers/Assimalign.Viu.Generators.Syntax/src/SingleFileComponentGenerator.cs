@@ -503,7 +503,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Compiles the dispatched <c>@template</c> parse into the C# render-method body ([V01.01.05.05]):
+    /// Compiles the dispatched template parse into the C# render-method body ([V01.01.05.05]):
     /// the registered <see cref="TemplateSyntaxParser"/>'s AST runs through <see cref="Transformer"/>
     /// under <c>PrefixIdentifiers</c> (with <paramref name="bindingMetadata"/> resolving identifier
     /// classifications) and the result is serialized by <see cref="RenderFunctionEmitter"/>. Transform
@@ -560,7 +560,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             var body = RenderBodySourceMapper.Inject(
                 emitted.Code, emitted.SourceMappings, blockContentStart, file.FilePath);
 
-            // The first @template block is the component's template (the descriptor carries one).
+            // The first template block is the component's template (the descriptor carries one).
             return (body, emitted.CacheSlotCount);
         }
 
@@ -568,7 +568,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Compiles the dispatched <c>@style</c> parses. The compilation itself lives in the shared Tooling
+    /// Compiles the dispatched style parses. The compilation itself lives in the shared Tooling
     /// core ([V01.01.12.12], <see cref="SingleFileComponentStyleCompiler"/>) — the SAME deterministic
     /// method the <c>ViuBundleCss</c> MSBuild task calls over the same <c>.viu</c> inputs, which is what
     /// keeps the emitted <c>ExtractedStyles</c> constant and the physical CSS bundle byte-identical

@@ -3,10 +3,10 @@ using System.Diagnostics.CodeAnalysis;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// A recoverable parse diagnostic: its code, human-readable message, and source location. Modeled on
-/// <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerError</c> but carrying the SingleFileComponent
-/// area's own <see cref="SingleFileComponentErrorCode"/> catalog. The parser reports these through
-/// <see cref="SingleFileComponentParseResult.Errors"/> or
+/// A recoverable parse diagnostic: its code, human-readable message, catalog severity, and source
+/// location. Modeled on <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerError</c> but carrying the
+/// SingleFileComponent area's own <see cref="SingleFileComponentErrorCode"/> catalog. The parser reports
+/// these through <see cref="SingleFileComponentParseResult.Errors"/> or
 /// <see cref="VueSingleFileComponentParseResult.Errors"/> and never throws for malformed input,
 /// matching Vue's recoverable-parsing model (<c>@vue/compiler-sfc</c> <c>parse().errors</c>). A
 /// <see cref="Diagnostic"/> whose Viu-defined code catalog and result-errors delivery stay
@@ -24,9 +24,10 @@ public sealed record SingleFileComponentError : Diagnostic
         Code = code;
         Message = message;
         Location = location;
-        // The whole Viu-defined catalog is recoverable *errors*, mirroring @vue/compiler-sfc's
-        // parse().errors; a warning tier would be a new catalog decision, not a per-instance choice.
-        Severity = DiagnosticSeverity.Error;
+        // Severity is a catalog decision, made per code, never per instance: the [V01.01.06.10]
+        // legacy-container codes are warnings (the block still parses during the migration window);
+        // every other code stays a recoverable error, mirroring @vue/compiler-sfc's parse().errors.
+        Severity = SingleFileComponentErrorMessages.GetSeverity(code);
     }
 
     /// <summary>The diagnostic code.</summary>

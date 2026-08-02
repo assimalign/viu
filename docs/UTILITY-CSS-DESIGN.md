@@ -426,7 +426,8 @@ The important separation is:
 
 Default discovery includes:
 
-- `.viu` `@template` content;
+- `.viu` `<template>` content (including the legacy `@template` container during its migration
+  window);
 - supported host markup such as `.html` and `.htm`;
 - explicitly registered source roots;
 - tag-based `.vue` template regions after the parser boundary owned by
@@ -505,10 +506,13 @@ application. AOT publication and trimming checks are separate gates.
 
 ### 8.1 Canonical `.viu`
 
-Viu's canonical component format remains `.viu`. It uses the documented
-`@template` / `@script` / `@style` container and is discovered by the SDK's `**/*.viu` item. The
-generator, component-style compiler, utility scanner, build tasks, hot-reload metadata, and Visual
-Studio document support share the same source-located descriptor.
+Viu's canonical component format remains `.viu`. Since the hybrid-container pivot
+(**[V01.01.06.10]**, [#257](https://github.com/assimalign/viu/issues/257), 2026-08-02) it uses the
+documented hybrid container — tag-based `<template>` / `<style>` blocks with the component's C# in
+an `@script { }` block, the legacy `@template`/`@style` containers still parsing during a
+migration window — and is discovered by the SDK's `**/*.viu` item. The generator, component-style
+compiler, utility scanner, build tasks, hot-reload metadata, and Visual Studio document support
+share the same source-located descriptor.
 
 ### 8.2 Tag-based `.vue` compatibility
 

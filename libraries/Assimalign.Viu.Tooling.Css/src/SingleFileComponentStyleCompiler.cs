@@ -34,7 +34,7 @@ public static class SingleFileComponentStyleCompiler
 
     /// <summary>
     /// Parses <paramref name="viuText"/> with <paramref name="parser"/>, resolves the scope id from the path,
-    /// and compiles the component's <c>@style</c> blocks. The convenience entry point for the
+    /// and compiles the component's style blocks. The convenience entry point for the
     /// <c>ViuBundleCss</c> task, which starts from raw file text; the generator uses
     /// <see cref="Compile(AggregateSyntaxParserResult{SingleFileComponentBlock}, string, CancellationToken)"/> directly
     /// because it already holds the shared parse. Both routes run the identical compilation.

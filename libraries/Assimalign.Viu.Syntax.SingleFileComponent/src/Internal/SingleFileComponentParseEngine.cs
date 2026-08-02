@@ -1,15 +1,18 @@
+using System;
 using System.Collections.Generic;
 
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The line-oriented state machine behind <see cref="SingleFileComponentParser"/>. <b>Column 0 is structural:</b> at the
-/// top level a line whose first column is <c>@</c> opens a block; inside a block a line whose first
-/// column is <c>}</c> closes it. Everything else is either block content (which must therefore be
-/// indented) or, at the top level, stray content. Because the parser only slices — it never looks inside
-/// content — literal braces in C# strings, nested CSS braces, HTML text with braces, and even lines that
-/// resemble a block opener are all preserved verbatim as long as they are indented. See
-/// <c>docs/FORMAT.md</c> for the full rule.
+/// The hybrid-container state machine behind <see cref="SingleFileComponentParser"/>
+/// ([V01.01.06.10]). Top-level dispatch is line-oriented and <b>column 0 is structural</b>: a line
+/// whose first column is <c>@</c> opens an @-block (<c>@script</c>, custom blocks, and the legacy
+/// <c>@template</c>/<c>@style</c> forms), and a line whose first column is <c>&lt;</c> opens a
+/// tag-based block (<c>&lt;template&gt;</c>/<c>&lt;style&gt;</c>, the canonical containers). An
+/// @-block closes at the first later line whose first column is <c>}</c>; a tag block closes at its
+/// matching end tag <em>anywhere</em>, using the shared <see cref="SingleFileComponentTagScanner"/>
+/// (the same boundary rules as the <c>.vue</c> engine). The parser only slices — it never looks
+/// inside content. See <c>docs/FORMAT.md</c> for the full rule set.
 /// </summary>
 /// <remarks>Internal and single-use: construct one engine per parse. Not thread-safe.</remarks>
 internal sealed class SingleFileComponentParseEngine
@@ -17,6 +20,7 @@ internal sealed class SingleFileComponentParseEngine
     private readonly string source;
     private readonly LineSpan[] lines;
     private readonly List<SingleFileComponentError> errors = new();
+    private readonly SingleFileComponentTagScanner scanner;
 
     /// <summary>Creates an engine over <paramref name="source"/>, pre-computing its line table.</summary>
     /// <param name="source">The full <c>.viu</c> file text (never <see langword="null"/>).</param>
@@ -24,6 +28,7 @@ internal sealed class SingleFileComponentParseEngine
     {
         this.source = source;
         this.lines = SplitLines(source);
+        this.scanner = new SingleFileComponentTagScanner(source, SpanOf, Report);
     }
 
     /// <summary>Runs the block scan and returns the descriptor plus any recoverable diagnostics.</summary>
@@ -47,8 +52,20 @@ internal sealed class SingleFileComponentParseEngine
                 continue;
             }
 
-            // Column 0 is structural. Only a leading '@' can open a block at the top level.
-            if (source[line.Start] != '@')
+            // Column 0 is structural. A leading '@' opens an @-block; a leading '<' opens a tag block.
+            var first = source[line.Start];
+            if (first == '<')
+            {
+                index = ParseTagAtLineStart(index, out var tagBlock);
+                if (tagBlock is not null)
+                {
+                    AssignBlock(tagBlock, ref template, ref script, styles, customBlocks);
+                }
+
+                continue;
+            }
+
+            if (first != '@')
             {
                 Report(SingleFileComponentErrorCode.StrayTopLevelContent, SpanOf(line.Start, line.TextEnd));
                 index++;
@@ -60,6 +77,17 @@ internal sealed class SingleFileComponentParseEngine
                 // A diagnostic was already reported; recover by skipping the header line.
                 index++;
                 continue;
+            }
+
+            // The @template/@style containers are legacy since [V01.01.06.10]: they still parse during
+            // the migration window, but each header reports a Warning-severity migration diagnostic.
+            if (string.Equals(header.Name, "template", StringComparison.Ordinal))
+            {
+                Report(SingleFileComponentErrorCode.LegacyTemplateBlockSyntax, header.HeaderLocation);
+            }
+            else if (string.Equals(header.Name, "style", StringComparison.Ordinal))
+            {
+                Report(SingleFileComponentErrorCode.LegacyStyleBlockSyntax, header.HeaderLocation);
             }
 
             // The block opened. Its content runs from the next line to the closing '}' at column 0.
@@ -85,7 +113,7 @@ internal sealed class SingleFileComponentParseEngine
                 resumeIndex = lines.Length;
             }
 
-            var block = BuildBlock(header, line.Start, blockEndOffset, contentStart, contentEnd);
+            var block = BuildBlock(header.Name, header.Options, line.Start, blockEndOffset, contentStart, contentEnd);
             AssignBlock(block, ref template, ref script, styles, customBlocks);
             index = resumeIndex;
         }
@@ -100,6 +128,162 @@ internal sealed class SingleFileComponentParseEngine
         };
 
         return new SingleFileComponentParseResult(descriptor, new SyntaxList<SingleFileComponentError>(errors.ToArray()));
+    }
+
+    // Handles a top-level line whose first column is '<': an HTML comment, a canonical
+    // <template>/<style> block, the diagnosed-and-discarded <script> tag, a stray closing or unknown
+    // tag, or a malformed tag. Returns the line index parsing resumes at; a produced block (template
+    // or style only) comes back through the out parameter.
+    private int ParseTagAtLineStart(int lineIndex, out SingleFileComponentBlock? block)
+    {
+        block = null;
+        var line = lines[lineIndex];
+        var start = line.Start;
+
+        // "<!--" — an HTML comment is tolerated between blocks, matching the .vue container.
+        if (scanner.StartsWith(start, "<!--"))
+        {
+            var commentEnd = source.IndexOf("-->", start + 4, StringComparison.Ordinal);
+            if (commentEnd < 0)
+            {
+                Report(SingleFileComponentErrorCode.MalformedTagBlock, SpanOf(start, source.Length));
+                return lines.Length;
+            }
+
+            return ResumeAfter(commentEnd + 3);
+        }
+
+        // A top-level closing tag has no opening block to close.
+        if (scanner.StartsWith(start, "</"))
+        {
+            var unexpectedEnd = scanner.FindTagEnd(start + 2);
+            if (unexpectedEnd < 0)
+            {
+                unexpectedEnd = source.Length;
+            }
+
+            Report(SingleFileComponentErrorCode.UnexpectedClosingTag, SpanOf(start, unexpectedEnd));
+            return SkipRestOfLine(unexpectedEnd);
+        }
+
+        if (!scanner.TryParseOpeningTag(start, out var header, out var recoveryOffset))
+        {
+            // The scanner already reported 1009/1010; recover quietly to the next line boundary.
+            return SkipRestOfLine(recoveryOffset);
+        }
+
+        var name = header.Name;
+
+        // A top-level <script> tag never executes in a .viu file: report it, slice past the element so
+        // its content can never reach compilation, and contribute no block.
+        if (string.Equals(name, "script", StringComparison.Ordinal))
+        {
+            Report(SingleFileComponentErrorCode.ScriptTagBlockNotSupported, header.Location);
+            if (header.IsSelfClosing)
+            {
+                return ResumeAfter(header.EndOffset);
+            }
+
+            if (scanner.TryFindRawClosingTag(name, header.EndOffset, out _, out var scriptEnd))
+            {
+                return ResumeAfter(scriptEnd);
+            }
+
+            return lines.Length;
+        }
+
+        if (string.Equals(name, "template", StringComparison.Ordinal)
+            || string.Equals(name, "style", StringComparison.Ordinal))
+        {
+            var contentStart = header.EndOffset;
+            int contentEnd;
+            int blockEnd;
+            if (header.IsSelfClosing)
+            {
+                contentEnd = contentStart;
+                blockEnd = contentStart;
+            }
+            else
+            {
+                // An HTML template closes on its nested-markup boundary; a preprocessed template and a
+                // style block are raw text to their matching end tag — the same rules as the .vue engine.
+                var isHtmlTemplate = string.Equals(name, "template", StringComparison.Ordinal)
+                    && SingleFileComponentTagScanner.IsHtmlTemplate(header.Options);
+                var foundClosingTag = isHtmlTemplate
+                    ? scanner.TryFindTemplateClosingTag(name, contentStart, out contentEnd, out blockEnd)
+                    : scanner.TryFindRawClosingTag(name, contentStart, out contentEnd, out blockEnd);
+
+                if (!foundClosingTag)
+                {
+                    Report(SingleFileComponentErrorCode.UnterminatedTagBlock, header.Location);
+                    contentEnd = source.Length;
+                    blockEnd = source.Length;
+                }
+            }
+
+            block = BuildBlock(name, header.Options, header.StartOffset, blockEnd, contentStart, contentEnd);
+            return ResumeAfter(blockEnd);
+        }
+
+        // Custom blocks stay @-syntax ([V01.01.06.10]): any other top-level tag is stray content.
+        // Recovery skips the whole element when its closing tag exists (avoiding per-line diagnostic
+        // spam), else moves to the next line.
+        Report(SingleFileComponentErrorCode.StrayTopLevelContent, header.Location);
+        if (header.IsSelfClosing)
+        {
+            return SkipRestOfLine(header.EndOffset);
+        }
+
+        if (scanner.TryFindRawClosingTag(name, header.EndOffset, out _, out var elementEnd))
+        {
+            return SkipRestOfLine(elementEnd);
+        }
+
+        return lineIndex + 1;
+    }
+
+    // Maps the offset just past a completed tag construct to the next top-level line index. A construct
+    // that ends mid-line must be followed by only whitespace on its line; a non-whitespace remainder is
+    // stray top-level content (blocks open at column 0, so nothing can open there).
+    private int ResumeAfter(int offset)
+    {
+        if (offset >= source.Length)
+        {
+            return lines.Length;
+        }
+
+        var lineIndex = LineIndexAt(offset);
+        var line = lines[lineIndex];
+        if (offset == line.Start)
+        {
+            return lineIndex;
+        }
+
+        var stray = offset;
+        while (stray < line.TextEnd && IsInlineWhitespace(source[stray]))
+        {
+            stray++;
+        }
+
+        if (stray < line.TextEnd)
+        {
+            Report(SingleFileComponentErrorCode.StrayTopLevelContent, SpanOf(stray, line.TextEnd));
+        }
+
+        return lineIndex + 1;
+    }
+
+    // Recovery counterpart of ResumeAfter: skips the remainder of the line at offset without further
+    // diagnostics (used after a construct that already reported one).
+    private int SkipRestOfLine(int offset)
+    {
+        if (offset >= source.Length)
+        {
+            return lines.Length;
+        }
+
+        var lineIndex = LineIndexAt(offset);
+        return offset == lines[lineIndex].Start ? lineIndex : lineIndex + 1;
     }
 
     // Parses a header line "@<name> [options] {". Returns false (with a diagnostic reported) when the
@@ -237,14 +421,20 @@ internal sealed class SingleFileComponentParseEngine
         return true;
     }
 
-    // Builds the typed block from its header and computed offsets.
-    private SingleFileComponentBlock BuildBlock(ParsedHeader header, int blockStart, int blockEnd, int contentStart, int contentEnd)
+    // Builds the typed block from its name, options, and computed offsets — shared by the @-block and
+    // tag-block paths.
+    private SingleFileComponentBlock BuildBlock(
+        string name,
+        SingleFileComponentBlockOption[] headerOptions,
+        int blockStart,
+        int blockEnd,
+        int contentStart,
+        int contentEnd)
     {
         var content = source.Substring(contentStart, contentEnd - contentStart);
-        var options = new SyntaxList<SingleFileComponentBlockOption>(header.Options);
+        var options = new SyntaxList<SingleFileComponentBlockOption>(headerOptions);
         var blockLocation = SpanOf(blockStart, blockEnd);
         var contentLocation = SpanOf(contentStart, contentEnd);
-        var name = header.Name;
 
         return name switch
         {
@@ -283,7 +473,8 @@ internal sealed class SingleFileComponentParseEngine
         };
     }
 
-    // Routes a block into the descriptor, enforcing at-most-one @template and @script.
+    // Routes a block into the descriptor, enforcing at most one template and one script regardless of
+    // which container syntax produced them (a tag <template> and a legacy @template still collide).
     private void AssignBlock(
         SingleFileComponentBlock block,
         ref SingleFileComponentTemplateBlock? template,
@@ -361,6 +552,13 @@ internal sealed class SingleFileComponentParseEngine
     // Maps an absolute offset to its (offset, line, column) via the pre-computed line table.
     private Position PositionAt(int offset)
     {
+        var line = lines[LineIndexAt(offset)];
+        return new Position(offset, line.Number, (offset - line.Start) + 1);
+    }
+
+    // Finds the index of the line containing offset (binary search over line starts).
+    private int LineIndexAt(int offset)
+    {
         var low = 0;
         var high = lines.Length - 1;
         while (low < high)
@@ -376,8 +574,7 @@ internal sealed class SingleFileComponentParseEngine
             }
         }
 
-        var line = lines[low];
-        return new Position(offset, line.Number, (offset - line.Start) + 1);
+        return low;
     }
 
     // Splits source into lines, treating \n, \r\n, and a lone \r each as one terminator. A final line
@@ -435,8 +632,8 @@ internal sealed class SingleFileComponentParseEngine
     private static bool IsInlineWhitespace(char value)
         => value == ' ' || value == '\t';
 
-    // A parsed header: the block name, its options, and the header line's span (for the unterminated
-    // diagnostic).
+    // A parsed @-header: the block name, its options, and the header line's span (for the unterminated
+    // and legacy-container diagnostics).
     private readonly struct ParsedHeader
     {
         public ParsedHeader(string name, SingleFileComponentBlockOption[] options, SourceLocation headerLocation)

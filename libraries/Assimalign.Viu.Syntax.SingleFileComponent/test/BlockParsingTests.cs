@@ -6,19 +6,20 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 // The happy-path block slicing: a well-formed .viu file yields typed template/script/style/custom
 // blocks with exact raw content. Block semantics mirror the Vue SFC spec
-// (https://vuejs.org/api/sfc-spec.html); the @-block container is the Viu divergence (see docs/FORMAT.md).
+// (https://vuejs.org/api/sfc-spec.html); the [V01.01.06.10] hybrid container is tag-based
+// <template>/<style> plus @script and @-form custom blocks (see docs/FORMAT.md).
 public class BlockParsingTests
 {
     private const string Component =
-        "@template {\n" +
+        "<template>\n" +
         "    <div>{{ message }}</div>\n" +
-        "}\n" +
+        "</template>\n" +
         "@script {\n" +
         "    public string Message = \"Hello\";\n" +
         "}\n" +
-        "@style scoped {\n" +
+        "<style scoped>\n" +
         "    .box { color: red; }\n" +
-        "}\n";
+        "</style>\n";
 
     [Fact]
     public void Parse_WellFormedComponent_ExposesEachBlock()
@@ -51,15 +52,17 @@ public class BlockParsingTests
     }
 
     [Fact]
-    public void Parse_Content_IsTheExactRawSliceIncludingTrailingNewline()
+    public void Parse_Content_IsTheExactRawSliceForEachContainer()
     {
         var descriptor = SingleFileComponentTestHelpers.Parse(Component);
 
-        // Content runs from the line after the header up to (not including) the closing-brace line, so it
-        // keeps interior indentation and the trailing newline before the '}'.
-        descriptor.Template!.Content.ShouldBe("    <div>{{ message }}</div>\n");
+        // Tag-block content runs from just past the opening tag's '>' to the '<' of the closing tag, so
+        // it keeps the leading newline (matching .vue); @-block content runs from the line after the
+        // header to the closing-brace line, so it has no leading newline. Both keep interior
+        // indentation and the trailing newline verbatim.
+        descriptor.Template!.Content.ShouldBe("\n    <div>{{ message }}</div>\n");
         descriptor.Script!.Content.ShouldBe("    public string Message = \"Hello\";\n");
-        descriptor.Styles[0].Content.ShouldBe("    .box { color: red; }\n");
+        descriptor.Styles[0].Content.ShouldBe("\n    .box { color: red; }\n");
     }
 
     [Fact]
@@ -83,7 +86,7 @@ public class BlockParsingTests
     [Fact]
     public void Parse_BlankLinesBetweenBlocks_AreTolerated()
     {
-        var source = "@template {\n    <p/>\n}\n\n\n@script {\n    // c#\n}\n";
+        var source = "<template>\n    <p/>\n</template>\n\n\n@script {\n    // c#\n}\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
@@ -93,20 +96,22 @@ public class BlockParsingTests
     }
 
     [Fact]
-    public void Parse_EmptyBlockBody_YieldsEmptyContent()
+    public void Parse_EmptyBlockBodies_YieldEmptyContent()
     {
-        var descriptor = SingleFileComponentTestHelpers.Parse("@template {\n}\n");
+        var descriptor = SingleFileComponentTestHelpers.Parse("<template></template>\n@script {\n}\n");
 
         descriptor.Template.ShouldNotBeNull();
         descriptor.Template!.Content.ShouldBe(string.Empty);
+        descriptor.Script.ShouldNotBeNull();
+        descriptor.Script!.Content.ShouldBe(string.Empty);
     }
 
     [Fact]
     public void Parse_MultipleStyleBlocks_ArePreservedInOrder()
     {
         var source =
-            "@style {\n    .a { color: red; }\n}\n" +
-            "@style scoped {\n    .b { color: blue; }\n}\n";
+            "<style>\n    .a { color: red; }\n</style>\n" +
+            "<style scoped>\n    .b { color: blue; }\n</style>\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
@@ -119,6 +124,7 @@ public class BlockParsingTests
     [Fact]
     public void Parse_CustomBlock_IsPreservedNotRejected()
     {
+        // Custom blocks stay @-syntax under the [V01.01.06.10] hybrid container.
         var source = "@docs {\n    Usage notes.\n}\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
@@ -131,28 +137,34 @@ public class BlockParsingTests
     }
 
     [Fact]
-    public void Parse_FileWithoutTrailingNewline_StillClosesTheBlock()
+    public void Parse_FileWithoutTrailingNewline_StillClosesTheBlocks()
     {
-        var source = "@template {\n    <p/>\n}";
+        var tagSource = "<template>\n    <p/>\n</template>";
+        var atSource = "@script {\n    x();\n}";
 
-        var descriptor = SingleFileComponentTestHelpers.Parse(source);
+        var tagDescriptor = SingleFileComponentTestHelpers.Parse(tagSource);
+        var atDescriptor = SingleFileComponentTestHelpers.Parse(atSource);
 
-        descriptor.Template.ShouldNotBeNull();
-        descriptor.Template!.Content.ShouldBe("    <p/>\n");
-        SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
+        tagDescriptor.Template.ShouldNotBeNull();
+        tagDescriptor.Template!.Content.ShouldBe("\n    <p/>\n");
+        SingleFileComponentTestHelpers.Errors(tagSource).Count.ShouldBe(0);
+        atDescriptor.Script.ShouldNotBeNull();
+        atDescriptor.Script!.Content.ShouldBe("    x();\n");
+        SingleFileComponentTestHelpers.Errors(atSource).Count.ShouldBe(0);
     }
 
     [Fact]
     public void Parse_CrlfLineEndings_AreHandledAndPreservedInContent()
     {
-        // Real .viu files authored on Windows use CRLF; the parser treats \r\n as one terminator and
-        // keeps it verbatim in the raw content slice.
-        var source = "@template {\r\n    <x/>\r\n}\r\n";
+        // Real .viu files authored on Windows use CRLF; both containers treat \r\n as one terminator and
+        // keep it verbatim in the raw content slice.
+        var source = "<template>\r\n    <x/>\r\n</template>\r\n@script {\r\n    y();\r\n}\r\n";
 
         var descriptor = SingleFileComponentTestHelpers.Parse(source);
 
         descriptor.Template.ShouldNotBeNull();
-        descriptor.Template!.Content.ShouldBe("    <x/>\r\n");
+        descriptor.Template!.Content.ShouldBe("\r\n    <x/>\r\n");
+        descriptor.Script!.Content.ShouldBe("    y();\r\n");
         SingleFileComponentTestHelpers.Errors(source).Count.ShouldBe(0);
     }
 }

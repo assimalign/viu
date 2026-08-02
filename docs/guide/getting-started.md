@@ -326,17 +326,19 @@ schedules a re-render — no reflection, fully trimming- and AOT-safe.
 
 ## Styling with .viu single-file components
 
-Viu's single-file component is the `.viu` file — the counterpart of Vue's `.vue`, using
-`@template`/`@script`/`@style` `@`-blocks instead of HTML-like tags (the exact grammar is in
-[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)). A `.viu` with
-an `@template`/`@script` compiles to a **mountable component** (see the note below,
+Viu's single-file component is the `.viu` file — the counterpart of Vue's `.vue`, using the hybrid
+container ([V01.01.06.10], #257): Vue-parity `<template>`/`<style>` tags plus the C# `@script { }`
+block (the exact grammar is in
+[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
+`@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
+`<template>`/`@script` compiles to a **mountable component** (see the note below,
 [#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **scoped, bundled CSS**
-unit. Add a `.viu` file with a `@style` block:
+unit. Add a `.viu` file with a `<style>` block:
 
 **`AppStyles.viu`**:
 
 ```
-@style {
+<style>
     .counter {
         display: grid;
         gap: 1rem;
@@ -363,18 +365,18 @@ unit. Add a `.viu` file with a `@style` block:
         font-weight: 700;
         cursor: pointer;
     }
-}
+</style>
 ```
 
-At build the SDK extracts every `@style` block, bundles it into a **content-fingerprinted** static web
+At build the SDK extracts every `<style>` block, bundles it into a **content-fingerprinted** static web
 asset (`<AssemblyName>.viu.css`), and **injects the `<link rel="stylesheet">` into `index.html`
 automatically** — before the SDK's gzip/brotli compression pipeline, so compression negotiation stays
 intact. You write no manual link tag. This is why `index.html` above has none; the details are in
 [`sdks/README.md`](../../sdks/README.md) and the injection mechanism is
 [V01.01.12.12.01](https://github.com/assimalign/viu/issues/167).
 
-> **`.viu` `@template`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
-> A `.viu` with an `@template` (standard Vue template markup) and an `@script` (C#) block now compiles to a
+> **`.viu` `<template>`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
+> A `.viu` with a `<template>` (standard Vue template markup) and an `@script` (C#) block now compiles to a
 > **mountable component**: the generator emits the render function, merges the script into the partial
 > class, **and** generates the `IComponent` bridge (a `Setup` that returns the render delegate),
 > so you mount it exactly like a hand-written component — `BrowserApplication.CreateBuilder(new Greeting()).Build().MountAsync("#app")`
@@ -383,9 +385,9 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > template event handler (`@click="Increment"`) calls the like-named `@script` method:
 >
 > ```
-> @template {
+> <template>
 >     <button class="counter" @click="Increment">{{ Count }}</button>
-> }
+> </template>
 > @script {
 >     using Assimalign.Viu;
 >     public readonly Reference<int> Count = Reactive.Reference(0);
@@ -461,7 +463,7 @@ This guide is intentionally scoped to what a consumer can build and publish toda
   above.
 - **Declared props/emits and lifecycle hooks in a `.viu` `@script`** — the `defineProps`/`defineEmits`
   analogues and `@script`-authored lifecycle, still in progress
-  ([#227](https://github.com/assimalign/viu/issues/227)). Mountable `.viu` `@template`/`@script` components
+  ([#227](https://github.com/assimalign/viu/issues/227)). Mountable `.viu` `<template>`/`@script` components
   themselves already work ([#216](https://github.com/assimalign/viu/issues/216), see the note above).
 - **A template-syntax reference and the API reference site** — the Documentation area
   [V01.01.13](https://github.com/assimalign/viu/issues/97).

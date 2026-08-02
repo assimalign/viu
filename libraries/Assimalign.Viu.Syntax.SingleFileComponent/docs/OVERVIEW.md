@@ -1,8 +1,10 @@
 # Assimalign.Viu.Syntax.SingleFileComponent — overview
 
 The build-time parsers for Viu single-file components. `SingleFileComponentParser` owns the canonical
-`.viu` `@`-block container; the isolated [V01.01.06.09] `VueSingleFileComponentParser` compatibility
-entry point slices tag-based `.vue` containers according to Vue 3.5's SFC-root rules. Both record exact
+`.viu` hybrid container ([V01.01.06.10]): tag-based `<template>`/`<style>` blocks (matching Vue) plus
+the `@script { }` C# block and `@`-form custom blocks. The isolated [V01.01.06.09]
+`VueSingleFileComponentParser` compatibility entry point slices fully tag-based `.vue` containers
+according to Vue 3.5's SFC-root rules; the two engines share one internal tag scanner. Both record exact
 source spans and **do not** parse block contents — template markup, C#, and CSS are parsed by other
 libraries. They fill the role
 [`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/v3.5.34/packages/compiler-sfc) `parse()`
@@ -18,9 +20,10 @@ the generated type with their `IComponentFactory` and request it through
 `BrowserApplication.CreateBuilder` or as a child. A style-only component stays a CSS-bundle unit.
 This library owns none of that; it only produces the descriptor those consumers read.
 
-The canonical container syntax (the `@template`/`@script`/`@style` `@`-block grammar, the column-0
-termination rule, options, diagnostics) is specified in [FORMAT.md](FORMAT.md) — the authoritative
-spec that the test suite pins. The packaged analyzer targets discover both formats, flow them through
+The canonical container syntax (the `<template>`/`<style>` tag grammar, the `@script`/custom
+`@`-block grammar with its column-0 termination rule, the legacy `@template`/`@style` transition
+window, options and attributes, diagnostics) is specified in [FORMAT.md](FORMAT.md) — the
+authoritative spec that the test suite pins. The packaged analyzer targets discover both formats, flow them through
 `AdditionalFiles` and the `dotnet watch` item graph, and feed their styles to the physical component
 bundle. Same-directory, same-base `.viu` takes deterministic precedence over `.vue` in both generator
 and bundle output. Visual Studio content-type routing remains a separate extension boundary.
@@ -47,7 +50,9 @@ and bundle output. Visual Studio content-type routing remains a separate extensi
   sources. It dispatches template, ordinary script, setup script, repeated style, and custom blocks
   through the same registered parser contracts while preserving their original block nodes and spans.
 - **Diagnostics** (`Diagnostics/`) — `SingleFileComponentError` and the Viu-defined
-  `SingleFileComponentErrorCode` (1000-based).
+  `SingleFileComponentErrorCode` (1000-based). Severity comes from the catalog: the [V01.01.06.10]
+  legacy-container codes (1015/1016) are warnings, everything else is an error, and the result's
+  `Errors` list carries all severities.
 
 ## Boundaries
 

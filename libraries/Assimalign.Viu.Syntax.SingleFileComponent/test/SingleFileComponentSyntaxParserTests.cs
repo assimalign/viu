@@ -13,12 +13,12 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 public class SingleFileComponentSyntaxParserTests
 {
     private const string Component =
-        "@template {\n" +
+        "<template>\n" +
         "    <div>{{ message }}</div>\n" +
-        "}\n" +
-        "@style scoped lang=\"scss\" {\n" +
+        "</template>\n" +
+        "<style scoped lang=\"scss\">\n" +
         "    .box { color: red; }\n" +
-        "}\n" +
+        "</style>\n" +
         "@script {\n" +
         "    public string Message = \"Hello\";\n" +
         "}\n" +
@@ -59,14 +59,14 @@ public class SingleFileComponentSyntaxParserTests
     [Fact]
     public void ParseComponent_Errors_SurfaceAsUniformDiagnostics()
     {
-        // A second @template is a recoverable duplicate-block diagnostic (first block wins).
+        // A second <template> is a recoverable duplicate-block diagnostic (first block wins).
         var source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>one</div>\n" +
-            "}\n" +
-            "@template {\n" +
+            "</template>\n" +
+            "<template>\n" +
             "    <div>two</div>\n" +
-            "}\n";
+            "</template>\n";
 
         var expected = SingleFileComponentParser.Parse(source);
         var result = new SingleFileComponentSyntaxParser().ParseComponent(source);

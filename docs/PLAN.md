@@ -45,7 +45,7 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` → renamed `Assimalign.Viu.Core`, root namespace `Assimalign.Viu` ([V01.01.12.21]) | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` → renamed `Assimalign.Viu.Browser` ([V01.01.12.22]) | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
 | Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
-| SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (@-block container syntax; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
+| SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` | `@vue/compiler-sfc` — `.viu` single-file components (hybrid container syntax since `V01.01.06.10`: `<template>`/`<style>` tags + the `@script` block; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
 | Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Router.Browser`, formerly `Assimalign.Viu.Router.RuntimeDom` — renamed [V01.01.12.22] — the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
@@ -82,8 +82,14 @@ These are deliberate, recorded divergences from upstream — everything else tra
 3. **No runtime template compilation.** Vue's full build compiles templates with `new Function` —
    impossible in WASM. Templates and SFCs compile at build time via Roslyn source generators; that
    is the only path, and it is also how the tooling story (diagnostics, IDE integration) gets
-   Razor-grade. The canonical `.viu` container uses `@template`/`@script`/`@style` @-block syntax
-   (the deliberate `V01.01.06.01` divergence decided 2026-07-17), while `V01.01.06.09` adds an
+   Razor-grade. The canonical `.viu` container is the **hybrid** form decided 2026-08-02
+   (`V01.01.06.10`, #257): tag-based `<template>`/`<style>` blocks exactly as in Vue, with the
+   component's C# kept in an `@script { }` block and custom blocks staying @-syntax. That decision
+   partially reverses the 2026-07-17 `V01.01.06.01` decision, which made `@template`/`@script`/
+   `@style` @-block syntax canonical for every block — the earlier decision happened and is
+   superseded, not erased: the legacy `@template`/`@style` containers still parse during a
+   migration window with a Warning-severity diagnostic (the decision record and rules live in
+   `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
    explicitly scoped tag-based `.vue` compatibility input. Template markup remains standard Vue
    template syntax in both containers.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
@@ -247,6 +253,8 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.06.05` | Emit hot-reload metadata for per-block updates | W05 | P005 |
 | `V01.01.06.06` | Implement CSS Modules and v-bind() in CSS | W04 | P004 |
 | `V01.01.06.09` | Add tag-based .vue single-file-component compatibility | W05 | P005 |
+| `V01.01.06.10` | Adopt the hybrid tag-based .viu container: template and style tags with the @script block | W05 | P002 |
+| `V01.01.06.11` | Extract the shared single-file-component projection with bidirectional source maps | W05 | P004 |
 
 ### [V01.01.07] Framework - ServerRenderer (W05, P004)
 
@@ -305,6 +313,9 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.12.05` | Build the dev-loop experience | W05 | P005 |
 | `V01.01.12.06` | Establish WASM size and AOT budget gates | W03 | P003 |
 | `V01.01.12.07` | Build .viu editor support | W06 | P007 |
+| `V01.01.12.07.03` | Recolor .viu classification with vibrant built-in categories and distinct component tags | W05 | P005 |
+| `V01.01.12.07.04` | Offer declared @script members in completion through Roslyn syntax parsing | W05 | P005 |
+| `V01.01.12.07.05` | Implement the tier-2 language-server surface: resolve, symbols, folding, honest hover format | W05 | P005 |
 | `V01.01.12.08` | Integrate Viu with the Cohesion platform (hosting; packaging landed via `.19`) | W05 | P004 |
 | `V01.01.12.09` | Modularize the library folder structure, whole-word naming | W03 | P002 |
 | `V01.01.12.10` | Scope the build-time utility-first CSS engine | W04 | P005 |
@@ -317,6 +328,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.12.17` | CSS-first utility directives and style composition | W06 | P006 |
 | `V01.01.12.18` | Rename product naming from Vue/Vuecs to Viu repo-wide | W04 | P002 |
 | `V01.01.12.19` | Adopt Cohesion SDK/shared-framework packaging (Assimalign.Viu.Sdk + Assimalign.Viu.App) | W05 | P003 |
+| `V01.01.12.23` | Provide semantic C# IntelliSense in the @script block through a Roslyn workspace in the language server | W06 | P004 |
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 

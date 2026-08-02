@@ -18,7 +18,7 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// template compiler's upstream-pinned <c>CompilerErrorCode</c>); a generator cannot enumerate those
 /// unbounded catalogs into one descriptor each without mirroring them, so this composition root instead
 /// envelopes each diagnostic by its <em>origin</em> (the <c>.viu</c> block container, a dispatched
-/// <c>@template</c> parse, or the Roslyn parse of the <c>@script</c> block's C# — [V01.01.06.03]) and its
+/// template parse, or the Roslyn parse of the <c>@script</c> block's C# — [V01.01.06.03]) and its
 /// severity, and carries the parser's original message verbatim. The descriptor <c>defaultSeverity</c>
 /// follows the parser severity because <c>Diagnostic.Create(descriptor, location, args)</c> reports at the
 /// descriptor's severity. Generator-owned script-contract rules use the same location snapshot and mapping
@@ -75,7 +75,7 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1004"));
 
-    /// <summary>A recoverable error reported by the dispatched <c>@template</c> parse.</summary>
+    /// <summary>A recoverable error reported by the dispatched template parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateError = new(
         id: "VIU1101",
         title: "Single-file component template parse error",
@@ -85,7 +85,7 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1101"));
 
-    /// <summary>A warning reported by the dispatched <c>@template</c> parse.</summary>
+    /// <summary>A warning reported by the dispatched template parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateWarning = new(
         id: "VIU1102",
         title: "Single-file component template parse warning",
@@ -95,7 +95,7 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1102"));
 
-    /// <summary>An informational message reported by the dispatched <c>@template</c> parse.</summary>
+    /// <summary>An informational message reported by the dispatched template parse.</summary>
     internal static readonly DiagnosticDescriptor TemplateInformation = new(
         id: "VIU1103",
         title: "Single-file component template parse information",
@@ -165,7 +165,7 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1206"));
 
-    /// <summary>A recoverable error reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
+    /// <summary>A recoverable error reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
     internal static readonly DiagnosticDescriptor StyleError = new(
         id: "VIU1301",
         title: "Single-file component style parse error",
@@ -175,7 +175,7 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1301"));
 
-    /// <summary>A warning reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
+    /// <summary>A warning reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
     internal static readonly DiagnosticDescriptor StyleWarning = new(
         id: "VIU1302",
         title: "Single-file component style parse warning",
@@ -185,7 +185,7 @@ internal static class SingleFileComponentDiagnostics
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1302"));
 
-    /// <summary>An informational message reported by the dispatched <c>@style</c> CSS parse ([V01.01.06.04]).</summary>
+    /// <summary>An informational message reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
     internal static readonly DiagnosticDescriptor StyleInformation = new(
         id: "VIU1303",
         title: "Single-file component style parse information",
@@ -203,7 +203,7 @@ internal static class SingleFileComponentDiagnostics
     /// </summary>
     /// <param name="filePath">The originating <c>.viu</c> file path.</param>
     /// <param name="diagnostic">The base parser diagnostic to map.</param>
-    /// <param name="fromTemplate">Whether the diagnostic came from a dispatched <c>@template</c> parse.</param>
+    /// <param name="fromTemplate">Whether the diagnostic came from a dispatched template parse.</param>
     /// <param name="blockContentStart">The file position where the dispatched block's content begins, or <see langword="null"/>.</param>
     /// <returns>The value-equatable diagnostic.</returns>
     public static DiagnosticInfo Create(
@@ -340,16 +340,16 @@ internal static class SingleFileComponentDiagnostics
     }
 
     /// <summary>
-    /// Envelopes a dispatched <c>@style</c> CSS parse <paramref name="diagnostic"/> ([V01.01.06.04]) as a
+    /// Envelopes a dispatched style CSS parse <paramref name="diagnostic"/> ([V01.01.06.04]) as a
     /// value-equatable <see cref="DiagnosticInfo"/> located on the <c>.viu</c> file. The CSS parser reports
-    /// positions relative to the <c>@style</c> block's content, so they are composed with
+    /// positions relative to the style block's content, so they are composed with
     /// <paramref name="blockContentStart"/> into <c>.viu</c> coordinates through the <em>same</em>
-    /// <see cref="ComposeBlockLocation"/> arithmetic the <c>@template</c>/<c>@script</c> paths use, landing
+    /// <see cref="ComposeBlockLocation"/> arithmetic the template/<c>@script</c> paths use, landing
     /// a CSS error on the exact <c>.viu</c> style line/column.
     /// </summary>
     /// <param name="filePath">The originating <c>.viu</c> file path.</param>
     /// <param name="diagnostic">The base CSS parser diagnostic to map.</param>
-    /// <param name="blockContentStart">The file position where the <c>@style</c> block's content begins.</param>
+    /// <param name="blockContentStart">The file position where the style block's content begins.</param>
     /// <returns>The value-equatable diagnostic located on the <c>.viu</c> file.</returns>
     public static DiagnosticInfo CreateStyle(string filePath, SyntaxDiagnostic diagnostic, Position blockContentStart)
     {
@@ -430,7 +430,7 @@ internal static class SingleFileComponentDiagnostics
 
     // Composes a block-content-relative span (one-based positions plus content-relative offsets) with the
     // block's content-start position into whole-.viu-file coordinates. Shared by the dispatched-block
-    // (@template) path and the @script path so both — and the emitted #line directives — agree exactly.
+    // (template) path and the @script path so both — and the emitted #line directives — agree exactly.
     private static LocationInfo ComposeBlockLocation(
         string filePath,
         Position blockStart,
@@ -463,7 +463,7 @@ internal static class SingleFileComponentDiagnostics
     /// <summary>
     /// Composes a block-content-relative template position into whole-<c>.viu</c>-file coordinates for a C#
     /// <c>#line</c> span directive ([V01.01.05.08] render source mapping), reusing the <em>same</em>
-    /// <see cref="Compose"/> arithmetic the <c>@template</c>/<c>@script</c> diagnostic paths use so the
+    /// <see cref="Compose"/> arithmetic the template/<c>@script</c> diagnostic paths use so the
     /// emitted <c>#line</c> map and the reported diagnostics agree exactly. Returns one-based line/column
     /// (the <c>#line</c> directive convention), where <see cref="Compose"/> yields zero-based for Roslyn.
     /// </summary>

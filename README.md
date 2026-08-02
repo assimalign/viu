@@ -53,7 +53,7 @@ carries a `docs/OVERVIEW.md` (what it is, its public surface, its Vue 3 counterp
 | [`Assimalign.Viu.Syntax.Html`](libraries/Assimalign.Viu.Syntax.Html) | (Vite HTML entry processing) — the `.html` host-page language (scaffold) | [OVERVIEW](libraries/Assimalign.Viu.Syntax.Html/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax.Html/docs/DESIGN.md) |
 | [`Assimalign.Viu.Syntax.JavaScript`](libraries/Assimalign.Viu.Syntax.JavaScript) | (interop-glue JavaScript) — the `.js` language around the interop boundary (scaffold) | [OVERVIEW](libraries/Assimalign.Viu.Syntax.JavaScript/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax.JavaScript/docs/DESIGN.md) |
 | [`Assimalign.Viu.Testing`](libraries/Assimalign.Viu.Testing) | [`@vue/runtime-test`](https://github.com/vuejs/core/tree/main/packages/runtime-test) + [`@vue/test-utils`](https://test-utils.vuejs.org) — the in-memory renderer and component test harness | [OVERVIEW](libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Testing/docs/DESIGN.md) |
-| [`Assimalign.Viu.Tooling.Css`](libraries/Assimalign.Viu.Tooling.Css) | (build-time composition core, no direct Vue peer) — shared `.viu` `@style` compilation and bundling used by both build-time hosts | [OVERVIEW](libraries/Assimalign.Viu.Tooling.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Tooling.Css/docs/DESIGN.md) |
+| [`Assimalign.Viu.Tooling.Css`](libraries/Assimalign.Viu.Tooling.Css) | (build-time composition core, no direct Vue peer) — shared `.viu` `<style>` compilation and bundling used by both build-time hosts | [OVERVIEW](libraries/Assimalign.Viu.Tooling.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Tooling.Css/docs/DESIGN.md) |
 
 ### Source generators and build tasks (`analyzers/`)
 
@@ -64,7 +64,7 @@ runtime template compilation. They never ship in the runtime assemblies.
 | --- | --- |
 | `Assimalign.Viu.Generators.Reactivity` | Emits the property wrappers for `[Reactive]`/`[ShallowReactive]` partial classes (Vue's `reactive()`, source-generated). |
 | `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
-| `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `@style` output to a physical stylesheet outside the analyzer sandbox. |
+| `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `<style>` output to a physical stylesheet outside the analyzer sandbox. |
 
 ### Packaged SDK showcase
 

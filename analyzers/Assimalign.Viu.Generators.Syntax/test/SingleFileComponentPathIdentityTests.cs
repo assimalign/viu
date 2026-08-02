@@ -17,7 +17,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 public sealed class SingleFileComponentPathIdentityTests
 {
     private const string RootNamespace = "Demo";
-    private const string ViuSource = "@template {\n    <div>canonical</div>\n}\n";
+    private const string ViuSource = "<template>\n    <div>canonical</div>\n</template>\n";
     private const string VueSource = "<template><div>compatibility</div></template>\n";
 
     [Fact]

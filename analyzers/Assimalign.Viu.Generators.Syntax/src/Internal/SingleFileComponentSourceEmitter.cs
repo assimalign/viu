@@ -9,7 +9,7 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// Renders a <see cref="SingleFileComponentModel"/> into the generated partial class for a <c>.viu</c>
 /// component. The output is deterministic and fully statically analyzable (no reflection, no dynamic
 /// code generation), so it is trimming- and WASM/NativeAOT-safe. Both seams are filled: the
-/// <c>@template</c> block's compiled render function ([V01.01.05.05]) is emitted from the model's
+/// template block's compiled render function ([V01.01.05.05]) is emitted from the model's
 /// pre-serialized render body — helper names bind <b>by name</b> to the runtime render-helper surface
 /// through the file-level <c>using static</c> (the generator never references the runtime assembly; the
 /// name/signature contract is documented in
@@ -119,18 +119,18 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("//\n");
         AppendIndent(builder, indent);
-        builder.Append("// Parsed blocks: @template=").Append(Present(model.HasTemplate))
+        builder.Append("// Parsed blocks: template=").Append(Present(model.HasTemplate))
             .Append(", @script=").Append(Present(model.HasScript))
-            .Append(", @style=").Append(Count(model.StyleCount))
+            .Append(", style=").Append(Count(model.StyleCount))
             .Append(", custom=").Append(Count(model.CustomBlockCount)).Append(".\n");
 
         AppendIndent(builder, indent);
         builder.Append("partial class ").Append(model.ClassName);
         if (model.RenderBody is not null)
         {
-            // [V01.01.06.07] A @template-bearing .viu is a mountable component: the generated partial
+            // [V01.01.06.07] A template-bearing .viu is a mountable component: the generated partial
             // implements IComponentTemplate (base list added here, the sole class-declaration site) so it
-            // can be activated by IComponentFactory. A @style-only .viu with no render body stays a plain
+            // can be activated by IComponentFactory. A style-only .viu with no render body stays a plain
             // partial class — no interface and no Setup. Named by global:: reference, never an assembly
             // reference.
             builder.Append(" : ").Append(ComponentsNamespace).Append(".IComponentTemplate");
@@ -158,7 +158,7 @@ internal static class SingleFileComponentSourceEmitter
 
         if (model.RenderBody is { } renderBody)
         {
-            // [V01.01.05.05] The compiled @template render function. The body was serialized by the
+            // [V01.01.05.05] The compiled template render function. The body was serialized by the
             // template compiler's RenderFunctionEmitter (the Vue 3.5 codegen.ts analogue) and is
             // already indented for this nesting depth.
             AppendIndent(builder, bodyIndent);
@@ -182,7 +182,7 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, bodyIndent);
             builder.Append("/// <summary>\n");
             AppendIndent(builder, bodyIndent);
-            builder.Append("/// The compiled render function for the <c>@template</c> block ([V01.01.05.05]) — the C#\n");
+            builder.Append("/// The compiled render function for the component's template block ([V01.01.05.05]) — the C#\n");
             AppendIndent(builder, bodyIndent);
             builder.Append("/// analogue of the component's compiled <c>render</c> in Vue 3.5 (vuejs/core\n");
             AppendIndent(builder, bodyIndent);
@@ -202,7 +202,7 @@ internal static class SingleFileComponentSourceEmitter
         else
         {
             AppendIndent(builder, bodyIndent);
-            builder.Append("// [V01.01.05.05] No @template block: no render function is emitted for this component.\n");
+            builder.Append("// [V01.01.05.05] No template block: no render function is emitted for this component.\n");
         }
 
         builder.Append('\n');
@@ -347,7 +347,7 @@ internal static class SingleFileComponentSourceEmitter
         builder.Append("}\n");
     }
 
-    // [V01.01.06.07] The IComponentTemplate bridge turns a compiled @template/@script partial into a
+    // [V01.01.06.07] The IComponentTemplate bridge turns a compiled template/@script partial into a
     // template the application-selected IComponentFactory can activate. Setup assigns the generated
     // Context before invoking the optional user-authored partial OnSetup implementation, then allocates
     // the per-instance render cache and returns the ComponentRenderer. Core calls Setup inside the mounted
@@ -367,7 +367,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("// [V01.01.06.07] The IComponentTemplate bridge: the generated context and Setup make this\n");
         AppendIndent(builder, indent);
-        builder.Append("// compiled @template component activatable and mountable with no hand-written wiring.\n");
+        builder.Append("// compiled template component activatable and mountable with no hand-written wiring.\n");
 
         AppendIndent(builder, indent);
         builder.Append("/// <summary>\n");
@@ -425,7 +425,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// The component setup entry point (upstream: <c>setup(props, context)</c>,\n");
         AppendIndent(builder, indent);
-        builder.Append("/// https://vuejs.org/api/composition-api-setup.html) generated for this <c>@template</c> component\n");
+        builder.Append("/// https://vuejs.org/api/composition-api-setup.html) generated for this template component\n");
         AppendIndent(builder, indent);
         builder.Append("/// ([V01.01.06.07]). It runs once per mount, assigns <see cref=\"Context\"/>, invokes\n");
         AppendIndent(builder, indent);
@@ -615,8 +615,8 @@ internal static class SingleFileComponentSourceEmitter
 
     // Emits a verbatim @script region flush against column 0 (no scaffold indentation added), wrapped in a
     // #line map. The C# #line directive remaps the LINE of the following text but takes each token's COLUMN
-    // verbatim from this generated file. Canonical .viu content and line-split regions begin at column 1;
-    // inline .vue content can begin later, so the first emitted line is padded to the region's source
+    // verbatim from this generated file. @-block script content and line-split regions begin at column 1;
+    // inline tag-block script content (.vue) can begin later, so the first emitted line is padded to the region's source
     // column. Subsequent source lines already begin at column 1. A reported (line, column) therefore lands
     // on the exact component coordinate — the same block-to-file mapping
     // SingleFileComponentDiagnostics composes. The trailing #line default restores this generated file's
@@ -645,17 +645,17 @@ internal static class SingleFileComponentSourceEmitter
         builder.Append("#line default\n");
     }
 
-    // [V01.01.06.04] The @style seam — emitted at the tail of the class body so it never interleaves with
-    // the @script merge region. When the component declares @style blocks, their compiled CSS rides as an
+    // [V01.01.06.04] The style seam — emitted at the tail of the class body so it never interleaves with
+    // the @script merge region. When the component declares style blocks, their compiled CSS rides as an
     // ExtractedStyles value and, for scoped components, the ScopeId constant carries the data-v-<hash>
-    // the renderer stamps on elements (the C# analogue of Vue's component __scopeId). No @style block
+    // the renderer stamps on elements (the C# analogue of Vue's component __scopeId). No style block
     // leaves the seam as a documenting comment, matching the render/script seams.
     private static void AppendStyleSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
         if (model.ExtractedStyles is not { } styles)
         {
             AppendIndent(builder, indent);
-            builder.Append("// [V01.01.06.04] Style seam. This component declares no @style block, so no scope id\n");
+            builder.Append("// [V01.01.06.04] Style seam. This component declares no style block, so no scope id\n");
             AppendIndent(builder, indent);
             builder.Append("// or compiled CSS is emitted.\n");
             return;
@@ -663,7 +663,7 @@ internal static class SingleFileComponentSourceEmitter
 
         builder.Append('\n');
         AppendIndent(builder, indent);
-        builder.Append("// [V01.01.06.04] Compiled @style blocks: scoped blocks are rewritten with the component's\n");
+        builder.Append("// [V01.01.06.04] Compiled style blocks: scoped blocks are rewritten with the component's\n");
         AppendIndent(builder, indent);
         builder.Append("// data-v-<hash> scope id and non-scoped blocks pass through unmodified. The renderer stamps\n");
         AppendIndent(builder, indent);
@@ -687,7 +687,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// <summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("/// The component's compiled CSS — scoped <c>@style</c> blocks rewritten with <see cref=\"ScopeId\"/>,\n");
+        builder.Append("/// The component's compiled CSS — scoped style blocks rewritten with <see cref=\"ScopeId\"/>,\n");
         AppendIndent(builder, indent);
         builder.Append("/// non-scoped blocks verbatim — extracted at build time (the WASM runtime does zero CSS work).\n");
         AppendIndent(builder, indent);
@@ -706,10 +706,10 @@ internal static class SingleFileComponentSourceEmitter
         AppendCssVariableSeam(builder, indent, model);
     }
 
-    // [V01.01.06.06] The @style module accessor seam. Each `module` block's original -> hashed class map is
+    // [V01.01.06.06] The style module accessor seam. Each `module` block's original -> hashed class map is
     // emitted as a nested static class (the C# analogue of Vue's `$style` / useCssModule()) whose const
     // members mirror the declared class names, so a reference to a class that does not exist is a compile
-    // error. Blocks that share an accessor (several `@style module` blocks, or `module="name"` repeated)
+    // error. Blocks that share an accessor (several `module` style blocks, or `module="name"` repeated)
     // merge into one class; a duplicate member is emitted once.
     private static void AppendModuleAccessors(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
@@ -745,7 +745,7 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, indent);
             builder.Append("/// <summary>\n");
             AppendIndent(builder, indent);
-            builder.Append("/// The typed CSS Modules accessor for this component's <c>@style module</c> block — the C#\n");
+            builder.Append("/// The typed CSS Modules accessor for this component's <c>module</c> style block — the C#\n");
             AppendIndent(builder, indent);
             builder.Append("/// analogue of Vue 3.5's <c>$style</c> / <c>useCssModule()</c>. Each member is the locally-hashed\n");
             AppendIndent(builder, indent);

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The human-readable messages for each <see cref="SingleFileComponentErrorCode"/>. Kept off the public surface; the
-/// parser attaches the message to each <see cref="SingleFileComponentError"/> it reports. Mirrors the shape of
+/// The human-readable messages and severities for each <see cref="SingleFileComponentErrorCode"/>. Kept off the
+/// public surface; the parser attaches the message and catalog severity to each
+/// <see cref="SingleFileComponentError"/> it reports. Mirrors the shape of
 /// <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerErrorMessages</c>.
 /// </summary>
 internal static class SingleFileComponentErrorMessages
@@ -39,6 +40,12 @@ internal static class SingleFileComponentErrorMessages
             "Duplicate attribute on a top-level tag-based block.",
         [SingleFileComponentErrorCode.DuplicateScriptSetupBlock] =
             "Duplicate script setup block. A .vue single-file component may contain at most one script setup block.",
+        [SingleFileComponentErrorCode.LegacyTemplateBlockSyntax] =
+            "The '@template { }' block container is legacy syntax and will be removed. Rewrite the block as '<template>...</template>'; block options become tag attributes (for example lang=\"html\").",
+        [SingleFileComponentErrorCode.LegacyStyleBlockSyntax] =
+            "The '@style { }' block container is legacy syntax and will be removed. Rewrite the block as '<style>...</style>'; block options become tag attributes (for example '<style scoped>' or '<style module=\"classes\">').",
+        [SingleFileComponentErrorCode.ScriptTagBlockNotSupported] =
+            "A top-level '<script>' tag is not supported in a .viu file and its content is never compiled or executed. Declare the component's C# with '@script { }'.",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>
@@ -46,4 +53,21 @@ internal static class SingleFileComponentErrorMessages
     /// <returns>The human-readable message.</returns>
     public static string GetMessage(SingleFileComponentErrorCode code)
         => Messages.TryGetValue(code, out var message) ? message : string.Empty;
+
+    /// <summary>
+    /// Gets the catalog severity for <paramref name="code"/>: the [V01.01.06.10] legacy-container codes
+    /// (<see cref="SingleFileComponentErrorCode.LegacyTemplateBlockSyntax"/> /
+    /// <see cref="SingleFileComponentErrorCode.LegacyStyleBlockSyntax"/>) are warnings — the blocks still
+    /// parse during the migration window — and every other code is a recoverable error, mirroring
+    /// <c>@vue/compiler-sfc</c>'s <c>parse().errors</c>.
+    /// </summary>
+    /// <param name="code">The diagnostic code.</param>
+    /// <returns>The severity every diagnostic reported with <paramref name="code"/> carries.</returns>
+    public static DiagnosticSeverity GetSeverity(SingleFileComponentErrorCode code)
+        => code switch
+        {
+            SingleFileComponentErrorCode.LegacyTemplateBlockSyntax => DiagnosticSeverity.Warning,
+            SingleFileComponentErrorCode.LegacyStyleBlockSyntax => DiagnosticSeverity.Warning,
+            _ => DiagnosticSeverity.Error,
+        };
 }

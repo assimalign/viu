@@ -7,7 +7,7 @@ C#, not content files).
 
 ## Why a separate library
 
-The `.viu` `@style` compilation — parse the component, run the scoped / CSS-Modules / `v-bind()` rewrites,
+The `.viu` style compilation — parse the component, run the scoped / CSS-Modules / `v-bind()` rewrites,
 serialize deterministically — must be run by **two build-time hosts**:
 
 1. the `Assimalign.Viu.Generators.Syntax` incremental **source generator**, which emits the `ExtractedStyles`
@@ -31,7 +31,7 @@ dependency arrows point toward the base and the language libraries, never sidewa
 
 | Type | Role |
 | --- | --- |
-| `SingleFileComponentParserFactory` | The shared `.viu` parser composition (the registration seam the generator's composition root used to own). `Create()` registers `@template` + `@style`; `CreateForStyleExtraction()` registers only `@style` — byte-identical `@style` results, and it never loads the template compiler / Roslyn, keeping the MSBuild task's load lean. |
+| `SingleFileComponentParserFactory` | The shared `.viu` parser composition (the registration seam the generator's composition root used to own). `Create()` registers the template + style parsers; `CreateForStyleExtraction()` registers only the style parser — byte-identical style results, and it never loads the template compiler / Roslyn, keeping the MSBuild task's load lean. Dispatch is by block name, so the canonical `<template>`/`<style>` containers and the legacy `@template`/`@style` containers ([V01.01.06.10] transition window) route identically. |
 | `StyleScopeId` | The `data-v-<hash>` scope-id derivation (FNV-1a over the project-relative `.viu` path). Both hosts resolve the identical id so the scoped CSS matches. |
 | `SingleFileComponentStyleCompiler` | The compilation itself: `Compile(parse, scopeId)` (generator, which already holds the parse) and `CompileFile(parser, text, path, projectDirectory)` (task). Returns a `SingleFileComponentStyleCompilation`. |
 | `SingleFileComponentStyleBundler` | Composes a project's components into one deterministic bundle string (ordering, LF-only layout). Pure — the task performs the file I/O and hands in the already-read text (`SingleFileComponentStyleInput`), so the core stays I/O-free and analyzer-sandbox-safe. |

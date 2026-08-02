@@ -5,22 +5,34 @@ grammar is [FORMAT.md](FORMAT.md). Upstream counterpart:
 [`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/main/packages/compiler-sfc) `parse()`
 (`packages/compiler-sfc/src/parse.ts`).
 
-## The `@`-block container is a deliberate divergence
+## The hybrid container — and the recorded reversal
 
-Vue wraps SFC blocks in HTML-like tags (`<template>`, `<script>`, `<style>`); a `.viu` file uses
-`@`-block container syntax instead (decided 2026-07-17). Only the **container** differs — block
-*semantics* follow the Vue SFC spec unchanged, and the markup inside `@template` remains standard Vue
-template syntax. This is one half of [ADR-0005](../../../docs/adr/0005-no-runtime-template-compilation.md)
-(build-time-only compilation); the full rule set and its rationale are in [FORMAT.md](FORMAT.md).
+Vue wraps every SFC block in HTML-like tags (`<template>`, `<script>`, `<style>`). The original
+[V01.01.06.01] design (2026-07-17) diverged for *every* block with the `@`-block container. That
+decision was **partially reversed on 2026-08-02 per user direction ([V01.01.06.10], #257)**: a `.viu`
+file now uses a **hybrid container** — tag-based `<template>`/`<style>` exactly as in Vue, with the
+component's C# in `@script { }` and custom blocks kept `@`-syntax. The rationale: markup and CSS gain
+real value from the Vue-identical tag wrappers (familiarity, tooling, no indentation discipline for
+raw CSS), while a C# block gains nothing from an HTML wrapper — the `@` reads as "C# starts here", as
+in Razor, and pins the one deliberate remaining divergence. The legacy `@template`/`@style` forms
+still parse through a Warning-severity migration window (1015/1016), and a top-level `<script>` tag
+is rejected with an error (1017) so its content can never silently skip compilation. Block
+*semantics* follow the Vue SFC spec unchanged, and the markup inside `<template>` remains standard
+Vue template syntax. Build-time-only compilation is one half of
+[ADR-0005](../../../docs/adr/0005-no-runtime-template-compilation.md); the full rule set is in
+[FORMAT.md](FORMAT.md).
 
-## Tag-based `.vue` compatibility stays separate
+## Tag-based `.vue` compatibility stays separate — but shares the scanner
 
 [V01.01.06.09] adds `VueSingleFileComponentParser` as a dedicated compatibility parser; it does not
-change `SingleFileComponentParser` or the canonical `.viu` grammar. The parser follows Vue 3.5's SFC
-tokenizer boundary: an HTML `template` uses nested markup boundaries, while root `script`, `style`,
-custom blocks, and preprocessed templates are raw text until their matching end tag. Its scanner keeps
-end-tag-shaped text inside quoted attributes, comments, and nested raw-text elements from closing the
-root template. See
+change `SingleFileComponentParser` or the `.viu` grammar. Both engines follow Vue 3.5's SFC
+tokenizer boundary: an HTML `template` uses nested markup boundaries, while root `style`, custom
+blocks, and preprocessed templates are raw text until their matching end tag. Since [V01.01.06.10]
+the tag machinery — opening-tag/attribute parsing, the nested-template boundary, raw-text closing-tag
+search, malformed-tag recovery — lives in one shared internal `SingleFileComponentTagScanner` that
+both the canonical hybrid engine and the `.vue` engine construct over their own span/report sinks, so
+the two containers cannot drift. The scanner keeps end-tag-shaped text inside quoted attributes,
+comments, and nested raw-text elements from closing the root template. See
 [`tokenizer.ts`](https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts)
 and
 [`parse.ts`](https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts).
@@ -34,15 +46,16 @@ are identical.
 ## Slice, don't parse
 
 The parser only slices the file into blocks and records spans — it never re-parses, trims, or
-normalizes block content. Canonical blocks use the purely structural column-0 `}` termination rule.
-Tag-based blocks use the Vue-compatible nested-template or raw-text closing-tag boundary described
-above. Neither container parser needs knowledge of C#, CSS, or template-expression semantics.
-Downstream libraries parse the block contents: the template compiler
-(`Assimalign.Viu.Syntax.Templates`) for `@template`, the CSS library for `@style`, and script
-analysis for `@script` ([V01.01.06.03]). The source generator that composes those parsers then
-assembles the result into the mountable component — the compiled render, merged C# script, compiled
-styles, and the `IComponentTemplate` bridge that makes a template-bearing component a real runtime component
-([V01.01.06.07]). None of that lives here: this library's output is the descriptor, nothing more.
+normalizes block content. @-blocks use the purely structural column-0 `}` termination rule.
+Tag-based blocks — the canonical `.viu` `<template>`/`<style>` and every `.vue` block — use the
+Vue-compatible nested-template or raw-text closing-tag boundary described above. Neither container
+parser needs knowledge of C#, CSS, or template-expression semantics. Downstream libraries parse the
+block contents: the template compiler (`Assimalign.Viu.Syntax.Templates`) for the template block, the
+CSS library for the style blocks, and script analysis for `@script` ([V01.01.06.03]). The source
+generator that composes those parsers then assembles the result into the mountable component — the
+compiled render, merged C# script, compiled styles, and the `IComponentTemplate` bridge that makes a
+template-bearing component a real runtime component ([V01.01.06.07]). None of that lives here: this
+library's output is the descriptor, nothing more.
 
 ## The registration seam
 
@@ -88,10 +101,14 @@ content.
 
 ## Deltas from Vue 3
 
-- **`@`-block container** instead of tag-based blocks (above; specified in [FORMAT.md](FORMAT.md)).
+- **`@script { }` and `@`-form custom blocks** instead of `<script>`/custom tags — the remaining
+  container divergence after the [V01.01.06.10] hybrid pivot (above; specified in
+  [FORMAT.md](FORMAT.md)). `<template>`/`<style>` now match Vue's containers; a top-level `<script>`
+  tag in `.viu` is a hard error (1017), never silently ignored.
 - **Viu-defined error codes** (`SingleFileComponentErrorCode`, 1000-based). Unlike the template
-  compiler, which mirrors vuejs/core's numbering, the `@`-block container is a Viu divergence with no
-  upstream codes to align to.
+  compiler, which mirrors vuejs/core's numbering, the `.viu` container is a Viu divergence with no
+  upstream codes to align to. Severity is a catalog property: the legacy-container codes (1015/1016)
+  are warnings; everything else is an error.
 
 ## Non-goals
 

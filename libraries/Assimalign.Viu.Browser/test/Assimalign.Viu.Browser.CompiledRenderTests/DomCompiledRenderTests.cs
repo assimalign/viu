@@ -47,7 +47,7 @@ public sealed class DomCompiledRenderTests
     // v-show, vModelText (input), vModelCheckbox, vModelRadio, vModelSelect, vModelDynamic (:type),
     // withModifiers (@click.prevent inline), and withKeys nested over withModifiers (@keydown.enter.stop).
     private const string DomDirectiveTemplate =
-        "@template {\n" +
+        "<template>\n" +
         "<div v-show=\"visible\">\n" +
         "  <input v-model=\"textModel\" />\n" +
         "  <input type=\"checkbox\" v-model=\"checkModel\" />\n" +
@@ -58,7 +58,7 @@ public sealed class DomCompiledRenderTests
         "  <input @keyup.enter=\"onEnter\" />\n" +
         "  <input @keydown.enter.stop=\"onEscape\" />\n" +
         "</div>\n" +
-        "}\n";
+        "</template>\n";
 
     // The hand-written half of the partial class the generated render binds against. v-model models are
     // object? because the emitted `onUpdate:modelValue` handler assigns the object?-typed __event back to
@@ -124,7 +124,7 @@ public sealed class DomCompiledRenderTests
         // lambda explicitly. This executes the real generated render and proves the carrier writes a DOM
         // edit back to the component model; a raw directive value compiled but left every runtime
         // directive's Assign delegate null.
-        const string template = "@template {\n<input v-model=\"model\" />\n}\n";
+        const string template = "<template>\n<input v-model=\"model\" />\n</template>\n";
         const string handWritten =
             "#nullable enable\n" +
             "namespace Demo\n" +
@@ -170,11 +170,11 @@ public sealed class DomCompiledRenderTests
     // [V01.01.04.07]: the compiler resolves <Transition> to the _Transition helper (DomRenderHelpers), and
     // the generated render binds and compiles against the real component.
     private const string TransitionTemplate =
-        "@template {\n" +
+        "<template>\n" +
         "<Transition name=\"fade\">\n" +
         "  <div v-if=\"show\">hi</div>\n" +
         "</Transition>\n" +
-        "}\n";
+        "</template>\n";
 
     private const string TransitionHandWrittenHalf =
         "#nullable enable\n" +
@@ -202,12 +202,12 @@ public sealed class DomCompiledRenderTests
     // `v-bind()` block (the ApplyCssVariables call into UseCssVariables). The hand-written half supplies the
     // members the emitted v-bind getter evaluates.
     private const string CssModuleAndVBindComponent =
-        "@template {\n" +
+        "<template>\n" +
         "<div class=\"box\">hi</div>\n" +
-        "}\n" +
-        "@style module {\n" +
+        "</template>\n" +
+        "<style module>\n" +
         ".box { color: v-bind(color); width: v-bind(size); }\n" +
-        "}\n";
+        "</style>\n";
 
     private const string CssModuleHandWrittenHalf =
         "#nullable enable\n" +
@@ -223,12 +223,12 @@ public sealed class DomCompiledRenderTests
     // [V01.01.05.04.01] A component whose template references the CSS module accessor `$style.box`: the
     // render body must resolve it to the generated `Style` accessor class and compile against it end to end.
     private const string CssModuleTemplateReferenceComponent =
-        "@template {\n" +
+        "<template>\n" +
         "<div :class=\"$style.box\">hi</div>\n" +
-        "}\n" +
-        "@style module {\n" +
+        "</template>\n" +
+        "<style module>\n" +
         ".box { color: red; }\n" +
-        "}\n";
+        "</style>\n";
 
     [Fact]
     public void CssModuleTemplateReference_ResolvesAccessor_AndCompiles()
@@ -274,12 +274,12 @@ public sealed class DomCompiledRenderTests
         "using Assimalign.Viu.Reactivity;\n" +
         "public Reference<int> count = Reactive.Reference(1);\n" +
         "}\n" +
-        "@template {\n" +
+        "<template>\n" +
         "<div>hi</div>\n" +
-        "}\n" +
-        "@style {\n" +
+        "</template>\n" +
+        "<style>\n" +
         ".box { width: v-bind(count); }\n" +
-        "}\n";
+        "</style>\n";
 
     [Fact]
     public void VBindReferenceMember_UnwrapsToValue_AndCompilesAgainstReactivity()
@@ -333,7 +333,7 @@ public sealed class DomCompiledRenderTests
         // compile. Here the generated render compiles AND, when the stored guarded onClick delegate is invoked,
         // runs the void method and applies .prevent to the event (upstream compiler-dom transformOn's
         // withModifiers wrapping: vuejs/core v3.5).
-        const string template = "@template {\n<button @click.prevent=\"record($event)\">go</button>\n}\n";
+        const string template = "<template>\n<button @click.prevent=\"record($event)\">go</button>\n</template>\n";
         const string handWritten =
             "#nullable enable\n" +
             "using Assimalign.Viu.Browser;\n" +
@@ -399,7 +399,7 @@ internal static class CompiledRenderSupport
     private const string RootNamespace = "Demo";
     private const string ProjectDirectory = "C:/proj";
 
-    /// <summary>Runs the generator over one <c>@template</c> and returns the generated partial-class source.</summary>
+    /// <summary>Runs the generator over one <c>&lt;template&gt;</c> and returns the generated partial-class source.</summary>
     internal static string Generate(string componentName, string template)
     {
         var file = new InMemoryAdditionalText($"{ProjectDirectory}/{componentName}.viu", template);

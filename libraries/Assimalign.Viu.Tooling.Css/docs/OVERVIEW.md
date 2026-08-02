@@ -1,6 +1,7 @@
 # Assimalign.Viu.Tooling.Css — overview
 
-The shared, build-time CSS composition core for `.viu` `@style` blocks. It compiles a component's
+The shared, build-time CSS composition core for `.viu` `<style>` blocks (and, during the
+[V01.01.06.10] transition window, legacy `@style` blocks). It compiles a component's
 styles (scoped CSS, CSS Modules, and `v-bind()` rewrites) and bundles a project's components into one
 deterministic stylesheet. It exists so the two build-time hosts that need this logic — the
 `Assimalign.Viu.Generators.Syntax` source generator (which emits the styles as a C# constant) and the
@@ -22,7 +23,7 @@ plan is [`docs/UTILITY-CSS-DESIGN.md`](../../../docs/UTILITY-CSS-DESIGN.md).
   the already-read text via `SingleFileComponentStyleInput`.
 - **`StyleScopeId`** — the `data-v-<hash>` scope-id derivation both hosts resolve identically.
 - **`SingleFileComponentParserFactory`** — the shared `.viu` parser composition (`Create()` /
-  `CreateForStyleExtraction()`), so the task can parse only `@style` without loading the template
+  `CreateForStyleExtraction()`), so the task can parse only style blocks without loading the template
   compiler.
 - **Result and input types** — `SingleFileComponentStyleCompilation`,
   `SingleFileComponentStyleDiagnostic`, `SingleFileComponentStyleInput`,

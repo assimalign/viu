@@ -15,7 +15,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 // resolver-level unit pins live in SingleFileComponentGeneratorTests; these run the whole pipeline.
 public sealed class HintNameCollisionTests
 {
-    private const string Source = "@template {\n    <div>x</div>\n}\n";
+    private const string Source = "<template>\n    <div>x</div>\n</template>\n";
 
     [Fact]
     public void TwoFilesOutsideProjectDirectory_WithTheSameLeafName_BothEmit()
@@ -54,15 +54,16 @@ public sealed class HintNameCollisionTests
     [Fact]
     public void TemplateDiagnosticOnTheBlockStartLine_AddsTheBlockColumn()
     {
-        // The first-line branch of the block-to-file composition: the error sits on the block
-        // content's FIRST line ("{{ message" opening at file column 5), so the block's start column
-        // adds to the relative column — the case the multi-line composition test cannot cover.
-        const string source = "@template {\n    {{ message\n}\n";
+        // The first-line branch of the block-to-file composition: tag-block content may begin INLINE
+        // right after the opening tag's `>`, so an error on the content's FIRST line must add the
+        // block's start column ("{{ message" opens at file column 15 = content start 11 + relative
+        // column 5 - 1) — the case the multi-line composition test cannot cover.
+        const string source = "<template>    {{ message\n</template>\n";
 
         var outcome = GeneratorTestHarness.Run("C:/proj/Counter.viu", source, "Demo", "C:/proj");
 
         var span = outcome.Diagnostics.Single().Location.GetLineSpan();
-        span.StartLinePosition.Line.ShouldBe(1);      // zero-based -> file line 2
-        span.StartLinePosition.Character.ShouldBe(4); // zero-based -> file column 5
+        span.StartLinePosition.Line.ShouldBe(0);       // zero-based -> file line 1
+        span.StartLinePosition.Character.ShouldBe(14); // zero-based -> file column 15
     }
 }

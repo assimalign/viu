@@ -5,7 +5,7 @@
 	<!-- .viu -> AdditionalFiles glob (evaluated after the consumer's items and
 	     default excludes are known). -->
 	<Import Project="..\Targets\Assimalign.Viu.Generators.Syntax.targets" Condition="Exists('..\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
-	<!-- CSS bundling for .viu @style blocks: the in-repo
+	<!-- CSS bundling for .viu style blocks (canonical <style> tags; legacy @style in the migration window): the in-repo
 	     build/Targets/Build.Css.Bundling.targets packed verbatim;
 	     Assimalign.Viu.Sdk.Common.props preset $(ViuBundleCssTaskAssembly) to
 	     the packaged Tasks/ copy of the ViuBundleCss task. -->

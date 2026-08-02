@@ -20,7 +20,7 @@ using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 namespace Assimalign.Viu.Generators.Syntax.Tests;
 
 /// <summary>
-/// Tests for [V01.01.05.08] — the render-body source map: the compiled <c>@template</c> render function is
+/// Tests for [V01.01.05.08] — the render-body source map: the compiled template render function is
 /// wrapped in <c>#line</c> span directives so a C# compile error inside an emitted template expression
 /// resolves to the offending <c>.viu</c> template line and column, never to opaque generated code. This is
 /// the render-body analogue of the <c>@script</c> merge's <c>#line</c> map (see
@@ -43,9 +43,9 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // `_ctx.Cont` is CS1061. The emitted #line span map must resolve it to the .viu template — file
         // line 2 (zero-based 1), the exact column of `Cont` — never to the .g.cs.
         const string source =
-            "@template {\n" +               // line 1
+            "<template>\n" +                // line 1
             "<div>{{ Cont }}</div>\n" +     // line 2: `Cont` begins at column 9 (zero-based char 8)
-            "}\n";                          // line 3
+            "</template>\n";                // line 3
 
         var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Counter.viu", source, RootNamespace, ProjectDirectory);
         outcome.Diagnostics.ShouldBeEmpty(); // permissive metadata: the unresolved identifier is not reported at generate time
@@ -69,9 +69,9 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // column (past the inserted `_ctx.` prefix and the enclosing helper calls); the span directive's
         // character offset is what re-aligns them, so the mapped column tracks the template, not the .g.cs.
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "        <span>{{ Missing }}</span>\n" +  // `Missing` begins at column 18 (zero-based char 17)
-            "}\n";
+            "</template>\n";
 
         var generated = GeneratorTestHarness.GeneratedSource(
             GeneratorTestHarness.Run($"{ProjectDirectory}/Widget.viu", source, RootNamespace, ProjectDirectory),
@@ -92,9 +92,9 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // the @script seam does around merged script — a lightweight structural pin that does not require a
         // compile.
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "<p>{{ label }}</p>\n" +
-            "}\n";
+            "</template>\n";
 
         var generated = GeneratorTestHarness.GeneratedSource(
             GeneratorTestHarness.Run($"{ProjectDirectory}/Tag.viu", source, RootNamespace, ProjectDirectory),
@@ -113,9 +113,9 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // A template with no dynamic expressions has nothing to map, so the render body is emitted with no
         // #line directives at all (the render source map is empty).
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "<div>static text</div>\n" +
-            "}\n";
+            "</template>\n";
 
         var generated = GeneratorTestHarness.GeneratedSource(
             GeneratorTestHarness.Run($"{ProjectDirectory}/Plain.viu", source, RootNamespace, ProjectDirectory),
@@ -132,9 +132,9 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // mappings must still cache: identical input re-runs to an equal model (equal RenderBody with equal
         // injected directives), leaving the model step strictly Cached, not Unchanged.
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "<div :id=\"dynamicId\">{{ message }}</div>\n" +
-            "}\n";
+            "</template>\n";
 
         var file = new InMemoryAdditionalText($"{ProjectDirectory}/Counter.viu", source);
         var compilation = GeneratorTestHarness.CreateCompilation();
@@ -158,7 +158,7 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // directive anchored at the leftmost (smallest generated column), since only one #line directive can
         // lead a physical line; the mapping is composed onto the block's content-start position.
         var body = "        return _f(_ctx.a, _ctx.b);\n";
-        var blockStart = new Position(Offset: 12, Line: 2, Column: 1); // @template content starts on file line 2
+        var blockStart = new Position(Offset: 12, Line: 2, Column: 1); // template block content starts on file line 2
         var mappings = new Assimalign.Viu.Syntax.SyntaxList<RenderSourceMapping>(new[]
         {
             // `b` further right on the same generated line (line 0), template col 10.
@@ -203,9 +203,9 @@ public sealed class SingleFileComponentTemplateSourceMapTests
     public void GeneratedComponentTemplateBridge_WithOnSetupImplementation_CompilesAgainstApprovedContract()
     {
         const string source =
-            "@template {\n" +
+            "<template>\n" +
             "    <div>ready</div>\n" +
-            "}\n" +
+            "</template>\n" +
             "@script {\n" +
             "    partial void OnSetup() { }\n" +
             "}\n";

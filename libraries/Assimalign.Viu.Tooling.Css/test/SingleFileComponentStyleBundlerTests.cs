@@ -9,7 +9,7 @@ using Xunit;
 namespace Assimalign.Viu.Tooling.Css.Tests;
 
 /// <summary>
-/// Pins the <see cref="SingleFileComponentStyleBundler"/> — the deterministic per-component <c>@style</c>
+/// Pins the <see cref="SingleFileComponentStyleBundler"/> — the deterministic per-component style
 /// bundle the <c>ViuBundleCss</c> task writes ([V01.01.12.12]). Fixes the ordering, the LF-only layout, and
 /// the byte-identical-to-generated-constant contract (each component's segment is the exact string the
 /// generator emits as <c>ExtractedStyles</c>, because both call the same compiler).
@@ -19,10 +19,10 @@ public sealed class SingleFileComponentStyleBundlerTests
     private const string ProjectDirectory = "C:/proj";
 
     private static readonly SingleFileComponentStyleInput Card = new(
-        "C:/proj/Components/Card.viu", "@style scoped {\n    .card { color: red; }\n}\n");
+        "C:/proj/Components/Card.viu", "<style scoped>\n    .card { color: red; }\n</style>\n");
 
     private static readonly SingleFileComponentStyleInput Panel = new(
-        "C:/proj/Components/Panel.viu", "@style scoped {\n    .panel { color: blue; }\n}\n");
+        "C:/proj/Components/Panel.viu", "<style scoped>\n    .panel { color: blue; }\n</style>\n");
 
     private static readonly SingleFileComponentStyleInput VueBadge = new(
         "C:/proj/Components/Badge.vue",
@@ -98,7 +98,7 @@ public sealed class SingleFileComponentStyleBundlerTests
     {
         var canonical = new SingleFileComponentStyleInput(
             "C:/proj/Components/Choice.viu",
-            "@style {\n.canonical-choice { color: red; }\n}\n");
+            "<style>\n.canonical-choice { color: red; }\n</style>\n");
         var compatibility = new SingleFileComponentStyleInput(
             "C:/proj/Components/Choice.vue",
             "<style>\n.compatibility-choice { color: blue; }\n</style>\n");
@@ -120,7 +120,7 @@ public sealed class SingleFileComponentStyleBundlerTests
     {
         var canonical = new SingleFileComponentStyleInput(
             "C:/proj/Canonical/Choice.viu",
-            "@style {\n.canonical-directory { color: red; }\n}\n");
+            "<style>\n.canonical-directory { color: red; }\n</style>\n");
         var compatibility = new SingleFileComponentStyleInput(
             "C:/proj/Compatibility/Choice.vue",
             "<style>\n.compatibility-directory { color: blue; }\n</style>\n");
@@ -146,11 +146,11 @@ public sealed class SingleFileComponentStyleBundlerTests
         forward.ShouldBe(reversed);
     }
 
-    /// <summary>A project whose components declare no <c>@style</c> block bundles to <see langword="null"/> (no asset written).</summary>
+    /// <summary>A project whose components declare no style block bundles to <see langword="null"/> (no asset written).</summary>
     [Fact]
     public void Bundle_NoStyleBlocks_ReturnsNull()
     {
-        var styleless = new SingleFileComponentStyleInput("C:/proj/Components/NoStyle.viu", "@template {\n    <div>ok</div>\n}\n");
+        var styleless = new SingleFileComponentStyleInput("C:/proj/Components/NoStyle.viu", "<template>\n    <div>ok</div>\n</template>\n");
 
         SingleFileComponentStyleBundler.Bundle(new[] { styleless }, ProjectDirectory).ShouldBeNull();
     }

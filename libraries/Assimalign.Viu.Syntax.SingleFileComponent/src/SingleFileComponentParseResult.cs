@@ -6,5 +6,10 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// (<c>@vue/compiler-sfc</c> <c>parse.ts</c>). Value-equatable so identical input yields an equal result.
 /// </summary>
 /// <param name="Descriptor">The parsed descriptor (always produced, even for malformed input).</param>
-/// <param name="Errors">The recoverable diagnostics, in source order; empty when the file is well-formed.</param>
+/// <param name="Errors">
+/// The recoverable diagnostics, in source order; empty when the file is fully well-formed. Despite the
+/// name (kept for compatibility), the list carries <b>all severities</b> since [V01.01.06.10]: the
+/// legacy-container migration diagnostics (1015/1016) are warnings — check
+/// <see cref="Diagnostic.Severity"/> before treating an entry as fatal.
+/// </param>
 public sealed record SingleFileComponentParseResult(SingleFileComponentDescriptor Descriptor, SyntaxList<SingleFileComponentError> Errors);

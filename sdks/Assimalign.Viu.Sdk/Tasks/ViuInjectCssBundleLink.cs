@@ -11,7 +11,7 @@ namespace Assimalign.Viu.Sdk.Tasks;
 
 /// <summary>
 /// The MSBuild task that writes a copy of a WebAssembly app's host page (<c>wwwroot/index.html</c>) with a
-/// <c>&lt;link rel="stylesheet"&gt;</c> to the bundled <c>.viu</c> <c>@style</c> stylesheet spliced into its
+/// <c>&lt;link rel="stylesheet"&gt;</c> to the bundled <c>.viu</c> <c>&lt;style&gt;</c> stylesheet spliced into its
 /// <c>&lt;head&gt;</c> — so a consuming app needs no hand-authored link tag ([V01.01.12.12.01], #167). The
 /// paired targets in <c>build/Targets/Build.Css.Bundling.targets</c> re-register the written copy as a
 /// <c>StaticWebAsset</c> (recomputing its integrity and endpoints) <b>before</b> the SDK's compression

@@ -4,7 +4,12 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// The catalog of diagnostic codes the single-file-component block parsers emit. Unlike
 /// <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerErrorCode</c> — whose numbering mirrors vuejs/core's
 /// <c>ErrorCodes</c> — these are <b>Viu-defined</b> container diagnostics with no upstream numbering to
-/// align to. Values start at 1000 to stay visibly distinct from any upstream-aligned catalog.
+/// align to. Values start at 1000 to stay visibly distinct from any upstream-aligned catalog. Since the
+/// [V01.01.06.10] hybrid container, the tag codes (1009–1013) — originally minted for the <c>.vue</c>
+/// compatibility parser — are also reachable from <c>.viu</c> files, whose canonical
+/// <c>&lt;template&gt;</c>/<c>&lt;style&gt;</c> blocks are tag-based. Each code's severity comes from
+/// the catalog (<c>SingleFileComponentErrorMessages.GetSeverity</c>): the legacy-container codes
+/// (1015/1016) are warnings; everything else is an error.
 /// </summary>
 public enum SingleFileComponentErrorCode
 {
@@ -49,4 +54,25 @@ public enum SingleFileComponentErrorCode
 
     /// <summary>A tag-based file declared more than one <c>&lt;script setup&gt;</c> block.</summary>
     DuplicateScriptSetupBlock = 1014,
+
+    /// <summary>
+    /// A <c>.viu</c> file used the legacy <c>@template { }</c> container; the canonical container is the
+    /// <c>&lt;template&gt;</c> tag ([V01.01.06.10]). Warning severity — the block still parses during the
+    /// migration window.
+    /// </summary>
+    LegacyTemplateBlockSyntax = 1015,
+
+    /// <summary>
+    /// A <c>.viu</c> file used the legacy <c>@style … { }</c> container; the canonical container is the
+    /// <c>&lt;style&gt;</c> tag ([V01.01.06.10]). Warning severity — the block still parses during the
+    /// migration window.
+    /// </summary>
+    LegacyStyleBlockSyntax = 1016,
+
+    /// <summary>
+    /// A <c>.viu</c> file declared a top-level <c>&lt;script&gt;</c> tag. A <c>.viu</c> component's C#
+    /// lives in <c>@script { }</c>; a tag-based script contributes no block and its content is never
+    /// compiled or executed.
+    /// </summary>
+    ScriptTagBlockNotSupported = 1017,
 }

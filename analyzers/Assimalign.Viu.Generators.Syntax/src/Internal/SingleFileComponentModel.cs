@@ -20,17 +20,17 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// <param name="ClassName">The generated partial class name.</param>
 /// <param name="FileName">The originating <c>.viu</c> leaf file name.</param>
 /// <param name="HintName">The stable <c>AddSource</c> hint name.</param>
-/// <param name="HasTemplate">Whether the component declares an <c>@template</c> block.</param>
+/// <param name="HasTemplate">Whether the component declares a template block.</param>
 /// <param name="HasScript">Whether the component declares an <c>@script</c> block.</param>
-/// <param name="StyleCount">The number of <c>@style</c> blocks.</param>
+/// <param name="StyleCount">The number of style blocks.</param>
 /// <param name="CustomBlockCount">The number of custom blocks.</param>
 /// <param name="FilePath">The originating <c>.viu</c> file path — the <c>#line</c> directive target that lands script errors and debugger stepping in the source.</param>
 /// <param name="Script">The <c>@script</c> block's two emission regions — hoisted usings and class-body members, each with its <c>#line</c> anchor; <see cref="ScriptRegions.None"/> when the component declares no script.</param>
 /// <param name="Bindings">The classified top-level script members, for the template compiler's ref-unwrapping decisions.</param>
 /// <param name="RenderBody">
-/// The compiled <c>@template</c> render-method body emitted by the template compiler's
+/// The compiled template render-method body emitted by the template compiler's
 /// <c>RenderFunctionEmitter</c> ([V01.01.05.05]), pre-indented for the render method's nesting depth,
-/// or <see langword="null"/> when the component has no <c>@template</c> block. A plain string, so the
+/// or <see langword="null"/> when the component has no template block. A plain string, so the
 /// pipeline stays value-equatable.
 /// </param>
 /// <param name="RenderCacheSize">
@@ -40,25 +40,25 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// </param>
 /// <param name="ScopeId">
 /// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
-/// <c>scoped</c> <c>@style</c> block, otherwise <see langword="null"/> ([V01.01.06.04]). Emitted as a
+/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]). Emitted as a
 /// generated constant so the renderer can stamp the matching <c>data-v-&lt;hash&gt;</c> attribute on the
 /// component's elements — the scope-id propagation contract the runtime side implements.
 /// </param>
 /// <param name="ExtractedStyles">
-/// The component's compiled CSS — scoped <c>@style</c> blocks rewritten with <see cref="ScopeId"/> and
+/// The component's compiled CSS — scoped style blocks rewritten with <see cref="ScopeId"/> and
 /// non-scoped blocks passed through unmodified, concatenated in source order — or <see langword="null"/>
-/// when the component declares no <c>@style</c> block. Emitted as a generated string constant; the
+/// when the component declares no style block. Emitted as a generated string constant; the
 /// physical static-web-asset bundling is the MSBuild-side follow-up.
 /// </param>
 /// <param name="ModuleClasses">
 /// The CSS Modules class map ([V01.01.06.06]) — one entry per <c>original → hashed</c> class, grouped by
 /// its accessor — emitted as the typed <c>$style</c>-equivalent nested class(es). Empty when no
-/// <c>@style module</c> block is declared.
+/// <c>module</c> style block is declared.
 /// </param>
 /// <param name="CssVariableBindings">
 /// The <c>v-bind()</c> CSS bindings ([V01.01.06.06]) — one entry per distinct <c>(hash, expression)</c> —
 /// emitted as the <c>ApplyCssVariables</c> seam the <c>UseCssVariables</c> runtime consumes. Empty when no
-/// <c>@style</c> block uses <c>v-bind()</c>.
+/// style block uses <c>v-bind()</c>.
 /// </param>
 internal readonly record struct SingleFileComponentModel(
     string? Namespace,

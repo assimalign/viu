@@ -3,8 +3,9 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// <summary>
 /// The parsed shape of a <c>.viu</c> single-file component: its blocks and their source spans. The C#
 /// port of Vue 3.5's <c>SFCDescriptor</c> (<c>@vue/compiler-sfc</c> <c>parse.ts</c>), adapted to the
-/// <c>.viu</c> @-block container (a documented Viu divergence from Vue's tag wrappers, decided
-/// 2026-07-17). Immutable and value-equatable: identical file content yields an equal descriptor — the
+/// <c>.viu</c> hybrid container ([V01.01.06.10], decided 2026-08-02): tag-based
+/// <c>&lt;template&gt;</c>/<c>&lt;style&gt;</c> blocks plus the @-form <c>@script { }</c> and custom
+/// blocks. Immutable and value-equatable: identical file content yields an equal descriptor — the
 /// incremental-caching prerequisite of [V01.01.06.02].
 /// </summary>
 /// <remarks>
@@ -19,13 +20,13 @@ public sealed record SingleFileComponentDescriptor
     /// <summary>The full original <c>.viu</c> source.</summary>
     public required string Source { get; init; }
 
-    /// <summary>The single <c>@template</c> block, or <see langword="null"/> when the file has none.</summary>
+    /// <summary>The single <c>&lt;template&gt;</c> (or legacy <c>@template</c>) block, or <see langword="null"/> when the file has none.</summary>
     public required SingleFileComponentTemplateBlock? Template { get; init; }
 
     /// <summary>The single <c>@script</c> block, or <see langword="null"/> when the file has none.</summary>
     public required SingleFileComponentScriptBlock? Script { get; init; }
 
-    /// <summary>The <c>@style</c> blocks, in source order.</summary>
+    /// <summary>The <c>&lt;style&gt;</c> (or legacy <c>@style</c>) blocks, in source order.</summary>
     public required SyntaxList<SingleFileComponentStyleBlock> Styles { get; init; }
 
     /// <summary>The custom blocks (e.g. <c>@docs</c>), in source order.</summary>

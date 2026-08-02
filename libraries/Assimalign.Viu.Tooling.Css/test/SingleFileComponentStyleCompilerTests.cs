@@ -7,7 +7,7 @@ using Xunit;
 namespace Assimalign.Viu.Tooling.Css.Tests;
 
 /// <summary>
-/// Pins the shared <see cref="SingleFileComponentStyleCompiler"/> — the deterministic <c>@style</c>
+/// Pins the shared <see cref="SingleFileComponentStyleCompiler"/> — the deterministic style
 /// compilation both the generator and the <c>ViuBundleCss</c> task run ([V01.01.12.12]). These tests fix
 /// the exact compiled CSS so any drift (which would break the byte-identical-to-generated-constant contract)
 /// fails here.
@@ -27,17 +27,17 @@ public sealed class SingleFileComponentStyleCompilerTests
         const string path = "C:/proj/Components/Card.viu";
         var scopeId = StyleScopeId.Resolve(path, ProjectDirectory);
 
-        var result = Compile("@style scoped {\n    .card { color: red; }\n}\n", path);
+        var result = Compile("<style scoped>\n    .card { color: red; }\n</style>\n", path);
 
         result.ScopeId.ShouldBe(scopeId);
         result.ExtractedStyles.ShouldBe($".card[{scopeId}] {{\n  color: red;\n}}\n");
     }
 
-    /// <summary>A component with no <c>@style</c> block compiles to the empty result.</summary>
+    /// <summary>A component with no style block compiles to the empty result.</summary>
     [Fact]
     public void Compile_NoStyleBlock_ReturnsEmpty()
     {
-        var result = Compile("@template {\n    <div>ok</div>\n}\n", "C:/proj/Components/NoStyle.viu");
+        var result = Compile("<template>\n    <div>ok</div>\n</template>\n", "C:/proj/Components/NoStyle.viu");
 
         result.ShouldBe(SingleFileComponentStyleCompilation.Empty);
         result.ExtractedStyles.ShouldBeNull();
@@ -48,7 +48,7 @@ public sealed class SingleFileComponentStyleCompilerTests
     [Fact]
     public void Compile_PlainBlock_PassesThroughVerbatim()
     {
-        var result = Compile("@style {\n    .a { color: red; }\n}\n", "C:/proj/Components/Plain.viu");
+        var result = Compile("<style>\n    .a { color: red; }\n</style>\n", "C:/proj/Components/Plain.viu");
 
         result.ScopeId.ShouldBeNull();
         result.ExtractedStyles.ShouldNotBeNull();
@@ -61,7 +61,7 @@ public sealed class SingleFileComponentStyleCompilerTests
     public void Compile_IsDeterministic()
     {
         const string path = "C:/proj/Components/Card.viu";
-        const string text = "@style scoped {\n    .card { color: red; padding: 8px; }\n}\n";
+        const string text = "<style scoped>\n    .card { color: red; padding: 8px; }\n</style>\n";
 
         Compile(text, path).ExtractedStyles.ShouldBe(Compile(text, path).ExtractedStyles);
     }

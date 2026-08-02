@@ -39,7 +39,7 @@ public sealed class SingleFileComponentPathComparisonTests
     {
         var canonical = new SingleFileComponentStyleInput(
             "C:/project/Components/Choice.viu",
-            "@style {\n.canonical-choice { color: red; }\n}\n");
+            "<style>\n.canonical-choice { color: red; }\n</style>\n");
         var compatibility = new SingleFileComponentStyleInput(
             "C:/project/Components/choice.vue",
             "<style>\n.compatibility-choice { color: blue; }\n</style>\n");
@@ -65,7 +65,7 @@ public sealed class SingleFileComponentPathComparisonTests
     {
         var canonical = new SingleFileComponentStyleInput(
             "C:/project/Components/Choice.VIU",
-            "@style {\n.canonical-choice { color: red; }\n}\n");
+            "<style>\n.canonical-choice { color: red; }\n</style>\n");
         var compatibility = new SingleFileComponentStyleInput(
             "C:/project/Components/Choice.VUE",
             "<style>\n.compatibility-choice { color: blue; }\n</style>\n");

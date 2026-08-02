@@ -70,8 +70,9 @@ internal static class SingleFileComponentTestHelpers
     }
 
     /// <summary>
-    /// Asserts the [V01.01.06.01] span contract for every span the parser emits: for every block (whole
-    /// and content region), every option, and every diagnostic, <c>Location.Source</c> equals the exact
+    /// Asserts the [V01.01.06.01] span contract — upheld unchanged by the [V01.01.06.10] hybrid
+    /// container — for every span the parser emits: for every block (whole and content region), every
+    /// option, and every diagnostic (errors and warnings alike), <c>Location.Source</c> equals the exact
     /// source slice between its offsets — and each block's <see cref="SingleFileComponentBlock.Content"/> equals its
     /// content-region slice.
     /// </summary>

@@ -7,13 +7,13 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 // The [V01.01.06.01] incremental-caching contract: descriptors and blocks are immutable records with
 // structural equality, so parsing equal input twice yields equal (and equal-hashing) descriptors, and
 // any content or location difference makes them unequal. This is what lets the incremental SFC generator
-// ([V01.01.06.02]) cache on the parse output.
+// ([V01.01.06.02]) cache on the parse output — and it holds identically for both hybrid containers.
 public class StructuralEqualityTests
 {
     private const string Component =
-        "@template {\n    <div>{{ title }}</div>\n}\n" +
+        "<template>\n    <div>{{ title }}</div>\n</template>\n" +
         "@script lang=\"csharp\" {\n    public string Title = \"hi\";\n}\n" +
-        "@style scoped {\n    .a { color: red; }\n}\n" +
+        "<style scoped>\n    .a { color: red; }\n</style>\n" +
         "@docs {\n    notes\n}\n";
 
     [Fact]
@@ -36,8 +36,8 @@ public class StructuralEqualityTests
     [Fact]
     public void Parse_DifferentContent_ProducesUnequalDescriptors()
     {
-        SingleFileComponentTestHelpers.Parse("@template {\n    a\n}\n")
-            .ShouldNotBe(SingleFileComponentTestHelpers.Parse("@template {\n    b\n}\n"));
+        SingleFileComponentTestHelpers.Parse("<template>\n    a\n</template>\n")
+            .ShouldNotBe(SingleFileComponentTestHelpers.Parse("<template>\n    b\n</template>\n"));
     }
 
     [Fact]
@@ -63,8 +63,8 @@ public class StructuralEqualityTests
     [Fact]
     public void Parse_DifferentOptions_ProduceUnequalStyleBlocks()
     {
-        var scoped = SingleFileComponentTestHelpers.Parse("@style scoped {\n}\n").Styles[0];
-        var plain = SingleFileComponentTestHelpers.Parse("@style {\n}\n").Styles[0];
+        var scoped = SingleFileComponentTestHelpers.Parse("<style scoped>\n</style>\n").Styles[0];
+        var plain = SingleFileComponentTestHelpers.Parse("<style>\n</style>\n").Styles[0];
 
         scoped.ShouldNotBe(plain);
     }

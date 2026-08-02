@@ -27,7 +27,7 @@ namespace Assimalign.Viu.Sdk.Tasks;
 /// existing file and <b>skips the write</b> when the content is unchanged, so a no-op rebuild neither runs
 /// the compile nor touches the file's timestamp. It reports whether it wrote through
 /// <see cref="BundleWritten"/> and whether a bundle remains available through <see cref="BundleExists"/>.
-/// When the final <c>@style</c> block is removed, the task deletes the previous output so a stale stylesheet
+/// When the final <c>&lt;style&gt;</c> block is removed, the task deletes the previous output so a stale stylesheet
 /// cannot remain registered as a static web asset. Compilation is recoverable — malformed CSS surfaces as a
 /// generator diagnostic, not here — so the task never fails the build for authoring errors; only genuine I/O
 /// failures are logged as errors.
@@ -77,7 +77,7 @@ public sealed class ViuBundleCss : Microsoft.Build.Utilities.Task, ICancelableTa
 
     /// <summary>
     /// The bundle path that now exists on disk, or the empty string when no component declared any
-    /// <c>@style</c> block (in which case nothing is written and no static web asset should be registered).
+    /// <c>&lt;style&gt;</c> block (in which case nothing is written and no static web asset should be registered).
     /// </summary>
     [Output]
     public string BundlePath { get; set; } = string.Empty;
@@ -93,7 +93,7 @@ public sealed class ViuBundleCss : Microsoft.Build.Utilities.Task, ICancelableTa
 
     /// <summary>
     /// <see langword="true"/> when <see cref="BundleOutputPath"/> exists after the task completes;
-    /// <see langword="false"/> when no component declared an <c>@style</c> block and any obsolete bundle was
+    /// <see langword="false"/> when no component declared a <c>&lt;style&gt;</c> block and any obsolete bundle was
     /// removed. The paired MSBuild targets use this state to avoid registering a stale static web asset.
     /// </summary>
     [Output]
@@ -229,7 +229,7 @@ public sealed class ViuBundleCss : Microsoft.Build.Utilities.Task, ICancelableTa
             {
                 Log.LogMessage(
                     MessageImportance.Low,
-                    "ViuBundleCss: no @style blocks found; no bundle written.");
+                    "ViuBundleCss: no style blocks found; no bundle written.");
             }
 
             DeleteEmptyBundleMarker();

@@ -47,6 +47,9 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// </summary>
 internal static class ScriptBlockAnalyzer
 {
+    // Mirrored by the language service's ScriptDeclarationReader
+    // (extensions\VisualStudio\Assimalign.Viu.LanguageService\src\Internal\ScriptDeclarationReader.cs),
+    // which reimplements the region split and probe wrapper for completion; keep the split rules in sync.
     // The raw @script content is parsed wrapped in this synthetic partial class so Roslyn parses it in
     // the same syntactic context the emitter places it — a partial-class body. Members (fields,
     // properties, methods) are therefore legal; a stray using directive or malformed member surfaces as
