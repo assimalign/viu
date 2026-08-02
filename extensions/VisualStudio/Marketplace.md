@@ -5,7 +5,9 @@ project-scoped tag-based `.vue` compatibility to Visual Studio.
 
 ## Features
 
-- Syntax highlighting for component blocks, template markup and directives, C#, and CSS
+- Syntax highlighting for component blocks, template markup and directives, C#, and CSS —
+  PascalCase component tags render as type names, directives as keywords, and utility `class`
+  values as variant/class segments, all using your theme's existing colors
 - Diagnostics for malformed single-file-component block structure
 - Completion for block headers and options, common template elements, directives, events, CSS
   properties, `Context.*`, and `Reactive.*`

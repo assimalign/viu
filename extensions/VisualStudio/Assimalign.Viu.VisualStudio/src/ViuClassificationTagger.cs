@@ -138,6 +138,16 @@ internal sealed class ViuClassificationTagger : TextViewTagger<ClassificationTag
             ViuClassificationKind.Punctuation => ClassificationType.KnownValues.Operator,
             ViuClassificationKind.String => ClassificationType.KnownValues.String,
             ViuClassificationKind.Type => ClassificationType.KnownValues.Type,
+            // Components borrow the "type" category so PascalCase tags render in the same teal
+            // Visual Studio uses for C# and Razor type names; directives, interpolation delimiters,
+            // and utility variants borrow "keyword" and utility classes borrow "string". The
+            // out-of-process model cannot register custom classification types, so every Viu token
+            // must map onto a built-in category the base editor registers (see docs/DESIGN.md).
+            ViuClassificationKind.Component => ClassificationType.KnownValues.Type,
+            ViuClassificationKind.Directive => ClassificationType.KnownValues.Keyword,
+            ViuClassificationKind.InterpolationDelimiter => ClassificationType.KnownValues.Keyword,
+            ViuClassificationKind.UtilityVariant => ClassificationType.KnownValues.Keyword,
+            ViuClassificationKind.UtilityClass => ClassificationType.KnownValues.String,
             _ => ClassificationType.KnownValues.Text,
         };
 }

@@ -14,4 +14,9 @@ internal enum ViuClassificationKind
     Punctuation,
     String,
     Type,
+    Component,
+    Directive,
+    InterpolationDelimiter,
+    UtilityVariant,
+    UtilityClass,
 }

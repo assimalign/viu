@@ -67,8 +67,11 @@ The complete repository and Marketplace setup is documented in
 
 ## Editing features
 
-- Syntax highlighting for Viu block headers, template markup and directives, C#, CSS, strings,
-  comments, numbers, and punctuation
+- Syntax highlighting for both hybrid `.viu` containers (tag-based `<template>`/`<style>` plus
+  `@script`, with the legacy @-blocks still colored during the migration window): PascalCase
+  component tags color as types, directives and interpolation delimiters as keywords, utility
+  `class` values split into variants and classes, and C#, CSS, strings, comments, and numbers keep
+  their categories — all borrowed from the active Visual Studio theme
 - Parser diagnostics for malformed single-file-component block structure
 - Full and incremental document synchronization
 - Completion for block headers and options, common template tags/directives/events, CSS properties,
@@ -122,8 +125,9 @@ prefixes, and trailing important syntax are resolved on the authored candidate a
 
 IntelliSense activates only inside static `class="..."` text and literal portions of bound class
 values. For `.vue`, the utility engine scans and edits only `<template>` content; text in
-`<script>` and `<style>` is not a utility source. The same template-only boundary applies to
-`.viu` `@template` versus `@script`/`@style`.
+`<script>` and `<style>` is not a utility source. The same template-only boundary applies to the
+hybrid `.viu` container: `<template>` content is the only utility source, never `@script` or
+`<style>` (nor the legacy `@template`/`@style` blocks during their migration window).
 
 The project lookup is intentionally narrow: the `ViuUtilityCss` item must be one direct literal
 relative path. An MSBuild property, wildcard, multiple entries, missing file, or unreadable
