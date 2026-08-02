@@ -178,8 +178,8 @@ public static class Program
                 result.TotalOperationCount,
                 result.StructuralOperationCount,
                 result.CreateElementCount,
-                result.SetElementTextCount + result.SetTextCount,
-                result.PatchPropertyCount,
+                result.SetTextCount,
+                result.PatchAttributeCount,
                 result.RemoveCount));
         }
     }

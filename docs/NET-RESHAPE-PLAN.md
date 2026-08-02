@@ -1,8 +1,14 @@
 # .NET reshape plan — from faithful port to idiomatic framework
 
-**Status: ARC 1 MERGED (train #235-#240, 2026-07-21). ARC 2 (below, §Arc 2) IMPLEMENTATION COMPLETE
-(R6–R8 all implemented; R8 owns the passed arc-end gate) — awaiting main-session arc review; base:
-`draft/core-abstraction-sketch`.** Original arc-1 status follows.
+**Status: ARC 1 MERGED (train #235-#240, 2026-07-21). ARC 2 MERGED (#241-#244, 2026-07-25).
+SUPERSEDED IN PART (2026-08-02, [V01.01.11.04.02] #251): the finalized redesign
+(`1c83bca`..`166ec7b`, late 2026-07) deliberately re-split the R2 consolidation —
+`Assimalign.Viu.Reactivity`, `Assimalign.Viu.Components`, and `Assimalign.Viu.State` are separate
+libraries again, each with namespace == assembly id. R2's root-namespace decision survives:
+`Assimalign.Viu.Core` still roots at `Assimalign.Viu`. The remaining arc outcomes (hydration, the
+Browser rename, the application/builder model, service-provider integration) stand. This header is
+the reconciliation record; the arc history below is preserved as written and reads accordingly.**
+Original arc-1 status follows.
 
 **Arc-1 status: arc implementation complete — R1, R2, R3, R4, and R5 all implemented (awaiting main-session
 review); the hold is LIFTED (2026-07-21): the stacked train is PUBLISHED as the bottom-up PR series

@@ -31,14 +31,14 @@ public sealed class InteropCountResult
     /// <summary>Comment nodes created.</summary>
     public int CreateCommentCount { get; init; }
 
-    /// <summary>Element text-content replacements.</summary>
-    public int SetElementTextCount { get; init; }
-
     /// <summary>Text-node content updates.</summary>
     public int SetTextCount { get; init; }
 
-    /// <summary>Single-property patches.</summary>
-    public int PatchPropertyCount { get; init; }
+    /// <summary>Single-attribute patches.</summary>
+    public int PatchAttributeCount { get; init; }
+
+    /// <summary>Scoped-style identifier stamps.</summary>
+    public int SetScopeIdentifierCount { get; init; }
 
     /// <summary>Node insertions.</summary>
     public int InsertCount { get; init; }
@@ -65,9 +65,9 @@ public sealed class InteropCountResult
             CreateElementCount = log.Count(TestNodeOperationType.CreateElement),
             CreateTextCount = log.Count(TestNodeOperationType.CreateText),
             CreateCommentCount = log.Count(TestNodeOperationType.CreateComment),
-            SetElementTextCount = log.Count(TestNodeOperationType.SetElementText),
             SetTextCount = log.Count(TestNodeOperationType.SetText),
-            PatchPropertyCount = log.Count(TestNodeOperationType.PatchProperty),
+            PatchAttributeCount = log.Count(TestNodeOperationType.PatchAttribute),
+            SetScopeIdentifierCount = log.Count(TestNodeOperationType.SetScopeIdentifier),
             InsertCount = log.Count(TestNodeOperationType.Insert),
             RemoveCount = log.Count(TestNodeOperationType.Remove),
             InsertStaticContentCount = log.Count(TestNodeOperationType.InsertStaticContent),

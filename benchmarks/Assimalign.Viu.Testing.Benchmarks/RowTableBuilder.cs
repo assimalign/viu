@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Globalization;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
 using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Testing.Benchmarks;
 
 /// <summary>
-/// Turns a row list into the virtual-node tree the renderer diffs — the shape js-framework-benchmark
+/// Turns a row list into the component tree the renderer diffs — the shape js-framework-benchmark
 /// renders (a <c>&lt;table&gt;</c> of keyed <c>&lt;tr&gt;</c> rows, each with an id cell and a label
 /// link; https://github.com/krausest/js-framework-benchmark). The <see cref="ScenarioVariant"/> chooses
 /// between the framework's real output (keyed rows, a <see cref="PatchFlags.Text"/> label so a change is
@@ -23,26 +23,26 @@ public static class RowTableBuilder
     /// <param name="rows">The rows to render.</param>
     /// <param name="selectedIdentifier">The selected row id, or null for none.</param>
     /// <param name="variant">Keyed+flagged output, or the keyless bypass.</param>
-    /// <returns>The table vnode.</returns>
-    public static VirtualNode Build(
+    /// <returns>The table component.</returns>
+    public static IElementComponent Build(
         IReadOnlyList<BenchmarkRow> rows,
         int? selectedIdentifier,
         ScenarioVariant variant)
     {
-        var rowNodes = new VirtualNode?[rows.Count];
+        var rowComponents = new IComponent[rows.Count];
         for (var index = 0; index < rows.Count; index++)
         {
-            rowNodes[index] = BuildRow(rows[index], selectedIdentifier, variant);
+            rowComponents[index] = BuildRow(rows[index], selectedIdentifier, variant);
         }
 
-        var body = VirtualNodeFactory.Element("tbody", null, rowNodes);
-        return VirtualNodeFactory.Element(
+        var body = ComponentTree.Element("tbody", children: rowComponents);
+        return ComponentTree.Element(
             "table",
-            VirtualNodeFactory.Properties(("class", "table table-hover table-striped test-data")),
-            body);
+            Attributes(("class", "table table-hover table-striped test-data")),
+            [body]);
     }
 
-    private static VirtualNode BuildRow(BenchmarkRow row, int? selectedIdentifier, ScenarioVariant variant)
+    private static IElementComponent BuildRow(BenchmarkRow row, int? selectedIdentifier, ScenarioVariant variant)
     {
         var keyed = variant == ScenarioVariant.Optimized;
         var isSelected = selectedIdentifier == row.Identifier;
@@ -51,46 +51,55 @@ public static class RowTableBuilder
         // The label link is the one dynamic cell: in the optimized variant it carries PatchFlags.Text so
         // a label change is a single targeted set-text; the keyless variant leaves it a plain text
         // element (a direct text change still costs one set-text, but the row loses its diff key).
-        var labelLink = keyed
-            ? VirtualNodeFactory.Element("a", VirtualNodeFactory.Properties(("class", "lbl")), row.Label, PatchFlags.Text)
-            : VirtualNodeFactory.Element("a", VirtualNodeFactory.Properties(("class", "lbl")), row.Label);
+        var labelLink = ComponentTree.Element(
+            "a",
+            Attributes(("class", "lbl")),
+            [ComponentTree.Text(row.Label)],
+            optimization: keyed ? new ComponentOptimization(PatchFlags.Text) : null);
 
-        var cells = new VirtualNode?[]
+        var cells = new IComponent[]
         {
-            VirtualNodeFactory.Element("td", VirtualNodeFactory.Properties(("class", "col-md-1")), identifierText),
-            VirtualNodeFactory.Element("td", VirtualNodeFactory.Properties(("class", "col-md-4")), labelLink),
-            VirtualNodeFactory.Element(
+            ComponentTree.Element(
                 "td",
-                VirtualNodeFactory.Properties(("class", "col-md-1")),
-                VirtualNodeFactory.Element(
-                    "a",
-                    VirtualNodeFactory.Properties(("class", "remove")),
-                    VirtualNodeFactory.Element(
-                        "span",
-                        VirtualNodeFactory.Properties(("class", "glyphicon glyphicon-remove"), ("aria-hidden", "true"))))),
-            VirtualNodeFactory.Element("td", VirtualNodeFactory.Properties(("class", "col-md-6"))),
+                Attributes(("class", "col-md-1")),
+                [ComponentTree.Text(identifierText)]),
+            ComponentTree.Element("td", Attributes(("class", "col-md-4")), [labelLink]),
+            ComponentTree.Element(
+                "td",
+                Attributes(("class", "col-md-1")),
+                [
+                    ComponentTree.Element(
+                        "a",
+                        Attributes(("class", "remove")),
+                        [
+                            ComponentTree.Element(
+                                "span",
+                                Attributes(("class", "glyphicon glyphicon-remove"), ("aria-hidden", "true"))),
+                        ]),
+                ]),
+            ComponentTree.Element("td", Attributes(("class", "col-md-6"))),
         };
 
-        return VirtualNodeFactory.Element("tr", BuildRowProperties(row.Identifier, isSelected, keyed), cells);
+        // No optimization flag on the row itself: a full attribute diff of an unchanged row emits no
+        // operations, so the row's own crossings stay minimal without a block tree, while the keyed diff
+        // (driven by the key parameter) still gets to move rows instead of rebuilding them. Selection
+        // toggles the class only.
+        return ComponentTree.Element(
+            "tr",
+            isSelected ? Attributes(("class", "danger")) : null,
+            cells,
+            key: keyed ? row.Identifier : null);
     }
 
-    private static VirtualNodeProperties? BuildRowProperties(int identifier, bool isSelected, bool keyed)
+    private static ComponentAttributes Attributes(
+        params (string Name, object? Value)[] values)
     {
-        // No PatchFlag on the row itself: a full prop diff of an unchanged row emits no ops, so the row's
-        // own crossings stay minimal without a block tree, while the keyed diff (driven by the "key"
-        // prop) still gets to move rows instead of rebuilding them. Selection toggles the class only.
-        if (keyed && isSelected)
+        var attributes = new List<IComponentAttribute>(values.Length);
+        for (var index = 0; index < values.Length; index++)
         {
-            return VirtualNodeFactory.Properties(("key", identifier), ("class", "danger"));
+            attributes.Add(new ComponentAttribute(values[index].Name, values[index].Value));
         }
-        if (keyed)
-        {
-            return VirtualNodeFactory.Properties(("key", identifier));
-        }
-        if (isSelected)
-        {
-            return VirtualNodeFactory.Properties(("class", "danger"));
-        }
-        return null;
+
+        return new ComponentAttributes(attributes);
     }
 }

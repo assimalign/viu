@@ -20,17 +20,61 @@
     "",
     "Seed provenance: measured 2026-07-20 with .NET SDK 10.0.301 via 'dotnet run -- interop'. Counts are",
     "renderer-deterministic (independent of host/label values), so a differing CI measurement means the",
-    "renderer's crossing behavior changed -- investigate rather than re-seed."
+    "renderer's crossing behavior changed -- investigate rather than re-seed.",
+    "",
+    "Reviewed 2026-08-02 ([V01.01.11.04.02], #251): creation-scenario ceilings raised by exactly +2",
+    "operations per row for the redesigned component model. The redesign removed the SetElementText",
+    "fast operation (one crossing for an element's string child); each text-bearing cell now costs",
+    "CreateText + Insert, and the benchmark rows carry two text cells. Every update scenario",
+    "(update-every-10th, swap-rows, select-row, remove-row, clear-1000) is unchanged, so diff",
+    "precision is intact. Whether a fast-text mount path should return is tracked as discovered work",
+    "under the RuntimeCore area rather than silently absorbed here."
   ],
   "scenarios": [
-    { "name": "create-1000", "totalOperationCount": 26005, "tolerance": 0 },
-    { "name": "create-10000", "totalOperationCount": 260005, "tolerance": 0 },
-    { "name": "update-every-10th", "totalOperationCount": 100, "tolerance": 0 },
-    { "name": "swap-rows", "totalOperationCount": 2, "tolerance": 0 },
-    { "name": "select-row", "totalOperationCount": 1, "tolerance": 0 },
-    { "name": "remove-row", "totalOperationCount": 1, "tolerance": 0 },
-    { "name": "append-1000", "totalOperationCount": 26000, "tolerance": 0 },
-    { "name": "replace-1000", "totalOperationCount": 27000, "tolerance": 0 },
-    { "name": "clear-1000", "totalOperationCount": 1000, "tolerance": 0 }
+    {
+      "name": "create-1000",
+      "totalOperationCount": 28005,
+      "tolerance": 0
+    },
+    {
+      "name": "create-10000",
+      "totalOperationCount": 280005,
+      "tolerance": 0
+    },
+    {
+      "name": "update-every-10th",
+      "totalOperationCount": 100,
+      "tolerance": 0
+    },
+    {
+      "name": "swap-rows",
+      "totalOperationCount": 2,
+      "tolerance": 0
+    },
+    {
+      "name": "select-row",
+      "totalOperationCount": 1,
+      "tolerance": 0
+    },
+    {
+      "name": "remove-row",
+      "totalOperationCount": 1,
+      "tolerance": 0
+    },
+    {
+      "name": "append-1000",
+      "totalOperationCount": 28000,
+      "tolerance": 0
+    },
+    {
+      "name": "replace-1000",
+      "totalOperationCount": 29000,
+      "tolerance": 0
+    },
+    {
+      "name": "clear-1000",
+      "totalOperationCount": 1000,
+      "tolerance": 0
+    }
   ]
 }

@@ -27,12 +27,16 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 - **Namespace == assembly name**, flat. Every file in `Assimalign.Viu.Browser` declares
   `namespace Assimalign.Viu.Browser;` regardless of subfolder. `Abstraction/` and `Internal/` are
   **physical folders only** — they never appear in a namespace.
-- **Recorded exception ([V01.01.12.21], `docs/NET-RESHAPE-PLAN.md` R2):** `Assimalign.Viu.Core` — the
-  consolidated runtime core + reactivity — roots every type at the **`Assimalign.Viu`** namespace (set via
-  `<RootNamespace>Assimalign.Viu</RootNamespace>` on its `src` csproj), *not* `Assimalign.Viu.Core`,
-  because the core **is** the product and its primitives read best unprefixed (`Assimalign.Viu.Reference<T>`,
-  `Assimalign.Viu.VirtualNode`). This is the single deliberate deviation from the rule; every other library
-  keeps namespace == assembly id (the source-generator assemblies included).
+- **Recorded exception (origin [V01.01.12.21] R2; retained through the 2026-07 redesign, see
+  [V01.01.11.04.02] #251):** `Assimalign.Viu.Core` roots every type at the **`Assimalign.Viu`**
+  namespace (set via `<RootNamespace>Assimalign.Viu</RootNamespace>` on its `src` csproj), *not*
+  `Assimalign.Viu.Core`, because the core **is** the product and its primitives read best unprefixed
+  (`Assimalign.Viu.Scheduler`, `Assimalign.Viu.TemplateReference`). Note the R2 *consolidation* this
+  exception originally shipped with was superseded: the finalized redesign deliberately re-split
+  `Assimalign.Viu.Reactivity`, `Assimalign.Viu.Components`, and `Assimalign.Viu.State` into separate
+  libraries, each keeping namespace == assembly id (`Assimalign.Viu.Reactivity.Reference<T>`). The
+  root-namespace deviation survives for `Assimalign.Viu.Core` alone; every other library keeps
+  namespace == assembly id (the source-generator assemblies included).
 
 ## Folders within `src/`
 
