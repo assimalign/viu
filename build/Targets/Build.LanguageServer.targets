@@ -146,9 +146,15 @@
           DependsOnTargets="ViuPublishLanguageServer"
           BeforeTargets="AssignTargetPaths;GetVsixSourceItems"
           Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
+    <!-- Two steps with QUALIFIED metadata on purpose. Inside a target, an unqualified
+         %(RecursiveDir)%(Filename) in an attribute batches over the metadata of items already in
+         scope (the project's existing Content), not over the files the glob just matched - which
+         stamped 'language-server.json' onto the server executables' Link, flattened the runtime
+         folders out of the VSIX, and made the extension deploy a payload the provider cannot find. -->
     <ItemGroup>
-      <Content Include="$(ViuLanguageServerPublishPath)\**\*"
-               Link="LanguageServer\%(RecursiveDir)%(Filename)%(Extension)"
+      <_ViuLanguageServerPayloadFile Include="$(ViuLanguageServerPublishPath)\**\*" />
+      <Content Include="@(_ViuLanguageServerPayloadFile)"
+               Link="LanguageServer\%(_ViuLanguageServerPayloadFile.RecursiveDir)%(_ViuLanguageServerPayloadFile.Filename)%(_ViuLanguageServerPayloadFile.Extension)"
                CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
