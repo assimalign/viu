@@ -32,11 +32,42 @@ Visual Studio
 ```
 
 `Assimalign.Viu.VisualStudio` performs fast lexical classification using Visual Studio's built-in
-classification categories. The out-of-process API cannot currently define custom classification
-colors, so user themes remain authoritative. Semantic method spans map to the base `identifier`
-category and punctuation maps to `operator`: Visual Studio does not register the SDK's `method`
-name, while `punctuation` is supplied only when Roslyn editor features are present. These fallbacks
-keep the VSIX independent of a particular managed-language workload.
+classification categories. It lexes both container syntaxes of the hybrid `.viu` format
+([V01.01.06.10]): tag-delimited top-level `<template>`/`<style>` sections (with nested-`<template>`
+depth tracking so slot fragments do not end a section) plus the `@script` @-block, and the legacy
+`@template`/`@style` @-blocks keep highlighting during the migration window.
+
+The out-of-process `VisualStudio.Extensibility` model cannot define custom classification types or
+format definitions: there is no equivalent of the in-process MEF
+`ClassificationTypeDefinition`/`ClassificationFormatDefinition` exports, so the extension cannot
+introduce its own colors, set bold or italic, or add "Viu Component"-style entries to
+Tools > Options > Fonts and Colors. Every token must borrow one of Visual Studio's built-in
+categories, the user's theme owns the actual color values, and LSP semantic tokens share the same
+ceiling (Visual Studio maps them onto the same built-in classifications). The result is a real
+palette upgrade assembled entirely from the theme's existing colors — a bespoke Viu palette would
+require an in-process editor component, which this architecture deliberately rejects. The recorded
+mapping decisions:
+
+- PascalCase (or dotted) template tag names classify as components and borrow the `type` category,
+  so components render in the same teal Visual Studio uses for C# and Razor type names; lowercase
+  tag names stay `markup node`. This pins the Vue component-naming convention
+  (<https://vuejs.org/guide/components/registration>).
+- Directive attribute names (`v-*`, `@event`, `:bind`, `#slot`, including valueless directives such
+  as `v-else`) borrow `keyword` so they pop against plain markup attributes.
+- `{{ }}` interpolation delimiters borrow `keyword`, and interpolation interiors run the C# token
+  passes so expressions color like script code.
+- `class` attribute values split lexically into utility variant prefixes (`hover:`, `md:` →
+  `keyword`) and utility classes (→ `string`, `[...]` arbitrary values included); candidate
+  validation stays in the language server per the source boundaries below.
+- Style custom properties (`--name`) borrow `type` so theme tokens stand apart from ordinary
+  declarations.
+- Semantic method spans map to the base `identifier` category and punctuation maps to `operator`:
+  Visual Studio does not register the SDK's `method` name, while `punctuation` is supplied only
+  when Roslyn editor features are present. These fallbacks keep the VSIX independent of a
+  particular managed-language workload.
+
+If the Extensibility SDK later adds custom classification registration, the mapping table in
+`ViuClassificationTagger.GetClassificationType` is the single place to upgrade.
 
 `Assimalign.Viu.LanguageServer` owns protocol framing and translates protocol values into
 editor-neutral contracts. It writes protocol messages only to standard output; standard error is
@@ -44,7 +75,9 @@ reserved for diagnostics.
 
 `Assimalign.Viu.LanguageService` caches the current text and the format-appropriate immutable
 container parse for each open `.viu` or accepted `.vue` document. It exposes block diagnostics,
-completion catalogs, shared utility-class completion, project-defined utilities and variants, and
+completion catalogs, declaration-aware `@script` member completion ([V01.01.12.07.04] #261 — a
+syntax-only Roslyn parse of the script block, cached on the block text; no compilation, no
+workspace), shared utility-class completion, project-defined utilities and variants, and
 generated-CSS hover documentation. It does not otherwise load a Roslyn workspace.
 
 Visual Studio requires a language-server provider's `DocumentFilter` to select a document type; it
@@ -112,7 +145,8 @@ theme or authored source.
 ## Source and update boundaries
 
 Utility IntelliSense activates only in static class attributes and literal class-binding strings.
-The container parser supplies only `.viu` `@template` or `.vue` `<template>` text to that context.
+The container parser supplies only `.viu` or `.vue` `<template>` text (including the legacy `.viu`
+`@template` container during its migration window) to that context.
 Script and style regions, ordinary `.cs`, arbitrary C# strings, and runtime-built class fragments
 are never utility candidate sources. Complete alternatives must appear in template text or be
 included through `@source inline(...)`. Code-first utility discovery is a separate deferred
@@ -153,12 +187,21 @@ analysis, the server needs snapshot caching, edit debouncing, and per-document c
 
 ## Packaging
 
-`Build.ps1` publishes self-contained, single-file .NET language-server executables for `win-x64`
-and `win-arm64`, then passes their common directory to the extension build through
-`ViuLanguageServerPublishPath`. The extension selects the executable matching
-`RuntimeInformation.ProcessArchitecture`. This keeps the installed extension independent of a
-machine-wide .NET runtime and makes the two architectures declared by the VSIX manifest real
-payload guarantees. The VSIX layout is:
+The shared `ViuPublishLanguageServer` target in `build/Targets/Build.LanguageServer.targets`
+publishes self-contained, single-file .NET language-server executables for `win-x64` and
+`win-arm64`; `Build.ps1` and the extension build both drive that one target, so an in-IDE build can
+never package a stale server. The extension selects the executable matching
+`RuntimeInformation.ProcessArchitecture`.
+
+Self-contained packaging is the current implementation, **not an invariant**. Recorded decision
+(2026-08-02, [V01.01.12.23] #259): the fully shipped product is expected to require a locally
+installed .NET SDK and the `Assimalign.Viu.Sdk` package for complete end-to-end functionality —
+in particular the Roslyn-workspace semantic features, whose project evaluation cannot be frozen
+into the VSIX because it must match the SDK the consumer's project builds with. The boundary is:
+baseline features (container parsing, diagnostics, utility IntelliSense) keep working with no
+machine prerequisites; semantic features may depend on local SDK state and must degrade gracefully
+— never silently — when it is absent. An earlier revision of this section stated machine
+independence as a design guarantee; that overstated the intent. The VSIX layout is:
 
 ```text
 Assimalign.Viu.VisualStudio/

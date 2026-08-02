@@ -103,7 +103,7 @@ public sealed class ViuUtilityStylesheetContextTests
                     </Project>
                     """);
                 var componentPath = Path.Combine(directory, "Card.viu");
-                File.WriteAllText(componentPath, "@template { <div /> }");
+                File.WriteAllText(componentPath, "<template><div /></template>");
 
                 ViuUtilityStylesheetContext
                     .ReadForDocument(new Uri(componentPath).AbsoluteUri)

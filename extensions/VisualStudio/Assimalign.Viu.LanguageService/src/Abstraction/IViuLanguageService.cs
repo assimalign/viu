@@ -44,4 +44,29 @@ public interface IViuLanguageService
     /// <param name="position">The zero-based editor position.</param>
     /// <returns>The hover result, or <see langword="null"/> when the token is unknown.</returns>
     LanguageHover? GetHover(string documentUri, LanguagePosition position);
+
+    /// <summary>Computes the deferred documentation body for a previously returned completion item.</summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="completionLabel">The label of the completion item being resolved.</param>
+    /// <returns>
+    /// The Markdown documentation, or <see langword="null"/> when the label is not a resolvable
+    /// candidate.
+    /// </returns>
+    string? ResolveCompletionDocumentation(string documentUri, string completionLabel);
+
+    /// <summary>Gets the hierarchical block outline for an open document.</summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <returns>The block symbols in source order, or an empty list when the document is not open.</returns>
+    IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri);
+
+    /// <summary>Gets the foldable block-content ranges for an open document.</summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <returns>The folding ranges, or an empty list when the document is not open.</returns>
+    IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri);
+
+    /// <summary>Gets quick fixes for diagnostics intersecting a range in an open document.</summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="range">The zero-based document range the editor is requesting actions for.</param>
+    /// <returns>The applicable code actions, or an empty list when none apply.</returns>
+    IReadOnlyList<LanguageCodeAction> GetCodeActions(string documentUri, LanguageRange range);
 }

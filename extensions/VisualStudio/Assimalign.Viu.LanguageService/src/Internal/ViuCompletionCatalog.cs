@@ -4,13 +4,16 @@ namespace Assimalign.Viu.LanguageService;
 
 internal static class ViuCompletionCatalog
 {
+    // The hybrid .viu container ([V01.01.06.10]): <template> and <style> are tags whose options are
+    // tag attributes, while the C# script block keeps the @-block grammar. The legacy @template and
+    // @style containers still parse during the migration window but are no longer offered.
     internal static IReadOnlyList<LanguageCompletionItem> BlockHeaders { get; } =
     [
         Snippet(
-            "@template",
+            "template",
             "Viu template block",
             "Contains the component's Vue-compatible template markup.",
-            "@template {\n\t$0\n}",
+            "<template>\n\t$0\n</template>",
             "01"),
         Snippet(
             "@script",
@@ -19,11 +22,23 @@ internal static class ViuCompletionCatalog
             "@script {\n\t$0\n}",
             "02"),
         Snippet(
-            "@style",
+            "style",
             "Viu CSS style block",
-            "Contains component CSS and supports `scoped`, `module`, and `lang` options.",
-            "@style {\n\t$0\n}",
+            "Contains component CSS; `scoped`, `module`, and `lang` are tag attributes.",
+            "<style>\n\t$0\n</style>",
             "03"),
+        Snippet(
+            "style scoped",
+            "Scoped Viu CSS style block",
+            "Contains component CSS scoped to this component.",
+            "<style scoped>\n\t$0\n</style>",
+            "04"),
+        Snippet(
+            "style module",
+            "Viu CSS module style block",
+            "Compiles class names as a CSS module exposed through the template binding.",
+            "<style module>\n\t$0\n</style>",
+            "05"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> VueBlockHeaders { get; } =
@@ -162,6 +177,14 @@ internal static class ViuCompletionCatalog
             "Declares an asynchronous template event handler.",
             "public async Task $1()\n{\n\t$0\n}",
             "06"),
+        // The generator scaffold's only other author-facing member. Render and RenderCacheSize are
+        // compiler-owned and must never be offered (SingleFileComponentSourceEmitter).
+        Snippet(
+            "OnSetup",
+            "partial void OnSetup()",
+            "Implements the generated setup hook. Runs once per mount after `Context` is assigned.",
+            "partial void OnSetup()\n{\n\t$0\n}",
+            "07"),
     ];
 
     /// <summary>
@@ -171,7 +194,10 @@ internal static class ViuCompletionCatalog
     /// This is a lexical aid, not C# IntelliSense: the language service hosts no compilation, so it
     /// knows nothing about types, members, or namespaces in scope. Keywords are offered because the
     /// alternative — answering a partially typed <c>using</c> with a Viu snippet list — is actively
-    /// misleading. Real declaration-aware completion is tracked separately.
+    /// misleading. Declared-member completion ([V01.01.12.07.04], #261,
+    /// <see cref="ScriptDeclarationReader"/>) ranks this file's own <c>@script</c> declarations
+    /// above these keywords; the remaining gap is workspace-backed semantics, tracked separately
+    /// ([V01.01.12.23], #259).
     /// </remarks>
     internal static IReadOnlyList<LanguageCompletionItem> ScriptKeywords { get; } =
         CreateScriptKeywords();

@@ -21,6 +21,8 @@ internal sealed class LanguageServerHost
     private readonly IViuLanguageService languageService;
     private readonly HashSet<string> openSupportedDocuments =
         new(StringComparer.OrdinalIgnoreCase);
+    private LanguageServerClientCapabilities clientCapabilities =
+        LanguageServerClientCapabilities.Default;
     private bool shutdownRequested;
 
     internal LanguageServerHost()
@@ -124,6 +126,7 @@ internal sealed class LanguageServerHost
             switch (method)
             {
                 case "initialize":
+                    clientCapabilities = LanguageServerClientCapabilities.Read(parameters);
                     await WriteResultAsync(
                             writer,
                             RequireIdentifier(hasIdentifier, identifier),
@@ -176,6 +179,42 @@ internal sealed class LanguageServerHost
                             writer,
                             RequireIdentifier(hasIdentifier, identifier),
                             HandleHover(parameters),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    return false;
+
+                case "completionItem/resolve":
+                    await WriteResultAsync(
+                            writer,
+                            RequireIdentifier(hasIdentifier, identifier),
+                            HandleCompletionItemResolve(parameters),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    return false;
+
+                case "textDocument/documentSymbol":
+                    await WriteResultAsync(
+                            writer,
+                            RequireIdentifier(hasIdentifier, identifier),
+                            HandleDocumentSymbol(parameters),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    return false;
+
+                case "textDocument/foldingRange":
+                    await WriteResultAsync(
+                            writer,
+                            RequireIdentifier(hasIdentifier, identifier),
+                            HandleFoldingRange(parameters),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    return false;
+
+                case "textDocument/codeAction":
+                    await WriteResultAsync(
+                            writer,
+                            RequireIdentifier(hasIdentifier, identifier),
+                            HandleCodeAction(parameters),
                             cancellationToken)
                         .ConfigureAwait(false);
                     return false;
@@ -334,15 +373,27 @@ internal sealed class LanguageServerHost
                 ["label"] = completion.Label,
                 ["kind"] = (int)completion.Kind,
                 ["detail"] = completion.Detail,
-                ["documentation"] = new JsonObject
-                {
-                    ["kind"] = "markdown",
-                    ["value"] = completion.Documentation,
-                },
                 ["insertText"] = completion.InsertText,
                 ["insertTextFormat"] = completion.IsSnippet ? 2 : 1,
                 ["sortText"] = completion.SortText,
+                // Every item carries the resolve round-trip payload: the label is a sufficient
+                // lookup key (resolution recomputes through the hover path) and the URI selects
+                // the per-document stylesheet context, keeping the server stateless.
+                ["data"] = new JsonObject
+                {
+                    ["documentUri"] = documentUri,
+                    ["label"] = completion.Label,
+                },
             };
+
+            // Deferred documentation (utility items) is omitted entirely and computed by
+            // completionItem/resolve; inline one-liners keep shipping with the item.
+            if (!string.IsNullOrEmpty(completion.Documentation))
+            {
+                item["documentation"] = LanguageServerMarkupContent.Create(
+                    completion.Documentation,
+                    clientCapabilities.CompletionDocumentationSupportsMarkdown);
+            }
 
             if (!string.IsNullOrEmpty(completion.FilterText))
             {
@@ -385,13 +436,204 @@ internal sealed class LanguageServerHost
 
         return new JsonObject
         {
-            ["contents"] = new JsonObject
-            {
-                ["kind"] = "markdown",
-                ["value"] = hover.Markdown,
-            },
+            ["contents"] = LanguageServerMarkupContent.Create(
+                hover.Markdown,
+                clientCapabilities.HoverSupportsMarkdown),
             ["range"] = ToJsonRange(hover.Range),
         };
+    }
+
+    private JsonNode HandleCompletionItemResolve(JsonElement parameters)
+    {
+        if (parameters.ValueKind != JsonValueKind.Object)
+        {
+            throw InvalidParameters("The completion item is required.");
+        }
+
+        var completionLabel = GetRequiredString(parameters, "label");
+        var item = (JsonObject)CloneElement(parameters)!;
+
+        // A missing payload or a closed document echoes the item back unchanged: Visual Studio
+        // resolves items asynchronously, and a race with didClose must never surface as an error.
+        if (!parameters.TryGetProperty("data", out var data) ||
+            data.ValueKind != JsonValueKind.Object ||
+            !data.TryGetProperty("documentUri", out var uriElement) ||
+            uriElement.ValueKind != JsonValueKind.String)
+        {
+            return item;
+        }
+
+        var documentUri = uriElement.GetString()!;
+        if (!IsOpenAndSupported(documentUri))
+        {
+            return item;
+        }
+
+        ConfigureUtilityStylesheet(documentUri);
+        var documentation = languageService.ResolveCompletionDocumentation(
+            documentUri,
+            completionLabel);
+        if (documentation is not null)
+        {
+            item["documentation"] = LanguageServerMarkupContent.Create(
+                documentation,
+                clientCapabilities.CompletionDocumentationSupportsMarkdown);
+        }
+
+        return item;
+    }
+
+    private JsonArray HandleDocumentSymbol(JsonElement parameters)
+    {
+        var textDocument = GetRequiredObject(parameters, "textDocument");
+        var documentUri = GetRequiredString(textDocument, "uri");
+        var results = new JsonArray();
+        if (!IsOpenAndSupported(documentUri))
+        {
+            return results;
+        }
+
+        foreach (var symbol in languageService.GetDocumentSymbols(documentUri))
+        {
+            if (clientCapabilities.SupportsHierarchicalDocumentSymbols)
+            {
+                results.Add((JsonNode)ToJsonDocumentSymbol(symbol));
+            }
+            else
+            {
+                AppendSymbolInformation(symbol, documentUri, results);
+            }
+        }
+
+        return results;
+    }
+
+    private JsonArray HandleFoldingRange(JsonElement parameters)
+    {
+        var textDocument = GetRequiredObject(parameters, "textDocument");
+        var documentUri = GetRequiredString(textDocument, "uri");
+        var results = new JsonArray();
+        if (!IsOpenAndSupported(documentUri))
+        {
+            return results;
+        }
+
+        foreach (var foldingRange in languageService.GetFoldingRanges(documentUri))
+        {
+            var json = new JsonObject
+            {
+                ["startLine"] = foldingRange.StartLine,
+                ["endLine"] = foldingRange.EndLine,
+            };
+            if (foldingRange.Kind is not null)
+            {
+                json["kind"] = foldingRange.Kind;
+            }
+
+            results.Add((JsonNode)json);
+        }
+
+        return results;
+    }
+
+    private JsonArray HandleCodeAction(JsonElement parameters)
+    {
+        var textDocument = GetRequiredObject(parameters, "textDocument");
+        var documentUri = GetRequiredString(textDocument, "uri");
+        var range = GetRange(GetRequiredObject(parameters, "range"));
+        var results = new JsonArray();
+
+        // Without codeActionLiteralSupport only Command[] results are legal, and this server
+        // implements no commands, so the honest answer is an empty result.
+        if (!clientCapabilities.SupportsCodeActionLiterals ||
+            !IsOpenAndSupported(documentUri))
+        {
+            return results;
+        }
+
+        foreach (var action in languageService.GetCodeActions(documentUri, range))
+        {
+            var diagnostics = new JsonArray();
+            foreach (var diagnostic in action.Diagnostics)
+            {
+                diagnostics.Add((JsonNode)ToJsonDiagnostic(diagnostic));
+            }
+
+            var edits = new JsonArray();
+            foreach (var edit in action.Edits)
+            {
+                edits.Add(
+                    (JsonNode)new JsonObject
+                    {
+                        ["range"] = ToJsonRange(edit.Range),
+                        ["newText"] = edit.NewText,
+                    });
+            }
+
+            results.Add(
+                (JsonNode)new JsonObject
+                {
+                    ["title"] = action.Title,
+                    ["kind"] = action.Kind,
+                    ["isPreferred"] = action.IsPreferred,
+                    ["diagnostics"] = diagnostics,
+                    ["edit"] = new JsonObject
+                    {
+                        ["changes"] = new JsonObject
+                        {
+                            [documentUri] = edits,
+                        },
+                    },
+                });
+        }
+
+        return results;
+    }
+
+    private static JsonObject ToJsonDocumentSymbol(LanguageDocumentSymbol symbol)
+    {
+        var children = new JsonArray();
+        foreach (var child in symbol.Children)
+        {
+            children.Add((JsonNode)ToJsonDocumentSymbol(child));
+        }
+
+        var json = new JsonObject
+        {
+            ["name"] = symbol.Name,
+            ["kind"] = (int)symbol.Kind,
+            ["range"] = ToJsonRange(symbol.Range),
+            ["selectionRange"] = ToJsonRange(symbol.SelectionRange),
+            ["children"] = children,
+        };
+        if (symbol.Detail is not null)
+        {
+            json["detail"] = symbol.Detail;
+        }
+
+        return json;
+    }
+
+    private static void AppendSymbolInformation(
+        LanguageDocumentSymbol symbol,
+        string documentUri,
+        JsonArray results)
+    {
+        results.Add(
+            (JsonNode)new JsonObject
+            {
+                ["name"] = symbol.Name,
+                ["kind"] = (int)symbol.Kind,
+                ["location"] = new JsonObject
+                {
+                    ["uri"] = documentUri,
+                    ["range"] = ToJsonRange(symbol.Range),
+                },
+            });
+        foreach (var child in symbol.Children)
+        {
+            AppendSymbolInformation(child, documentUri, results);
+        }
     }
 
     private async ValueTask PublishDiagnosticsAsync(
@@ -404,15 +646,7 @@ internal sealed class LanguageServerHost
         {
             foreach (var diagnostic in languageService.GetDiagnostics(documentUri))
             {
-                diagnostics.Add(
-                    (JsonNode)new JsonObject
-                    {
-                        ["range"] = ToJsonRange(diagnostic.Range),
-                        ["severity"] = (int)diagnostic.Severity,
-                        ["code"] = diagnostic.Code,
-                        ["source"] = diagnostic.Source,
-                        ["message"] = diagnostic.Message,
-                    });
+                diagnostics.Add((JsonNode)ToJsonDiagnostic(diagnostic));
             }
         }
 
@@ -465,7 +699,9 @@ internal sealed class LanguageServerHost
                 },
                 ["completionProvider"] = new JsonObject
                 {
-                    ["resolveProvider"] = false,
+                    // Utility completion items defer their documentation bodies to
+                    // completionItem/resolve to keep the per-keystroke payload small.
+                    ["resolveProvider"] = true,
                     // The quote characters open the list on `class="` itself. Without them nothing
                     // appears until the author types a `-`, which reads as a broken feature.
                     ["triggerCharacters"] = new JsonArray(
@@ -484,11 +720,17 @@ internal sealed class LanguageServerHost
                         "'"),
                 },
                 ["hoverProvider"] = true,
+                ["documentSymbolProvider"] = true,
+                ["foldingRangeProvider"] = true,
+                ["codeActionProvider"] = new JsonObject
+                {
+                    ["codeActionKinds"] = new JsonArray("quickfix"),
+                },
             },
             ["serverInfo"] = new JsonObject
             {
                 ["name"] = "Assimalign.Viu.LanguageServer",
-                ["version"] = "0.1.0",
+                ["version"] = "0.2.0",
             },
         };
 
@@ -533,6 +775,16 @@ internal sealed class LanguageServerHost
         => new(
             GetRequiredInteger(element, "line"),
             GetRequiredInteger(element, "character"));
+
+    private static JsonObject ToJsonDiagnostic(LanguageDiagnostic diagnostic)
+        => new()
+        {
+            ["range"] = ToJsonRange(diagnostic.Range),
+            ["severity"] = (int)diagnostic.Severity,
+            ["code"] = diagnostic.Code,
+            ["source"] = diagnostic.Source,
+            ["message"] = diagnostic.Message,
+        };
 
     private static JsonObject ToJsonRange(LanguageRange range)
         => new()

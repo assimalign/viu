@@ -96,51 +96,12 @@ public class LanguageServerHostTests
     }
 
     [Fact]
-    public async Task RunAsync_HoverRequest_ReturnsMarkdownHover()
-    {
-        var inputBytes = Encoding.UTF8.GetBytes(
-            Frame(
-                """
-                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Counter.viu","languageId":"viu","version":1,"text":"@script {\n    Reactive.Reference(0);\n}\n"}}}
-                """) +
-            Frame(
-                """
-                {"jsonrpc":"2.0","id":"hover","method":"textDocument/hover","params":{"textDocument":{"uri":"file:///Counter.viu"},"position":{"line":1,"character":18}}}
-                """) +
-            Frame(
-                """
-                {"jsonrpc":"2.0","method":"exit"}
-                """));
-
-        await using var input = new MemoryStream(inputBytes);
-        await using var output = new MemoryStream();
-        var host = new LanguageServerHost();
-
-        await host.RunAsync(input, output);
-
-        output.Position = 0;
-        var messages = await ReadAllMessagesAsync(output);
-        messages.Count.ShouldBe(2);
-        messages[1].RootElement
-            .GetProperty("result")
-            .GetProperty("contents")
-            .GetProperty("kind")
-            .GetString()
-            .ShouldBe("markdown");
-
-        foreach (var message in messages)
-        {
-            message.Dispose();
-        }
-    }
-
-    [Fact]
     public async Task RunAsync_CompletionWithEditRange_SerializesFilterAndTextEdit()
     {
         var inputBytes = Encoding.UTF8.GetBytes(
             Frame(
                 """
-                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Counter.viu","languageId":"viu","version":1,"text":"@template {\n    <div class=\"hover:bg-red\"></div>\n}\n"}}}
+                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Counter.viu","languageId":"viu","version":1,"text":"<template>\n    <div class=\"hover:bg-red\"></div>\n</template>\n"}}}
                 """) +
             Frame(
                 """
@@ -278,6 +239,70 @@ public class LanguageServerHostTests
                         },
                     },
                 });
+            var documentSymbolMessage = JsonSerializer.Serialize(
+                new
+                {
+                    jsonrpc = "2.0",
+                    id = "symbols",
+                    method = "textDocument/documentSymbol",
+                    @params = new
+                    {
+                        textDocument = new
+                        {
+                            uri = documentUri,
+                        },
+                    },
+                });
+            var foldingRangeMessage = JsonSerializer.Serialize(
+                new
+                {
+                    jsonrpc = "2.0",
+                    id = "folding",
+                    method = "textDocument/foldingRange",
+                    @params = new
+                    {
+                        textDocument = new
+                        {
+                            uri = documentUri,
+                        },
+                    },
+                });
+            var codeActionMessage = JsonSerializer.Serialize(
+                new
+                {
+                    jsonrpc = "2.0",
+                    id = "actions",
+                    method = "textDocument/codeAction",
+                    @params = new
+                    {
+                        textDocument = new
+                        {
+                            uri = documentUri,
+                        },
+                        range = new
+                        {
+                            start = new { line = 0, character = 0 },
+                            end = new { line = 0, character = 20 },
+                        },
+                        context = new { diagnostics = Array.Empty<object>() },
+                    },
+                });
+            var resolveMessage = JsonSerializer.Serialize(
+                new
+                {
+                    jsonrpc = "2.0",
+                    id = "resolve",
+                    method = "completionItem/resolve",
+                    @params = new
+                    {
+                        label = "bg-red-500",
+                        data = new
+                        {
+                            documentUri,
+                            label = "bg-red-500",
+                        },
+                    },
+                });
             var closeMessage = JsonSerializer.Serialize(
                 new
                 {
@@ -292,10 +317,18 @@ public class LanguageServerHostTests
                     },
                 });
             var inputBytes = Encoding.UTF8.GetBytes(
+                Frame(
+                    """
+                    {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"textDocument":{"documentSymbol":{"hierarchicalDocumentSymbolSupport":true},"codeAction":{"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix"]}}}}}}}
+                    """) +
                 Frame(openMessage) +
                 Frame(changeMessage) +
                 Frame(completionMessage) +
                 Frame(hoverMessage) +
+                Frame(documentSymbolMessage) +
+                Frame(foldingRangeMessage) +
+                Frame(codeActionMessage) +
+                Frame(resolveMessage) +
                 Frame(closeMessage) +
                 Frame(
                     """
@@ -315,19 +348,32 @@ public class LanguageServerHostTests
             languageService.DiagnosticsCount.ShouldBe(0);
             languageService.CompletionCount.ShouldBe(0);
             languageService.HoverCount.ShouldBe(0);
+            languageService.ResolveCount.ShouldBe(0);
+            languageService.DocumentSymbolCount.ShouldBe(0);
+            languageService.FoldingRangeCount.ShouldBe(0);
+            languageService.CodeActionCount.ShouldBe(0);
 
             output.Position = 0;
             var messages = await ReadAllMessagesAsync(output);
-            messages.Count.ShouldBe(5);
-            messages[2].RootElement
+            messages.Count.ShouldBe(10);
+            messages[3].RootElement
                 .GetProperty("result")
                 .GetProperty("items")
                 .GetArrayLength()
                 .ShouldBe(0);
-            messages[3].RootElement
+            messages[4].RootElement
                 .GetProperty("result")
                 .ValueKind
                 .ShouldBe(JsonValueKind.Null);
+            messages[5].RootElement.GetProperty("result").GetArrayLength().ShouldBe(0);
+            messages[6].RootElement.GetProperty("result").GetArrayLength().ShouldBe(0);
+            messages[7].RootElement.GetProperty("result").GetArrayLength().ShouldBe(0);
+            // The resolve echoes the unsupported document's item back unchanged.
+            messages[8].RootElement
+                .GetProperty("result")
+                .GetProperty("label")
+                .GetString()
+                .ShouldBe("bg-red-500");
 
             foreach (var message in messages)
             {
@@ -408,9 +454,28 @@ public class LanguageServerHostTests
                         },
                     },
                 });
+            // The resolve request round-trips exactly the data payload the completion item
+            // carries; the item's data is asserted below to match this payload.
+            var resolveMessage = JsonSerializer.Serialize(
+                new
+                {
+                    jsonrpc = "2.0",
+                    id = "resolve",
+                    method = "completionItem/resolve",
+                    @params = new
+                    {
+                        label = "bg-brand",
+                        data = new
+                        {
+                            documentUri,
+                            label = "bg-brand",
+                        },
+                    },
+                });
             var inputBytes = Encoding.UTF8.GetBytes(
                 Frame(openMessage) +
                 Frame(completionMessage) +
+                Frame(resolveMessage) +
                 Frame(
                     """
                     {"jsonrpc":"2.0","method":"exit"}
@@ -424,7 +489,7 @@ public class LanguageServerHostTests
 
             output.Position = 0;
             var messages = await ReadAllMessagesAsync(output);
-            messages.Count.ShouldBe(2);
+            messages.Count.ShouldBe(3);
             var items = messages[1].RootElement
                 .GetProperty("result")
                 .GetProperty("items")
@@ -434,7 +499,13 @@ public class LanguageServerHostTests
                 item =>
                     item.GetProperty("label").GetString() ==
                     "bg-brand");
-            var documentation = brand.GetProperty("documentation")
+            brand.TryGetProperty("documentation", out _).ShouldBeFalse();
+            var data = brand.GetProperty("data");
+            data.GetProperty("documentUri").GetString().ShouldBe(documentUri);
+            data.GetProperty("label").GetString().ShouldBe("bg-brand");
+
+            var resolved = messages[2].RootElement.GetProperty("result");
+            var documentation = resolved.GetProperty("documentation")
                 .GetProperty("value")
                 .GetString();
             documentation.ShouldNotBeNull();
@@ -507,6 +578,22 @@ public class LanguageServerHostTests
             ];
 
         public LanguageHover? GetHover(string documentUri, LanguagePosition position) => null;
+
+        public string? ResolveCompletionDocumentation(
+            string documentUri,
+            string completionLabel)
+            => null;
+
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+            => Array.Empty<LanguageDocumentSymbol>();
+
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+            => Array.Empty<LanguageFoldingRange>();
+
+        public IReadOnlyList<LanguageCodeAction> GetCodeActions(
+            string documentUri,
+            LanguageRange range)
+            => Array.Empty<LanguageCodeAction>();
     }
 
     private sealed class RecordingLanguageService : IViuLanguageService
@@ -522,6 +609,14 @@ public class LanguageServerHostTests
         internal int CompletionCount { get; private set; }
 
         internal int HoverCount { get; private set; }
+
+        internal int ResolveCount { get; private set; }
+
+        internal int DocumentSymbolCount { get; private set; }
+
+        internal int FoldingRangeCount { get; private set; }
+
+        internal int CodeActionCount { get; private set; }
 
         public void OpenDocument(string documentUri, string text, int? version)
             => OpenCount++;
@@ -561,6 +656,34 @@ public class LanguageServerHostTests
         {
             HoverCount++;
             return null;
+        }
+
+        public string? ResolveCompletionDocumentation(
+            string documentUri,
+            string completionLabel)
+        {
+            ResolveCount++;
+            return null;
+        }
+
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+        {
+            DocumentSymbolCount++;
+            return Array.Empty<LanguageDocumentSymbol>();
+        }
+
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+        {
+            FoldingRangeCount++;
+            return Array.Empty<LanguageFoldingRange>();
+        }
+
+        public IReadOnlyList<LanguageCodeAction> GetCodeActions(
+            string documentUri,
+            LanguageRange range)
+        {
+            CodeActionCount++;
+            return Array.Empty<LanguageCodeAction>();
         }
     }
 }

@@ -30,7 +30,7 @@ public class LanguageServerCompletionListTests
         var inputBytes = Encoding.UTF8.GetBytes(
             Frame(
                 """
-                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Card.viu","languageId":"viu","version":1,"text":"@template {\n    <div class=\"\"></div>\n}\n"}}}
+                {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///Card.viu","languageId":"viu","version":1,"text":"<template>\n    <div class=\"\"></div>\n</template>\n"}}}
                 """) +
             Frame(
                 """
@@ -125,5 +125,21 @@ public class LanguageServerCompletionListTests
         }
 
         public LanguageHover? GetHover(string documentUri, LanguagePosition position) => null;
+
+        public string? ResolveCompletionDocumentation(
+            string documentUri,
+            string completionLabel)
+            => null;
+
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+            => Array.Empty<LanguageDocumentSymbol>();
+
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+            => Array.Empty<LanguageFoldingRange>();
+
+        public IReadOnlyList<LanguageCodeAction> GetCodeActions(
+            string documentUri,
+            LanguageRange range)
+            => Array.Empty<LanguageCodeAction>();
     }
 }

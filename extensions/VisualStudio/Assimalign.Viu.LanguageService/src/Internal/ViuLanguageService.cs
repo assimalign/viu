@@ -16,9 +16,14 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
     private static readonly IReadOnlyDictionary<string, string> HoverDocumentation =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["@template"] = "**`@template`** contains Vue-compatible template markup for the component.",
+            // Hybrid .viu container ([V01.01.06.10]): <template>/<style> are the canonical tag
+            // containers, @script stays an @-block, and the legacy @template/@style containers hover
+            // as migration guidance during the transition window.
+            ["template"] = "**`<template>`** contains Vue-compatible template markup for the component.",
             ["@script"] = "**`@script`** contains C# members merged into the generated partial component.",
-            ["@style"] = "**`@style`** contains component CSS and can be `scoped` or a CSS `module`.",
+            ["style"] = "**`<style>`** contains component CSS and can be `scoped` or a CSS `module`.",
+            ["@template"] = "**`@template { }`** is the legacy Viu template container. Rewrite the block as `<template>...</template>`; block options become tag attributes.",
+            ["@style"] = "**`@style { }`** is the legacy Viu style container. Rewrite the block as `<style>...</style>`; block options become tag attributes such as `scoped`.",
             ["v-if"] = "**`v-if`** conditionally renders an element or component.",
             ["v-for"] = "**`v-for`** repeats an element or component for values in a source.",
             ["v-model"] = "**`v-model`** creates a two-way form value binding.",
@@ -41,6 +46,8 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
 
     private readonly object synchronization = new();
     private readonly LanguageDocumentStore documents = new();
+    // Called only inside the synchronization lock; the reader is deliberately not thread-safe.
+    private readonly ScriptDeclarationReader scriptDeclarations = new();
     // Document URIs must compare exactly as they do in the server host's open-document set, or a
     // client that varies casing (a Windows drive letter, most commonly) reports a document as open
     // while the workspace fails to find it and every language feature silently returns nothing.
@@ -200,10 +207,112 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             return block?.Kind switch
             {
                 SingleFileComponentBlockKind.Template => GetTemplateCompletions(linePrefix),
-                SingleFileComponentBlockKind.Script => GetScriptCompletions(linePrefix),
+                SingleFileComponentBlockKind.Script => GetScriptCompletions(linePrefix, document.Syntax),
                 SingleFileComponentBlockKind.Style => ViuCompletionCatalog.StyleProperties,
                 _ => GetRootCompletions(document.Syntax),
             };
+        }
+    }
+
+    public string? ResolveCompletionDocumentation(string documentUri, string completionLabel)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        ArgumentNullException.ThrowIfNull(completionLabel);
+
+        if (completionLabel.Length == 0)
+        {
+            return null;
+        }
+
+        lock (synchronization)
+        {
+            // Resolution needs only the per-document utility context, never the open document:
+            // the label is the complete candidate text, and recomputing against the current
+            // stylesheet context mirrors the hover path exactly, so a stylesheet edit between
+            // completion and resolve can never serve stale documentation.
+            var stylesheetContext = GetUtilityContext(documentUri);
+            var resolution = UtilityRegistry.Resolve(
+                completionLabel,
+                stylesheetContext.Theme,
+                CancellationToken.None);
+            var metadata = resolution.Metadata
+                ?? FindProjectRule(
+                    stylesheetContext.Compile(completionLabel),
+                    completionLabel);
+            return metadata is null ? null : GetUtilityDocumentation(metadata);
+        }
+    }
+
+    public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+
+        lock (synchronization)
+        {
+            if (!documents.TryGet(documentUri, out var document))
+            {
+                return Array.Empty<LanguageDocumentSymbol>();
+            }
+
+            var blocks = CollectBlocks(document.Syntax);
+            var symbols = new List<LanguageDocumentSymbol>(blocks.Count);
+            foreach (var block in blocks)
+            {
+                symbols.Add(CreateBlockSymbol(document.Text, block, document.Syntax));
+            }
+
+            return symbols;
+        }
+    }
+
+    public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+
+        lock (synchronization)
+        {
+            if (!documents.TryGet(documentUri, out var document))
+            {
+                return Array.Empty<LanguageFoldingRange>();
+            }
+
+            var ranges = new List<LanguageFoldingRange>();
+            foreach (var block in CollectBlocks(document.Syntax))
+            {
+                // The fold stops one line short of the block end so the closing delimiter ('}' or
+                // '</template>') stays visible while the block is collapsed.
+                var startLine = ToLanguagePosition(block.Location.Start).Line;
+                var endLine = ToLanguagePosition(block.Location.End).Line - 1;
+                if (endLine > startLine)
+                {
+                    ranges.Add(new LanguageFoldingRange(startLine, endLine));
+                }
+            }
+
+            return ranges;
+        }
+    }
+
+    public IReadOnlyList<LanguageCodeAction> GetCodeActions(
+        string documentUri,
+        LanguageRange range)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+
+        lock (synchronization)
+        {
+            if (!documents.TryGet(documentUri, out var document) ||
+                document.Syntax.Format != LanguageDocumentFormat.Vue)
+            {
+                return Array.Empty<LanguageCodeAction>();
+            }
+
+            // The parse is authoritative: the Vue-compatibility diagnostics are recomputed here
+            // rather than trusting whatever diagnostics the client echoed into the request.
+            var actions = new List<LanguageCodeAction>();
+            AddScriptLanguageCodeAction(document.Text, document.Syntax.Script, range, actions);
+            AddScriptLanguageCodeAction(document.Text, document.Syntax.ScriptSetup, range, actions);
+            return actions;
         }
     }
 
@@ -277,7 +386,9 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             : ViuCompletionCatalog.BlockHeaders;
         foreach (var completion in blockHeaders)
         {
-            if ((completion.Label == "@template" || completion.Label == "template") &&
+            // Both catalogs label the singleton template block "template" ([V01.01.06.10] made the
+            // .viu container a tag, so the legacy "@template" label no longer exists).
+            if (completion.Label == "template" &&
                 syntax.Template is not null)
             {
                 continue;
@@ -306,31 +417,59 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
         LanguageDocumentFormat format)
     {
         var trimmed = linePrefix.TrimStart();
-        if (format == LanguageDocumentFormat.Viu &&
-            trimmed.Contains('{', StringComparison.Ordinal))
+
+        // A completed header is followed by block content, never further options: '>' closes a tag
+        // header, '{' opens an @-block. The '{'-gate applies only to @-headers — a tag header never
+        // carries one — and the '>'-gate only to tag headers.
+        if (trimmed.StartsWith("<", StringComparison.Ordinal))
+        {
+            if (trimmed.Contains('>', StringComparison.Ordinal))
+            {
+                return Array.Empty<LanguageCompletionItem>();
+            }
+        }
+        else if (format == LanguageDocumentFormat.Viu &&
+                 trimmed.Contains('{', StringComparison.Ordinal))
         {
             return Array.Empty<LanguageCompletionItem>();
         }
 
-        if (trimmed.StartsWith(
-                format == LanguageDocumentFormat.Vue ? "<template " : "@template ",
-                StringComparison.Ordinal))
+        if (format == LanguageDocumentFormat.Vue)
+        {
+            if (trimmed.StartsWith("<template ", StringComparison.Ordinal))
+            {
+                return ViuCompletionCatalog.TemplateHeaderOptions;
+            }
+
+            if (trimmed.StartsWith("<script ", StringComparison.Ordinal))
+            {
+                return ViuCompletionCatalog.VueScriptHeaderOptions;
+            }
+
+            if (trimmed.StartsWith("<style ", StringComparison.Ordinal))
+            {
+                return ViuCompletionCatalog.StyleHeaderOptions;
+            }
+
+            return Array.Empty<LanguageCompletionItem>();
+        }
+
+        // Hybrid .viu ([V01.01.06.10]): template/style options are tag attributes, @script keeps the
+        // @-option grammar, and the legacy @template/@style headers keep completing during the
+        // migration window (the option catalogs are valid in both grammars).
+        if (trimmed.StartsWith("<template ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("@template ", StringComparison.Ordinal))
         {
             return ViuCompletionCatalog.TemplateHeaderOptions;
         }
 
-        if (trimmed.StartsWith(
-                format == LanguageDocumentFormat.Vue ? "<script " : "@script ",
-                StringComparison.Ordinal))
+        if (trimmed.StartsWith("@script ", StringComparison.Ordinal))
         {
-            return format == LanguageDocumentFormat.Vue
-                ? ViuCompletionCatalog.VueScriptHeaderOptions
-                : ViuCompletionCatalog.ScriptHeaderOptions;
+            return ViuCompletionCatalog.ScriptHeaderOptions;
         }
 
-        if (trimmed.StartsWith(
-                format == LanguageDocumentFormat.Vue ? "<style " : "@style ",
-                StringComparison.Ordinal))
+        if (trimmed.StartsWith("<style ", StringComparison.Ordinal) ||
+            trimmed.StartsWith("@style ", StringComparison.Ordinal))
         {
             return ViuCompletionCatalog.StyleHeaderOptions;
         }
@@ -522,7 +661,10 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             metadata.CandidateText,
             LanguageCompletionItemKind.Property,
             "Viu utility class",
-            GetUtilityDocumentation(metadata),
+            // Utility documentation is deferred to ResolveCompletionDocumentation: interpolating
+            // and serializing up to 500 CSS bodies per keystroke dominated the completion payload
+            // while the editor renders documentation for one selected item at a time.
+            Documentation: string.Empty,
             metadata.CandidateText,
             IsSnippet: false,
             SortText: $"{metadata.SortOrder:D5}:{metadata.CandidateText}",
@@ -642,7 +784,9 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             ? context
             : UtilityStylesheetLanguageContext.Default;
 
-    private static IReadOnlyList<LanguageCompletionItem> GetScriptCompletions(string linePrefix)
+    private IReadOnlyList<LanguageCompletionItem> GetScriptCompletions(
+        string linePrefix,
+        LanguageDocumentSyntax syntax)
     {
         if (linePrefix.Contains("Context.", StringComparison.Ordinal))
         {
@@ -654,15 +798,26 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             return ViuCompletionCatalog.ReactiveMembers;
         }
 
-        // The Viu scaffold items and the C# keywords are both offered, then filtered by the partially
-        // typed word. Returning the unfiltered scaffold list answered `u` with "mounted callback"
-        // and never with `using`, which reads as the editor ignoring what was typed.
+        // Declared members ([V01.01.12.07.04], #261), the Viu scaffold items, and the C# keywords
+        // are offered together, then filtered by the partially typed word. Returning the unfiltered
+        // scaffold list answered `u` with "mounted callback" and never with `using`, which reads as
+        // the editor ignoring what was typed. Ranking comes from SortText: declared "00:" orders
+        // before scaffold "01"–"07", which orders before keyword "90". Deduplication is first-wins
+        // by label, so an author-declared `Context`/`OnSetup` (already flagged VIU1204 by the
+        // generator) shows the author's real declaration rather than a duplicate pair; keywords
+        // cannot collide because a member identifier spelled as a keyword carries its `@`.
         var word = GetTrailingIdentifier(linePrefix);
         var completions = new List<LanguageCompletionItem>(
             ViuCompletionCatalog.ScriptGeneral.Count +
             ViuCompletionCatalog.ScriptKeywords.Count);
-        completions.AddRange(ViuCompletionCatalog.ScriptGeneral);
-        completions.AddRange(ViuCompletionCatalog.ScriptKeywords);
+        var seenLabels = new HashSet<string>(StringComparer.Ordinal);
+
+        // The union of both script blocks: a .vue file's plain and setup scripts merge into one
+        // generated partial class, so a completion in either block legitimately sees both.
+        AppendDeclaredMembers(syntax.Script, completions, seenLabels);
+        AppendDeclaredMembers(syntax.ScriptSetup, completions, seenLabels);
+        AppendCatalogItems(ViuCompletionCatalog.ScriptGeneral, completions, seenLabels);
+        AppendCatalogItems(ViuCompletionCatalog.ScriptKeywords, completions, seenLabels);
 
         if (word.Length == 0)
         {
@@ -676,6 +831,49 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
                     StringComparison.OrdinalIgnoreCase))
             .ToArray();
         return matches.Length > 0 ? matches : completions;
+    }
+
+    private void AppendDeclaredMembers(
+        SingleFileComponentScriptBlock? script,
+        List<LanguageCompletionItem> completions,
+        HashSet<string> seenLabels)
+    {
+        if (script is null)
+        {
+            return;
+        }
+
+        foreach (var member in scriptDeclarations.Read(script.Content))
+        {
+            if (!seenLabels.Add(member.Name))
+            {
+                continue;
+            }
+
+            completions.Add(new LanguageCompletionItem(
+                member.Name,
+                member.Kind,
+                member.Detail,
+                member.DocumentationSummary ??
+                    $"Declared in this file's @script block as `{member.Detail} {member.Name}`.",
+                member.Name,
+                IsSnippet: false,
+                SortText: "00:" + member.Name));
+        }
+    }
+
+    private static void AppendCatalogItems(
+        IReadOnlyList<LanguageCompletionItem> catalog,
+        List<LanguageCompletionItem> completions,
+        HashSet<string> seenLabels)
+    {
+        foreach (var item in catalog)
+        {
+            if (seenLabels.Add(item.Label))
+            {
+                completions.Add(item);
+            }
+        }
     }
 
     private static string GetTrailingIdentifier(string linePrefix)
@@ -766,24 +964,191 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
         SingleFileComponentScriptBlock? script,
         ICollection<LanguageDiagnostic> diagnostics)
     {
+        var diagnostic = CreateVueScriptLanguageDiagnostic(script);
+        if (diagnostic is not null)
+        {
+            diagnostics.Add(diagnostic);
+        }
+    }
+
+    private static LanguageDiagnostic? CreateVueScriptLanguageDiagnostic(
+        SingleFileComponentScriptBlock? script)
+    {
         if (script is null ||
             string.Equals(script.Lang, "csharp", StringComparison.Ordinal))
         {
-            return;
+            return null;
         }
 
         var languageOption = FindOption(script, "lang");
         var authoredLanguage = script.Lang is null
             ? "an implicit JavaScript language"
             : $"'{script.Lang}'";
-        diagnostics.Add(
-            new LanguageDiagnostic(
-                ToLanguageRange(languageOption?.Location ?? script.Location),
-                LanguageDiagnosticSeverity.Error,
-                "VIU1206",
-                $"The .vue script uses {authoredLanguage}. Viu accepts only an explicit lang=\"csharp\" attribute and never executes JavaScript.",
-                "viu"));
+        return new LanguageDiagnostic(
+            ToLanguageRange(languageOption?.Location ?? script.Location),
+            LanguageDiagnosticSeverity.Error,
+            "VIU1206",
+            $"The .vue script uses {authoredLanguage}. Viu accepts only an explicit lang=\"csharp\" attribute and never executes JavaScript.",
+            "viu");
     }
+
+    private static void AddScriptLanguageCodeAction(
+        string documentText,
+        SingleFileComponentScriptBlock? script,
+        LanguageRange requestRange,
+        ICollection<LanguageCodeAction> actions)
+    {
+        var diagnostic = CreateVueScriptLanguageDiagnostic(script);
+        if (diagnostic is null ||
+            !RangesIntersect(diagnostic.Range, requestRange))
+        {
+            return;
+        }
+
+        LanguageTextEdit edit;
+        var languageOption = FindOption(script!, "lang");
+        if (languageOption is not null)
+        {
+            edit = new LanguageTextEdit(
+                ToLanguageRange(languageOption.Location),
+                "lang=\"csharp\"");
+        }
+        else
+        {
+            // Absent lang: insert before the header's '>'. Parser recovery can leave a malformed
+            // header whose content does not start right after '>', in which case no edit is safe.
+            var insertOffset = script!.ContentLocation.Start.Offset - 1;
+            if (insertOffset < 0 ||
+                insertOffset >= documentText.Length ||
+                documentText[insertOffset] != '>')
+            {
+                return;
+            }
+
+            var insertPosition = TextCoordinateConverter.GetPosition(documentText, insertOffset);
+            edit = new LanguageTextEdit(
+                new LanguageRange(insertPosition, insertPosition),
+                " lang=\"csharp\"");
+        }
+
+        actions.Add(
+            new LanguageCodeAction(
+                "Use lang=\"csharp\"",
+                "quickfix",
+                [diagnostic],
+                [edit],
+                IsPreferred: true));
+    }
+
+    private static IReadOnlyList<SingleFileComponentBlock> CollectBlocks(
+        LanguageDocumentSyntax syntax)
+    {
+        var blocks = new List<SingleFileComponentBlock>();
+        if (syntax.Template is not null)
+        {
+            blocks.Add(syntax.Template);
+        }
+
+        if (syntax.Script is not null)
+        {
+            blocks.Add(syntax.Script);
+        }
+
+        if (syntax.ScriptSetup is not null)
+        {
+            blocks.Add(syntax.ScriptSetup);
+        }
+
+        foreach (var style in syntax.Styles)
+        {
+            blocks.Add(style);
+        }
+
+        foreach (var customBlock in syntax.CustomBlocks)
+        {
+            blocks.Add(customBlock);
+        }
+
+        blocks.Sort(
+            (left, right) =>
+                left.Location.Start.Offset.CompareTo(right.Location.Start.Offset));
+        return blocks;
+    }
+
+    private static LanguageDocumentSymbol CreateBlockSymbol(
+        string documentText,
+        SingleFileComponentBlock block,
+        LanguageDocumentSyntax syntax)
+    {
+        // The hybrid container ([V01.01.06.10]) mixes tag blocks and @-blocks in one document, so
+        // the authored container decides the symbol name: the block starts at '<' for a tag and at
+        // '@' for an @-block.
+        var startOffset = block.Location.Start.Offset;
+        var isTagContainer =
+            startOffset < documentText.Length &&
+            documentText[startOffset] == '<';
+        var isSetupScript = ReferenceEquals(block, syntax.ScriptSetup);
+        var name = isTagContainer
+            ? isSetupScript ? $"<{block.Name} setup>" : $"<{block.Name}>"
+            : $"@{block.Name}";
+
+        var start = ToLanguagePosition(block.Location.Start);
+        // The selection is the header name token: '@name' for an @-block, 'name' after '<' for a
+        // tag. The Language Server Protocol requires the selection to sit inside the full range.
+        var selectionStart = isTagContainer
+            ? start with { Character = start.Character + 1 }
+            : start;
+        var selectionLength = isTagContainer
+            ? block.Name.Length
+            : block.Name.Length + 1;
+        var selectionRange = new LanguageRange(
+            selectionStart,
+            selectionStart with { Character = selectionStart.Character + selectionLength });
+
+        return new LanguageDocumentSymbol(
+            name,
+            CreateBlockDetail(block, includeSetupOption: !isSetupScript),
+            block.Kind == SingleFileComponentBlockKind.Script
+                ? LanguageSymbolKind.Class
+                : LanguageSymbolKind.Module,
+            ToLanguageRange(block.Location),
+            selectionRange,
+            Array.Empty<LanguageDocumentSymbol>());
+    }
+
+    private static string? CreateBlockDetail(
+        SingleFileComponentBlock block,
+        bool includeSetupOption)
+    {
+        var parts = new List<string>(block.Options.Count);
+        foreach (var option in block.Options)
+        {
+            // A setup script folds the 'setup' flag into the symbol name; repeating it in the
+            // detail would read as a duplicate option.
+            if (!includeSetupOption &&
+                option.Value is null &&
+                string.Equals(option.Name, "setup", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            parts.Add(
+                option.Value is null
+                    ? option.Name
+                    : $"{option.Name}=\"{option.Value}\"");
+        }
+
+        return parts.Count == 0 ? null : string.Join(' ', parts);
+    }
+
+    private static bool RangesIntersect(LanguageRange left, LanguageRange right)
+        => ComparePositions(left.Start, right.End) <= 0 &&
+           ComparePositions(right.Start, left.End) <= 0;
+
+    private static int ComparePositions(LanguagePosition left, LanguagePosition right)
+        => left.Line != right.Line
+            ? left.Line.CompareTo(right.Line)
+            : left.Character.CompareTo(right.Character);
 
     private static SingleFileComponentBlockOption? FindOption(
         SingleFileComponentBlock block,

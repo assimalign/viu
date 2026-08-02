@@ -21,7 +21,7 @@ public class UtilityCompletionScaleTests
     public void GetCompletions_UnfilteredClassAttribute_IsBoundedByTheCompletionLimit()
     {
         const string templateLine = "    <div class=\"\"></div>";
-        var source = $"@template {{\n{templateLine}\n}}\n";
+        var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf("\"\"", StringComparison.Ordinal) + 1;
         var service = ViuLanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
@@ -39,7 +39,7 @@ public class UtilityCompletionScaleTests
     public void GetCompletions_ProjectTheme_ReusesTheExpandedCatalogAcrossRequests()
     {
         const string templateLine = "    <div class=\"gap-\"></div>";
-        var source = $"@template {{\n{templateLine}\n}}\n";
+        var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
         var position = new LanguagePosition(1, caret);
         var service = ViuLanguageServices.Create();
@@ -75,7 +75,7 @@ public class UtilityCompletionScaleTests
     public void GetCompletions_DocumentUriCasingDiffersFromOpen_StillResolvesTheOpenDocument()
     {
         const string templateLine = "    <div class=\"gap-\"></div>";
-        var source = $"@template {{\n{templateLine}\n}}\n";
+        var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
         var service = ViuLanguageServices.Create();
         service.OpenDocument("file:///c:/workspace/Card.viu", source, 1);

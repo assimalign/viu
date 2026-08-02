@@ -68,7 +68,7 @@ public class TemplateExpressionContextTests
     public void GetHover_BoundClassExpression_ReturnsNull()
     {
         const string templateLine = "    <div :class=\"ShellClass\"></div>";
-        var source = $"@template {{\n{templateLine}\n}}\n";
+        var source = $"<template>\n{templateLine}\n</template>\n";
         var service = ViuLanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
@@ -83,7 +83,7 @@ public class TemplateExpressionContextTests
         string templateLine,
         string typedPrefix)
     {
-        var source = $"@template {{\n{templateLine}\n}}\n";
+        var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf(typedPrefix, StringComparison.Ordinal) + typedPrefix.Length;
         caret.ShouldBeGreaterThan(typedPrefix.Length - 1, "the probe text must occur in the line");
 
