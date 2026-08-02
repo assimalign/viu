@@ -102,12 +102,14 @@
     The stamp is touched after a successful publish, and _ViuInvalidateLanguageServerPublishStamp
     deletes it whenever a payload is actually absent.
   -->
+  <!-- No BuildingProject guard: that property only becomes 'true' inside the Build target chain, so
+       guarding on it silently skipped the direct `-t:ViuPublishLanguageServer` invocation Build.ps1
+       uses. The DesignTimeBuild guard alone keeps design-time evaluation out. -->
   <Target Name="ViuPublishLanguageServer"
           DependsOnTargets="_ViuInvalidateLanguageServerPublishStamp;_ViuCollectLanguageServerPublishInputs"
           Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'
                      and '$(ViuSkipLanguageServerPublish)' != 'true'
-                     and '$(DesignTimeBuild)' != 'true'
-                     and '$(BuildingProject)' != 'false'"
+                     and '$(DesignTimeBuild)' != 'true'"
           Inputs="@(_ViuLanguageServerPublishInput)"
           Outputs="$(ViuLanguageServerPublishStampFile)">
 
@@ -135,10 +137,15 @@
     the Link metadata, which must yield LanguageServer\<runtime identifier> to match the paths in
     language-server.json.
   -->
+  <!-- No Exists() condition here: a false target condition also skips DependsOnTargets, so gating on
+       the directory prevented the publish from ever running on a clean tree - the exact failure this
+       file exists to prevent. After the publish dependency runs the directory exists; if the escape
+       hatch suppressed the publish and nothing is on disk, the glob expands empty and the validation
+       backstops report the real problem. -->
   <Target Name="ViuIncludeLanguageServerPayload"
           DependsOnTargets="ViuPublishLanguageServer"
           BeforeTargets="AssignTargetPaths;GetVsixSourceItems"
-          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true' and Exists('$(ViuLanguageServerPublishPath)')">
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
     <ItemGroup>
       <Content Include="$(ViuLanguageServerPublishPath)\**\*"
                Link="LanguageServer\%(RecursiveDir)%(Filename)%(Extension)"
