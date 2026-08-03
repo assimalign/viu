@@ -86,7 +86,9 @@ public class LanguageServerDocumentSymbolTests
         output.Position = 0;
         var messages = await ReadAllMessagesAsync(output);
         var symbols = messages[1].RootElement.GetProperty("result");
-        symbols.GetArrayLength().ShouldBe(2);
+        // Flattening recurses: the two block containers plus the script's declared member
+        // ([V01.01.06.11] symbol children) each become one SymbolInformation entry.
+        symbols.GetArrayLength().ShouldBe(3);
 
         var template = symbols[0];
         template.GetProperty("name").GetString().ShouldBe("<template>");

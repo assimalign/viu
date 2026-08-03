@@ -5,6 +5,7 @@ using System.Threading;
 
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
+using Assimalign.Viu.Tooling.SingleFileComponent;
 using Assimalign.Viu.Tooling.UtilityCss;
 
 namespace Assimalign.Viu.LanguageService;
@@ -258,7 +259,12 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             var symbols = new List<LanguageDocumentSymbol>(blocks.Count);
             foreach (var block in blocks)
             {
-                symbols.Add(CreateBlockSymbol(document.Text, block, document.Syntax));
+                symbols.Add(
+                    CreateBlockSymbol(
+                        document.Text,
+                        block,
+                        document.Syntax,
+                        CreateScriptMemberSymbols(block)));
             }
 
             return symbols;
@@ -852,7 +858,7 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
 
             completions.Add(new LanguageCompletionItem(
                 member.Name,
-                member.Kind,
+                ToCompletionKind(member.Kind),
                 member.Detail,
                 member.DocumentationSummary ??
                     $"Declared in this file's @script block as `{member.Detail} {member.Name}`.",
@@ -861,6 +867,17 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
                 SortText: "00:" + member.Name));
         }
     }
+
+    // The service-edge materialization of the shared projection's host-neutral member kind
+    // ([V01.01.06.11], #258): the library deliberately names no editor enum, so each host maps at
+    // its own boundary — the completion analogue of the generator's diagnostic adapter.
+    private static LanguageCompletionItemKind ToCompletionKind(ScriptDeclaredMemberKind kind)
+        => kind switch
+        {
+            ScriptDeclaredMemberKind.Property => LanguageCompletionItemKind.Property,
+            ScriptDeclaredMemberKind.Method => LanguageCompletionItemKind.Method,
+            _ => LanguageCompletionItemKind.Field,
+        };
 
     private static void AppendCatalogItems(
         IReadOnlyList<LanguageCompletionItem> catalog,
@@ -1078,7 +1095,8 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
     private static LanguageDocumentSymbol CreateBlockSymbol(
         string documentText,
         SingleFileComponentBlock block,
-        LanguageDocumentSyntax syntax)
+        LanguageDocumentSyntax syntax,
+        IReadOnlyList<LanguageDocumentSymbol> children)
     {
         // The hybrid container ([V01.01.06.10]) mixes tag blocks and @-blocks in one document, so
         // the authored container decides the symbol name: the block starts at '<' for a tag and at
@@ -1113,8 +1131,72 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
                 : LanguageSymbolKind.Module,
             ToLanguageRange(block.Location),
             selectionRange,
-            Array.Empty<LanguageDocumentSymbol>());
+            children);
     }
+
+    private IReadOnlyList<LanguageDocumentSymbol> CreateScriptMemberSymbols(
+        SingleFileComponentBlock block)
+    {
+        // Only a C# script block contributes member children: .viu @script is implicitly C#, and a
+        // .vue script participates only with an explicit lang="csharp" (anything else already carries
+        // the VIU1206 diagnostic and is never parsed as C#).
+        if (block is not SingleFileComponentScriptBlock script ||
+            (script.Lang is not null &&
+             !string.Equals(script.Lang, "csharp", StringComparison.Ordinal)))
+        {
+            return Array.Empty<LanguageDocumentSymbol>();
+        }
+
+        var members = scriptDeclarations.Read(script.Content);
+        if (members.Count == 0)
+        {
+            return Array.Empty<LanguageDocumentSymbol>();
+        }
+
+        var contentStart = script.ContentLocation.Start;
+        var symbols = new List<LanguageDocumentSymbol>(members.Count);
+        foreach (var member in members)
+        {
+            symbols.Add(
+                new LanguageDocumentSymbol(
+                    member.Name,
+                    member.Detail,
+                    ToSymbolKind(member.Kind),
+                    ComposeScriptRange(contentStart, member.MemberLocation),
+                    ComposeScriptRange(contentStart, member.IdentifierLocation),
+                    Array.Empty<LanguageDocumentSymbol>()));
+        }
+
+        return symbols;
+    }
+
+    private static LanguageRange ComposeScriptRange(
+        Position blockContentStart,
+        SourceLocation relative)
+        => new(
+            ComposeScriptPosition(blockContentStart, relative.Start),
+            ComposeScriptPosition(blockContentStart, relative.End));
+
+    private static LanguagePosition ComposeScriptPosition(
+        Position blockContentStart,
+        Position relative)
+    {
+        // The same block-to-file arithmetic the emitted #line map uses
+        // (SingleFileComponentDiagnostics.ComposeToFilePosition), so outline positions and build
+        // positions cannot disagree ([V01.01.06.11]).
+        var (line, column) = SingleFileComponentDiagnostics.ComposeToFilePosition(
+            blockContentStart,
+            relative);
+        return new LanguagePosition(line - 1, column - 1);
+    }
+
+    private static LanguageSymbolKind ToSymbolKind(ScriptDeclaredMemberKind kind)
+        => kind switch
+        {
+            ScriptDeclaredMemberKind.Field => LanguageSymbolKind.Field,
+            ScriptDeclaredMemberKind.Property => LanguageSymbolKind.Property,
+            _ => LanguageSymbolKind.Method,
+        };
 
     private static string? CreateBlockDetail(
         SingleFileComponentBlock block,

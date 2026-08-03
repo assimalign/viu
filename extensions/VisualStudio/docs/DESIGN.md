@@ -28,6 +28,7 @@ Visual Studio
             -> Assimalign.Viu.LanguageServer
                  -> Assimalign.Viu.LanguageService
                       -> Assimalign.Viu.Syntax.SingleFileComponent
+                      -> Assimalign.Viu.Tooling.SingleFileComponent (the shared build/editor projection, [V01.01.06.11])
                       -> Assimalign.Viu.Tooling.UtilityCss
 ```
 
@@ -171,10 +172,19 @@ affected component on .NET 10 browser WebAssembly.
 
 Project-aware IntelliSense requires one authoritative `.viu`/`.vue` to C# projection and source map:
 
-1. Extract the generator's component-name, script-region, generated-context, and source-mapping logic
-   into a shared `Assimalign.Viu.Tooling.SingleFileComponent` library.
+1. **Delivered ([V01.01.06.11], #258).** The generator's component-name, script-region,
+   generated-context, and source-mapping logic is extracted into the shared
+   `Assimalign.Viu.Tooling.SingleFileComponent` library
+   (`libraries/Assimalign.Viu.Tooling.SingleFileComponent`, see its `docs/DESIGN.md`); the source
+   generator and this language service both consume it, and the two-host conformance test
+   (`analyzers/Assimalign.Viu.Generators.Syntax/test/SingleFileComponentProjectionConformanceTests.cs`)
+   pins ordinal-identical generated source, hint names, and diagnostics.
 2. Have both the source generator and language service consume that projection builder so editor and
-   compiler behavior cannot drift.
+   compiler behavior cannot drift. (The extraction landed this for today's surfaces — the shared
+   `ScriptBlockAnalyzer` member description and the block-to-file position composition that places
+   outline symbol children (`SingleFileComponentDiagnostics.ComposeToFilePosition`, the same
+   arithmetic as the emitted `#line` map); the full projected-document
+   consumption arrives with steps 3–5.)
 3. Load the containing project through `MSBuildWorkspace` in the language-server process.
 4. Add the projected partial component as a synthetic Roslyn document.
 5. Map Roslyn completion, hover, signature help, definitions, references, and diagnostics back to the

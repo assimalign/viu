@@ -5,13 +5,18 @@
   </PropertyGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+    <!-- The shared .viu -> C# projection library ([V01.01.06.11], #258): declared @script member
+         description (ScriptBlockAnalyzer.DescribeMembers) and the block-to-file position composition
+         (SingleFileComponentDiagnostics.ComposeToFilePosition) are the same code the build's source
+         generator runs, so editor results and build results agree by construction. -->
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.SingleFileComponent" />
     <!-- Viu Utilities IntelliSense ([V01.01.12.07.01], #247) consumes the same candidate grammar,
          variant registry, and eventual design-system catalog as build-time CSS generation. Keeping the
          engine out of this project would force an editor-only catalog that can drift from emitted CSS. -->
     <ViuProjectReference Include="Assimalign.Viu.Tooling.UtilityCss" />
-    <!-- Declared @script member completion ([V01.01.12.07.04], #261) parses the script block with a
-         syntax-only Roslyn parse (no compilation, no workspace, no MSBuild). Runtime assets must flow
-         to the Assimalign.Viu.LanguageServer publish, so no PrivateAssets here. -->
+    <!-- The shared projection library runs a syntax-only Roslyn parse (no compilation, no workspace,
+         no MSBuild) at service runtime ([V01.01.12.07.04], #261). Runtime assets must flow to the
+         Assimalign.Viu.LanguageServer publish, so no PrivateAssets here. -->
     <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 </Project>
