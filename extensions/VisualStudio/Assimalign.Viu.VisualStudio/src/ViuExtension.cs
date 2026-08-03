@@ -11,8 +11,13 @@ internal sealed class ViuExtension : Extension
     /// <inheritdoc />
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
+        // Opening either container document type loads the extension, as does any solution that
+        // opts in through the SDK build property. "viu-vue" is listed because the `.vue` container
+        // is a declared compatibility target ([V01.01.06.09]) and a solution holding only `.vue`
+        // components would otherwise never activate the language service.
         LoadedWhen = ActivationConstraint.Or(
             ActivationConstraint.EditorContentType("viu"),
+            ActivationConstraint.EditorContentType("viu-vue"),
             ActivationConstraint.SolutionHasProjectBuildProperty(
                 "ViuVisualStudioLanguageServiceEnabled",
                 "^[Tt]rue$")),

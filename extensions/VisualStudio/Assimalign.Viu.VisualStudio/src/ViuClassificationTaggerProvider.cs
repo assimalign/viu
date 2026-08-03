@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,11 +22,35 @@ internal sealed class ViuClassificationTaggerProvider :
 {
     private readonly object synchronizationLock = new();
     private readonly Dictionary<Uri, List<ViuClassificationTagger>> taggers = [];
+    private readonly TraceSource traceSource;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ViuClassificationTaggerProvider"/> class.
+    /// </summary>
+    /// <param name="traceSource">
+    /// Trace sink supplied by the extension host. Classification runs entirely out of process, so
+    /// the trace log is the only channel that can show which spans a document actually received.
+    /// </param>
+    public ViuClassificationTaggerProvider(TraceSource traceSource)
+    {
+        this.traceSource = traceSource;
+    }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Both container document types are classified. The <c>.vue</c> container is a declared
+    /// compatibility target ([V01.01.06.09]) whose documents are served by the same language server,
+    /// so omitting it here left <c>.vue</c> single-file components with no colorization at all. The
+    /// generator evaluates this property at compile time, so the filters must be written inline —
+    /// the shipped contract is pinned against the generated manifest instead.
+    /// </remarks>
     public TextViewExtensionConfiguration TextViewExtensionConfiguration => new()
     {
-        AppliesTo = [DocumentFilter.FromDocumentType(ViuLanguageServerProvider.ViuDocumentType)],
+        AppliesTo =
+        [
+            DocumentFilter.FromDocumentType(ViuLanguageServerProvider.ViuDocumentType),
+            DocumentFilter.FromDocumentType(ViuLanguageServerProvider.VueCompatibilityDocumentType),
+        ],
     };
 
     /// <inheritdoc />
@@ -53,7 +78,7 @@ internal sealed class ViuClassificationTaggerProvider :
         ITextViewSnapshot textView,
         CancellationToken cancellationToken)
     {
-        ViuClassificationTagger tagger = new(this, textView.Document.Uri);
+        ViuClassificationTagger tagger = new(this, textView.Document.Uri, this.traceSource);
 
         lock (this.synchronizationLock)
         {
