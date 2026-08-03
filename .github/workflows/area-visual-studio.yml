@@ -15,6 +15,12 @@ on:
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
+      # The packed-consumer round trip consumes the Install-Local feed (SDK + framework packs), so
+      # its lane inputs re-verify this workflow ([V01.01.12.23]).
+      - 'scripts/Install-Local.ps1'
+      - 'scripts/Test-LanguageServerSemanticRoundTrip.ps1'
+      - 'sdks/**'
+      - 'frameworks/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'global.json'
@@ -34,6 +40,12 @@ on:
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
+      # The packed-consumer round trip consumes the Install-Local feed (SDK + framework packs), so
+      # its lane inputs re-verify this workflow ([V01.01.12.23]).
+      - 'scripts/Install-Local.ps1'
+      - 'scripts/Test-LanguageServerSemanticRoundTrip.ps1'
+      - 'sdks/**'
+      - 'frameworks/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'global.json'
@@ -62,6 +74,18 @@ jobs:
       - name: Build extension
         shell: pwsh
         run: ./extensions/VisualStudio/Build.ps1 -Configuration Release
+
+      # The packed-consumer semantic round trip ([V01.01.12.23], #259, acceptance criterion 5):
+      # pack the SDK + framework feed, then drive the published single-file server over stdio
+      # against a restored consumer scaffold. Runs here because this is the only lane that builds
+      # the server payload; area-packaging never does. Cost: roughly six to eight minutes.
+      - name: Install local Viu packages
+        shell: pwsh
+        run: ./scripts/Install-Local.ps1
+
+      - name: Verify packed-consumer semantic round trip
+        shell: pwsh
+        run: ./scripts/Test-LanguageServerSemanticRoundTrip.ps1 -Configuration Release
 
       - name: Test language tooling
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx --configuration Release

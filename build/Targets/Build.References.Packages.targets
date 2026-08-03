@@ -7,12 +7,18 @@
              ([V01.01.12.07.04], #261): its assets must stay unrestricted so they flow into the
              self-contained Assimalign.Viu.LanguageServer publish. Do not add PrivateAssets here. -->
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
-        <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0">
-            <PrivateAssets>all</PrivateAssets>
-        </_ViuPackage>
-        <_ViuPackage Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0">
-            <PrivateAssets>all</PrivateAssets>
-        </_ViuPackage>
+        <!-- Removed ([V01.01.12.23], #259): Microsoft.CodeAnalysis.CSharp.Workspaces 5.0.0 and
+             Microsoft.CodeAnalysis.Workspaces.MSBuild 5.0.0 had zero consumers, and the semantic
+             IntelliSense increment deliberately ships without a workspace (SemanticModel over an
+             artifact-fed CSharpCompilation — no MSBuildWorkspace, no MEF host). If a future
+             increment adopts CompletionService, the Workspaces/Features packages must re-enter at
+             the single Microsoft.CodeAnalysis 5.3.x line above (5.3.0 exists on nuget.org) WITHOUT
+             PrivateAssets=all, mirroring the CSharp precedent, so their runtime assets flow into
+             the self-contained language-server publish. -->
+        <!-- Flagged for a separate cleanup item ([V01.01.12.23], #259): Microsoft.Build (unlike
+             Microsoft.Build.Framework/Utilities.Core below) and Microsoft.Build.Locator also have
+             zero consumers today. They are retained pending that item — do not fold their removal
+             into unrelated changes. -->
         <_ViuPackage Include="Microsoft.Build" Version="18.7.1">
             <PrivateAssets>all</PrivateAssets>
             <!-- MSBuild supplies the task-host runtime; retain only compile assets. -->

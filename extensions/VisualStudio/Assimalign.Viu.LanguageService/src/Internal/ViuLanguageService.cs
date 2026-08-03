@@ -10,7 +10,10 @@ using Assimalign.Viu.Tooling.UtilityCss;
 
 namespace Assimalign.Viu.LanguageService;
 
-internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLanguageService
+internal sealed class ViuLanguageService :
+    IViuLanguageService,
+    IUtilityCssLanguageService,
+    IScriptSemanticLanguageService
 {
     private static readonly UtilityCssRegistry UtilityRegistry = UtilityCssRegistry.BuiltIn;
 
@@ -47,13 +50,40 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
 
     private readonly object synchronization = new();
     private readonly LanguageDocumentStore documents = new();
-    // Called only inside the synchronization lock; the reader is deliberately not thread-safe.
+    // Reads compute outside the synchronization lock, so the reader carries its own gate.
     private readonly ScriptDeclarationReader scriptDeclarations = new();
+    // The artifact-fed semantic engine ([V01.01.12.23], #259) likewise computes outside the
+    // service lock under its own gate; the service only snapshots the per-document context here.
+    private readonly ScriptSemanticEngine scriptSemantics = new();
     // Document URIs must compare exactly as they do in the server host's open-document set, or a
     // client that varies casing (a Windows drive letter, most commonly) reports a document as open
     // while the workspace fails to find it and every language feature silently returns nothing.
     private readonly Dictionary<string, UtilityStylesheetLanguageContext> utilityContexts =
         new(StringComparer.OrdinalIgnoreCase);
+    // The host-fed project context per document ([V01.01.12.23], #259), snapshotted by script
+    // completion and fed to the semantic engine; a document without one keeps the syntax-only
+    // answers unchanged.
+    private readonly Dictionary<string, LanguageProjectContext> projectContexts =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public void ConfigureProjectContext(
+        string documentUri,
+        LanguageProjectContext? context)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+
+        lock (synchronization)
+        {
+            if (context is null)
+            {
+                projectContexts.Remove(documentUri);
+            }
+            else
+            {
+                projectContexts[documentUri] = context;
+            }
+        }
+    }
 
     public void ConfigureUtilityStylesheet(
         string documentUri,
@@ -86,12 +116,21 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             {
                 return;
             }
+        }
 
-            utilityContexts[documentUri] =
-                UtilityStylesheetLanguageContext.Create(
-                    stylesheetText,
-                    stylesheetIdentity,
-                    referenceGraph);
+        // The context build (theme parse + project stylesheet compile) runs outside the lock so a
+        // reconfigure cannot stall document synchronization or concurrent reads. Two requests
+        // configuring the same document concurrently may build identical contexts; the store below
+        // is last-wins, and identical inputs produce identical contexts, so the duplicate compute
+        // is wasted CPU rather than incorrectness.
+        var context = UtilityStylesheetLanguageContext.Create(
+            stylesheetText,
+            stylesheetIdentity,
+            referenceGraph);
+
+        lock (synchronization)
+        {
+            utilityContexts[documentUri] = context;
         }
     }
 
@@ -124,98 +163,113 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
 
+        // The engine's per-document state is lock-free, so clearing it outside the service lock
+        // can never stall document synchronization behind a long semantic computation.
+        scriptSemantics.CloseDocument(documentUri);
         lock (synchronization)
         {
             utilityContexts.Remove(documentUri);
+            projectContexts.Remove(documentUri);
             return documents.Close(documentUri);
         }
     }
 
-    public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(string documentUri)
+    public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
+        string documentUri,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        lock (synchronization)
+        var (document, _) = CaptureSnapshot(documentUri);
+        if (document is null)
         {
-            if (!documents.TryGet(documentUri, out var document))
-            {
-                return Array.Empty<LanguageDiagnostic>();
-            }
-
-            var diagnostics = document.Syntax.Errors
-                .Select(ToLanguageDiagnostic)
-                .ToList();
-            AddVueCompatibilityDiagnostics(document.Syntax, diagnostics);
-            return diagnostics;
+            return Array.Empty<LanguageDiagnostic>();
         }
+
+        var diagnostics = document.Syntax.Errors
+            .Select(ToLanguageDiagnostic)
+            .ToList();
+        AddVueCompatibilityDiagnostics(document.Syntax, diagnostics);
+        return diagnostics;
     }
 
     public IReadOnlyList<LanguageCompletionItem> GetCompletions(
         string documentUri,
-        LanguagePosition position)
+        LanguagePosition position,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        lock (synchronization)
+        var (document, stylesheetContext) = CaptureSnapshot(documentUri);
+        if (document is null ||
+            !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
         {
-            if (!documents.TryGet(documentUri, out var document) ||
-                !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
-            {
-                return Array.Empty<LanguageCompletionItem>();
-            }
-
-            var block = FindBlock(document.Syntax, offset);
-            var template = block as SingleFileComponentTemplateBlock;
-            if (template is not null &&
-                UtilityClassCompletionContext.TryCreate(
-                    template.Content,
-                    template.ContentLocation.Start.Offset,
-                    offset,
-                    out var utilityContext))
-            {
-                return GetUtilityClassCompletions(
-                    document.Text,
-                    utilityContext,
-                    GetUtilityContext(documentUri));
-            }
-
-            // docs/UTILITY-CSS-DESIGN.md section 10: completion activates only in supported static
-            // class attributes and literal class-binding strings. Every other attribute value and
-            // every interpolation is a C# expression this service cannot complete, and the line-prefix
-            // heuristics below cannot see the quote: `:class="Shell"` reads as the single token
-            // `:class="Shell` and answers with attribute names while the cursor is inside the value.
-            if (template is not null &&
-                IsExpressionContext(document.Text, template, offset))
-            {
-                return Array.Empty<LanguageCompletionItem>();
-            }
-
-            var linePrefix = TextCoordinateConverter.GetLinePrefix(document.Text, offset);
-            if (template is null)
-            {
-                // Block header options describe a block header, never markup inside a template block.
-                // Gating on the template block keeps the recovered `@style ` header working, whose
-                // block does contain the cursor.
-                var headerCompletions = GetHeaderOptionCompletions(
-                    linePrefix,
-                    document.Syntax.Format);
-                if (headerCompletions.Count > 0)
-                {
-                    return headerCompletions;
-                }
-            }
-
-            return block?.Kind switch
-            {
-                SingleFileComponentBlockKind.Template => GetTemplateCompletions(linePrefix),
-                SingleFileComponentBlockKind.Script => GetScriptCompletions(linePrefix, document.Syntax),
-                SingleFileComponentBlockKind.Style => ViuCompletionCatalog.StyleProperties,
-                _ => GetRootCompletions(document.Syntax),
-            };
+            return Array.Empty<LanguageCompletionItem>();
         }
+
+        var block = FindBlock(document.Syntax, offset);
+        var template = block as SingleFileComponentTemplateBlock;
+        if (template is not null &&
+            UtilityClassCompletionContext.TryCreate(
+                template.Content,
+                template.ContentLocation.Start.Offset,
+                offset,
+                out var utilityContext))
+        {
+            return GetUtilityClassCompletions(
+                document.Text,
+                utilityContext,
+                stylesheetContext,
+                cancellationToken);
+        }
+
+        // docs/UTILITY-CSS-DESIGN.md section 10: completion activates only in supported static
+        // class attributes and literal class-binding strings. Every other attribute value and
+        // every interpolation is a C# expression this service cannot complete, and the line-prefix
+        // heuristics below cannot see the quote: `:class="Shell"` reads as the single token
+        // `:class="Shell` and answers with attribute names while the cursor is inside the value.
+        if (template is not null &&
+            IsExpressionContext(document.Text, template, offset))
+        {
+            return Array.Empty<LanguageCompletionItem>();
+        }
+
+        var linePrefix = TextCoordinateConverter.GetLinePrefix(document.Text, offset);
+        if (template is null)
+        {
+            // Block header options describe a block header, never markup inside a template block.
+            // Gating on the template block keeps the recovered `@style ` header working, whose
+            // block does contain the cursor.
+            var headerCompletions = GetHeaderOptionCompletions(
+                linePrefix,
+                document.Syntax.Format);
+            if (headerCompletions.Count > 0)
+            {
+                return headerCompletions;
+            }
+        }
+
+        return block switch
+        {
+            SingleFileComponentTemplateBlock => GetTemplateCompletions(linePrefix),
+            SingleFileComponentScriptBlock scriptBlock => GetScriptCompletions(
+                documentUri,
+                document,
+                scriptBlock,
+                offset,
+                linePrefix,
+                cancellationToken),
+            SingleFileComponentStyleBlock => ViuCompletionCatalog.StyleProperties,
+            _ => GetRootCompletions(document.Syntax),
+        };
     }
 
-    public string? ResolveCompletionDocumentation(string documentUri, string completionLabel)
+    public string? ResolveCompletionDocumentation(
+        string documentUri,
+        string completionLabel,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         ArgumentNullException.ThrowIfNull(completionLabel);
@@ -225,161 +279,198 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             return null;
         }
 
-        lock (synchronization)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Semantic script labels resolve first, from the engine's cached symbols for this
+        // document's most recent semantic completion ([V01.01.12.23], #259) — the same deferred-
+        // documentation contract the utility path below uses. C# identifiers and dash-separated
+        // utility candidates do not overlap in practice, and an unknown or stale label simply
+        // falls through to the utility resolution.
+        var semanticDocumentation = scriptSemantics.ResolveDocumentation(
+            documentUri,
+            completionLabel,
+            cancellationToken);
+        if (semanticDocumentation is not null)
         {
-            // Resolution needs only the per-document utility context, never the open document:
-            // the label is the complete candidate text, and recomputing against the current
-            // stylesheet context mirrors the hover path exactly, so a stylesheet edit between
-            // completion and resolve can never serve stale documentation.
-            var stylesheetContext = GetUtilityContext(documentUri);
-            var resolution = UtilityRegistry.Resolve(
-                completionLabel,
-                stylesheetContext.Theme,
-                CancellationToken.None);
-            var metadata = resolution.Metadata
-                ?? FindProjectRule(
-                    stylesheetContext.Compile(completionLabel),
-                    completionLabel);
-            return metadata is null ? null : GetUtilityDocumentation(metadata);
+            return semanticDocumentation;
         }
+
+        // Resolution needs only the per-document utility context, never the open document:
+        // the label is the complete candidate text, and recomputing against the current
+        // stylesheet context mirrors the hover path exactly, so a stylesheet edit between
+        // completion and resolve can never serve stale documentation.
+        var (_, stylesheetContext) = CaptureSnapshot(documentUri);
+        var resolution = UtilityRegistry.Resolve(
+            completionLabel,
+            stylesheetContext.Theme,
+            cancellationToken);
+        var metadata = resolution.Metadata
+            ?? FindProjectRule(
+                stylesheetContext.Compile(completionLabel),
+                completionLabel);
+        return metadata is null ? null : GetUtilityDocumentation(metadata);
     }
 
-    public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+    public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
+        string documentUri,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        lock (synchronization)
+        var (document, _) = CaptureSnapshot(documentUri);
+        if (document is null)
         {
-            if (!documents.TryGet(documentUri, out var document))
-            {
-                return Array.Empty<LanguageDocumentSymbol>();
-            }
-
-            var blocks = CollectBlocks(document.Syntax);
-            var symbols = new List<LanguageDocumentSymbol>(blocks.Count);
-            foreach (var block in blocks)
-            {
-                symbols.Add(
-                    CreateBlockSymbol(
-                        document.Text,
-                        block,
-                        document.Syntax,
-                        CreateScriptMemberSymbols(block)));
-            }
-
-            return symbols;
+            return Array.Empty<LanguageDocumentSymbol>();
         }
+
+        var blocks = CollectBlocks(document.Syntax);
+        var symbols = new List<LanguageDocumentSymbol>(blocks.Count);
+        foreach (var block in blocks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            symbols.Add(
+                CreateBlockSymbol(
+                    document.Text,
+                    block,
+                    document.Syntax,
+                    CreateScriptMemberSymbols(block)));
+        }
+
+        return symbols;
     }
 
-    public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+    public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
+        string documentUri,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        lock (synchronization)
+        var (document, _) = CaptureSnapshot(documentUri);
+        if (document is null)
         {
-            if (!documents.TryGet(documentUri, out var document))
-            {
-                return Array.Empty<LanguageFoldingRange>();
-            }
-
-            var ranges = new List<LanguageFoldingRange>();
-            foreach (var block in CollectBlocks(document.Syntax))
-            {
-                // The fold stops one line short of the block end so the closing delimiter ('}' or
-                // '</template>') stays visible while the block is collapsed.
-                var startLine = ToLanguagePosition(block.Location.Start).Line;
-                var endLine = ToLanguagePosition(block.Location.End).Line - 1;
-                if (endLine > startLine)
-                {
-                    ranges.Add(new LanguageFoldingRange(startLine, endLine));
-                }
-            }
-
-            return ranges;
+            return Array.Empty<LanguageFoldingRange>();
         }
+
+        var ranges = new List<LanguageFoldingRange>();
+        foreach (var block in CollectBlocks(document.Syntax))
+        {
+            // The fold stops one line short of the block end so the closing delimiter ('}' or
+            // '</template>') stays visible while the block is collapsed.
+            var startLine = ToLanguagePosition(block.Location.Start).Line;
+            var endLine = ToLanguagePosition(block.Location.End).Line - 1;
+            if (endLine > startLine)
+            {
+                ranges.Add(new LanguageFoldingRange(startLine, endLine));
+            }
+        }
+
+        return ranges;
     }
 
     public IReadOnlyList<LanguageCodeAction> GetCodeActions(
         string documentUri,
-        LanguageRange range)
+        LanguageRange range,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        lock (synchronization)
+        var (document, _) = CaptureSnapshot(documentUri);
+        if (document is null ||
+            document.Syntax.Format != LanguageDocumentFormat.Vue)
         {
-            if (!documents.TryGet(documentUri, out var document) ||
-                document.Syntax.Format != LanguageDocumentFormat.Vue)
-            {
-                return Array.Empty<LanguageCodeAction>();
-            }
-
-            // The parse is authoritative: the Vue-compatibility diagnostics are recomputed here
-            // rather than trusting whatever diagnostics the client echoed into the request.
-            var actions = new List<LanguageCodeAction>();
-            AddScriptLanguageCodeAction(document.Text, document.Syntax.Script, range, actions);
-            AddScriptLanguageCodeAction(document.Text, document.Syntax.ScriptSetup, range, actions);
-            return actions;
+            return Array.Empty<LanguageCodeAction>();
         }
+
+        // The parse is authoritative: the Vue-compatibility diagnostics are recomputed here
+        // rather than trusting whatever diagnostics the client echoed into the request.
+        var actions = new List<LanguageCodeAction>();
+        AddScriptLanguageCodeAction(document.Text, document.Syntax.Script, range, actions);
+        AddScriptLanguageCodeAction(document.Text, document.Syntax.ScriptSetup, range, actions);
+        return actions;
     }
 
-    public LanguageHover? GetHover(string documentUri, LanguagePosition position)
+    public LanguageHover? GetHover(
+        string documentUri,
+        LanguagePosition position,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
 
+        var (document, stylesheetContext) = CaptureSnapshot(documentUri);
+        if (document is null ||
+            !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
+        {
+            return null;
+        }
+
+        var block = FindBlock(document.Syntax, offset);
+        var template = block as SingleFileComponentTemplateBlock;
+        if (template is not null &&
+            UtilityClassCompletionContext.TryCreate(
+                template.Content,
+                template.ContentLocation.Start.Offset,
+                offset,
+                out var utilityContext))
+        {
+            var utilityHover = GetUtilityClassHover(
+                document.Text,
+                utilityContext,
+                stylesheetContext,
+                cancellationToken);
+            if (utilityHover is not null)
+            {
+                return utilityHover;
+            }
+        }
+
+        // A C# expression inside an attribute value or interpolation must not be documented as if
+        // it were markup: without this gate `title="v-if"` hovers as the v-if directive.
+        if (template is not null &&
+            IsExpressionContext(document.Text, template, offset))
+        {
+            return null;
+        }
+
+        var tokenRange = GetTokenRange(document.Text, offset);
+        if (tokenRange.End <= tokenRange.Start)
+        {
+            return null;
+        }
+
+        var token = document.Text.Substring(
+            tokenRange.Start,
+            tokenRange.End - tokenRange.Start);
+        if (!TryGetHoverDocumentation(token, out var markdown))
+        {
+            return null;
+        }
+
+        return new LanguageHover(
+            markdown,
+            new LanguageRange(
+                TextCoordinateConverter.GetPosition(document.Text, tokenRange.Start),
+                TextCoordinateConverter.GetPosition(document.Text, tokenRange.End)));
+    }
+
+    /// <summary>
+    /// Captures the immutable per-document state a read computes over. The lock is held only for
+    /// the two dictionary lookups; the compute runs outside it over the immutable
+    /// <see cref="LanguageDocument"/> and <see cref="UtilityStylesheetLanguageContext"/> values, so
+    /// document synchronization is never stalled by a long feature computation.
+    /// </summary>
+    private (LanguageDocument? Document, UtilityStylesheetLanguageContext UtilityContext) CaptureSnapshot(
+        string documentUri)
+    {
         lock (synchronization)
         {
-            if (!documents.TryGet(documentUri, out var document) ||
-                !TextCoordinateConverter.TryGetOffset(document.Text, position, out var offset))
-            {
-                return null;
-            }
-
-            var block = FindBlock(document.Syntax, offset);
-            var template = block as SingleFileComponentTemplateBlock;
-            if (template is not null &&
-                UtilityClassCompletionContext.TryCreate(
-                    template.Content,
-                    template.ContentLocation.Start.Offset,
-                    offset,
-                    out var utilityContext))
-            {
-                var utilityHover = GetUtilityClassHover(
-                    document.Text,
-                    utilityContext,
-                    GetUtilityContext(documentUri));
-                if (utilityHover is not null)
-                {
-                    return utilityHover;
-                }
-            }
-
-            // A C# expression inside an attribute value or interpolation must not be documented as if
-            // it were markup: without this gate `title="v-if"` hovers as the v-if directive.
-            if (template is not null &&
-                IsExpressionContext(document.Text, template, offset))
-            {
-                return null;
-            }
-
-            var tokenRange = GetTokenRange(document.Text, offset);
-            if (tokenRange.End <= tokenRange.Start)
-            {
-                return null;
-            }
-
-            var token = document.Text.Substring(
-                tokenRange.Start,
-                tokenRange.End - tokenRange.Start);
-            if (!TryGetHoverDocumentation(token, out var markdown))
-            {
-                return null;
-            }
-
-            return new LanguageHover(
-                markdown,
-                new LanguageRange(
-                    TextCoordinateConverter.GetPosition(document.Text, tokenRange.Start),
-                    TextCoordinateConverter.GetPosition(document.Text, tokenRange.End)));
+            var document = documents.TryGet(documentUri, out var openDocument)
+                ? openDocument
+                : null;
+            return (document, GetUtilityContext(documentUri));
         }
     }
 
@@ -533,7 +624,8 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
     private static IReadOnlyList<LanguageCompletionItem> GetUtilityClassCompletions(
         string documentText,
         UtilityClassCompletionContext context,
-        UtilityStylesheetLanguageContext stylesheetContext)
+        UtilityStylesheetLanguageContext stylesheetContext,
+        CancellationToken cancellationToken)
     {
         var editRange = new LanguageRange(
             TextCoordinateConverter.GetPosition(documentText, context.TokenStart),
@@ -548,14 +640,19 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
             metadataByCandidate[metadata.CandidateText] = metadata;
         }
 
+        // The token is checked between candidate batches: each batch is bounded work, and a
+        // superseded keystroke's request should stop paying for project stylesheet compiles.
+        cancellationToken.ThrowIfCancellationRequested();
         AddProjectUtilityCompletions(
             context.Prefix,
             stylesheetContext,
             metadataByCandidate);
+        cancellationToken.ThrowIfCancellationRequested();
         AddProjectVariantCompletions(
             context.Prefix,
             stylesheetContext,
             metadataByCandidate);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return metadataByCandidate.Values
             .OrderBy(metadata => metadata.SortOrder)
@@ -752,7 +849,8 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
     private static LanguageHover? GetUtilityClassHover(
         string documentText,
         UtilityClassCompletionContext context,
-        UtilityStylesheetLanguageContext stylesheetContext)
+        UtilityStylesheetLanguageContext stylesheetContext,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(context.TokenText))
         {
@@ -762,7 +860,7 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
         var resolution = UtilityRegistry.Resolve(
             context.TokenText,
             stylesheetContext.Theme,
-            CancellationToken.None);
+            cancellationToken);
         var metadata = resolution.Metadata;
         if (metadata is null)
         {
@@ -785,12 +883,137 @@ internal sealed class ViuLanguageService : IViuLanguageService, IUtilityCssLangu
     private static string GetUtilityDocumentation(UtilityClassMetadata metadata)
         => $"**`{metadata.CandidateText}`** — {metadata.Description}\n\n```css\n{metadata.Css}\n```";
 
+    // Reads utilityContexts, so every caller must hold the synchronization lock.
     private UtilityStylesheetLanguageContext GetUtilityContext(string documentUri)
         => utilityContexts.TryGetValue(documentUri, out var context)
             ? context
             : UtilityStylesheetLanguageContext.Default;
 
     private IReadOnlyList<LanguageCompletionItem> GetScriptCompletions(
+        string documentUri,
+        LanguageDocument document,
+        SingleFileComponentScriptBlock script,
+        int offset,
+        string linePrefix,
+        CancellationToken cancellationToken)
+    {
+        var word = GetTrailingIdentifier(linePrefix);
+        var semantic = GetScriptSemanticCompletions(
+            documentUri,
+            document,
+            script,
+            offset,
+            word,
+            cancellationToken);
+        if (semantic is null)
+        {
+            // ANY engine miss — no project context, an unmapped position, a binder failure —
+            // falls through to the existing syntax-only path unchanged: the fallback is the
+            // existing code, not a new one.
+            return GetSyntaxOnlyScriptCompletions(linePrefix, document.Syntax);
+        }
+
+        return MergeScriptSemanticCompletions(semantic, word);
+    }
+
+    // The semantic gate ([V01.01.12.23], #259): only an (implicitly or explicitly) C# script
+    // block with a host-fed project context reaches the engine; a .vue block in another language
+    // already carries VIU1206 and is never treated as C#.
+    private ScriptSemanticCompletionResult? GetScriptSemanticCompletions(
+        string documentUri,
+        LanguageDocument document,
+        SingleFileComponentScriptBlock script,
+        int offset,
+        string word,
+        CancellationToken cancellationToken)
+    {
+        if (script.Lang is not null &&
+            !string.Equals(script.Lang, "csharp", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        LanguageProjectContext? context;
+        lock (synchronization)
+        {
+            context = projectContexts.TryGetValue(documentUri, out var configured)
+                ? configured
+                : null;
+        }
+
+        if (context is null)
+        {
+            return null;
+        }
+
+        return scriptSemantics.GetCompletions(
+            context,
+            documentUri,
+            GetDocumentFilePath(documentUri),
+            document.Text,
+            offset,
+            word,
+            cancellationToken);
+    }
+
+    // On an engine hit the semantic items REPLACE the declared-member list; the scaffold and
+    // keyword catalogs still append with the existing first-wins label dedup and SortText bands
+    // ("00:" semantic, "01"–"07" scaffold, "90" keywords). After a member access only the matching
+    // Context./Reactive. member catalog appends — keywords never follow a dot, exactly as the
+    // syntax-only path never offered them there.
+    private static IReadOnlyList<LanguageCompletionItem> MergeScriptSemanticCompletions(
+        ScriptSemanticCompletionResult semantic,
+        string word)
+    {
+        var completions = new List<LanguageCompletionItem>(
+            semantic.Items.Count +
+            ViuCompletionCatalog.ScriptGeneral.Count +
+            ViuCompletionCatalog.ScriptKeywords.Count);
+        var seenLabels = new HashSet<string>(StringComparer.Ordinal);
+        AppendCatalogItems(semantic.Items, completions, seenLabels);
+        if (semantic.IsMemberAccess)
+        {
+            if (string.Equals(
+                    semantic.MemberAccessTargetText,
+                    "Context",
+                    StringComparison.Ordinal))
+            {
+                AppendCatalogItems(ViuCompletionCatalog.ContextMembers, completions, seenLabels);
+            }
+            else if (string.Equals(
+                         semantic.MemberAccessTargetText,
+                         "Reactive",
+                         StringComparison.Ordinal))
+            {
+                AppendCatalogItems(ViuCompletionCatalog.ReactiveMembers, completions, seenLabels);
+            }
+        }
+        else
+        {
+            AppendCatalogItems(ViuCompletionCatalog.ScriptGeneral, completions, seenLabels);
+            AppendCatalogItems(ViuCompletionCatalog.ScriptKeywords, completions, seenLabels);
+        }
+
+        if (word.Length == 0)
+        {
+            return completions;
+        }
+
+        var matches = completions
+            .Where(
+                completion => completion.Label.StartsWith(
+                    word,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return matches.Length > 0 ? matches : completions;
+    }
+
+    private static string GetDocumentFilePath(string documentUri)
+        => Uri.TryCreate(documentUri, UriKind.Absolute, out var uri) && uri.IsFile
+            ? uri.LocalPath
+            : documentUri;
+
+    private IReadOnlyList<LanguageCompletionItem> GetSyntaxOnlyScriptCompletions(
         string linePrefix,
         LanguageDocumentSyntax syntax)
     {

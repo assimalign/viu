@@ -78,8 +78,11 @@ reserved for diagnostics.
 container parse for each open `.viu` or accepted `.vue` document. It exposes block diagnostics,
 completion catalogs, declaration-aware `@script` member completion ([V01.01.12.07.04] #261 — a
 syntax-only Roslyn parse of the script block, cached on the block text; no compilation, no
-workspace), shared utility-class completion, project-defined utilities and variants, and
-generated-CSS hover documentation. It does not otherwise load a Roslyn workspace.
+workspace), semantic `@script` completion when the host feeds a restored project context
+([V01.01.12.23] #259 — an artifact-fed `CSharpCompilation` answered through
+`SemanticModel.LookupSymbols`; still no workspace), shared utility-class completion,
+project-defined utilities and variants, and generated-CSS hover documentation. It never loads a
+Roslyn workspace.
 
 Visual Studio requires a language-server provider's `DocumentFilter` to select a document type; it
 rejects a path-only filter, and a document-type filter cannot express an owning-project
@@ -185,15 +188,59 @@ Project-aware IntelliSense requires one authoritative `.viu`/`.vue` to C# projec
    outline symbol children (`SingleFileComponentDiagnostics.ComposeToFilePosition`, the same
    arithmetic as the emitted `#line` map); the full projected-document
    consumption arrives with steps 3–5.)
-3. Load the containing project through `MSBuildWorkspace` in the language-server process.
-4. Add the projected partial component as a synthetic Roslyn document.
-5. Map Roslyn completion, hover, signature help, definitions, references, and diagnostics back to the
-   original `@script` block and template-expression spans.
+3. **Delivered ([V01.01.12.23], #259) — recorded decision: artifact-fed, not `MSBuildWorkspace`.**
+   The server never evaluates the project. `ViuProjectAssetsReader` resolves the restore's own
+   artifact (`obj\project.assets.json`) with pure `System.Text.Json`: package compile assets
+   against the declared `packageFolders` order using NuGet's `.nupkg.metadata` restore-success
+   marker; `Microsoft.NETCore.App` reference assemblies from the installed SDK's targeting pack
+   (dotnet root pinned by the restore's `runtimeIdentifierGraphPath`, then `DOTNET_ROOT*`, then
+   `%ProgramFiles%\dotnet`); every other shared framework (`Assimalign.Viu.App`) from its pinned
+   `<name>.Ref` `downloadDependencies` package; project references from built outputs
+   (newest wins, missing outputs dropped with a named remedy). No `MSBuildWorkspace`, no BuildHost
+   processes, and no muxer/`global.json`/arm64 resolution exposure. The consumer prerequisite is
+   exactly: **the project restored once (`dotnet restore`) plus an installed .NET SDK** for the
+   `Microsoft.NETCore.App.Ref` targeting pack — the packed-consumer round trip
+   (`scripts/Test-LanguageServerSemanticRoundTrip.ps1`, wired into `area-visual-studio.yml`)
+   proves that documented prerequisite is sufficient against the published single-file server.
+   Degradation is graceful and visible: a per-project status ladder (missing artifacts, partial
+   resolution, stale artifacts, active) reports through `window/logMessage` on state-signature
+   transitions — never per keystroke, re-warning on re-degradation — while loose files outside any
+   Viu project stay silent, and the no-project-state path answers byte-identically to the
+   pre-semantic service (both pinned by `LanguageServerSemanticDegradationTests`). Status messages
+   carry the absolute project path so two same-named projects stay distinguishable. Two recorded
+   decisions in this ladder: a healthy project reports "active" once on first resolution — not only
+   on a degraded-to-available transition — so availability is visible in both directions; and an
+   unresolvable package compile asset degrades the whole project to syntax-only with a warning
+   naming the package, rather than serving a partial compilation whose missing references would
+   surface as misleading binder misses (a partial-compilation rung remains a possible refinement).
+4. **Delivered ([V01.01.12.23], #259) — SemanticModel backend for increment 1.** The open
+   document's live text is projected through the shared library (generator-identical by
+   construction), emitted, parsed, and added as an immutable fork of a per-project cached
+   `CSharpCompilation` holding sibling `.cs` sources and projected sibling components. Completion
+   binds with `SemanticModel.LookupSymbols` (member access binds the receiver first): no
+   workspace, no MEF composition, no Features assemblies, zero new packages in the trimmed
+   single-file publish. The recorded increment-2 upgrade behind the same engine seam is
+   `AdhocWorkspace` + `CompletionService` (Features/Workspaces packages re-entering the central
+   catalog at the single Microsoft.CodeAnalysis 5.3.x line, without `PrivateAssets=all`); its gate
+   is an integration test against the actual trimmed single-file publish (MEF and
+   `Assembly.Location`-dependent code paths are exactly what in-process tests cannot see) plus a
+   VSIX size re-measure against the 50MB Marketplace budget (estimated +10–12 MB per compressed
+   RID). Known gap, recorded as a non-goal for this increment: sibling `.cs` members produced by
+   the **Reactivity source generator** are absent from the editor compilation — only the Syntax
+   generator's projection is shared. The later option is running the ref pack's packaged
+   generators through `CSharpGeneratorDriver`, with version-skew and load-isolation questions to
+   settle then.
+5. **Delivered for completion ([V01.01.12.23], #259).** `GeneratedScriptDocumentMapper` maps the
+   member and using regions bidirectionally through the emitter's simple-form `#line` directives
+   (line-affine, column-identity) and suppresses — never misplaces — positions in scaffold or
+   render-body spans. Completion and resolve documentation ride the map today; hover, signature
+   help, definitions, references, and diagnostics remain open work on the same map.
 6. Integrate the existing template and CSS syntax trees for precise semantic tokens and recoverable
    embedded-language diagnostics.
 
-Parsing remains cancellable and off the Visual Studio UI path. Before enabling whole-project semantic
-analysis, the server needs snapshot caching, edit debouncing, and per-document cancellation.
+Parsing remains cancellable and off the Visual Studio UI path: feature requests dispatch
+concurrently with `$/cancelRequest` support, semantic engine work is serialized under its own gate,
+and every cache re-validates by cheap stats on the next request (no file watchers).
 
 ## Packaging
 
@@ -227,6 +274,23 @@ Assimalign.Viu.VisualStudio/
 The server path is resolved relative to the installed extension and rejected if configuration tries
 to escape that directory. The host build validates both executable paths before packaging, so a
 clean direct build cannot silently emit a VSIX without its language server.
+
+The semantic IntelliSense increment ([V01.01.12.23] #259) shipped with **zero new packages**: the
+publish already carried `Microsoft.CodeAnalysis` + `Microsoft.CodeAnalysis.CSharp` 5.3.0 with
+unrestricted runtime assets, and the SemanticModel backend needs nothing else. The consumerless
+`Microsoft.CodeAnalysis.CSharp.Workspaces` 5.0.0 and `Microsoft.CodeAnalysis.Workspaces.MSBuild`
+5.0.0 central pins were removed from `build/Targets/Build.References.Packages.targets` rather than
+version-aligned; the comment there records that any future Workspaces/Features re-entry (the
+CompletionService increment) must land at the single 5.3.x line without `PrivateAssets=all` so the
+assemblies flow into this publish, and that the consumerless `Microsoft.Build`/`Microsoft.Build.Locator`
+pins are flagged for a separate cleanup item. The trimming and publish stance is unchanged:
+`PublishTrimmed` with partial trim mode, single file, compression, and English-only satellite
+resources. Measured by the packed-consumer round trip on the two-file scaffold
+(`scripts/Test-LanguageServerSemanticRoundTrip.ps1`, 2026-08-02, Debug win-arm64): single-file
+payload 17,880,455 bytes (within the pre-semantic ballpark — no new packages entered the
+closure); first semantic completion (cold: materializing roughly 170 reference assemblies plus
+the first bind) 787 ms; semantic completion after a subsequent edit 41 ms via the cached base
+compilation; consumer `dotnet restore` 6.2 s with a warm package cache.
 
 ## References
 
