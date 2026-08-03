@@ -56,6 +56,10 @@ internal sealed class ViuLanguageServerProvider : LanguageServerProvider
             // solution-wide; the server's owning-project gate prevents non-Viu Vue documents from
             // reaching any Viu language feature.
             DocumentFilter.FromDocumentType(VueCompatibilityDocumentType),
+            // Only document-type filters are permitted here: the contribution generator rejects a
+            // glob filter on a language server outright ("Language servers require specifying a
+            // document type"). The classification tagger, which has no such restriction, additionally
+            // matches on file path so colorization does not depend on content-type materialization.
         ]);
 
     /// <inheritdoc />

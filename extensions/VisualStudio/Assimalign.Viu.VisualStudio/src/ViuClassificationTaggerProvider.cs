@@ -38,11 +38,21 @@ internal sealed class ViuClassificationTaggerProvider :
 
     /// <inheritdoc />
     /// <remarks>
-    /// Both container document types are classified. The <c>.vue</c> container is a declared
-    /// compatibility target ([V01.01.06.09]) whose documents are served by the same language server,
-    /// so omitting it here left <c>.vue</c> single-file components with no colorization at all. The
-    /// generator evaluates this property at compile time, so the filters must be written inline —
-    /// the shipped contract is pinned against the generated manifest instead.
+    /// Both container formats are classified. The <c>.vue</c> container is a declared compatibility
+    /// target ([V01.01.06.09]) served by the same language server, so omitting it left <c>.vue</c>
+    /// single-file components with no colorization at all.
+    /// <para>
+    /// Each format is matched two ways. A document-type filter is the intended mechanism, but it can
+    /// only match once the <c>viu</c> content type has materialized, and that binding exists purely at
+    /// runtime — nothing static registers the <c>.viu</c> extension, so a document opened before the
+    /// binding is established never matches and is left permanently unclassified. The glob filters
+    /// match on the document file path instead, which needs no content type at all, so classification
+    /// no longer depends on document-type registration winning a race against the editor.
+    /// </para>
+    /// <para>
+    /// The generator evaluates this property at compile time, so the filters are written inline; the
+    /// shipped contract is pinned against the generated manifest instead.
+    /// </para>
     /// </remarks>
     public TextViewExtensionConfiguration TextViewExtensionConfiguration => new()
     {
@@ -50,6 +60,8 @@ internal sealed class ViuClassificationTaggerProvider :
         [
             DocumentFilter.FromDocumentType(ViuLanguageServerProvider.ViuDocumentType),
             DocumentFilter.FromDocumentType(ViuLanguageServerProvider.VueCompatibilityDocumentType),
+            DocumentFilter.FromGlobPattern("**/*.viu", relativePath: false),
+            DocumentFilter.FromGlobPattern("**/*.vue", relativePath: false),
         ],
     };
 
