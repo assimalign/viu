@@ -8,25 +8,27 @@ namespace Assimalign.Viu.VisualStudio;
 [VisualStudioContribution]
 internal sealed class ViuExtension : Extension
 {
-    // The extension declares no LoadedWhen constraint, which is deliberate and load-bearing.
-    //
-    // Nothing static registers the .viu file extension: the packaged extension.vsixmanifest carries no
-    // assets, and no pkgdef, editor factory, or grammar claims it. The "viu" and "viu-vue" document
-    // types - and therefore the .viu/.vue content-type bindings - come into existence only when this
-    // extension loads and its documentTypes contributions are applied at runtime.
-    //
-    // That makes an editor-content-type activation constraint circular: EditorContentType("viu") can
-    // never become true, because the content type it waits on is created by the very load it gates.
-    // A solution-build-property term does not rescue it either - gating load on any condition risks
-    // the document types registering after a .viu buffer has already been created against the
-    // fallback content type, which leaves the document permanently unclassified.
-    //
-    // Loading unconditionally is cheap here: the extension is hosted out of process, and the language
-    // server still performs its own per-document owning-project check before serving anything.
-
     /// <inheritdoc />
     public override ExtensionConfiguration ExtensionConfiguration => new()
     {
+        // LoadedWhen is emitted by the contribution generator as the command set's supportedScope and
+        // nothing else - it never gates the extension parts, the document types, or the language
+        // server. Its one job is eager activation: when the scope goes active Visual Studio force
+        // loads the command set, which is what starts the out-of-process extension host. With no
+        // constraint the scope stays permanently inactive, the host is never started eagerly, and the
+        // extension contributes nothing until something else happens to demand it.
+        //
+        // The two editor-content-type terms can never fire on their own, because nothing static
+        // registers the .viu or .vue extension - the packaged vsixmanifest carries no assets, and the
+        // content types come into existence only once this extension loads and applies its
+        // documentTypes. They are retained because they cost nothing and do fire once a container
+        // document is already bound. The two solution-state terms carry the real weight: they are
+        // jointly exhaustive, so the host starts eagerly in every session, solution or not.
+        LoadedWhen = ActivationConstraint.Or(
+            ActivationConstraint.EditorContentType("viu"),
+            ActivationConstraint.EditorContentType("viu-vue"),
+            ActivationConstraint.SolutionState(SolutionState.NoSolution),
+            ActivationConstraint.SolutionState(SolutionState.Exists)),
         Metadata = new(
             id: "Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c",
             version: this.ExtensionAssemblyVersion,
