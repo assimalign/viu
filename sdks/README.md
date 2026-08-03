@@ -194,15 +194,29 @@ the updated generated code, while style-only edits remain mounted.
 
 ## Local development loop
 
-`scripts/Install-Local.ps1` packs the full chain into the repo-local feed
-`_out/packages/`:
+`scripts/Install-Local.ps1` packs the complete package set into the repo-local
+feed `_out/packages/`:
 
-1. `dotnet pack sdks/Assimalign.Viu.Sdk/Tasks` → `Assimalign.Viu.Sdk.<ver>.nupkg`
-2. `dotnet pack frameworks/Assimalign.Viu.App.Runtime/src -p:RuntimeIdentifier=browser-wasm` → `Assimalign.Viu.App.Runtime.browser-wasm.<ver>.nupkg`
-3. `dotnet pack frameworks/Assimalign.Viu.App.Refs/src` → `Assimalign.Viu.App.Ref.<ver>.nupkg`
+1. every independently published library → `Assimalign.Viu.<Name>.<ver>.nupkg` (19 packages)
+2. `dotnet pack sdks/Assimalign.Viu.Sdk/Tasks` → `Assimalign.Viu.Sdk.<ver>.nupkg`
+3. `dotnet pack frameworks/Assimalign.Viu.App.Runtime/src -p:RuntimeIdentifier=browser-wasm` → `Assimalign.Viu.App.Runtime.browser-wasm.<ver>.nupkg`
+4. `dotnet pack frameworks/Assimalign.Viu.App.Refs/src` → `Assimalign.Viu.App.Ref.<ver>.nupkg`
 
-It prunes `~/.nuget/packages/` extracts for the same versions first, so
-same-version repacks always pick up fresh content.
+The library set comes from `scripts/modules/ViuPackaging.psm1`, shared with
+`scripts/Pack-Release.ps1`, so the local feed and the release set cannot
+disagree about what ships — and a library added under `libraries/` but missing
+from the inventory fails the pack instead of silently producing a short feed.
+Use `-SkipLibraries`, `-SkipSdk`, or `-SkipFramework` to pack a subset.
+
+Cached extracts for the same version are pruned first, so same-version repacks
+always pick up fresh content. Pruning covers the machine-global cache **and any
+repo-local `globalPackagesFolder`** a consumer declares in its own
+`nuget.config` — the sibling `viu-examples` repository does exactly that, and a
+prune that missed it left consumers compiling against a previous build's
+analyzer while the feed itself looked current. Discovery only touches caches
+that already hold `Assimalign.Viu.*` extracts; pass `-ConsumerRoot` for a
+consumer outside this repository's sibling directories, or `-SkipCachePrune`
+when the version was bumped and no prune is needed.
 
 A consumer outside this repo points a `nuget.config` at the feed:
 

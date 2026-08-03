@@ -56,6 +56,8 @@ if (-not [string]::IsNullOrWhiteSpace($versionSuffix)) {
 
 $repositoryDirectory = [System.IO.Path]::GetFullPath(
     (Split-Path $PSScriptRoot -Parent))
+
+Import-Module (Join-Path $PSScriptRoot 'modules/ViuPackaging.psm1') -Force
 $releaseOutputDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $repositoryDirectory '_out/release'))
 $packageDirectory = [System.IO.Path]::GetFullPath(
@@ -105,57 +107,11 @@ $buildProperties = @(
     "-p:PackageOutputPath=$packageDirectory"
 )
 
-$libraryPackageIds = @(
-    'Assimalign.Viu.Reactivity',
-    'Assimalign.Viu.Shared',
-    'Assimalign.Viu.Syntax',
-    'Assimalign.Viu.Components',
-    'Assimalign.Viu.Syntax.Css',
-    'Assimalign.Viu.Syntax.Html',
-    'Assimalign.Viu.Syntax.JavaScript',
-    'Assimalign.Viu.Syntax.SingleFileComponent',
-    'Assimalign.Viu.Syntax.Templates',
-    'Assimalign.Viu.State',
-    'Assimalign.Viu.Router',
-    'Assimalign.Viu.Tooling.Css',
-    'Assimalign.Viu.Tooling.SingleFileComponent',
-    'Assimalign.Viu.Tooling.UtilityCss',
-    'Assimalign.Viu.Core',
-    'Assimalign.Viu.Browser',
-    'Assimalign.Viu.ServerRenderer',
-    'Assimalign.Viu.Testing',
-    'Assimalign.Viu.Router.Browser'
-)
-
-$configuredLibraryProjects = @(
-    $libraryPackageIds |
-        ForEach-Object {
-            Join-Path $repositoryDirectory "libraries/$_/src/$_.csproj"
-        }
-)
-$discoveredLibraryProjects = @(
-    Get-ChildItem `
-        -LiteralPath (Join-Path $repositoryDirectory 'libraries') `
-        -Directory |
-        ForEach-Object {
-            Get-ChildItem `
-                -LiteralPath (Join-Path $_.FullName 'src') `
-                -Filter '*.csproj' `
-                -File `
-                -ErrorAction SilentlyContinue
-        } |
-        ForEach-Object {
-            [System.IO.Path]::GetFullPath($_.FullName)
-        }
-)
-$projectDifference = @(
-    Compare-Object `
-        ($configuredLibraryProjects | Sort-Object) `
-        ($discoveredLibraryProjects | Sort-Object)
-)
-if ($projectDifference.Count -ne 0) {
-    throw "The release library inventory is incomplete: $($projectDifference | Out-String)"
-}
+# The library inventory and its drift guard live in the shared packaging module, so the
+# release set and the local dogfooding feed (scripts/Install-Local.ps1) cannot disagree
+# about what ships.
+$libraryPackageIds = Get-ViuLibraryPackageId
+$configuredLibraryProjects = Get-ViuLibraryProject -RepositoryDirectory $repositoryDirectory
 
 function Invoke-PackageBuild {
     param(
