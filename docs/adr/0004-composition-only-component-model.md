@@ -1,9 +1,33 @@
 # ADR-0004: Composition-only component model (no Options API, mixins, or global properties)
 
-- **Status:** Accepted
+- **Status:** Accepted (decision stands; framing annotated and stated mechanism outdated as of
+  2026-08-02 — see the note below)
 - **Date:** 2026-07-19 (foundational C#/WASM premise; formally recorded under [V01.01.13.01], #98)
 - **Scope:** `Assimalign.Viu.RuntimeCore` — the component instance, setup model, app API, and
   provide/inject.
+
+> **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
+> framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
+> [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority — the composition-only
+> component model is carried forward there as clauses `[CMP-1]`–`[CMP-25]` and §17.1. **The core
+> decision recorded here is unaffected**: Viu ships a composition-only component model with no
+> options-style authoring, no mixins, and no global-properties bag.
+>
+> **The stated replacement mechanism, however, no longer exists.** The Decision below routes
+> cross-cutting values through "typed provide/inject (`InjectionKey<T>`, app-level `Provide<T>`)" and
+> plugins (`IPlugin`), and describes an `ApplicationConfiguration` carrying the error handler, warn
+> handler, and performance flag. As of this working tree: `InjectionKey` and `ApplicationConfiguration`
+> do not exist anywhere in the source, `IPlugin` is now `IApplicationPlugin`, and application state
+> moved onto `IApplicationContext`. **Component-tree provide/inject was not ported at all** — it is a
+> recorded decision, not a deferral (`libraries/DESIGN.md` approved decision 8), and the specification
+> states it as `[CMP-24]`: component dependencies are explicit through parameters and slots,
+> `IComponentContext.Services`, State definitions, and `IComponentContext.Components`. Reversing the
+> replacement mechanism recorded in an accepted ADR requires a **superseding ADR**, not an edit to
+> this one; until that ADR is written, `[CMP-24]` is the authority and this paragraph is the notice.
+>
+> A factual note for a future reader, recorded rather than edited: the scope line names
+> `Assimalign.Viu.RuntimeCore`, renamed `Assimalign.Viu.Core` ([V01.01.12.21]). The body is preserved
+> as the historical record and is not rewritten (see [README.md](README.md), "Append-only").
 
 ## Context
 

@@ -70,6 +70,42 @@ drift (the `@vue/compiler-sfc`-consumed-by-Vite-and-Volar shape).
 
 ## Founding design decisions (C#/WASM divergences)
 
+> **Superseded framing (2026-08-02) — the decisions stand, the framing does not.**
+>
+> On 2026-08-02 the user directed that **Viu is a standalone framework, not a port of Vue.js**. Vue
+> is no longer a normative authority for Viu's semantics; the adopted idea was the **render
+> architecture** — hierarchical virtual-node-tree rendering with compiler-informed diffing — which
+> Viu now owns and specifies on its own terms.
+> [**`docs/SPECIFICATION.md`**](SPECIFICATION.md) is the authority for Viu's semantics, and behavior
+> is pinned by this repository's tests.
+>
+> Three consequences for reading this section and the architecture map above it:
+>
+> 1. **The framing sentence immediately below is superseded.** "Everything else tracks Vue 3
+>    semantics (vuejs/core v3.5.x) as the reference implementation" is no longer the policy. There is
+>    no reference implementation; there is a specification. The eight decisions themselves are
+>    unaffected and remain accurate — each is carried forward as normative clauses in
+>    `SPECIFICATION.md` (§3 constraints, §5 reactivity, §6 rendering, §8 compilation, §11 the
+>    host-agnostic rule, §15 packaging) and, for the five recorded as ADRs, in
+>    [`docs/adr/`](adr/README.md), where each carries its own dated framing note.
+> 2. **The 2026-07-19 packaging note above ("upstream Vue.js references — `@vue/*` names, vuejs.org
+>    links, the `vue:` template prefix — are deliberately untouched") is the written form of the
+>    policy this decision reverses**, and is superseded for `@vue/*` naming and vuejs.org links used
+>    as behavioral authority. Two parts of that sentence remain **true and deliberate**: the `vue:`
+>    template prefix is live shipping template syntax, and the "Vue 3 counterpart" column of the
+>    architecture table above is preserved as the historical record of how the areas were originally
+>    scoped — it is not a parity contract.
+> 3. **The `.vue` compatibility surface is unaffected and is a shipping product feature.**
+>    [V01.01.06.09] (#250) targets the Vue single-file-component container specification because
+>    compatibility with a documented external format *is* the requirement — the same category as Viu
+>    Utilities' Tailwind CSS v4.3.3 target. It is specified as `SPECIFICATION.md` §9.
+>
+> Continued evaluation of Vue's (and other frameworks') **performance** work is explicitly retained,
+> through [`docs/PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) — a non-normative ledger in which
+> nothing becomes binding on Viu until it lands in the specification or an ADR.
+>
+> This section is preserved, not rewritten: it records what was decided and when.
+
 These are deliberate, recorded divergences from upstream — everything else tracks Vue 3 semantics
 (vuejs/core v3.5.x) as the reference implementation:
 

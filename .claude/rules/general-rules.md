@@ -7,9 +7,16 @@ paths:
 # General rules (C#)
 
 These are the canonical coding conventions for Viu. They load automatically when a `.cs`/`.csproj`
-file is touched — do not re-derive conventions from scratch. Viu is a faithful re-implementation of
-Vue.js 3 in C#/.NET WebAssembly; where behavior mirrors Vue, **upstream vuejs/core (v3.5.x) semantics
-win** — link the reference in the code, test, or issue that pins the behavior.
+file is touched — do not re-derive conventions from scratch.
+
+Viu is a **standalone** C#/.NET WebAssembly UI framework. **[`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md)
+is the authority for Viu's semantics**, and behavior is pinned by tests in this repository — no
+external project's behavior, release, or roadmap is authoritative for Viu (decision of 2026-08-02).
+Where a type implements a documented **external compatibility target** — the `.vue`
+single-file-component container format ([V01.01.06.09], a shipping feature), Tailwind CSS v4.3.3
+(Viu Utilities), WHATWG HTML serialization, the Language Server Protocol — name and link that
+target. That is a compatibility *requirement* on a foreign format, not a semantic authority over
+Viu.
 
 ## Project layout
 
@@ -92,8 +99,9 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 ## AOT / trimming (hard constraints)
 
 - Trimming- and WASM/NativeAOT-safe: **no reflection-based serialization, no dynamic code generation, no
-  linker-unfriendly activation paths.** Roslyn **source generators** are the sanctioned path for anything
-  Vue does with `Proxy` or runtime `new Function`.
+  linker-unfriendly activation paths.** Roslyn **source generators** are the sanctioned path for every
+  form of metaprogramming — reactive property wrappers, component activation, and template
+  compilation all happen at build time, never through runtime interception or emitted IL.
 - Shipping libraries set `<IsAotCompatible>true</IsAotCompatible>` (see [build-system.md](build-system.md)).
 - The JS-interop boundary is the dominant performance cost — batch interop, and always clean up JS-side
   handles and event listeners.

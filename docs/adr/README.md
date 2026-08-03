@@ -1,10 +1,19 @@
 # Architecture decision records
 
 This is Viu's append-only log of architecture decisions — the *why* behind the choices that shape
-the framework, especially the deliberate C#/WASM divergences from Vue 3. The narrative summary of
-these decisions lives in [`docs/PLAN.md`](../PLAN.md) ("Founding design decisions"); this directory
-records each one as a standalone, citable document a future session can act on without that
-conversation's context.
+the framework. [`docs/SPECIFICATION.md`](../SPECIFICATION.md) states *what* Viu guarantees; an ADR
+states why a guarantee is shaped that way. The narrative summary of these decisions lives in
+[`docs/PLAN.md`](../PLAN.md) ("Founding design decisions"); this directory records each one as a
+standalone, citable document a future session can act on without that conversation's context.
+
+> **Framing note (2026-08-02).** ADRs 0001–0005 were written while the repository framed Viu as a
+> re-implementation of Vue.js 3. On 2026-08-02 the user directed that **Viu is a standalone
+> framework**: Vue is no longer a normative authority for Viu's semantics, and
+> [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is. Each of those five records carries a dated
+> superseded-framing note at the top; **none of their decisions were reversed** by that direction.
+> Per the append-only rule below, their bodies are preserved rather than rewritten. Continued
+> evaluation of other frameworks' performance work happens through
+> [`docs/PERFORMANCE-RESEARCH.md`](../PERFORMANCE-RESEARCH.md), which is non-normative.
 
 ## Conventions
 
@@ -16,9 +25,11 @@ conversation's context.
   preserved, not edited.
   (Correcting a typo or a broken link is fine; reversing the recorded decision is not.)
 - **Template.** Copy [`template.md`](template.md) for a new record.
-- **When to write one.** Any decision with lasting architectural consequence — a divergence from
-  vuejs/core semantics, a cross-cutting constraint, a technology or boundary choice. Small, local
-  choices belong in the relevant `DESIGN.md`, not here.
+- **When to write one.** Any decision with lasting architectural consequence — a change to behavior
+  [`docs/SPECIFICATION.md`](../SPECIFICATION.md) specifies, a cross-cutting constraint, a technology
+  or boundary choice, or a commitment to a documented external compatibility target. An ADR that
+  changes specified behavior must say which specification clauses it adds, amends, or supersedes.
+  Small, local choices belong in the relevant `DESIGN.md`, not here.
 
 ## Repo-level versus library-level ADRs
 
@@ -35,11 +46,11 @@ ADRs keep their own numbering within their library folder.
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0001](0001-source-generators-over-reflection.md) | Roslyn source generators over reflection and dynamic code generation | Accepted |
-| [0002](0002-ref-first-reactivity.md) | Ref-first reactivity instead of JavaScript `Proxy` | Accepted |
-| [0003](0003-batched-interop-dom-operations.md) | Batched JS-interop DOM operations as the performance budget | Accepted |
-| [0004](0004-composition-only-component-model.md) | Composition-only component model (no Options API, mixins, or global properties) | Accepted |
-| [0005](0005-no-runtime-template-compilation.md) | No runtime template compilation (build-time source generators only) | Accepted |
+| [0001](0001-source-generators-over-reflection.md) | Roslyn source generators over reflection and dynamic code generation | Accepted (framing annotated 2026-08-02) |
+| [0002](0002-ref-first-reactivity.md) | Ref-first reactivity instead of JavaScript `Proxy` | Accepted (framing annotated 2026-08-02) |
+| [0003](0003-batched-interop-dom-operations.md) | Batched JS-interop DOM operations as the performance budget | Accepted (framing annotated 2026-08-02) |
+| [0004](0004-composition-only-component-model.md) | Composition-only component model (no Options API, mixins, or global properties) | Accepted (framing annotated 2026-08-02; **stated replacement mechanism outdated — needs a superseding ADR**) |
+| [0005](0005-no-runtime-template-compilation.md) | No runtime template compilation (build-time source generators only) | Accepted (container framing partially superseded 2026-08-02; framework framing annotated) |
 
 See also [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for how ADRs fit into the wider documentation
 convention.

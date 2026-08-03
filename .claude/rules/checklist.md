@@ -31,6 +31,7 @@ is ❌, fix it before reporting completion, not after. Mark genuinely inapplicab
 ## Correctness & docs
 - [ ] Trimming/WASM-AOT-safe (no reflection serialization, no dynamic codegen); JS handles/listeners
       cleaned up.
-- [ ] Public APIs have XML docs; behavior mirroring Vue 3 links the upstream reference.
+- [ ] Public APIs have XML docs stating what the member does and what it guarantees; behavior specified in
+      `docs/SPECIFICATION.md` cites its clause id.
 - [ ] The work item ([V01.01.NN…]) is referenced; scope creep captured via the `viu-work-items` skill.
 - [ ] No dangling solution/project references after any rename or move.

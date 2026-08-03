@@ -19,8 +19,16 @@ paths:
 - Pin **observable behavior**, and for reactivity/caching semantics assert **run counts** (effect runs,
   getter invocations), not just final values — caching and dependency-tracking bugs hide behind
   correct-looking values.
-- Where behavior mirrors Vue 3, the test pins the **upstream contract** — reference the vuejs/core file or
-  vuejs.org page in a comment so a divergence is caught, not enshrined.
+- The test pins **Viu's own specified behavior** — the repository's tests *are* the authority for how
+  Viu behaves. Spell the pinned behavior out in the test name or a comment ("an empty
+  `DynamicChildren` list skips every child visit"), so a later reader can tell an intentional
+  contract from an accidental one, and cite the clause in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md)
+  or the `[Vxx.xx.xx]` work item that specified it. Never cite another framework's source or
+  documentation as the reason a value is what it is.
+- Where a test pins a documented **external compatibility target** — the `.vue` single-file-component
+  container format, Tailwind CSS v4.3.3 (Viu Utilities), WHATWG HTML serialization, the Language
+  Server Protocol — name and link that target. There the citation *is* the requirement: the test
+  asserts conformance to a foreign format Viu deliberately consumes.
 - Cover exception paths (throwing effects/getters, teardown under error) and lifecycle edges (stop,
   dispose, scope teardown), not just the happy path.
 

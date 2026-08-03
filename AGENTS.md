@@ -1,11 +1,17 @@
 # Viu
 
-A faithful re-implementation of Vue.js 3 in C#/.NET, targeting the browser through the .NET
-WebAssembly build tools (`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). The
-architecture mirrors Vue 3's package boundaries (`@vue/reactivity`, `runtime-core`, `runtime-dom`,
-compiler packages, `server-renderer`) as `Assimalign.Viu.*` class libraries, with Roslyn source
-generators standing in for everything Vue does with JS `Proxy` and runtime `new Function` — WASM is
-AOT/trimming territory, so reflection-based serialization and dynamic code generation are forbidden.
+A standalone C#/.NET user-interface framework, targeting the browser through the .NET WebAssembly
+build tools (`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). Viu renders through a
+hierarchical virtual-node tree with compiler-informed diffing, split across `Assimalign.Viu.*` class
+libraries by responsibility (reactivity, the component vocabulary, the host-neutral runtime core, the
+browser host, the parser cluster, server rendering, routing, state, tooling). Roslyn source
+generators are the sanctioned metaprogramming mechanism — WASM is AOT/trimming territory, so
+reflection-based serialization and dynamic code generation are forbidden.
+
+`docs/SPECIFICATION.md` is the authority for Viu's semantics; no external project's behavior is
+(decision of 2026-08-02). Viu does ship a **`.vue` single-file-component compatibility parser** as a
+product feature ([V01.01.06.09], #250) — a compatibility target on a documented external format, in
+the same category as Viu Utilities' Tailwind CSS v4.3.3 target, specified in `SPECIFICATION.md` §9.
 
 ## Layout
 
@@ -44,9 +50,15 @@ paths:
 ---
 
 These are the canonical coding conventions for Viu. They load automatically when a `.cs`/`.csproj`
-file is touched — do not re-derive conventions from scratch. Viu is a faithful re-implementation of
-Vue.js 3 in C#/.NET WebAssembly; where behavior mirrors Vue, **upstream vuejs/core (v3.5.x) semantics
-win** — link the reference in the code, test, or issue that pins the behavior.
+file is touched — do not re-derive conventions from scratch.
+
+Viu is a **standalone** C#/.NET WebAssembly UI framework. **`docs/SPECIFICATION.md` is the authority
+for Viu's semantics**, and behavior is pinned by tests in this repository — no external project's
+behavior, release, or roadmap is authoritative for Viu (decision of 2026-08-02). Where a type
+implements a documented **external compatibility target** — the `.vue` single-file-component
+container format ([V01.01.06.09], a shipping feature), Tailwind CSS v4.3.3 (Viu Utilities), WHATWG
+HTML serialization, the Language Server Protocol — name and link that target. That is a compatibility
+*requirement* on a foreign format, not a semantic authority over Viu.
 
 ### Project layout
 
@@ -125,8 +137,9 @@ win** — link the reference in the code, test, or issue that pins the behavior.
 ### AOT / trimming (hard constraints)
 
 - Trimming- and WASM/NativeAOT-safe: **no reflection-based serialization, no dynamic code generation, no
-  linker-unfriendly activation paths.** Roslyn **source generators** are the sanctioned path for anything
-  Vue does with `Proxy` or runtime `new Function`.
+  linker-unfriendly activation paths.** Roslyn **source generators** are the sanctioned path for every
+  form of metaprogramming — reactive property wrappers, component activation, and template
+  compilation all happen at build time, never through runtime interception or emitted IL.
 - Shipping libraries set `<IsAotCompatible>true</IsAotCompatible>` (see [build-system.md](build-system.md)).
 - The JS-interop boundary is the dominant performance cost — batch interop, and always clean up JS-side
   handles and event listeners.
@@ -291,7 +304,9 @@ is ❌, fix it before reporting completion, not after. Mark genuinely inapplicab
 ### Correctness & docs
 - [ ] Trimming/WASM-AOT-safe (no reflection serialization, no dynamic codegen); JS handles/listeners
       cleaned up.
-- [ ] Public APIs have XML docs; behavior mirroring Vue 3 links the upstream reference.
+- [ ] Public APIs have XML docs stating what the member does, what it guarantees, and why its shape is
+      what it is — in Viu's own vocabulary, citing a `SPECIFICATION.md` clause id or the `[Vxx.xx.xx]`
+      work item, never another framework as the authority.
 - [ ] The work item ([V01.01.NN…]) is referenced; scope creep captured via the `viu-work-items` skill.
 - [ ] No dangling solution/project references after any rename or move.
 
@@ -321,9 +336,13 @@ Rules that need especially explicit confirmation before deviating:
 - **AOT / trimming safety** — no reflection-based serialization, no dynamic code generation.
 - **The central build system** — `ViuProjectReference` / `ViuPackageReference` (no raw
   `<ProjectReference>` / `<PackageReference>`), the `build/` props/targets, and centralized versioning.
-- **Upstream Vue 3 parity** — a behavioral divergence from vuejs/core v3.5 must be intentional, documented
-  (in the type's XML docs and, where relevant, a `DESIGN.md` non-goal), and pinned by a test that asserts
-  the *chosen* behavior.
+- **Specified behavior** — a change to behavior pinned by `docs/SPECIFICATION.md` or by a `[Vxx.xx.xx]`
+  issue must be intentional, documented (in the type's XML docs and, where relevant, a `DESIGN.md`
+  non-goal), and pinned by a test that asserts the *chosen* behavior. A specification clause, the tests
+  that pin it, and the XML docs that cite it move together.
+- **External compatibility targets** — the `.vue` single-file-component container format, Tailwind CSS
+  v4.3.3 (Viu Utilities), WHATWG HTML serialization, the Language Server Protocol. There conformance to
+  the foreign format *is* the requirement; a deliberate departure needs the same explicit confirmation.
 
 
 
@@ -349,8 +368,16 @@ paths:
 - Pin **observable behavior**, and for reactivity/caching semantics assert **run counts** (effect runs,
   getter invocations), not just final values — caching and dependency-tracking bugs hide behind
   correct-looking values.
-- Where behavior mirrors Vue 3, the test pins the **upstream contract** — reference the vuejs/core file or
-  vuejs.org page in a comment so a divergence is caught, not enshrined.
+- The test pins **Viu's own specified behavior** — the repository's tests *are* the authority for how
+  Viu behaves. Spell the pinned behavior out in the test name or a comment ("an empty
+  `DynamicChildren` list skips every child visit"), so a later reader can tell an intentional contract
+  from an accidental one, and cite the clause in `docs/SPECIFICATION.md` or the `[Vxx.xx.xx]` work item
+  that specified it. Never cite another framework's source or documentation as the reason a value is
+  what it is.
+- Where a test pins a documented **external compatibility target** — the `.vue` single-file-component
+  container format, Tailwind CSS v4.3.3 (Viu Utilities), WHATWG HTML serialization, the Language Server
+  Protocol — name and link that target. There the citation *is* the requirement: the test asserts
+  conformance to a foreign format Viu deliberately consumes.
 - Cover exception paths (throwing effects/getters, teardown under error) and lifecycle edges (stop,
   dispose, scope teardown), not just the happy path.
 
@@ -372,14 +399,49 @@ paths:
   - "**/*.cs"
 ---
 
-- **XML doc comments on every public member.** Where a type or member mirrors a Vue 3 concept, name the
-  counterpart and link the authoritative reference (vuejs.org or the vuejs/core source file) — e.g.
-  "the C# port of Vue 3.5's `computed()`". This is how upstream semantics stay pinned.
+- **XML doc comments on every public member.** A Viu doc states three things in Viu's own vocabulary:
+  **what** the member does, **what it guarantees** (invariants, ordering, thread affinity, allocation
+  behavior), and **why the shape is what it is** where that isn't obvious. Viu is a standalone
+  framework; no doc comment may make Viu's behavior *derivative* of another project's.
+  - **Banned:** "the C# port of X", "mirrors X", "counterpart of X", "upstream", "parity",
+    "faithful", and any `vuejs.org` / `github.com/vuejs` / `router.vuejs.org` URL.
+  - **Do not just delete the banned clause.** In many docs it is the only thing carrying the
+    semantics (`"Creates a shallow ref (Vue's shallowRef())"`). Replace it with the behavior it stood
+    in for: *"Creates a reference cell that notifies only on assignment of a new instance, never on
+    mutation of the instance it holds."* A summary that says less after the edit is a regression.
+  - **Intent markers must survive.** Where a clause like `(upstream parity)` was encoding "this is
+    deliberate, do not 'fix' it", restate the intent as a Viu design decision. Where it pinned a
+    frozen value layout (`PatchFlags`, `ShapeFlags`, `SlotFlags`, the SSR hydration markers), restate
+    it as Viu's own stability guarantee — the layout is a contract with previously compiled output.
+- **Pinning behavior.** Behavior is pinned by (a) the prose in the doc comment itself, (b) a
+  `[Vxx.xx.xx]` WBS reference to the issue that specified it, and (c) a test asserting the chosen
+  behavior. Where `docs/SPECIFICATION.md` contains a clause for the behavior, cite it as text —
+  `Specified by <c>[RND-FLAGS-1]</c>.` — never as a URL, so the API-reference generator
+  ([V01.01.13.04]) resolves ids to anchors from one mapping. **Do not write a clause id the spec does
+  not yet contain.**
+- **External links.** `<see href>` is for genuine external standards and for foreign formats Viu
+  consumes — W3C UI Events, WHATWG HTML, Tailwind's docs, the Language Server Protocol, and the
+  `.vue` single-file-component container format. It is never used to cite another framework as the
+  authority for Viu's own behavior. Version-pin format-citation URLs and frame them explicitly, e.g.
+  *"Container-format reference for the input this parser accepts: `<see href=…>`"*.
+- **The `.vue` compatibility surface is a shipping feature, not a legacy reference.** [V01.01.06.09]
+  (#250) parses the tag-based `.vue` container so Vue single-file components compile under Viu. Every
+  mention of `.vue` files, `VueSingleFileComponent*` types, `SingleFileComponentFormat.Vue`, the
+  `viu-vue` document type, `**/*.vue` globs, and `.vue`-format spec compatibility **must be
+  preserved** — removing them misdescribes the product. The banned-phrase rules above govern *how
+  Viu's own semantics are described*, not the naming of the foreign format Viu reads.
+- **Other frameworks are performance research, not specification.** Viu tracks other renderers'
+  performance work as an input to its own optimization backlog. That tracking lives in
+  `docs/PERFORMANCE-RESEARCH.md` and in the work items it spawns — never in doc comments, and never
+  as a reason a Viu behavior is what it is. An adopted technique is documented in Viu's terms and
+  pinned by a Viu benchmark; origin acknowledgement, if wanted, goes in `docs/SPECIFICATION.md`
+  § "Prior art and influences", once, centrally.
 - Per-library design docs mature into `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) and
-  `docs/DESIGN.md` (why it is shaped this way, C#/WASM divergences, non-goals). Keep them current in the
+  `docs/DESIGN.md` (why it is shaped this way, WASM/AOT constraints, non-goals). Keep them current in the
   same change as the code — a `DESIGN.md` that lags the code actively misleads.
-- Repo-level planning lives in `docs/` — `docs/PLAN.md` is the authoritative narrative (architecture map,
-  founding decisions, waves); the GitHub Project **#15** board is the authoritative backlog.
+- Repo-level planning lives in `docs/` — `docs/SPECIFICATION.md` is the authoritative statement of
+  Viu's semantics; `docs/PLAN.md` is the authoritative delivery narrative (architecture map, founding
+  decisions, waves); the GitHub Project **#15** board is the authoritative backlog.
 - Markdown docs use whole words and link related rules/issues so a future session can act without this
   conversation's context.
 
@@ -423,5 +485,8 @@ paths:
   generation, no linker-unfriendly activation paths. Roslyn source generators are the sanctioned path.
 - The JS-interop boundary is the dominant performance cost — prefer batched interop over per-op
   calls, and always clean up JS-side handles and event listeners.
-- Where behavior mirrors Vue 3, upstream semantics win: link the vuejs.org / vuejs/core reference in
-  the issue, code comment, or test that pins the behavior.
+- `docs/SPECIFICATION.md` is the authority for Viu's semantics: cite the clause id in the issue, code
+  comment, or test that pins the behavior, and never another framework's documentation. Where the
+  change implements a documented external compatibility target (the `.vue` container format, Tailwind
+  CSS v4.3.3, WHATWG HTML serialization, the Language Server Protocol), name and link that target —
+  there conformance to the foreign format *is* the requirement.

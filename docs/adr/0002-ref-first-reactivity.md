@@ -1,9 +1,26 @@
 # ADR-0002: Ref-first reactivity instead of JavaScript `Proxy`
 
-- **Status:** Accepted
+- **Status:** Accepted (decision stands; framing annotated 2026-08-02 — see the note below)
 - **Date:** 2026-07-19 (foundational C#/WASM premise; formally recorded under [V01.01.13.01], #98)
 - **Scope:** `Assimalign.Viu.Reactivity` and every consumer of it (`RuntimeCore`, the compiler's
   expression-binding contract).
+
+> **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
+> framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
+> [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority — this ADR's decision is
+> carried forward there as clauses `[RCT-1]`–`[RCT-12]`, and its most consequential corollary (with
+> no proxy, the compiler alone decides every access form) as `[RCT-8]` and `[SFC-6]`. **The decision
+> recorded here is unaffected**: reference-first reactivity with no proxy remains the model. What is
+> superseded is the framing — the design is described below as a port of another project's ref
+> internals and as a mapping of its API surface, whereas it is Viu's own reactivity model, specified
+> and test-pinned on its own terms.
+>
+> Two factual notes for a future reader, recorded rather than edited: the scope line names
+> `RuntimeCore`, which was renamed `Assimalign.Viu.Core` ([V01.01.12.21]) before Reactivity was
+> re-split into its own library; and the generator assembly named in the Consequences is
+> `Assimalign.Viu.Generators.Reactivity` (in the folder
+> `analyzers/Assimalign.Viu.Generators.Reactive/`). The body is preserved as the historical record
+> and is not rewritten (see [README.md](README.md), "Append-only").
 
 ## Context
 

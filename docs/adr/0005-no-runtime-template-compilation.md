@@ -1,10 +1,34 @@
 # ADR-0005: No runtime template compilation (build-time source generators only)
 
-- **Status:** Accepted (container framing partially superseded on 2026-08-02 — see the Decision note)
+- **Status:** Accepted (container framing partially superseded on 2026-08-02 — see the Decision note;
+  framework framing annotated the same date — see the note below)
 - **Date:** 2026-07-17 (the build-time `.viu` compilation container was decided this date, `docs/PLAN.md`
   founding decision 3; formally recorded as an ADR under [V01.01.13.01], #98, on 2026-07-19)
 - **Scope:** `Assimalign.Viu.Syntax.Templates`, `Assimalign.Viu.Syntax.SingleFileComponent`, and the
   `Assimalign.Viu.Generators.Syntax` composition root.
+
+> **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
+> framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
+> [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority — this ADR's decision is carried
+> forward there as `[DEF-3]` and `[SFC-1]`–`[SFC-2]`. **The decision recorded here is unaffected**:
+> templates and single-file components compile at build time only, and there is no runtime
+> compilation path. What is superseded is the framing — the Context describes the rule as a
+> consequence of another framework's runtime compiler being impossible on WebAssembly, whereas it is
+> properly Viu's own AOT constraint plus a deliberate tooling choice.
+>
+> Two clarifications that the standalone decision makes worth stating plainly, since the body
+> predates it:
+>
+> - The `.vue` compatibility parser ([V01.01.06.09], #250) is a **shipping product feature** targeting
+>   a documented external container format, specified as `SPECIFICATION.md` §9. It is a compatibility
+>   target, not evidence of derivation.
+> - "The markup inside the template container remains standard Vue template syntax" describes the
+>   template language Viu implements and is retained as a factual statement about the input Viu
+>   accepts; the semantics of that language are specified by Viu in `SPECIFICATION.md` §8 and pinned
+>   by this repository's tests.
+>
+> The body is preserved as the historical record and is not rewritten (see [README.md](README.md),
+> "Append-only").
 
 ## Context
 

@@ -1,8 +1,18 @@
 # ADR-0001: Roslyn source generators over reflection and dynamic code generation
 
-- **Status:** Accepted
+- **Status:** Accepted (decision stands; framing annotated 2026-08-02 — see the note below)
 - **Date:** 2026-07-19 (foundational C#/WASM premise; formally recorded under [V01.01.13.01], #98)
 - **Scope:** Repo-wide — every `Assimalign.Viu.*` runtime library and every build-time generator.
+
+> **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
+> framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
+> [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority (clauses `[EXE-4]`–`[EXE-10]`
+> carry this ADR's constraints forward). **The decision recorded here is unaffected** — source
+> generators over reflection and dynamic codegen remains binding. What is superseded is the framing:
+> the constraints below are stated as consequences of Vue's `Proxy` and `new Function` being
+> unavailable, whereas they are properly Viu's own AOT/trimming requirements, which would hold for
+> any framework targeting WebAssembly. The body is preserved as the historical record and is not
+> rewritten (see [README.md](README.md), "Append-only").
 
 ## Context
 

@@ -7,10 +7,14 @@
 
 ## Context
 
-The forces at play: what problem this decides, the constraints that bound it (AOT/trimming, the
-WASM interop budget, upstream Vue 3 parity, the single-threaded model), and the relevant upstream
-Vue 3 behavior. Link the authoritative reference — vuejs.org or the specific `vuejs/core` source
-file/module — so the parity baseline the decision diverges from (or preserves) is explicit.
+The forces at play: what problem this decides and the constraints that bound it (AOT/trimming, the
+WASM interop budget, the single-threaded model, the immutable render tree, the absence of an
+object-proxy layer). State the current specified behavior the decision changes or preserves, citing
+the [`docs/SPECIFICATION.md`](../SPECIFICATION.md) clause id — Viu's own specification is the
+baseline, and no external project's behavior is authoritative here. Where the decision concerns a
+documented **external compatibility target** Viu deliberately consumes — the `.vue`
+single-file-component container format, Tailwind CSS v4.3.3, WHATWG HTML serialization, the Language
+Server Protocol — name and link that target: there the citation *is* the requirement.
 
 ## Decision
 
@@ -19,9 +23,9 @@ it without this conversation's context. State the rule, not just the sentiment.
 
 ## Consequences
 
-What becomes easier and what becomes harder. Include the follow-on obligations the decision creates
-(new seams to maintain, tests that pin the chosen behavior, budgets to gate) and the deltas from
-Vue 3 that the decision commits Viu to.
+What becomes easier and what becomes harder. Include the follow-on obligations the decision creates:
+new seams to maintain, tests that pin the chosen behavior, budgets to gate, and the
+`docs/SPECIFICATION.md` clauses that must be added, amended, or marked superseded in the same change.
 
 ## Alternatives considered
 
@@ -30,5 +34,9 @@ measurement (link the harness/benchmark). This is where a superseding ADR will l
 
 ## References
 
-- Vue 3 counterpart(s): vuejs.org guide / `vuejs/core` package or source file.
+- The [`docs/SPECIFICATION.md`](../SPECIFICATION.md) clause ids the decision adds, amends, or supersedes.
+- Any external compatibility target the decision commits Viu to (name + version-pinned link).
 - Related ADRs, `docs/PLAN.md` founding decisions, per-library `DESIGN.md` sections.
+- For a performance-motivated decision, the
+  [`docs/PERFORMANCE-RESEARCH.md`](../PERFORMANCE-RESEARCH.md) finding row and the benchmark run that
+  justified it.

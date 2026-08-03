@@ -37,5 +37,8 @@
   generation, no linker-unfriendly activation paths. Roslyn source generators are the sanctioned path.
 - The JS-interop boundary is the dominant performance cost — prefer batched interop over per-op
   calls, and always clean up JS-side handles and event listeners.
-- Where behavior mirrors Vue 3, upstream semantics win: link the vuejs.org / vuejs/core reference in
-  the issue, code comment, or test that pins the behavior.
+- `docs/SPECIFICATION.md` is the authority for Viu's semantics: cite the clause id in the issue, code
+  comment, or test that pins the behavior. An external project is authoritative only where the issue
+  names a declared compatibility target (the `.vue` container format, Tailwind CSS v4.3.3, a WHATWG
+  or W3C specification); performance ideas borrowed from other frameworks are recorded in
+  `docs/PERFORMANCE-RESEARCH.md` and never make that framework normative.

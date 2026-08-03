@@ -1,11 +1,18 @@
 # Viu
 
-A faithful re-implementation of Vue.js 3 in C#/.NET, targeting the browser through the .NET
-WebAssembly build tools (`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). The
-architecture mirrors Vue 3's package boundaries (`@vue/reactivity`, `runtime-core`, `runtime-dom`,
-compiler packages, `server-renderer`) as `Assimalign.Viu.*` class libraries, with Roslyn source
-generators standing in for everything Vue does with JS `Proxy` and runtime `new Function` — WASM is
+A standalone C#/.NET UI framework targeting the browser through the .NET WebAssembly build tools
+(`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). Viu renders through a hierarchical
+virtual-node tree with compiler-informed diffing, compiles templates and single-file components at
+build time via Roslyn source generators, and ships as `Assimalign.Viu.*` class libraries. WASM is
 AOT/trimming territory, so reflection-based serialization and dynamic code generation are forbidden.
+
+**[`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) is the authority for Viu's semantics** — cite its
+clause ids (`[RND-KEY-3]`, `[CMP-4]`, …) rather than any external framework. Viu is not a port of and
+takes no semantics from any JavaScript framework. Two things are deliberately different:
+external **compatibility targets** (the `.vue` container format, Tailwind CSS v4.3.3, WHATWG HTML
+serialization) are real product features and are documented as such; and
+[`docs/PERFORMANCE-RESEARCH.md`](docs/PERFORMANCE-RESEARCH.md) is the non-normative channel for
+evaluating other frameworks' performance work — including Vue's — for possible replication.
 
 ## Layout
 

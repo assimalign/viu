@@ -1,10 +1,27 @@
 # ADR-0003: Batched JS-interop DOM operations as the performance budget
 
-- **Status:** Accepted
+- **Status:** Accepted (decision stands; framing annotated 2026-08-02 — see the note below)
 - **Date:** 2026-07-19 (foundational C#/WASM premise; formally recorded under [V01.01.13.01], #98)
 - **Scope:** `Assimalign.Viu.RuntimeDom`, `Assimalign.Viu.RuntimeCore` (renderer, scheduler, block
   tree), `Assimalign.Viu.Shared` (the flag vocabulary), and the compiler's static-optimization
   passes.
+
+> **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
+> framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
+> [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority — this ADR's decision is
+> carried forward there as clauses `[EXE-11]`–`[EXE-14]` and `[RND-IO-1]`–`[RND-IO-5]`. **The
+> decision recorded here is unaffected**: the interop boundary is Viu's performance budget, and
+> compiler-informed patching exists to spend as few crossings as possible. What is superseded is the
+> framing — compiler-informed rendering is described below as another project's idea that pays off
+> more on WebAssembly, whereas it is now the architecture Viu owns and specifies
+> ([`docs/SPECIFICATION.md`](../SPECIFICATION.md) §6). Continued evaluation of other frameworks'
+> renderer performance work happens through
+> [`docs/PERFORMANCE-RESEARCH.md`](../PERFORMANCE-RESEARCH.md), which is explicitly non-normative.
+>
+> A factual note for a future reader, recorded rather than edited: the scope line names
+> `Assimalign.Viu.RuntimeDom` and `Assimalign.Viu.RuntimeCore`, renamed `Assimalign.Viu.Browser`
+> ([V01.01.12.22]) and `Assimalign.Viu.Core` ([V01.01.12.21]) respectively. The body is preserved as
+> the historical record and is not rewritten (see [README.md](README.md), "Append-only").
 
 ## Context
 
