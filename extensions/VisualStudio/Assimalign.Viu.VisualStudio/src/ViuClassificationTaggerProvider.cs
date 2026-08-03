@@ -60,8 +60,12 @@ internal sealed class ViuClassificationTaggerProvider :
         [
             DocumentFilter.FromDocumentType(ViuLanguageServerProvider.ViuDocumentType),
             DocumentFilter.FromDocumentType(ViuLanguageServerProvider.VueCompatibilityDocumentType),
-            DocumentFilter.FromGlobPattern("**/*.viu", relativePath: false),
-            DocumentFilter.FromGlobPattern("**/*.vue", relativePath: false),
+            // relativePath: true is required, not incidental. A glob is matched with forward slashes
+            // and the SDK documents that a backslash is not valid within one; only the relative-path
+            // form converts a Windows document path's backslashes to slashes before matching, so the
+            // absolute form cannot match anything on Windows.
+            DocumentFilter.FromGlobPattern("**/*.viu", relativePath: true),
+            DocumentFilter.FromGlobPattern("**/*.vue", relativePath: true),
         ],
     };
 
