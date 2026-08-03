@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -101,12 +102,15 @@ public class LanguageServerCompletionListTests
 
         public bool CloseDocument(string documentUri) => true;
 
-        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(string documentUri)
+        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDiagnostic>();
 
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,
-            LanguagePosition position)
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
         {
             var items = new LanguageCompletionItem[itemCount];
             for (var index = 0; index < itemCount; index++)
@@ -124,22 +128,32 @@ public class LanguageServerCompletionListTests
             return items;
         }
 
-        public LanguageHover? GetHover(string documentUri, LanguagePosition position) => null;
+        public LanguageHover? GetHover(
+            string documentUri,
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
+            => null;
 
         public string? ResolveCompletionDocumentation(
             string documentUri,
-            string completionLabel)
+            string completionLabel,
+            CancellationToken cancellationToken = default)
             => null;
 
-        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDocumentSymbol>();
 
-        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageFoldingRange>();
 
         public IReadOnlyList<LanguageCodeAction> GetCodeActions(
             string documentUri,
-            LanguageRange range)
+            LanguageRange range,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageCodeAction>();
     }
 }

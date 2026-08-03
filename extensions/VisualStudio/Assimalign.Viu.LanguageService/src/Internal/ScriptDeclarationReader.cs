@@ -15,8 +15,10 @@ namespace Assimalign.Viu.LanguageService;
 /// style block never pays a reparse.
 /// </summary>
 /// <remarks>
-/// Not thread-safe: every call site runs inside the owning service's request lock, so the reader
-/// assumes single-threaded use and takes no internal lock.
+/// Thread-safe: language-service reads compute outside the service lock ([V01.01.12.23], #259), so
+/// the reader guards its cache and miss counter with a private gate. Concurrent misses serialize
+/// the underlying parse — bounded CPU work — which also keeps the clear-at-capacity policy from
+/// thrashing under racing misses.
 /// </remarks>
 internal sealed class ScriptDeclarationReader
 {
@@ -25,33 +27,47 @@ internal sealed class ScriptDeclarationReader
     // impossible.
     private const int MaximumCacheEntries = 8;
 
+    private readonly object synchronization = new();
     private readonly Dictionary<string, IReadOnlyList<ScriptDeclaredMember>> cache =
         new(StringComparer.Ordinal);
+    private int cacheMissCount;
 
     /// <summary>Gets how many <see cref="Read"/> calls missed the cache and parsed.</summary>
-    internal int CacheMissCount { get; private set; }
+    internal int CacheMissCount
+    {
+        get
+        {
+            lock (synchronization)
+            {
+                return cacheMissCount;
+            }
+        }
+    }
 
     /// <summary>Reads the members declared by <paramref name="scriptContent"/>.</summary>
     /// <param name="scriptContent">The raw <c>@script</c> block content.</param>
     /// <returns>The declared fields, properties, and methods, in declaration order.</returns>
     internal IReadOnlyList<ScriptDeclaredMember> Read(string scriptContent)
     {
-        if (cache.TryGetValue(scriptContent, out var cached))
+        lock (synchronization)
         {
-            return cached;
-        }
+            if (cache.TryGetValue(scriptContent, out var cached))
+            {
+                return cached;
+            }
 
-        CacheMissCount++;
-        // The shared analyzer reports block-content-relative member locations, so a description is
-        // a pure function of the script text and the cache key stays the content string alone.
-        IReadOnlyList<ScriptDeclaredMember> members =
-            ScriptBlockAnalyzer.DescribeMembers(scriptContent);
-        if (cache.Count == MaximumCacheEntries)
-        {
-            cache.Clear();
-        }
+            cacheMissCount++;
+            // The shared analyzer reports block-content-relative member locations, so a description is
+            // a pure function of the script text and the cache key stays the content string alone.
+            IReadOnlyList<ScriptDeclaredMember> members =
+                ScriptBlockAnalyzer.DescribeMembers(scriptContent);
+            if (cache.Count == MaximumCacheEntries)
+            {
+                cache.Clear();
+            }
 
-        cache[scriptContent] = members;
-        return members;
+            cache[scriptContent] = members;
+            return members;
+        }
     }
 }

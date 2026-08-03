@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -99,7 +101,9 @@ public class LanguageServerCodeActionTests
 
             output.Position = 0;
             var messages = await ReadAllMessagesAsync(output);
-            var actions = messages[2].RootElement.GetProperty("result");
+            // The unrestored temporary project also produces a project-context status notification
+            // ([V01.01.12.23], #259), so the response is located by identifier rather than index.
+            var actions = FindResponse(messages, "actions").GetProperty("result");
             actions.GetArrayLength().ShouldBe(1);
             var action = actions[0];
             action.GetProperty("title").GetString().ShouldBe("Use lang=\"csharp\"");
@@ -186,6 +190,14 @@ public class LanguageServerCodeActionTests
     private static string Frame(string payload)
         => $"Content-Length: {Encoding.UTF8.GetByteCount(payload)}\r\n\r\n{payload}";
 
+    private static JsonElement FindResponse(List<JsonDocument> messages, string identifier)
+        => messages.Single(
+                message =>
+                    message.RootElement.TryGetProperty("id", out var responseIdentifier) &&
+                    responseIdentifier.ValueKind == JsonValueKind.String &&
+                    responseIdentifier.GetString() == identifier)
+            .RootElement;
+
     private sealed class QuickfixLanguageService : IViuLanguageService
     {
         public void OpenDocument(string documentUri, string text, int? version)
@@ -200,30 +212,43 @@ public class LanguageServerCodeActionTests
 
         public bool CloseDocument(string documentUri) => true;
 
-        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(string documentUri)
+        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDiagnostic>();
 
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,
-            LanguagePosition position)
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageCompletionItem>();
 
-        public LanguageHover? GetHover(string documentUri, LanguagePosition position) => null;
+        public LanguageHover? GetHover(
+            string documentUri,
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
+            => null;
 
         public string? ResolveCompletionDocumentation(
             string documentUri,
-            string completionLabel)
+            string completionLabel,
+            CancellationToken cancellationToken = default)
             => null;
 
-        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDocumentSymbol>();
 
-        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageFoldingRange>();
 
         public IReadOnlyList<LanguageCodeAction> GetCodeActions(
             string documentUri,
-            LanguageRange range)
+            LanguageRange range,
+            CancellationToken cancellationToken = default)
             =>
             [
                 new LanguageCodeAction(

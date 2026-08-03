@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -17,10 +18,29 @@ internal sealed class LanguageServerHost
     private const int MethodNotFoundCode = -32601;
     private const int InvalidParametersCode = -32602;
     private const int InternalErrorCode = -32603;
+    // The Language Server Protocol's RequestCancelled code: the reply for a request whose
+    // $/cancelRequest arrived while it was still in flight.
+    private const int RequestCancelledCode = -32800;
 
     private readonly IViuLanguageService languageService;
     private readonly HashSet<string> openSupportedDocuments =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly ViuProjectContextReader projectContextReader = new();
+    // The status transition ledger ([V01.01.12.23], #259): project file path -> the last reported
+    // state signature. A status is reported only when its signature differs from the project's
+    // last reported one — never once per keystroke, and never merely once ever: recovery
+    // overwrites the signature, so a later re-degradation re-warns. Concurrent request tasks race
+    // through TryAdd/TryUpdate, so exactly one task wins any given transition.
+    private readonly ConcurrentDictionary<string, string> reportedProjectStatuses =
+        new(StringComparer.OrdinalIgnoreCase);
+    // Keyed by the request identifier's raw JSON text (JsonElement.GetRawText()), so the numeric
+    // identifier 1 and the string identifier "1" stay distinct per JSON-RPC. The loop thread adds
+    // entries; request tasks remove their own entry from pool threads.
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> pendingRequestCancellations =
+        new(StringComparer.Ordinal);
+    // Loop-thread only: the dispatched request tasks. Completed tasks are pruned each iteration,
+    // and the list is drained before the shutdown reply and before RunAsync returns.
+    private readonly List<Task> inFlightRequests = new();
     private LanguageServerClientCapabilities clientCapabilities =
         LanguageServerClientCapabilities.Default;
     private bool shutdownRequested;
@@ -33,6 +53,14 @@ internal sealed class LanguageServerHost
     internal LanguageServerHost(IViuLanguageService languageService)
         => this.languageService = languageService ?? throw new ArgumentNullException(nameof(languageService));
 
+    /// <summary>
+    /// Runs the JSON-RPC message loop. Notifications and lifecycle messages apply inline in
+    /// receive order before the next message is read; feature requests dispatch to tracked tasks
+    /// and may answer out of receive order relative to each other. A dispatched request may
+    /// therefore observe document synchronization newer than its send time (monotonic reads) —
+    /// the accepted Language Server Protocol idiom, which clients compensate for with document
+    /// versions and <c>$/cancelRequest</c>.
+    /// </summary>
     internal async Task<int> RunAsync(
         Stream input,
         Stream output,
@@ -46,6 +74,8 @@ internal sealed class LanguageServerHost
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            inFlightRequests.RemoveAll(task => task.IsCompleted);
+
             JsonDocument? document;
             try
             {
@@ -55,7 +85,7 @@ internal sealed class LanguageServerHost
             {
                 await WriteErrorAsync(
                         writer,
-                        id: null,
+                        identifier: (JsonNode?)null,
                         ParseErrorCode,
                         exception.Message,
                         cancellationToken)
@@ -66,7 +96,7 @@ internal sealed class LanguageServerHost
             {
                 await WriteErrorAsync(
                         writer,
-                        id: null,
+                        identifier: (JsonNode?)null,
                         ParseErrorCode,
                         exception.Message,
                         cancellationToken)
@@ -76,6 +106,9 @@ internal sealed class LanguageServerHost
 
             if (document is null)
             {
+                // End of input without an exit message: drain so no request task is left writing
+                // to an output stream the caller disposes right after RunAsync returns.
+                await DrainInFlightRequestsAsync().ConfigureAwait(false);
                 return 0;
             }
 
@@ -105,9 +138,10 @@ internal sealed class LanguageServerHost
             !message.TryGetProperty("method", out var methodElement) ||
             methodElement.ValueKind != JsonValueKind.String)
         {
+            var optionalIdentifier = GetOptionalIdentifier(message);
             await WriteErrorAsync(
                     writer,
-                    GetOptionalIdentifier(message),
+                    optionalIdentifier.HasValue ? CloneElement(optionalIdentifier.Value) : null,
                     InvalidRequestCode,
                     "A JSON-RPC message must contain a string method.",
                     cancellationToken)
@@ -137,11 +171,17 @@ internal sealed class LanguageServerHost
 
                 case "initialized":
                 case "$/setTrace":
+                    return false;
+
                 case "$/cancelRequest":
+                    HandleCancelRequest(parameters);
                     return false;
 
                 case "shutdown":
                     shutdownRequested = true;
+                    // Draining before the reply preserves the contract that every response
+                    // precedes the shutdown reply.
+                    await DrainInFlightRequestsAsync().ConfigureAwait(false);
                     await WriteResultAsync(
                             writer,
                             RequireIdentifier(hasIdentifier, identifier),
@@ -151,6 +191,11 @@ internal sealed class LanguageServerHost
                     return false;
 
                 case "exit":
+                    // Deliberate deviation from the protocol's "exit immediately": every compute
+                    // is bounded synchronous CPU work, and draining without cancelling keeps
+                    // in-flight responses off an output stream the caller disposes right after
+                    // RunAsync returns.
+                    await DrainInFlightRequestsAsync().ConfigureAwait(false);
                     return true;
 
                 case "textDocument/didOpen":
@@ -166,55 +211,16 @@ internal sealed class LanguageServerHost
                     return false;
 
                 case "textDocument/completion":
-                    await WriteResultAsync(
-                            writer,
-                            RequireIdentifier(hasIdentifier, identifier),
-                            HandleCompletion(parameters),
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    return false;
-
                 case "textDocument/hover":
-                    await WriteResultAsync(
-                            writer,
-                            RequireIdentifier(hasIdentifier, identifier),
-                            HandleHover(parameters),
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    return false;
-
                 case "completionItem/resolve":
-                    await WriteResultAsync(
-                            writer,
-                            RequireIdentifier(hasIdentifier, identifier),
-                            HandleCompletionItemResolve(parameters),
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    return false;
-
                 case "textDocument/documentSymbol":
-                    await WriteResultAsync(
-                            writer,
-                            RequireIdentifier(hasIdentifier, identifier),
-                            HandleDocumentSymbol(parameters),
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    return false;
-
                 case "textDocument/foldingRange":
-                    await WriteResultAsync(
-                            writer,
-                            RequireIdentifier(hasIdentifier, identifier),
-                            HandleFoldingRange(parameters),
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                    return false;
-
                 case "textDocument/codeAction":
-                    await WriteResultAsync(
-                            writer,
+                    await DispatchFeatureRequestAsync(
+                            method,
                             RequireIdentifier(hasIdentifier, identifier),
-                            HandleCodeAction(parameters),
+                            parameters,
+                            writer,
                             cancellationToken)
                         .ConfigureAwait(false);
                     return false;
@@ -266,6 +272,327 @@ internal sealed class LanguageServerHost
         }
     }
 
+    private void HandleCancelRequest(JsonElement parameters)
+    {
+        if (parameters.ValueKind != JsonValueKind.Object ||
+            !parameters.TryGetProperty("id", out var identifier))
+        {
+            return;
+        }
+
+        // An unknown identifier is silently ignored: the request either never dispatched or has
+        // already answered, and cancellation of a finished request is a no-op per the protocol.
+        if (pendingRequestCancellations.TryGetValue(identifier.GetRawText(), out var requestCancellation))
+        {
+            try
+            {
+                requestCancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Benign race: the request completed and disposed its source between the lookup
+                // and the cancel.
+            }
+        }
+    }
+
+    private async ValueTask DrainInFlightRequestsAsync()
+    {
+        if (inFlightRequests.Count == 0)
+        {
+            return;
+        }
+
+        // A tracked request task never faults — every failure becomes a JSON-RPC reply or is
+        // swallowed on host teardown — so a bare WhenAll is safe here.
+        await Task.WhenAll(inFlightRequests).ConfigureAwait(false);
+        inFlightRequests.Clear();
+    }
+
+    private async ValueTask DispatchFeatureRequestAsync(
+        string method,
+        JsonElement identifier,
+        JsonElement parameters,
+        LanguageServerProtocolMessageWriter writer,
+        CancellationToken cancellationToken)
+    {
+        // Parameters are parsed fully on the loop thread: every JsonElement points into the pooled
+        // JsonDocument the loop disposes at the end of this iteration, so a dispatched task must
+        // only ever see the JsonDocument-independent pending-request record.
+        var pending = CreatePendingRequest(method, identifier, parameters, out var inlineResult);
+        if (pending is null)
+        {
+            // Closed or unsupported documents (and clients without a required capability) answer
+            // inline with the empty/echo result, keeping those replies in strict receive order.
+            await WriteResultAsync(writer, identifier, inlineResult, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (!pendingRequestCancellations.TryAdd(pending.IdentifierKey, requestCancellation))
+        {
+            // A duplicate in-flight identifier would make $/cancelRequest ambiguous, so the
+            // protocol-violating request is rejected instead of orphaning a cancellation source.
+            requestCancellation.Dispose();
+            await WriteErrorAsync(
+                    writer,
+                    identifier,
+                    InvalidRequestCode,
+                    "A request with this identifier is already in flight.",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        inFlightRequests.Add(RunRequestAsync(pending, requestCancellation, writer, cancellationToken));
+    }
+
+    private LanguageServerPendingRequest? CreatePendingRequest(
+        string method,
+        JsonElement identifier,
+        JsonElement parameters,
+        out JsonNode? inlineResult)
+    {
+        switch (method)
+        {
+            case "textDocument/completion":
+            case "textDocument/hover":
+            {
+                var (documentUri, position) = GetDocumentPosition(parameters);
+                if (!IsOpenAndSupported(documentUri))
+                {
+                    inlineResult = method == "textDocument/completion"
+                        ? CreateCompletionList(new JsonArray(), isIncomplete: false)
+                        : null;
+                    return null;
+                }
+
+                inlineResult = null;
+                return new LanguageServerPendingRequest
+                {
+                    Method = method,
+                    Identifier = CloneElement(identifier),
+                    IdentifierKey = identifier.GetRawText(),
+                    ClientCapabilities = clientCapabilities,
+                    DocumentUri = documentUri,
+                    Position = position,
+                };
+            }
+
+            case "completionItem/resolve":
+            {
+                if (parameters.ValueKind != JsonValueKind.Object)
+                {
+                    throw InvalidParameters("The completion item is required.");
+                }
+
+                var completionLabel = GetRequiredString(parameters, "label");
+                var item = (JsonObject)CloneElement(parameters)!;
+
+                // A missing payload or a closed document echoes the item back unchanged: Visual
+                // Studio resolves items asynchronously, and a race with didClose must never
+                // surface as an error.
+                if (!parameters.TryGetProperty("data", out var data) ||
+                    data.ValueKind != JsonValueKind.Object ||
+                    !data.TryGetProperty("documentUri", out var uriElement) ||
+                    uriElement.ValueKind != JsonValueKind.String)
+                {
+                    inlineResult = item;
+                    return null;
+                }
+
+                var documentUri = uriElement.GetString()!;
+                if (!IsOpenAndSupported(documentUri))
+                {
+                    inlineResult = item;
+                    return null;
+                }
+
+                inlineResult = null;
+                return new LanguageServerPendingRequest
+                {
+                    Method = method,
+                    Identifier = CloneElement(identifier),
+                    IdentifierKey = identifier.GetRawText(),
+                    ClientCapabilities = clientCapabilities,
+                    DocumentUri = documentUri,
+                    CompletionLabel = completionLabel,
+                    ResolveItem = item,
+                };
+            }
+
+            case "textDocument/documentSymbol":
+            case "textDocument/foldingRange":
+            {
+                var textDocument = GetRequiredObject(parameters, "textDocument");
+                var documentUri = GetRequiredString(textDocument, "uri");
+                if (!IsOpenAndSupported(documentUri))
+                {
+                    inlineResult = new JsonArray();
+                    return null;
+                }
+
+                inlineResult = null;
+                return new LanguageServerPendingRequest
+                {
+                    Method = method,
+                    Identifier = CloneElement(identifier),
+                    IdentifierKey = identifier.GetRawText(),
+                    ClientCapabilities = clientCapabilities,
+                    DocumentUri = documentUri,
+                };
+            }
+
+            default:
+            {
+                var textDocument = GetRequiredObject(parameters, "textDocument");
+                var documentUri = GetRequiredString(textDocument, "uri");
+                var range = GetRange(GetRequiredObject(parameters, "range"));
+
+                // Without codeActionLiteralSupport only Command[] results are legal, and this
+                // server implements no commands, so the honest answer is an empty result.
+                if (!clientCapabilities.SupportsCodeActionLiterals ||
+                    !IsOpenAndSupported(documentUri))
+                {
+                    inlineResult = new JsonArray();
+                    return null;
+                }
+
+                inlineResult = null;
+                return new LanguageServerPendingRequest
+                {
+                    Method = method,
+                    Identifier = CloneElement(identifier),
+                    IdentifierKey = identifier.GetRawText(),
+                    ClientCapabilities = clientCapabilities,
+                    DocumentUri = documentUri,
+                    Range = range,
+                };
+            }
+        }
+    }
+
+    private async Task RunRequestAsync(
+        LanguageServerPendingRequest request,
+        CancellationTokenSource requestCancellation,
+        LanguageServerProtocolMessageWriter writer,
+        CancellationToken hostCancellation)
+    {
+        JsonNode? result = null;
+        JsonObject? statusNotification = null;
+        LanguageServerProtocolRequestException? requestFailure = null;
+        Exception? internalFailure = null;
+        var cancelled = false;
+        try
+        {
+            result = await Task.Run(
+                    () =>
+                    {
+                        // The project-context probe (disk IO included) runs on the request task,
+                        // mirroring the utility-stylesheet configuration the compute methods
+                        // already perform, and its status notification is written below before
+                        // the reply.
+                        if (IsSemanticFeatureRequest(request.Method))
+                        {
+                            statusNotification = ConfigureProjectContext(request.DocumentUri);
+                        }
+
+                        return ComputeRequestResult(request, requestCancellation.Token);
+                    },
+                    requestCancellation.Token)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = true;
+        }
+        catch (LanguageServerProtocolRequestException exception)
+        {
+            requestFailure = exception;
+        }
+        catch (Exception exception)
+        {
+            internalFailure = exception;
+        }
+        finally
+        {
+            pendingRequestCancellations.TryRemove(request.IdentifierKey, out _);
+            requestCancellation.Dispose();
+        }
+
+        try
+        {
+            // The status notification precedes the reply — legal interleaving, and the shared
+            // writer serializes whole messages so the pair can never interleave with another
+            // task's frames.
+            if (statusNotification is not null)
+            {
+                await WriteNotificationAsync(
+                        writer,
+                        "window/logMessage",
+                        statusNotification,
+                        hostCancellation)
+                    .ConfigureAwait(false);
+            }
+
+            // Replies use the host token only: a per-request token firing between the header and
+            // payload writes would corrupt the stream framing for every later message.
+            if (cancelled)
+            {
+                await WriteErrorAsync(
+                        writer,
+                        request.Identifier,
+                        RequestCancelledCode,
+                        "The request was canceled.",
+                        hostCancellation)
+                    .ConfigureAwait(false);
+            }
+            else if (requestFailure is not null)
+            {
+                await WriteErrorAsync(
+                        writer,
+                        request.Identifier,
+                        requestFailure.Code,
+                        requestFailure.Message,
+                        hostCancellation)
+                    .ConfigureAwait(false);
+            }
+            else if (internalFailure is not null)
+            {
+                await WriteErrorAsync(
+                        writer,
+                        request.Identifier,
+                        InternalErrorCode,
+                        internalFailure.Message,
+                        hostCancellation)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                await WriteResultAsync(writer, request.Identifier, result, hostCancellation)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or IOException or ObjectDisposedException)
+        {
+            // Host teardown mid-write: a tracked task must always complete successfully so the
+            // shutdown/exit drains stay bare Task.WhenAll calls.
+        }
+    }
+
+    private JsonNode? ComputeRequestResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
+        => request.Method switch
+        {
+            "textDocument/completion" => ComputeCompletionResult(request, cancellationToken),
+            "textDocument/hover" => ComputeHoverResult(request, cancellationToken),
+            "completionItem/resolve" => ComputeCompletionItemResolveResult(request, cancellationToken),
+            "textDocument/documentSymbol" => ComputeDocumentSymbolResult(request, cancellationToken),
+            "textDocument/foldingRange" => ComputeFoldingRangeResult(request, cancellationToken),
+            _ => ComputeCodeActionResult(request, cancellationToken),
+        };
+
     private async ValueTask HandleDidOpenAsync(
         JsonElement parameters,
         LanguageServerProtocolMessageWriter writer,
@@ -276,15 +603,27 @@ internal sealed class LanguageServerHost
         var text = GetRequiredString(textDocument, "text");
         var version = GetOptionalInteger(textDocument, "version");
 
+        JsonObject? statusNotification = null;
         if (ViuDocumentSupport.IsSupported(documentUri))
         {
             openSupportedDocuments.Add(documentUri);
             ConfigureUtilityStylesheet(documentUri);
+            statusNotification = ConfigureProjectContext(documentUri);
             languageService.OpenDocument(documentUri, text, version);
         }
         else if (openSupportedDocuments.Remove(documentUri))
         {
             languageService.CloseDocument(documentUri);
+        }
+
+        if (statusNotification is not null)
+        {
+            await WriteNotificationAsync(
+                    writer,
+                    "window/logMessage",
+                    statusNotification,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
 
         await PublishDiagnosticsAsync(writer, documentUri, cancellationToken).ConfigureAwait(false);
@@ -355,16 +694,17 @@ internal sealed class LanguageServerHost
             .ConfigureAwait(false);
     }
 
-    private JsonObject HandleCompletion(JsonElement parameters)
+    private JsonObject ComputeCompletionResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
     {
-        var (documentUri, position) = GetDocumentPosition(parameters);
-        if (!IsOpenAndSupported(documentUri))
-        {
-            return CreateCompletionList(new JsonArray(), isIncomplete: false);
-        }
-
-        ConfigureUtilityStylesheet(documentUri);
-        var completions = languageService.GetCompletions(documentUri, position);
+        // The stylesheet configuration (disk probing included) runs on the request task, mirroring
+        // the previous per-request configure-then-compute order without blocking the loop thread.
+        ConfigureUtilityStylesheet(request.DocumentUri);
+        var completions = languageService.GetCompletions(
+            request.DocumentUri,
+            request.Position,
+            cancellationToken);
         var items = new JsonArray();
         foreach (var completion in completions)
         {
@@ -381,7 +721,7 @@ internal sealed class LanguageServerHost
                 // the per-document stylesheet context, keeping the server stateless.
                 ["data"] = new JsonObject
                 {
-                    ["documentUri"] = documentUri,
+                    ["documentUri"] = request.DocumentUri,
                     ["label"] = completion.Label,
                 },
             };
@@ -392,7 +732,7 @@ internal sealed class LanguageServerHost
             {
                 item["documentation"] = LanguageServerMarkupContent.Create(
                     completion.Documentation,
-                    clientCapabilities.CompletionDocumentationSupportsMarkdown);
+                    request.ClientCapabilities.CompletionDocumentationSupportsMarkdown);
             }
 
             if (!string.IsNullOrEmpty(completion.FilterText))
@@ -419,16 +759,15 @@ internal sealed class LanguageServerHost
             completions.Count >= LanguageCompletionLimits.MaximumItems);
     }
 
-    private JsonNode? HandleHover(JsonElement parameters)
+    private JsonNode? ComputeHoverResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
     {
-        var (documentUri, position) = GetDocumentPosition(parameters);
-        if (!IsOpenAndSupported(documentUri))
-        {
-            return null;
-        }
-
-        ConfigureUtilityStylesheet(documentUri);
-        var hover = languageService.GetHover(documentUri, position);
+        ConfigureUtilityStylesheet(request.DocumentUri);
+        var hover = languageService.GetHover(
+            request.DocumentUri,
+            request.Position,
+            cancellationToken);
         if (hover is null)
         {
             return null;
@@ -438,87 +777,61 @@ internal sealed class LanguageServerHost
         {
             ["contents"] = LanguageServerMarkupContent.Create(
                 hover.Markdown,
-                clientCapabilities.HoverSupportsMarkdown),
+                request.ClientCapabilities.HoverSupportsMarkdown),
             ["range"] = ToJsonRange(hover.Range),
         };
     }
 
-    private JsonNode HandleCompletionItemResolve(JsonElement parameters)
+    private JsonNode ComputeCompletionItemResolveResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
     {
-        if (parameters.ValueKind != JsonValueKind.Object)
-        {
-            throw InvalidParameters("The completion item is required.");
-        }
-
-        var completionLabel = GetRequiredString(parameters, "label");
-        var item = (JsonObject)CloneElement(parameters)!;
-
-        // A missing payload or a closed document echoes the item back unchanged: Visual Studio
-        // resolves items asynchronously, and a race with didClose must never surface as an error.
-        if (!parameters.TryGetProperty("data", out var data) ||
-            data.ValueKind != JsonValueKind.Object ||
-            !data.TryGetProperty("documentUri", out var uriElement) ||
-            uriElement.ValueKind != JsonValueKind.String)
-        {
-            return item;
-        }
-
-        var documentUri = uriElement.GetString()!;
-        if (!IsOpenAndSupported(documentUri))
-        {
-            return item;
-        }
-
-        ConfigureUtilityStylesheet(documentUri);
+        ConfigureUtilityStylesheet(request.DocumentUri);
         var documentation = languageService.ResolveCompletionDocumentation(
-            documentUri,
-            completionLabel);
+            request.DocumentUri,
+            request.CompletionLabel!,
+            cancellationToken);
+        var item = request.ResolveItem!;
         if (documentation is not null)
         {
             item["documentation"] = LanguageServerMarkupContent.Create(
                 documentation,
-                clientCapabilities.CompletionDocumentationSupportsMarkdown);
+                request.ClientCapabilities.CompletionDocumentationSupportsMarkdown);
         }
 
         return item;
     }
 
-    private JsonArray HandleDocumentSymbol(JsonElement parameters)
+    private JsonArray ComputeDocumentSymbolResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
     {
-        var textDocument = GetRequiredObject(parameters, "textDocument");
-        var documentUri = GetRequiredString(textDocument, "uri");
         var results = new JsonArray();
-        if (!IsOpenAndSupported(documentUri))
+        foreach (var symbol in languageService.GetDocumentSymbols(
+                     request.DocumentUri,
+                     cancellationToken))
         {
-            return results;
-        }
-
-        foreach (var symbol in languageService.GetDocumentSymbols(documentUri))
-        {
-            if (clientCapabilities.SupportsHierarchicalDocumentSymbols)
+            if (request.ClientCapabilities.SupportsHierarchicalDocumentSymbols)
             {
                 results.Add((JsonNode)ToJsonDocumentSymbol(symbol));
             }
             else
             {
-                AppendSymbolInformation(symbol, documentUri, results);
+                AppendSymbolInformation(symbol, request.DocumentUri, results);
             }
         }
 
         return results;
     }
 
-    private JsonArray HandleFoldingRange(JsonElement parameters)
+    private JsonArray ComputeFoldingRangeResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
     {
-        var textDocument = GetRequiredObject(parameters, "textDocument");
-        var documentUri = GetRequiredString(textDocument, "uri");
         var results = new JsonArray();
-        if (!IsOpenAndSupported(documentUri))
-        {
-            return results;
-        }
-
-        foreach (var foldingRange in languageService.GetFoldingRanges(documentUri))
+        foreach (var foldingRange in languageService.GetFoldingRanges(
+                     request.DocumentUri,
+                     cancellationToken))
         {
             var json = new JsonObject
             {
@@ -536,22 +849,15 @@ internal sealed class LanguageServerHost
         return results;
     }
 
-    private JsonArray HandleCodeAction(JsonElement parameters)
+    private JsonArray ComputeCodeActionResult(
+        LanguageServerPendingRequest request,
+        CancellationToken cancellationToken)
     {
-        var textDocument = GetRequiredObject(parameters, "textDocument");
-        var documentUri = GetRequiredString(textDocument, "uri");
-        var range = GetRange(GetRequiredObject(parameters, "range"));
         var results = new JsonArray();
-
-        // Without codeActionLiteralSupport only Command[] results are legal, and this server
-        // implements no commands, so the honest answer is an empty result.
-        if (!clientCapabilities.SupportsCodeActionLiterals ||
-            !IsOpenAndSupported(documentUri))
-        {
-            return results;
-        }
-
-        foreach (var action in languageService.GetCodeActions(documentUri, range))
+        foreach (var action in languageService.GetCodeActions(
+                     request.DocumentUri,
+                     request.Range,
+                     cancellationToken))
         {
             var diagnostics = new JsonArray();
             foreach (var diagnostic in action.Diagnostics)
@@ -581,7 +887,7 @@ internal sealed class LanguageServerHost
                     {
                         ["changes"] = new JsonObject
                         {
-                            [documentUri] = edits,
+                            [request.DocumentUri] = edits,
                         },
                     },
                 });
@@ -662,6 +968,8 @@ internal sealed class LanguageServerHost
             .ConfigureAwait(false);
     }
 
+    // Loop-thread only: reads and mutates openSupportedDocuments, so a dispatched request task
+    // must never call this — the open/supported evaluation happens before dispatch.
     private bool IsOpenAndSupported(string documentUri)
     {
         if (!openSupportedDocuments.Contains(documentUri))
@@ -733,6 +1041,74 @@ internal sealed class LanguageServerHost
                 ["version"] = "0.2.0",
             },
         };
+
+    // Semantic script features consume the project context, so the probe runs exactly where the
+    // utility stylesheet configures: document open plus the completion, hover, and resolve
+    // requests ([V01.01.12.23], #259).
+    private static bool IsSemanticFeatureRequest(string method)
+        => method is "textDocument/completion" or "textDocument/hover" or "completionItem/resolve";
+
+    /// <summary>
+    /// Probes the document's project context, feeds it to the language service, and composes the
+    /// <c>window/logMessage</c> payload the caller writes before its reply — or
+    /// <see langword="null"/> when the status is silent or unchanged since the project's last
+    /// reported state.
+    /// </summary>
+    private JsonObject? ConfigureProjectContext(string documentUri)
+    {
+        if (languageService is not IScriptSemanticLanguageService scriptSemanticLanguageService)
+        {
+            return null;
+        }
+
+        var (context, status) = projectContextReader.Read(documentUri);
+        scriptSemanticLanguageService.ConfigureProjectContext(documentUri, context);
+        if (!status.TryCreateLogMessage(out var messageType, out var message) ||
+            !TryRecordStatusTransition(status))
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["type"] = messageType,
+            ["message"] = message,
+        };
+    }
+
+    // Records a reportable status in the transition ledger: true exactly once per state-signature
+    // transition per project, regardless of how many concurrent requests observe it.
+    private bool TryRecordStatusTransition(ViuProjectContextStatus status)
+    {
+        // Every reportable status names its project; the silent NoOwningProject state never
+        // reaches this method because TryCreateLogMessage already returned false for it.
+        var projectFilePath = status.ProjectFilePath;
+        if (projectFilePath is null)
+        {
+            return false;
+        }
+
+        var signature = status.StateSignature;
+        while (true)
+        {
+            if (reportedProjectStatuses.TryGetValue(projectFilePath, out var lastSignature))
+            {
+                if (string.Equals(lastSignature, signature, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                if (reportedProjectStatuses.TryUpdate(projectFilePath, signature, lastSignature))
+                {
+                    return true;
+                }
+            }
+            else if (reportedProjectStatuses.TryAdd(projectFilePath, signature))
+            {
+                return true;
+            }
+        }
+    }
 
     private void ConfigureUtilityStylesheet(string documentUri)
     {
@@ -888,9 +1264,16 @@ internal sealed class LanguageServerHost
     private static LanguageServerProtocolRequestException InvalidParameters(string message)
         => new(InvalidParametersCode, message);
 
-    private static async ValueTask WriteResultAsync(
+    private static ValueTask WriteResultAsync(
         LanguageServerProtocolMessageWriter writer,
         JsonElement identifier,
+        JsonNode? result,
+        CancellationToken cancellationToken)
+        => WriteResultAsync(writer, CloneElement(identifier), result, cancellationToken);
+
+    private static async ValueTask WriteResultAsync(
+        LanguageServerProtocolMessageWriter writer,
+        JsonNode? identifier,
         JsonNode? result,
         CancellationToken cancellationToken)
     {
@@ -898,16 +1281,24 @@ internal sealed class LanguageServerHost
                 new JsonObject
                 {
                     ["jsonrpc"] = "2.0",
-                    ["id"] = CloneElement(identifier),
+                    ["id"] = identifier,
                     ["result"] = result,
                 },
                 cancellationToken)
             .ConfigureAwait(false);
     }
 
+    private static ValueTask WriteErrorAsync(
+        LanguageServerProtocolMessageWriter writer,
+        JsonElement identifier,
+        int code,
+        string message,
+        CancellationToken cancellationToken)
+        => WriteErrorAsync(writer, CloneElement(identifier), code, message, cancellationToken);
+
     private static async ValueTask WriteErrorAsync(
         LanguageServerProtocolMessageWriter writer,
-        JsonElement? id,
+        JsonNode? identifier,
         int code,
         string message,
         CancellationToken cancellationToken)
@@ -916,7 +1307,7 @@ internal sealed class LanguageServerHost
                 new JsonObject
                 {
                     ["jsonrpc"] = "2.0",
-                    ["id"] = id.HasValue ? CloneElement(id.Value) : null,
+                    ["id"] = identifier,
                     ["error"] = new JsonObject
                     {
                         ["code"] = code,

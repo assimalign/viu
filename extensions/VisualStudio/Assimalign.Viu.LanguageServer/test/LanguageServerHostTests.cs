@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -489,8 +490,19 @@ public class LanguageServerHostTests
 
             output.Position = 0;
             var messages = await ReadAllMessagesAsync(output);
-            messages.Count.ShouldBe(3);
-            var items = messages[1].RootElement
+            // Four messages: the unrestored temporary project reports its once-only
+            // project-context status ([V01.01.12.23], #259) alongside the diagnostics push and the
+            // two responses.
+            messages.Count.ShouldBe(4);
+            messages
+                .Count(
+                    message =>
+                        message.RootElement.TryGetProperty("method", out var method) &&
+                        method.GetString() == "window/logMessage")
+                .ShouldBe(1);
+            // Concurrent dispatch ([V01.01.12.23], #259) no longer defines the order between the
+            // completion and resolve responses, so each response is located by its identifier.
+            var items = FindResponse(messages, "completion")
                 .GetProperty("result")
                 .GetProperty("items")
                 .EnumerateArray()
@@ -504,7 +516,7 @@ public class LanguageServerHostTests
             data.GetProperty("documentUri").GetString().ShouldBe(documentUri);
             data.GetProperty("label").GetString().ShouldBe("bg-brand");
 
-            var resolved = messages[2].RootElement.GetProperty("result");
+            var resolved = FindResponse(messages, "resolve").GetProperty("result");
             var documentation = resolved.GetProperty("documentation")
                 .GetProperty("value")
                 .GetString();
@@ -538,6 +550,14 @@ public class LanguageServerHostTests
         }
     }
 
+    private static JsonElement FindResponse(List<JsonDocument> messages, string identifier)
+        => messages.Single(
+                message =>
+                    message.RootElement.TryGetProperty("id", out var responseIdentifier) &&
+                    responseIdentifier.ValueKind == JsonValueKind.String &&
+                    responseIdentifier.GetString() == identifier)
+            .RootElement;
+
     private static string Frame(string payload)
         => $"Content-Length: {Encoding.UTF8.GetByteCount(payload)}\r\n\r\n{payload}";
 
@@ -555,12 +575,15 @@ public class LanguageServerHostTests
 
         public bool CloseDocument(string documentUri) => true;
 
-        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(string documentUri)
+        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDiagnostic>();
 
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,
-            LanguagePosition position)
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
             =>
             [
                 new LanguageCompletionItem(
@@ -577,22 +600,32 @@ public class LanguageServerHostTests
                     FilterText: "hover:bg-red"),
             ];
 
-        public LanguageHover? GetHover(string documentUri, LanguagePosition position) => null;
+        public LanguageHover? GetHover(
+            string documentUri,
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
+            => null;
 
         public string? ResolveCompletionDocumentation(
             string documentUri,
-            string completionLabel)
+            string completionLabel,
+            CancellationToken cancellationToken = default)
             => null;
 
-        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDocumentSymbol>();
 
-        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
+            string documentUri,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageFoldingRange>();
 
         public IReadOnlyList<LanguageCodeAction> GetCodeActions(
             string documentUri,
-            LanguageRange range)
+            LanguageRange range,
+            CancellationToken cancellationToken = default)
             => Array.Empty<LanguageCodeAction>();
     }
 
@@ -636,7 +669,9 @@ public class LanguageServerHostTests
             return true;
         }
 
-        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(string documentUri)
+        public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
+            string documentUri,
+            CancellationToken cancellationToken = default)
         {
             DiagnosticsCount++;
             return Array.Empty<LanguageDiagnostic>();
@@ -644,7 +679,8 @@ public class LanguageServerHostTests
 
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,
-            LanguagePosition position)
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
         {
             CompletionCount++;
             return Array.Empty<LanguageCompletionItem>();
@@ -652,7 +688,8 @@ public class LanguageServerHostTests
 
         public LanguageHover? GetHover(
             string documentUri,
-            LanguagePosition position)
+            LanguagePosition position,
+            CancellationToken cancellationToken = default)
         {
             HoverCount++;
             return null;
@@ -660,19 +697,24 @@ public class LanguageServerHostTests
 
         public string? ResolveCompletionDocumentation(
             string documentUri,
-            string completionLabel)
+            string completionLabel,
+            CancellationToken cancellationToken = default)
         {
             ResolveCount++;
             return null;
         }
 
-        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(string documentUri)
+        public IReadOnlyList<LanguageDocumentSymbol> GetDocumentSymbols(
+            string documentUri,
+            CancellationToken cancellationToken = default)
         {
             DocumentSymbolCount++;
             return Array.Empty<LanguageDocumentSymbol>();
         }
 
-        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(string documentUri)
+        public IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
+            string documentUri,
+            CancellationToken cancellationToken = default)
         {
             FoldingRangeCount++;
             return Array.Empty<LanguageFoldingRange>();
@@ -680,7 +722,8 @@ public class LanguageServerHostTests
 
         public IReadOnlyList<LanguageCodeAction> GetCodeActions(
             string documentUri,
-            LanguageRange range)
+            LanguageRange range,
+            CancellationToken cancellationToken = default)
         {
             CodeActionCount++;
             return Array.Empty<LanguageCodeAction>();
