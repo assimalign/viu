@@ -14,8 +14,7 @@
     The generated file is committed; regenerate only when the WHATWG list changes.
 
 .PARAMETER EntitiesJsonPath
-    Path to entities.json. Download the authoritative copy from https://html.spec.whatwg.org/entities.json
-    (also mirrored in vuejs/core's `entities` dependency).
+    Path to entities.json. Download the authoritative copy from https://html.spec.whatwg.org/entities.json.
 
 .PARAMETER OutputPath
     Path to the generated .cs file. Defaults to the sibling src/Internal/HtmlNamedCharacterReferences.g.cs.
