@@ -5,15 +5,13 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// The in-memory history: a queue of entries with a movable position and no browser coupling at all.
-/// The C# port of vue-router's <c>createMemoryHistory</c>
-/// (<c>packages/router/src/history/memory.ts</c>) — the mode used for tests and non-browser hosts,
-/// and the reference model for the push/replace/go and position semantics the web history reproduces
-/// over interop.
+/// The mode used for tests and non-browser hosts, and the reference model for the push/replace/go
+/// and position semantics the web history reproduces over interop.
 /// </summary>
 /// <remarks>
-/// References no interop assembly and touches no DOM. Each entry carries a full
-/// <see cref="RouterHistoryState"/> (a deliberate enrichment over upstream's empty <c>{}</c> memory
-/// state) so the monotonic position counter round-trips exactly as it does in the browser — the
+/// References no interop assembly and touches no DOM. Each entry deliberately carries a full
+/// <see cref="RouterHistoryState"/> rather than an empty placeholder, so the monotonic position
+/// counter and the back/forward adjacency round-trip exactly as they do in the browser — the
 /// [V01.01.08.02] requirement that memory reproduce the same state semantics. Not thread-safe.
 /// </remarks>
 internal sealed class MemoryRouterHistory : IRouterHistory
@@ -51,8 +49,8 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     public void Replace(string location, RouterHistoryState? data = null)
     {
         ArgumentNullException.ThrowIfNull(location);
-        // Upstream: queue.splice(position--, 1); setLocation(to) — drop the current entry and
-        // decrement, then setLocation re-adds at the same index (truncating any forward entries).
+        // Drop the current entry and step back, then re-add at the same index through SetLocation,
+        // which truncates any forward entries — a replace must not leave a stale forward branch.
         var newState = RouterHistoryStateBuilder.BuildForReplace(State, location, data?.Scroll);
         queue.RemoveAt(position);
         position--;
@@ -63,8 +61,8 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     public void Go(int delta, bool triggerListeners = true)
     {
         var from = Location;
-        // Upstream treats delta === 0 as forward in abstract mode (0 does not reload as it would in
-        // the browser), so only a strictly negative delta is "back".
+        // A zero delta is treated as forward: in memory it cannot reload the way the browser would,
+        // so only a strictly negative delta counts as "back".
         var direction = delta < 0 ? NavigationDirection.Back : NavigationDirection.Forward;
         position = Math.Max(0, Math.Min(position + delta, queue.Count - 1));
         if (triggerListeners)
@@ -95,7 +93,7 @@ internal sealed class MemoryRouterHistory : IRouterHistory
         Reset();
     }
 
-    // Upstream setLocation: position++, then append at the tip or truncate-from-here and append.
+    // Advance the position, then append at the tip or truncate-from-here and append.
     private void SetLocation(string location, RouterHistoryState state)
     {
         position++;

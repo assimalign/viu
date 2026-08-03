@@ -10,8 +10,9 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins Vue 3.5's keyed-children reconciliation and longest-increasing-subsequence move behavior:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/renderer.ts.
+/// Pins Viu's keyed-children reconciliation and its longest-increasing-subsequence move
+/// minimization ([RND-KEY-3]): the elements already in a correct relative order are left alone and
+/// only the rest move, so a reorder costs the minimum number of host operations.
 /// </summary>
 public sealed class KeyedDiffRegressionTests
 {

@@ -2,9 +2,7 @@ namespace Assimalign.Viu.Syntax;
 
 /// <summary>
 /// The half-open source range <c>[Start, End)</c> a node spans, plus the exact original source slice.
-/// The C# port of Vue 3.5's <c>SourceLocation</c> interface (<c>@vue/compiler-core</c> <c>ast.ts</c>,
-/// re-exported by <c>@vue/compiler-sfc</c>). The shared span type of every <c>Assimalign.Viu.Syntax.*</c>
-/// parser.
+/// The shared span type of every <c>Assimalign.Viu.Syntax.*</c> parser.
 /// </summary>
 /// <remarks>
 /// The incremental-caching contract of the derived parsers ([V01.01.05.01]/[V01.01.06.01]) requires that,

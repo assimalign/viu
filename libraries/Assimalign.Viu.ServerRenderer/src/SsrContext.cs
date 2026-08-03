@@ -5,9 +5,7 @@ using System.Text;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The per-render server context — the C# port of <c>SSRContext</c> in <c>@vue/server-renderer</c>
-/// (<c>packages/server-renderer/src/renderToString.ts</c>,
-/// https://vuejs.org/api/ssr.html#rendertostring). One instance is threaded through a single
+/// The per-render server context. One instance is threaded through a single
 /// <see cref="ServerRenderer.RenderToStringAsync(ServerApplication, SsrContext?, System.Threading.CancellationToken)"/>
 /// (or streaming) call and carries the two things the surrounding document assembly needs after the
 /// component tree serializes: the <see cref="Teleports"/> map (content that was rendered out of tree
@@ -23,15 +21,16 @@ public sealed class SsrContext
 
     /// <summary>
     /// The teleported content, keyed by the target selector the <c>&lt;Teleport&gt;</c>'s <c>to</c> prop
-    /// named (upstream: <c>context.teleports</c>). Populated when the render completes: each entry is the
-    /// fully serialized HTML for one target, ready for the host to splice into the target element. Empty
-    /// when the tree contains no teleports. Mirrors Vue's <c>ssrContext.teleports</c> contract, including
-    /// the trailing <c>&lt;!--teleport anchor--&gt;</c> the hydration walker expects.
+    /// named. Populated when the render completes: each entry is the fully serialized HTML for one
+    /// target, ready for the host to splice into the target element. Empty when the tree contains no
+    /// teleports. Each entry ends with the <c>&lt;!--teleport anchor--&gt;</c> marker the Viu hydration
+    /// walker matches on ([V01.01.07.03]), so splicing an entry verbatim is what makes the target range
+    /// hydratable. Specified by <c>[SSR-MARKERS-2]</c> and <c>[HYD-6]</c>.
     /// </summary>
     public IReadOnlyDictionary<string, string> Teleports => _teleports;
 
     /// <summary>
-    /// A free-form state bag for the render (upstream: <c>SSRContext</c> is an open <c>Record</c>).
+    /// A free-form state bag for the render, deliberately unschematized.
     /// Application code and helpers stash per-request data here — most importantly the serialized state
     /// the client rehydrates — without the renderer prescribing a shape. Never used by the renderer's
     /// own HTML output.
@@ -39,9 +38,8 @@ public sealed class SsrContext
     public IDictionary<string, object?> State { get; } = new Dictionary<string, object?>(StringComparer.Ordinal);
 
     /// <summary>
-    /// Appends <paramref name="content"/> to the buffer for <paramref name="target"/> (upstream:
-    /// <c>ssrRenderTeleport</c> pushing into <c>context.__teleportBuffers[target]</c>). Multiple teleports
-    /// naming the same target accumulate in tree order; the buffer is resolved to a
+    /// Appends <paramref name="content"/> to the buffer for <paramref name="target"/>. Multiple
+    /// teleports naming the same target accumulate in tree order; the buffer is resolved to a
     /// <see cref="Teleports"/> entry by <see cref="ResolveTeleports"/> when the render completes.
     /// </summary>
     /// <param name="target">The target selector from the teleport's <c>to</c> prop.</param>
@@ -58,9 +56,9 @@ public sealed class SsrContext
     }
 
     /// <summary>
-    /// Freezes the accumulated teleport buffers into the public <see cref="Teleports"/> map (upstream:
-    /// <c>resolveTeleports</c>). Called once, after the whole component tree has serialized, so a teleport
-    /// that appears anywhere in the tree is captured.
+    /// Freezes the accumulated teleport buffers into the public <see cref="Teleports"/> map. Called
+    /// once, after the whole component tree has serialized, so a teleport that appears anywhere in the
+    /// tree is captured.
     /// </summary>
     internal void ResolveTeleports()
     {

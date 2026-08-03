@@ -8,20 +8,18 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The navigation anchor — the C# port of vue-router's <c>&lt;RouterLink&gt;</c>
-/// (<c>packages/router/src/RouterLink.ts</c>, https://router.vuejs.org/api/#Component-RouterLink).
-/// It renders an <c>&lt;a&gt;</c> whose <c>href</c> is resolved through the router (base included),
-/// applies the active and exact-active classes by matching its target against the current route
-/// (https://router.vuejs.org/guide/essentials/active-links.html), and intercepts an unmodified
-/// primary-button click to navigate client-side instead of triggering a page load — a modified,
-/// middle/right-button, or already-prevented click falls through to the browser
-/// (upstream's <c>guardEvent</c>).
+/// The navigation anchor. It renders an <c>&lt;a&gt;</c> whose <c>href</c> is resolved through the
+/// router (base included), applies the active and exact-active classes by matching its target
+/// against the current route, and intercepts an unmodified primary-button click to navigate
+/// client-side instead of triggering a page load. A modified, middle- or right-button, or
+/// already-prevented click deliberately falls through to the browser, so open-in-new-tab and the
+/// context menu keep working.
 /// </summary>
 /// <remarks>
-/// Deliberate simplifications from vue-router (see <c>docs/DESIGN.md</c>): a string <c>to</c> target
-/// (no location-object form), no <c>custom</c>/slot-only rendering, and the <c>target="_blank"</c>
-/// guard reads the link's own <c>target</c> attribute. Not thread-safe (single-threaded JS
-/// event-loop model).
+/// Deliberate scope decisions (see <c>docs/DESIGN.md</c>): the <c>to</c> target is a string path —
+/// there is no location-object form; there is no slot-only rendering mode that hands the resolved
+/// href to the caller instead of emitting an anchor; and the <c>target="_blank"</c> escape reads the
+/// link's own <c>target</c> attribute. Not thread-safe (single-threaded JS event-loop model).
 /// </remarks>
 public sealed class RouterLink : IComponentTemplate
 {
@@ -55,8 +53,8 @@ public sealed class RouterLink : IComponentTemplate
             }
             if (raw is RouterLinkClickEvent click)
             {
-                // guardEvent: modifier keys, an already-prevented event, and non-primary buttons all
-                // fall through to the browser (upstream RouterLink.ts).
+                // Modifier keys, an already-prevented event, and non-primary buttons all fall through
+                // to the browser, so open-in-new-tab and the context menu keep working.
                 if (click.HasSystemModifier || click.DefaultPrevented || click.Button != 0)
                 {
                     return;
@@ -133,10 +131,10 @@ public sealed class RouterLink : IComponentTemplate
         return content is null ? null : [content];
     }
 
-    // Upstream RouterLink active model: the link is active when its target's leaf record appears in
-    // the current route's matched chain (an ancestor-or-self match) and the current params include the
-    // target's; exact-active additionally requires that record to be the current leaf with equal params
-    // (isSameRouteLocationParams). https://router.vuejs.org/guide/essentials/active-links.html
+    // The active model: the link is active when its target's leaf record appears anywhere in the
+    // current route's matched chain (an ancestor-or-self match) and the current parameters include
+    // the target's, so a parent link stays highlighted while a child route is showing. Exact-active
+    // additionally requires that record to be the current leaf and the two parameter sets to agree.
     private static (bool IsActive, bool IsExactActive) ComputeActive(RouteLocation current, RouteLocation target)
     {
         if (target.Matched.Count == 0)
@@ -164,8 +162,8 @@ public sealed class RouterLink : IComponentTemplate
         return (isActive, isExactActive);
     }
 
-    // Every parameter the target carries is present in the current location with the same value
-    // (upstream includesParams). The target having no params is vacuously included (a parent link).
+    // Every parameter the target carries is present in the current location with the same value.
+    // A target with no parameters is vacuously included, which is what keeps a parent link active.
     private static bool IncludesParameters(RouteParameters current, RouteParameters target)
     {
         foreach (var name in target.Names)

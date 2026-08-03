@@ -5,18 +5,17 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A reactive <see cref="IList{T}"/> — the Viu counterpart of Vue 3.5's reactive-array
-/// instrumentation (<c>packages/reactivity/src/arrayInstrumentations.ts</c> and the array branch of
-/// <c>baseHandlers.ts</c>). Because C# cannot proxy <see cref="List{T}"/>, this is a first-class
-/// implementation wrapping private storage with tracking built in.
+/// A reactive <see cref="IList{T}"/>. With no object-proxy interception layer (<c>[RCT-6]</c>),
+/// reactive collections are dedicated types that implement the BCL collection interfaces over
+/// private storage with tracking built in, rather than wrappers around a BCL type.
 /// <para>
-/// Granularity mirrors upstream: each index has its own <see cref="Dependency"/>, plus one
-/// iteration dependency (upstream <c>ARRAY_ITERATE_KEY</c>) and one length dependency (the
-/// <c>length</c> key). Reading <c>list[i]</c> tracks index <c>i</c> only; enumerating,
-/// <see cref="Contains"/>, and <see cref="IndexOf"/> track iteration; <see cref="Count"/> tracks
-/// length. Assigning an existing index triggers that index <b>and iteration</b> but not length —
-/// upstream <c>dep.ts trigger()</c> runs <c>ARRAY_ITERATE_KEY</c> for every numeric <c>SET</c>
-/// while the <c>length</c> dep runs only when the length actually changes. Structural changes
+/// Tracking is per index, not per collection: each index has its own <see cref="Dependency"/>, plus
+/// one iteration dependency and one length dependency. Reading <c>list[i]</c> tracks index
+/// <c>i</c> only; enumerating, <see cref="Contains"/>, and <see cref="IndexOf"/> track iteration;
+/// <see cref="Count"/> tracks length. Assigning an existing index triggers that index <b>and
+/// iteration</b> but not length: an element change is observable to anything that enumerated, but
+/// the length did not change, so a reader that only read <see cref="Count"/> must not re-run.
+/// Structural changes
 /// (append, insert, remove, clear) trigger iteration, length, and the shifted indices. Indexer get
 /// and set and <see cref="Count"/> are allocation-free once an index's dependency exists. Not
 /// thread-safe (single-threaded JS event-loop model).
@@ -48,12 +47,12 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
 
     /// <summary>
     /// The live underlying storage, exposed to <see cref="Reactive.ToRaw{T}(ReactiveList{T})"/> as the
-    /// untracked raw view (Vue's <c>toRaw</c> on a reactive array). Reads off it never track and writes
+    /// untracked raw view. Reads off it never track and writes
     /// through it never trigger — it is the same data, minus the instrumentation.
     /// </summary>
     internal List<T> RawStorage => _items;
 
-    /// <summary>The element count (reading it tracks the length dependency — upstream <c>length</c>).</summary>
+    /// <summary>The element count; reading it tracks the length dependency only.</summary>
     public int Count
     {
         get
@@ -69,7 +68,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
     /// <summary>
     /// Gets or sets the element at <paramref name="index"/>. The getter tracks that index; the setter
     /// triggers that index and iteration when the value changes per
-    /// <see cref="EqualityComparer{T}.Default"/> (upstream array <c>SET</c>: sibling index deps are
+    /// <see cref="EqualityComparer{T}.Default"/> (sibling index dependencies are
     /// untouched, but <c>ARRAY_ITERATE_KEY</c> runs for every numeric change so enumerating effects
     /// observe replacements; the length dep is untouched).
     /// </summary>
@@ -94,7 +93,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
         }
     }
 
-    /// <summary>Appends <paramref name="item"/>; triggers iteration and length (upstream array push).</summary>
+    /// <summary>Appends <paramref name="item"/>; triggers iteration and length.</summary>
     /// <param name="item">The element to append.</param>
     public void Add(T item)
     {
@@ -137,7 +136,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
 
     /// <summary>
     /// Removes the element at <paramref name="index"/>; triggers iteration, length, and every index
-    /// from <paramref name="index"/> onward (the tail shifted down; upstream array length shrink).
+    /// from <paramref name="index"/> onward (the tail shifted down).
     /// </summary>
     /// <param name="index">The index to remove.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> is out of range.</exception>
@@ -199,7 +198,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
 
     /// <summary>
     /// Whether <paramref name="item"/> is present. Depends on iteration (the whole list), so it
-    /// re-runs when the list is structurally changed — upstream <c>includes</c> instrumentation.
+    /// re-runs when the list is structurally changed, not when an unrelated index is assigned.
     /// </summary>
     /// <param name="item">The element to locate.</param>
     /// <returns><see langword="true"/> when present.</returns>
@@ -211,11 +210,11 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
 
     /// <summary>
     /// The index of the first occurrence of <paramref name="item"/>, or -1. Depends on iteration —
-    /// upstream <c>indexOf</c> instrumentation.
+    /// the same iteration dependency <see cref="Contains"/> tracks.
     /// </summary>
     /// <param name="item">The element to locate.</param>
     /// <returns>The zero-based index, or -1.</returns>
-    // Parity note: upstream normalizes the needle with toRaw so a raw value finds a stored reactive
+    // Note: the needle is normalized to its raw form so a raw value finds a stored reactive
     // one. In Viu a reactive object is its own raw (no proxy identity to unwrap — see
     // IReactiveObject), so default equality is already raw-safe and no separate unwrap pass is needed.
     public int IndexOf(T item)
@@ -257,7 +256,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTrave
     void IReactiveTraversable.Traverse(ReactiveTraversal traversal)
     {
         // Deep watch of a list depends on iteration alone — every mutation (element replacement
-        // included, per the upstream numeric-SET rule) triggers it, so per-index tracking here
+        // included, per the assign-existing-index rule above) triggers it, so per-index tracking here
         // would only allocate cells without adding coverage. Recurses into element values.
         _iterate.Track();
         for (var index = 0; index < _items.Count; index++)

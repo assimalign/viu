@@ -4,9 +4,11 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Testing.Benchmarks;
 
 /// <summary>
-/// Builds and mutates the synthetic row lists the scenarios operate on — the C# port of
-/// js-framework-benchmark's data helpers (<c>buildData</c>, <c>update</c>, <c>swapRows</c>;
-/// https://github.com/krausest/js-framework-benchmark/blob/master/frameworks/keyed/vanillajs/src/main.js).
+/// Builds and mutates the synthetic row lists the scenarios operate on. It reproduces the data helpers
+/// of the js-framework-benchmark corpus (<c>buildData</c>, <c>update</c>, <c>swapRows</c>) exactly,
+/// because a published number is only comparable when the inputs are identical — the corpus is the
+/// external measurement standard these scenarios target, not a statement about Viu's own semantics:
+/// <see href="https://github.com/krausest/js-framework-benchmark/blob/master/frameworks/keyed/vanillajs/src/main.js">js-framework-benchmark vanillajs main.js</see>.
 /// Row ids are monotonic across a source so keys stay globally unique (a create-1000 after a clear never
 /// reuses an old key), and labels are drawn from the same adjective/colour/noun word lists with a fixed
 /// seed so a run is reproducible. The mutation helpers are pure — they return a new list, leaving the

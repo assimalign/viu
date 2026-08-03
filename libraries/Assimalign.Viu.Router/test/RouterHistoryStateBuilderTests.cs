@@ -3,8 +3,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the push/replace/bootstrap state arithmetic — the C# port of vue-router's buildState and the
-// state assembly in useHistoryStateNavigation (packages/router/src/history/html5.ts). [V01.01.08.02]
+// Pins the push/replace/bootstrap state arithmetic: back/forward adjacency, the replaced flag, and
+// the monotonic position counter that a push advances and a replace preserves. [V01.01.08.02]
 // position-counter round-trip AC.
 public class RouterHistoryStateBuilderTests
 {

@@ -7,6 +7,8 @@ using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Shared.Tests;
 
+// Pins the SlotFlags values — a frozen contract between compiled output and the runtime,
+// additive only. SlotFlags is a plain enumeration, not a bitmask ([RND-FLAGS-5]).
 public class SlotFlagsParityTests
 {
     [Theory]

@@ -130,7 +130,7 @@ public sealed class RefTests
     [Fact]
     public void CustomRefControlsItsOwnTrackAndTrigger()
     {
-        // Debounced-ref shape from the Vue docs, with a manual flush instead of a timer:
+        // The canonical debounced-reference shape, with a manual flush instead of a timer:
         // the setter stores the value but defers trigger until Flush() runs.
         Action? flush = null;
         var backing = 0;

@@ -1,20 +1,20 @@
 # Assimalign.Viu.Syntax.SingleFileComponent — overview
 
 The build-time parsers for Viu single-file components. `SingleFileComponentParser` owns the canonical
-`.viu` hybrid container ([V01.01.06.10]): tag-based `<template>`/`<style>` blocks (matching Vue) plus
+`.viu` hybrid container ([V01.01.06.10]): tag-based `<template>`/`<style>` blocks plus
 the `@script { }` C# block and `@`-form custom blocks. The isolated [V01.01.06.09]
 `VueSingleFileComponentParser` compatibility entry point slices fully tag-based `.vue` containers
-according to Vue 3.5's SFC-root rules; the two engines share one internal tag scanner. Both record exact
+according to that format's root rules; the two engines share one internal tag scanner and therefore
+cannot drift. Both record exact
 source spans and **do not** parse block contents — template markup, C#, and CSS are parsed by other
-libraries. They fill the role
-[`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/v3.5.34/packages/compiler-sfc) `parse()`
-plays at the block boundary. Area: `V01.01.06`.
+libraries. Area: `V01.01.06`. Specified by `[SFC-3]`–`[SFC-5]` and `[VUE-1]`–`[VUE-3]`.
 
 Downstream, the source generator turns a template-bearing `.viu` or `.vue` file into a **mountable
 component** — the compiled render function, merged C# script, compiled styles, and the
 `IComponentTemplate` bridge ([V01.01.06.07], [V01.01.06.09]). Both ordinary and setup `.vue` scripts
 must explicitly use `lang="csharp"`; each is merged as C# partial-class members with an exact source
-map, while JavaScript and Vue's JavaScript compiler macros are never executed. Applications register
+map, while JavaScript and the JavaScript compiler macros the `.vue` format permits are never
+executed (`[VUE-4]`). Applications register
 the generated type with their `IComponentFactory` and request it through
 `ComponentTree.Template<TComponent>()`, either as the root supplied to
 `BrowserApplication.CreateBuilder` or as a child. A style-only component stays a CSS-bundle unit.
@@ -31,15 +31,16 @@ and bundle output. Visual Studio content-type routing remains a separate extensi
 ## Public surface
 
 - **`SingleFileComponentParser`** (static) — `Parse(string)` returns a `SingleFileComponentParseResult`
-  (an `SingleFileComponentDescriptor` plus recoverable diagnostics). This is the authoritative,
-  `@vue/compiler-sfc`-parity entry point.
-- **`SingleFileComponentDescriptor`** — the parsed file, mirroring Vue's `SFCDescriptor`: `Template`
+  (an `SingleFileComponentDescriptor` plus recoverable diagnostics). This is the authoritative
+  entry point for the canonical container.
+- **`SingleFileComponentDescriptor`** — the parsed file: `Template`
   (0/1), `Script` (0/1), `Styles` (0..n, source order), `CustomBlocks`, and `Source`.
 - **`VueSingleFileComponentParser`** (static) — parses a tag-based `.vue` source into
   `VueSingleFileComponentParseResult`, with recoverable structural diagnostics.
 - **`VueSingleFileComponentDescriptor`** — the compatibility descriptor. It keeps distinct `Script`
-  and `ScriptSetup` slots, plus `Template`, repeated `Styles`, `CustomBlocks`, and `Source`, matching
-  Vue's valid one-ordinary-plus-one-setup-script shape without changing canonical `.viu` semantics.
+  and `ScriptSetup` slots, plus `Template`, repeated `Styles`, `CustomBlocks`, and `Source`, so the
+  `.vue` format's valid one-ordinary-plus-one-setup-script shape round-trips without changing
+  canonical `.viu` semantics (`[VUE-2]`).
 - **The block model** (`Blocks/`) — `SingleFileComponentBlock` and its
   `Template`/`Script`/`Style`/`CustomBlock` kinds, `SingleFileComponentBlockKind`, and
   `SingleFileComponentBlockOption`. Each block carries its raw content and exact-slice source spans.

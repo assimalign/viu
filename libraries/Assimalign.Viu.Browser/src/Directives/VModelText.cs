@@ -7,10 +7,8 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The <c>v-model</c> directive for text inputs and <c>&lt;textarea&gt;</c> — the C# port of
-/// upstream's <c>vModelText</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts,
-/// https://vuejs.org/guide/essentials/forms.html). Reflects the model onto <c>el.value</c> and
+/// The <c>v-model</c> directive for text inputs and <c>&lt;textarea&gt;</c>.
+/// Reflects the model onto <c>el.value</c> and
 /// writes user edits back through the binding's <see cref="ViuModelBinding.Setter"/>. IME safety:
 /// input updates are suppressed between <c>compositionstart</c> and <c>compositionend</c>. Modifiers:
 /// <c>.lazy</c> listens on <c>change</c> instead of <c>input</c>; <c>.number</c> coerces via
@@ -69,7 +67,7 @@ public sealed class VModelText : IDirective
                 (Action<BrowserEvent>)(_ => operations.GetState(handle).Composing = true));
             operations.SetModelListener(handle, "onCompositionend",
                 (Action<BrowserEvent>)(browserEvent => OnCompositionEnd(operations, handle, browserEvent, trim, castToNumber)));
-            // Upstream also binds onCompositionEnd (and the trim re-sync) to 'change'.
+            // 'change' also ends a composition and drives the trim re-sync, so it is bound too.
             operations.SetModelListener(handle, "onChange",
                 (Action<BrowserEvent>)(browserEvent => OnChange(operations, handle, browserEvent, lazy: false, trim, castToNumber)));
         }
@@ -89,7 +87,7 @@ public sealed class VModelText : IDirective
     {
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
-        // Upstream: el.value = value == null ? '' : value.
+        // A null model reflects as the empty string, never the literal "null".
         var formatted = BrowserModelDirective.FormatValue(BrowserModelDirective.Carrier(binding)?.Value);
         operations.SetValueGuarded(handle, formatted);
         operations.GetState(handle).CurrentValue = formatted;
@@ -104,7 +102,7 @@ public sealed class VModelText : IDirective
         var operations = BrowserDirectiveOperations.Require();
         var handle = BrowserModelDirective.Handle(element);
         var state = operations.GetState(handle);
-        state.Assign = BrowserModelDirective.Carrier(binding)?.Setter; // refresh the assigner (upstream)
+        state.Assign = BrowserModelDirective.Carrier(binding)?.Setter; // refresh the assigner
         if (state.Composing)
         {
             return; // never clobber an in-progress composition
@@ -118,8 +116,8 @@ public sealed class VModelText : IDirective
         }
         if (state.Focused)
         {
-            // Upstream gates these on document.activeElement === el && el.type !== 'range'; a range
-            // input's guard nuance is deferred (uncommon; e2e harness [V01.01.11.03]).
+            // Focus-gated so a re-render never rewrites the value the user is actively editing. The
+            // range-input carve-out is deferred (uncommon; e2e harness [V01.01.11.03]).
             var lazy = BrowserModelDirective.HasModifier(binding, "lazy");
             var trim = BrowserModelDirective.HasModifier(binding, "trim");
             if (lazy
@@ -145,8 +143,8 @@ public sealed class VModelText : IDirective
         IElementComponent? previousComponent)
         => BrowserDirectiveOperations.Require().ReleaseState(BrowserModelDirective.Handle(element));
 
-    // The DOM value -> model commit shared by input/change/compositionend (upstream: the shared
-    // listener body). trim then number, matching upstream order.
+    // The DOM value -> model commit shared by input/change/compositionend. Trim runs before number
+    // coercion: trimming first is what lets " 42 " parse.
     private static void Commit(BrowserDirectiveOperations operations, int handle, BrowserEvent browserEvent, bool trim, bool castToNumber)
     {
         var state = operations.GetState(handle);
@@ -170,13 +168,14 @@ public sealed class VModelText : IDirective
         }
         else if (state.Composing)
         {
-            // A composition can be ended by 'change' too (upstream binds onCompositionEnd here).
+            // A composition can be ended by 'change' too, not only by compositionend.
             state.Composing = false;
             Commit(operations, handle, browserEvent, trim, castToNumber);
         }
         if (trim)
         {
-            // Re-sync the element to the trimmed value on blur/change (upstream trim 'change' hook).
+            // Re-sync the element to the trimmed value on blur/change so what is displayed is what
+            // the model holds.
             var trimmed = (browserEvent.TargetValue ?? string.Empty).Trim();
             state.CurrentValue = trimmed;
             operations.SetValueGuarded(handle, trimmed);

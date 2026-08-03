@@ -5,8 +5,7 @@ using Shouldly;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Shared parsing helpers for the test corpus. Mirrors the setup in vuejs/core's
-/// <c>packages/compiler-core/__tests__/parse.spec.ts</c>: parse in base mode, and capture the
+/// Shared parsing helpers for the test corpus: parse in base mode, and capture the
 /// recoverable errors reported through <see cref="ParserOptions.OnError"/>.
 /// </summary>
 internal static class TestHelpers

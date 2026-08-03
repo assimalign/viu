@@ -11,15 +11,14 @@ namespace Assimalign.Viu.Browser;
 /// The browser <c>v-show</c> directive.
 /// </summary>
 /// <remarks>
-/// This is Viu's C# port of Vue's
-/// <c>vShow</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vShow.ts).
-/// It preserves the author-supplied inline display value, hides an initially falsy element before
-/// insertion, and restores the original value when the binding becomes truthy. Transition
+/// Preserves the author-supplied inline display value, hides an initially falsy element before
+/// insertion, and restores the original value when the binding becomes truthy — so toggling
+/// visibility never destroys the element or the state attached to it, which is the whole reason to
+/// choose <c>v-show</c> over conditional rendering. Transition
 /// coordination uses <see cref="DirectiveBinding.Transition"/>: a persisted transition drives
 /// enter hooks when the element becomes visible and defers <c>display: none</c> until leave
-/// completes. This mirrors Vue 3.5's browser <c>vShow</c> implementation:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/directives/vShow.ts.
+/// completes, and the renderer skips its own insertion/removal transition for a persisted binding
+/// so the two never both drive the same phase (<c>[BLT-10]</c>).
 /// </remarks>
 public sealed class VShow : IDirective
 {

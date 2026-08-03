@@ -5,8 +5,11 @@ namespace Assimalign.Viu.Components;
 
 /// <summary>Describes an event a component template may emit.</summary>
 /// <remarks>
-/// This is Viu's AOT-safe equivalent of Vue's runtime
-/// <see href="https://vuejs.org/guide/components/events.html#events-validation">emit declaration</see>.
+/// A declaration is a static value rather than reflection over the template type, so what a
+/// component emits is known without runtime type inspection — the property that keeps event
+/// dispatch trimming- and AOT-safe. Declaring an event is also what makes a parent's matching
+/// <c>onX</c> property a consumed component event instead of a fallthrough attribute. Specified by
+/// <c>[CMP-14]</c> and <c>[CMP-17]</c>.
 /// </remarks>
 public interface IComponentEvent
 {

@@ -1,9 +1,9 @@
 # Assimalign.Viu.ServerRenderer — design
 
-The upstream reference is
-[`@vue/server-renderer`](https://github.com/vuejs/core/tree/main/packages/server-renderer), especially
-`packages/server-renderer/src/render.ts`, `renderToString.ts`, and the shared HTML escaping helpers.
-Viu preserves those observable server-rendering semantics over its unified component tree.
+Server rendering emits HTML for the same unified component tree the client renderers patch, on a
+plain .NET host with no DOM or interop dependency. The normative statement of what it emits is
+[`docs/SPECIFICATION.md` §11](../../../docs/SPECIFICATION.md#11-server-rendering-and-hydration);
+this document records why the area is shaped the way it is.
 
 ## One component tree for client and server
 
@@ -18,14 +18,16 @@ ServerRenderer consumes `IComponent`; it does not maintain a second virtual-node
 - teleports emit origin anchors and buffer target content;
 - template requests activate an `IComponentTemplate` and serialize its rendered subtree.
 
-This runtime walk is the parity baseline for a future compiler-informed string-concatenation path.
-Compiler optimizations may skip portions of the walk, but must produce byte-identical HTML.
+This runtime walk is the reference behavior for a future compiler-informed string-concatenation
+path. Compiler optimizations may skip portions of the walk, but must produce byte-identical HTML —
+compiled server rendering is an optimization of this walk, never a second semantics.
 
 ## Core owns component semantics
 
 The server renderer does not duplicate component context, argument resolution, attribute fallthrough,
 effect-scope ownership, task observation, or error propagation. Core grants ServerRenderer internal
-access to `MountedComponent`, analogous to Vue runtime-core's internal `ssrUtils` export.
+access to `MountedComponent` (`InternalsVisibleTo`) precisely so that one component pipeline serves
+both hosts; duplicating it in the server area is what would let the two drift.
 
 For each `ITemplateComponent`, `ServerComponentRenderer`:
 
@@ -64,9 +66,10 @@ request-scoped services or state, server hosts should create one app per request
 
 ## Async and streaming model
 
-Vue's JavaScript implementation stores nested strings, buffers, and promises and unrolls them later.
-C# can express the same ordering as a single async recursion: a child template's server-prefetch tasks
-are awaited inline before its subtree serializes.
+Ordering is expressed as a single async recursion rather than as a tree of nested string, buffer,
+and promise segments unrolled after the fact: a child template's server-prefetch tasks are awaited
+inline before its subtree serializes. One recursion means the emission order *is* the tree order, so
+no separate unroll pass can reorder output.
 
 `SsrWriter` is the one character sink for a render. String mode accumulates in one `StringBuilder`.
 Streaming mode drains that buffer at completed-template boundaries and awaits `TextWriter.FlushAsync`,
@@ -78,8 +81,9 @@ share the same application, cancellation token, and component-identifier sequenc
 
 ## Escaping and attributes
 
-`ServerRender.EscapeHtml` follows Vue's shared escaping table for `"`, `&`, `'`, `<`, and `>`.
-`EscapeHtmlComment` repeatedly removes comment terminators. Attribute serialization:
+`ServerRender.EscapeHtml` escapes `"`, `&`, `'`, `<`, and `>` — a deliberate superset of the WHATWG
+minimal set, so one routine is correct for both text and attribute values and no caller has to
+choose. `EscapeHtmlComment` repeatedly removes comment terminators. Attribute serialization:
 
 - skips renderer metadata, event listeners, forced properties, and element child overrides;
 - normalizes class and style values;
@@ -92,7 +96,9 @@ suppress normal child serialization.
 
 ## Hydration marker contract
 
-These exact strings are a cross-package contract:
+These exact strings are a cross-package contract; changing one is a breaking change to the
+hydration protocol, because markup already served by a deployed application would stop hydrating
+([`[SSR-MARKERS-1]`](../../../docs/SPECIFICATION.md#112-the-hydration-marker-protocol)):
 
 | Component tree value | Main output |
 |---|---|

@@ -12,8 +12,8 @@ namespace Assimalign.Viu.Browser.Tests;
 
 // Pins the DOM <TransitionGroup> FLIP move through the deterministic in-memory adapter: after a
 // reorder, the elements whose positions changed get the v-move class with an inverting transform, a
-// single reflow is forced, and the class is removed on the move transition end. Upstream contract:
-// @vue/runtime-dom components/TransitionGroup.ts (https://vuejs.org/guide/built-ins/transition-group.html).
+// single reflow is forced, and the class is removed on the move transition end. The contract under
+// test is the FLIP measure/invert/play sequence and its batched position reads ([BLT-8], [BLT-9]).
 public sealed class TransitionGroupTests : IDisposable
 {
     private readonly TransitionTestHarness _harness = new();
@@ -45,15 +45,15 @@ public sealed class TransitionGroupTests : IDisposable
         _harness.RunUntilIdle();
 
         // The moved items get the inverting transform then the v-move class; the static item is untouched.
-        // The inline transform is cleared afterwards so the move class animates back (upstream
-        // applyTranslation + the moveClass loop); MoveLog is the recorded history of those writes.
+        // The inline transform is cleared afterwards so the move class animates back; MoveLog is the
+        // recorded history of those writes.
         _harness.MoveLog.ShouldContain($"transform:{one}:0,-100");
         _harness.MoveLog.ShouldContain($"transform:{three}:0,100");
         _harness.MoveLog.ShouldNotContain($"transform:{two}:0,0");
         _harness.Classes(one).ShouldContain("v-move");
         _harness.Classes(three).ShouldContain("v-move");
         _harness.Classes(two).ShouldNotContain("v-move");
-        // One read pass then one write pass: a single reflow separates them (upstream forceReflow).
+        // One read pass then one write pass: a single forced reflow separates them.
         _harness.ReflowCount.ShouldBe(1);
 
         // The move class is removed when the transform transition ends.
@@ -111,7 +111,8 @@ public sealed class TransitionGroupTests : IDisposable
         list.Value = ["2", "1"];
         _harness.RunUntilIdle();
 
-        // hasCSSTransform gate is false -> no transforms, no move class, no reflow (upstream early return).
+        // The has-transform gate is false -> no transforms, no move class, no reflow: the whole FLIP
+        // is skipped when nothing would animate.
         _harness.MoveTransforms.ShouldBeEmpty();
         _harness.ReflowCount.ShouldBe(0);
         _harness.Classes(spans[0]).ShouldNotContain("v-move");
@@ -176,8 +177,8 @@ public sealed class TransitionGroupTests : IDisposable
 
         // The batched-read acceptance criterion: exactly TWO read crossings for the whole reorder — one
         // pre-patch snapshot, one post-patch read — no matter how many children, and each crossing carries
-        // the full child batch. Upstream reads getBoundingClientRect per child inside a same-process JS loop;
-        // a handle platform batches the pass so N children cost one crossing, not N ([V01.01.04.07.03]).
+        // the full child batch. A same-process renderer can afford a rect read per child; a handle
+        // platform batches the pass so N children cost one crossing, not N ([V01.01.04.07.03]).
         _harness.MeasurePositionsCallCount.ShouldBe(2);
         _harness.MeasuredBatchSizes.ShouldBe([itemCount, itemCount]);
         // Sanity: the FLIP actually ran (the first item moved to the far end).
@@ -269,7 +270,7 @@ public sealed class TransitionGroupTests : IDisposable
         _harness.Classes(one).ShouldContain("v-move");
         _harness.HasPendingMove(one).ShouldBeTrue();
 
-        // Reorder 2 BEFORE the first move ends: upstream callPendingCbs force-finishes the in-flight move
+        // Reorder 2 BEFORE the first move ends: the in-flight move is force-finished
         // (the interrupted move class is removed) and the FLIP re-runs from the settled position — a fresh
         // pending move replaces the stale one rather than stacking a second transitionend listener.
         list.Value = ["1", "2", "3"];
@@ -307,8 +308,8 @@ public sealed class TransitionGroupTests : IDisposable
         list.Value = ["3", "1", "2"];
         _harness.RunUntilIdle();
 
-        // The FLIP wrote and then cleared the inverting transform for each moved child (upstream
-        // applyTranslation then style.transform = ''), so no inline transform lingers even mid-animation.
+        // The FLIP wrote and then cleared the inverting transform for each moved child, so no inline
+        // transform lingers even mid-animation.
         _harness.MoveTransforms.ShouldBeEmpty();
         _harness.HasPendingMove(one).ShouldBeTrue();
         _harness.HasPendingMove(three).ShouldBeTrue();
@@ -327,10 +328,10 @@ public sealed class TransitionGroupTests : IDisposable
     }
 
     // --- attribute fallthrough ([V01.01.04.07.04]) ----------------------------------------------
-    // Upstream TransitionGroup renders createVNode(tag, null, children) and does nothing special for
-    // attrs: the standard single-root fallthrough (packages/runtime-core/src/componentAttrs.ts, applied
-    // by renderComponentRoot) lands class/style/arbitrary attributes on that tag element, while the
-    // declared props (tag/moveClass + the transition props) are consumed. In fragment mode there is no
+    // TransitionGroup renders a plain element for its tag and does nothing special for attributes:
+    // the standard single-root fallthrough ([CMP-17]) lands class/style/arbitrary attributes on that
+    // tag element, while the declared parameters (tag/moveClass + the transition parameters) are
+    // consumed. In fragment mode there is no
     // element root, so the attrs have no target and are dropped with no warning.
 
     [Fact]
@@ -356,7 +357,7 @@ public sealed class TransitionGroupTests : IDisposable
         // Declared props are consumed — tag/name never leak onto the wrapper as literal attributes.
         _harness.BoundProperty(wrapper, "tag").ShouldBeNull();
         _harness.BoundProperty(wrapper, "name").ShouldBeNull();
-        // Vue removes unsupported TransitionGroup.mode from its declared properties, so it follows the
+        // TransitionGroup does not declare `mode` — it is meaningless for a group — so it follows the
         // ordinary attribute-fallthrough path rather than affecting group sequencing.
         _harness.BoundProperty(wrapper, "mode").ShouldBe("out-in");
     }

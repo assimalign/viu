@@ -3,10 +3,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// The output of <see cref="RenderFunctionEmitter.Emit(TransformResult, RenderFunctionEmitterOptions)"/>:
 /// the C# render-function body, the cache-slot count the hosting runtime must allocate, and the render
-/// source map ([V01.01.05.08]). The C# counterpart of the <c>CodegenResult</c> Vue 3.5's <c>generate()</c>
-/// returns (<c>@vue/compiler-core</c> <c>codegen.ts</c>) — <c>code</c> maps to <see cref="Code"/> and
-/// <c>map</c> to <see cref="SourceMappings"/>; the <c>preamble</c>/<c>ast</c> members have no counterpart
-/// because the composition root owns the method declaration.
+/// source map ([V01.01.05.08]). There is no preamble member: the composition root owns the method
+/// declaration and the helper import (<c>[SFC-CG-1]</c>, <c>[SFC-CG-2]</c>).
 /// </summary>
 /// <remarks>
 /// A record over value-equatable members, so an incremental-generator pipeline stage carrying this result
@@ -23,9 +21,9 @@ public sealed record RenderFunctionEmitterResult
 
     /// <summary>
     /// The number of <c>_cache</c> slots the render function uses (<c>v-once</c> subtrees and cached
-    /// handlers). The upstream counterpart is the <c>cached</c> count stamped on the transformed root;
-    /// the runtime sizes the per-instance cache array from it because C# arrays, unlike JavaScript
-    /// arrays, cannot grow on assignment.
+    /// handlers), emitted as the generated <c>RenderCacheSize</c> constant (<c>[SFC-CG-1]</c>). The count
+    /// must be exact, because the runtime allocates the per-instance cache array once at this size and a
+    /// C# array cannot grow on assignment.
     /// </summary>
     public required int CacheSlotCount { get; init; }
 

@@ -3,9 +3,10 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// The state carried on a single history entry — a flat, primitives-only payload with no nested
 /// object graph so it round-trips cheaply across the JS-interop boundary and through the browser
-/// History API's structured-clone serialization. The C# port of vue-router's <c>StateEntry</c>
-/// (the object <c>useHistoryStateNavigation</c> writes with <c>history.pushState</c>/
-/// <c>replaceState</c>, <c>packages/router/src/history/html5.ts</c>).
+/// History API's structured-clone serialization. This is the payload written with
+/// <c>history.pushState</c>/<c>history.replaceState</c>, so it must stay primitives-only: a nested
+/// object graph would be both slower to clone and lossy across a reload. Specified by
+/// <c>[RTR-3]</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,7 +24,9 @@ namespace Assimalign.Viu.Router;
 /// <param name="Replaced">Whether this entry replaced its predecessor rather than being pushed onto it.</param>
 /// <param name="Position">
 /// The entry's monotonic position counter (the basis for back/forward distance detection and scroll
-/// restoration). Mirrors the <c>position</c> field upstream seeds from <c>window.history.length</c>.
+/// restoration). Seeded from <c>window.history.length</c> in the browser and from zero in memory,
+/// then assigned by Viu — never re-read from the environment — so the arithmetic is identical in
+/// both modes.
 /// </param>
 /// <param name="Scroll">
 /// The saved scroll anchor for this entry, or <see langword="null"/> when none was captured (a fresh

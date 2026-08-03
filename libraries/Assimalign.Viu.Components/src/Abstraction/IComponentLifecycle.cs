@@ -16,8 +16,9 @@ namespace Assimalign.Viu.Components;
 /// callbacks, may overlap unless application code prevents it. Core treats a synchronous factory
 /// exception or a returned <see langword="null"/> task as a lifecycle error. A fault observed after
 /// unmount bypasses disposed component hooks and goes to the application error handler or host.
-/// This is Viu's typed C# counterpart to Vue's Composition API lifecycle hooks:
-/// https://vuejs.org/api/composition-api-lifecycle.html.
+/// Hooks are named and typed rather than keyed by an enum, so a missing or misspelled phase is a
+/// compile error and no callback registry has to be discovered at runtime. Specified by
+/// <c>[CMP-20]</c>, <c>[CMP-21]</c>, and <c>[CMP-22]</c>.
 /// </remarks>
 public interface IComponentLifecycle
 {

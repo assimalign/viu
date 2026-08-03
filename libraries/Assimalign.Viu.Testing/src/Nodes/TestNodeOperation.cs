@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// One recorded node operation: the operation type, its target, and its arguments — parity with
-/// the op records in <c>@vue/runtime-test</c>. A struct so logging stays allocation-light and
-/// does not distort the patch-efficiency numbers it exists to measure.
+/// One recorded node operation: the operation type, its target, and its arguments. A struct so
+/// logging stays allocation-light and does not distort the patch-efficiency numbers it exists to
+/// measure.
 /// </summary>
 /// <param name="Type">The operation kind.</param>
 /// <param name="TargetNode">The node the operation created or acted on.</param>

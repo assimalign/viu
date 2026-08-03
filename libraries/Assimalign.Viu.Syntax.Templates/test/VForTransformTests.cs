@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/vFor.spec.ts: the ForNode alias
+// These cases ARE the contract for the ForNode alias
 // decomposition, the renderList fragment codegen, and keyed/unkeyed fragment classification.
 public class VForTransformTests
 {

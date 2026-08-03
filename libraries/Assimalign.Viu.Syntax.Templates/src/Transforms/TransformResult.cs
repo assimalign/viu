@@ -4,8 +4,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The output of <see cref="Transformer.Transform(RootNode, TransformOptions)"/>: the root code-generation
-/// node plus the finalized helper/component/directive/hoist/cache metadata. The C# port of the fields Vue
-/// 3.5's <c>transform()</c> stamps onto the <c>RootNode</c> (<c>@vue/compiler-core</c> <c>transform.ts</c>).
+/// node plus the finalized helper/component/directive/hoist/cache metadata.
 /// </summary>
 /// <remarks>
 /// Because the parse AST is immutable, the transformed structure and its code-generation nodes are surfaced

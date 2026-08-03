@@ -3,8 +3,7 @@ using System;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// A unit of work on the <see cref="Scheduler"/> queue — the C# port of <c>SchedulerJob</c> in
-/// <c>@vue/runtime-core</c> (<c>packages/runtime-core/src/scheduler.ts</c>). Jobs are
+/// A unit of work on the <see cref="Scheduler"/> queue. Jobs are
 /// deduplicated by instance while queued, ordered by <see cref="Identifier"/> (a component's uid,
 /// so parents update before children), and phase-ordered by <see cref="IsPreFlush"/>.
 /// Not thread-safe (single-threaded JS event-loop model).
@@ -23,9 +22,8 @@ public sealed class SchedulerJob
     }
 
     /// <summary>
-    /// The ordering id (upstream: <c>job.id</c>) — a component's uid, so a parent (lower uid)
-    /// updates before its children. Null sorts after every numbered job (upstream treats a
-    /// missing id as infinity).
+    /// The ordering id — a component's uid, so a parent (lower uid) updates before its children.
+    /// Null sorts after every numbered job.
     /// </summary>
     public int? Identifier { get; init; }
 
@@ -34,7 +32,7 @@ public sealed class SchedulerJob
 
     /// <summary>
     /// Whether the job runs in the pre-flush phase (watcher callbacks), before render jobs of
-    /// the same id (upstream: <c>SchedulerJobFlags.PRE</c>).
+    /// the same id.
     /// </summary>
     public bool IsPreFlush
     {
@@ -43,9 +41,9 @@ public sealed class SchedulerJob
     }
 
     /// <summary>
-    /// Whether the job may re-queue itself while it is running (upstream:
-    /// <c>SchedulerJobFlags.ALLOW_RECURSE</c>). The <see cref="Scheduler"/> recursion limit
-    /// still applies.
+    /// Whether the job may re-queue itself while it is running. The <see cref="Scheduler"/>
+    /// recursion limit still applies, so a genuinely runaway job is still reported rather than
+    /// spinning.
     /// </summary>
     public bool AllowRecurse
     {
@@ -54,8 +52,8 @@ public sealed class SchedulerJob
     }
 
     /// <summary>
-    /// Marks the job's owner as torn down (upstream: <c>SchedulerJobFlags.DISPOSED</c>); a
-    /// queued-but-disposed job is skipped by the flush.
+    /// Marks the job's owner as torn down; a queued-but-disposed job is skipped by the flush
+    /// rather than dequeued, so teardown never has to search the queue.
     /// </summary>
     public bool IsDisposed
     {
@@ -74,10 +72,9 @@ public sealed class SchedulerJob
 
     /// <summary>
     /// The sort key: <see cref="Identifier"/> with pre-flush jobs ordered before render jobs of
-    /// the same id, mirroring upstream <c>findInsertionIndex</c>. An id-less job sorts last —
-    /// except an id-less <em>pre-flush</em> job, which sorts first (upstream <c>getId</c>:
-    /// <c>job.id == null ? (PRE ? -1 : Infinity) : job.id</c> — an instance-less pre watcher runs
-    /// ahead of every render).
+    /// the same id. An id-less job sorts last — except an id-less <em>pre-flush</em> job, which
+    /// sorts first, because an instance-less pre watcher belongs to no component and so must run
+    /// ahead of every render.
     /// </summary>
     internal long OrderKey
         => ((long)(Identifier ?? (IsPreFlush ? -1 : int.MaxValue)) << 1) | (IsPreFlush ? 0L : 1L);

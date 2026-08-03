@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// </summary>
 /// <remarks>
 /// One engine is used for one source string. Instances are not thread-safe. Root blocks other than an
-/// HTML <c>template</c> are scanned as raw text, matching Vue 3.5's SFC tokenizer. Template boundaries
+/// HTML <c>template</c> are scanned as raw text, as the <c>.vue</c> container format requires. Template boundaries
 /// are found with a lightweight HTML stack so end-tag text in attributes, comments, and nested raw-text
 /// elements cannot close the root template. All tag machinery lives in the shared
 /// <see cref="SingleFileComponentTagScanner"/>, which the hybrid <c>.viu</c> engine reuses

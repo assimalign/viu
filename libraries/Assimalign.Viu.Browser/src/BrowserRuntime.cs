@@ -10,11 +10,10 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The browser entry point of Viu — the package that plays <c>@vue/runtime-dom</c>'s role
-/// (https://github.com/vuejs/core/tree/main/packages/runtime-dom). Loads the bridge module
-/// this package ships as a static web asset, then hands out renderers whose node-ops drive the
-/// real DOM over int-handle interop. Single-threaded by design (browser main thread only);
-/// not thread-safe.
+/// The browser entry point of Viu: the host that binds Core's host-neutral renderer to the real
+/// DOM. Loads the bridge module this package ships as a static web asset, then hands out renderers
+/// whose node-ops drive the DOM over int-handle interop. Single-threaded by design (browser main
+/// thread only); not thread-safe.
 /// <para>
 /// Normal app bootstrap does <b>not</b> call this type: build a <c>BrowserApplication</c> with
 /// <see cref="BrowserApplication.CreateBuilder(IComponent, bool)"/>
@@ -56,7 +55,7 @@ public static class BrowserRuntime
     internal static bool IsBridgeInitialized => _initialization is { IsCompletedSuccessfully: true };
 
     /// <summary>
-    /// Creates a renderer over the browser node-ops (upstream: <c>ensureRenderer()</c>).
+    /// Creates a renderer over the browser node-ops. The bridge must already be initialized.
     /// </summary>
     /// <exception cref="InvalidOperationException">The bridge has not been initialized (call <see cref="InitializeAsync"/>).</exception>
     public static Renderer<int> CreateRenderer()

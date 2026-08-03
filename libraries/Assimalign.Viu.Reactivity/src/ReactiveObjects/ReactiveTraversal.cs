@@ -4,16 +4,15 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// Walks a reactive value graph, reading every reachable reactive member so the ambient subscriber
-/// depends on all of them — the C# port of Vue 3.5's <c>traverse()</c>
-/// (<c>packages/reactivity/src/watch.ts</c>). A deep <c>watch</c> runs its source through a
-/// traversal so a mutation anywhere in the graph re-runs the watcher.
+/// depends on all of them. A deep <c>watch</c> runs its source through a traversal so a mutation
+/// anywhere in the graph re-runs the watcher.
 /// <para>
 /// Recursion is reflection-free: it descends only through <see cref="ReactiveValue"/> cells and
 /// <see cref="IReactiveTraversable"/> values (source-generated <c>[Reactive]</c> objects and the
 /// reactive collections), which expose their members explicitly. Plain CLR objects are leaves — a
-/// deliberate divergence from Vue, whose runtime enumerates every own key, documented on
+/// deliberate consequence of having no runtime member enumeration to fall back on, documented on
 /// <see cref="IReactiveTraversable"/>. Cycles are broken by reference identity and a
-/// <see cref="Depth"/> ceiling bounds descent (Vue 3.5 <c>deep: number</c> parity). Not thread-safe
+/// <see cref="Depth"/> ceiling bounds descent. Not thread-safe
 /// (single-threaded JS event-loop model); construct one per traversal.
 /// </para>
 /// </summary>
@@ -50,7 +49,7 @@ public sealed class ReactiveTraversal
             return;
         }
 
-        // markRaw exclusion (Vue traverse checks ReactiveFlags.SKIP before any branch): a marked
+        // MarkRaw exclusion, checked before any branch: a marked
         // object is a leaf here — neither its own dependency nor its members are subscribed, so a
         // deep watch never re-runs for a change inside it.
         if (RawMarkers.IsMarked(value))
@@ -59,7 +58,8 @@ public sealed class ReactiveTraversal
         }
 
         // A ref: reading BoxedValue tracks the ref's own dependency, then we recurse one level into the
-        // unwrapped value (Vue traverse: isRef -> traverse(value.value, depth - 1)).
+        // unwrapped value: a reference contributes its own dependency, then the walk descends one
+        // level into what it holds.
         if (value is ReactiveValue reference)
         {
             _remainingDepth--;

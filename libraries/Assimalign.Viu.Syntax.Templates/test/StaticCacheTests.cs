@@ -15,9 +15,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Tests for the static-caching walk (<see cref="StaticCache"/>) and the DOM stringification pass
-/// (<see cref="StaticStringifier"/>) — [V01.01.05.07], the C# port of Vue 3.5's
-/// <c>@vue/compiler-core</c> <c>cacheStatic.ts</c> and <c>@vue/compiler-dom</c> <c>stringifyStatic.ts</c>.
-/// The corpus pins upstream eligibility (what caches vs what does not: dynamic keys, refs, runtime
+/// (<see cref="StaticStringifier"/>) — [V01.01.05.07], specified by <c>[SFC-OPT-1]</c>–<c>[SFC-OPT-4]</c>.
+/// The corpus pins eligibility (what caches vs what does not: dynamic keys, refs, runtime
 /// directives, component boundaries), the numeric stringification thresholds (20 nodes / 5 elements with
 /// bindings), WHATWG fragment-escaping of the serialized HTML, void-tag serialization, the opt-out flag,
 /// and the value-equatable/deterministic output the incremental generator relies on.
@@ -53,7 +52,8 @@ public class StaticCacheTests
     public void StaticProps_OnDynamicChildElement_AreCached()
     {
         // The element has a dynamic child (TEXT flag) so its subtree is not cached, but its static props
-        // object is (upstream hoists it; Viu caches it — see docs/DESIGN.md). The root element's own props
+        // object is: both cached subtrees and cached props objects route through the same per-instance
+        // slot (see docs/DESIGN.md). The root element's own props
         // are eligible even though the root vnode is not.
         var result = Transform("<div class=\"card\">{{ msg }}</div>", prefixIdentifiers: true);
 
@@ -131,7 +131,7 @@ public class StaticCacheTests
         unoptimized.CacheSlotCount.ShouldBe(0);
     }
 
-    // ---- stringification thresholds (upstream 20 nodes / 5 elements-with-bindings) ----
+    // ---- stringification thresholds (20 nodes / 5 elements-with-bindings, [SFC-OPT-2]) ----
 
     [Fact]
     public void ContiguousStaticRun_AtNodeThreshold_CollapsesToOneStaticVNode()
@@ -201,7 +201,7 @@ public class StaticCacheTests
     [Fact]
     public void SerializedHtml_EscapesMarkupSensitiveCharacters()
     {
-        // escapeHtml parity (@vue/shared): & < > " ' are escaped so the innerHTML round-trips to the same
+        // Escaping ([SFC-OPT-4]): & < > " ' are escaped so the innerHTML round-trips to the same
         // DOM as node-by-node creation.
         var code = Emit(Wrapped("<i>a &amp; b &lt; c</i>", 20)).Code;
 
@@ -211,7 +211,7 @@ public class StaticCacheTests
     [Fact]
     public void SerializedHtml_OmitsClosingTagForVoidElements()
     {
-        // Void elements serialize with no end tag (upstream isVoidTag).
+        // Void elements serialize with no end tag.
         var code = Emit(Wrapped("<br>", 20)).Code;
 
         code.ShouldContain("_createStaticVNode(");
@@ -231,7 +231,7 @@ public class StaticCacheTests
     [Fact]
     public void SlotContent_IsNotStringified()
     {
-        // Upstream bails stringification when scopes.vSlot > 0: a component's slot content is not folded
+        // Stringification bails inside a slot scope: a component's slot content is not folded
         // into an innerHTML string.
         Emit(WrappedComponent("<div></div>", 20)).Code.ShouldNotContain("_createStaticVNode");
     }

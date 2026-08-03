@@ -7,15 +7,14 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// Turns tokenized path segments into a compiled <see cref="PathParser"/> — building the regular
-/// expression, the specificity score, and the parameter keys in one pass. The C# port of
-/// vue-router's <c>tokensToParser</c> (<c>packages/router/src/matcher/pathParserRanker.ts</c>).
+/// expression, the specificity score, and the parameter keys in one pass.
 /// </summary>
 internal static class PathParserFactory
 {
-    // Upstream BASE_PARAM_PATTERN — a lazy "anything but a slash" match.
+    // The default parameter pattern — a lazy "anything but a slash" match.
     private const string BaseParameterPattern = "[^/]+?";
 
-    // Upstream catch-all pattern whose presence earns the wildcard penalty.
+    // The catch-all pattern, whose presence earns the wildcard penalty.
     private const string WildcardPattern = ".*";
 
     /// <summary>Compiles tokenized segments into a <see cref="PathParser"/>.</summary>
@@ -24,7 +23,7 @@ internal static class PathParserFactory
     /// <exception cref="RouteMatcherException">A custom parameter pattern was not a valid regular expression.</exception>
     public static PathParser Compile(List<List<PathToken>> segments, PathMatchingOptions options)
     {
-        // The top-level matcher always anchors both ends (upstream start/end default to true).
+        // The top-level matcher always anchors both ends, so a pattern can never match a prefix.
         var strict = options.Strict;
         var sensitive = options.Sensitive;
 
@@ -82,7 +81,7 @@ internal static class PathParserFactory
                     if (tokenIndex == 0)
                     {
                         // Make the leading slash itself optional only when the optional param is the
-                        // whole segment (upstream: `optional && segment.length < 2`).
+                        // whole segment — an optional parameter alone in its segment takes the slash with it.
                         subPattern = token.Optional && segment.Count < 2
                             ? $"(?:/{subPattern})"
                             : "/" + subPattern;
@@ -137,7 +136,7 @@ internal static class PathParserFactory
         return new PathParser(regularExpression, score.ToArray(), keys.ToArray(), storedSegments);
     }
 
-    // Upstream: token.value.replace(REGEX_CHARS_RE, '\\$&').
+    // Escape every regular-expression metacharacter in literal path text.
     private static string EscapeStaticText(string value)
         => value.Length == 0
             ? value

@@ -7,8 +7,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Tests;
 
-// Pins the flush contract of @vue/runtime-core's scheduler.ts and nextTick —
-// https://vuejs.org/api/general.html#nexttick. Tests install the deterministic flush pump so
+// Pins Viu's scheduler flush contract: coalescing within one synchronous turn, pre-flush before
+// render before post-flush, parent-before-child id ordering, and NextTick completion. Tests
+// install the deterministic flush pump so
 // the microtask-like flush runs exactly when the test pumps it; the interop-observable WASM
 // ordering test is tracked under [V01.01.03.04].
 public class SchedulerTests : IDisposable
@@ -222,7 +223,7 @@ public class SchedulerTests : IDisposable
         exception.Message.ShouldContain("Maximum recursive updates exceeded");
         exception.Message.ShouldContain("runaway-effect");
         exception.Message.ShouldContain("7");
-        runs.ShouldBe(100); // upstream RECURSION_LIMIT
+        runs.ShouldBe(100); // the scheduler's recursion limit
     }
 
     [Fact]

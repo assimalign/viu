@@ -237,7 +237,7 @@ When pending content must be replaced by a fallback as one coordinated branch, u
 does not serialize the fallback. Suspense client hydration is currently unsupported; a hydration
 attempt fails explicitly rather than partially claiming the server DOM. Boundary timeout/events,
 fallback-to-reveal transition choreography, and delaying mounted/post-render effects from the
-hidden default branch are also not yet at Vue parity.
+hidden default branch are also not implemented.
 
 ### 2.4 Application state in a `.viu` component
 
@@ -618,8 +618,8 @@ using WatchHandle watch = Reactive.Watch(
         Immediate = true,
     });
 
-query.Value = "vue";
-query.Value = "viu";
+query.Value = "reactivity";
+query.Value = "rendering";
 ```
 
 The watch callback itself is synchronous. It may start application-owned background work and use
@@ -805,6 +805,6 @@ For Pinia-shaped member APIs, State also provides `StateStore<TState>` with type
   registration selected by name.
 - Suspense mount/update behavior is implemented, including fallback and nested-boundary
   coordination. Suspense hydration, boundary timeout/events, fallback-to-reveal transition
-  choreography, and hidden-branch post-effect delay are not yet at Vue parity.
+  choreography, and hidden-branch post-effect delay are not implemented.
 - Component-tree `provide`/`inject` is intentionally absent. Use arguments, slots, explicit state
   registries, and the application-owned service provider.

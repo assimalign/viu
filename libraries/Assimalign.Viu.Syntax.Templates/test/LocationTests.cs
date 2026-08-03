@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, describe('Edge Cases')
-// 'parse with correct location info' and 'correct loc when the closing > is formatted', plus the
-// [V01.01.05.01] acceptance criterion: for EVERY node, loc.Source equals the exact source substring.
+// Source-location accuracy, including the [V01.01.05.01] acceptance criterion: for EVERY node,
+// Location.Source equals the exact source substring its own offsets delimit. This is the invariant the
+// whole incremental-caching and diagnostic-remapping chain rests on.
 public class LocationTests
 {
     [Fact]

@@ -4,9 +4,9 @@ namespace Assimalign.Viu;
 /// Identifies an existing host node while a server-rendered tree is being hydrated.
 /// </summary>
 /// <remarks>
-/// This is the host-neutral equivalent of the DOM node-type checks used by Vue 3.5's
-/// hydration walker:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/hydration.ts.
+/// The hydration walker must classify a node it did not create, so this enumeration is the
+/// host-neutral form of the node-kind question — a host reports it without Core knowing anything
+/// about DOM node types.
 /// </remarks>
 public enum HydrationNodeKind
 {

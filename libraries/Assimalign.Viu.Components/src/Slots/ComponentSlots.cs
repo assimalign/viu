@@ -7,7 +7,7 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// Builds a named slot collection with Vue-compatible structural stability metadata.
+/// Builds a named slot collection together with its structural stability metadata.
 /// </summary>
 /// <remarks>
 /// This mutable builder is intended to be populated before it is passed to

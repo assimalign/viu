@@ -10,8 +10,8 @@ namespace Assimalign.Viu;
 /// renderer-owned storage.
 /// </summary>
 /// <remarks>
-/// This is Viu's host-generic port of Vue 3.5's <c>KeepAlive</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/KeepAlive.ts.
+/// KeepAlive is host-generic: it caches and re-activates mounted subtrees through the renderer's
+/// own move and activation paths, so no host-specific knowledge is required.
 /// Each factory activation owns an independent cache. Component activation and application services
 /// remain the responsibility of the application-supplied factory and service provider.
 /// </remarks>

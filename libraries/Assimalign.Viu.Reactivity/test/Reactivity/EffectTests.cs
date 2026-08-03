@@ -148,7 +148,7 @@ public sealed class EffectTests
         var count = Reactive.Reference(1);
         var runs = 0;
 
-        // The exception from the first run propagates to the caller (upstream effect() parity)...
+        // The exception from the first run propagates to the caller...
         Should.Throw<InvalidOperationException>(() => Reactive.Effect(() =>
         {
             runs++;

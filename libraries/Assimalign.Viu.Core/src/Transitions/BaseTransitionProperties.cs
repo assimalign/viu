@@ -7,8 +7,8 @@ namespace Assimalign.Viu;
 /// <see cref="BaseTransition"/>.
 /// </summary>
 /// <remarks>
-/// This is the C# counterpart of Vue 3.5's <c>BaseTransitionProps</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/BaseTransition.ts.
+/// The hooks are host-neutral: they receive the boxed host node, so the same transition
+/// declaration works against any renderer.
 /// </remarks>
 public sealed class BaseTransitionProperties
 {

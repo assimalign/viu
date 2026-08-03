@@ -4,13 +4,10 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// Implemented by a route component to contribute a <c>beforeRouteEnter</c> guard — the C# port of
-/// vue-router's in-component <c>beforeRouteEnter</c> option
-/// (https://router.vuejs.org/guide/advanced/navigation-guards.html#In-Component-Guards). The pipeline
-/// invokes it for a record that is <b>entering</b> (its component is not yet mounted), so — matching
-/// upstream, where <c>beforeRouteEnter</c> has no access to <c>this</c> — the guard is supplied
-/// explicitly as <see cref="RouteRecord.RouteEnterGuard"/> rather than discovered from a mounted
-/// component instance.
+/// Implemented by a route component to contribute an in-component before-enter guard. The pipeline
+/// invokes it for a record that is <b>entering</b> — its component is not yet mounted, so there is no
+/// instance to discover the guard from. The guard is therefore supplied explicitly as
+/// <see cref="RouteRecord.RouteEnterGuard"/>, and it never observes component instance state.
 /// </summary>
 /// <remarks>
 /// <b>Registration is interface-based, never reflective.</b> A route record directly references the
@@ -18,14 +15,16 @@ namespace Assimalign.Viu.Router;
 /// involved (issue #73's boundary). The leave and update in-component guards, which do need
 /// per-instance state, are registered instead through
 /// <see cref="RouterGuards.OnBeforeRouteLeave"/>/<see cref="RouterGuards.OnBeforeRouteUpdate"/>.
-/// Upstream's <c>next(vm =&gt; ...)</c> instance callback is intentionally not modelled (the same
-/// no-<c>next</c> divergence as the rest of the guard API).
+/// There is no post-activation instance callback: every guard in Viu decides by return value rather
+/// than by invoking a continuation, so a guard cannot defer work until the component exists.
+/// Specified by <c>[RTR-5]</c>.
 /// </remarks>
 public interface IRouteEnterGuard
 {
     /// <summary>
-    /// Runs before this component's record is entered, after the per-route <c>beforeEnter</c> and
-    /// before the global <c>beforeResolve</c> (upstream's documented order).
+    /// Runs before this component's record is entered, after the per-route
+    /// <see cref="RouteRecord.BeforeEnter"/> guard and before the global
+    /// <see cref="Router.BeforeResolve"/> stage.
     /// </summary>
     /// <param name="to">The resolved location being navigated to.</param>
     /// <param name="from">The current location being navigated away from.</param>

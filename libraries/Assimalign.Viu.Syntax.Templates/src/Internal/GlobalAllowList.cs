@@ -4,16 +4,15 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The identifiers that expression rewriting leaves untouched: neither prefixed with the render context nor
-/// reported as unresolved. The C# analogue of Vue 3.5's <c>isGloballyAllowed</c> plus the literal allow-list
-/// used by <c>processExpression</c> (<c>@vue/compiler-core</c> <c>utils.ts</c>/<c>transformExpression.ts</c>,
-/// backed by <c>@vue/shared</c>'s <c>GLOBALS_ALLOWED</c>).
+/// reported as unresolved.
 /// </summary>
 /// <remarks>
-/// Vue's list names the JavaScript globals a template may reference (<c>Math</c>, <c>Date</c>, <c>JSON</c>,
-/// <c>parseInt</c>, …). Because Viu expressions are C#, this is the corresponding common .NET base-class
-/// surface a template legitimately reaches for. It is a Viu runtime-contract choice, documented in the
-/// feature design notes; C# literal keywords (<c>true</c>, <c>false</c>, <c>null</c>, <c>this</c>) never reach
-/// this check because Roslyn tokenizes them as keywords, not identifiers.
+/// Because template expressions are C#, the list is the common .NET base-class surface a template
+/// legitimately reaches for (<c>Math</c>, <c>String</c>, <c>Convert</c>, …). Membership is a deliberate
+/// contract, not a convenience: a name on this list can never be shadowed by a component member, so
+/// adding one is a breaking change for any component that already declares that member. C# literal
+/// keywords (<c>true</c>, <c>false</c>, <c>null</c>, <c>this</c>) never reach this check because Roslyn
+/// tokenizes them as keywords, not identifiers.
 /// </remarks>
 internal static class GlobalAllowList
 {

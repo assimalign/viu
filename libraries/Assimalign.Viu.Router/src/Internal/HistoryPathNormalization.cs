@@ -6,9 +6,7 @@ namespace Assimalign.Viu.Router;
 /// The pure base-path arithmetic shared by the web and hash histories: normalize a configured base,
 /// strip it off a read location, prepend it (or reduce it to the leading <c>#</c>) for an
 /// <c>href</c>, compute the hash-mode base, and derive the current base-stripped location from raw
-/// URL components. The C# port of vue-router's <c>normalizeBase</c>/<c>stripBase</c>/<c>createHref</c>
-/// (<c>packages/router/src/history/common.ts</c>, <c>location.ts</c>) and the
-/// <c>createCurrentLocation</c>/hash-base logic of <c>html5.ts</c>/<c>hash.ts</c>.
+/// URL components.
 /// </summary>
 /// <remarks>
 /// Every method is a total function of its string inputs — no DOM, no interop — so base handling is
@@ -18,8 +16,7 @@ namespace Assimalign.Viu.Router;
 internal static class HistoryPathNormalization
 {
     /// <summary>
-    /// Removes a single trailing <c>/</c>. The C# port of upstream's
-    /// <c>removeTrailingSlash = path =&gt; path.replace(/\/$/, '')</c>.
+    /// Removes a single trailing <c>/</c>, leaving an already slash-free path unchanged.
     /// </summary>
     internal static string RemoveTrailingSlash(string path)
         => path.Length > 0 && path[^1] == '/' ? path[..^1] : path;
@@ -28,8 +25,8 @@ internal static class HistoryPathNormalization
     /// Normalizes a configured base: defaults an empty base to <c>"/"</c>, forces a leading <c>/</c>
     /// unless it already starts with <c>/</c> or <c>#</c>, then trims a trailing slash — so
     /// <c>"/app/"</c> and <c>"app"</c> both become <c>"/app"</c> and <c>"/"</c> becomes <c>""</c>
-    /// (the "no base" sentinel). The C# port of <c>normalizeBase</c>; the browser <c>&lt;base&gt;</c>
-    /// href default is resolved by the caller (see <see cref="StripBaseHrefOrigin"/>) before this.
+    /// (the "no base" sentinel). The browser <c>&lt;base&gt;</c> href default is resolved by the
+    /// caller (see <see cref="StripBaseHrefOrigin"/>) before this.
     /// </summary>
     /// <param name="rawBase">The configured base, or <see langword="null"/>/empty for the default.</param>
     internal static string NormalizeBase(string? rawBase)
@@ -44,8 +41,8 @@ internal static class HistoryPathNormalization
 
     /// <summary>
     /// Strips a leading <c>scheme://host</c> from a <c>&lt;base href&gt;</c> so only the path portion
-    /// remains. The reflection-free C# port of upstream's <c>base.replace(/^\w+:\/\/[^/]+/, '')</c>
-    /// applied to the document base element's href default.
+    /// remains. Implemented as a scan rather than a regular expression, so the base path is
+    /// resolvable without pulling the regex engine into a trimmed application.
     /// </summary>
     /// <param name="href">The raw <c>&lt;base&gt;</c> href.</param>
     internal static string StripBaseHrefOrigin(string href)
@@ -62,8 +59,7 @@ internal static class HistoryPathNormalization
 
     /// <summary>
     /// Strips the base off the beginning of a read pathname, case-insensitively, collapsing an
-    /// exact-base match to <c>"/"</c>. The C# port of <c>stripBase</c>
-    /// (<c>packages/router/src/location.ts</c>).
+    /// exact-base match to <c>"/"</c>, so a visit to the base itself resolves to the root route.
     /// </summary>
     /// <param name="pathname">The raw <c>location.pathname</c>.</param>
     /// <param name="base">The normalized base (empty means "no base").</param>
@@ -81,8 +77,8 @@ internal static class HistoryPathNormalization
     /// <summary>
     /// Builds an <c>href</c> value: <c>base + location</c> for a plain base, or (when the base carries
     /// a <c>#</c> after at least one leading character, i.e. hash mode) the leading <c>#</c> plus the
-    /// location. The C# port of <c>createHref</c> and its <c>BEFORE_HASH_RE</c> = <c>/^[^#]+#/</c>
-    /// replacement (<c>packages/router/src/history/common.ts</c>).
+    /// location — in hash mode everything before the <c>#</c> is dropped, because the server never
+    /// sees the fragment and the anchor must stay same-document.
     /// </summary>
     /// <param name="base">The normalized base.</param>
     /// <param name="location">The base-stripped location.</param>
@@ -99,10 +95,8 @@ internal static class HistoryPathNormalization
     /// <summary>
     /// Computes the hash-mode base from the current URL: the provided base (or
     /// <c>pathname + search</c>) when a host is present, or empty for a hostless <c>file://</c> URL,
-    /// with a <c>#</c> appended if absent. The C# port of the base computation in
-    /// <c>createWebHashHistory</c> (<c>packages/router/src/history/hash.ts</c>); the result is then
-    /// passed through <see cref="NormalizeBase"/> exactly as upstream forwards it to
-    /// <c>createWebHistory</c>.
+    /// with a <c>#</c> appended if absent. The result is then passed through
+    /// <see cref="NormalizeBase"/>, so hash mode and web mode share one base representation.
     /// </summary>
     /// <param name="providedBase">The caller-supplied base, or <see langword="null"/>.</param>
     /// <param name="host">The raw <c>location.host</c> (empty for <c>file://</c>).</param>
@@ -129,8 +123,7 @@ internal static class HistoryPathNormalization
     /// <summary>
     /// Derives the current base-stripped location from raw URL components. In hash mode (base carries
     /// a <c>#</c>) the location is the portion of the fragment after the hash-base, forced to a
-    /// leading <c>/</c>; otherwise it is <c>stripBase(pathname) + search + hash</c>. The C# port of
-    /// <c>createCurrentLocation</c> (<c>packages/router/src/history/html5.ts</c>).
+    /// leading <c>/</c>; otherwise it is the base-stripped pathname plus the search and hash.
     /// </summary>
     /// <param name="base">The normalized base.</param>
     /// <param name="pathname">The raw <c>location.pathname</c>.</param>
@@ -148,7 +141,7 @@ internal static class HistoryPathNormalization
             {
                 pathFromHash = "/" + pathFromHash;
             }
-            // Upstream returns stripBase(pathFromHash, '') — an empty base strips nothing.
+            // The hash base has already been sliced off, so there is nothing further to strip.
             return pathFromHash;
         }
         return StripBase(pathname, @base) + search + hash;

@@ -5,8 +5,8 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// Represents a tag attribute (<c>&lt;style scoped&gt;</c> — the canonical <c>.viu</c> template/style
 /// form since [V01.01.06.10], and every <c>.vue</c> block) and an @-header option
 /// (<c>@script lang="csharp" {</c>, custom and legacy blocks) with one identical record — the two
-/// grammars surface the same name/value pairs. See the Vue SFC block-attribute contract at
-/// https://vuejs.org/api/sfc-spec.html. Immutable and value-equatable so identical headers
+/// grammars surface the same name/value pairs, so a consumer reads options without knowing which
+/// header form produced them. Immutable and value-equatable so identical headers
 /// compare equal.
 /// </summary>
 /// <param name="Name">The option name (e.g. <c>scoped</c>, <c>lang</c>, <c>module</c>).</param>

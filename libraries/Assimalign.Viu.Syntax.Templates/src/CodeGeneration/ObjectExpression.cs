@@ -1,8 +1,7 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A code-generation object literal, e.g. a vnode props object or a compiled slots object. The C# port of
-/// Vue 3.5's <c>ObjectExpression</c> (<c>@vue/compiler-core</c> <c>ast.ts</c>).
+/// A code-generation object literal, e.g. a render node's props object or a compiled slots object.
 /// </summary>
 public sealed record ObjectExpression : TemplateSyntaxNode
 {

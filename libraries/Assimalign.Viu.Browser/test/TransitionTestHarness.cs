@@ -9,9 +9,9 @@ namespace Assimalign.Viu.Browser.Tests;
 
 // A DOM-free harness that drives the real Core renderer + the real DOM <Transition>/
 // <TransitionGroup> components over int node handles, with a recording DomTransitionOperations that
-// the test advances deterministically. It mirrors how upstream tests transitions without a browser
-// (packages/runtime-dom/__tests__/components/Transition* use jsdom + synthetic transitionend); here
-// the class add/remove, next-frame schedule, and end-detection are all recorded/driven in memory.
+// the test advances deterministically: the class add/remove, next-frame schedule, and end-detection
+// are all recorded and driven in memory, so the choreography is pinned without a browser and without
+// wall-clock timing.
 internal sealed class TransitionTestHarness : IDisposable
 {
     private readonly Dictionary<int, RecordingNode> _nodes = [];

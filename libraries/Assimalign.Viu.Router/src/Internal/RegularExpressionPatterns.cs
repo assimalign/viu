@@ -12,8 +12,7 @@ internal static partial class RegularExpressionPatterns
 {
     /// <summary>
     /// The characters that must be escaped when literal path text is embedded into a regular
-    /// expression. The C# port of vue-router's <c>REGEX_CHARS_RE</c>
-    /// (<c>packages/router/src/matcher/pathParserRanker.ts</c>): <c>. + * ? ^ $ { } ( ) [ ] / \</c>.
+    /// expression: <c>. + * ? ^ $ { } ( ) [ ] / \</c>.
     /// </summary>
     [GeneratedRegex(@"[.+*?^${}()[\]/\\]")]
     public static partial Regex RegularExpressionSpecialCharacters();

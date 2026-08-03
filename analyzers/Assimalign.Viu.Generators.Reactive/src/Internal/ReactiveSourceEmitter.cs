@@ -4,8 +4,9 @@ namespace Assimalign.Viu.Generators.Reactivity;
 
 /// <summary>
 /// Renders a <see cref="ReactiveClassModel"/> into the partial-class implementation the generator
-/// adds — the compiled stand-in for Vue's <c>reactive()</c> proxy. Every emitted member is fully
-/// qualified (no <c>using</c>s), nullable-annotated, and free of reflection so the output is
+/// adds: the build-time interception layer that replaces the object proxy Viu deliberately does not
+/// have. Every emitted member is fully qualified (no <c>using</c>s), nullable-annotated, and free of
+/// reflection so the output is
 /// trim/AOT-safe. The per-property getter/setter fast path calls
 /// <c>Dependency.Track()</c>/<c>Trigger()</c> directly on a sealed field — no interface dispatch —
 /// mirroring the hand-written pattern in the core.s <c>ComponentProperties</c>.
@@ -118,7 +119,7 @@ internal static class ReactiveSourceEmitter
             if (model.Readonly)
             {
                 AppendIndent(builder, indent + 2);
-                builder.Append("global::System.Diagnostics.Debug.WriteLine(\"[Vue warn] Set operation on key \\\"")
+                builder.Append("global::System.Diagnostics.Debug.WriteLine(\"[Viu warn] Set operation on key \\\"")
                     .Append(property.Name).Append("\\\" failed: target is readonly.\");\n");
             }
             else
@@ -210,8 +211,9 @@ internal static class ReactiveSourceEmitter
             return;
         }
 
-        // The port of Vue's ReactiveFlags.IS_READONLY, surfaced through Reactive.IsReadonly(): a
-        // readonly variant overrides the IReactiveObject default-interface member to report true.
+        // The readonly marker Reactive.IsReadonly() observes: a readonly variant overrides the
+        // IReactiveObject default-interface member to report true. It is emitted as a compiled
+        // member rather than carried in run-time state because there is no proxy to hold a flag.
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("bool ").Append(ReactiveObjectType).Append(".IsReadOnly => true;\n");
@@ -226,10 +228,11 @@ internal static class ReactiveSourceEmitter
 
         var sourceType = model.TypeName + model.TypeParameterList;
 
-        // The compiled counterpart of Vue 3.5's toRefs() (https://vuejs.org/api/reactivity-utilities.html#torefs):
-        // a typed bundle of per-property refs, each write-through-linked to this object because it reads and
-        // writes the property through Reactive.ToRef, routing tracking and triggering through the property's
-        // own dependency. Emitted only when there is at least one reactive property.
+        // A typed bundle of per-property references, each write-through-linked to this object: every
+        // reference reads and writes its property through Reactive.ToRef, so tracking and triggering
+        // still route through that property's own dependency and the bundle never becomes a stale
+        // snapshot. Destructuring a reactive object therefore keeps reactivity, which a plain
+        // property copy would lose. Emitted only when there is at least one reactive property.
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("public readonly struct ReactiveReferences\n");
@@ -275,12 +278,12 @@ internal static class ReactiveSourceEmitter
 
         var sourceType = model.TypeName + model.TypeParameterList;
 
-        // The compiled counterpart of Vue 3.5's toRaw() for reactive objects
-        // (https://vuejs.org/api/reactivity-advanced.html#toraw): an untracked view straight over
-        // the raw value fields — reads do not track and writes do not trigger, exactly like
-        // reading/writing the raw target behind Vue's proxy. Emitted for readonly variants too:
-        // upstream toRaw(readonly(obj)) returns the underlying mutable target. As a nested type it
-        // reaches the private backing fields without reflection.
+        // The untracked escape hatch Reactive.ToRaw() surfaces: a view straight over the raw value
+        // fields, where reads do not track and writes do not trigger. Bulk work that would otherwise
+        // notify once per assignment goes through it. Emitted for readonly variants too — a readonly
+        // variant restricts the reactive surface, not access to the underlying mutable target, so
+        // ToRaw() on one still yields a writable view. As a nested type it reaches the private
+        // backing fields without reflection.
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("public readonly struct RawValues\n");

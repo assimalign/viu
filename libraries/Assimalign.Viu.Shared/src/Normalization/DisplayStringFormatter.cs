@@ -7,18 +7,17 @@ using System.Text;
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// Text-interpolation formatting — the C# port of <c>toDisplayString</c> from
-/// <c>@vue/shared</c> (<c>packages/shared/src/toDisplayString.ts</c>,
-/// https://vuejs.org/guide/essentials/template-syntax.html). Null renders empty, scalars via
-/// invariant culture (mandatory so SSR output and client hydration agree), and collections
-/// render in upstream's JSON-like two-space-indented shape, including its Map/Set replacer
-/// conventions for non-string-keyed dictionaries and sets. Hand-written recursion over
+/// Text-interpolation formatting: what a <c>{{ expression }}</c> renders to. Null renders empty,
+/// scalars via invariant culture (mandatory so SSR output and client hydration agree — a
+/// culture-sensitive number would produce a hydration mismatch), and collections render in a
+/// JSON-like two-space-indented shape, with the <c>Map(n)</c>/<c>Set(n)</c> wrapper conventions
+/// for non-string-keyed dictionaries and sets. Hand-written recursion over
 /// <see cref="IDictionary"/>/<see cref="IEnumerable"/> — no reflection-based serialization
 /// (WASM AOT/trimming constraint).
 /// </summary>
 public static class DisplayStringFormatter
 {
-    /// <summary>Formats <paramref name="value"/> for text interpolation (upstream: <c>toDisplayString</c>).</summary>
+    /// <summary>Formats <paramref name="value"/> for text interpolation.</summary>
     /// <param name="value">The interpolated value.</param>
     /// <returns>The display string; never null.</returns>
     public static string ToDisplayString(object? value)
@@ -41,8 +40,8 @@ public static class DisplayStringFormatter
     }
 
     /// <summary>
-    /// Scalar formatting with invariant culture: JavaScript-style booleans
-    /// (<c>true</c>/<c>false</c>), <see cref="IFormattable"/> via
+    /// Scalar formatting with invariant culture: lowercase booleans
+    /// (<c>true</c>/<c>false</c>, matching what the DOM round-trips), <see cref="IFormattable"/> via
     /// <see cref="CultureInfo.InvariantCulture"/>, everything else via <c>ToString()</c>.
     /// </summary>
     /// <param name="value">The scalar value.</param>
@@ -79,11 +78,11 @@ public static class DisplayStringFormatter
                 WriteJsonObject(builder, EnumeratePairs(dictionary), depth);
                 break;
             case IDictionary dictionary:
-                // Upstream Map replacer: { "Map(n)": { "key =>": value } }.
+                // Map convention: { "Map(n)": { "key =>": value } }.
                 WriteMapConvention(builder, dictionary, depth);
                 break;
             case IEnumerable enumerable when IsSetLike(value):
-                // Upstream Set replacer: { "Set(n)": [ ... ] }.
+                // Set convention: { "Set(n)": [ ... ] }.
                 WriteSetConvention(builder, enumerable, depth);
                 break;
             case IEnumerable enumerable:

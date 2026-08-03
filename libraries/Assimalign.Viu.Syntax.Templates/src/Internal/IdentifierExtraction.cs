@@ -9,9 +9,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Extracts the identifier names an alias expression <i>declares</i> — the value/key/index of a <c>v-for</c>
-/// and the destructured props of a <c>v-slot</c> — so the transform can register them in the template scope.
-/// The C# analogue of the parameter walk Vue 3.5 performs in <c>processExpression(..., asParams = true)</c>
-/// and feeds to <c>addIdentifiers</c> (<c>@vue/compiler-core</c> <c>transformExpression.ts</c>/<c>babelUtils.ts</c>).
+/// and the destructured props of a <c>v-slot</c> — so the transform can register them in the template
+/// scope, where they shadow component bindings and are never rewritten.
 /// </summary>
 /// <remarks>
 /// Because template aliases are C#, this handles the C# binding forms — a plain identifier (<c>item</c>), a

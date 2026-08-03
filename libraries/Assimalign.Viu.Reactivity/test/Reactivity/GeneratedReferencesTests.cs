@@ -6,10 +6,9 @@ namespace Assimalign.Viu.Reactivity.Tests;
 // The generated ToReferences() bundle (ReactiveValue<T> refs) and the IReactiveObject.IsReadOnly
 // readonly flag are emitted by the Assimalign.Viu.Generators.Reactivity source generator (wired into this
 // test project). These tests
-// consume the real generated output. Upstream parity: https://vuejs.org/api/reactivity-utilities.html
-// (toRefs, isReadonly).
+// consume the real generated output rather than a hand-written stand-in.
 
-/// <summary>A read-only reactive object (the port of <c>readonly(reactive())</c>).</summary>
+/// <summary>A read-only reactive object: reads still track, writes warn and do nothing.</summary>
 [Reactive(Readonly = true)]
 public partial class ReadonlyProfile
 {
@@ -82,7 +81,8 @@ public sealed class GeneratedReferencesTests
     {
         var profile = new ReadonlyProfile();
 
-        // readonly(reactive()) is both readonly and reactive (Vue parity).
+        // A read-only reactive object is BOTH readonly and reactive: rejecting writes does not stop
+        // reads from tracking.
         Reactive.IsReadonly(profile).ShouldBeTrue();
         Reactive.IsReactive(profile).ShouldBeTrue();
 
@@ -93,7 +93,7 @@ public sealed class GeneratedReferencesTests
     [Fact]
     public void ToRawValues_Reads_DoNotTrack()
     {
-        // Upstream toRaw contract (https://vuejs.org/api/reactivity-advanced.html#toraw): reads
+        // The raw view contract: reads
         // through the raw view do not establish dependencies, so the effect never re-runs.
         var person = new ReactivePerson { Name = "Ada", Age = 30 };
         var raw = person.ToRawValues();
@@ -127,8 +127,8 @@ public sealed class GeneratedReferencesTests
         });
         runs.ShouldBe(1);
 
-        // A raw write mutates the shared backing field without triggering (upstream: writes to the
-        // raw target bypass the proxy's trigger).
+        // A raw write mutates the shared backing field without triggering: the raw view is the same
+        // live storage, taken deliberately below the tracking layer.
         var raw = person.ToRawValues();
         raw.Name = "Grace";
         runs.ShouldBe(1);

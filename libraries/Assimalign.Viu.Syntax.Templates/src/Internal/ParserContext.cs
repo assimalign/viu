@@ -6,18 +6,18 @@ using System.Text;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The stateful parser driver: consumes <see cref="Tokenizer"/> events and builds the located AST. The
-/// C# port of Vue 3.5's <c>baseParse</c> and its tokenizer callbacks (<c>@vue/compiler-core</c>
-/// <c>parser.ts</c>). One instance parses one template (Vue uses module-level state reset per parse;
-/// this port uses a fresh instance instead). Not thread-safe.
+/// The stateful parser driver: consumes <see cref="Tokenizer"/> events and builds the located AST.
+/// One instance parses one template — there is no module-level state to reset, so two parses can never
+/// contaminate each other. Not thread-safe.
 /// </summary>
 /// <remarks>
-/// Divergences from upstream, all AST-preserving: nodes are built into immutable records at close time
-/// (Vue mutates in place); character references are decoded when content is materialised (see
-/// <see cref="HtmlEntityDecoder"/>); JavaScript expression parsing (<c>prefixIdentifiers</c>, the Babel
-/// AST) and <c>v-for</c> expression decomposition are out of [V01.01.05.01] scope. The <c>dirToAttr</c>
-/// value location is recomputed so <c>loc.Source</c> matches its offsets for every node (Vue leaves that
-/// one source string stale) — the location-accuracy contract of this work item.
+/// Nodes are built into immutable records at close time, through <see cref="ElementBuilder"/> and
+/// <see cref="PropertyBuilder"/>, so nothing in the emitted AST is ever mutated after the fact.
+/// Character references are decoded when content is materialised (see <see cref="HtmlEntityDecoder"/>).
+/// Expression bodies stay opaque here: identifier classification and <c>v-for</c> decomposition belong to
+/// the transform stage. Every emitted node satisfies the exact-slice invariant — including a directive's
+/// value location, which is recomputed so <c>Location.Source</c> matches its own offsets rather than
+/// inheriting the attribute's — the location-accuracy contract of [V01.01.05.01].
 /// </remarks>
 internal sealed class ParserContext : ITokenizerCallbacks
 {

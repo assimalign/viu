@@ -36,20 +36,20 @@ result — the incremental-generator caching contract.
 
 A qualified rule's prelude is parsed (`CssSelectorParser`) into a `CssSelectorListNode` of
 `CssComplexSelectorNode`s, each a **flat, source-ordered list** of `CssSelectorPartNode` parts —
-simple selectors, pseudo selectors, and the combinators between compounds. This mirrors
-`postcss-selector-parser`'s node list, which is the representation Vue's scoped plugin walks to pick the
-compound that receives the `[data-v-hash]` attribute (the last part that is neither a combinator nor a
-pseudo). Compounds are implicit (runs of adjacent simple/pseudo parts between combinators), which is all
+simple selectors, pseudo selectors, and the combinators between compounds. The model is flat rather than
+a nested compound tree because the one question the rewrite asks is positional — which compound receives
+the `[data-v-hash]` attribute (the last part that is neither a combinator nor a
+pseudo) — and a flat list answers it with a single reverse scan. Compounds are implicit (runs of adjacent simple/pseudo parts between combinators), which is all
 the rewrite needs. The reserved functional pseudos `:deep()`/`:slotted()`/`:global()` have their inner
 selector lists parsed recursively; every other functional pseudo (`:not(...)`, `:nth-child(...)`) keeps
 its argument as verbatim text.
 
 ## The scoped transform
 
-`CssScopedRewriter` is the pure-.NET port of `@vue/compiler-sfc`'s `pluginScoped.ts`, pinned against that
-plugin's [test fixtures](https://github.com/vuejs/core/blob/main/packages/compiler-sfc/__tests__/compileStyle.spec.ts)
-in `CssScopedRewriterTests`. Scope id `data-v-test` yields the attribute `[data-v-test]` (no value) and
-the keyframes short id `test`:
+`CssScopedRewriter` implements the compile-time half of scoped CSS (`[STY-1]`). The table below is the
+**frozen input → output contract**, asserted case for case by `CssScopedRewriterTests`; a row is changed
+only by a deliberate decision, never as cleanup. Scope id `data-v-test` yields the attribute
+`[data-v-test]` (no value) and the keyframes short id `test`:
 
 | Input | Output |
 | --- | --- |
@@ -64,9 +64,8 @@ the keyframes short id `test`:
 | `:global(.foo) { }` | `.foo { }` (whole selector unscoped) |
 | `@keyframes x` + `animation: x 5s` | `@keyframes x-test` + `animation: x-test 5s` |
 
-Keyframe names are collected in a first pass (so an `animation`/`animation-name` reference resolves
-regardless of source order, matching the plugin's `AtRule`-collect / `OnceExit`-rewrite split) and
-suffixed with `-<shortId>`. Serialization is **deterministic** (canonical two-space indent,
+Keyframe names are collected in a first pass, so an `animation`/`animation-name` reference resolves
+regardless of source order, then suffixed with `-<shortId>`. Serialization is **deterministic** (canonical two-space indent,
 `prop: value;`, `selector {`), so the incremental cache holds; the scoped output's whitespace is therefore
 normalized rather than source-preserving (unscoped `@style` blocks pass through the generator verbatim, so
 their formatting is never touched).
@@ -74,21 +73,20 @@ their formatting is never touched).
 ## The scope-id scheme
 
 The scope id is `data-v-` + an FNV-1a hash (8 hex) of the component's **project-relative `.viu` path**
-(normalized to forward slashes), computed by the generator's `StyleScopeId`. This mirrors Vue's dev-mode
-scheme of hashing the short file path (`@vitejs/plugin-vue`): deterministic, stable across machines and
+(normalized to forward slashes), computed by the generator's `StyleScopeId`. Hashing the path rather than
+the content makes the id deterministic, stable across machines and
 rebuilds (asset-caching contract), and unique per component file. A path-based id intentionally does not
-change when only the file's *content* changes — the id identifies the component, not a revision; Vue's
-production build additionally folds the source in for cache-busting, which is deferred with the
+change when only the file's *content* changes — the id identifies the component, not a revision.
+Additionally folding the source in for production cache-busting is deferred with the
 static-web-asset emission below. A linked file outside the project directory falls back to hashing its
 leaf name so the id stays machine-independent.
 
 ## CSS Modules and `v-bind()` — the [V01.01.06.06] rewrites
 
-Two more transforms sit alongside `CssScopedRewriter`, each a pure-.NET port of a `@vue/compiler-sfc`
-stage and each reached the same way — the composition-root generator runs them over the parsed tree, not
-the `.viu` parser wiring them in.
+Two more tree-to-tree transforms sit alongside `CssScopedRewriter`, each reached the same way — the
+composition-root generator runs them over the parsed tree, not the `.viu` parser wiring them in.
 
-- **`CssModuleRewriter`** ports `compileStyle()`'s CSS-Modules mode (`postcss-modules`). It renames every
+- **`CssModuleRewriter`** implements CSS Modules (`[STY-2]`). It renames every
   local class selector `.foo` to `.foo_<hash>` and returns the original → hashed map for the generated
   `$style` accessor. `<hash>` is the eight-hex-digit FNV-1a of `<shortScopeId>-foo` (`CssHash`, the same
   FNV-1a as `StyleScopeId`), so it is deterministic, stable across rebuilds, and unique per component. The
@@ -96,8 +94,8 @@ the `.viu` parser wiring them in.
   arguments (`:not()`, `:deep()`, `:slotted()`, `:global()`) are left alone — `:deep`/`:global`
   deliberately target external/un-hashed names, and non-reserved pseudo arguments are verbatim text (the
   parser non-goal below).
-- **`CssBindingRewriter`** ports `cssVars.ts`. It scans each declaration value for `v-bind(expr)` (a port
-  of upstream's `lexBinding`: it skips string literals and `/* */` comments and balances nested parens),
+- **`CssBindingRewriter`** implements `v-bind()` in CSS (`[STY-6]`). It scans each declaration value for
+  `v-bind(expr)` lexically — skipping string literals and `/* */` comments and balancing nested parens —
   replaces each with `var(--<hash>)`, and collects the distinct `(hash, expression, location)` bindings for
   the `UseCssVars` runtime. `<hash>` is the FNV-1a of `<shortScopeId>-<expr>`, so the emitted CSS
   `var(--<hash>)` and the runtime's `style.setProperty("--<hash>", …)` agree by construction. Each binding
@@ -111,8 +109,8 @@ the `.viu` parser wiring them in.
 composition-root generator routes each extracted expression through
 `Assimalign.Viu.Syntax.Templates`' `TemplateExpressionCompiler.CompileInstanceExpression` with the component's
 binding metadata — the same binding-aware rewriting a render expression gets. This makes `v-bind(count)` unwrap
-a script `Reference<T>` member to `count.Value` automatically (matching upstream cssVars ergonomics), instead of
-forcing the author to write `v-bind(count.Value)`. The getter runs as an **instance member** of the component
+a script `Reference<T>` member to `count.Value` automatically, so a style block and a template read the same
+member the same way, instead of forcing the author to write `v-bind(count.Value)` in one and `count` in the other. The getter runs as an **instance member** of the component
 partial class (`ApplyCssVariables`), so the rewriting is instance-member mode: bindings read through the implicit
 `this` (no `_ctx.`), a definite `Reference<T>` unwraps to `.Value`, and every other binding reads bare — the
 generator only marks a binding a definite reference when its declared type is reactive, so no `unref` (and thus no
@@ -198,8 +196,8 @@ only the scope-id string.
   `:deep()`, `:slotted()`, `:global()` is not renamed (see the [V01.01.06.06] section). This follows the
   verbatim-pseudo-argument non-goal below and, for `:deep`/`:global`, is the correct behavior (those target
   external names).
-- **The production `hash(id + raw)` prod-mode `v-bind` name** — upstream's dev build uses a readable
-  `id-<escaped-expr>` custom property and its prod build a bare hash; Viu always uses the deterministic
+- **A readable debug spelling for the `v-bind` custom property** — an `id-<escaped-expr>` form would be
+  friendlier in dev tools, but Viu always uses the deterministic
   component-scoped hash (`--<hash>`), which is unambiguous and needs no escaping, and records the readable
   expression in metadata instead.
 - **Physical static-web-asset bundling.** A Roslyn source generator emits C#, not content files (and
@@ -211,10 +209,9 @@ only the scope-id string.
   delegates to — over the same `.viu` inputs, so the physical bundle is byte-identical to `ExtractedStyles`;
   it writes the bundle under `obj/…/viu/` and registers it as a `StaticWebAsset`. See that library's
   `docs/DESIGN.md` and `docs/UTILITY-CSS-DESIGN.md` §2.4.
-- **Legacy deep combinators** `>>>` and `/deep/` — deprecated upstream in favor of `:deep()`; not
-  supported.
-- **Deep inside `:is()`/`:where()`/`:not()`** — upstream's `splitSelectorForNestedDeep` and the
-  `:is`/`:where` inner-recursion refinements are not ported; those functional pseudos are treated as
+- **Legacy deep combinators** `>>>` and `/deep/` — superseded by `:deep()`; not supported.
+- **Deep inside `:is()`/`:where()`/`:not()`** — splitting a selector around a nested `:deep()` and
+  recursing into `:is`/`:where` arguments are not implemented; those functional pseudos are treated as
   opaque verbatim arguments. Straightforward `:deep()`/`:slotted()`/`:global()` and
   compound/complex/grouped scoping are covered.
 - **Comment preservation in scoped output.** Comments are tokenized (for exact spans) but dropped by the

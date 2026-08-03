@@ -12,12 +12,11 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins the host-generic KeepAlive cache against Vue 3.5's observable lifecycle, filtering, and
+/// Pins the host-generic KeepAlive cache: its observable lifecycle, filtering, and
 /// least-recently-used behavior.
 /// </summary>
 /// <remarks>
-/// Upstream contract:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/__tests__/components/KeepAlive.spec.ts.
+/// Specified by <c>[BLT-5]</c> and <c>[BLT-6]</c>.
 /// </remarks>
 public sealed class KeepAliveTests : IDisposable
 {

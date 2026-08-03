@@ -9,8 +9,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// The element transform: on exit it builds the element's <see cref="VNodeCall"/> code-generation node,
 /// resolving the vnode tag (including dynamic components), building its props, and attaching its children or
-/// slots. The C# port of Vue 3.5's <c>transformElement</c>, <c>resolveComponentType</c>, <c>buildProps</c>,
-/// and <c>buildDirectiveArgs</c> (<c>@vue/compiler-core</c> <c>transforms/transformElement.ts</c>).
+/// slots. Tag resolution, prop building, and directive-argument building all live here because each
+/// depends on the results of the others.
 /// </summary>
 /// <remarks>
 /// The patch-flag analysis in <see cref="BuildProps"/> is ported here because it is inseparable from prop
@@ -140,7 +140,7 @@ internal static class TransformElement
         context.SetCodegenNode(element, codegenNode);
     };
 
-    /// <summary>Resolves the vnode tag for a component, including dynamic components (upstream <c>resolveComponentType</c>).</summary>
+    /// <summary>Resolves the vnode tag for a component, including dynamic components.</summary>
     public static object ResolveComponentType(ElementNode element, TransformContext context)
     {
         var tag = element.Tag;
@@ -187,7 +187,7 @@ internal static class TransformElement
         return ToValidAssetId(tag, "component");
     }
 
-    /// <summary>Builds an element's props, directives, and patch-flag analysis (upstream <c>buildProps</c>).</summary>
+    /// <summary>Builds an element's props, directives, and patch-flag analysis.</summary>
     public static BuildPropsResult BuildProps(
         ElementNode element,
         TransformContext context,
@@ -496,7 +496,7 @@ internal static class TransformElement
         };
     }
 
-    /// <summary>Builds the runtime directive argument array for a custom/model directive (upstream <c>buildDirectiveArgs</c>).</summary>
+    /// <summary>Builds the runtime directive argument array for a custom/model directive.</summary>
     public static ArrayExpression BuildDirectiveArguments(DirectiveNode directive, TransformContext context)
     {
         var arguments = new List<object>();
@@ -696,8 +696,8 @@ internal static class TransformElement
     private static bool IsComponentTag(string tag) => tag is "component" or "Component";
 
     // Internal (not private) because code generation ([V01.01.05.05]) re-derives the same asset ids for
-    // its resolveComponent/resolveDirective preamble — upstream shares toValidAssetId the same way
-    // (@vue/compiler-core utils.ts, used by both transformElement.ts and codegen.ts).
+    // its resolveComponent/resolveDirective preamble. The two must derive identical ids, so the
+    // derivation lives in one place rather than being duplicated per stage.
     internal static string ToValidAssetId(string name, string type)
     {
         var builder = new StringBuilder("_").Append(type).Append('_');

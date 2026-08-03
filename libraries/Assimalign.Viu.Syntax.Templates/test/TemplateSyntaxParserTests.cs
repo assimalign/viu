@@ -7,7 +7,7 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.Templates;
 
 // Pins the TemplateSyntaxParser adapter contract ([V01.01.05.09]): parsing semantics are exactly
-// TemplateParser.Parse (the upstream-pinned baseParse port stays authoritative), recoverable OnError
+// TemplateParser.Parse (that static entry point stays authoritative), recoverable OnError
 // errors additionally surface as the result's uniform Diagnostics, a caller-supplied OnError still
 // sees every error, and the caller's ParserOptions instance is never mutated.
 public class TemplateSyntaxParserTests
@@ -40,7 +40,7 @@ public class TemplateSyntaxParserTests
     [Fact]
     public void ParseTemplate_MalformedInput_SurfacesCompilerErrorsAsDiagnostics()
     {
-        // Unterminated tag: upstream reports EOF_IN_TAG (recoverable, never throws).
+        // An unterminated tag reports EOF_IN_TAG: recoverable, never thrown.
         var result = new TemplateSyntaxParser().ParseTemplate("<div");
 
         result.Diagnostics.Count.ShouldBeGreaterThan(0);
@@ -98,7 +98,7 @@ public class TemplateSyntaxParserTests
         var root = TemplateParser.Parse("<div>{{ value }}</div>");
 
         // The language-agnostic SyntaxNode.RawKind projection is the NodeType numeric value, which
-        // is itself pinned to @vue/compiler-core's NodeTypes.
+        // is itself a frozen catalog — additive only, never renumbered.
         root.RawKind.ShouldBe((int)NodeType.Root);
         var element = root.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
         element.RawKind.ShouldBe((int)NodeType.Element);

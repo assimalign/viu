@@ -5,11 +5,11 @@ using System.Text;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Rewrites a parsed <see cref="CssStylesheetNode"/> into attribute-scoped CSS text, the pure-.NET C#
-/// port of Vue 3.5's scoped-CSS transform (<c>@vue/compiler-sfc</c> <c>compileStyle()</c> with the
-/// scoped PostCSS plugin, <c>pluginScoped.ts</c>; https://vuejs.org/api/sfc-css-features.html). Each
-/// complex selector gains a <c>[data-v-hash]</c> attribute on the last compound, and Vue's reserved
-/// pseudo-combinators are honored:
+/// Rewrites a parsed <see cref="CssStylesheetNode"/> into attribute-scoped CSS text: the compile-time
+/// half of scoped CSS, whose runtime half is the renderer stamping the same identifier onto host
+/// elements (specified by <c>[STY-1]</c>). Each
+/// complex selector gains a <c>[data-v-hash]</c> attribute on the last compound, and the three
+/// reserved functional pseudos that opt out of, or redirect, that scoping are honored:
 /// <list type="bullet">
 /// <item><c>:deep(inner)</c> / <c>::v-deep(inner)</c> — the attribute lands on the compound before the deep, then a descendant combinator, and <c>inner</c> is left unscoped.</item>
 /// <item><c>:slotted(inner)</c> / <c>::v-slotted(inner)</c> — <c>inner</c> is scoped with the slotted suffix <c>[data-v-hash-s]</c>.</item>
@@ -227,7 +227,7 @@ public static class CssScopedRewriter
     }
 
     // Splits one animation shorthand by whitespace and replaces the first component that names a scoped
-    // keyframe (upstream finds the keyframe name among the space-separated parts and swaps it in place).
+    // keyframe: the name is located among the space-separated parts and swapped in place.
     private static string RewriteAnimationShorthand(string animation, Dictionary<string, string> keyframes)
     {
         var parts = animation.Trim().Split(new[] { ' ', '\t', '\n', '\r', '\f' }, StringSplitOptions.RemoveEmptyEntries);

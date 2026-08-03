@@ -1,19 +1,18 @@
 # Assimalign.Viu.Router.Browser — overview
 
 The browser integration layer between `Assimalign.Viu.Router` and `Assimalign.Viu.Browser`: the
-one small adapter that lets `RouterLink` intercept a real DOM click and navigate client-side. It is
-the C# home for the coupling vue-router keeps inline — upstream's `guardEvent`
-(`packages/router/src/RouterLink.ts`, https://github.com/vuejs/router) reads the DOM `MouseEvent`
-and calls `e.preventDefault()` directly, but Viu keeps `RouterLink` renderer-agnostic (it renders
-through the node-ops abstraction and never references the DOM adapter), so the mapping cannot live in
-either package it bridges.
+one small adapter that lets `RouterLink` intercept a real DOM click and navigate client-side.
+`RouterLink` is renderer-agnostic — it renders through the node-ops abstraction and never references
+the DOM adapter — and `Browser` stays Router-agnostic, so the DOM-event-to-router mapping cannot live
+in either package it bridges. Specified by
+[`[RTR-7]`](../../../docs/SPECIFICATION.md#12-routing).
 
 ## What it provides
 
 - **`RouterLinkDomBridge`** — `Install()`/`Uninstall()` wire the bridge into the DOM event system
   (`BrowserObjectEvents.Invoker`). `Invoke` converts the dispatched `BrowserEvent`'s click metadata
   (mouse button, the Control/Shift/Alt/Meta modifiers, and the arrival-time `defaultPrevented`) into
-  the DOM-free `RouterLinkClickEvent` the link's guard reads, then mirrors the guard's
+  the DOM-free `RouterLinkClickEvent` the link's guard reads, then propagates the guard's
   `PreventDefault` decision back onto the live event so the browser's full page load is suppressed.
 
 ## Using it

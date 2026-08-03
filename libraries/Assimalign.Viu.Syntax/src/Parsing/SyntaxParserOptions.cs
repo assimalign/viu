@@ -6,7 +6,7 @@ namespace Assimalign.Viu.Syntax;
 /// <summary>
 /// Configures a <see cref="SyntaxParser{T}"/>: the <see cref="SyntaxAnalyzer{T}"/> instances that run
 /// over the parsed nodes and the time budget for that analysis pass. Language-specific parser options
-/// stay on the concrete parser (e.g. the template parser's upstream-pinned <c>ParserOptions</c>) —
+/// stay on the concrete parser (e.g. the template parser's own <c>ParserOptions</c>) —
 /// this type carries only the shared pipeline configuration.
 /// </summary>
 /// <typeparam name="T">The root node type of the syntax tree the configured parser produces.</typeparam>

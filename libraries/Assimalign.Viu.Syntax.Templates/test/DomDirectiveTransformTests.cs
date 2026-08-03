@@ -4,8 +4,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-dom/__tests__/transforms/{vShow,vHtml,vText}.spec.ts, plus the
-// v-pre (parser-driven) and v-cloak (noop) integration cases.
+// The DOM directive transforms: v-show, v-html, and v-text, plus the v-pre (parser-driven) and v-cloak
+// (contributes nothing) integration cases. These cases ARE the contract for what each directive
+// contributes to an element's props and which runtime directive, if any, it requests.
 public class DomDirectiveTransformTests
 {
     [Fact]

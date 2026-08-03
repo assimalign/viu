@@ -1,10 +1,8 @@
 # Assimalign.Viu.Testing — overview
 
-The DOM-free testing package — the C# counterpart of
-[`@vue/runtime-test`](https://github.com/vuejs/core/tree/main/packages/runtime-test) (the in-memory
-renderer and node-op log) plus [`@vue/test-utils`](https://test-utils.vuejs.org) (the `mount` entry
-and the component wrapper). Everything runs on a plain CoreCLR test host — no browser, no WASM
-toolchain, no JS interop. Area: `V01.01.11`.
+The DOM-free testing package: an in-memory renderer with a node-operation log, plus a `mount` entry
+and component/element wrappers for querying and interacting with a rendered tree. Everything runs on
+a plain CoreCLR test host — no browser, no WASM toolchain, no JS interop. Area: `V01.01.11`.
 
 ## Public surface
 
@@ -12,8 +10,8 @@ toolchain, no JS interop. Area: `V01.01.11`.
   `IComponentTemplate`. Both paths can use the real Core `ApplicationContext`; template mounting
   activates the supplied root once, and child activation delegates to
   `ComponentMountOptions.Components`.
-- **`TestRenderer`** — the ready-to-use in-memory renderer (`@vue/runtime-test`'s `render` + `nodeOps`
-  pair): `Render`, `Hydrate`, `CreateContainer`, the underlying `Renderer<TestNode>`, and the
+- **`TestRenderer`** — the ready-to-use in-memory renderer, pairing the render entry points with the
+  node-ops implementation: `Render`, `Hydrate`, `CreateContainer`, the underlying `Renderer<TestNode>`, and the
   `OperationLog` every node operation is recorded into. `RegisterQueryRoot` makes detached roots
   searchable by Core's Teleport target resolver. The constructor can select live-tree hydration or
   immutable snapshot semantics.

@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transform.spec.ts: the transform driver
+// These cases ARE the contract for the transform driver
 // (node/directive transform ordering, replace/remove, helper registration, third-party injection) and the
 // [V01.01.05.02] block-structure (dynamic-children order) invariant.
 public class TransformPipelineTests

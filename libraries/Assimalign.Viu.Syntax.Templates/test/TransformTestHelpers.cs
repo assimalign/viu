@@ -9,8 +9,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Shared helpers for the transform test corpus: parse a template in DOM mode and run the transform pipeline,
-/// then navigate the resulting code-generation IR. Mirrors the <c>transformWithXxx</c> helpers in vuejs/core's
-/// <c>packages/compiler-core/__tests__/transforms/*.spec.ts</c>.
+/// then navigate the resulting code-generation IR.
 /// </summary>
 internal static class TransformTestHelpers
 {

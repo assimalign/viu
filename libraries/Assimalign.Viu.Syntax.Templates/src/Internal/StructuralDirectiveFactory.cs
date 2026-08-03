@@ -3,8 +3,7 @@ using System;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A transform that rewrites the node it is applied to, driven by a matched structural directive. The C#
-/// port of Vue 3.5's <c>StructuralDirectiveTransform</c> (<c>@vue/compiler-core</c> <c>transform.ts</c>).
+/// A transform that rewrites the node it is applied to, driven by a matched structural directive.
 /// Only <c>v-if</c> and <c>v-for</c> fall into this category.
 /// </summary>
 /// <param name="element">The element carrying the directive, with the matched directive already removed.</param>
@@ -18,8 +17,7 @@ internal delegate Action? StructuralDirectiveTransform(
 
 /// <summary>
 /// Builds a <see cref="NodeTransform"/> from a structural directive transform, matching directives by name
-/// and removing them before applying so the transform can re-traverse the node. The C# port of Vue 3.5's
-/// <c>createStructuralDirectiveTransform</c> (<c>@vue/compiler-core</c> <c>transform.ts</c>).
+/// and removing them before applying so the transform can re-traverse the node.
 /// </summary>
 internal static class StructuralDirectiveFactory
 {

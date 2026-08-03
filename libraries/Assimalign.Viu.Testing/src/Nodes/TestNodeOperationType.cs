@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// The kinds of node operations the test adapter records — parity with <c>NodeOpTypes</c> in
-/// <c>@vue/runtime-test</c> (<c>packages/runtime-test/src/nodeOps.ts</c>), split per create
-/// kind. Structural ops are <see cref="Insert"/> and <see cref="Remove"/>.
+/// The kinds of node operations the test adapter records, split per creation kind so an assertion
+/// can distinguish "created an element" from "created a text node". The structural operations are
+/// <see cref="Insert"/> and <see cref="Remove"/>.
 /// </summary>
 public enum TestNodeOperationType
 {

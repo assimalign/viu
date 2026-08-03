@@ -58,8 +58,8 @@ internal static class SingleFileComponentErrorMessages
     /// Gets the catalog severity for <paramref name="code"/>: the [V01.01.06.10] legacy-container codes
     /// (<see cref="SingleFileComponentErrorCode.LegacyTemplateBlockSyntax"/> /
     /// <see cref="SingleFileComponentErrorCode.LegacyStyleBlockSyntax"/>) are warnings — the blocks still
-    /// parse during the migration window — and every other code is a recoverable error, mirroring
-    /// <c>@vue/compiler-sfc</c>'s <c>parse().errors</c>.
+    /// parse during the migration window — and every other code is a recoverable error, reported on the
+    /// result rather than thrown (<c>[SFC-DIAG-1]</c>).
     /// </summary>
     /// <param name="code">The diagnostic code.</param>
     /// <returns>The severity every diagnostic reported with <paramref name="code"/> carries.</returns>

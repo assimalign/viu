@@ -9,12 +9,11 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The <c>v-model</c> directive for checkboxes — the C# port of upstream's <c>vModelCheckbox</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts,
-/// https://vuejs.org/guide/essentials/forms.html#checkbox). Binds a boolean (honoring
+/// The <c>v-model</c> directive for checkboxes. Binds a boolean (honoring
 /// <c>true-value</c>/<c>false-value</c>), or adds/removes the element's bound <c>:value</c> in a
-/// model <see cref="IList"/> (loose-equality membership, upstream <c>looseIndexOf</c>) or
-/// <see cref="ISet{T}"/> (strict membership, upstream <c>Set.has</c>). The bound <c>:value</c>,
+/// model <see cref="IList"/> (membership by loose equality, so a form round-trip's string coercion
+/// still matches the bound object) or <see cref="ISet{T}"/> (membership by strict equality, because
+/// a set's own identity semantics decide what it contains). The bound <c>:value</c>,
 /// <c>true-value</c>, and <c>false-value</c> are read as raw immutable component attributes, so object values
 /// round-trip. Reads <c>checked</c> from the dispatched <see cref="BrowserEvent"/> payload, never a
 /// follow-up interop read. Stateless singleton (<see cref="Instance"/>); per-element state lives in
@@ -135,7 +134,7 @@ public sealed class VModelCheckbox : IDirective
         }
     }
 
-    // Reflect the model onto el.checked and refresh the change handler's inputs (upstream setChecked).
+    // Reflect the model onto el.checked and refresh the change handler's inputs.
     private static void SetChecked(
         BrowserDirectiveOperations operations,
         int handle,
@@ -164,7 +163,7 @@ public sealed class VModelCheckbox : IDirective
         }
         else
         {
-            // Upstream: if (value === oldValue) return — no change to reflect.
+            // Unchanged model value: nothing to reflect.
             var previousValue =
                 BrowserModelDirective.ModelValue(binding.PreviousValue);
             if (Equals(value, previousValue))

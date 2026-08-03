@@ -1,8 +1,8 @@
 # Assimalign.Viu.Syntax.Html — design
 
 Why the HTML scaffold exists and how it is shaped. What it is: see [OVERVIEW.md](OVERVIEW.md).
-Upstream analogue: Vite's HTML entry processing (there is no `@vue/compiler-*` HTML-document parser;
-Vue's template markup is a different language, handled by `Assimalign.Viu.Syntax.Templates`).
+This library parses HTML *documents* — the host page a WASM app boots from. Viu's *template* markup
+is a separate language with its own parser, `Assimalign.Viu.Syntax.Templates`.
 
 ## Why a scaffold now
 

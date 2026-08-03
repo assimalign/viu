@@ -4,8 +4,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The <c>v-html</c> directive transform: compiles to an <c>innerHTML</c> prop and raises the child-conflict
-/// diagnostic when the element also has template children. The C# port of Vue 3.5's <c>transformVHtml</c>
-/// (<c>@vue/compiler-dom</c> <c>transforms/vHtml.ts</c>).
+/// diagnostic when the element also has template children.
 /// </summary>
 internal static class VHtmlTransform
 {

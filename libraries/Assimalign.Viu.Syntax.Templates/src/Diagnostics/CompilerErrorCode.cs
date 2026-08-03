@@ -1,264 +1,261 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The catalog of compiler error codes. The C# port of Vue 3.5's <c>ErrorCodes</c> enum
-/// (<c>@vue/compiler-core</c> <c>errors.ts</c>). The numeric values match upstream exactly so the
-/// diagnostic surface ([V01.01.05.08]) and any higher-order compiler can share the codes.
+/// The catalog of compiler error codes. The numeric values are a <b>frozen contract</b> — the
+/// diagnostic surface ([V01.01.05.08]), build logs, and any <c>NoWarn</c>/editorconfig entry a consumer
+/// writes all key on the number, so a code may be added but never renumbered or reused. The layout is
+/// banded: <b>0–52</b> the parse and directive codes, <b>53</b> the reserved
+/// <see cref="ExtendPoint"/> sentinel, <b>54–65</b> the DOM directive codes, <b>1000+</b> the
+/// Viu-specific analysis codes. The bands and the sentinel are pinned by the catalog tests.
 /// </summary>
 /// <remarks>
-/// The template parser ([V01.01.05.01]) emits only the parse and Vue-specific parse codes (values
-/// 0–27). The transform, generic, and same-name-argument codes are carried for numeric parity with
-/// upstream and are produced by later pipeline stages. HTML parse errors follow the WHATWG catalog:
+/// The template parser ([V01.01.05.01]) emits only the tokenizer and directive-syntax codes (values
+/// 0–27); the transform-stage codes are produced by later pipeline stages, which is why the enum
+/// carries values the parser alone never reports. HTML parse errors follow the WHATWG catalog:
 /// https://html.spec.whatwg.org/multipage/parsing.html#parse-errors.
 /// </remarks>
 public enum CompilerErrorCode
 {
     // ---- WHATWG / HTML parse errors (emitted by the parser) ----
 
-    /// <summary>An empty comment was closed abruptly, e.g. <c>&lt;!--&gt;</c> (upstream <c>ABRUPT_CLOSING_OF_EMPTY_COMMENT</c>).</summary>
+    /// <summary>An empty comment was closed abruptly, e.g. <c>&lt;!--&gt;</c>.</summary>
     AbruptClosingOfEmptyComment = 0,
 
-    /// <summary>A <c>&lt;![CDATA[</c> section appeared in HTML content (upstream <c>CDATA_IN_HTML_CONTENT</c>).</summary>
+    /// <summary>A <c>&lt;![CDATA[</c> section appeared in HTML content.</summary>
     CdataInHtmlContent = 1,
 
-    /// <summary>An attribute name was repeated on one element (upstream <c>DUPLICATE_ATTRIBUTE</c>).</summary>
+    /// <summary>An attribute name was repeated on one element.</summary>
     DuplicateAttribute = 2,
 
-    /// <summary>An end tag carried attributes (upstream <c>END_TAG_WITH_ATTRIBUTES</c>).</summary>
+    /// <summary>An end tag carried attributes.</summary>
     EndTagWithAttributes = 3,
 
-    /// <summary>An end tag carried a trailing <c>/</c> (upstream <c>END_TAG_WITH_TRAILING_SOLIDUS</c>).</summary>
+    /// <summary>An end tag carried a trailing <c>/</c>.</summary>
     EndTagWithTrailingSolidus = 4,
 
-    /// <summary>The input ended where a tag name was expected (upstream <c>EOF_BEFORE_TAG_NAME</c>).</summary>
+    /// <summary>The input ended where a tag name was expected.</summary>
     EofBeforeTagName = 5,
 
-    /// <summary>The input ended inside a CDATA section (upstream <c>EOF_IN_CDATA</c>).</summary>
+    /// <summary>The input ended inside a CDATA section.</summary>
     EofInCdata = 6,
 
-    /// <summary>The input ended inside a comment (upstream <c>EOF_IN_COMMENT</c>).</summary>
+    /// <summary>The input ended inside a comment.</summary>
     EofInComment = 7,
 
-    /// <summary>The input ended inside script comment-like text (upstream <c>EOF_IN_SCRIPT_HTML_COMMENT_LIKE_TEXT</c>).</summary>
+    /// <summary>The input ended inside script comment-like text.</summary>
     EofInScriptHtmlCommentLikeText = 8,
 
-    /// <summary>The input ended inside a tag (upstream <c>EOF_IN_TAG</c>).</summary>
+    /// <summary>The input ended inside a tag.</summary>
     EofInTag = 9,
 
-    /// <summary>A comment was closed incorrectly (upstream <c>INCORRECTLY_CLOSED_COMMENT</c>).</summary>
+    /// <summary>A comment was closed incorrectly.</summary>
     IncorrectlyClosedComment = 10,
 
-    /// <summary>A comment was opened incorrectly, e.g. <c>&lt;!x</c> (upstream <c>INCORRECTLY_OPENED_COMMENT</c>).</summary>
+    /// <summary>A comment was opened incorrectly, e.g. <c>&lt;!x</c>.</summary>
     IncorrectlyOpenedComment = 11,
 
-    /// <summary>A tag name started with an invalid character (upstream <c>INVALID_FIRST_CHARACTER_OF_TAG_NAME</c>).</summary>
+    /// <summary>A tag name started with an invalid character.</summary>
     InvalidFirstCharacterOfTagName = 12,
 
-    /// <summary>An attribute value was expected but missing (upstream <c>MISSING_ATTRIBUTE_VALUE</c>).</summary>
+    /// <summary>An attribute value was expected but missing.</summary>
     MissingAttributeValue = 13,
 
-    /// <summary>An end tag name was expected, e.g. <c>&lt;/&gt;</c> (upstream <c>MISSING_END_TAG_NAME</c>).</summary>
+    /// <summary>An end tag name was expected, e.g. <c>&lt;/&gt;</c>.</summary>
     MissingEndTagName = 14,
 
-    /// <summary>Whitespace between attributes was expected (upstream <c>MISSING_WHITESPACE_BETWEEN_ATTRIBUTES</c>).</summary>
+    /// <summary>Whitespace between attributes was expected.</summary>
     MissingWhitespaceBetweenAttributes = 15,
 
-    /// <summary>A <c>&lt;!--</c> appeared inside a comment (upstream <c>NESTED_COMMENT</c>).</summary>
+    /// <summary>A <c>&lt;!--</c> appeared inside a comment.</summary>
     NestedComment = 16,
 
-    /// <summary>An attribute name contained <c>"</c>, <c>'</c>, or <c>&lt;</c> (upstream <c>UNEXPECTED_CHARACTER_IN_ATTRIBUTE_NAME</c>).</summary>
+    /// <summary>An attribute name contained <c>"</c>, <c>'</c>, or <c>&lt;</c>.</summary>
     UnexpectedCharacterInAttributeName = 17,
 
-    /// <summary>An unquoted attribute value contained a forbidden character (upstream <c>UNEXPECTED_CHARACTER_IN_UNQUOTED_ATTRIBUTE_VALUE</c>).</summary>
+    /// <summary>An unquoted attribute value contained a forbidden character.</summary>
     UnexpectedCharacterInUnquotedAttributeValue = 18,
 
-    /// <summary>An attribute name started with <c>=</c> (upstream <c>UNEXPECTED_EQUALS_SIGN_BEFORE_ATTRIBUTE_NAME</c>).</summary>
+    /// <summary>An attribute name started with <c>=</c>.</summary>
     UnexpectedEqualsSignBeforeAttributeName = 19,
 
-    /// <summary>An unexpected U+0000 NULL character appeared (upstream <c>UNEXPECTED_NULL_CHARACTER</c>).</summary>
+    /// <summary>An unexpected U+0000 NULL character appeared.</summary>
     UnexpectedNullCharacter = 20,
 
-    /// <summary>A <c>&lt;?</c> appeared in HTML content (upstream <c>UNEXPECTED_QUESTION_MARK_INSTEAD_OF_TAG_NAME</c>).</summary>
+    /// <summary>A <c>&lt;?</c> appeared in HTML content.</summary>
     UnexpectedQuestionMarkInsteadOfTagName = 21,
 
-    /// <summary>An unexpected <c>/</c> appeared in a tag (upstream <c>UNEXPECTED_SOLIDUS_IN_TAG</c>).</summary>
+    /// <summary>An unexpected <c>/</c> appeared in a tag.</summary>
     UnexpectedSolidusInTag = 22,
 
-    // ---- Vue-specific parse errors (emitted by the parser) ----
+    // ---- Template-syntax parse errors, beyond the WHATWG set (emitted by the parser) ----
 
-    /// <summary>An end tag matched no open element (upstream <c>X_INVALID_END_TAG</c>).</summary>
+    /// <summary>An end tag matched no open element.</summary>
     XInvalidEndTag = 23,
 
-    /// <summary>An element was missing its end tag (upstream <c>X_MISSING_END_TAG</c>).</summary>
+    /// <summary>An element was missing its end tag.</summary>
     XMissingEndTag = 24,
 
-    /// <summary>An interpolation was not closed (upstream <c>X_MISSING_INTERPOLATION_END</c>).</summary>
+    /// <summary>An interpolation was not closed.</summary>
     XMissingInterpolationEnd = 25,
 
-    /// <summary>A directive shorthand had no name (upstream <c>X_MISSING_DIRECTIVE_NAME</c>).</summary>
+    /// <summary>A directive shorthand had no name.</summary>
     XMissingDirectiveName = 26,
 
-    /// <summary>A dynamic directive argument was not closed with <c>]</c> (upstream <c>X_MISSING_DYNAMIC_DIRECTIVE_ARGUMENT_END</c>).</summary>
+    /// <summary>A dynamic directive argument was not closed with <c>]</c>.</summary>
     XMissingDynamicDirectiveArgumentEnd = 27,
 
     // ---- Transform errors (later pipeline stages) ----
 
-    /// <summary>Upstream <c>X_V_IF_NO_EXPRESSION</c>.</summary>
+    /// <summary><c>v-if</c>/<c>v-else-if</c> is missing its expression.</summary>
     XVIfNoExpression = 28,
 
-    /// <summary>Upstream <c>X_V_IF_SAME_KEY</c>.</summary>
+    /// <summary>Two branches of one <c>v-if</c> chain used the same key.</summary>
     XVIfSameKey = 29,
 
-    /// <summary>Upstream <c>X_V_ELSE_NO_ADJACENT_IF</c>.</summary>
+    /// <summary><c>v-else</c>/<c>v-else-if</c> has no adjacent <c>v-if</c> or <c>v-else-if</c>.</summary>
     XVElseNoAdjacentIf = 30,
 
-    /// <summary>Upstream <c>X_V_FOR_NO_EXPRESSION</c>.</summary>
+    /// <summary><c>v-for</c> is missing its expression.</summary>
     XVForNoExpression = 31,
 
-    /// <summary>Upstream <c>X_V_FOR_MALFORMED_EXPRESSION</c>.</summary>
+    /// <summary><c>v-for</c>'s expression did not match the <c>alias in source</c> form.</summary>
     XVForMalformedExpression = 32,
 
-    /// <summary>Upstream <c>X_V_FOR_TEMPLATE_KEY_PLACEMENT</c>.</summary>
+    /// <summary>A <c>&lt;template v-for&gt;</c> put its key on a child instead of the <c>&lt;template&gt;</c> tag.</summary>
     XVForTemplateKeyPlacement = 33,
 
-    /// <summary>Upstream <c>X_V_BIND_NO_EXPRESSION</c>.</summary>
+    /// <summary><c>v-bind</c> is missing its expression.</summary>
     XVBindNoExpression = 34,
 
-    /// <summary>Upstream <c>X_V_ON_NO_EXPRESSION</c>.</summary>
+    /// <summary><c>v-on</c> is missing its expression and has no modifier to imply one.</summary>
     XVOnNoExpression = 35,
 
-    /// <summary>Upstream <c>X_V_SLOT_UNEXPECTED_DIRECTIVE_ON_SLOT_OUTLET</c>.</summary>
+    /// <summary>A custom directive was placed on a <c>&lt;slot&gt;</c> outlet, which renders no element to apply it to.</summary>
     XVSlotUnexpectedDirectiveOnSlotOutlet = 36,
 
-    /// <summary>Upstream <c>X_V_SLOT_MIXED_SLOT_USAGE</c>.</summary>
+    /// <summary>A component mixed an implicit default slot with a named <c>v-slot</c> template.</summary>
     XVSlotMixedSlotUsage = 37,
 
-    /// <summary>Upstream <c>X_V_SLOT_DUPLICATE_SLOT_NAMES</c>.</summary>
+    /// <summary>Two slot templates declared the same slot name.</summary>
     XVSlotDuplicateSlotNames = 38,
 
-    /// <summary>Upstream <c>X_V_SLOT_EXTRANEOUS_DEFAULT_SLOT_CHILDREN</c>.</summary>
+    /// <summary>A component with an explicit default-slot template also had loose children.</summary>
     XVSlotExtraneousDefaultSlotChildren = 39,
 
-    /// <summary>Upstream <c>X_V_SLOT_MISPLACED</c>.</summary>
+    /// <summary><c>v-slot</c> was used somewhere other than a component or a <c>&lt;template&gt;</c> tag.</summary>
     XVSlotMisplaced = 40,
 
-    /// <summary>Upstream <c>X_V_MODEL_NO_EXPRESSION</c>.</summary>
+    /// <summary><c>v-model</c> is missing its expression.</summary>
     XVModelNoExpression = 41,
 
-    /// <summary>Upstream <c>X_V_MODEL_MALFORMED_EXPRESSION</c>.</summary>
+    /// <summary><c>v-model</c>'s expression is not an assignable member expression.</summary>
     XVModelMalformedExpression = 42,
 
-    /// <summary>Upstream <c>X_V_MODEL_ON_SCOPE_VARIABLE</c>.</summary>
+    /// <summary><c>v-model</c> targeted a template-local scope variable, which cannot be written back.</summary>
     XVModelOnScopeVariable = 43,
 
-    /// <summary>Upstream <c>X_V_MODEL_ON_PROPS</c>.</summary>
+    /// <summary><c>v-model</c> targeted a prop, which the child may not assign.</summary>
     XVModelOnProps = 44,
 
-    /// <summary>Upstream <c>X_INVALID_EXPRESSION</c>.</summary>
+    /// <summary>An expression body failed to parse.</summary>
     XInvalidExpression = 45,
 
-    /// <summary>Upstream <c>X_KEEP_ALIVE_INVALID_CHILDREN</c>.</summary>
+    /// <summary><c>&lt;KeepAlive&gt;</c> was given other than exactly one child component.</summary>
     XKeepAliveInvalidChildren = 46,
 
     // ---- Generic errors (later pipeline stages) ----
 
-    /// <summary>Upstream <c>X_PREFIX_ID_NOT_SUPPORTED</c>.</summary>
+    /// <summary>Identifier prefixing was requested in a build that does not support it.</summary>
     XPrefixIdNotSupported = 47,
 
-    /// <summary>Upstream <c>X_MODULE_MODE_NOT_SUPPORTED</c>.</summary>
+    /// <summary>ES module output mode was requested in a build that does not support it.</summary>
     XModuleModeNotSupported = 48,
 
-    /// <summary>Upstream <c>X_CACHE_HANDLER_NOT_SUPPORTED</c>.</summary>
+    /// <summary>Handler caching was requested without the identifier prefixing it depends on.</summary>
     XCacheHandlerNotSupported = 49,
 
-    /// <summary>Upstream <c>X_SCOPE_ID_NOT_SUPPORTED</c>.</summary>
+    /// <summary>A scope id was supplied outside module mode, where it cannot be applied.</summary>
     XScopeIdNotSupported = 50,
 
-    /// <summary>Upstream <c>X_VNODE_HOOKS</c>.</summary>
+    /// <summary>An <c>@vnode-*</c> lifecycle hook was used; the <c>vue:</c> prefix replaces it.</summary>
     XVnodeHooks = 51,
 
-    /// <summary>Upstream <c>X_V_BIND_INVALID_SAME_NAME_ARGUMENT</c>.</summary>
+    /// <summary>A same-name <c>v-bind</c> shorthand was used with an argument that is not a plain static identifier.</summary>
     XVBindInvalidSameNameArgument = 52,
 
     /// <summary>
-    /// The reserved value one past the last defined <b>core</b> code, matching upstream
-    /// <c>@vue/compiler-core</c>'s <c>__EXTEND_POINT__</c>. The DOM diagnostics below extend the catalog from
-    /// here, exactly as <c>@vue/compiler-dom</c>'s <c>DOMErrorCodes</c> enum extends core's error codes.
+    /// The reserved value one past the last defined <b>core</b> code. It is a sentinel, never reported:
+    /// it exists so the DOM band below can start immediately after the core band without a later core
+    /// addition colliding with it. Its value 53 is pinned by the catalog test and must not change.
     /// </summary>
     ExtendPoint = 53,
 
-    // ---- DOM directive transform errors ([V01.01.05.03], the C# port of @vue/compiler-dom's DOMErrorCodes) ----
+    // ---- DOM directive transform errors ([V01.01.05.03]) ----
     //
-    // DESIGN DECISION (flagged): Viu merges @vue/compiler-core and @vue/compiler-dom into a single
-    // Assimalign.Viu.Syntax.Templates project, so the DOM codes live in THIS one enum rather than a separate one.
-    // Upstream's DOMErrorCodes begins at core's __EXTEND_POINT__ value (53) — its first real code reuses the
-    // sentinel's number because the two enums are distinct types. A single C# enum cannot give ExtendPoint the
-    // value 53 (pinned by ErrorCatalog_NumericValues_MatchUpstreamErrorCodes, which must not change) AND give
-    // X_V_HTML_NO_EXPRESSION the same 53. The DOM codes are therefore appended after the preserved sentinel
-    // (starting at 54), so each equals its upstream DOMErrorCodes value + 1. Core codes 0..53 remain numeric-
-    // exact with upstream; the +1 DOM offset is pinned by DomErrorCatalog_NumericValues below.
+    // Viu keeps the core and DOM diagnostics in ONE enum, because Assimalign.Viu.Syntax.Templates is a
+    // single project covering both the platform-neutral template language and its DOM directive set;
+    // a second enum would force every diagnostic consumer to switch on two catalog types.
+    // Consequence: the DOM codes start at 54, one past the preserved ExtendPoint sentinel, rather than
+    // reusing 53 — a single C# enum cannot give two members the same value, and ExtendPoint's 53 is
+    // pinned. Both the sentinel and the DOM band's start are pinned by the catalog tests; neither may
+    // be renumbered.
 
-    /// <summary><c>v-html</c> is missing its expression (upstream DOM <c>X_V_HTML_NO_EXPRESSION</c>).</summary>
+    /// <summary><c>v-html</c> is missing its expression.</summary>
     XVHtmlNoExpression = 54,
 
-    /// <summary><c>v-html</c> will override the element's children (upstream DOM <c>X_V_HTML_WITH_CHILDREN</c>).</summary>
+    /// <summary><c>v-html</c> will override the element's children.</summary>
     XVHtmlWithChildren = 55,
 
-    /// <summary><c>v-text</c> is missing its expression (upstream DOM <c>X_V_TEXT_NO_EXPRESSION</c>).</summary>
+    /// <summary><c>v-text</c> is missing its expression.</summary>
     XVTextNoExpression = 56,
 
-    /// <summary><c>v-text</c> will override the element's children (upstream DOM <c>X_V_TEXT_WITH_CHILDREN</c>).</summary>
+    /// <summary><c>v-text</c> will override the element's children.</summary>
     XVTextWithChildren = 57,
 
-    /// <summary><c>v-model</c> used on an unsupported element (upstream DOM <c>X_V_MODEL_ON_INVALID_ELEMENT</c>).</summary>
+    /// <summary><c>v-model</c> used on an unsupported element.</summary>
     XVModelOnInvalidElement = 58,
 
-    /// <summary><c>v-model</c> argument used on a plain element (upstream DOM <c>X_V_MODEL_ARG_ON_ELEMENT</c>).</summary>
+    /// <summary><c>v-model</c> argument used on a plain element.</summary>
     XVModelArgumentOnElement = 59,
 
-    /// <summary><c>v-model</c> used on a file input (upstream DOM <c>X_V_MODEL_ON_FILE_INPUT_ELEMENT</c>).</summary>
+    /// <summary><c>v-model</c> used on a file input.</summary>
     XVModelOnFileInputElement = 60,
 
-    /// <summary>Unnecessary <c>value</c> binding alongside <c>v-model</c> (upstream DOM <c>X_V_MODEL_UNNECESSARY_VALUE</c>).</summary>
+    /// <summary>Unnecessary <c>value</c> binding alongside <c>v-model</c>.</summary>
     XVModelUnnecessaryValue = 61,
 
-    /// <summary><c>v-show</c> is missing its expression (upstream DOM <c>X_V_SHOW_NO_EXPRESSION</c>).</summary>
+    /// <summary><c>v-show</c> is missing its expression.</summary>
     XVShowNoExpression = 62,
 
-    /// <summary><c>&lt;Transition&gt;</c> expects exactly one child (upstream DOM <c>X_TRANSITION_INVALID_CHILDREN</c>).</summary>
+    /// <summary><c>&lt;Transition&gt;</c> expects exactly one child.</summary>
     XTransitionInvalidChildren = 63,
 
-    /// <summary>A side-effect tag (<c>&lt;script&gt;</c>/<c>&lt;style&gt;</c>) was ignored (upstream DOM <c>X_IGNORED_SIDE_EFFECT_TAG</c>).</summary>
+    /// <summary>A side-effect tag (<c>&lt;script&gt;</c>/<c>&lt;style&gt;</c>) was ignored.</summary>
     XIgnoredSideEffectTag = 64,
 
-    /// <summary>The reserved value one past the last defined DOM code (upstream DOM <c>__EXTEND_POINT__</c>).</summary>
+    /// <summary>The reserved value one past the last defined DOM code.</summary>
     DomExtendPoint = 65,
 
-    // ---- Viu-specific expression/scope analysis codes ([V01.01.05.04], no upstream counterpart) ----
+    // ---- Expression/scope analysis codes ([V01.01.05.04]) ----
     //
-    // These extend the catalog past both upstream sentinels, exactly as @vue/compiler-dom's DOMErrorCodes
-    // extended core's __EXTEND_POINT__. They have no vuejs/core equivalent because they encode a divergence
-    // C# forces: with no runtime Proxy fallback, a template identifier that resolves to nothing real is an
-    // error the compiler must surface, where Vue would silently emit a _ctx member access.
+    // These exist because there is no runtime proxy ([RCT-8]): a template identifier that resolves to
+    // nothing real cannot fall back to a dynamic member lookup, so the compiler must surface it. They
+    // start a reserved 1000+ band rather than continuing at 66, leaving the slots immediately after
+    // DomExtendPoint free for a future stage-specific band (the server renderer, [V01.01.07]) to claim
+    // contiguously.
 
     /// <summary>
     /// A template identifier resolved to neither a template-local, an allowed global, nor a known component
     /// binding, under strict binding metadata (<see cref="BindingMetadata.ReportsUnresolvedIdentifiers"/>).
-    /// Viu-specific; no upstream counterpart. Viu-only codes live in a reserved band at 1000+ so
-    /// the numeric slots after <see cref="DomExtendPoint"/> stay free for upstream extension enums
-    /// (<c>@vue/compiler-ssr</c>'s <c>SSRErrorCodes</c> continue the chain at 66+ under this type's
-    /// +1 mapping scheme; the server-renderer area [V01.01.07] will claim them).
     /// </summary>
     XViuUnresolvedIdentifier = 1000,
 
     /// <summary>
-    /// A template expression accessed a member that does not exist on a CSS Modules accessor (the
-    /// <c>$style</c>/named-module equivalent, [V01.01.05.04.01]) whose full class map the generator supplied
-    /// (<see cref="CssModuleAccessors.ReportsUnknownMembers"/>). Viu-specific; no upstream counterpart —
-    /// Vue's runtime <c>$style</c> is a plain object indexed at runtime, whereas the Viu accessor is a
-    /// compile-time class whose members are exactly the declared classes, so an unknown member is a
-    /// compile-time error the compiler surfaces on the template coordinate rather than a runtime
-    /// <see langword="undefined"/>.
+    /// A template expression accessed a member that does not exist on a CSS Modules accessor
+    /// ([V01.01.05.04.01]) whose full class map the generator supplied
+    /// (<see cref="CssModuleAccessors.ReportsUnknownMembers"/>). The accessor is a compile-time class
+    /// whose members are exactly the declared classes, so an unknown member is decidably wrong and is
+    /// reported on the exact template coordinate rather than failing at runtime (<c>[STY-4]</c>).
     /// </summary>
     XViuUnknownCssModuleMember = 1001,
 }

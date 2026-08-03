@@ -10,8 +10,8 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins mismatch recovery from Vue 3.5's hydration walker:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/hydration.ts.
+/// Pins Viu's hydration mismatch recovery: hydration adopts server markup where it agrees and
+/// falls back to client rendering where it does not, never leaving a half-adopted subtree.
 /// </summary>
 public sealed class HydrationRendererTests
 {

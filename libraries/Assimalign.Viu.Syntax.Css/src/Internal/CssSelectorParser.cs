@@ -6,8 +6,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// Parses a qualified rule's prelude token range into a <see cref="CssSelectorListNode"/> — comma-separated
 /// complex selectors, each a flat source-order list of simple selectors, pseudo selectors, and the
 /// combinators between compounds. This is the "sufficient for scoping decisions" selector parse the
-/// scoped rewrite reads: it recovers the same node shape Vue's plugin walks over
-/// <c>postcss-selector-parser</c>'s output (<c>@vue/compiler-sfc</c> <c>pluginScoped.ts</c>), including
+/// scoped rewrite reads: it recovers enough structure to place the scope attribute, including
 /// the reserved functional pseudos <c>:deep()</c>/<c>:slotted()</c>/<c>:global()</c> whose inner selector
 /// lists are parsed recursively. It follows the W3C Selectors Level 4 grammar
 /// (https://www.w3.org/TR/selectors-4/) only as far as scoping needs — attribute-selector internals and

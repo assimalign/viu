@@ -6,8 +6,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Direct unit tests over the embedded table and decoder (internal, via InternalsVisibleTo). The decoder
-// mirrors the behaviour Vue 3.5 gets from the `entities` package's decodeHTML / DecodingMode.
+// Direct unit tests over the embedded table and decoder (internal, via InternalsVisibleTo), covering the
+// WHATWG named and numeric character-reference rules including the legacy no-semicolon form.
 public class EntityDecoderTests
 {
     [Fact]

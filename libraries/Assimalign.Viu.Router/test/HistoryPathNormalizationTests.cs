@@ -3,9 +3,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the base-path arithmetic of vue-router's history layer: normalizeBase / stripBase / createHref
-// (packages/router/src/history/common.ts, location.ts) and the createCurrentLocation / hash-base
-// logic (html5.ts, hash.ts). [V01.01.08.02] base handling AC.
+// Pins the base-path arithmetic shared by the web and hash histories: base normalization, stripping
+// the base off a read location, building an href, computing the hash-mode base, and deriving the
+// current base-stripped location from raw URL components. Every case is a total function of its
+// string inputs, so the whole table runs with no browser. [V01.01.08.02] base-handling AC.
 public class HistoryPathNormalizationTests
 {
     [Theory]

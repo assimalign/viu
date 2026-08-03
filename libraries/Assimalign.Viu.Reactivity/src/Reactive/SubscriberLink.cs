@@ -2,7 +2,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// The edge node connecting one <see cref="Dependency"/> to one <see cref="Subscriber"/> in the
-/// reactive dependency graph — the C# port of Vue 3.5's <c>Link</c>
+/// reactive dependency graph — one edge of the doubly-linked subscriber graph (<c>[RCT-9]</c>)
 /// (<c>packages/reactivity/src/dep.ts</c>). Each link participates in two intrusive doubly-linked
 /// lists — the subscriber's dependency list (<see cref="PreviousDependency"/>/<see cref="NextDependency"/>)
 /// and the dependency's subscriber list (<see cref="PreviousSubscriber"/>/<see cref="NextSubscriber"/>)

@@ -1,8 +1,7 @@
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A <c>watch</c> callback — the C# port of Vue 3.5's watch callback signature
-/// <c>(value, oldValue, onCleanup)</c> (https://vuejs.org/api/reactivity-core.html#watch). Invoked
+/// A <c>watch</c> callback, receiving <c>(value, oldValue, onCleanup)</c>. Invoked
 /// after the watched source changes with the new and previous values; on the very first call of an
 /// <c>Immediate</c> watcher <paramref name="oldValue"/> is <see langword="default"/> (unset).
 /// </summary>

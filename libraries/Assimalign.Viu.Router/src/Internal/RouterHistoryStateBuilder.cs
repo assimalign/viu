@@ -3,9 +3,7 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// The pure state-machine arithmetic for a push/replace/bootstrap, shared by the memory and web
 /// histories: it produces the <see cref="RouterHistoryState"/> objects a navigation writes without
-/// touching the DOM or interop, so the linked-list/position semantics are unit-testable. The C# port
-/// of vue-router's <c>buildState</c> and the state assembly inside <c>useHistoryStateNavigation</c>'s
-/// <c>push</c>/<c>replace</c> (<c>packages/router/src/history/html5.ts</c>).
+/// touching the DOM or interop, so the adjacency and position semantics are unit-testable.
 /// </summary>
 /// <remarks>
 /// Position is assigned here (monotonic, +1 per push, preserved across a replace) rather than read
@@ -17,20 +15,21 @@ namespace Assimalign.Viu.Router;
 internal static class RouterHistoryStateBuilder
 {
     /// <summary>
-    /// Builds the initial state for a fresh entry that has no prior state — the C# port of the
-    /// <c>buildState(null, current, null, replaced: true, position: history.length - 1)</c> bootstrap
-    /// upstream writes when <c>history.state</c> is empty.
+    /// Builds the initial state for a fresh entry that has no prior state — used when the
+    /// environment holds no Viu-written state for the current entry. It has no predecessor, no
+    /// successor, and is marked replaced, because bootstrapping must not add a history entry.
     /// </summary>
     /// <param name="current">The current location.</param>
-    /// <param name="position">The seed position (upstream: <c>history.length - 1</c>; memory: <c>0</c>).</param>
+    /// <param name="position">The seed position (web: <c>window.history.length - 1</c>; memory: <c>0</c>).</param>
     internal static RouterHistoryState BuildInitial(string current, int position)
         => new(Back: null, Current: current, Forward: null, Replaced: true, Position: position, Scroll: null);
 
     /// <summary>
     /// Rewrites the leaving entry during a push so its <see cref="RouterHistoryState.Forward"/> points
-    /// at the pushed location (upstream amends the current entry with <c>forward: to</c> and the live
-    /// scroll before pushing the new one). The scroll anchor stays <see langword="null"/> here; the
-    /// browser interop injects <c>window.scrollX/Y</c> when it applies the replace.
+    /// at the pushed location: the leaving entry is amended before the new one is pushed, so
+    /// back/forward adjacency is complete in both directions. The scroll anchor stays
+    /// <see langword="null"/> here; the browser interop injects <c>window.scrollX/Y</c> when it
+    /// applies the replace.
     /// </summary>
     /// <param name="current">The state of the entry being left.</param>
     /// <param name="to">The location being pushed.</param>
@@ -39,8 +38,7 @@ internal static class RouterHistoryStateBuilder
 
     /// <summary>
     /// Builds the new entry for a push: its predecessor is the leaving location, it has no successor
-    /// yet, and its position is one past the leaving entry's. The C# port of
-    /// <c>buildState(currentLocation, to, null)</c> with <c>position: currentState.position + 1</c>.
+    /// yet, and its position is one past the leaving entry's.
     /// </summary>
     /// <param name="current">The state of the entry being left.</param>
     /// <param name="to">The location being pushed.</param>
@@ -56,8 +54,7 @@ internal static class RouterHistoryStateBuilder
 
     /// <summary>
     /// Builds the entry for a replace: it keeps the leaving entry's neighbours and position but marks
-    /// itself replaced. The C# port of <c>buildState(currentState.back, to, currentState.forward,
-    /// true)</c> pinned to <c>position: currentState.position</c>.
+    /// itself replaced, so a replace never advances the monotonic position counter.
     /// </summary>
     /// <param name="current">The state of the entry being replaced.</param>
     /// <param name="to">The replacement location.</param>

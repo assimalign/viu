@@ -7,16 +7,17 @@ using Xunit;
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
 /// <summary>
-/// Pins text and value escaping against the exact upstream tables
-/// (<c>@vue/shared/src/escapeHtml.ts</c>). Escaping is security-adjacent, so injection-shaped inputs
-/// are covered here directly.
+/// Pins Viu's text and value escaping: the exact five-character escape set of [SSR-6] and the
+/// repeated comment-terminator stripping. Escaping is security-adjacent, so injection-shaped inputs
+/// are covered here directly and the escape set is frozen — widening or narrowing it is a
+/// specification change, not a cleanup.
 /// </summary>
 public class ServerRenderEscapingTests
 {
     [Fact]
     public void EscapeHtml_AllFiveCharacters_MatchesUpstreamTable()
     {
-        // Upstream escapeHtml: " -> &quot;  & -> &amp;  ' -> &#39;  < -> &lt;  > -> &gt;
+        // The frozen escape table: " -> &quot;  & -> &amp;  ' -> &#39;  < -> &lt;  > -> &gt;
         ServerRender.EscapeHtml("\"").ShouldBe("&quot;");
         ServerRender.EscapeHtml("&").ShouldBe("&amp;");
         ServerRender.EscapeHtml("'").ShouldBe("&#39;");

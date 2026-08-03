@@ -3,9 +3,9 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The central code-generation node describing one <c>createVNode</c>/<c>createElementBlock</c> call — the
-/// vnode a template element, component, or fragment compiles to. The C# port of Vue 3.5's <c>VNodeCall</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>).
+/// The central code-generation node: one render-node construction call
+/// (<c>createVNode</c>/<c>createElementBlock</c>) — what a template element, component, or fragment
+/// compiles to.
 /// </summary>
 /// <remarks>
 /// The <see cref="PatchFlag"/> and <see cref="DynamicProps"/> fields are populated by prop analysis
@@ -28,7 +28,7 @@ public sealed record VNodeCall : TemplateSyntaxNode
 
     /// <summary>
     /// The children: a <see cref="SyntaxList{T}"/> of <see cref="TemplateChildNode"/>, a single text child, a
-    /// slots object, a <c>renderList</c> call for <c>v-for</c>, or <see langword="null"/> (upstream's union).
+    /// slots object, a <c>renderList</c> call for <c>v-for</c>, or <see langword="null"/>.
     /// </summary>
     public object? Children { get; init; }
 
@@ -37,7 +37,7 @@ public sealed record VNodeCall : TemplateSyntaxNode
 
     /// <summary>
     /// The dynamic prop names list: a stringified array literal or a <see cref="SimpleExpressionNode"/>, or
-    /// <see langword="null"/> (upstream's <c>string | SimpleExpressionNode | undefined</c>).
+    /// <see langword="null"/> when the patch flag alone identifies what may change.
     /// </summary>
     public object? DynamicProps { get; init; }
 

@@ -3,11 +3,12 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A ref with explicit control over dependency tracking and triggering — the counterpart of Vue's
-/// <c>customRef()</c>. The factory receives <c>track</c>/<c>trigger</c> delegates bound to this
-/// ref's dependency and returns the getter/setter; the ref performs no automatic tracking,
-/// triggering, or change detection of its own. Not thread-safe (single-threaded JS event-loop
-/// model).
+/// A reference cell with explicit, caller-driven control over dependency tracking and triggering —
+/// the sanctioned extension point for behavior the built-in cells do not cover (debouncing,
+/// external stores, values that change outside a write). The factory receives
+/// <c>track</c>/<c>trigger</c> delegates bound to this reference's dependency and returns the
+/// getter/setter; the reference performs no automatic tracking, triggering, or change detection of
+/// its own. Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 /// <typeparam name="T">The type of the contained value.</typeparam>
 public sealed class CustomReference<T> : ReactiveValue<T>

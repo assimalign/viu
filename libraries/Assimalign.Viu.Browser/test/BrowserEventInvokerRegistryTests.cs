@@ -7,8 +7,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the invoker pattern of @vue/runtime-dom's events module
-// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/modules/events.ts):
+// Pins Viu's invoker contract ([RND-IO-2]): one host listener per (element, event,
+// options-signature), handler changes as .NET delegate swaps with zero listener interop, and the
+// independent property/model channels on a shared listener.
 // handler updates between renders are delegate swaps with ZERO listener-management interop,
 // asserted through an instrumented bridge (recorded add/remove delegates).
 public class BrowserEventInvokerRegistryTests
@@ -70,7 +71,7 @@ public class BrowserEventInvokerRegistryTests
     [Fact]
     public void SuffixParsing_MapsToListenerOptions()
     {
-        // Upstream parseName: onClickOnce / onClickCapture / onClickPassive and combinations.
+        // Suffix parsing: onClickOnce / onClickCapture / onClickPassive and combinations.
         BrowserEventInvokerRegistry.ParseEventName("onClick").ShouldBe(("click", false, false, false));
         BrowserEventInvokerRegistry.ParseEventName("onClickOnce").ShouldBe(("click", true, false, false));
         BrowserEventInvokerRegistry.ParseEventName("onClickCapture").ShouldBe(("click", false, true, false));
@@ -177,8 +178,8 @@ public class BrowserEventInvokerRegistryTests
     [Fact]
     public void Dispatch_EventArrivingPrevented_ReportsDefaultPreventedWithoutResignaling()
     {
-        // An event that arrived already prevented reads defaultPrevented (upstream guardEvent bails on
-        // it) but does not re-signal preventDefault — the browser already applied it.
+        // An event that arrived already prevented reads defaultPrevented (a router link's activation
+        // guard bails on it) but does not re-signal preventDefault — the browser already applied it.
         bool? seenPrevented = null;
         _registry.SetListener(Element, "onClick", (Action<BrowserEvent>)(browserEvent =>
             seenPrevented = browserEvent.DefaultPrevented));
@@ -298,8 +299,8 @@ public class BrowserEventInvokerRegistryTests
         invocationCount.ShouldBe(1);
     }
 
-    // --- model channel ([V01.01.04.06]: v-model listeners coexist with template @event props;
-    // upstream attaches the directive's listener with a separate raw addEventListener) ----------
+    // --- model channel ([V01.01.04.06]: v-model listeners coexist with template @event props on one
+    // shared host listener, so a directive listener costs no extra interop) ---------------------
 
     [Fact]
     public void ModelAndPropertyChannels_ShareOneDomListener_AndBothFire()

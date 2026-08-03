@@ -4,8 +4,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The <c>v-bind</c> (with argument) directive transform: emits a single prop and applies the
-/// <c>.camel</c>/<c>.prop</c>/<c>.attr</c> modifiers and the same-name shorthand. The C# port of Vue 3.5's
-/// <c>transformBind</c> (<c>@vue/compiler-core</c> <c>transforms/vBind.ts</c>). Argument-less <c>v-bind</c>
+/// <c>.camel</c>/<c>.prop</c>/<c>.attr</c> modifiers and the same-name shorthand. Argument-less <c>v-bind</c>
 /// (<c>v-bind="object"</c>) is handled by the element transform.
 /// </summary>
 internal static class VBindTransform
@@ -84,7 +83,7 @@ internal static class VBindTransform
         };
     }
 
-    /// <summary>Expands the same-name <c>v-bind</c> shorthand to its camel-cased binding (upstream <c>transformBindShorthand</c>).</summary>
+    /// <summary>Expands the same-name <c>v-bind</c> shorthand to its camel-cased binding.</summary>
     public static SimpleExpressionNode CreateShorthandExpression(SimpleExpressionNode argument)
         => Ir.SimpleExpression(CompilerText.Camelize(argument.Content), false, argument.Location);
 

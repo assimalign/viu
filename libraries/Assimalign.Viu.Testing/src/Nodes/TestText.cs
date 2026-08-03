@@ -1,7 +1,8 @@
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// An in-memory text node (mirrors <c>TestText</c> in <c>@vue/runtime-test</c>).
+/// An in-memory text node. Its content is set through the node-ops text operation, so a text patch
+/// is one recorded operation exactly as it is one host call in a real adapter.
 /// </summary>
 public sealed class TestText : TestNode
 {

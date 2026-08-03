@@ -6,21 +6,21 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The route outlet — the C# port of vue-router's <c>&lt;RouterView&gt;</c>
-/// (<c>packages/router/src/RouterView.ts</c>, https://router.vuejs.org/api/#Component-RouterView).
-/// It renders the component of the matched record at its nesting depth: the outermost view renders
-/// <c>route.matched[0]</c>, a view nested inside that component renders <c>route.matched[1]</c>, and
-/// so on. Because the unified component design has no hierarchical dependency facility, nesting
-/// depth is an explicit <c>depth</c> argument (zero by default). The reactive
+/// The route outlet. It renders the component of the matched record at its nesting depth: the
+/// outermost view renders the first entry of <see cref="RouteLocation.Matched"/>, a view nested
+/// inside that component renders the second, and so on. Because Viu has no hierarchical component
+/// dependency facility, a view cannot discover its own depth from an ancestor — nesting depth is an
+/// explicit <c>depth</c> argument (zero by default) that a nested layout passes on. The reactive
 /// <see cref="Router.CurrentRoute"/> read in the render function re-renders the view on navigation,
-/// and the renderer's component diff retains an unchanged matched template request.
+/// and the renderer's component diff retains an unchanged matched template request. Specified by
+/// <c>[RTR-4]</c>.
 /// </summary>
 /// <remarks>
-/// Deliberate simplifications from vue-router (see <c>docs/DESIGN.md</c>): a single default view per
-/// record (no named views), the arguments flow through the record's
-/// <see cref="RouteRecord.ArgumentsResolver"/>, and a record without a component renders a comment
-/// placeholder rather than being skipped in the depth walk. Not thread-safe (single-threaded JS
-/// event-loop model).
+/// Deliberate scope decisions (see <c>docs/DESIGN.md</c>): one default view per record — there are
+/// no named views; arguments flow through the record's <see cref="RouteRecord.ArgumentsResolver"/>;
+/// and a record without a component renders a comment placeholder rather than being skipped in the
+/// depth walk, so a componentless layout record does not shift its children's depth. Not thread-safe
+/// (single-threaded JS event-loop model).
 /// </remarks>
 public sealed class RouterView : IComponentTemplate
 {

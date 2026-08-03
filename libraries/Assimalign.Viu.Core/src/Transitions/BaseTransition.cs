@@ -10,8 +10,8 @@ namespace Assimalign.Viu;
 /// Wraps one slot child with platform-neutral enter and leave behavior.
 /// </summary>
 /// <remarks>
-/// This is Viu's host-generic port of Vue 3.5's <c>BaseTransition</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/BaseTransition.ts.
+/// This is the host-generic half of transitions: it owns hook ordering and the enter/leave state
+/// machine, while a host package supplies what a transition actually does to a node.
 /// Host-specific packages such as <c>Assimalign.Viu.Browser</c> supply CSS-aware callbacks through
 /// <see cref="BaseTransitionProperties"/>. The template is not thread-safe.
 /// </remarks>

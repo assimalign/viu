@@ -3,9 +3,9 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The human-readable messages for each <see cref="CompilerErrorCode"/>. The C# port of Vue 3.5's
-/// <c>errorMessages</c> map (<c>@vue/compiler-core</c> <c>errors.ts</c>); the strings are kept verbatim
-/// so diagnostics read identically to upstream.
+/// The human-readable messages for each <see cref="CompilerErrorCode"/>. The strings are observable
+/// build output: a consumer greps them and CI logs quote them, so a wording change is a visible change
+/// and is pinned by <c>CompilerErrorCatalogTests</c>.
 /// </summary>
 internal static class CompilerErrorMessages
 {
@@ -38,7 +38,7 @@ internal static class CompilerErrorMessages
         [CompilerErrorCode.UnexpectedNullCharacter] = "Unexpected null character.",
         [CompilerErrorCode.UnexpectedSolidusInTag] = "Illegal '/' in tags.",
 
-        // Vue-specific parse errors
+        // Template-syntax parse errors, beyond the WHATWG set
         [CompilerErrorCode.XInvalidEndTag] = "Invalid end tag.",
         [CompilerErrorCode.XMissingEndTag] = "Element is missing end tag.",
         [CompilerErrorCode.XMissingInterpolationEnd] = "Interpolation end sign was not found.",
@@ -90,7 +90,7 @@ internal static class CompilerErrorMessages
             "For example, @vnode-mounted should be changed to @vue:mounted. " +
             "@vnode-* hooks support has been removed in 3.4.",
 
-        // DOM directive transform errors (verbatim from @vue/compiler-dom errors.ts DOMErrorMessages)
+        // DOM directive transform errors
         [CompilerErrorCode.XVHtmlNoExpression] = "v-html is missing expression.",
         [CompilerErrorCode.XVHtmlWithChildren] = "v-html will override element children.",
         [CompilerErrorCode.XVTextNoExpression] = "v-text is missing expression.",

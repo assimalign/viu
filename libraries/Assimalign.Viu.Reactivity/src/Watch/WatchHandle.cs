@@ -3,8 +3,7 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// The handle returned by <c>Watch</c> and <c>WatchEffect</c> — the C# port of Vue 3.5's
-/// <c>WatchHandle</c> (https://vuejs.org/api/reactivity-core.html#watch). Stops the watcher,
+/// The handle returned by <c>Watch</c> and <c>WatchEffect</c>. Stops the watcher,
 /// or pauses and resumes callback delivery. Watchers created inside an <see cref="EffectScope"/>
 /// also stop when the scope stops, so an explicit <see cref="Stop"/> is only needed for
 /// independently created watchers. Implements <see cref="IDisposable"/> for <c>using</c> support.

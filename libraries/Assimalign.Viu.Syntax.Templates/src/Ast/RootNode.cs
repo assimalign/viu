@@ -1,9 +1,10 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The root of a parsed template. The C# port of Vue 3.5's <c>RootNode</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>), reduced to the members the parser produces (the codegen
-/// and transform bookkeeping fields belong to later pipeline stages).
+/// The root of a parsed template, carrying only what the parser produces: the top-level children and
+/// the original source. Transform and code-generation bookkeeping is deliberately not on this node —
+/// it belongs to <see cref="TransformResult"/>, so a parse result stays a pure function of its input
+/// and the incremental cache never sees a later stage's state.
 /// </summary>
 public sealed record RootNode : TemplateSyntaxNode
 {

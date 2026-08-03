@@ -1,10 +1,11 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The catalog of diagnostic codes the single-file-component block parsers emit. Unlike
-/// <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerErrorCode</c> — whose numbering mirrors vuejs/core's
-/// <c>ErrorCodes</c> — these are <b>Viu-defined</b> container diagnostics with no upstream numbering to
-/// align to. Values start at 1000 to stay visibly distinct from any upstream-aligned catalog. Since the
+/// The catalog of diagnostic codes the single-file-component block parsers emit. Values start at 1000
+/// so a container diagnostic is distinguishable at a glance from
+/// <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerErrorCode</c>, whose parse band occupies the low
+/// numbers: the two catalogs are separate enums that a build surfaces side by side, and a reader must be
+/// able to tell which stage reported a code without consulting either enum. Since the
 /// [V01.01.06.10] hybrid container, the tag codes (1009–1013) — originally minted for the <c>.vue</c>
 /// compatibility parser — are also reachable from <c>.viu</c> files, whose canonical
 /// <c>&lt;template&gt;</c>/<c>&lt;style&gt;</c> blocks are tag-based. Each code's severity comes from

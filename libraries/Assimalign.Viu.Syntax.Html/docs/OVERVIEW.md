@@ -1,9 +1,9 @@
 # Assimalign.Viu.Syntax.Html — overview
 
 The `.html` language of the `Assimalign.Viu.Syntax.*` cluster — the parser build tooling registers
-for HTML documents, above all the WASM host page (`wwwroot/index.html`), the role Vite's HTML entry
-processing plays in a Vue build. Vue *template* markup is the separate
-`Assimalign.Viu.Syntax.Templates` parser, not this one. Area: `V01.01.05` (Syntax cluster).
+for HTML documents, above all the WASM host page (`wwwroot/index.html`) whose entry references the
+build rewrites. Viu *template* markup is the separate `Assimalign.Viu.Syntax.Templates` parser, not
+this one. Area: `V01.01.05` (Syntax cluster).
 
 > **Scaffold.** The parser currently produces a single located `HtmlDocumentNode` carrying the raw
 > source, with no diagnostics — enough to pin the pipeline seam and the caching contract. Element-

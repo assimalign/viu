@@ -8,9 +8,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// The set of CSS Modules accessors ([V01.01.05.04.01]) a template's expressions may reference, keyed by their
 /// C#-parseable spelling. Supplied by the composition-root generator ([V01.01.06.06]) alongside
 /// <see cref="BindingMetadata"/>, it lets expression classification resolve <c>$style.box</c> (and named-module
-/// forms) to the generated accessor class rather than a phantom component binding — the Viu stand-in for Vue
-/// 3.5's runtime <c>$style</c> render-context object, which Viu cannot have because it generates static,
-/// trimming-safe C# (no runtime proxy, no dynamic member access).
+/// forms) to the generated accessor class rather than a phantom component binding. The resolution is
+/// entirely compile-time: Viu generates static, trimming-safe C# with no runtime proxy and no dynamic
+/// member access (<c>[RCT-8]</c>, <c>[STY-2]</c>).
 /// </summary>
 /// <remarks>
 /// Transform <i>input</i> like <see cref="BindingMetadata"/>: a plain immutable class rebuilt from the generator's

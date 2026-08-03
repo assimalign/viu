@@ -35,8 +35,8 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// </param>
 /// <param name="RenderCacheSize">
 /// The number of <c>_cache</c> slots the render function uses (<c>v-once</c> subtrees and cached
-/// handlers); surfaced as a generated constant because C# arrays cannot grow on assignment the way
-/// upstream's JavaScript render cache does.
+/// handlers); surfaced as a generated constant because the cache is a fixed-length C# array allocated
+/// once per instance and cannot grow on assignment.
 /// </param>
 /// <param name="ScopeId">
 /// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
@@ -104,7 +104,7 @@ internal readonly record struct SingleFileComponentModel(
     /// <see cref="Bindings"/>. This is the consumable form the render-code-generation path
     /// ([V01.01.05.04]/[V01.01.05.05]) reads to decide where a <c>Reference&lt;T&gt;.Value</c> unwrap
     /// belongs. <see cref="BindingMetadata.IsScriptSetup"/> is set whenever the component declares a
-    /// script, mirroring Vue's <c>__isScriptSetup</c> for a <c>&lt;script setup&gt;</c> block.
+    /// script block at all, because a Viu component has exactly one script slot.
     /// </summary>
     /// <returns>The binding metadata, or <see cref="BindingMetadata.Empty"/> for a scriptless component.</returns>
     public BindingMetadata ToBindingMetadata() => BuildBindingMetadata(HasScript, Bindings);

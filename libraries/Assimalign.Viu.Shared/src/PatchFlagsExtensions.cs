@@ -6,8 +6,8 @@ namespace Assimalign.Viu.Shared;
 /// Allocation-free bitwise predicates over <see cref="PatchFlags"/>. All positive-flag checks
 /// are gated on both operands being positive, so the negative sentinels
 /// (<see cref="PatchFlags.Cached"/> and <see cref="PatchFlags.Bail"/>, whose two's-complement
-/// representations have most bits set) never spuriously satisfy them from either side — matching
-/// upstream's <c>patchFlag &gt; 0</c> fast-path guard. Sentinels are tested with
+/// representations have most bits set) never spuriously satisfy them from either side. That
+/// <c>flags &gt; 0</c> guard is the required form of every positive-bit test. Sentinels are tested with
 /// <see cref="IsCached"/>/<see cref="IsBail"/> instead. Every predicate is a plain inlineable
 /// bitwise/equality check; <see cref="System.Enum.HasFlag(System.Enum)"/> is never used.
 /// </summary>

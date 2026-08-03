@@ -27,7 +27,7 @@ internal static class ReactivityState
 
     /// <summary>
     /// Incremented on every reactive mutation anywhere; lets computeds skip dependency traversal
-    /// entirely when nothing in the graph has changed (Vue 3.5 <c>globalVersion</c> fast path).
+    /// entirely when nothing anywhere in the graph has changed.
     /// </summary>
     internal static int GlobalVersion;
 
@@ -69,7 +69,8 @@ internal static class ReactivityState
     /// <summary>
     /// Decrements the batch depth and, when it reaches zero, flushes queued subscribers. Computeds
     /// only have their notified flag cleared (they re-evaluate lazily); effects are triggered. The
-    /// first exception thrown by an effect is rethrown after the queue drains (Vue parity).
+    /// first exception thrown by an effect is rethrown after the queue drains, so one failing
+    /// effect never strands the others mid-flush.
     /// </summary>
     /// <exception cref="InvalidOperationException">There is no open batch to close.</exception>
     internal static void EndBatch()

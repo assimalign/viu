@@ -11,7 +11,8 @@ namespace Assimalign.Viu.Testing.Benchmarks;
 /// <summary>
 /// BenchmarkDotNet timings for the reactivity hot paths the architecture bets on — dependency
 /// track/trigger, computed invalidation/recompute, effect trigger fan-out, batched-write coalescing, and
-/// scheduler queue+flush (the version-counter/linked-list design of <c>@vue/reactivity</c>). Pure CoreCLR
+/// scheduler queue+flush. These are the paths where the engine's version-counter and doubly-linked
+/// subscriber-edge design pays off or does not ([RCT-9]), so they are the ones worth timing. Pure CoreCLR
 /// with no browser or interop; wall-clock numbers are environment-relative, so they are reported as
 /// artifacts, never gated. BenchmarkDotNet isolates each case in its own process, so the ambient static
 /// reactivity/scheduler state does not leak between cases.

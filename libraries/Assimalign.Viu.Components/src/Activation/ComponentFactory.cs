@@ -9,10 +9,10 @@ namespace Assimalign.Viu.Components;
 /// </summary>
 /// <remarks>
 /// Activators may close over any application-owned resolver. The factory does not own or dispose
-/// values captured by activators. Registered names use Vue's asset lookup order: raw name,
-/// camel-case name, then Pascal-case name. See
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/helpers/resolveAssets.ts.
-/// The factory is not thread-safe.
+/// values captured by activators. A registered name is resolved by trying the raw name, then its
+/// camel-case spelling, then the Pascal-case spelling of that, so a <c>my-widget</c> request
+/// resolves a <c>myWidget</c> or <c>MyWidget</c> registration; lookup is ordinal throughout.
+/// Specified by <c>[CMP-6]</c>. The factory is not thread-safe.
 /// </remarks>
 public sealed class ComponentFactory : IComponentFactory
 {

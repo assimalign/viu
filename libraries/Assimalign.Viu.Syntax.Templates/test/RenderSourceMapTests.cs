@@ -13,8 +13,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// prefix) and whose <see cref="RenderSourceMapping.TemplateLocation"/> is the exact template span. The
 /// composition root ([V01.01.06.02]) turns these into <c>#line</c> span directives; the end-to-end
 /// compiled-<c>#line</c> proof lives in the generator's
-/// <c>SingleFileComponentTemplateSourceMapTests</c>. Upstream analogue: the source-map segments Vue 3.5's
-/// <c>generate()</c> emits under <c>sourceMap</c> (<c>@vue/compiler-core</c> <c>codegen.ts</c>).
+/// <c>SingleFileComponentTemplateSourceMapTests</c>. Specified by <c>[SFC-8]</c>.
 /// </summary>
 public sealed class RenderSourceMapTests
 {

@@ -5,9 +5,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Shared.Tests;
 
-// Pins the class/style binding normalization contract of @vue/shared's normalizeProp.ts
-// (test vectors ported from vuejs/core's normalizeProp.spec.ts) —
-// https://vuejs.org/guide/essentials/class-and-style.html.
+// Pins Viu's class/style binding normalization: every accepted :class / :style shape (string,
+// nested enumerable, name -> truthy dictionary) collapses to the single form the host applies,
+// with host truthiness (false, null, numeric zero, NaN, "" are falsy). The vectors below are the
+// frozen contract — a vector is added, never edited away.
 public class StyleAndClassNormalizationTests
 {
     [Fact]
@@ -90,7 +91,7 @@ public class StyleAndClassNormalizationTests
     [Fact]
     public void ParseStringStyle_KeepsSemicolonsInsideParentheses()
     {
-        // Upstream listDelimiterRE: /;(?![^(]*\))/ — the url(data:...;base64,...) survives.
+        // Declarations split on ';' only outside parentheses, so url(data:...;base64,...) survives.
         var parsed = StyleAndClassNormalization.ParseStringStyle(
             "background-image: url(data:image/png;base64,abc123); color: red");
 
@@ -147,7 +148,7 @@ public class StyleAndClassNormalizationTests
     {
         StyleAndClassNormalization.Hyphenate("backgroundColor").ShouldBe("background-color");
         StyleAndClassNormalization.Hyphenate("color").ShouldBe("color");
-        // Upstream \B([A-Z]): no hyphen before a leading capital.
+        // No hyphen before a leading capital, so a vendor prefix survives intact.
         StyleAndClassNormalization.Hyphenate("WebkitTransition").ShouldBe("webkit-transition");
         StyleAndClassNormalization.Hyphenate("ArrowUp").ShouldBe("arrow-up");
     }

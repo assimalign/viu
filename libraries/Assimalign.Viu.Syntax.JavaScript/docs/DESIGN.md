@@ -1,9 +1,8 @@
 # Assimalign.Viu.Syntax.JavaScript — design
 
 Why the JavaScript scaffold exists and how it is shaped. What it is: see [OVERVIEW.md](OVERVIEW.md).
-There is no `@vue/compiler-*` counterpart — Viu's component logic is C#, so this library covers only
-the plain `.js` around the interop boundary (the role a Vite build's JS handling plays for glue and
-host-page scripts).
+Viu's component logic is C#, so this library covers only the plain `.js` around the interop
+boundary — interop glue and host-page scripts. No Viu component is ever authored in JavaScript.
 
 ## Why a scaffold now
 

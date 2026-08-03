@@ -15,8 +15,8 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// <summary>
 /// Maps the base <c>Assimalign.Viu.Syntax</c> <see cref="SyntaxDiagnostic"/> surface onto the stable,
 /// VIU-prefixed host-neutral catalog ([V01.01.06.11]). The base deliberately keeps per-language
-/// code catalogs (the <c>.viu</c> container's <c>SingleFileComponentErrorCode</c> starting at 1000, the
-/// template compiler's upstream-pinned <c>CompilerErrorCode</c>); the projection cannot enumerate those
+/// code catalogs (the <c>.viu</c> container's <c>SingleFileComponentErrorCode</c> starting at 1000, and the
+/// template compiler's own <c>CompilerErrorCode</c>); the projection cannot enumerate those
 /// unbounded catalogs into one descriptor each without mirroring them, so it instead envelopes each
 /// diagnostic by its <em>origin</em> (the <c>.viu</c> block container, a dispatched template parse, the
 /// Roslyn parse of the <c>@script</c> block's C# — [V01.01.06.03] — or a dispatched style CSS parse) and
@@ -193,8 +193,8 @@ internal static class SingleFileComponentDiagnostics
         var location = BuildLocation(filePath, diagnostic.Location, blockContentStart);
 
         // The base surface deliberately projects each language's unbounded code catalog as RawCode;
-        // carrying it in the message keeps the upstream-pinned CompilerErrorCode / Viu-defined
-        // SingleFileComponentErrorCode visible to consumers without minting one descriptor per code.
+        // carrying it in the message keeps the originating CompilerErrorCode / SingleFileComponentErrorCode
+        // visible to consumers without minting one descriptor per code.
         var message = diagnostic.Message
             + " ("
             + (fromTemplate ? "template compiler code " : "single-file-component code ")

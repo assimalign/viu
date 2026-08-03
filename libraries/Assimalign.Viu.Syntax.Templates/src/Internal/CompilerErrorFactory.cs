@@ -2,8 +2,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Builds <see cref="CompilerError"/> diagnostics from a code and location, resolving the human-readable
-/// message from <see cref="CompilerErrorMessages"/>. The transform-stage analogue of the parser's error
-/// emission and of Vue 3.5's <c>createCompilerError</c> (<c>@vue/compiler-core</c> <c>errors.ts</c>).
+/// message from <see cref="CompilerErrorMessages"/>. The transform stage emits diagnostics this way
+/// rather than through <c>ParserOptions.OnError</c>, because a transform reports against a node it
+/// already holds.
 /// </summary>
 internal static class CompilerErrorFactory
 {

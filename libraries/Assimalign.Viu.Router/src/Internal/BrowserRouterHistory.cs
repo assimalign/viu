@@ -7,11 +7,9 @@ namespace Assimalign.Viu.Router;
 /// The browser history <em>policy</em>: it owns the current location and state, composes URLs from
 /// the configured base, runs the push/replace/popstate state machine, and books navigation
 /// listeners — all without touching the DOM. Every environment effect is delegated to an injected
-/// <see cref="IBrowserHistoryInterop"/>. The C# port of vue-router's <c>useHistoryStateNavigation</c>
-/// and <c>useHistoryListeners</c> composed by <c>createWebHistory</c>
-/// (<c>packages/router/src/history/html5.ts</c>). Web and hash modes share this class; they differ
-/// only in the base handed to it (a hash base carries a <c>#</c>), exactly as
-/// <c>createWebHashHistory</c> just forwards a hash base to <c>createWebHistory</c>.
+/// <see cref="IBrowserHistoryInterop"/>. Web and hash modes share this class; they differ only in
+/// the base handed to it — a hash base carries a <c>#</c> — so there is one state machine to reason
+/// about and test rather than two.
 /// </summary>
 /// <remarks>
 /// Because the browser edge is an injected seam, the whole policy — base prepend/strip, the state
@@ -26,7 +24,7 @@ internal sealed class BrowserRouterHistory : IRouterHistory
 
     private string currentLocation;
     private RouterHistoryState currentState;
-    // Upstream pauseState: the location a silent go() is leaving, so its popstate is swallowed.
+    // The location a silent Go() is leaving, so the popstate it provokes is swallowed.
     private string? pausedLocation;
 
     internal BrowserRouterHistory(IBrowserHistoryInterop interop, string normalizedBase)
@@ -44,8 +42,8 @@ internal sealed class BrowserRouterHistory : IRouterHistory
         }
         else
         {
-            // Fresh navigation with no prior state: seed the current entry (upstream seeds
-            // position = history.length - 1 and replaces the entry in place).
+            // Fresh navigation with no prior state: seed the current entry from the environment's
+            // history length and replace it in place, so bootstrapping never adds an entry.
             currentState = RouterHistoryStateBuilder.BuildInitial(currentLocation, snapshot.HistoryLength - 1);
             interop.Replace(BuildUrl(currentLocation), currentState);
         }
@@ -91,7 +89,7 @@ internal sealed class BrowserRouterHistory : IRouterHistory
     {
         if (!triggerListeners)
         {
-            // Swallow the popstate this go() will provoke (upstream pauseListeners()).
+            // Swallow the popstate this Go() will provoke, so a silent reposition is invisible.
             pausedLocation = currentLocation;
         }
         interop.Go(delta);
@@ -119,8 +117,8 @@ internal sealed class BrowserRouterHistory : IRouterHistory
         interop.Unsubscribe();
     }
 
-    // The popstate handler (upstream popStateHandler): reconcile the arrived entry, honour a paused
-    // silent go, compute the signed delta from the position counters, then notify listeners.
+    // The popstate handler: reconcile the arrived entry, honour a paused silent go, compute the
+    // signed delta from the position counters, then notify listeners.
     private void OnPopState(BrowserHistorySnapshot snapshot)
     {
         var to = HistoryPathNormalization.CreateCurrentLocation(
@@ -167,7 +165,7 @@ internal sealed class BrowserRouterHistory : IRouterHistory
     }
 
     // Compose the URL written to the environment: root-relative `base + location` for web mode, or
-    // the `#…` fragment slice for hash mode (upstream changeLocation's non-<base>-element branch).
+    // the `#…` fragment slice for hash mode.
     private string BuildUrl(string location)
     {
         var hashIndex = Base.IndexOf('#');

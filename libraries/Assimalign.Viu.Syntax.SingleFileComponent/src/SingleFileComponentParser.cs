@@ -4,18 +4,18 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
 /// The <c>.viu</c> single-file component block parser entry point: slices a file into its
-/// <see cref="SingleFileComponentDescriptor"/> of typed, located blocks. The role Vue 3.5's <c>parse()</c> plays in
-/// <c>@vue/compiler-sfc</c> — block-level slicing only. The container is hybrid ([V01.01.06.10]):
-/// <c>&lt;template&gt;</c> and <c>&lt;style&gt;</c> are tag-based (matching Vue), while the component's
-/// C# lives in <c>@script { }</c> and custom blocks keep the @-form. The markup inside
-/// <c>&lt;template&gt;</c> stays standard Vue template syntax and is parsed by the template compiler
-/// ([V01.01.05.01]); this parser never looks inside a block's content.
+/// <see cref="SingleFileComponentDescriptor"/> of typed, located blocks. Block-level slicing only: the
+/// parser never looks inside a block's content (specified by <c>[SFC-5]</c>). The container is hybrid
+/// ([V01.01.06.10], specified by <c>[SFC-3]</c>): <c>&lt;template&gt;</c> and <c>&lt;style&gt;</c> are
+/// tag-based, while the component's C# lives in <c>@script { }</c> and custom blocks keep the @-form.
+/// The markup inside <c>&lt;template&gt;</c> is the Viu template language and is parsed by the template
+/// compiler ([V01.01.05.01]).
 /// </summary>
 /// <remarks>
 /// Runs entirely at build time inside a Roslyn generator ([V01.01.06.02]): no file or network I/O — the
 /// source text is handed in as a string — no async, and no reflection. Parsing is recoverable: malformed
-/// input is reported through <see cref="SingleFileComponentParseResult.Errors"/> and never throws. See the format
-/// specification in <c>docs/FORMAT.md</c> and the Vue SFC spec https://vuejs.org/api/sfc-spec.html.
+/// input is reported through <see cref="SingleFileComponentParseResult.Errors"/> and never throws. The
+/// grammar is normative in <c>docs/FORMAT.md</c>.
 /// </remarks>
 public static class SingleFileComponentParser
 {

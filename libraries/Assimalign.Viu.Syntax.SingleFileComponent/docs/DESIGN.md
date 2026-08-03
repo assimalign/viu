@@ -1,44 +1,46 @@
 # Assimalign.Viu.Syntax.SingleFileComponent — design
 
 Why the `.viu` parser is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md); the exact
-grammar is [FORMAT.md](FORMAT.md). Upstream counterpart:
-[`@vue/compiler-sfc`](https://github.com/vuejs/core/tree/main/packages/compiler-sfc) `parse()`
-(`packages/compiler-sfc/src/parse.ts`).
+grammar is [FORMAT.md](FORMAT.md), which is normative. The structural invariants are specified by
+`[SFC-3]`–`[SFC-5]`.
 
 ## The hybrid container — and the recorded reversal
 
-Vue wraps every SFC block in HTML-like tags (`<template>`, `<script>`, `<style>`). The original
-[V01.01.06.01] design (2026-07-17) diverged for *every* block with the `@`-block container. That
+The original [V01.01.06.01] design (2026-07-17) put *every* block in an `@`-block container. That
 decision was **partially reversed on 2026-08-02 per user direction ([V01.01.06.10], #257)**: a `.viu`
-file now uses a **hybrid container** — tag-based `<template>`/`<style>` exactly as in Vue, with the
+file now uses a **hybrid container** — tag-based `<template>`/`<style>`, with the
 component's C# in `@script { }` and custom blocks kept `@`-syntax. The rationale: markup and CSS gain
-real value from the Vue-identical tag wrappers (familiarity, tooling, no indentation discipline for
-raw CSS), while a C# block gains nothing from an HTML wrapper — the `@` reads as "C# starts here", as
-in Razor, and pins the one deliberate remaining divergence. The legacy `@template`/`@style` forms
+real value from tag wrappers (familiarity, tooling, no indentation discipline for
+raw CSS — and the same wrappers the `.vue` compatibility container uses, which is what lets both
+converge on one downstream pipeline, `[VUE-9]`), while a C# block gains nothing from an HTML wrapper —
+the `@` reads as "C# starts here", as
+in Razor. The legacy `@template`/`@style` forms
 still parse through a Warning-severity migration window (1015/1016), and a top-level `<script>` tag
-is rejected with an error (1017) so its content can never silently skip compilation. Block
-*semantics* follow the Vue SFC spec unchanged, and the markup inside `<template>` remains standard
-Vue template syntax. Build-time-only compilation is one half of
+is rejected with an error (1017) so its content can never silently skip compilation. Build-time-only
+compilation is one half of
 [ADR-0005](../../../docs/adr/0005-no-runtime-template-compilation.md); the full rule set is in
 [FORMAT.md](FORMAT.md).
 
 ## Tag-based `.vue` compatibility stays separate — but shares the scanner
 
 [V01.01.06.09] adds `VueSingleFileComponentParser` as a dedicated compatibility parser; it does not
-change `SingleFileComponentParser` or the `.viu` grammar. Both engines follow Vue 3.5's SFC
-tokenizer boundary: an HTML `template` uses nested markup boundaries, while root `style`, custom
-blocks, and preprocessed templates are raw text until their matching end tag. Since [V01.01.06.10]
+change `SingleFileComponentParser` or the `.viu` grammar (`[VUE-1]`). Both engines use one tag-boundary
+rule: an HTML `template` uses nested markup boundaries, while root `style`, custom
+blocks, and preprocessed templates are raw text until their matching end tag. `.viu` adopts the `.vue`
+container's boundary rule deliberately — it is what makes the no-drift guarantee below mechanical.
+Since [V01.01.06.10]
 the tag machinery — opening-tag/attribute parsing, the nested-template boundary, raw-text closing-tag
 search, malformed-tag recovery — lives in one shared internal `SingleFileComponentTagScanner` that
 both the canonical hybrid engine and the `.vue` engine construct over their own span/report sinks, so
-the two containers cannot drift. The scanner keeps end-tag-shaped text inside quoted attributes,
-comments, and nested raw-text elements from closing the root template. See
+the two containers cannot drift (`[VUE-3]`). The scanner keeps end-tag-shaped text inside quoted
+attributes, comments, and nested raw-text elements from closing the root template.
+Container-format references for the `.vue` input this parser accepts:
 [`tokenizer.ts`](https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts)
 and
 [`parse.ts`](https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts).
 
 The compatibility result deliberately uses `VueSingleFileComponentDescriptor` rather than changing
-the canonical descriptor. Vue allows one ordinary `<script>` and one `<script setup>` in the same
+the canonical descriptor. The `.vue` container allows one ordinary `<script>` and one `<script setup>` in the same
 file, while `.viu` has one uniform `@script` slot pending its own script-analysis work. Both descriptor
 types reuse the immutable block, option, diagnostic, and source-location values where their semantics
 are identical.
@@ -48,7 +50,7 @@ are identical.
 The parser only slices the file into blocks and records spans — it never re-parses, trims, or
 normalizes block content. @-blocks use the purely structural column-0 `}` termination rule.
 Tag-based blocks — the canonical `.viu` `<template>`/`<style>` and every `.vue` block — use the
-Vue-compatible nested-template or raw-text closing-tag boundary described above. Neither container
+shared nested-template or raw-text closing-tag boundary described above. Neither container
 parser needs knowledge of C#, CSS, or template-expression semantics. Downstream libraries parse the
 block contents: the template compiler (`Assimalign.Viu.Syntax.Templates`) for the template block, the
 CSS library for the style blocks, and script analysis for `@script` ([V01.01.06.03]). The source
@@ -64,8 +66,8 @@ library's output is the descriptor, nothing more.
 blocks as a `SyntaxSource` (content, block name, `lang`) so a composition root (the generator, a build
 task, or a test) can register the parsers the build embeds — without this library referencing any of
 them. The `.vue` adapter includes both ordinary and setup script slots and preserves source order. A
-registration-free parse is just the plain container parse, preserving `@vue/compiler-sfc` parity
-(`parse()` never looks inside block content).
+registration-free parse is just the plain container parse — the slice-don't-parse contract holds
+either way (`[SFC-5]`).
 
 ## Generator compatibility contract
 
@@ -74,8 +76,9 @@ results on the same template, style, script-analysis, source-mapping, and emissi
 ordinary or setup script is merged only when it declares the exact `lang="csharp"` contract. Missing
 and other language values produce `VIU1206`; their content is never executed or merged. The two legal
 script slots remain separate through analysis and each retains its own exact `#line` map, then both
-contribute C# partial-class members and template binding metadata. This is an explicit C# compatibility
-contract: Viu does not execute JavaScript or implement Vue's JavaScript compiler macros. A
+contribute C# partial-class members and template binding metadata (`[VUE-4]`, `[VUE-5]`). This is an
+explicit C# compatibility contract: Viu does not execute JavaScript, and the JavaScript compiler
+macros the `.vue` format permits (`defineProps` and friends) are never evaluated. A
 same-directory, same-base `.viu`/`.vue` pair produces `VIU1004`; canonical `.viu` wins and only one
 component is emitted.
 
@@ -99,19 +102,22 @@ caching ([V01.01.06.02], and see
 recoverable: malformed input is reported through diagnostics and the parser never throws for bad
 content.
 
-## Deltas from Vue 3
+## Platform adaptations
+
+Where the `.viu` container deliberately differs from the `.vue` container it stays compatible with:
 
 - **`@script { }` and `@`-form custom blocks** instead of `<script>`/custom tags — the remaining
-  container divergence after the [V01.01.06.10] hybrid pivot (above; specified in
-  [FORMAT.md](FORMAT.md)). `<template>`/`<style>` now match Vue's containers; a top-level `<script>`
+  container difference after the [V01.01.06.10] hybrid pivot (above; specified in
+  [FORMAT.md](FORMAT.md)). `<template>`/`<style>` are tag-based in both; a top-level `<script>`
   tag in `.viu` is a hard error (1017), never silently ignored.
-- **Viu-defined error codes** (`SingleFileComponentErrorCode`, 1000-based). Unlike the template
-  compiler, which mirrors vuejs/core's numbering, the `.viu` container is a Viu divergence with no
-  upstream codes to align to. Severity is a catalog property: the legacy-container codes (1015/1016)
-  are warnings; everything else is an error.
+- **A separate error-code catalog** (`SingleFileComponentErrorCode`, 1000-based) so a container
+  diagnostic is distinguishable at a glance from the template compiler's `CompilerErrorCode`, whose
+  parse band occupies the low numbers. Severity is a catalog property: the legacy-container codes
+  (1015/1016) are warnings; everything else is an error.
 
 ## Non-goals
 
-- **Vue JavaScript setup macros.** Explicit C# `<script setup lang="csharp">` is partial-class member
-  shorthand; JavaScript top-level execution and macros such as `defineProps` are not evaluated.
+- **JavaScript setup macros.** Explicit C# `<script setup lang="csharp">` is partial-class member
+  shorthand; JavaScript top-level execution and macros such as `defineProps` are not evaluated
+  (`[VUE-4]`).
 - **Parsing block interiors.** By design — that belongs to the per-language parsers.

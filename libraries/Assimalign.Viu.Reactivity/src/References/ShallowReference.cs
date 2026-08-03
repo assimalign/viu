@@ -3,11 +3,13 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A shallow reactive single-value container — the counterpart of Vue's <c>shallowRef()</c>.
+/// A reference cell that notifies only on assignment of a new instance, never on mutation of the
+/// instance it holds — the escape hatch for large or externally owned objects whose interiors must
+/// not be tracked.
 /// Only replacement of <see cref="Value"/> itself triggers; in-place mutation of the held object
 /// never notifies. Use <see cref="Reactive.TriggerReference"/> to force notification after an
 /// in-place mutation. (In C# <see cref="Reference{T}"/> is also cell-shallow, but
-/// <see cref="ShallowReference{T}"/> keeps the explicit upstream API distinction.)
+/// <see cref="ShallowReference{T}"/> keeps the distinction explicit at the declaration site.)
 /// Change detection uses <see cref="EqualityComparer{T}.Default"/>: like <c>Object.is</c>, NaN is
 /// self-equal; unlike <c>Object.is</c>, <c>+0.0</c> and <c>-0.0</c> compare equal (a deliberate
 /// .NET divergence). Setting an equal value does not trigger.

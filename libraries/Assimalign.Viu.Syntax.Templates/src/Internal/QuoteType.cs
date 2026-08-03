@@ -2,7 +2,6 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// How an attribute value was quoted, reported to <see cref="ITokenizerCallbacks.OnAttributeEnd"/>.
-/// The C# port of Vue 3.5's <c>QuoteType</c> (<c>@vue/compiler-core</c> <c>tokenizer.ts</c>).
 /// </summary>
 internal enum QuoteType
 {

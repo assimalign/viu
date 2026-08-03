@@ -1,21 +1,25 @@
 # Getting started with Viu
 
-Viu is a faithful re-implementation of [Vue.js 3](https://vuejs.org) in C#/.NET that runs in the
-browser through the .NET WebAssembly build tools. This guide takes you from an empty folder to a
-running, publishable Viu app using the packaged **`Assimalign.Viu.Sdk`** — the surface an external
-consumer uses. It is the Viu counterpart of Vue's
-[Quick Start](https://vuejs.org/guide/quick-start.html), rewritten for the C#/WASM reality.
+Viu is a standalone C#/.NET user-interface framework that runs in the browser through the .NET
+WebAssembly build tools. This guide takes you from an empty folder to a running, publishable Viu app
+using the packaged **`Assimalign.Viu.Sdk`** — the surface an external consumer uses.
 
-If you are coming from Vue, three deliberate C#/WASM divergences shape everything below (they are the
-[founding design decisions](../PLAN.md#founding-design-decisions-cwasm-divergences)):
+Three decisions shape everything below (they are the
+[founding design decisions](../PLAN.md#founding-design-decisions-cwasm-divergences), and
+[`docs/SPECIFICATION.md`](../SPECIFICATION.md) is the authoritative statement of what Viu
+guarantees):
 
-- **Refs are explicit.** `ref()` becomes `Reference<T>` and you read/write it through `.Value`. There
-  is no JavaScript `Proxy`, so reactivity never happens "invisibly."
-- **`reactive()` is a source generator, not a Proxy.** A `[Reactive]` partial class has its reactive
-  property wrappers emitted at build time by a Roslyn source generator.
-- **Templates compile at build time.** WASM has no `new Function`, so there is no runtime template
-  compiler; `.viu` single-file components and templates are compiled by source generators during the
-  build ([ADR-0005](../adr/0005-no-runtime-template-compilation.md)).
+- **Reactive state is an explicit cell.** A `Reference<T>` is an object you read and write through
+  `.Value`. Reading it inside a render function or a `Computed` subscribes to it; assigning to it
+  notifies every subscriber. Nothing is intercepted and nothing is tracked invisibly — the
+  subscription happens because you performed a property read.
+- **Reactive objects are source-generated, not intercepted.** A `[Reactive]` partial class has its
+  tracking/triggering property bodies emitted at build time by a Roslyn source generator, so an
+  ordinary C# object becomes reactive with no reflection and no runtime proxy.
+- **Templates compile at build time.** There is no runtime template compiler and no runtime code
+  generation — WASM is AOT and trimming territory. `.viu` and `.vue` single-file components and their
+  templates are compiled by source generators during the build
+  ([ADR-0005](../adr/0005-no-runtime-template-compilation.md)).
 
 > **Preview status.** Viu is pre-release. There is **no `dotnet new` template yet** — that lands with
 > [V01.01.12.04] (wave W05), so this guide creates the project by hand. Package versions and the local
@@ -160,12 +164,13 @@ await runMain()
 
 ## Your first component
 
-A Viu component is a plain C# object implementing `IComponent`. Its `Setup` method — the C#
-port of Vue's [`setup()`](https://vuejs.org/api/composition-api-setup.html) — runs **once** per
-instance, closes over the reactive state, and returns a **render function** that re-runs whenever the
-state it read changes. Because C# has no `Proxy`, that closure *is* the proxy-free realization of Vue's
-state object ([ADR-0004](../adr/0004-composition-only-component-model.md): Viu is composition-only —
-no Options API).
+A Viu component is a plain C# object implementing `IComponent`. Its `Setup` method runs **once** per
+instance, declares the component's reactive state as ordinary locals, and returns a **render
+function** that re-runs whenever the state it read changes. The closure *is* the component's state:
+there is no separate state object to declare, no name-based lookup between state and template, and
+no instance to reflect over at run time — which is exactly what makes the model AOT- and
+trimming-safe ([ADR-0004](../adr/0004-composition-only-component-model.md): a component is a setup
+function returning a render function, and there is no second, declarative authoring style).
 
 **`Program.cs`** — a Viu WASM app's whole bootstrap: build the app from a root component and mount it
 by selector, then keep the WASM main loop alive (rendering is reactive from there on). The builder is
@@ -185,9 +190,11 @@ await BrowserApplication.CreateBuilder(new Counter()).Build().MountAsync("#app")
 await Task.Delay(Timeout.Infinite);
 ```
 
-Configure the app on the builder before `Build()` — plugins with `builder.Use(...)`, app-level values
-with `builder.Provide(key, value)` — exactly as `createApp(App).use(...).provide(...)` composes an app
-in Vue.
+Configure the app on the builder before `Build()` — `UseRootComponent`, `UseComponentFactory`,
+`UseServiceProvider`, `UseStateRegistry`, `UseDirectiveResolver`, and plugins with
+`Use(IApplicationPlugin)`. Configuration is complete by the time `Build()` returns; a plugin is an
+awaited pre-mount initialization hook over an already-composed application, not a mutable registry
+you can extend afterwards.
 
 ### Dependency injection (`System.IServiceProvider`)
 
@@ -219,10 +226,21 @@ singleton/scoped services. To use a full container (`Microsoft.Extensions.Depend
 Autofac, …), implement the small `IServiceContainer` over it and pass it to
 `builder.UseServiceContainer(...)`.
 
-This is **app-level** DI. It sits beside — it does not replace — Vue's component-tree
-[provide/inject](https://vuejs.org/guide/components/provide-inject.html) (`DependencyInjection.Provide`/
-`Inject` with `InjectionKey<T>`), which stays the mechanism for passing values down a component subtree.
-App-level singleton wiring is what belongs in services.
+This is **app-level** DI, and it is the *only* ambient channel: Viu deliberately has **no hierarchical
+component-tree dependency API** — no ambient provide/inject walking up the parent chain
+([`[CMP-24]`](../SPECIFICATION.md#48-no-component-tree-provideinject)). A component's dependencies are
+explicit, and there are exactly four ways to get one:
+
+- **parameters and slots** for parent-to-child data;
+- **`IComponentContext.Services`** for application services (what you registered on the builder above);
+- **a State definition** resolved through the application's store registry, for shared mutable state; and
+- **`IComponentContext.Components`** for deliberate component resolution by name or type.
+
+This is a decision, not a deferral. An ambient hierarchical channel makes a component's contract
+invisible at its call site and its behavior dependent on where it happens to be mounted; it also
+resists trimming, because nothing static says which values a subtree will ask for. The cost is
+visible and accepted elsewhere in the framework — `RouterView` takes its nesting depth as an explicit
+argument precisely because no ambient channel exists to carry it.
 
 **`Counter.cs`** — a working counter:
 
@@ -280,31 +298,32 @@ the external [`viu-examples` showcase](https://github.com/assimalign/viu-example
 
 ## Reactivity basics
 
-Viu ports [`@vue/reactivity`](https://vuejs.org/guide/essentials/reactivity-fundamentals.html) to C#.
-The API surface is the static `Reactive` facade; the map from Vue to Viu:
+Viu's reactivity is a dependency graph of explicit cells. The API surface is the static `Reactive`
+facade:
 
-| Vue 3 | Viu | Notes |
-| --- | --- | --- |
-| `ref(0)` | `Reactive.Reference(0)` → `Reference<T>` | Read/write through `.Value`. |
-| `computed(() => …)` | `Reactive.Computed(() => …)` → `Computed<T>` | Lazy, cached, versioned. |
-| `watch(src, cb)` | `Reactive.Watch(source, callback)` | Scheduler-integrated. |
-| `reactive(obj)` | `[Reactive]` **partial class** | Property wrappers emitted by a source generator. |
-| `reactive([])` / arrays | `ReactiveList<T>`, `ReactiveDictionary<TKey,TValue>`, `ReactiveSet<T>` | Dedicated reactive collections. |
+| Primitive | What it does |
+| --- | --- |
+| `Reactive.Reference(0)` → `Reference<T>` | A tracked cell. Reading `.Value` inside an effect subscribes to it; assigning a different value notifies every subscriber. |
+| `Reactive.ShallowReference(obj)` → `ShallowReference<T>` | A cell that notifies only when you assign a *new instance*, never when you mutate the instance it already holds. |
+| `Reactive.Computed(() => …)` → `Computed<T>` | Derived state. Evaluated lazily on first read, cached until a dependency's version changes, then recomputed on the next read — not eagerly on invalidation. |
+| `Reactive.Watch(source, callback)` | Runs a callback when a source changes, delivered through the scheduler so several writes in one turn coalesce into one invocation. |
+| `[Reactive]` **partial class** | A reactive object. The generator emits the tracking/triggering bodies for each `partial` property. |
+| `ReactiveList<T>`, `ReactiveDictionary<TKey,TValue>`, `ReactiveSet<T>` | Reactive collections implementing the BCL collection interfaces, tracking reads and triggering on writes. |
 
-The C# deltas a Vue developer must internalize:
+Three consequences worth internalizing up front:
 
-- **Explicit `.Value`.** There is no auto-unwrapping in your C# code; `count.Value++` where Vue would
-  write `count.value++` (templates compiled from `.viu` do unwrap refs for you).
-- **No `Proxy`, so no destructuring footgun.** `Reference<T>` is a reference type — passing it around
-  or capturing it in a closure keeps the reactive connection. There is no "reactivity lost on
-  destructure" trap because there is no proxy to destructure away from.
-- **Reactive collections are dedicated types.** Instead of proxying a `List<T>`, use `ReactiveList<T>`
-  and friends, which implement the BCL collection interfaces while tracking reads and triggering on
-  writes.
+- **`.Value` is always explicit in C#.** `count.Value++`, never `count++`. Templates compiled from a
+  single-file component do unwrap reference cells for you, so `{{ Count }}` in a `<template>` reads the
+  underlying value; hand-written C# never does.
+- **A `Reference<T>` survives being passed around.** It is a reference type, so handing it to a method
+  or capturing it in a closure keeps the reactive connection intact — there is no wrapper to
+  accidentally unwrap and no interception layer to fall out of.
+- **Collections are dedicated types, not wrapped instances.** Use `ReactiveList<T>` instead of trying
+  to make a `List<T>` reactive; the tracking is in the type, not layered over it at run time.
 
-`[Reactive]` is the counterpart of `reactive()` — Vue's `Proxy` becomes a build-time source generator
-(see [ADR-0002](../adr/0002-ref-first-reactivity.md) and the
-[reactivity section of the Core overview](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md)). The class must be
+`[Reactive]` is what makes an ordinary object's properties participate in that graph, and it does so
+at build time (see [ADR-0002](../adr/0002-ref-first-reactivity.md) and the
+[Reactivity overview](../../libraries/Assimalign.Viu.Reactivity/docs/OVERVIEW.md)). The class must be
 `partial`, and every reactive property is declared `partial`:
 
 ```csharp
@@ -326,14 +345,23 @@ schedules a re-render — no reflection, fully trimming- and AOT-safe.
 
 ## Styling with .viu single-file components
 
-Viu's single-file component is the `.viu` file — the counterpart of Vue's `.vue`, using the hybrid
-container ([V01.01.06.10], #257): Vue-parity `<template>`/`<style>` tags plus the C# `@script { }`
-block (the exact grammar is in
-[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
+Viu's canonical single-file component is the `.viu` file, using the hybrid container
+([V01.01.06.10], #257): `<template>`/`<style>` tags plus the C# `@script { }` block (the exact grammar
+is in [`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
 `@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
 `<template>`/`@script` compiles to a **mountable component** (see the note below,
 [#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **scoped, bundled CSS**
-unit. Add a `.viu` file with a `<style>` block:
+unit.
+
+> **`.vue` files compile too.** Viu ships a `.vue` single-file-component compatibility parser as a
+> product feature ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)). The SDK globs
+> `**/*.viu` and `**/*.vue` into the same build graph, and everything downstream of the container
+> parse — template code generation, scoped styles, CSS Modules, source mapping, hot-reload metadata —
+> is shared. A `.vue` script merges into the generated component only when it declares
+> `lang="csharp"`, because Viu executes no JavaScript. The rules are specified in
+> [§9 of the specification](../SPECIFICATION.md#9-vue-compatibility--a-shipping-feature).
+
+Add a `.viu` file with a `<style>` block:
 
 **`AppStyles.viu`**:
 
@@ -376,7 +404,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 [V01.01.12.12.01](https://github.com/assimalign/viu/issues/167).
 
 > **`.viu` `<template>`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
-> A `.viu` with a `<template>` (standard Vue template markup) and an `@script` (C#) block now compiles to a
+> A `.viu` with a `<template>` (Viu template syntax) and an `@script` (C#) block now compiles to a
 > **mountable component**: the generator emits the render function, merges the script into the partial
 > class, **and** generates the `IComponent` bridge (a `Setup` that returns the render delegate),
 > so you mount it exactly like a hand-written component — `BrowserApplication.CreateBuilder(new Greeting()).Build().MountAsync("#app")`
@@ -395,8 +423,8 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > }
 > ```
 >
-> Still in progress ([#227](https://github.com/assimalign/viu/issues/227)): declared props/emits (the
-> `defineProps`/`defineEmits` analogues) and lifecycle hooks authored inside `@script`. Until those land,
+> Still in progress ([#227](https://github.com/assimalign/viu/issues/227)): parameters and events
+> declared inside `@script`, and `@script`-authored lifecycle hooks. Until those land,
 > undeclared attributes fall through to the component's root element, and a parent composes a child `.viu`
 > by explicit instantiation (`new Greeting()`). Hand-authored `IComponent` components (as above)
 > remain fully supported.
@@ -450,10 +478,12 @@ That folder is a static site — host it on any static web host.
   [`viu-examples` showcase](https://github.com/assimalign/viu-examples) consumes the packaged SDK
   and demonstrates components, routing, reactivity, state, browser directives, built-ins, and the
   `.viu` CSS pipeline.
-- **The delivery plan** — [`docs/PLAN.md`](../PLAN.md) maps each Vue 3 package to its Viu library and
-  records the founding decisions; the [architecture decisions](../adr/) log the C#/WASM divergences.
-- **The Vue 3 guides this parallels** — [Quick Start](https://vuejs.org/guide/quick-start.html) and
-  [Reactivity Fundamentals](https://vuejs.org/guide/essentials/reactivity-fundamentals.html).
+- **The specification** — [`docs/SPECIFICATION.md`](../SPECIFICATION.md) states what Viu guarantees,
+  clause by clause: the execution model, the component model, reactivity, the rendering architecture,
+  compilation, styling, server rendering, routing, and state. It is the place to go when the guide
+  says *what* and you need *exactly what*.
+- **The delivery plan** — [`docs/PLAN.md`](../PLAN.md) records the wave strategy and the founding
+  decisions; the [architecture decisions](../adr/) log the repo-wide C#/WASM choices behind them.
 
 ## Not yet available
 
@@ -461,8 +491,7 @@ This guide is intentionally scoped to what a consumer can build and publish toda
 
 - **A `dotnet new` project template** — [V01.01.12.04] (W05); until then, create the project by hand as
   above.
-- **Declared props/emits and lifecycle hooks in a `.viu` `@script`** — the `defineProps`/`defineEmits`
-  analogues and `@script`-authored lifecycle, still in progress
+- **Parameters, events, and lifecycle hooks declared inside a `.viu` `@script`** — still in progress
   ([#227](https://github.com/assimalign/viu/issues/227)). Mountable `.viu` `<template>`/`@script` components
   themselves already work ([#216](https://github.com/assimalign/viu/issues/216), see the note above).
 - **A template-syntax reference and the API reference site** — the Documentation area

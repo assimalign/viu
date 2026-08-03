@@ -1,19 +1,17 @@
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// A navigation that did not complete — the C# port of vue-router's <c>NavigationFailure</c>
-/// (<c>packages/router/src/errors.ts</c>,
-/// https://router.vuejs.org/guide/advanced/navigation-failures.html). Returned from
+/// A navigation that did not complete. Returned from
 /// <see cref="Router.Push"/>/<see cref="Router.Replace"/> and handed to every
 /// <see cref="AfterNavigationHook"/>, it records the failure <see cref="Type"/> and the
-/// <see cref="To"/>/<see cref="From"/> locations involved.
+/// <see cref="To"/>/<see cref="From"/> locations involved. Specified by <c>[RTR-6]</c>.
 /// </summary>
 /// <remarks>
-/// Unlike upstream — where a failure is an <c>Error</c> that a rejected promise carries — a Viu
-/// failure is a plain returned value, so <see cref="Router.Push"/> resolves with it rather than
-/// throwing (only genuinely unexpected guard exceptions fault the returned task). This keeps the
-/// awaitable <c>push</c>/<c>replace</c> contract free of exception control flow while still
-/// distinguishing aborts, cancellations, and duplicates.
+/// A failure is a plain returned value, never an exception: <see cref="Router.Push"/> completes
+/// with it rather than throwing, and only a genuinely unexpected guard exception faults the returned
+/// task. An abort, a cancellation, and a duplicate are all ordinary outcomes of a correct
+/// application, so keeping them out of exception control flow means a caller that ignores the return
+/// value never sees a crash for routine behavior.
 /// </remarks>
 public sealed class NavigationFailure
 {
@@ -34,8 +32,7 @@ public sealed class NavigationFailure
     public RouteLocation From { get; }
 
     /// <summary>
-    /// Whether this failure is of <paramref name="type"/> — the C# counterpart of upstream's
-    /// <c>isNavigationFailure(failure, type)</c> test.
+    /// Whether this failure is of <paramref name="type"/>.
     /// </summary>
     /// <param name="type">The failure type to test against.</param>
     /// <returns><see langword="true"/> when <see cref="Type"/> equals <paramref name="type"/>.</returns>

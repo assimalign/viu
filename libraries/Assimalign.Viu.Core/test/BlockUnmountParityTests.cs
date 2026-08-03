@@ -11,7 +11,10 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins optimized block teardown to Vue 3.5's dynamic-child and v-once behavior.
+/// Pins optimized block teardown: unmounting a block visits only its collected dynamic
+/// descendants, except for the three cases that retain the full walk because skipping them would
+/// leak — `HasOnce` blocks, bailed trees, and non-stable fragments ([RND-BLOCK-6],
+/// [RND-BLOCK-7]).
 /// </summary>
 public sealed class BlockUnmountParityTests : IDisposable
 {

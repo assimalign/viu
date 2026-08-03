@@ -6,12 +6,11 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins navigation supersession/cancellation and the popstate pipeline ([V01.01.08.04]) against
-// vue-router (packages/router/src/router.ts: the pendingLocation cancel check and the popstate
-// listener's compensating history.go;
-// https://router.vuejs.org/guide/advanced/navigation-failures.html). A gated guard creates a genuine
-// in-flight navigation so a later one can supersede it deterministically; all DOM-free with memory
-// history.
+// Pins navigation supersession/cancellation and the popstate pipeline ([V01.01.08.04]): a later
+// navigation cancels an in-flight one, the superseded chain runs no further guards, and an aborted
+// popstate navigation restores the URL with a compensating history.go. A gated guard creates a
+// genuine in-flight navigation so a later one can supersede it deterministically; all DOM-free with
+// memory history.
 public class NavigationCancellationTests
 {
     private static IReadOnlyList<RouteRecord> Routes() =>
@@ -51,7 +50,7 @@ public class NavigationCancellationTests
     [Fact]
     public async Task SupersededNavigation_DoesNotRunItsRemainingGuards()
     {
-        // The cancelled chain must not run further guards after supersession (vue-router's cancel
+        // The cancelled chain must not run further guards after supersession (the cancel
         // check short-circuits the queue).
         var gate = new TaskCompletionSource();
         var beforeResolveForA = 0;
@@ -106,7 +105,7 @@ public class NavigationCancellationTests
     [Fact]
     public void Go_WhenGuardAborts_RestoresTheUrl_AndLeavesTheRouteUntouched()
     {
-        // vue-router restores the URL after an aborted popstate with a compensating history.go(-delta).
+        // An aborted popstate navigation restores the URL with a compensating history.go(-delta).
         var history = RouterHistory.CreateMemory();
         var router = new Router(history, Routes());
         _ = router.Push("/a");

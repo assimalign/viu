@@ -6,10 +6,11 @@ namespace Assimalign.Viu.Tooling.Css;
 /// <summary>
 /// Derives a component's scoped-CSS scope id — the <c>data-v-&lt;hash&gt;</c> attribute the renderer stamps
 /// on the component's elements and the scoped rewrite appends to selectors ([V01.01.06.04]). The hash is a
-/// deterministic FNV-1a over the component's <b>project-relative</b> <c>.viu</c> or <c>.vue</c> path (normalized to
-/// forward slashes), mirroring Vue's dev-mode scheme of hashing the short file path
-/// (<c>@vitejs/plugin-vue</c>): stable across machines and rebuilds for asset caching, and unique per
-/// component file. String-only (no <c>System.IO</c>), so it stays inside the analyzer API surface (RS1035).
+/// deterministic FNV-1a over the component's <b>project-relative</b> <c>.viu</c> or <c>.vue</c> path
+/// (normalized to forward slashes). Hashing the short relative path — rather than an absolute path or the
+/// file's content — is what makes the id stable across machines and rebuilds, which asset caching depends
+/// on, while staying unique per component file. String-only (no <c>System.IO</c>), so it stays inside the
+/// analyzer API surface (RS1035).
 /// Project containment follows the host operating system: ordinal-ignore-case on Windows and ordinal
 /// elsewhere.
 /// </summary>
@@ -18,8 +19,8 @@ namespace Assimalign.Viu.Tooling.Css;
 /// generator resolves it to emit the <c>ScopeId</c> constant and to salt the module/v-bind hashes, and the
 /// <c>ViuBundleCss</c> task resolves it to reproduce the same scoped CSS byte-for-byte. A path-based hash
 /// intentionally does not change when only the file's <em>content</em> changes — the scope id identifies the
-/// component, not a content revision. This matches Vue's non-production hashing (production additionally
-/// folds in the source for cache-busting); folding content in is a later optimization, tracked with the
+/// component, not a content revision, so an edit does not invalidate every cached asset that mentions it.
+/// Folding content in for release-mode cache-busting is a later optimization, tracked with the
 /// static-web-asset emission. When the file sits outside the project directory (a linked file whose relative
 /// path is unknown), the leaf file name is hashed instead so the id stays machine-independent.
 /// </remarks>

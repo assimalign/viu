@@ -6,10 +6,10 @@ namespace Assimalign.Viu.Router;
 /// The thin interop edge the web/hash history policy drives — the only surface that ever touches the
 /// browser. Each method is a single interop crossing carrying flat primitives; the DOM-free policy
 /// (<see cref="BrowserRouterHistory"/>) computes every URL and <see cref="RouterHistoryState"/> and
-/// hands them here to apply. Modeling the edge as an injected seam (mirroring
-/// <c>BrowserEventInvokerRegistry</c>'s recorded bridge delegates) lets the policy — base handling,
-/// state round-trip, listener bookkeeping, interop-call counting — be unit-tested with a fake
-/// implementation and no browser; the real implementation is
+/// hands them here to apply. Modeling the edge as an injected seam — the same shape
+/// <c>BrowserEventInvokerRegistry</c> uses for its recorded bridge delegates — lets the policy (base
+/// handling, state round-trip, listener bookkeeping, interop-call counting) be unit-tested with a
+/// fake implementation and no browser; the real implementation is
 /// <see cref="JavaScriptBrowserHistoryInterop"/>.
 /// </summary>
 internal interface IBrowserHistoryInterop

@@ -8,11 +8,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The <c>v-on</c> (with argument) directive transform. Combines Vue 3.5's base <c>transformOn</c>
-/// (<c>@vue/compiler-core</c> <c>transforms/vOn.ts</c> — event-name resolution, inline-statement wrapping,
-/// handler caching) with the DOM <c>transformOn</c> (<c>@vue/compiler-dom</c> <c>transforms/vOn.ts</c> —
-/// key/system modifier guards via <c>withModifiers</c>/<c>withKeys</c> and <c>.once</c>/<c>.capture</c>/
-/// <c>.passive</c> event-option suffixes), because Viu is one merged compiler project.
+/// The <c>v-on</c> (with argument) directive transform. It does two jobs in one pass: the
+/// platform-neutral half handles event-name resolution, inline-statement wrapping, and handler caching;
+/// the DOM half adds key and system-modifier guards through <c>withModifiers</c>/<c>withKeys</c> and the
+/// <c>.once</c>/<c>.capture</c>/<c>.passive</c> event-option suffixes. Viu is one merged compiler
+/// project, so they are one transform rather than a base and an override.
 /// </summary>
 internal static class VOnTransform
 {
@@ -119,11 +119,10 @@ internal static class VOnTransform
             var hasMultipleStatements = expression.Content.IndexOf(';') >= 0;
 
             // Rewrite the handler's identifiers, with the event variable in scope for an inline
-            // statement so its assignments unwrap refs (upstream transformOn: addIdentifiers($event)
-            // around processExpression). `$event` is not a legal C# identifier, so under prefixing the
-            // inline statement is parsed against the Viu spelling `__event` — the parameter name the
-            // wrapping lambda emits below. Template authors keep Vue's `$event`; the substitution is
-            // the documented C# divergence (docs/DESIGN.md).
+            // statement so its assignments unwrap references. `$event` is not a legal C# identifier, so
+            // under prefixing the inline statement is parsed against the spelling `__event` — the
+            // parameter name the wrapping lambda emits below. Template authors still write `$event`; the
+            // substitution is length-preserving, so every expression offset survives it ([SFC-7]).
             ExpressionNode processedExpression = expression;
             if (context.PrefixIdentifiers)
             {
@@ -154,13 +153,12 @@ internal static class VOnTransform
                 // (`__event => { call; }`) instead of the expression lambda (`__event => (call)`) that a
                 // value-returning handler uses: a void call — the most common handler shape — has no value
                 // to place in the parenthesized body, so only the block form binds (to the runtime's
-                // `Action<…>` handler overload; a value call binds there too, its result discarded exactly
-                // as upstream's arrow function discards it). Every other single-statement shape (increment,
-                // assignment, a plain value expression) yields a C# value and stays an expression lambda,
-                // matching upstream's uniform `$event => (expr)` as closely as C#'s void-expression rule
-                // allows. Only the prefixed (C#-codegen) path diverges; non-prefixed output stays byte-for-
-                // byte upstream parity. Multi-statement bodies were already brace blocks upstream.
-                // Upstream transformOn: vuejs/core v3.5 compiler-core transforms/vOn.ts.
+                // `Action<…>` handler overload; a value call binds there too, its result discarded).
+                // Every other single-statement shape (increment, assignment, a plain value expression)
+                // yields a C# value and stays an expression lambda, which keeps the emitted form uniform
+                // wherever C#'s void-expression rule permits it. Only the prefixed path makes this
+                // choice; the non-prefixed path emits the handler text unchanged. Multi-statement bodies
+                // are always brace blocks.
                 var asStatementBlock = hasMultipleStatements ||
                     (isInlineStatement && context.PrefixIdentifiers && IsCallExpression(expression.Content));
 
@@ -199,9 +197,8 @@ internal static class VOnTransform
     // (`save($event)`) or a null-conditional invocation (`model?.save()`). A call is the only handler
     // shape that can be void-typed, so it alone must emit as a statement-block lambda
     // (`__event => { call; }`); the parenthesized expression lambda (`__event => (call)`) that
-    // value-returning handlers use cannot bind a void result. Parsed with the C# parser because this is a
-    // C# code-generation question with no upstream (JavaScript) counterpart — JavaScript has no `void`, so
-    // upstream `transformOn` emits `$event => (expr)` uniformly. Mirrors the ExpressionProcessor use of
+    // value-returning handlers use cannot bind a void result. Parsed with the C# parser — the question is
+    // purely one of C# typing, so only the C# parser can answer it. Mirrors the ExpressionProcessor use of
     // SyntaxFactory.ParseExpression; a parse that is not a call keeps the expression-lambda form.
     private static bool IsCallExpression(string content) => IsCallShape(SyntaxFactory.ParseExpression(content));
 

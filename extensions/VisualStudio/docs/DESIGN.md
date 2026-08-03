@@ -51,8 +51,9 @@ mapping decisions:
 
 - PascalCase (or dotted) template tag names classify as components and borrow the `type` category,
   so components render in the same teal Visual Studio uses for C# and Razor type names; lowercase
-  tag names stay `markup node`. This pins the Vue component-naming convention
-  (<https://vuejs.org/guide/components/registration>).
+  tag names stay `markup node`. Casing is the only signal a purely lexical classifier has — it never
+  consults a component registry — and Viu's ordinal name resolution makes the authored spelling
+  meaningful (specified by `[CMP-6]`).
 - Directive attribute names (`v-*`, `@event`, `:bind`, `#slot`, including valueless directives such
   as `v-else`) borrow `keyword` so they pop against plain markup attributes.
 - `{{ }}` interpolation delimiters borrow `keyword`, and interpolation interiors run the C# token

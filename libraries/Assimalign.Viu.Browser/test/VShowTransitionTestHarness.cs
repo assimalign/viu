@@ -13,9 +13,9 @@ namespace Assimalign.Viu.Browser.Tests;
 // BrowserDirectiveOperations (the v-show display toggle), so a <Transition persisted> wrapping a v-show
 // <div> exercises its whole production path with no browser. It is TransitionTestHarness merged with the
 // v-show half of BrowserDirectiveTestHarness — the two seams write to one per-element record, so a test
-// can pin the class sequence, the reflow count, and the display-toggle sequence together. Upstream
-// contract: @vue/runtime-dom directives/vShow.ts persisted handling + components/Transition.ts
-// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vShow.ts).
+// can pin the class sequence, the reflow count, and the display-toggle sequence together. The
+// contract under test is persisted-transition handling in v-show, where the directive drives the
+// enter/leave phases and the renderer skips its own ([BLT-10]).
 internal sealed class VShowTransitionTestHarness : IDisposable
 {
     // The sentinel a v-show reveal with no saved inline display logs (RemoveStyleProperty -> "no inline

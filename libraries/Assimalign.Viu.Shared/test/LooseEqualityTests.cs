@@ -6,8 +6,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Shared.Tests;
 
-// Pins Vue's loose equality (looseEqual.ts, vectors from vuejs/core's looseEqual.spec.ts) —
-// the semantics behind checkbox/select v-model value matching.
+// Pins Viu's form-binding value matching: how checkbox/select v-model decides that a candidate
+// option equals the bound model value after an HTML form round-trip has coerced it to a string.
+// The vectors below are the frozen contract — a vector is added, never edited away.
 public class LooseEqualityTests
 {
     [Fact]
@@ -22,7 +23,7 @@ public class LooseEqualityTests
     [Fact]
     public void LooseEqual_CoercesNumberAndStringLikeJavaScript()
     {
-        // Upstream fallback: String(a) === String(b).
+        // Final fallback: display-string comparison, so 1 matches "1".
         LooseEquality.LooseEqual(1, "1").ShouldBeTrue();
         LooseEquality.LooseEqual(1.5, "1.5").ShouldBeTrue();
         LooseEquality.LooseEqual(1, "2").ShouldBeFalse();

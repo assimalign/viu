@@ -185,8 +185,9 @@ public sealed class ComputedTests
     [Fact]
     public void ReadonlyComputedWarnsOnWrite_AndDoesNotThrow()
     {
-        // Upstream parity (packages/reactivity/src/computed.ts): writing a getter-only computed warns
-        // in dev and is a no-op — it never throws (R6 aligned this from the previous NotSupportedException).
+        // Writing a getter-only computed warns in dev and is a no-op — it never throws. A binding
+        // that assigns a derived value is an authoring mistake to report, not a reason to tear down
+        // a render (R6 aligned this from the previous NotSupportedException).
         var captured = new List<string>();
         var previousSink = RuntimeWarnings.Sink;
         RuntimeWarnings.Sink = captured.Add;
@@ -297,7 +298,7 @@ public sealed class ComputedTests
         });
         effectRuns.ShouldBe(1);
 
-        // Upstream triggerRef() force-notifies anything with a dep, including computeds.
+        // TriggerReference force-notifies anything that owns a dependency, computeds included.
         Reactive.TriggerReference(doubled);
         effectRuns.ShouldBe(2);
         doubled.Value.ShouldBe(2); // value itself is unchanged

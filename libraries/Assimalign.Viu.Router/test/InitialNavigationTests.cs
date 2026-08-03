@@ -10,11 +10,10 @@ using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the initial-navigation / START-location semantics ([V01.01.08.07], issue #219) against
-// vue-router (packages/router/src/router.ts: currentRoute starts at START_LOCATION_NORMALIZED, the
-// first navigation runs the full pipeline with from === START and finalizeNavigation forces a
-// replace; router.isReady resolves when it settles — https://router.vuejs.org/api/#isReady and
-// #Variables-START-LOCATION). Run counts are pinned so the initial pass fires each guard exactly once
+// Pins the initial-navigation semantics ([V01.01.08.07], issue #219): CurrentRoute starts at the
+// RouteLocation.Start sentinel, the first navigation runs the full guard pipeline with `from` set to
+// that sentinel, the confirm step replaces rather than pushes the current history entry, and
+// ReadyAsync always settles. Run counts are pinned so the initial pass fires each guard exactly once
 // with no double resolution. All DOM-free through memory history (the RouterView case adds the
 // in-memory Testing renderer).
 public class InitialNavigationTests
@@ -29,7 +28,7 @@ public class InitialNavigationTests
     [Fact]
     public void CurrentRoute_BeforeAnyNavigation_IsTheStartSentinel()
     {
-        // Upstream: currentRoute initializes to START_LOCATION_NORMALIZED (path "/", empty matched),
+        // CurrentRoute initializes to the Start sentinel (path "/", empty matched),
         // never the eagerly resolved initial location.
         var router = new Router(RouterHistory.CreateMemory(), Routes());
 
@@ -121,7 +120,7 @@ public class InitialNavigationTests
     [Fact]
     public async Task ReadyAsync_ConfirmReplacesTheInitialHistoryEntry_RatherThanPushing()
     {
-        // Upstream forces a replace when from === START (isFirstNavigation), so the app entry is not
+        // The first navigation forces a replace, so the application's entry URL is not
         // left as a stale back-target. In memory history a replace preserves the position counter (a
         // push would advance it to 1), and the redirected initial navigation still writes only once.
         var history = RouterHistory.CreateMemory();
@@ -138,7 +137,7 @@ public class InitialNavigationTests
     [Fact]
     public async Task ReadyAsync_IsIdempotent_RunningTheInitialNavigationOnce()
     {
-        // Every call returns the same task (upstream: the initial push happens once; isReady resolves
+        // Every call returns the same task (the initial navigation happens once; ReadyAsync resolves
         // to the settled result), so the guard runs exactly once no matter how many callers await.
         var beforeEachRuns = 0;
         var router = new Router(RouterHistory.CreateMemory(), Routes());
@@ -201,7 +200,7 @@ public class InitialNavigationTests
     [Fact]
     public async Task RouterView_RendersNothingAtStart_ThenRendersAfterTheInitialNavigation()
     {
-        // Upstream renders nothing at START (empty matched). The outlet mounted before ReadyAsync shows
+        // Nothing renders at the Start sentinel (empty matched). The outlet mounted before ReadyAsync shows
         // nothing, and the matched component renders exactly once after the initial navigation confirms.
         TrackingComponent view = LabelView("home");
         var router = new Router(

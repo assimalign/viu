@@ -12,9 +12,8 @@ the same source maps, the same diagnostics on the same coordinates. Before this 
 language service had started to re-implement pieces of that by hand — its `ScriptDeclarationReader`
 mirrored `ScriptBlockAnalyzer`'s leading-using split with a comment pleading to "keep the split
 rules in sync". That is drift by construction: two implementations of one contract, kept equal only
-by vigilance. The upstream analogue is exact — Vue ships `@vue/compiler-sfc` as one package that
-both the build plugin (`@vitejs/plugin-vue`) and the editor tooling (Volar) consume, precisely so
-`compileScript()` behaves identically in both.
+by vigilance. A build compiler and an editor that disagree about the same file are worse than either
+alone: the editor reports a problem the build does not have, or stays silent about one it does.
 
 So the projection lives **once**, here, and both hosts call it:
 

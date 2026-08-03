@@ -126,7 +126,7 @@ public sealed class EngineTests
         var target = new object();
         Reactive.Effect(() => TargetTracking.Track(target, "name"));
 
-        // Untracked KEY of a tracked target: nothing observes it — no global bump (Vue parity).
+        // Untracked key of a tracked target: nothing observes it, so no global version bump.
         var before = ReactivityState.GlobalVersion;
         TargetTracking.Trigger(target, "other");
         ReactivityState.GlobalVersion.ShouldBe(before);

@@ -6,14 +6,17 @@ standalone contract between `Assimalign.Viu.Generators.Syntax` and downstream de
 [V01.01.12.05]. It applies equally to canonical `.viu` sources and the documented tag-based `.vue`
 compatibility format.
 
-The contract starts from the separation in Vue 3.5's
-[`runtime-core/src/hmr.ts`](https://github.com/vuejs/core/blob/v3.5.34/packages/runtime-core/src/hmr.ts):
-a template update can re-render an existing instance, while a component-definition update reloads the
-component. Viu adds an independent style revision because styles are compiled into a static web asset and
-can be replaced without component work. Viu deliberately remounts both managed template and script edits
-on .NET 10 browser WebAssembly: its already transformed call sites can continue targeting a pre-update
-generated method body even after the metadata delta is accepted. This is a documented runtime-platform
-divergence; style-only updates remain mounted and preserve state.
+The contract rests on a three-way separation of what an edit actually invalidated. A template edit
+changes only what a component renders; a script edit changes the component definition itself; a style
+edit changes neither, because styles are compiled into a static web asset that can be replaced without
+touching a mounted component. Tracking the three independently is what lets a host do the least work an
+edit permits instead of reloading everything.
+
+Viu deliberately remounts on both template and script edits when running on .NET 10 browser
+WebAssembly: already transformed call sites there can continue targeting a pre-update generated method
+body even after the metadata delta is accepted, so an in-place re-render would risk executing stale
+code. Remounting trades component-local state for a guarantee that the code that runs is the code that
+was just edited. Style-only updates remain mounted and preserve state.
 
 ## Enablement
 
@@ -158,9 +161,10 @@ A downstream host classifies the runtime's changed marker types for the same `Co
 | None | No operation |
 
 A script change is dominant for component work so the host receives the script-reset notification once.
-A simultaneous style change still requires the independent stylesheet replacement. This differs from
-Vue's in-place template state preservation but provides reliable updated-code execution on the supported
-.NET 10 browser-WASM runtime without reflection or dynamic code.
+A simultaneous style change still requires the independent stylesheet replacement. Viu chooses reliable
+updated-code execution over in-place state preservation for template edits: on the supported .NET 10
+browser-WASM runtime, preserving state would require re-entering a generated body that may already be
+stale, and Viu has no reflection or dynamic-code path available to resolve the newer one.
 
 The source generator owns both this metadata and the consumer-assembly forwarding handler. Core owns the
 mounted-instance registry and update classification; the development-server transport is a downstream

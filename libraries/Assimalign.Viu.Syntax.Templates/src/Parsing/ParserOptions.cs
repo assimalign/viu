@@ -4,10 +4,10 @@ using System.Linq;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Configures <see cref="TemplateParser"/>. The C# port of the parse-relevant members of Vue 3.5's
-/// <c>ParserOptions</c> (<c>@vue/compiler-core</c> <c>options.ts</c>). The defaults reproduce Vue's
-/// <c>defaultParserOptions</c> (platform-agnostic base mode); <see cref="CreateHtml"/> reproduces
-/// <c>@vue/compiler-dom</c>'s <c>parserOptions</c> (namespace inference, void/pre/RCDATA tags).
+/// Configures <see cref="TemplateParser"/>. The defaults are platform-agnostic base mode — no host
+/// knowledge at all — and <see cref="CreateHtml"/> layers on the DOM host's rules: namespace
+/// inference, void tags, and raw-text/RCDATA elements. The split exists so the template language
+/// itself carries no DOM dependency.
 /// </summary>
 public sealed class ParserOptions
 {
@@ -59,7 +59,7 @@ public sealed class ParserOptions
     public Action<CompilerError>? OnError { get; set; }
 
     /// <summary>
-    /// Creates HTML-mode options mirroring <c>@vue/compiler-dom</c>'s <c>parserOptions</c>: special
+    /// Creates the DOM host's options: special
     /// handling for <c>&lt;script&gt;</c>/<c>&lt;style&gt;</c> (raw text) and
     /// <c>&lt;title&gt;</c>/<c>&lt;textarea&gt;</c> (RCDATA), void-tag self-closing, and SVG/MathML
     /// namespace switching. The tag/namespace tables come from the shared DOM knowledge
@@ -77,8 +77,8 @@ public sealed class ParserOptions
         GetNamespace = InferHtmlNamespace,
     };
 
-    // Port of @vue/compiler-dom's getNamespace (WHATWG tree-construction dispatcher:
-    // https://html.spec.whatwg.org/multipage/parsing.html#tree-construction-dispatcher).
+    // Namespace inference per the WHATWG tree-construction dispatcher:
+    // https://html.spec.whatwg.org/multipage/parsing.html#tree-construction-dispatcher.
     private static ElementNamespace InferHtmlNamespace(string tag, ElementNode? parent, ElementNamespace rootNamespace)
     {
         var inferredNamespace = parent is not null ? parent.Namespace : rootNamespace;
@@ -128,7 +128,7 @@ public sealed class ParserOptions
         return inferredNamespace;
     }
 
-    // Upstream /^m(?:[ions]|text)$/: the MathML text integration points.
+    // The MathML text integration points, per the WHATWG tree-construction dispatcher.
     private static bool IsMathMlTextIntegrationTag(string tag)
         => tag is "mi" or "mo" or "mn" or "ms" or "mtext";
 

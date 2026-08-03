@@ -6,8 +6,8 @@ namespace Assimalign.Viu;
 /// Supplies every platform operation used by <see cref="Renderer{TNode}"/>.
 /// </summary>
 /// <remarks>
-/// This is the host-neutral counterpart of Vue 3.5's custom-renderer options:
-/// https://vuejs.org/api/custom-renderer.html. Core never performs browser or WebView2 work
+/// This is the whole host abstraction: the complete set of primitives a host must supply for
+/// <see cref="Renderer{TNode}"/> to drive it (<c>[RND-HOST-1]</c>). Core never performs browser or WebView2 work
 /// directly. A host package supplies these delegates and may batch their effects at its own
 /// commit boundary. The renderer is single-threaded and trimming safe.
 /// </remarks>

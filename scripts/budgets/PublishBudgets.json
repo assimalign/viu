@@ -1,7 +1,6 @@
 {
   "note": [
     "Per-sample budget manifest for the Viu WASM size and startup gates ([V01.01.12.06], #95).",
-    "The Viu analog of vuejs/core's size-check job (https://github.com/vuejs/core/blob/main/.github/workflows/size-data.yml).",
     "",
     "compressedPublishSizeBytes: the brotli-compressed sum of the published wwwroot payload (post-trim,",
     "Release), as measured by scripts/Measure-PublishBudget.ps1. Pre-compressed *.br/*.gz duplicates and",

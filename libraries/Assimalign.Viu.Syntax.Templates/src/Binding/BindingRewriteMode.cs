@@ -1,9 +1,11 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// How expression classification spells the receiver of a rewritten component binding. Vue's single render
-/// context has no such choice — every binding resolves through the runtime proxy — but Viu generates code into
-/// two distinct member contexts, so the compiler must decide the receiver form for each.
+/// How expression classification spells the receiver of a rewritten component binding. Viu generates
+/// code into two distinct member contexts — a static render method that receives the component as a
+/// parameter, and an instance member of the component's own partial class — and a binding reads
+/// differently in each, so the receiver form is an explicit compiler decision rather than a single
+/// fixed spelling.
 /// </summary>
 public enum BindingRewriteMode
 {

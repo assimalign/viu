@@ -106,7 +106,7 @@ internal sealed class InMemoryHandleDom
 
     internal (int First, int Last) InsertStaticContent(string content, int parentHandle, int anchorHandle, string? elementNamespace)
     {
-        // One raw node stands in for the parsed chunk (parity with @vue/runtime-test): the buffered
+        // One raw node stands in for the parsed chunk: the buffered
         // path forces a flush and calls this exactly as the direct path does, so both DOMs match.
         var handle = Register(new Node(NodeKind.RawStatic, "#static") { Text = content, ElementNamespace = elementNamespace });
         Insert(parentHandle, handle, anchorHandle);
@@ -196,14 +196,14 @@ internal sealed class InMemoryHandleDom
     // transitionDuration:0s) and clearMoveStyles. Kept out of the structural Serialize() fingerprint like
     // the transition classes; the ordered log lets a sequencing test pin transforms -> reflow -> class -> clear.
 
-    /// <summary>Records the FLIP inverting transform for an element (upstream <c>applyTranslation</c>).</summary>
+    /// <summary>Records the FLIP inverting transform for an element.</summary>
     internal void SetMoveTransform(int handle, double deltaX, double deltaY)
     {
         TransitionLog.Add(string.Create(CultureInfo.InvariantCulture, $"transform:{handle}:{deltaX},{deltaY}"));
         Get(handle).MoveTransform = (deltaX, deltaY);
     }
 
-    /// <summary>Clears the FLIP transform so the move class animates the element home (upstream <c>clearMoveStyles</c>).</summary>
+    /// <summary>Clears the FLIP transform so the move class animates the element home.</summary>
     internal void ClearMoveStyles(int handle)
     {
         TransitionLog.Add(string.Create(CultureInfo.InvariantCulture, $"clear:{handle}"));
@@ -213,7 +213,7 @@ internal sealed class InMemoryHandleDom
     /// <summary>The FLIP inverting transform currently applied to an element, or null once cleared.</summary>
     internal (double DeltaX, double DeltaY)? MoveTransform(int handle) => Get(handle).MoveTransform;
 
-    /// <summary>The transition classes currently on an element (upstream <c>el.__vtc</c>/<c>classList</c>).</summary>
+    /// <summary>The transition classes currently on an element, tracked apart from its bound <c>class</c> attribute.</summary>
     internal IReadOnlyCollection<string> TransitionClasses(int handle) => Get(handle).TransitionClasses;
 
     /// <summary>Whether the handle is still registered (not yet released by a remove/setElementText).</summary>
@@ -373,11 +373,11 @@ internal sealed class InMemoryHandleDom
 
         internal Dictionary<string, string> Listeners { get; } = new(StringComparer.Ordinal);
 
-        // Transition classes are tracked apart from the bound `class` attribute (upstream el.__vtc), so
+        // Transition classes are tracked apart from the bound `class` attribute, so
         // they stay out of the structural Serialize() fingerprint the differential test compares.
         internal HashSet<string> TransitionClasses { get; } = new(StringComparer.Ordinal);
 
-        // The FLIP inverting transform (upstream el.style.transform), likewise out of the fingerprint.
+        // The FLIP inverting transform (an inline style), likewise out of the fingerprint.
         internal (double DeltaX, double DeltaY)? MoveTransform { get; set; }
     }
 }

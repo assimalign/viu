@@ -2,8 +2,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// A code-generation ternary conditional, the shape a <c>v-if</c>/<c>v-else-if</c>/<c>v-else</c> chain
-/// compiles to (each branch's condition selecting its block, falling through to the next). The C# port of
-/// Vue 3.5's <c>ConditionalExpression</c> (<c>@vue/compiler-core</c> <c>ast.ts</c>).
+/// compiles to: each branch's condition selects its block, falling through to the next.
 /// </summary>
 public sealed record ConditionalExpression : TemplateSyntaxNode
 {
@@ -19,7 +18,7 @@ public sealed record ConditionalExpression : TemplateSyntaxNode
     /// </summary>
     public required TemplateSyntaxNode Alternate { get; init; }
 
-    /// <summary>Whether code generation should break the alternate onto a new line (upstream's <c>newline</c>).</summary>
+    /// <summary>Whether code generation should break the alternate onto a new line.</summary>
     public bool Newline { get; init; } = true;
 
     /// <inheritdoc />

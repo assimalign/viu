@@ -5,9 +5,9 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 // The happy-path block slicing: a well-formed .viu file yields typed template/script/style/custom
-// blocks with exact raw content. Block semantics mirror the Vue SFC spec
-// (https://vuejs.org/api/sfc-spec.html); the [V01.01.06.10] hybrid container is tag-based
-// <template>/<style> plus @script and @-form custom blocks (see docs/FORMAT.md).
+// blocks with exact raw content — every block's Location.Source is the literal substring between its
+// container boundaries, never trimmed or normalized ([SFC-5]). The [V01.01.06.10] hybrid container is
+// tag-based <template>/<style> plus @script and @-form custom blocks; docs/FORMAT.md is normative.
 public class BlockParsingTests
 {
     private const string Component =

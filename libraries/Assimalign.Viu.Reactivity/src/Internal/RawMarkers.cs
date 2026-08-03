@@ -4,8 +4,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// The identity-keyed set of objects excluded from reactivity by <see cref="Reactive.MarkRaw{T}"/> —
-/// the C# port of Vue 3.5's <c>markRaw()</c> <c>SKIP</c> flag
-/// (https://vuejs.org/api/reactivity-advanced.html#markraw). Viu has no proxy wrapper, so instead of
+/// the backing store for <see cref="Reactive.MarkRaw{T}"/>. Viu has no proxy wrapper, so instead of
 /// stamping a hidden property on a target it records the instance in a
 /// <see cref="ConditionalWeakTable{TKey,TValue}"/>: membership is by reference identity, entries are
 /// held weakly so marking never keeps an object alive, and there is no reflection (trim/AOT-safe).

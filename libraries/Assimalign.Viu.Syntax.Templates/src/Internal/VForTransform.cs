@@ -8,8 +8,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// The <c>v-for</c> transform: builds a <see cref="WorkingFor"/> capturing the source and decomposed aliases
 /// and compiles it to a <c>renderList</c> fragment block whose keyed/unkeyed/stable classification drives the
-/// runtime diff. The C# port of Vue 3.5's <c>transformFor</c> and <c>processFor</c>
-/// (<c>@vue/compiler-core</c> <c>transforms/vFor.ts</c>). See https://vuejs.org/guide/essentials/list.html.
+/// runtime diff.
 /// </summary>
 internal static class VForTransform
 {
@@ -34,7 +33,7 @@ internal static class VForTransform
         }
 
         // The iterated source is evaluated in the outer scope, so rewrite it before the aliases enter scope
-        // (upstream processExpression(source) precedes addIdentifiers of value/key/index).
+        // — the aliases must not shadow a same-named outer binding inside the source itself.
         if (context.PrefixIdentifiers && parseResult.Source is SimpleExpressionNode sourceExpression)
         {
             parseResult = parseResult with { Source = ExpressionProcessor.ProcessExpression(sourceExpression, context) };
@@ -64,8 +63,8 @@ internal static class VForTransform
         }
 
         // v-memo on a v-for element is handled here (per-item memoization in the render-list loop). Mark the
-        // inner element as seen so transformMemo does not also wrap it — mirroring upstream's WeakSet guard,
-        // which the immutable model breaks because the structural factory produces a fresh reduced element.
+        // inner element as seen so transformMemo does not also wrap it. Node identity cannot carry the
+        // mark, because the structural factory produces a fresh reduced element rather than mutating one.
         if (!isTemplate && TransformUtilities.FindDirective(element, "memo") is not null)
         {
             context.SeenMemo.Add(element);
@@ -75,7 +74,7 @@ internal static class VForTransform
         context.ScopeVFor++;
 
         // Register the value/key/index aliases so the loop body's expressions treat them as template-locals
-        // (upstream addIdentifiers, gated on prefixIdentifiers). They are declarations, never rewritten.
+        // rather than component bindings. They are declarations, so they are never rewritten.
         if (context.PrefixIdentifiers)
         {
             AddAliasIdentifiers(context, parseResult);

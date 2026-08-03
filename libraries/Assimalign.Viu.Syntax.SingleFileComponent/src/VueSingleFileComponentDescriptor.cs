@@ -1,15 +1,18 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The parsed shape of a tag-based <c>.vue</c> single-file component. Mirrors Vue 3.5's
-/// <c>SFCDescriptor</c> block slots while reusing Viu's immutable block and source-location types.
-/// See https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts.
+/// The parsed shape of a tag-based <c>.vue</c> single-file component: one block slot per slot the
+/// container format defines, built from Viu's own immutable block and source-location types
+/// (<c>[VUE-1]</c>).
+/// Container-format reference for the input this describes:
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts">@vue/compiler-sfc parse.ts</see>.
 /// </summary>
 /// <remarks>
 /// This descriptor is deliberately separate from <see cref="SingleFileComponentDescriptor"/>. The
-/// canonical <c>.viu</c> grammar has one script slot, while Vue permits one ordinary
-/// <c>&lt;script&gt;</c> and one <c>&lt;script setup&gt;</c> in the same component. Keeping separate
-/// slots preserves that valid source without changing established <c>.viu</c> semantics.
+/// canonical <c>.viu</c> grammar has one script slot, while the <c>.vue</c> container permits one
+/// ordinary <c>&lt;script&gt;</c> and one <c>&lt;script setup&gt;</c> in the same component. Keeping
+/// separate slots preserves that valid source without changing established <c>.viu</c> semantics
+/// (<c>[VUE-2]</c>).
 /// </remarks>
 public sealed record VueSingleFileComponentDescriptor
 {

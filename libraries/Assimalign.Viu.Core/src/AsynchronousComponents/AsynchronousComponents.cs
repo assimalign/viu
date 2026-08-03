@@ -6,8 +6,7 @@ namespace Assimalign.Viu;
 /// Defines factory-registered asynchronous components.
 /// </summary>
 /// <remarks>
-/// This is Viu's trimming-safe counterpart to Vue 3.5's <c>defineAsyncComponent</c>:
-/// https://vuejs.org/guide/components/async.html. A definition is an explicit registration/request
+/// A definition is an explicit registration/request
 /// facade; it is not an activated component and does not resolve services.
 /// </remarks>
 public static class AsynchronousComponents

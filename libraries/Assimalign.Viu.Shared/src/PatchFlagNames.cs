@@ -4,10 +4,11 @@ using System.Text;
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// Diagnostics-only equivalent of upstream's <c>PatchFlagNames</c> map
-/// (<c>packages/shared/src/patchFlags.ts</c>): renders <see cref="PatchFlags"/> values using the
-/// upstream flag names (e.g. <c>NEED_HYDRATION</c>) for compiler codegen comments, devtools, and
-/// error messages. Never call this on a hot path — it allocates. Implemented as switch-based
+/// Diagnostics-only rendering of <see cref="PatchFlags"/> values under their canonical
+/// screaming-snake diagnostic names (e.g. <c>NEED_HYDRATION</c>), used in compiler code-generation
+/// comments, devtools, and error messages. The names are a stable diagnostic vocabulary: tooling
+/// reads them out of generated code, so they are renamed only alongside the tools that parse them.
+/// Never call this on a hot path — it allocates. Implemented as switch-based
 /// lookups (no dictionaries, no reflection, no static constructor) inside a standalone type, so
 /// the trimmer removes the whole map from release WASM output whenever no diagnostic code
 /// references it.
@@ -15,15 +16,15 @@ namespace Assimalign.Viu.Shared;
 public static class PatchFlagNames
 {
     /// <summary>
-    /// Formats a <see cref="PatchFlags"/> value using upstream flag names for diagnostic output.
-    /// Single flags and the negative sentinels format as their upstream name (e.g.
-    /// <c>"TEXT"</c>, <c>"CACHED"</c>, <c>"BAIL"</c>); combined positive flags format as a
-    /// comma-separated list in ascending bit order (e.g. <c>"TEXT, CLASS"</c>), matching the
-    /// upstream compiler's codegen comments. Values containing no known flag (including zero)
-    /// format as their numeric value.
+    /// Formats a <see cref="PatchFlags"/> value under its diagnostic name. Single flags and the
+    /// negative sentinels format as that name (e.g. <c>"TEXT"</c>, <c>"CACHED"</c>,
+    /// <c>"BAIL"</c>); combined positive flags format as a comma-separated list in ascending bit
+    /// order (e.g. <c>"TEXT, CLASS"</c>), which is the form the compiler writes into its
+    /// code-generation comments. Values containing no known flag (including zero) format as their
+    /// numeric value.
     /// </summary>
     /// <param name="flags">The patch flags to format.</param>
-    /// <returns>A human-readable, upstream-parity name for <paramref name="flags"/>.</returns>
+    /// <returns>A human-readable diagnostic name for <paramref name="flags"/>.</returns>
     public static string Format(PatchFlags flags)
     {
         var single = GetName(flags);

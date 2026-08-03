@@ -6,9 +6,7 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The batched job scheduler and <see cref="NextTick"/> — the C# port of
-/// <c>@vue/runtime-core</c>'s scheduler (<c>packages/runtime-core/src/scheduler.ts</c>,
-/// https://vuejs.org/api/general.html#nexttick). Jobs queued in one synchronous turn coalesce
+/// The batched job scheduler and <see cref="NextTick"/>. Jobs queued in one synchronous turn coalesce
 /// into a single flush scheduled as a continuation on the current
 /// <see cref="SynchronizationContext"/>: pre-flush jobs (watchers) run before render jobs in id
 /// order (parents before children), and post-flush callbacks run after the queue drains.
@@ -20,8 +18,8 @@ namespace Assimalign.Viu;
 /// </summary>
 public static class Scheduler
 {
-    // Upstream RECURSION_LIMIT: how many times one job may execute within a single flush
-    // chain before the scheduler reports an infinite update loop.
+    // How many times one job may execute within a single flush chain before the scheduler
+    // reports an infinite update loop.
     private const int RecursionLimit = 100;
 
     private static readonly List<SchedulerJob> _queue = [];
@@ -92,7 +90,7 @@ public static class Scheduler
     public static bool IsFlushPending => _isFlushPending;
 
     /// <summary>
-    /// Queues <paramref name="job"/> for the next flush (upstream: <c>queueJob</c>). An
+    /// Queues <paramref name="job"/> for the next flush. An
     /// already-queued job is deduplicated; a job queued during a flush is inserted into the
     /// running flush in id order. A job that queues itself while it is running is deduplicated
     /// away unless <see cref="SchedulerJob.AllowRecurse"/> is set.
@@ -112,8 +110,8 @@ public static class Scheduler
     }
 
     /// <summary>
-    /// Queues <paramref name="callback"/> to run after the job queue drains (upstream:
-    /// <c>queuePostFlushCb</c>) — the phase for mounted/updated lifecycle work.
+    /// Queues <paramref name="callback"/> to run after the job queue drains — the phase for
+    /// mounted/updated lifecycle work, where the host tree is already patched.
     /// </summary>
     /// <param name="callback">The post-flush callback.</param>
     /// <exception cref="ArgumentNullException"><paramref name="callback"/> is null.</exception>
@@ -132,14 +130,13 @@ public static class Scheduler
 
     /// <summary>
     /// Returns a task that completes after the current or next flush — awaiting it observes
-    /// post-patch state (upstream: <c>nextTick()</c>,
-    /// https://vuejs.org/api/general.html#nexttick). Already completed when nothing is queued.
+    /// post-patch state. Already completed when nothing is queued.
     /// </summary>
     public static Task NextTick()
         => _flushCompletion?.Task ?? Task.CompletedTask;
 
     /// <summary>
-    /// Removes a not-yet-flushed job from the queue (upstream: <c>invalidateJob</c>) — a
+    /// Removes a not-yet-flushed job from the queue — a
     /// parent-driven component update runs the effect synchronously and must cancel the
     /// reactive update queued for the same instance.
     /// </summary>
@@ -155,9 +152,9 @@ public static class Scheduler
     }
 
     /// <summary>
-    /// Runs queued pre-flush jobs immediately, in queue order (upstream:
-    /// <c>flushPreFlushCbs</c>) — the forced flush point before a synchronous render so
-    /// watcher callbacks observe pre-patch state.
+    /// Runs queued pre-flush jobs immediately, in queue order — the forced flush point before a
+    /// synchronous render, so watcher callbacks observe pre-patch state and their own writes still
+    /// land in that render.
     /// </summary>
     public static void FlushPreFlushCallbacks()
     {
@@ -179,9 +176,8 @@ public static class Scheduler
     }
 
     /// <summary>
-    /// Runs pending post-flush callbacks in id order until none remain (upstream:
-    /// <c>flushPostFlushCbs</c>). Callbacks queued during the active pass fold into it,
-    /// deduplicated.
+    /// Runs pending post-flush callbacks in id order until none remain. Callbacks queued during the
+    /// active pass fold into it, deduplicated.
     /// </summary>
     public static void FlushPostFlushCallbacks()
     {
@@ -226,7 +222,7 @@ public static class Scheduler
     /// <summary>
     /// The synchronous drain a renderer performs after a direct (non-scheduled) render: pre-flush
     /// jobs, then post-flush callbacks, so lifecycle hooks fire before the render call returns
-    /// (upstream: the flush pair in <c>render()</c>). No-op while a scheduled flush is running —
+    /// No-op while a scheduled flush is running —
     /// that flush owns the drain.
     /// </summary>
     internal static void FlushAfterSynchronousRender()
@@ -284,7 +280,7 @@ public static class Scheduler
     private static int FindInsertionIndex(long orderKey)
     {
         // Binary search over the not-yet-flushed span; <= keeps first-queued-first order for
-        // equal keys (upstream findInsertionIndex parity).
+        // equal keys, so insertion order is preserved among jobs that sort the same.
         var low = _isFlushing ? _flushIndex + 1 : 0;
         var high = _queue.Count;
         while (low < high)
@@ -350,7 +346,7 @@ public static class Scheduler
                     continue;
                 }
                 CheckRecursiveUpdates(job);
-                // ALLOW_RECURSE parity: clearing QUEUED before the run lets the job re-queue
+                // Clearing the queued flag before the run lets an AllowRecurse job re-queue
                 // itself; otherwise it stays flagged until after execution so self-queues
                 // deduplicate away.
                 if (job.AllowRecurse)
@@ -374,8 +370,8 @@ public static class Scheduler
             if (_queue.Count > 0 || _pendingPostFlushCallbacks.Count > 0)
             {
                 // Post-flush callbacks queued more work: run another cycle before NextTick
-                // resolves, sharing this chain's recursion bookkeeping (upstream parity:
-                // flushJobs re-invokes itself with the same `seen` map).
+                // resolves, sharing this chain's recursion bookkeeping: the flush re-invokes
+                // itself against the same per-chain execution counts.
                 _isFlushPending = true;
                 FlushJobs();
                 return;

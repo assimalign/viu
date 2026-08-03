@@ -3,19 +3,16 @@ using System;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// Thrown when a chain of guard-driven redirects exceeds the safety cap, indicating a redirect loop —
-/// the C# port of vue-router's infinite-redirect detection (<c>packages/router/src/router.ts</c>,
-/// which warns <c>"Detected a possibly infinite redirection in a navigation guard..."</c> and aborts
-/// to avoid a stack overflow;
-/// https://router.vuejs.org/guide/advanced/navigation-guards.html#Redirecting). Unlike a
-/// <see cref="NavigationFailure"/>, this is a genuine error: it is routed to every
-/// <see cref="NavigationErrorHandler"/> and faults the task returned by
-/// <see cref="Router.Push"/>/<see cref="Router.Replace"/>.
+/// Thrown when a chain of guard-driven redirects exceeds the safety cap, indicating a redirect loop
+/// that would otherwise recurse until the stack overflows. Unlike a <see cref="NavigationFailure"/>,
+/// this is a genuine error: a loop is always a bug in the route table or its guards, so it is routed
+/// to every <see cref="NavigationErrorHandler"/> and faults the task returned by
+/// <see cref="Router.Push"/>/<see cref="Router.Replace"/>. Specified by <c>[RTR-6]</c>.
 /// </summary>
 /// <remarks>
-/// Viu enforces a fixed redirect-depth cap rather than upstream's development-only same-location
-/// warning, so the protection is active in every configuration (a deliberate, documented divergence
-/// noted in <c>docs/DESIGN.md</c>).
+/// The depth cap is fixed and active in every configuration, not just development builds: an
+/// unbounded redirect chain fails as a stack overflow in production, which is far harder to diagnose
+/// than a typed exception (see <c>docs/DESIGN.md</c>).
 /// </remarks>
 public sealed class NavigationRedirectException : Exception
 {

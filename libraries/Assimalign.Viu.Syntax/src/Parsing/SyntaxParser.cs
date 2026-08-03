@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Syntax;
 /// Implementations run at build time inside netstandard2.0 Roslyn generator hosts
 /// ([V01.01.05.05]/[V01.01.06.02]): no file or network I/O — source text is handed in as a string —
 /// and no reflection or dynamic code generation. Parsing is recoverable: malformed input is reported
-/// through <see cref="SyntaxParserResult.Diagnostics"/> (or a language's own upstream-pinned channel)
+/// through <see cref="SyntaxParserResult.Diagnostics"/> (or a language's own dedicated channel)
 /// and never throws; <see cref="OperationCanceledException"/> is the only expected exception, on
 /// cancellation.
 /// </remarks>

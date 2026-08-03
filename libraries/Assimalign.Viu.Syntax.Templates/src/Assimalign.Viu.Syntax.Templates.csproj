@@ -24,9 +24,10 @@
     <ViuProjectReference Include="Assimalign.Viu.Syntax" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Roslyn expression parsing ([V01.01.05.04]): the C# analogue of Vue 3.5's @babel/parser dependency
-         in transformExpression. Used by the netstandard2.0 compiler front end to parse, validate, and rewrite
-         template expressions. The version is centralized in build/Targets/Build.References.Packages.targets
+    <!-- Roslyn expression parsing ([V01.01.05.04]): template expressions are C#, so the C# parser is what
+         parses, validates, and rewrites them in the netstandard2.0 compiler front end. The compiler's idea
+         of an expression is therefore exactly the C# compiler's, with no second grammar to keep in sync.
+         The version is centralized in build/Targets/Build.References.Packages.targets
          (never inline here). This is a generator-only dependency by graph position, not by
          PrivateAssets: the library sits build-time-only in the dependency graph (consumed by the codegen
          generator [V01.01.05.05], whose Roslyn is provided by the compiler host), so Microsoft.CodeAnalysis

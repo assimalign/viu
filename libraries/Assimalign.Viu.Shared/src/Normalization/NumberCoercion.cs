@@ -4,9 +4,8 @@ using System.Globalization;
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// JavaScript-style numeric coercion — the C# port of <c>looseToNumber</c> and <c>toNumber</c>
-/// from <c>@vue/shared</c> (<c>packages/shared/src/general.ts</c>). The <c>.number</c> modifier
-/// on <c>v-model</c> (https://vuejs.org/guide/essentials/forms.html#lazy) runs the raw DOM string
+/// Numeric coercion for values arriving from the DOM, which surfaces every form value as a string.
+/// The <c>.number</c> modifier on <c>v-model</c> runs the raw DOM string
 /// through <see cref="LooseToNumber(object?)"/>: a value whose leading portion parses as a number
 /// becomes that number, and anything else is left untouched — so <c>"12abc"</c> yields <c>12</c>
 /// but <c>"abc"</c> and <c>""</c> stay strings. Parsing is invariant-culture (mandatory so SSR and
@@ -15,11 +14,11 @@ namespace Assimalign.Viu.Shared;
 public static class NumberCoercion
 {
     /// <summary>
-    /// The C# port of upstream's <c>looseToNumber</c> — <c>parseFloat</c> semantics: the longest
-    /// leading numeric prefix (after leading whitespace, an optional sign, digits, an optional
-    /// fraction and exponent, or <c>Infinity</c>) becomes a <see cref="double"/>; a value with no
-    /// numeric prefix is returned unchanged (upstream: <c>const n = parseFloat(val); return
-    /// isNaN(n) ? val : n</c>).
+    /// Prefix coercion with ECMA-262 <c>parseFloat</c> semantics: the longest leading numeric
+    /// prefix (after leading whitespace, an optional sign, digits, an optional fraction and
+    /// exponent, or <c>Infinity</c>) becomes a <see cref="double"/>; a value with no numeric
+    /// prefix is returned unchanged rather than becoming <c>NaN</c>, so a partially typed entry
+    /// never destroys what the user typed.
     /// </summary>
     /// <param name="value">The raw value, typically a DOM element's string value.</param>
     /// <returns>The parsed <see cref="double"/>, or <paramref name="value"/> unchanged when it has no numeric prefix.</returns>
@@ -27,19 +26,19 @@ public static class NumberCoercion
     {
         if (value is not string text)
         {
-            // v-model always hands this a string; other shapes pass through (upstream coerces via
-            // String(val) first, but the runtime only feeds it DOM string values).
+            // v-model always hands this a string; other shapes pass through unchanged, because the
+            // runtime only ever feeds this DOM string values.
             return value;
         }
         return TryParseFloatPrefix(text, out var number) ? number : value;
     }
 
     /// <summary>
-    /// The C# port of upstream's <c>toNumber</c> — stricter than <see cref="LooseToNumber(object?)"/>:
-    /// the <em>entire</em> string must parse as a number (upstream: <c>looseToNumber</c> uses
-    /// <c>parseFloat(val)</c>, while <c>toNumber</c> uses <c>Number(val)</c>), otherwise the value
-    /// is returned unchanged. Used where a whole-string numeric value is expected (e.g. compiled
-    /// numeric props), not the partial-prefix <c>v-model.number</c> path.
+    /// Whole-string coercion, stricter than <see cref="LooseToNumber(object?)"/>: the
+    /// <em>entire</em> trimmed string must parse as a number, otherwise the value is returned
+    /// unchanged. An empty string coerces to <c>0</c>. Used where a whole-string numeric value is
+    /// expected (e.g. compiled numeric parameters), not the partial-prefix
+    /// <c>v-model.number</c> path.
     /// </summary>
     /// <param name="value">The raw value.</param>
     /// <returns>The parsed <see cref="double"/>, or <paramref name="value"/> unchanged when it is not wholly numeric.</returns>
@@ -52,7 +51,7 @@ public static class NumberCoercion
         var trimmed = text.Trim();
         if (trimmed.Length == 0)
         {
-            // Number("") === 0 in JavaScript; toNumber therefore returns 0.
+            // An empty string is numerically zero under the host's Number("") === 0 coercion.
             return 0d;
         }
         return double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
@@ -62,7 +61,7 @@ public static class NumberCoercion
 
     // parseFloat: skip leading whitespace, then match the longest StrDecimalLiteral prefix
     // (optional sign, Infinity, or digits/fraction/exponent). Returns false when no numeric
-    // prefix exists (JavaScript's NaN result), matching ECMA-262 parseFloat.
+    // prefix exists (where ECMA-262 parseFloat yields NaN).
     private static bool TryParseFloatPrefix(string text, out double number)
     {
         number = 0d;

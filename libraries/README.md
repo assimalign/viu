@@ -40,4 +40,5 @@ Read [DESIGN.md](DESIGN.md) for the implemented boundaries,
 
 Known limitation: Suspense mount/update behavior is implemented, but Suspense hydration currently
 fails explicitly. Boundary timeout/events, fallback-to-reveal transition choreography, and
-hidden-branch post-effect delay are not yet at Vue parity.
+hidden-branch post-effect delay are not implemented — see
+[§17 of the specification](../docs/SPECIFICATION.md#17-non-goals-and-current-limits).

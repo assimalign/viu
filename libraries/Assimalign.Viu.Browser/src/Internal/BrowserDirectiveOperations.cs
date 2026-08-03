@@ -27,7 +27,7 @@ internal sealed class BrowserDirectiveOperations
     /// </summary>
     public static BrowserDirectiveOperations? Current { get; set; }
 
-    /// <summary>Registers, swaps, or removes (null) a model-channel event listener (upstream: v-model's raw <c>addEventListener</c>).</summary>
+    /// <summary>Registers, swaps, or removes (null) a model-channel event listener — the channel a <c>v-model</c> directive owns, independent of a template handler on the same event.</summary>
     public required Action<int, string, Delegate?> SetModelListener { get; init; }
 
     /// <summary>Writes <c>el.value</c> through the guarded compare-and-set leaf (caret/IME safe).</summary>

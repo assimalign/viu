@@ -2,9 +2,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The decomposed pieces of a <c>v-for</c> expression: the iterated <see cref="Source"/> and the value, key,
-/// and index aliases. The C# port of Vue 3.5's <c>ForParseResult</c> (<c>@vue/compiler-core</c>
-/// <c>ast.ts</c>). Upstream fills this during parsing; in this port the <c>v-for</c> transform performs the
-/// minimal alias tokenization ([V01.01.05.02]), leaving expression bodies opaque for [V01.01.05.04].
+/// and index aliases. The <c>v-for</c> transform — not the parser — performs the alias tokenization
+/// ([V01.01.05.02]), because the parser deliberately leaves expression bodies opaque; the aliases become
+/// template-local scope entries for expression analysis ([V01.01.05.04]).
 /// </summary>
 /// <param name="Source">The iterated source expression (right of <c>in</c>/<c>of</c>).</param>
 /// <param name="Value">The value alias, or <see langword="null"/> (e.g. <c>v-for="n in 10"</c>'s <c>n</c>).</param>

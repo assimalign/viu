@@ -5,34 +5,46 @@ using System.Diagnostics;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// The static entry-point facade for Viu's reactivity system, mirroring the public API of
-/// <c>@vue/reactivity</c>: refs, computeds, effects, effect scopes, tracking control, and
-/// batching. All ambient state is static and NOT thread-safe by design — the runtime targets the
-/// single-threaded JS event-loop model (browser WASM).
+/// The static entry-point facade for Viu's reactivity system: references, computeds, effects,
+/// effect scopes, watches, tracking control, and batching. This is the whole discoverable surface
+/// — the ratified member list is <c>[RCT-5]</c>. All ambient state is static and NOT thread-safe
+/// by design — the runtime targets the single-threaded JS event-loop model (browser WASM).
 /// </summary>
 public static class Reactive
 {
-    /// <summary>Creates a reactive ref holding <paramref name="value"/> (Vue's <c>ref()</c>).</summary>
+    /// <summary>
+    /// Creates a tracked reference cell holding <paramref name="value"/>: reads inside an effect
+    /// subscribe to it, and a write that changes the value notifies those subscribers.
+    /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
     /// <returns>The new ref.</returns>
     public static Reference<T> Reference<T>(T value) => new(value);
 
-    /// <summary>Creates a shallow ref holding <paramref name="value"/> (Vue's <c>shallowRef()</c>).</summary>
+    /// <summary>
+    /// Creates a reference cell that notifies only on assignment of a new instance, never on
+    /// mutation of the instance it holds — the escape hatch for large or externally owned objects
+    /// whose interiors must not be tracked.
+    /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
     /// <returns>The new shallow ref.</returns>
     public static ShallowReference<T> ShallowReference<T>(T value) => new(value);
 
-    /// <summary>Creates a custom ref with explicit track/trigger control (Vue's <c>customRef()</c>).</summary>
+    /// <summary>
+    /// Creates a reference cell whose tracking and notification the caller drives explicitly — the
+    /// sanctioned extension point for behavior the built-in cells do not cover (debouncing,
+    /// external stores, values that change outside a write).
+    /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="factory">Receives track/trigger delegates and returns the getter/setter pair.</param>
     /// <returns>The new custom ref.</returns>
     public static CustomReference<T> CustomReference<T>(CustomReferenceFactory<T> factory) => new(factory);
 
     /// <summary>
-    /// Creates a lazy cached computed over <paramref name="getter"/>; pass <paramref name="setter"/>
-    /// for the writable variant (Vue's <c>computed()</c>).
+    /// Creates a lazily evaluated, version-cached derivation over <paramref name="getter"/>: the
+    /// getter is not invoked until the first read and is re-evaluated only when a source it read
+    /// has actually changed. Pass <paramref name="setter"/> for the writable variant.
     /// </summary>
     /// <typeparam name="T">The computed value type.</typeparam>
     /// <param name="getter">The derivation function (not invoked until the first read).</param>
@@ -42,10 +54,10 @@ public static class Reactive
 
     /// <summary>
     /// Creates a reactive effect over <paramref name="action"/>, runs it immediately, and returns
-    /// the runner handle (Vue's <c>effect()</c>). With a <paramref name="scheduler"/>, later
+    /// the runner handle. With a <paramref name="scheduler"/>, later
     /// invalidations invoke the scheduler instead of re-running the effect. If the first run
-    /// throws, the effect is stopped before the exception propagates (upstream <c>effect()</c>
-    /// parity), so a failed effect leaves no live subscriptions behind.
+    /// throws, the effect is stopped before the exception propagates — deliberately, so a failed
+    /// effect leaves no live subscriptions behind rather than a half-tracked one.
     /// </summary>
     /// <param name="action">The reactive function to track.</param>
     /// <param name="scheduler">Optional scheduler invoked on invalidation instead of a re-run.</param>
@@ -65,18 +77,21 @@ public static class Reactive
         return effect;
     }
 
-    /// <summary>Creates an effect scope (Vue's <c>effectScope()</c>).</summary>
+    /// <summary>
+    /// Creates an effect scope — a lifetime boundary that owns the effects created inside it, so
+    /// stopping the scope stops them all at once.
+    /// </summary>
     /// <param name="detached">When true, the scope does not attach to the current scope.</param>
     /// <returns>The new scope.</returns>
     public static EffectScope EffectScope(bool detached = false) => new(detached);
 
-    /// <summary>The ambient scope new effects and computeds register with (Vue's <c>getCurrentScope()</c>).</summary>
+    /// <summary>The ambient scope new effects register with, or null when none is active.</summary>
     public static EffectScope? CurrentScope => global::Assimalign.Viu.Reactivity.EffectScope.Current;
 
     /// <summary>
-    /// Registers a callback to run exactly once when the current scope stops (Vue's
-    /// <c>onScopeDispose()</c>). With no active scope this is a no-op that emits a debug warning
-    /// unless <paramref name="failSilently"/> is set.
+    /// Registers a callback to run exactly once when the current scope stops. With no active
+    /// scope this is a no-op that emits a debug warning unless <paramref name="failSilently"/> is
+    /// set.
     /// </summary>
     /// <param name="callback">The cleanup callback.</param>
     /// <param name="failSilently">Suppresses the no-active-scope debug warning.</param>
@@ -91,15 +106,17 @@ public static class Reactive
         }
         else if (!failSilently)
         {
-            Debug.WriteLine("[Vue warn] OnScopeDispose() is called when there is no active effect scope to be associated with.");
+            Debug.WriteLine("[Viu warn] OnScopeDispose() is called when there is no active effect scope to be associated with.");
         }
     }
 
     /// <summary>
-    /// Force-notifies a ref's subscribers regardless of value equality — used after in-place
-    /// mutation of a <see cref="ShallowReference{T}"/>'s inner object (Vue's <c>triggerRef()</c>).
-    /// Anything that owns a dependency is triggered, including <see cref="Computed{T}"/> (upstream
-    /// parity): effects reading the computed re-run even though its cached value is unchanged.
+    /// Force-notifies a reference's subscribers regardless of value equality — used after in-place
+    /// mutation of a <see cref="ShallowReference{T}"/>'s inner object, which by definition produced
+    /// no notification of its own. Anything that owns a dependency is triggered, deliberately
+    /// including <see cref="Computed{T}"/>: effects reading the computed re-run even though its
+    /// cached value is unchanged, because a forced trigger asserts that the value's meaning
+    /// changed even when its identity did not.
     /// </summary>
     /// <param name="reference">The ref to force-trigger.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
@@ -111,7 +128,10 @@ public static class Reactive
         reference.Dependency.Trigger();
     }
 
-    /// <summary>Pauses dependency tracking (Vue's <c>pauseTracking()</c>); pair with <see cref="ResetTracking"/>.</summary>
+    /// <summary>
+    /// Suspends dependency collection on the current thread; pair with <see cref="ResetTracking"/>.
+    /// Reads taken while paused do not subscribe.
+    /// </summary>
     public static void PauseTracking() => ReactivityState.PauseTracking();
 
     /// <summary>Restores the tracking state saved by the matching <see cref="PauseTracking"/>.</summary>
@@ -128,10 +148,9 @@ public static class Reactive
     public static void EndBatch() => ReactivityState.EndBatch();
 
     /// <summary>
-    /// Watches a ref and invokes <paramref name="callback"/> with the new and previous values when it
-    /// changes (Vue's <c>watch()</c>, https://vuejs.org/api/reactivity-core.html#watch). With
-    /// <see cref="WatchOptions.Deep"/> the ref's value is traversed so a nested reactive change also
-    /// fires the callback.
+    /// Watches a reference and invokes <paramref name="callback"/> with the new and previous values
+    /// when it changes. With <see cref="WatchOptions.Deep"/> the value is traversed on each read so
+    /// a nested reactive change also fires the callback.
     /// </summary>
     /// <typeparam name="T">The watched value type.</typeparam>
     /// <param name="source">The ref to watch.</param>
@@ -160,7 +179,8 @@ public static class Reactive
 
     /// <summary>
     /// Watches a getter and invokes <paramref name="callback"/> with the new and previous return
-    /// values when any reactive value the getter reads changes (Vue's <c>watch(getter, cb)</c>).
+    /// values when any reactive value the getter reads changes. The getter's reads define the
+    /// dependency set, so it is re-tracked on every run.
     /// </summary>
     /// <typeparam name="T">The watched value type.</typeparam>
     /// <param name="source">The getter whose reactive reads are tracked.</param>
@@ -186,9 +206,10 @@ public static class Reactive
 
     /// <summary>
     /// Watches a source-generated reactive object; the callback fires when any of its reactive
-    /// members (deep) changes (Vue's <c>watch(reactiveObject, cb)</c>, which is deep by default). The
-    /// callback receives the same instance as both new and old value — the object is mutated in place
-    /// (upstream parity). Set <see cref="WatchOptions.DeepDepth"/> to bound the traversal.
+    /// members changes, at any depth (this overload is deep by definition). The callback receives
+    /// the same instance as both new and old value: the object is mutated in place, so there is no
+    /// prior snapshot to hand back and none is fabricated. Set
+    /// <see cref="WatchOptions.DeepDepth"/> to bound the traversal.
     /// </summary>
     /// <typeparam name="TReactive">The reactive object type.</typeparam>
     /// <param name="source">The reactive object to watch.</param>
@@ -211,8 +232,8 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Watches several refs at once; the callback receives arrays of the new and previous values with
-    /// per-source old values preserved (Vue's array-source <c>watch</c>).
+    /// Watches several references at once; the callback receives arrays of the new and previous
+    /// values, with each source's own previous value preserved at its index.
     /// </summary>
     /// <param name="sources">The refs to watch.</param>
     /// <param name="callback">Receives <c>(newValues, oldValues, onCleanup)</c>.</param>
@@ -235,8 +256,8 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Watches several getters at once; the callback receives arrays of the new and previous values
-    /// with per-source old values preserved (Vue's array-source <c>watch</c>).
+    /// Watches several getters at once; the callback receives arrays of the new and previous
+    /// values, with each source's own previous value preserved at its index.
     /// </summary>
     /// <param name="sources">The getters to watch.</param>
     /// <param name="callback">Receives <c>(newValues, oldValues, onCleanup)</c>.</param>
@@ -271,10 +292,10 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Runs <paramref name="effect"/> immediately, tracking every reactive value it reads, and re-runs
-    /// it whenever any of them changes (Vue's <c>watchEffect()</c>,
-    /// https://vuejs.org/api/reactivity-core.html#watcheffect). The <c>onCleanup</c> argument registers
-    /// a cleanup that runs before the next run and on stop.
+    /// Runs <paramref name="effect"/> immediately, tracking every reactive value it reads, and
+    /// re-runs it whenever any of them changes. There is no separate source declaration: the body
+    /// itself is the dependency set, re-tracked on every run. The <c>onCleanup</c> argument
+    /// registers a cleanup that runs before the next run and on stop.
     /// </summary>
     /// <param name="effect">The effect body; its <see cref="OnCleanup"/> argument registers a cleanup callback.</param>
     /// <param name="options">Flush options (immediate/once/deep do not apply).</param>
@@ -288,9 +309,9 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Runs <paramref name="effect"/> immediately, tracking every reactive value it reads, and re-runs
-    /// it whenever any of them changes (Vue's <c>watchEffect()</c>). Overload for effects that need no
-    /// cleanup registration.
+    /// Runs <paramref name="effect"/> immediately, tracking every reactive value it reads, and
+    /// re-runs it whenever any of them changes. Overload for effects that need no cleanup
+    /// registration.
     /// </summary>
     /// <param name="effect">The effect body.</param>
     /// <param name="options">Flush options.</param>
@@ -303,17 +324,19 @@ public static class Reactive
     }
 
     // ---- Reactivity utilities and escape hatches ----
-    // The C# port of @vue/reactivity's utility surface (https://vuejs.org/api/reactivity-utilities.html)
-    // and advanced escape hatches (https://vuejs.org/api/reactivity-advanced.html). All introspection is
-    // interface/type-check based so it stays O(1), reflection-free, and trim/AOT-safe.
-    // Deviates from the repository whole-word naming rule per the approved Vue-shaped API
-    // compatibility decision: IsRef, Unref, and ToRef retain Vue's established helper names while
-    // the C# contracts and concrete types spell out Reference.
+    // Inspection ("is this reactive?") and the deliberate ways out of reactivity. All introspection
+    // is interface/type-check based so it stays O(1), reflection-free, and trim/AOT-safe.
+    // Deviates from the repository whole-word naming rule per a ratified API-shape decision:
+    // IsRef, Unref, and ToRef are frozen short forms, because the whole-word spellings collide with
+    // the surface they operate on -- ToReference is indistinguishable at a call site from the
+    // Reference<T> factory, and Unreference reads as releasing a reference rather than reading
+    // through one. The contracts and concrete types still spell out Reference. See
+    // docs/DESIGN.md, "The ratified public surface".
 
     /// <summary>
-    /// Whether <paramref name="value"/> is a ref (any <see cref="IReactiveReference"/>: a plain, shallow, custom,
-    /// or computed ref, or a <see cref="ToRef{T}(Func{T}, Action{T})"/>/<c>ToReferences()</c> projection)
-    /// — the C# port of Vue 3.5's <c>isRef()</c> (https://vuejs.org/api/reactivity-utilities.html#isref).
+    /// Whether <paramref name="value"/> is a reference: any <see cref="IReactiveReference"/> — a plain,
+    /// shallow, custom, or computed reference, or a
+    /// <see cref="ToRef{T}(Func{T}, Action{T})"/>/<c>ToReferences()</c> projection.
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> is a ref.</returns>
@@ -323,10 +346,10 @@ public static class Reactive
     /// Whether <paramref name="value"/> is a reactive object — a source-generated
     /// <c>[Reactive]</c>/<c>[ShallowReactive]</c> object or a reactive collection
     /// (<see cref="ReactiveList{T}"/>/<see cref="ReactiveDictionary{TKey,TValue}"/>/<see cref="ReactiveSet{T}"/>),
-    /// and not one excluded by <see cref="MarkRaw{T}"/> — the C# port of Vue 3.5's <c>isReactive()</c>
-    /// (https://vuejs.org/api/reactivity-utilities.html#isreactive). Refs and computeds are not reactive
+    /// and not one excluded by <see cref="MarkRaw{T}"/>. References and computeds are not reactive
     /// objects (use <see cref="IsRef"/>). The check keys on <see cref="IReactiveTraversable"/>, which in
-    /// Viu is implemented by exactly those two families.
+    /// Viu is implemented by exactly those two families — which is what keeps it O(1) and
+    /// reflection-free.
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> is a (non-marked) reactive object.</returns>
@@ -336,8 +359,7 @@ public static class Reactive
     /// <summary>
     /// Whether <paramref name="value"/> is a read-only reactive view — a getter-only
     /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(Readonly = true)]</c>/
-    /// <c>[ShallowReactive(Readonly = true)]</c> object — the C# port of Vue 3.5's <c>isReadonly()</c>
-    /// (https://vuejs.org/api/reactivity-utilities.html#isreadonly). Keys on
+    /// <c>[ShallowReactive(Readonly = true)]</c> object. Keys on
     /// <see cref="IReactiveReadOnly.IsReadOnly"/> for references and generated reactive objects.
     /// </summary>
     /// <param name="value">The value to test.</param>
@@ -346,9 +368,9 @@ public static class Reactive
         => value is IReactiveReadOnly reactiveReadOnly && reactiveReadOnly.IsReadOnly;
 
     /// <summary>
-    /// Returns the value inside a ref, or the argument itself when it is not a ref — the C# port of Vue
-    /// 3.5's <c>unref()</c> (https://vuejs.org/api/reactivity-utilities.html#unref). This overload unwraps
-    /// any <see cref="IReactiveReference{T}"/> without boxing <typeparamref name="T"/>.
+    /// Returns the value inside a reference, or the argument itself when it is not a reference, so a
+    /// caller can accept "value or reference" without branching. This overload unwraps any
+    /// <see cref="IReactiveReference{T}"/> without boxing <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="reference">The ref to unwrap.</param>
@@ -404,10 +426,11 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Returns <paramref name="value"/> unchanged — the non-ref branch of <c>unref()</c>. The concrete-ref
-    /// overloads take precedence for ref arguments, so a struct value flows through this overload without
-    /// boxing. (A ref whose static type is only <see cref="object"/> is opaque to overload resolution and
-    /// is returned as-is; unwrap it through <see cref="Unref{T}(IReactiveReference{T})"/> instead.)
+    /// Returns <paramref name="value"/> unchanged — the non-reference branch. The concrete-reference
+    /// overloads take precedence for reference arguments, so a struct value flows through this overload
+    /// without boxing. (A reference whose static type is only <see cref="object"/> is opaque to overload
+    /// resolution and is returned as-is; unwrap it through
+    /// <see cref="Unref{T}(IReactiveReference{T})"/> instead.)
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The value to pass through.</param>
@@ -415,14 +438,13 @@ public static class Reactive
     public static T Unref<T>(T value) => value;
 
     /// <summary>
-    /// Creates a ref projected through <paramref name="getter"/> (and optional <paramref name="setter"/>)
-    /// — the delegate-based form of Vue 3.5's <c>toRef()</c>
-    /// (https://vuejs.org/api/reactivity-utilities.html#toref). Reading the ref invokes the getter, so it
-    /// tracks whatever reactive source the getter reads; writing routes through the setter, so it triggers
-    /// that source. With no setter the ref is read-only (a write is a warned no-op), mirroring a
-    /// getter-only <c>toRef</c>. Property-name-string forms are intentionally omitted (AOT/trim: no
-    /// reflection) — a per-property write-through ref instead comes from a generated object's
-    /// <c>ToReferences()</c> (the <c>toRefs</c> counterpart).
+    /// Creates a reference projected through <paramref name="getter"/> (and optional
+    /// <paramref name="setter"/>). Reading the reference invokes the getter, so it tracks whatever
+    /// reactive source the getter reads; writing routes through the setter, so it triggers that
+    /// source. With no setter the reference is read-only and a write is a warned no-op. There is
+    /// deliberately no property-name-string form: resolving a name to a member at runtime needs
+    /// reflection, which the AOT/trimming constraint forbids. A per-property write-through
+    /// reference comes from a generated object's <c>ToReferences()</c> instead.
     /// </summary>
     /// <typeparam name="T">The projected value type.</typeparam>
     /// <param name="getter">Invoked on read; its reactive reads become the ref's dependencies.</param>
@@ -436,14 +458,14 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Returns the raw, non-reactive view of <paramref name="value"/> — the C# port of Vue 3.5's
-    /// <c>toRaw()</c> (https://vuejs.org/api/reactivity-advanced.html#toraw). Viu has no identity-swapping
-    /// proxy, so a source-generated <c>[Reactive]</c> object (or any non-collection value) is its own raw
-    /// and is returned by identity — reads through the returned instance still track, because it <em>is</em>
-    /// the reactive instance (documented C# divergence from <c>toRaw</c>, which strips a proxy). For an
-    /// untracked view whose reads do not track and writes do not trigger, use the reactive-collection
-    /// overloads (which return the underlying storage) or a generated object's <c>ToRawValues()</c>
-    /// view (emitted per <c>[Reactive]</c> class straight over the raw backing fields).
+    /// Returns the raw, non-reactive view of <paramref name="value"/>. Viu wraps nothing, so a
+    /// source-generated <c>[Reactive]</c> object (or any non-collection value) is its own raw and is
+    /// returned by identity — reads through the returned instance still track, because it <em>is</em>
+    /// the reactive instance. That is a direct consequence of having no proxy layer
+    /// (<c>[RCT-6]</c>) and is stated plainly because it means this overload cannot hand back an
+    /// untracked view. For one, use the reactive-collection overloads (which return the underlying
+    /// storage) or a generated object's <c>ToRawValues()</c> view (emitted per <c>[Reactive]</c>
+    /// class straight over the raw backing fields).
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The value to unwrap.</param>
@@ -451,9 +473,9 @@ public static class Reactive
     public static T ToRaw<T>(T value) => value;
 
     /// <summary>
-    /// Returns the untracked underlying <see cref="List{T}"/> of <paramref name="list"/> — Vue's
-    /// <c>toRaw</c> on a reactive array. It is the same live storage, so reads off it do not track and
-    /// writes through it do not trigger (an effect reading the reactive list does not re-run).
+    /// Returns the untracked underlying <see cref="List{T}"/> of <paramref name="list"/>. It is the
+    /// same live storage, so reads off it do not track and writes through it do not trigger (an
+    /// effect reading the reactive list does not re-run).
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="list">The reactive list.</param>
@@ -466,9 +488,9 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Returns the untracked underlying <see cref="Dictionary{TKey,TValue}"/> of <paramref name="dictionary"/>
-    /// — Vue's <c>toRaw</c> on a reactive Map. It is the same live storage, so reads off it do not track
-    /// and writes through it do not trigger.
+    /// Returns the untracked underlying <see cref="Dictionary{TKey,TValue}"/> of
+    /// <paramref name="dictionary"/>. It is the same live storage, so reads off it do not track and
+    /// writes through it do not trigger.
     /// </summary>
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
@@ -483,9 +505,8 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Returns the untracked underlying <see cref="HashSet{T}"/> of <paramref name="set"/> — Vue's
-    /// <c>toRaw</c> on a reactive Set. It is the same live storage, so reads off it do not track and
-    /// writes through it do not trigger.
+    /// Returns the untracked underlying <see cref="HashSet{T}"/> of <paramref name="set"/>. It is the
+    /// same live storage, so reads off it do not track and writes through it do not trigger.
     /// </summary>
     /// <typeparam name="T">The member type.</typeparam>
     /// <param name="set">The reactive set.</param>
@@ -498,8 +519,7 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Marks <paramref name="value"/> so it is permanently excluded from reactivity — the C# port of Vue
-    /// 3.5's <c>markRaw()</c> (https://vuejs.org/api/reactivity-advanced.html#markraw). A marked object is
+    /// Marks <paramref name="value"/> so it is permanently excluded from reactivity. A marked object is
     /// skipped by deep-watch traversal (a change inside it never re-runs a deep watcher) and is reported as
     /// non-reactive by <see cref="IsReactive"/>, even when it is itself a generated
     /// <see cref="IReactiveObject"/>. There is no wrapper to strip (Viu objects are their own raw);

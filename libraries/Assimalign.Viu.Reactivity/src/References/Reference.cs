@@ -3,9 +3,9 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A reactive single-value container — the C# counterpart of Vue's <c>ref()</c> and the PRIMARY
-/// reactivity primitive in Viu (C# has no JS <c>Proxy</c>, so the role of <c>reactive()</c> is
-/// largely carried by refs). Unlike Vue's deep ref there is no deep conversion in C#:
+/// A reactive single-value container, and the PRIMARY reactivity primitive in Viu: with no
+/// object-proxy interception layer ([RCT-6]), explicit reference cells carry most of the work that
+/// implicit deep reactivity would otherwise do. There is no deep conversion:
 /// <see cref="Reference{T}"/> tracks the <see cref="Value"/> cell only — mutations inside the held
 /// object are not observed unless that object itself uses reactive primitives.
 /// Change detection uses <see cref="EqualityComparer{T}.Default"/>: like <c>Object.is</c>, NaN is

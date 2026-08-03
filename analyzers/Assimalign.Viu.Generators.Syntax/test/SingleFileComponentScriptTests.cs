@@ -26,8 +26,9 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// Tests for [V01.01.06.03] — merging the <c>@script</c> block's C# into the generated partial class:
 /// the <c>#line</c> mapping back to the <c>.viu</c> source, the partial-class merge with a user-authored
 /// sibling <c>.cs</c>, recoverable script validation, and the binding-metadata classification the template
-/// compiler consumes for ref-unwrapping. Mirrors <c>@vue/compiler-sfc</c>'s <c>compileScript()</c>
-/// (https://vuejs.org/api/sfc-script-setup.html) adapted to C# partial classes.
+/// compiler consumes for reference-unwrapping. The script block is merged, never executed: Viu compiles
+/// it into the component's partial class at build time, so the same C# a developer wrote is the C# that
+/// runs, and every diagnostic maps back to the authored source rather than to generated scaffolding.
 /// </summary>
 public sealed class SingleFileComponentScriptTests
 {
@@ -138,13 +139,13 @@ public sealed class SingleFileComponentScriptTests
     [Fact]
     public void Classification_MapsEachMemberShape_ToItsBindingType()
     {
-        // Pins the conservative, syntactic classification table (the C# port of Vue's BindingTypes):
-        // only a field/property whose declared type is a known Assimalign.Viu.Reactivity reference
-        // contract or implementation
+        // Pins the conservative, syntactic classification table: only a field/property whose declared
+        // type is a known Assimalign.Viu.Reactivity reference contract or implementation
         // is SetupReference (the only binding the template ever unwraps through .Value); const is a folded
         // LiteralConstant; a mutable binding is SetupLet; a fixed (readonly / get-only) binding is
-        // SetupConstant; and a method is a non-ref SetupConstant. See
-        // https://vuejs.org/guide/essentials/reactivity-fundamentals.html#ref-unwrapping-in-templates.
+        // SetupConstant; and a method is a non-reference SetupConstant. The table is syntactic on
+        // purpose: classification runs before semantic binding, so an unrecognized shape must degrade to
+        // "not a reference" and emit a plain access rather than guess an unwrap the runtime cannot undo.
         const string content =
             "    public IReactiveReference<int> Contract = default!;\n" +
             "    public IReactiveTrackedReference UntypedContract = default!;\n" +
@@ -186,8 +187,8 @@ public sealed class SingleFileComponentScriptTests
     [Fact]
     public void HoistedUsings_EmitAboveNamespace_WhileMembersStayInClassBody()
     {
-        // [V01.01.06.03.01] The hoisted layout: a leading `using` in an @script block (legal in Vue's
-        // <script setup>, used by the design sample) is lifted into the generated file's using region
+        // [V01.01.06.03.01] The hoisted layout: a leading `using` in an @script block (idiomatic C# at the
+        // top of any code region, and what the design sample writes) is lifted into the generated file's using region
         // ABOVE the namespace under its own #line map; the remaining members stay in the class body under
         // their own #line map, anchored to the first member's line. This replaces the interim
         // class-body-only merge that degraded a leading using to a recoverable VIU1201.
@@ -400,7 +401,8 @@ public sealed class SingleFileComponentScriptTests
     public void ToBindingMetadata_ExposesClassifiedBindings_AsScriptSetupState()
     {
         // The render-code-generation path consumes the classification as a Templates.BindingMetadata; a
-        // scripted component reports IsScriptSetup (Vue's __isScriptSetup) and resolves each member's type.
+        // scripted component reports IsScriptSetup, so the compiler knows the bindings came from an
+        // authored script block rather than being inferred, and resolves each member's type.
         var bindings = new EquatableArray<ScriptBinding>(new[]
         {
             new ScriptBinding("Count", BindingType.SetupReference),
@@ -534,7 +536,8 @@ public sealed class SingleFileComponentScriptTests
         // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the @script block declares a Reference<int>
         // member, so the template's use of it compiles to a _ctx-routed .Value unwrap in the emitted
         // render body — the whole point of feeding script-classified BindingMetadata into the template
-        // compiler (upstream analogue: SETUP_REF resolving through $setup in function mode).
+        // compiler: without the classification the compiler cannot tell a reference member from an
+        // ordinary one, and would emit the cell itself where the template asked for its value.
         const string source =
             "<template>\n" +
             "    <div>{{ Count }}</div>\n" +

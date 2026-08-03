@@ -6,8 +6,11 @@ namespace Assimalign.Viu.Components;
 /// Describes content whose logical tree position differs from its rendered container.
 /// </summary>
 /// <remarks>
-/// Mirrors Vue 3.5's Teleport contract:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/Teleport.ts.
+/// The value stays at its logical position in the component tree while its children are rendered
+/// into <see cref="Target"/>. The renderer emits origin anchors where the value sits logically and
+/// manages the target range separately, so patching, moves, and unmounting still reach the children
+/// through the logical tree; toggling <see cref="IsDisabled"/> moves the content between the two
+/// containers. Specified by <c>[BLT-1]</c> through <c>[BLT-4]</c>.
 /// </remarks>
 public interface ITeleportComponent : IComponent
 {

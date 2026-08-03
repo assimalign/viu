@@ -7,7 +7,7 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 // Pins the SingleFileComponentSyntaxParser adapter contract ([V01.01.05.09]): block slicing is exactly
-// SingleFileComponentParser.Parse (the @vue/compiler-sfc-parity static entry point stays
+// SingleFileComponentParser.Parse (that static entry point stays
 // authoritative), the node list restores source order, errors surface as the uniform Diagnostics, and
 // each block reaches the aggregate registration seam as content + block name + lang option.
 public class SingleFileComponentSyntaxParserTests

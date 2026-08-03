@@ -2,8 +2,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The markup namespace an element belongs to, inferred by the parser per the WHATWG tree-construction
-/// dispatcher. The C# port of Vue 3.5's <c>Namespaces</c> enum (<c>@vue/compiler-core</c> <c>ast.ts</c>);
-/// numeric values match upstream.
+/// dispatcher.
 /// </summary>
 /// <remarks>
 /// See the WHATWG namespace switching rules:
@@ -11,12 +10,12 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </remarks>
 public enum ElementNamespace
 {
-    /// <summary>The HTML namespace (upstream <c>HTML</c>).</summary>
+    /// <summary>The HTML namespace.</summary>
     Html = 0,
 
-    /// <summary>The SVG namespace (upstream <c>SVG</c>).</summary>
+    /// <summary>The SVG namespace.</summary>
     Svg = 1,
 
-    /// <summary>The MathML namespace (upstream <c>MATH_ML</c>).</summary>
+    /// <summary>The MathML namespace.</summary>
     MathML = 2,
 }

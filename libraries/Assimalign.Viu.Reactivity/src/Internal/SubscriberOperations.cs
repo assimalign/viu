@@ -2,7 +2,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// Shared subscriber algorithms: link bookkeeping before/after a run, dirtiness checks, and
-/// subscriber-list insertion/removal — the C# port of the helpers in Vue 3.5's <c>effect.ts</c>
+/// subscriber-list insertion/removal — the doubly-linked-edge maintenance behind
 /// (<c>prepareDeps</c>/<c>cleanupDeps</c>/<c>isDirty</c>/<c>addSub</c>/<c>removeSub</c>).
 /// </summary>
 internal static class SubscriberOperations

@@ -6,8 +6,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// The mutable working form of an <see cref="IfBranchNode"/> used while the transform pipeline traverses and
 /// rewrites the tree. Structural rewriting (branch grouping, child replacement/removal) needs stable node
 /// identity and in-place child lists, which immutable records cannot provide; this working node is frozen
-/// into an immutable <see cref="IfBranchNode"/> when its containing element's vnode children are built.
-/// Mirrors the mutable <c>IfBranchNode</c> upstream mutates in <c>@vue/compiler-core</c> <c>transforms/vIf.ts</c>.
+/// into an immutable <see cref="IfBranchNode"/> when its containing element's render-node children are
+/// built.
 /// </summary>
 internal sealed record WorkingIfBranch : TemplateSyntaxNode
 {

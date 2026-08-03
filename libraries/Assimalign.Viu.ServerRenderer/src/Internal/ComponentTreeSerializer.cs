@@ -9,7 +9,10 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// Serializes the unified component tree to HTML using Vue-compatible server-rendering markers.
+/// Serializes the unified component tree to HTML, embedding the hydration markers defined by
+/// <see cref="SsrMarkers"/>. It dispatches the seven <see cref="ComponentKind"/> values against the
+/// same <c>IComponent</c> tree the client renderers patch; there is no second server node model.
+/// Specified by <c>[SSR-3]</c>.
 /// </summary>
 internal static class ComponentTreeSerializer
 {

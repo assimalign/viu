@@ -6,9 +6,8 @@ source into its generated partial-class scaffold, its bidirectional source maps,
 diagnostics. It exists so the two hosts that need that projection — the
 `Assimalign.Viu.Generators.Syntax` **source generator** (which emits the scaffold at build time) and
 the `Assimalign.Viu.LanguageService` **language server** (which reasons about the same source in the
-editor) — run one implementation and cannot drift. The C# analogue of `@vue/compiler-sfc`'s
-`compileScript()`/`compileTemplate()` pipeline being consumed by both a build plugin and Volar
-(<https://github.com/vuejs/core/tree/main/packages/compiler-sfc>).
+editor) — run one implementation and cannot drift. Specified by
+[`[TOOL-2]`](../../../docs/SPECIFICATION.md#14-the-tooling-and-editor-contract).
 
 The rationale, the netstandard2.0 / no-I/O constraints, and the `DocumentationMode` seam are in
 [DESIGN.md](DESIGN.md).

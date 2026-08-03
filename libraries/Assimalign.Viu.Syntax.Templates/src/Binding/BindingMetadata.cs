@@ -4,15 +4,14 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The map from a component member name to its <see cref="BindingType"/>, plus the prop-alias table and the
-/// setup-mode flag. The C# port of Vue 3.5's <c>BindingMetadata</c> (<c>@vue/compiler-core</c>
-/// <c>options.ts</c>), produced by the component/setup source model and consumed by expression and scope
-/// analysis ([V01.01.05.04]).
+/// setup-mode flag: produced by the component/setup source model and consumed by expression and scope
+/// analysis ([V01.01.05.04]) to decide every identifier's access form (specified by <c>[SFC-6]</c>).
 /// </summary>
 /// <remarks>
 /// This is transform <i>input</i>, not part of the value-equatable transform output, so it is a plain class
 /// rather than a record. It is immutable after construction and safe to share across the single-threaded
-/// transform. <see cref="ReportsUnresolvedIdentifiers"/> is a Viu-specific addition with no Vue counterpart:
-/// because C# is statically typed and has no <c>Proxy</c> fallback, a template identifier that is neither a
+/// transform. <see cref="ReportsUnresolvedIdentifiers"/> exists because there is no runtime proxy
+/// (<c>[RCT-8]</c>): a template identifier that is neither a
 /// template-local, an allowed global, nor a known binding cannot silently resolve to a member — the strict
 /// component model sets this flag so such identifiers surface a diagnostic instead of compiling to an invalid
 /// member access.
@@ -30,17 +29,18 @@ public sealed class BindingMetadata
     /// <summary>Creates binding metadata.</summary>
     /// <param name="bindings">The member-name to <see cref="BindingType"/> map, or <see langword="null"/> for none.</param>
     /// <param name="isScriptSetup">
-    /// Whether the bindings come from a <c>&lt;script setup&gt;</c> block (upstream <c>__isScriptSetup</c>).
+    /// Whether the bindings come from a <c>&lt;script setup&gt;</c> block.
     /// </param>
     /// <param name="reportsUnresolvedIdentifiers">
     /// Whether an identifier absent from <paramref name="bindings"/>, the template-local scope, and the global
     /// allow-list should surface a <see cref="CompilerErrorCode.XViuUnresolvedIdentifier"/> diagnostic (the
-    /// strict Viu mode). Defaults to <see langword="false"/> so partial or absent metadata never spuriously
-    /// errors and the permissive <c>_ctx.</c> fallback (Vue's behavior) is used instead.
+    /// strict mode). Defaults to <see langword="false"/> so partial or absent metadata never spuriously
+    /// errors; the permissive <c>_ctx.</c> fallback is used instead and the C# compiler catches a genuinely
+    /// missing member.
     /// </param>
     /// <param name="propertyAliases">
-    /// The map from a <see cref="BindingType.PropertyAliased"/> alias to its real prop name (upstream
-    /// <c>__propsAliases</c>), or <see langword="null"/> for none.
+    /// The map from a <see cref="BindingType.PropertyAliased"/> alias to its real prop name, or
+    /// <see langword="null"/> for none.
     /// </param>
     public BindingMetadata(
         IReadOnlyDictionary<string, BindingType>? bindings = null,
@@ -54,12 +54,12 @@ public sealed class BindingMetadata
         ReportsUnresolvedIdentifiers = reportsUnresolvedIdentifiers;
     }
 
-    /// <summary>Whether the bindings come from a <c>&lt;script setup&gt;</c> block (upstream <c>__isScriptSetup</c>).</summary>
+    /// <summary>Whether the bindings come from a <c>&lt;script setup&gt;</c> block.</summary>
     public bool IsScriptSetup { get; }
 
     /// <summary>
-    /// Whether unresolved identifiers surface a diagnostic (the strict Viu mode). No Vue counterpart; see the
-    /// type remarks.
+    /// Whether unresolved identifiers surface a diagnostic rather than falling back to a permissive
+    /// <c>_ctx.</c> member access; see the type remarks.
     /// </summary>
     public bool ReportsUnresolvedIdentifiers { get; }
 

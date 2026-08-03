@@ -623,9 +623,11 @@ internal static class ViuLexicalClassifier
         {
             Group nameGroup = match.Groups["name"];
             string tagName = nameGroup.Value;
-            // Vue names components in PascalCase (or dotted member expressions); lowercase tags are
-            // HTML elements or the lowercase Vue built-ins. Components therefore borrow the type
-            // category so they read as types: https://vuejs.org/guide/components/registration
+            // Viu components are named in PascalCase (or as dotted member expressions); a lowercase
+            // tag is an HTML element or a lowercase built-in. The classifier is lexical — it has no
+            // component registry to consult — so casing is the only signal available, and it is a
+            // reliable one because name resolution is ordinal over the authored spelling ([CMP-6]).
+            // Components therefore borrow the type category so they read as types.
             AddSpan(
                 lineNumber,
                 nameGroup.Index,

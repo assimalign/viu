@@ -16,8 +16,8 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// Pins the generator-surfacing conventions ([V01.01.05.08]): the stable VIU descriptor shape (ID,
 /// category, help link, default severity, enabled-by-default) and the base-<see cref="SyntaxDiagnostic"/>
 /// severity → descriptor mapping across every severity, including the Warning/Information/Hidden
-/// branches no current parser produces yet but the machinery must already route (Vue's error-vs-warning
-/// split is pinned on the base diagnostic at parse time, per the addendum on issue #55). Since
+/// branches no current parser produces yet but the machinery must already route (the error-vs-warning
+/// split is decided on the base diagnostic at parse time, per the addendum on issue #55). Since
 /// [V01.01.06.11] the severity mapping produces the shared projection library's neutral catalog entries;
 /// the Roslyn descriptors here are the generator adapter's materialization of that catalog. Roslyn
 /// diagnostics/analyzer conventions: https://learn.microsoft.com/dotnet/csharp/roslyn-sdk/.

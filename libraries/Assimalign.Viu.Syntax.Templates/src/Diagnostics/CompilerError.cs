@@ -3,9 +3,9 @@ using System.Diagnostics.CodeAnalysis;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A parse error with its code, human-readable message, and source location. The C# port of Vue 3.5's
-/// <c>CompilerError</c> (<c>@vue/compiler-core</c> <c>errors.ts</c>). The parser reports errors through
-/// <see cref="ParserOptions.OnError"/> rather than throwing, matching Vue's recoverable-parsing model.
+/// A parse error with its code, human-readable message, and source location. The parser
+/// <em>pushes</em> errors through <see cref="ParserOptions.OnError"/> as it goes rather than throwing,
+/// so one pass reports every problem in a malformed template and still returns a tree.
 /// A <see cref="Diagnostic"/> whose language-specific code catalog and push delivery stay distinct
 /// from the single-file-component parser's, per the shared base's per-language contract.
 /// </summary>
@@ -21,8 +21,8 @@ public sealed record CompilerError : Diagnostic
         Code = code;
         Message = message;
         Location = location;
-        // Every upstream compiler-core error is an error-severity diagnostic (warnings go through the
-        // separate onWarn channel upstream, which this port does not carry).
+        // Every compiler error is error severity: this catalog carries no warning-severity codes, so
+        // severity is a property of the type, not of the instance.
         Severity = DiagnosticSeverity.Error;
     }
 

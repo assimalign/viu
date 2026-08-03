@@ -3,7 +3,7 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// State flags shared by every subscriber (effects and computeds). Mirrors Vue 3.5's
+/// State flags shared by every subscriber (effects and computeds). These are Viu's
 /// <c>EffectFlags</c> bit field.
 /// </summary>
 [Flags]

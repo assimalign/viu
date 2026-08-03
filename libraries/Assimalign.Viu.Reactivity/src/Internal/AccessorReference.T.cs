@@ -3,16 +3,14 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A ref whose value is projected through a getter (and optional setter) delegate — the backing
-/// implementation of <see cref="Reactive.ToRef{T}(Func{T}, Action{T})"/> and the write-through refs a
-/// generated <c>ToReferences()</c> hands out. It is the C# port of Vue 3.5's <c>toRef()</c> object
-/// refs (<c>GetterRefImpl</c>/<c>ObjectRefImpl</c>,
-/// https://vuejs.org/api/reactivity-utilities.html#toref): tracking and triggering flow entirely
-/// through whatever reactive source the delegates touch (e.g. a generated property's getter tracks
-/// and its setter triggers), so the <see cref="ReactiveValue.Dependency"/> it inherits is never
-/// subscribed. A ref created without a setter is read-only (<see cref="IsReadOnly"/>): a write warns
-/// and does nothing, mirroring a getter-only <c>toRef</c>. Not thread-safe (single-threaded JS
-/// event-loop model).
+/// A reference whose value is projected through a getter (and optional setter) delegate — the
+/// backing implementation of <see cref="Reactive.ToRef{T}(Func{T}, Action{T})"/> and the
+/// write-through references a generated <c>ToReferences()</c> hands out. Tracking and triggering
+/// flow entirely through whatever reactive source the delegates touch (a generated property's
+/// getter tracks and its setter triggers), so the <see cref="ReactiveValue.Dependency"/> this type
+/// inherits is never subscribed — it holds no state of its own to notify about. A reference created
+/// without a setter is read-only (<see cref="IsReadOnly"/>): a write warns and does nothing. Not
+/// thread-safe (single-threaded JS event-loop model).
 /// </summary>
 /// <typeparam name="T">The type of the projected value.</typeparam>
 internal sealed class AccessorReference<T> : ReactiveValue<T>

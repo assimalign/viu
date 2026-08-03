@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the memory history — the C# port of vue-router's createMemoryHistory
-// (packages/router/src/history/memory.ts). It is the interop-free reference model for the
-// push/replace/go and position semantics the web history reproduces. [V01.01.08.02] memory-mode AC.
+// Pins the memory history: the interop-free reference model for the push/replace/go and position
+// semantics the web history reproduces over interop. [V01.01.08.02] memory-mode AC; specified by
+// [RTR-3].
 public class MemoryRouterHistoryTests
 {
     private static IRouterHistory CreateHistory(string? basePath = null)
@@ -104,7 +104,7 @@ public class MemoryRouterHistoryTests
         history.Go(5);        // clamps: cannot move past the tip
 
         history.Location.ShouldBe("/a");     // unchanged
-        seen[0].Delta.ShouldBe(5);           // raw requested delta, upstream-faithful
+        seen[0].Delta.ShouldBe(5);           // the raw requested delta, not the clamped movement
         seen[0].Direction.ShouldBe(NavigationDirection.Forward);
     }
 
@@ -117,7 +117,7 @@ public class MemoryRouterHistoryTests
 
         history.Go(0);
 
-        // Upstream treats delta === 0 as forward in abstract mode (memory has no page reload).
+        // A zero delta counts as forward: memory has no page reload for it to mean instead.
         seen[0].Direction.ShouldBe(NavigationDirection.Forward);
     }
 

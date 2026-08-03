@@ -8,8 +8,8 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the Browser implementation to Vue's vModelCheckbox behavior:
-// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts.
+// Pins Viu's checkbox v-model contract: boolean binding honoring true-value/false-value, list
+// membership by loose equality, and set membership by strict equality.
 public sealed class VModelCheckboxTests : IDisposable
 {
     private readonly BrowserDirectiveTestHarness _harness = new();

@@ -6,13 +6,14 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Creates unified-tree values for Vue-shaped dynamic component selections.
+/// Creates unified-tree values for dynamic component selection — the runtime half of
+/// <c>&lt;component :is&gt;</c>.
 /// </summary>
 /// <remarks>
-/// Mirrors Vue 3.5's <c>resolveDynamicComponent</c> and <c>&lt;component :is&gt;</c> replacement
-/// semantics: https://vuejs.org/api/built-in-special-elements.html#component. Because the approved
-/// <see cref="IComponentFactory"/> contract intentionally has no registration-probe API, a plain
-/// string is always an element tag. Use <see cref="Named"/> for an explicit registered name.
+/// Because the <see cref="IComponentFactory"/> contract intentionally has no registration-probe
+/// API — probing would require the factory to answer "do you know this name?" ahead of activation,
+/// which the trimming-safe registration model cannot do — a plain string is always an element tag.
+/// Use <see cref="Named"/> for an explicit registered name.
 /// </remarks>
 public static class DynamicComponents
 {

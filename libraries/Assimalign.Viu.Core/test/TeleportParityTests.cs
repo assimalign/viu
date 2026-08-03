@@ -12,7 +12,9 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins Teleport's deferred mounting and block patching to Vue 3.5's runtime-core behavior.
+/// Pins Teleport's deferred mounting and block patching: a deferred teleport resolves its target
+/// in the post-flush phase, while a disabled one still mounts its content in place immediately —
+/// only target-side setup defers ([BLT-2], [BLT-3]).
 /// </summary>
 public sealed class TeleportParityTests : IDisposable
 {

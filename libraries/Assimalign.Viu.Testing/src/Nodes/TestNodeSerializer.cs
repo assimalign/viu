@@ -4,16 +4,17 @@ using System.Text;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// Renders a test node subtree to an HTML-like string for snapshot-style assertions — the C#
-/// port of <c>serialize</c> in <c>@vue/runtime-test</c>
-/// (<c>packages/runtime-test/src/serialize.ts</c>). Event-listener and null props are omitted;
-/// content is emitted verbatim (no HTML encoding), matching upstream.
+/// Renders a test node subtree to an HTML-like string for snapshot-style assertions.
+/// Event-listener and null properties are omitted, and content is emitted verbatim with no HTML
+/// encoding — this output is a debugging and assertion aid, not markup for a browser, so escaping it
+/// would hide exactly the characters a test is checking. Use
+/// <c>Assimalign.Viu.ServerRenderer</c> when real markup is wanted.
 /// </summary>
 public static class TestNodeSerializer
 {
     /// <summary>Serializes <paramref name="node"/> and its subtree.</summary>
     /// <param name="node">The root of the subtree.</param>
-    /// <param name="indent">Spaces per depth level; 0 renders one line (upstream default).</param>
+    /// <param name="indent">Spaces per depth level; 0 (the default) renders the whole subtree on one line.</param>
     /// <returns>The HTML-like string.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="node"/> is null.</exception>
     public static string Serialize(TestNode node, int indent = 0)

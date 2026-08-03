@@ -12,7 +12,7 @@ internal static class ViuCompletionCatalog
         Snippet(
             "template",
             "Viu template block",
-            "Contains the component's Vue-compatible template markup.",
+            "Contains the component's template markup, compiled to a render function at build time.",
             "<template>\n\t$0\n</template>",
             "01"),
         Snippet(
@@ -46,7 +46,7 @@ internal static class ViuCompletionCatalog
         Snippet(
             "template",
             "Vue-format template block",
-            "Contains the component's Vue-compatible template markup.",
+            "Contains the component's template markup, compiled to a render function at build time.",
             "<template>\n\t$0\n</template>",
             "01"),
         Snippet(

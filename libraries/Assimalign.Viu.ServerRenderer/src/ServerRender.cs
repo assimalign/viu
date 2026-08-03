@@ -13,32 +13,32 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The by-name SSR helper library — the C# port of the <c>ssr*</c> runtime helpers the compiled SSR
-/// render bodies call into (<c>@vue/server-renderer</c>'s <c>helpers/*</c> plus <c>@vue/shared</c>'s
-/// <c>escapeHtml</c>). The pure-string members (<see cref="EscapeHtml(string)"/>,
+/// The by-name SSR helper library: the string-producing and push-based helpers a server render
+/// calls into. The pure-string members (<see cref="EscapeHtml(string)"/>,
 /// <see cref="SsrRenderAttrs(IComponentAttributeCollection?, string?)"/>, <see cref="SsrRenderClass"/>,
-/// <see cref="SsrRenderStyle"/>, <see cref="SsrInterpolate"/>, …) are the exact string-producing
-/// helpers upstream exposes and are used both by the component-tree runtime renderer
-/// (<see cref="ServerRenderer"/>) and, later, by the compiler-generated <c>ssrRender</c> bodies
-/// ([V01.01.07.02]). The <c>*Async</c> members are the push-based helpers the generated code awaits,
-/// forwarding to the same engine the runtime renderer uses so both paths produce byte-identical output.
+/// <see cref="SsrRenderStyle"/>, <see cref="SsrInterpolate"/>, …) are used both by the component-tree
+/// runtime renderer (<see cref="ServerRenderer"/>) and, later, by the compiler-generated
+/// <c>ssrRender</c> bodies ([V01.01.07.02]). The <c>*Async</c> members are the push-based helpers the
+/// generated code awaits, forwarding to the same engine the runtime renderer uses so both paths
+/// produce byte-identical output — compiled rendering is an optimization, never a second semantics.
 /// <para>
-/// Escaping is security-adjacent and pinned to the exact upstream tables
-/// (<c>packages/shared/src/escapeHtml.ts</c>): <see cref="EscapeHtml(string)"/> escapes <c>"</c>, <c>&amp;</c>,
-/// <c>'</c>, <c>&lt;</c>, and <c>&gt;</c> — a superset of the WHATWG minimal set, matching Vue's output for
-/// both text and attribute values. See https://html.spec.whatwg.org/multipage/parsing.html#serialising-html-fragments.
+/// Escaping is security-adjacent, so the escape set is fixed and test-pinned:
+/// <see cref="EscapeHtml(string)"/> escapes <c>"</c>, <c>&amp;</c>, <c>'</c>, <c>&lt;</c>, and
+/// <c>&gt;</c> — deliberately a superset of the WHATWG minimal set, so one routine is correct for
+/// both text and attribute values and no caller has to choose. See
+/// <see href="https://html.spec.whatwg.org/multipage/parsing.html#serialising-html-fragments">WHATWG HTML serialization</see>.
+/// Specified by <c>[SSR-6]</c>.
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
 public static partial class ServerRender
 {
-    // The five characters escapeHtml rewrites (upstream escapeRE = /["'&<>]/), vectorized so the
-    // common no-escape-needed case is an allocation-free scan (SearchValues is the .NET 8+ fast path).
+    // The five characters EscapeHtml rewrites, vectorized so the common no-escape-needed case is an
+    // allocation-free scan (SearchValues is the .NET 8+ fast path).
     private static readonly SearchValues<char> EscapableCharacters = SearchValues.Create("\"&'<>");
 
     /// <summary>
-    /// Escapes text or an attribute value for HTML (upstream: <c>escapeHtml</c> in
-    /// <c>@vue/shared/src/escapeHtml.ts</c>): <c>"</c> → <c>&amp;quot;</c>, <c>&amp;</c> → <c>&amp;amp;</c>,
+    /// Escapes text or an attribute value for HTML: <c>"</c> → <c>&amp;quot;</c>, <c>&amp;</c> → <c>&amp;amp;</c>,
     /// <c>'</c> → <c>&amp;#39;</c>, <c>&lt;</c> → <c>&amp;lt;</c>, <c>&gt;</c> → <c>&amp;gt;</c>. Returns the input
     /// unchanged when it contains none of those characters.
     /// </summary>
@@ -85,16 +85,16 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Escapes an arbitrary value as HTML text, coercing it to its display string first (upstream:
-    /// <c>escapeHtml('' + value)</c>). Null yields the empty string.
+    /// Escapes an arbitrary value as HTML text, coercing it to its display string first. Null yields
+    /// the empty string.
     /// </summary>
     /// <param name="value">The value to coerce and escape.</param>
     public static string EscapeHtml(object? value) => EscapeHtml(DisplayStringFormatter.ToDisplayString(value));
 
     /// <summary>
     /// Strips the comment-terminating sequences from comment content so it cannot break out of its
-    /// <c>&lt;!-- --&gt;</c> wrapper (upstream: <c>escapeHtmlComment</c>, applied repeatedly until stable so
-    /// overlapping sequences cannot reconstitute a terminator).
+    /// <c>&lt;!-- --&gt;</c> wrapper. Stripping is applied repeatedly until the result stops changing, so
+    /// overlapping sequences cannot reconstitute a terminator after a single pass.
     /// </summary>
     /// <param name="source">The comment content.</param>
     /// <returns>The sanitized comment content.</returns>
@@ -115,26 +115,25 @@ public static partial class ServerRender
         return current;
     }
 
-    /// <summary>Renders a comment node (upstream: <c>&lt;!--...--&gt;</c> in <c>renderVNode</c>).</summary>
+    /// <summary>Renders a comment node as <c>&lt;!--content--&gt;</c>.</summary>
     /// <param name="content">The comment content; empty yields the <c>&lt;!----&gt;</c> anchor.</param>
     public static string SsrRenderComment(string? content) => "<!--" + EscapeHtmlComment(content) + "-->";
 
     /// <summary>
-    /// Renders an interpolation (upstream: <c>ssrInterpolate</c> = <c>escapeHtml(toDisplayString(value))</c>).
+    /// Renders an interpolation: the value's display string, escaped.
     /// </summary>
     /// <param name="value">The interpolated value.</param>
     public static string SsrInterpolate(object? value) => EscapeHtml(DisplayStringFormatter.ToDisplayString(value));
 
     /// <summary>
-    /// Normalizes and escapes a class binding (upstream: <c>ssrRenderClass</c> =
-    /// <c>escapeHtml(normalizeClass(raw))</c>).
+    /// Normalizes a class binding to its flat class string, then escapes it.
     /// </summary>
     /// <param name="value">The class binding: string, list, or name/flag map.</param>
     public static string SsrRenderClass(object? value) => EscapeHtml(StyleAndClassNormalization.NormalizeClass(value));
 
     /// <summary>
-    /// Normalizes, stringifies, and escapes a style binding (upstream: <c>ssrRenderStyle</c>). A string
-    /// passes through escaped; a map is normalized then serialized to inline CSS then escaped.
+    /// Normalizes, stringifies, and escapes a style binding. A string passes through escaped; a map is
+    /// normalized, then serialized to inline CSS, then escaped.
     /// </summary>
     /// <param name="value">The style binding: string, list, or property map.</param>
     public static string SsrRenderStyle(object? value)
@@ -152,7 +151,7 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Serializes an element's attributes to an attribute string (upstream: <c>ssrRenderAttrs</c>). Skips the
+    /// Serializes an element's attributes to an attribute string. Skips the
     /// reserved props (<c>key</c>, <c>ref</c>, <c>ref_for</c>, <c>ref_key</c>, <c>innerHTML</c>,
     /// <c>textContent</c>), event handlers (<c>onX</c>), <c>.</c>-prefixed force-property bindings, and
     /// <c>value</c> on a <c>&lt;textarea&gt;</c>; strips a leading <c>^</c> force-attribute marker; routes
@@ -184,7 +183,7 @@ public static partial class ServerRender
             {
                 continue;
             }
-            // A leading '^' forces attribute rendering (upstream: key.slice(1)).
+            // A leading '^' forces attribute rendering; the marker itself is not emitted.
             var name = rawName.StartsWith('^') ? rawName[1..] : rawName;
             if (string.Equals(name, "class", StringComparison.Ordinal))
             {
@@ -196,7 +195,8 @@ public static partial class ServerRender
             }
             else if (string.Equals(name, "className", StringComparison.Ordinal))
             {
-                // className coerces directly to a string, never through class normalization (upstream).
+                // className coerces directly to a string, never through class normalization: it is the
+                // raw DOM property spelling, so an author who used it asked for a verbatim value.
                 if (value is not null)
                 {
                     builder.Append(" class=\"").Append(EscapeHtml(DisplayStringFormatter.FormatScalar(value))).Append('"');
@@ -211,8 +211,9 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Serializes one attribute with a statically known, pre-validated key (upstream: <c>ssrRenderAttr</c>).
-    /// Returns the empty string when the value is not renderable.
+    /// Serializes one attribute with a statically known, pre-validated key, skipping the name-safety
+    /// check <see cref="SsrRenderDynamicAttr"/> performs. Returns the empty string when the value is
+    /// not renderable.
     /// </summary>
     /// <param name="key">The attribute name (already the correct casing).</param>
     /// <param name="value">The attribute value.</param>
@@ -227,7 +228,7 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Serializes one attribute with a dynamic (unknown) key (upstream: <c>ssrRenderDynamicAttr</c>):
+    /// Serializes one attribute with a dynamic (unknown) key:
     /// preserves the raw name on custom elements and SVG, else maps to the attribute name or lowercases;
     /// renders boolean attributes by presence; renders a safe name as <c>name="value"</c> (or bare for an
     /// empty string); and skips an SSR-unsafe attribute name.
@@ -245,7 +246,8 @@ public static partial class ServerRender
         string attributeKey;
         if (tag is not null && (tag.IndexOf('-', StringComparison.Ordinal) > 0 || DomKnowledge.IsSvgTag(tag)))
         {
-            // Custom elements and SVG preserve the author's casing (upstream parity).
+            // Custom elements and SVG are case-sensitive, so the author's casing is preserved verbatim
+            // rather than lowercased or mapped.
             attributeKey = key;
         }
         else
@@ -265,15 +267,16 @@ public static partial class ServerRender
                 ? " " + attributeKey
                 : " " + attributeKey + "=\"" + EscapeHtml(DisplayStringFormatter.FormatScalar(value!)) + "\"";
         }
-        // Unsafe attribute name (contains '>', '/', '=', quotes, or whitespace/control): skipped rather
-        // than escaped, matching upstream's isSSRSafeAttrName gate — the injection-hardening behavior.
+        // Unsafe attribute name (contains '>', '/', '=', quotes, or whitespace/control): dropped rather
+        // than escaped. Escaping the name is not sound — the parser would still see markup — so the only
+        // safe outcome is to omit the attribute entirely [SSR-6].
         return string.Empty;
     }
 
     // ==== Push-based async helpers (the surface the compiled ssrRender bodies await) =============
 
     /// <summary>
-    /// Renders a child tree value (upstream: <c>ssrRenderComponent</c>). Template requests run their full
+    /// Renders a child tree value. Template requests run their full
     /// server lifecycle — setup, server prefetch, and subtree render — while primitive values serialize
     /// directly. The child inherits <paramref name="parent"/>'s component context.
     /// </summary>
@@ -294,8 +297,9 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Renders a slot outlet, wrapped in the fragment hydration anchors (upstream: <c>ssrRenderSlot</c>,
-    /// which brackets the content with <c>&lt;!--[--&gt;</c>/<c>&lt;!--]--&gt;</c>). Invokes the named slot with
+    /// Renders a slot outlet, bracketed by the <c>&lt;!--[--&gt;</c>/<c>&lt;!--]--&gt;</c> fragment
+    /// hydration anchors so the walker can find the outlet's child range without an element wrapper.
+    /// Invokes the named slot with
     /// <paramref name="slotArguments"/> (the scoped-slot scope), falling back to <paramref name="fallback"/>
     /// when the slot is absent or renders empty.
     /// </summary>
@@ -335,8 +339,7 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Iterates a <c>v-for</c> source, awaiting <paramref name="renderItem"/> per entry (upstream:
-    /// <c>ssrRenderList</c>). Supports an integer count (<c>n in 5</c>, value one-based), a dictionary
+    /// Iterates a <c>v-for</c> source, awaiting <paramref name="renderItem"/> per entry. Supports an integer count (<c>n in 5</c>, value one-based), a dictionary
     /// (value, key), and any other enumerable (item, zero-based index). The callback does the pushing, so
     /// this helper writes nothing itself.
     /// </summary>
@@ -372,7 +375,7 @@ public static partial class ServerRender
     }
 
     /// <summary>
-    /// Renders a <c>&lt;Teleport&gt;</c> (upstream: <c>ssrRenderTeleport</c>): the origin position gets the
+    /// Renders a <c>&lt;Teleport&gt;</c>: the origin position gets the
     /// <c>&lt;!--teleport start--&gt;</c>/<c>&lt;!--teleport end--&gt;</c> anchor pair, while
     /// <paramref name="contentRenderer"/>'s output is buffered against <paramref name="target"/> in the
     /// <see cref="SsrContext"/> (with the trailing <c>&lt;!--teleport anchor--&gt;</c>). A disabled teleport
@@ -419,8 +422,8 @@ public static partial class ServerRender
 
     /// <summary>
     /// Renders a <c>&lt;Suspense&gt;</c>'s default branch, awaiting its async dependencies server-side
-    /// (upstream: <c>ssrRenderSuspense</c> renders and awaits the <c>default</c> slot; SSR never shows the
-    /// fallback). Because the walk already awaits each descendant component's <c>ServerPrefetch</c>, invoking
+    /// — server rendering resolves the branch and never emits the fallback, because a server response
+    /// has no later moment at which to swap it in. Because the walk already awaits each descendant component's <c>ServerPrefetch</c>, invoking
     /// <paramref name="defaultBranch"/> resolves the branch's async data before returning. Full boundary
     /// semantics (the fallback branch, error capture) arrive with the runtime Suspense component
     /// ([V01.01.03.20]).
@@ -434,20 +437,22 @@ public static partial class ServerRender
         return defaultBranch(state);
     }
 
-    // Upstream shouldIgnoreProp = makeMap(`,key,ref,innerHTML,textContent,ref_key,ref_for`); the leading
-    // comma admits the empty-string key. innerHTML/textContent are applied as child overrides, not attrs.
+    // Renderer metadata, not markup: key/ref/ref_key/ref_for are reconciliation inputs, and
+    // innerHTML/textContent are applied as child overrides rather than attributes. The empty name is
+    // ignored too, so a malformed binding cannot emit a nameless attribute.
     private static bool ShouldIgnoreProperty(string name) => name switch
     {
         "" or "key" or "ref" or "innerHTML" or "textContent" or "ref_key" or "ref_for" => true,
         _ => false,
     };
 
-    // Upstream isOn = /^on[^a-z]/: 'on' followed by a non-lowercase-letter (onClick, on:foo, on-x), so a
-    // word like "onions" is not treated as a handler.
+    // A handler name is 'on' followed by a non-lowercase letter (onClick, on:foo, on-x), so an ordinary
+    // word like "onions" is not mistaken for one.
     private static bool IsEventHandlerName(string name)
         => name.Length > 2 && name[0] == 'o' && name[1] == 'n' && !char.IsAsciiLetterLower(name[2]);
 
-    // Upstream isRenderableAttrValue: string | number | boolean (and not null). Objects/arrays are skipped.
+    // Only scalars serialize to an attribute value: string, bool, or a numeric type, and never null.
+    // An object or collection has no meaningful attribute spelling, so it is skipped.
     private static bool IsRenderableAttributeValue(object? value) => value switch
     {
         null => false,
@@ -457,7 +462,8 @@ public static partial class ServerRender
         _ => false,
     };
 
-    // Upstream includeBooleanAttr = !!value || value === '': any truthy value or the empty string.
+    // A boolean attribute is emitted by presence for any truthy value, and also for the empty string —
+    // the disabled="" spelling HTML treats as set.
     private static bool IncludeBooleanAttribute(object? value)
         => StyleAndClassNormalization.IsTruthy(value) || value is string { Length: 0 };
 
@@ -473,9 +479,9 @@ public static partial class ServerRender
         };
     }
 
-    // Upstream commentStripRE = /^(?:-?>)+|<!--|-->|--!>|<!-$/g (JS [^] -> .NET . with no special flags
-    // needed here). Applied repeatedly by EscapeHtmlComment so overlapping matches cannot re-form a
-    // terminator.
+    // Every sequence that could terminate or reopen a comment, including the leading '>' and '->' forms
+    // a parser accepts at the start of comment content. Applied repeatedly by EscapeHtmlComment so
+    // overlapping matches cannot re-form a terminator.
     [GeneratedRegex("^(?:-?>)+|<!--|-->|--!>|<!-$")]
     private static partial Regex CommentStripPattern();
 }

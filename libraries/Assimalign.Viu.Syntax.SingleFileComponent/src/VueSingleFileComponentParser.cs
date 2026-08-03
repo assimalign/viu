@@ -13,10 +13,11 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// The parser performs block-level slicing only. It preserves exact source locations and raw content,
 /// reports recoverable structural diagnostics through <see cref="VueSingleFileComponentParseResult.Errors"/>,
 /// performs no file input/output, reflection, or dynamic code generation, and does not parse the block
-/// languages themselves. The corresponding upstream behavior is implemented by Vue's
-/// <c>@vue/compiler-sfc</c> parser and SFC tokenizer:
-/// https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts and
-/// https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts.
+/// languages themselves. Container-format references for the input this parser accepts (not statements
+/// about Viu's own semantics):
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts">@vue/compiler-sfc parse.ts</see>
+/// and
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts">@vue/compiler-core tokenizer.ts</see>.
 /// </remarks>
 public static class VueSingleFileComponentParser
 {

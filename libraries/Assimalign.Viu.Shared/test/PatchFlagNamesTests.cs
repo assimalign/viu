@@ -5,6 +5,8 @@ using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Shared.Tests;
 
+// Pins the diagnostic names PatchFlags values format as. Tooling reads these names out of
+// generated code, so they are a stable diagnostic vocabulary, not free-form text.
 public class PatchFlagNamesTests
 {
     [Theory]

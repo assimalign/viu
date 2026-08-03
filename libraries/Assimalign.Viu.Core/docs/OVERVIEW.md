@@ -28,7 +28,8 @@ Core partitions each template request against the activated template's explicit 
 - Parameter default factories run at most once per mounted instance. Required and validator failures
   warn without rewriting the supplied value.
 - Declared `onX` and `onXOnce` listeners are consumed as component-event listeners. Undeclared
-  listeners remain fallthrough attributes, matching Vue's `$attrs` distinction.
+  listeners remain fallthrough attributes: a listener the component did not declare is the host
+  element's business, not the component's.
 - `Emit` carries zero or more ordered arguments. Kebab-case emissions match camel-case listeners,
   event validators inspect the complete argument list, and both ordinary and `Once` listeners may
   run for one emission. Once state belongs to the mounted instance and survives parent updates.
@@ -40,9 +41,8 @@ When attribute inheritance is enabled and the template renders one element root,
 fallthrough properties through the same class, style, and event rules used by `mergeProps`: classes
 are space-joined, style declarations merge with the parent value winning, and compatible event
 delegates combine in root-then-parent order. Declared component-event listeners never enter this
-host-event merge. These rules mirror Vue's [fallthrough attribute
-behavior](https://vuejs.org/guide/components/attrs.html) without introducing provide/inject or a
-service-container dependency.
+host-event merge. The merge introduces neither provide/inject nor a service-container dependency —
+it is a pure function of the two property bags.
 
 ## Host-neutral renderer foundation
 
@@ -63,9 +63,9 @@ comment, static, fragment, template, and teleport. Its behavior includes:
   lifecycle/error routing, fallthrough attributes, emitted events, and template references;
 - stable/dynamic/forwarded slot update gating and comment-only slot fallback;
 - per-tree-value `onVnode*` lifecycle hooks without leaking them to the host attribute layer;
-- runtime-directive resolution through Vue's raw, camel-case, then Pascal-case asset-name lookup,
-  plus all Vue element directive phases;
-- teleport movement between logical and target containers, Vue 3.5 deferred target setup,
+- runtime-directive resolution through raw, camel-case, then Pascal-case asset-name lookup, plus
+  every element directive phase;
+- teleport movement between logical and target containers, deferred target setup,
   target-later-in-the-same-tick resolution, and block dynamic-child patching with static host
   carry-forward;
 - server-markup hydration with mismatch recovery, fragment/teleport anchors, cached-block handling,

@@ -12,8 +12,8 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins Vue 3.5's slot-stability portion of <c>shouldUpdateComponent</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/componentRenderUtils.ts.
+/// Pins slot-stability update gating: a stable slot collection lets the child skip a forced update
+/// when its parent re-renders, while a dynamic one does not ([RND-FLAGS-5]).
 /// </summary>
 public sealed class SlotRendererTests : IDisposable
 {

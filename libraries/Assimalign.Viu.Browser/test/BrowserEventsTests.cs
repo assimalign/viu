@@ -6,8 +6,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins withModifiers/withKeys parity with @vue/runtime-dom's vOn helpers —
-// https://vuejs.org/guide/essentials/event-handling.html.
+// Pins Viu's event-modifier and key-guard contract: which modifiers gate a handler, how .exact
+// treats pressed-but-unlisted system modifiers, and the key aliases that map to a hyphenated
+// event.key. The alias table is the frozen contract — a vector here is not incidental.
 public class BrowserEventsTests
 {
     private static BrowserEvent Event(

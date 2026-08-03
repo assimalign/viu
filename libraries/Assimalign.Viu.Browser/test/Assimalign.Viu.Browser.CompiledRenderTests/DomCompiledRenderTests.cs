@@ -43,7 +43,7 @@ namespace Assimalign.Viu.Browser.CompiledRenderTests;
 public sealed class DomCompiledRenderTests
 {
     // Exercises every DOM directive spelling the emitter can produce, matching the pinned
-    // vuejs/core compiler-dom vModel element/type -> directive mapping (VModelTransformTests):
+    // The compiler's element/type -> model-directive mapping (pinned in VModelTransformTests):
     // v-show, vModelText (input), vModelCheckbox, vModelRadio, vModelSelect, vModelDynamic (:type),
     // withModifiers (@click.prevent inline), and withKeys nested over withModifiers (@keydown.enter.stop).
     private const string DomDirectiveTemplate =
@@ -119,7 +119,7 @@ public sealed class DomCompiledRenderTests
     [Fact]
     public void NativeVModel_CompiledRenderCarriesCurrentValueAndWorkingSetter()
     {
-        // Browser v-model cannot use reflection to recover Vue's vnode.props["onUpdate:modelValue"]
+        // Browser v-model cannot use reflection to recover a magically named "onUpdate:modelValue"
         // assigner. The generated directive tuple therefore carries the current value and assignment
         // lambda explicitly. This executes the real generated render and proves the carrier writes a DOM
         // edit back to the component model; a raw directive value compiled but left every runtime
@@ -189,7 +189,7 @@ public sealed class DomCompiledRenderTests
     [Fact]
     public void TransitionTemplate_ResolvesTheTransitionHelper_AndCompiles()
     {
-        // <Transition> resolves to the DOM _Transition helper (upstream compiler-dom built-in mapping), and
+        // <Transition> resolves to the DOM _Transition helper (the compiler's built-in mapping), and
         // the generated render binds it against DomRenderHelpers._Transition (the real component) and compiles.
         var generated = CompiledRenderSupport.Generate("TransitionWidget", TransitionTemplate);
         generated.ShouldContain("_Transition");
@@ -331,8 +331,8 @@ public sealed class DomCompiledRenderTests
         // emitter wrote the parenthesized void call `__event => (_ctx.record(__event))`, which binds neither the
         // Func<BrowserEvent, object?> nor the Action<BrowserEvent> overload — the generated render failed to
         // compile. Here the generated render compiles AND, when the stored guarded onClick delegate is invoked,
-        // runs the void method and applies .prevent to the event (upstream compiler-dom transformOn's
-        // withModifiers wrapping: vuejs/core v3.5).
+        // runs the void method and applies .prevent to the event (the compiler's withModifiers
+        // wrapping).
         const string template = "<template>\n<button @click.prevent=\"record($event)\">go</button>\n</template>\n";
         const string handWritten =
             "#nullable enable\n" +

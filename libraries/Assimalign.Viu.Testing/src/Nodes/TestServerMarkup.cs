@@ -10,8 +10,8 @@ namespace Assimalign.Viu.Testing;
 /// <c>Assimalign.Viu.ServerRenderer</c> emits: elements with double/single-quoted or bare
 /// attributes, void elements (no closing tag), text, and comments — including the hydration markers
 /// <c>&lt;!--[--&gt;</c>, <c>&lt;!--]--&gt;</c>, <c>&lt;!----&gt;</c>, and the teleport anchors. Whitespace is
-/// preserved verbatim (Vue SSR emits none between nodes), so write fragments as a single line to mirror
-/// real output. Intended for hydration tests ([V01.01.07.03]).
+/// preserved verbatim, and the server renderer emits none between nodes, so write fragments as a
+/// single line to match real output. Intended for hydration tests ([V01.01.07.03]).
 /// </summary>
 public static class TestServerMarkup
 {
@@ -171,7 +171,7 @@ public static class TestServerMarkup
             }
             else
             {
-                // A bare boolean attribute (upstream renders these by presence).
+                // A bare boolean attribute: the server renderer emits these by presence, with no value.
                 element.Properties[name] = string.Empty;
             }
         }

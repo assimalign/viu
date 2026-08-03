@@ -1,12 +1,11 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Configures <see cref="RenderFunctionEmitter"/>. The C# counterpart of the codegen-relevant members of
-/// Vue 3.5's <c>CodegenOptions</c> (<c>@vue/compiler-core</c> <c>options.ts</c>), reduced to what the C#
-/// emission actually varies on: Vue's <c>mode</c>/<c>prefixIdentifiers</c>/<c>runtimeModuleName</c> options
-/// select between JavaScript module/function preambles, which have no C# counterpart — the composition
-/// root (the source generator, [V01.01.06.02]) owns the method declaration and the file-level
-/// <c>using static</c> helper import instead.
+/// Configures <see cref="RenderFunctionEmitter"/>. The surface is deliberately tiny — indentation only —
+/// because the emitter produces a method <em>body</em>, nothing more: the composition root (the source
+/// generator, [V01.01.06.02]) owns the method declaration, the enclosing partial class, and the
+/// file-level <c>using static</c> that binds the helper names (<c>[SFC-CG-1]</c>,
+/// <c>[SFC-CG-2]</c>).
 /// </summary>
 public sealed class RenderFunctionEmitterOptions
 {
@@ -18,8 +17,7 @@ public sealed class RenderFunctionEmitterOptions
     public int IndentLevel { get; set; }
 
     /// <summary>
-    /// The text of one indentation level. Defaults to four spaces (the repository C# convention; upstream
-    /// codegen.ts indents two — a purely cosmetic divergence).
+    /// The text of one indentation level. Defaults to four spaces, the repository C# convention.
     /// </summary>
     public string IndentText { get; set; } = "    ";
 }

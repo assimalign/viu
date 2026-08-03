@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A single reactive dependency cell — the C# port of Vue 3.5's <c>Dep</c>. Maintains a version
+/// A single reactive dependency cell — the node every reactive value owns. Maintains a version
 /// counter and an intrusive doubly-linked list of subscriber <see cref="SubscriberLink"/>s.
 /// <see cref="Track"/> links the ambient active subscriber (deduplicating via link versions);
 /// <see cref="Trigger"/> bumps this dependency's version plus the global version and notifies
@@ -20,7 +20,7 @@ public sealed class Dependency
     /// </summary>
     internal SubscriberLink? ActiveLink;
 
-    /// <summary>Tail of the subscriber list (notification iterates tail-to-head, Vue parity).</summary>
+    /// <summary>Tail of the subscriber list; notification iterates tail-to-head.</summary>
     internal SubscriberLink? Subscribers;
 
     /// <summary>Set when this dependency is owned by a computed (dual dependency/subscriber role).</summary>

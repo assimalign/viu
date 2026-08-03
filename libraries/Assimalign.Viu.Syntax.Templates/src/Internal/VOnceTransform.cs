@@ -4,8 +4,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The <c>v-once</c> transform: marks the element's subtree as rendered once and cached, and pauses block
-/// tracking around it. The C# port of Vue 3.5's <c>transformOnce</c> (<c>@vue/compiler-core</c>
-/// <c>transforms/vOnce.ts</c>). See https://vuejs.org/api/built-in-directives.html#v-once.
+/// tracking around it.
 /// </summary>
 internal static class VOnceTransform
 {

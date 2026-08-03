@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// An in-memory element node: tag, properties, children, and the event listeners registered
-/// through <c>patchProp</c> (mirrors <c>TestElement</c> in <c>@vue/runtime-test</c>).
+/// An in-memory element node: tag, properties, children, and the event listeners the renderer
+/// registered through the node-ops property patch.
 /// </summary>
 public sealed class TestElement : TestNode
 {

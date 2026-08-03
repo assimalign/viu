@@ -66,8 +66,9 @@ and the component-lifetime cancellation token remains valid while the template i
 - an `IEnumerable<string>`; or
 - a `Func<string, bool>` predicate.
 
-String segments use exact ordinal matching and are not trimmed, matching Vue's comma-separated
-pattern behavior. An unnamed component cannot satisfy `include`. A matching `exclude` always wins.
+String segments use exact ordinal matching and are not trimmed — a segment is taken literally, so
+whitespace in the pattern is significant. An unnamed component cannot satisfy `include`. A matching
+`exclude` always wins.
 Changing either argument prunes inactive entries that no longer match; an active entry remains
 mounted but is no longer cached.
 
@@ -76,6 +77,6 @@ or an unparseable string means unbounded. Eviction fully unmounts the least-rece
 subtree. The cache and its detached storage container are private to the host-neutral renderer and
 do not appear in the application component tree.
 
-The behavior follows Vue 3.5's
-[`KeepAlive.ts`](https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/KeepAlive.ts)
-while retaining Viu's explicit, AOT-safe component activation boundary.
+The behavior is specified by
+[`docs/SPECIFICATION.md` §7.2](../../../docs/SPECIFICATION.md#72-keepalive), and is implemented
+within Viu's explicit, AOT-safe component activation boundary.

@@ -5,8 +5,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// The mutable working state for one attribute or directive as its name, argument, modifiers, and value
 /// arrive across several tokenizer callbacks, materialised into an immutable <see cref="AttributeNode"/>
-/// or <see cref="DirectiveNode"/> at <see cref="ITokenizerCallbacks.OnAttributeEnd"/>. Mirrors Vue 3.5's
-/// mutable <c>currentProp</c> (<c>@vue/compiler-core</c> <c>parser.ts</c>).
+/// or <see cref="DirectiveNode"/> at <see cref="ITokenizerCallbacks.OnAttributeEnd"/>. The mutation lives
+/// here so the emitted AST records stay immutable, as with <see cref="ElementBuilder"/>.
 /// </summary>
 internal sealed class PropertyBuilder
 {

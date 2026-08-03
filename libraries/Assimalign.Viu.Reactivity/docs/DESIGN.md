@@ -15,32 +15,46 @@ ancestry is:
 The redesign uses `470142e` to recover package responsibilities and uses the current Core code as
 the implementation baseline. This avoids losing fixes and the later class-based hot-path model.
 
-## Vue-shaped public API
+## The ratified public surface
 
-The `Reactive` facade remains the discoverable C# counterpart of `@vue/reactivity`.
+`Reactive` is the single static facade; it is the discoverable entry point for everything the
+package offers. The surface below is **ratified and stable** — it is the normative list in
+`[RCT-5]`, and a member is added to it, never quietly renamed.
 
-| Vue 3.5 concept | Viu surface to preserve |
+| Capability | Viu surface |
 | --- | --- |
-| `ref()` | `Reactive.Reference<T>(value)`, `Reference<T>`, and `IReactiveReference<T>` |
-| `shallowRef()` | `Reactive.ShallowReference<T>(value)`, `ShallowReference<T>`, and `IReactiveReference<T>` |
-| `customRef()` | `Reactive.CustomReference<T>(factory)`, `CustomReference<T>`, and `IReactiveReference<T>` |
-| `computed()` | `Reactive.Computed<T>(getter, setter)`, `Computed<T>`, and `IReactiveReference<T>` |
-| `effect()` | `Reactive.Effect(...)` and `ReactiveEffect` |
-| `effectScope()` / `getCurrentScope()` / `onScopeDispose()` | `Reactive.EffectScope(...)`, `Reactive.CurrentScope`, `Reactive.OnScopeDispose(...)`, and `EffectScope` |
-| `watch()` / `watchEffect()` | `Reactive.Watch(...)`, `Reactive.WatchEffect(...)`, `WatchOptions`, `WatchHandle`, and scheduler/delegate contracts |
-| `triggerRef()` | `Reactive.TriggerReference(...)` |
-| `isRef()` / `unref()` | `Reactive.IsRef(...)` / `Reactive.Unref(...)` |
-| `toRef()` / `toRefs()` | `Reactive.ToRef(...)` and generated `ToReferences()` members |
-| `isReactive()` / `isReadonly()` | matching `Reactive` inspection methods |
-| `toRaw()` / `markRaw()` | matching `Reactive` escape hatches |
-| tracking and batching controls | `PauseTracking`, `ResetTracking`, `StartBatch`, and `EndBatch` |
+| A tracked reference cell | `Reactive.Reference<T>(value)`, `Reference<T>`, and `IReactiveReference<T>` |
+| A cell that notifies only on assignment, not on mutation of what it holds | `Reactive.ShallowReference<T>(value)`, `ShallowReference<T>`, and `IReactiveReference<T>` |
+| A cell with caller-supplied track/trigger control | `Reactive.CustomReference<T>(factory)`, `CustomReference<T>`, and `IReactiveReference<T>` |
+| Lazily evaluated, version-cached derived state | `Reactive.Computed<T>(getter, setter)`, `Computed<T>`, and `IReactiveReference<T>` |
+| A tracked side effect | `Reactive.Effect(...)` and `ReactiveEffect` |
+| A lifetime boundary owning effects | `Reactive.EffectScope(...)`, `Reactive.CurrentScope`, `Reactive.OnScopeDispose(...)`, and `EffectScope` |
+| Change observation with an explicit callback | `Reactive.Watch(...)`, `Reactive.WatchEffect(...)`, `WatchOptions`, `WatchHandle`, and scheduler/delegate contracts |
+| Forced notification regardless of value equality | `Reactive.TriggerReference(...)` |
+| Reference inspection and unwrapping | `Reactive.IsRef(...)` / `Reactive.Unref(...)` |
+| Projected references | `Reactive.ToRef(...)` and generated `ToReferences()` members |
+| Reactive-object inspection | `Reactive.IsReactive(...)` / `Reactive.IsReadonly(...)` |
+| Escape hatches out of reactivity | `Reactive.ToRaw(...)` / `Reactive.MarkRaw(...)` |
+| Tracking and batching controls | `PauseTracking`, `ResetTracking`, `StartBatch`, and `EndBatch` |
 
-C# cannot reproduce JavaScript `Proxy` safely under trimming and AOT. Vue's `reactive()` family
-therefore remains represented by `[Reactive]` and `[ShallowReactive]` source generation plus
-`ReactiveList<T>`, `ReactiveDictionary<TKey, TValue>`, and `ReactiveSet<T>`. This is a platform
-adaptation of the API, not an attempt to emulate `Proxy` through reflection.
+**`IsRef`, `Unref`, and `ToRef` are ratified short forms** and a recorded exception to the
+repository's whole-word naming rule. The whole-word spellings collide with the surface they operate
+on: `Reactive.ToReference(...)` is indistinguishable at a call site from the `Reference<T>` factory
+`Reactive.Reference(...)`, and `Unreference` reads as *releasing* a reference rather than reading
+through one. These three names are frozen; they are not an oversight to be corrected.
 
-`isProxy()` has no literal C# counterpart because the design creates no proxy object. Callers use
+### There is no proxy
+
+Reactive *objects* are not produced by intercepting member access at runtime. Trimming and
+NativeAOT forbid the dynamic interception a proxy-based design needs, so an object opts in through
+`[Reactive]` / `[ShallowReactive]` and a source generator emits its per-property reactive wrappers,
+while reactive collections are dedicated types — `ReactiveList<T>`,
+`ReactiveDictionary<TKey, TValue>`, and `ReactiveSet<T>` — that implement the BCL collection
+interfaces rather than wrapping BCL types (`[RCT-6]`).
+
+The consequence is deliberate: **there is no implicit deep reactivity** (`[RCT-7]`). An author opts
+in per class or per collection. This is more predictable and less magical, and it is what makes the
+model trimming-safe. There is likewise nothing to ask "is this a proxy?" about — callers use
 `IsReactive` and `IsReadonly` to inspect generated reactive objects and reactive collections.
 
 ## Type model
@@ -128,6 +142,6 @@ Standalone watches run synchronously unless a caller supplies an
 the runtime-bound `ViuWatch` facade; none of those concerns introduce a Reactivity dependency on
 Core or Components.
 
-`EffectScope` and `Reactive.EffectScope(...)` remain the Vue-shaped developer APIs.
+`EffectScope` and `Reactive.EffectScope(...)` are the developer-facing scope APIs.
 Abstraction-facing consumers use `IReactiveEffectScopeFactory`, normally through
 `ReactiveEffectScopeFactory`, when they should not depend on the concrete scope type.

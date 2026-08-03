@@ -1,8 +1,8 @@
 namespace Assimalign.Viu.Syntax;
 
 /// <summary>
-/// A point in a parsed source string. The C# port of Vue 3.5's <c>Position</c> interface
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>, re-exported by <c>@vue/compiler-sfc</c>). Shared by every
+/// A point in a parsed source string, carried as an offset plus a line/column pair so a diagnostic can
+/// be reported against either coordinate without a second scan. Shared by every
 /// <c>Assimalign.Viu.Syntax.*</c> parser so their spans use one coordinate model. A value type with
 /// structural equality so it participates in the owning node's value comparison — the incremental-caching
 /// contract of the derived parsers ([V01.01.05.01]/[V01.01.06.01]).

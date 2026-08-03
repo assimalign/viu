@@ -13,9 +13,8 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// The shared <c>.viu</c>/<c>.vue</c> → C# projection facade ([V01.01.06.11]) — the ONE
 /// implementation of parse → analyze → compile → model that the Assimalign.Viu.Generators.Syntax
 /// source generator runs at build time and the Assimalign.Viu.LanguageService runs in the editor, so
-/// scaffold names, render mapping, and diagnostics can never drift between the two hosts. The C#
-/// analogue of <c>@vue/compiler-sfc</c>'s <c>compileScript()</c>/<c>compileTemplate()</c> pipeline
-/// consumed by both a build plugin and Volar. Everything host-specific stays outside: the generator
+/// scaffold names, render mapping, and diagnostics can never drift between the two hosts. Specified by
+/// <c>[TOOL-2]</c>. Everything host-specific stays outside: the generator
 /// owns the incremental pipeline, file reads, hot-reload gating, and <c>.vue</c>-shadowing; the
 /// language service owns request caching and LSP mapping. Both feed a value-equatable
 /// <see cref="SingleFileComponentProjectionInput"/> and receive a value-equatable
@@ -374,9 +373,9 @@ internal static class SingleFileComponentProjection
             // static runs collapse to innerHTML string inserts, cutting per-node JS-interop round-trips on
             // WASM. Deterministic and value-equatable, so the incremental-generator cache is preserved.
             transformOptions.HoistStatic = true;
-            // CacheHandlers stays off: the upstream cached member-expression wrapper `(...args) => ...`
-            // has no C# spelling yet; handler caching is runtime-binding follow-up work. v-once caching
-            // is independent of this switch and fully emitted.
+            // CacheHandlers stays off: the cached member-expression wrapper form has no C# spelling yet;
+            // handler caching is runtime-binding follow-up work. v-once caching is independent of this
+            // switch and fully emitted.
             transformOptions.OnError = error => diagnostics.Add(
                 SingleFileComponentDiagnostics.Create(input.FilePath, error, fromTemplate: true, blockContentStart));
 
@@ -434,8 +433,8 @@ internal static class SingleFileComponentProjection
         {
             // [V01.01.06.06.01] Route the extracted expression through the template compiler's
             // binding-metadata rewriting (instance-member mode), so `v-bind(count)` unwraps a script
-            // IReactiveReference<T> member to `count.Value` automatically — matching upstream cssVars
-            // ergonomics.
+            // IReactiveReference<T> member to `count.Value` automatically, so a CSS binding reads exactly
+            // like a template binding.
             // A malformed expression surfaces its diagnostics on the exact .viu style coordinate through
             // the same style-origin envelope the CSS parse diagnostics use.
             var compiled = TemplateExpressionCompiler.CompileInstanceExpression(
@@ -459,8 +458,7 @@ internal static class SingleFileComponentProjection
     }
 
     // The template spelling of a `module` option ([V01.01.05.04.01]): the default (valueless `module`) is
-    // Vue's `$style`; a named module is referenced by its authored name (`<style module="theme">` -> `theme`),
-    // exactly as Vue's render context exposes it.
+    // `$style`; a named module is referenced by its authored name (`<style module="theme">` -> `theme`).
     private static string ModuleTemplateName(string? moduleName)
         => string.IsNullOrEmpty(moduleName) ? "$style" : moduleName!;
 

@@ -10,8 +10,8 @@ namespace Assimalign.Viu;
 /// </summary>
 /// <remarks>
 /// String references are intentionally unsupported because Viu has no reflection-backed component
-/// proxy. This mirrors Vue 3.5's object and function template-reference forms:
-/// https://vuejs.org/guide/essentials/template-refs.html.
+/// proxy. Both forms exist because a reference may need to be either stored (the object form) or
+/// observed (the callback form, which also sees the null on unmount).
 /// </remarks>
 public sealed class TemplateReference :
     IComponentReference,

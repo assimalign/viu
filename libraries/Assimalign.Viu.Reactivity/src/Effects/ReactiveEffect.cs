@@ -4,7 +4,7 @@ using System.Diagnostics;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// The subscriber primitive underneath render effects and watchers — the C# port of Vue 3.5's
+/// The subscriber primitive underneath render effects and watchers — Viu's
 /// <c>ReactiveEffect</c>. <see cref="Run"/> executes the function with this effect installed as
 /// the ambient active subscriber, re-collecting dependencies with version-based cleanup (deps not
 /// read in the latest run are unlinked). When a tracked dependency triggers, the effect either
@@ -42,7 +42,7 @@ public sealed class ReactiveEffect : Subscriber
 
     /// <summary>
     /// When <see langword="true"/>, the effect may re-trigger itself by writing its own
-    /// dependencies (Vue <c>ALLOW_RECURSE</c> parity). Default <see langword="false"/>:
+    /// dependencies. Default <see langword="false"/>:
     /// self-triggering while running is ignored, preventing infinite loops.
     /// </summary>
     public bool AllowRecurse
@@ -66,7 +66,8 @@ public sealed class ReactiveEffect : Subscriber
 
     /// <summary>
     /// Executes the function with this effect as the active subscriber, re-collecting its
-    /// dependencies. After a stop, runs the function untracked (Vue parity). The previous active
+    /// dependencies. After a stop, runs the function untracked — a stopped effect still executes on
+    /// an explicit call but never re-subscribes. The previous active
     /// subscriber is restored even if the function throws, so nested effects stay isolated.
     /// </summary>
     public void Run()
@@ -120,7 +121,7 @@ public sealed class ReactiveEffect : Subscriber
 
     /// <summary>
     /// Resumes notification delivery; if anything triggered while paused, delivers a single
-    /// trailing invalidation (Vue 3.5 pause/resume parity).
+    /// trailing invalidation.
     /// </summary>
     public void Resume()
     {

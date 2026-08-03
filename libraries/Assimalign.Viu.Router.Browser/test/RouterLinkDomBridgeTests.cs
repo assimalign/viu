@@ -11,10 +11,10 @@ using Assimalign.Viu.Testing;
 namespace Assimalign.Viu.Router.Browser.Tests;
 
 // Pins the Router<->DOM click bridge ([V01.01.08.03.01], issue #191): the browser adapter's
-// BrowserEvent is mapped onto vue-router's guardEvent contract (button + system modifiers +
-// defaultPrevented, packages/router/src/RouterLink.ts, https://github.com/vuejs/router) and the
-// guard's preventDefault decision is mirrored back onto the live event's response flags. DOM-free
-// through the in-memory Testing renderer; real-browser behavior is the e2e harness ([V01.01.11.03]).
+// BrowserEvent is mapped onto RouterLinkClickEvent (mouse button, the four system modifiers, and the
+// arrival-time defaultPrevented state), and the guard's preventDefault decision is propagated back
+// onto the live event's response flags. DOM-free through the in-memory Testing renderer;
+// real-browser behavior is the e2e harness ([V01.01.11.03]).
 public class RouterLinkDomBridgeTests
 {
     // --- mapping: BrowserEvent -> RouterLinkClickEvent -------------------------------------------
@@ -43,7 +43,7 @@ public class RouterLinkDomBridgeTests
     public void Invoke_SeedsAlreadyPreventedState_SoTheGuardBails()
     {
         // An event that arrived prevented -> the RouterLinkClickEvent reads DefaultPrevented, so the
-        // guard falls through (upstream guardEvent bails on e.defaultPrevented).
+        // guard falls through and the bridge never re-signals.
         Bridge(Click(defaultPrevented: true)).DefaultPrevented.ShouldBeTrue();
     }
 

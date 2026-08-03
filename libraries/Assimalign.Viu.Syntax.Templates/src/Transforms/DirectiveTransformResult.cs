@@ -3,9 +3,9 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The result of a directive transform: the vnode properties it contributes and, optionally, the runtime
-/// directive it needs applied via <c>withDirectives</c>. The C# port of Vue 3.5's
-/// <c>DirectiveTransformResult</c> (<c>@vue/compiler-core</c> <c>transform.ts</c>).
+/// The result of a directive transform: the render-node properties it contributes and, optionally, the
+/// runtime directive it needs applied via <c>withDirectives</c>. A directive that compiles away entirely
+/// contributes properties and no runtime directive.
 /// </summary>
 public sealed record DirectiveTransformResult
 {
@@ -14,13 +14,13 @@ public sealed record DirectiveTransformResult
 
     /// <summary>
     /// The runtime directive helper to apply (e.g. <c>vShow</c>, <c>vModelText</c>), or <see langword="null"/>
-    /// when the directive contributes only props. Mirrors upstream's <c>needRuntime</c> symbol case.
+    /// when the directive contributes only props. A directive that compiles away entirely leaves this null.
     /// </summary>
     public RuntimeHelper? NeedRuntime { get; init; }
 
     /// <summary>
     /// Whether the directive needs a resolved (user) runtime directive without a specific helper symbol,
-    /// mirroring upstream's <c>needRuntime: true</c> boolean case.
+    /// so the renderer applies the directive at runtime.
     /// </summary>
     public bool NeedsResolvedDirective { get; init; }
 }

@@ -5,9 +5,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The <c>v-memo</c> transform: wraps the element's compiled subtree in a <c>withMemo</c> call carrying the
-/// dependency expression and a per-instance cache index. The C# port of Vue 3.5's <c>transformMemo</c>
-/// (<c>@vue/compiler-core</c> <c>transforms/vMemo.ts</c>). See
-/// https://vuejs.org/api/built-in-directives.html#v-memo.
+/// dependency expression and a per-instance cache index.
 /// </summary>
 internal static class VMemoTransform
 {
@@ -28,8 +26,8 @@ internal static class VMemoTransform
         // v-memo on a v-for element is memoized per item by the v-for transform's render-list loop, not by a
         // whole-subtree withMemo. This guard skips the outer element that still carries v-for; the v-for
         // transform separately marks its reduced inner element as seen (SeenMemo). Together they prevent the
-        // double handling that upstream's shared WeakSet suppresses on a single mutated node — which the
-        // immutable model, producing a fresh reduced element, cannot rely on. Pinned by
+        // double handling. Node identity cannot carry the mark, because the transform produces a fresh
+        // reduced element rather than mutating one node. Pinned by
         // VOnceMemoTransformTests.VMemo_WithVFor_ProducesPerItemMemoLoop.
         if (TransformUtilities.FindDirective(element, "for") is not null)
         {

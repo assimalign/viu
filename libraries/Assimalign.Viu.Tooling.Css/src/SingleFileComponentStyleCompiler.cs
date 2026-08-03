@@ -196,9 +196,9 @@ public static class SingleFileComponentStyleCompiler
             ? scopeId.Substring(ScopeIdPrefix.Length)
             : scopeId;
 
-    // The generated accessor class name for a `module` option: default (valueless `module`) maps to `Style` —
-    // the C# analogue of Vue's `$style`, which has no legal C# spelling — and `module="name"` maps to the
-    // pascal-cased name.
+    // The generated accessor class name for a `module` option: the default (valueless `module`) maps to
+    // `Style`, because the `$style` name a template writes has no legal C# spelling; `module="name"` maps
+    // to the pascal-cased name.
     private static string ModuleAccessorName(string? moduleName)
         => string.IsNullOrEmpty(moduleName) ? "Style" : PascalCase(moduleName!);
 

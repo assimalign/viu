@@ -5,8 +5,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Reactivity.Tests;
 
-// Watch/WatchEffect semantics, mirroring Vue 3.5's apiWatch/baseWatch
-// (https://vuejs.org/api/reactivity-core.html#watch and .../watchers.html). Run counts are pinned.
+// Watch/WatchEffect semantics: source declaration, old-value delivery, flush timing, cleanup
+// ordering, and stop/pause. Run counts are pinned, because a caching or dependency-tracking bug
+// hides behind a correct-looking final value.
 public sealed class WatchTests
 {
     [Fact]
@@ -216,7 +217,7 @@ public sealed class WatchTests
 
         source.Value = 2;
         source.Value = 3;
-        // Deduplicated to a single queued job (upstream scheduler dedup).
+        // Deduplicated to a single queued job by the scheduler.
         scheduler.ScheduledJobs.Count.ShouldBe(1);
         scheduler.ScheduledJobs[0].Flush.ShouldBe(WatchFlushMode.Post);
 

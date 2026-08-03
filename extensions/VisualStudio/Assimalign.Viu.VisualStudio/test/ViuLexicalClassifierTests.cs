@@ -105,8 +105,8 @@ public class ViuLexicalClassifierTests
     [Fact]
     public void Classify_PascalCaseTemplateTag_ClassifiesAsComponent()
     {
-        // Vue names components in PascalCase; plain lowercase names are HTML elements or the
-        // lowercase Vue built-ins: https://vuejs.org/guide/components/registration
+        // Viu components are named in PascalCase; a plain lowercase name is an HTML element or a
+        // lowercase built-in. Casing is the only signal a lexical classifier has ([CMP-6]).
         string[] lines =
         [
             "<template>",

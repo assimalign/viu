@@ -4,11 +4,13 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Css;
 
-// The scoped-CSS rewrite ([V01.01.06.04]), pinned against @vue/compiler-sfc's pluginScoped test
-// expectations (packages/compiler-sfc/__tests__/compileStyle.spec.ts) so a divergence from Vue's
-// documented scoping semantics is caught, not enshrined. Scope id "data-v-test" yields the attribute
-// "[data-v-test]" (no value) and the keyframes short id "test", matching upstream's fixtures.
-// See https://vuejs.org/api/sfc-css-features.html.
+// The scoped-CSS rewrite ([V01.01.06.04], specified by [STY-1]). These cases ARE the contract for
+// where the scope attribute lands: the last compound of each complex selector; prepended for a
+// leading pseudo-element; skipped entirely inside :global(); redirected to the preceding compound by
+// :deep() and to the "-s" suffix by :slotted(). @keyframes names take the short-id suffix and every
+// animation reference is rewritten to match, in either source order. A case here is changed only by a
+// deliberate decision to change the rewrite, never as cleanup.
+// Scope id "data-v-test" yields the attribute "[data-v-test]" (no value) and the keyframes short id "test".
 public class CssScopedRewriterTests
 {
     [Fact]
@@ -105,7 +107,7 @@ public class CssScopedRewriterTests
     public void Rewrite_Keyframes_ForwardReferenceFromEarlierRule_IsRewritten()
     {
         // The animation declaration precedes its @keyframes; the two-pass collect resolves it regardless
-        // of source order (upstream collects in AtRule, rewrites in OnceExit).
+        // of source order: keyframe names are collected in a first pass, then references rewritten.
         var source =
             ".anim { animation-name: spin; }\n" +
             "@keyframes spin { from { opacity: 0; } to { opacity: 1; } }\n";

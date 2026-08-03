@@ -3,18 +3,17 @@ using System;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The value a <see cref="NavigationGuard"/> returns to decide a navigation — the C# stand-in for the
-/// value vue-router guards produce (<c>true</c>/<c>false</c>/a location, or the equivalent
-/// <c>next()</c>/<c>next(false)</c>/<c>next(location)</c> calls;
-/// https://router.vuejs.org/guide/advanced/navigation-guards.html). Use the shared
-/// <see cref="Allow"/> and <see cref="Abort"/> singletons for the common cases and
+/// The value a <see cref="NavigationGuard"/> returns to decide a navigation: proceed, abort, or
+/// redirect. Use the shared <see cref="Allow"/> and <see cref="Abort"/> singletons for the common
+/// cases and
 /// <see cref="RedirectTo(string)"/>/<see cref="RedirectToName(string, RouteParameters)"/> to send the
-/// navigation to a different location.
+/// navigation to a different location. Specified by <c>[RTR-5]</c>.
 /// </summary>
 /// <remarks>
 /// Immutable and safe to cache; the two singletons carry no per-navigation state. A redirect result
-/// re-enters the navigation pipeline against the new target (with infinite-redirect protection),
-/// exactly as upstream turns a guard-returned location into a fresh <c>pushWithRedirect</c>.
+/// re-enters the navigation pipeline against the new target — the redirected navigation runs every
+/// guard again from the top, under the redirect-depth cap enforced by
+/// <see cref="NavigationRedirectException"/>.
 /// </remarks>
 public sealed class NavigationGuardResult
 {
@@ -31,23 +30,23 @@ public sealed class NavigationGuardResult
     }
 
     /// <summary>
-    /// Allow the navigation to proceed to the next guard and stage (upstream: <c>return true</c> /
-    /// <c>next()</c>).
+    /// Allow the navigation to proceed to the next guard and stage. Shared and stateless, so
+    /// returning it allocates nothing.
     /// </summary>
     public static NavigationGuardResult Allow { get; } =
         new(NavigationGuardAction.Allow, null, null, null);
 
     /// <summary>
     /// Abort the navigation, leaving <see cref="Router.CurrentRoute"/> and history untouched and
-    /// producing an <see cref="NavigationFailureType.Aborted"/> failure (upstream: <c>return false</c>
-    /// / <c>next(false)</c>).
+    /// producing an <see cref="NavigationFailureType.Aborted"/> failure. Shared and stateless, so
+    /// returning it allocates nothing.
     /// </summary>
     public static NavigationGuardResult Abort { get; } =
         new(NavigationGuardAction.Abort, null, null, null);
 
     /// <summary>
-    /// Redirect the navigation to the given base-stripped path, restarting the pipeline against it
-    /// (upstream: <c>return '/path'</c> / <c>next('/path')</c>).
+    /// Redirect the navigation to the given base-stripped path, restarting the pipeline against it —
+    /// every guard runs again from the top, under the redirect-depth cap.
     /// </summary>
     /// <param name="location">The path to redirect to.</param>
     /// <returns>A redirect result carrying <paramref name="location"/>.</returns>
@@ -60,7 +59,7 @@ public sealed class NavigationGuardResult
 
     /// <summary>
     /// Redirect the navigation to a named route with interpolated parameters, restarting the pipeline
-    /// against it (upstream: <c>return { name, params }</c> / <c>next({ name, params })</c>).
+    /// against it — every guard runs again from the top, under the redirect-depth cap.
     /// </summary>
     /// <param name="name">The target route name.</param>
     /// <param name="parameters">The parameters to interpolate into the named route.</param>

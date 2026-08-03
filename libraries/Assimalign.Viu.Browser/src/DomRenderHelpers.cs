@@ -10,8 +10,9 @@ namespace Assimalign.Viu.Browser;
 /// Provides the browser-specific helper names emitted by the template compiler.
 /// </summary>
 /// <remarks>
-/// The underscore-prefixed names deliberately mirror Vue's generated helper vocabulary. Directive
-/// members are unresolved metadata only; redesigned Core remains responsible for resolving and
+/// The underscore prefix marks a member as compiler-emission surface rather than an API a developer
+/// writes by hand; the names are part of the code-generation contract and are not renamed casually.
+/// Directive members are unresolved metadata only; Core remains responsible for resolving and
 /// invoking a registered directive. Task-returning handler overloads preserve the returned
 /// <see cref="Task"/> so browser dispatch can observe failures.
 /// </remarks>

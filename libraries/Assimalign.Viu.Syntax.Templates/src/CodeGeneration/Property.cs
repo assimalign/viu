@@ -1,8 +1,8 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A single key/value entry in an <see cref="ObjectExpression"/>. The C# port of Vue 3.5's <c>Property</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>). Used for vnode props, slot objects, and modifier maps.
+/// A single key/value entry in an <see cref="ObjectExpression"/>. Used for render-node props, slot
+/// objects, and modifier maps.
 /// </summary>
 public sealed record Property : TemplateSyntaxNode
 {

@@ -7,6 +7,10 @@ using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Shared.Tests;
 
+// Pins the PatchFlags bit layout. The values are a frozen contract between compiled output and
+// the runtime: changing one silently breaks components compiled by an earlier Viu, so values are
+// additive only and this table is the guard against an accidental renumbering ([RND-FLAGS-1],
+// [RND-FLAGS-3]).
 public class PatchFlagsParityTests
 {
     [Theory]

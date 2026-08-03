@@ -1,8 +1,9 @@
 # Assimalign.Viu.Reactivity
 
-The independent home for Viu's Vue-shaped reactive engine: references,
+The independent home for Viu's reactive engine: references,
 computeds, dependencies, subscribers, effects, effect scopes, collections, watch primitives,
-reactive-object generation, traversal, and introspection.
+reactive-object generation, traversal, and introspection. Specified by
+[`docs/SPECIFICATION.md` §5](../../../docs/SPECIFICATION.md#5-reactivity).
 
 Commit `80bb967` is the documentation tail of the Core consolidation. The useful code baseline is
 its ancestor `470142e`, the last snapshot with a standalone `Assimalign.Viu.Reactivity` package;

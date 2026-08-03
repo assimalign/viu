@@ -1,8 +1,8 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A plain (non-directive) attribute. The C# port of Vue 3.5's <c>AttributeNode</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>).
+/// A plain (non-directive) attribute: a literal name and optional literal value, with no expression to
+/// evaluate. The transform stage turns it into a static property, so it never contributes a patch flag.
 /// </summary>
 public sealed record AttributeNode : PropertyNode
 {

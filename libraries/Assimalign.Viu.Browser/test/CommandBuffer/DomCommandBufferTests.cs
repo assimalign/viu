@@ -189,7 +189,7 @@ public sealed class DomCommandBufferTests
         buffer.WriteCreateElement(two, "li", null);
 
         // The FLIP write frame ([V01.01.04.07.03]): invert every moved child, one reflow barrier, then the
-        // move class + transform clear — the exact upstream applyTranslation/forceReflow/moveClass order.
+        // move class + transform clear — the exact invert/reflow/move-class order the FLIP requires.
         buffer.WriteSetMoveTransform(one, 12.5, -7.25); // fractional deltas prove the float64 operand fidelity
         buffer.WriteSetMoveTransform(two, 0, 40);
         buffer.WriteForceReflow();

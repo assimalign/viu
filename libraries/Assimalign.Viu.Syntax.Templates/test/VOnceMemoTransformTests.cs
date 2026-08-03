@@ -6,8 +6,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/vOnce.spec.ts and vMemo.spec.ts:
-// v-once caches the subtree; v-memo wraps it in withMemo; their interaction with v-for.
+// These cases ARE the contract for v-once (caches the subtree) and v-memo (wraps it in withMemo),
+// including their interaction when both appear on a v-for element.
 public class VOnceMemoTransformTests
 {
     [Fact]

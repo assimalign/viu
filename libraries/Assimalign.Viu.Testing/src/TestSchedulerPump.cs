@@ -8,8 +8,7 @@ namespace Assimalign.Viu.Testing;
 /// <summary>
 /// Captures the <see cref="Scheduler"/>'s scheduled flushes and runs them only when the test
 /// says so, making the microtask-like flush deterministic on a plain CoreCLR test host — the
-/// stand-in for "let the JS event loop run" around Vue's <c>nextTick</c> flush
-/// (https://vuejs.org/api/general.html#nexttick). Installed via the scheduler's internal
+/// stand-in for "let the JS event loop run" that a real host provides. Installed via the scheduler's internal
 /// dispatcher seam rather than an ambient <see cref="System.Threading.SynchronizationContext"/>,
 /// so test-framework thread hops cannot strand a flush. Install in a <c>using</c> block;
 /// disposal restores the previous dispatcher. Not thread-safe by design.

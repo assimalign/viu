@@ -10,8 +10,11 @@ namespace Assimalign.Viu.Browser;
 /// current element tag and input type at runtime.
 /// </summary>
 /// <remarks>
-/// This is Viu's C# port of Vue 3.5's <c>vModelDynamic</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/directives/vModel.ts.
+/// Used where the compiler cannot prove which model directive applies — a dynamic <c>:type</c>, or a
+/// <c>&lt;component :is&gt;</c> that resolves to an element tag. Each hook re-resolves the concrete
+/// directive from the element's current tag and type and forwards to it, so a control that changes
+/// type between renders is torn down and re-bound with the right semantics rather than keeping the
+/// first one it happened to match.
 /// </remarks>
 public sealed class VModelDynamic : IDirective
 {

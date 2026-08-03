@@ -8,7 +8,7 @@ namespace Assimalign.Viu;
 /// Shares host-neutral transition state across multiple children owned by one component.
 /// </summary>
 /// <remarks>
-/// This is the Core half of Vue 3.5's TransitionGroup choreography. Host packages retain ownership
+/// This is the Core half of transition-group choreography. Host packages retain ownership
 /// of layout measurement and visual effects. The scope is component-local and is not thread-safe.
 /// </remarks>
 public sealed class ComponentTransitionScope

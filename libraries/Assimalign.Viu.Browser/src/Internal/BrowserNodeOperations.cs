@@ -6,10 +6,10 @@ using Assimalign.Viu;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The production <see cref="RendererOptions{TNode}"/> over the DOM bridge — the browser
-/// implementation of Vue's <c>nodeOps</c> + <c>patchProp</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/nodeOps.ts). Handles are
-/// ints (see the marshaling ADR in <c>libraries/Assimalign.Viu.Browser/docs/</c>); 0 is the
+/// The production <see cref="RendererOptions{TNode}"/> over the DOM bridge: the browser's
+/// implementation of the host primitives Core's renderer needs — node creation, insertion, removal,
+/// text and property patching — and nothing about the tree walk itself ([RND-HOST-1]). Handles
+/// are ints (see the marshaling ADR in <c>libraries/Assimalign.Viu.Browser/docs/</c>); 0 is the
 /// "no node" sentinel. Node removal releases the removed subtree's JS handles and DOM
 /// listeners deterministically, and the returned handle list purges the invoker registry in
 /// the same call — no leaks on either side of the boundary ([V01.01.04.01]). Event handling

@@ -4,10 +4,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Pins the DOM error-code numbering decision for [V01.01.05.03]. Viu merges compiler-core and
-// compiler-dom into one error enum; upstream's DOMErrorCodes reuses core's __EXTEND_POINT__ value (53) as
-// its first code, which one C# enum cannot do while keeping ExtendPoint == 53 (pinned by ErrorTests). The
-// DOM codes are therefore appended after the preserved sentinel (each = its upstream DOMErrorCodes value + 1).
+// Pins the DOM error-code numbering decision for [V01.01.05.03]. Viu keeps the core and DOM diagnostics
+// in ONE enum, so a diagnostic consumer never switches on two catalog types. A single C# enum cannot give
+// two members the same value, and the ExtendPoint sentinel's 53 is pinned by ErrorTests, so the DOM band
+// starts at 54, immediately after the preserved sentinel. Both boundaries are frozen.
 public class DomErrorCatalogTests
 {
     [Fact]

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Reactivity.Tests;
 
-// Reactive collection instrumentation, mirroring Vue 3.5's array/Map/Set handlers
+// Reactive collection tracking granularity — Viu's list/dictionary/set
 // (packages/reactivity/src/collectionHandlers.ts, arrayInstrumentations.ts). Run counts are pinned:
 // per-key granularity means an effect re-runs only for the entry it actually read.
 public sealed class ReactiveCollectionTests
@@ -91,7 +91,7 @@ public sealed class ReactiveCollectionTests
         indexRuns.ShouldBe(1);
         enumerationRuns.ShouldBe(1);
 
-        // Upstream dep.ts trigger(): a numeric SET runs the index dep and ARRAY_ITERATE_KEY (so
+        // Assigning an existing index triggers that index and iteration (so
         // enumerating effects observe the replacement) but not the length dep.
         list[1] = 20;
         lengthRuns.ShouldBe(1);
@@ -183,7 +183,7 @@ public sealed class ReactiveCollectionTests
         });
         runs.ShouldBe(1);
 
-        // Upstream dep.ts trigger(): a Map SET runs ITERATE_KEY (values()/entries() observe
+        // Assigning an existing key triggers entry iteration (Values and enumeration observe
         // values, and size shares that dep), so an entry-iteration effect re-runs.
         dictionary["a"] = 2;
         runs.ShouldBe(2);
@@ -192,7 +192,7 @@ public sealed class ReactiveCollectionTests
         dictionary["a"] = 2;
         runs.ShouldBe(2);
 
-        // Upstream Map ADD / DELETE trigger iteration as well.
+        // Adding or removing a key triggers iteration as well.
         dictionary["c"] = 3;
         runs.ShouldBe(3);
 
@@ -214,7 +214,7 @@ public sealed class ReactiveCollectionTests
         runs.ShouldBe(1);
         keyCount.ShouldBe(1);
 
-        // Upstream MAP_KEY_ITERATE_KEY: keys() re-runs only on ADD/DELETE — a value replacement
+        // Keys-only iteration re-runs only on add/remove — a value replacement
         // leaves a keys-only effect untouched.
         dictionary["a"] = 99;
         runs.ShouldBe(1);

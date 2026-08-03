@@ -1,9 +1,8 @@
 # Assimalign.Viu.ServerRenderer — overview
 
-`Assimalign.Viu.ServerRenderer` is Viu's host-neutral counterpart to
-[`@vue/server-renderer`](https://github.com/vuejs/core/tree/main/packages/server-renderer). It walks
-the same unified `IComponent` tree that client renderers patch and emits HTML on a plain .NET host.
-It has no DOM, Browser, WebView2, or JavaScript-interop dependency.
+`Assimalign.Viu.ServerRenderer` is Viu's host-neutral server-rendering library. It walks the same
+unified `IComponent` tree that client renderers patch and emits HTML on a plain .NET host. It has no
+DOM, Browser, WebView2, or JavaScript-interop dependency.
 
 ## Public surface
 
@@ -17,8 +16,9 @@ It has no DOM, Browser, WebView2, or JavaScript-interop dependency.
 - `SsrContext` carries per-render teleport output and a free-form state handoff bag.
 - `SsrRenderState` is the push surface shared by the runtime walker and future compiler-produced server
   render functions.
-- `ServerRender` contains Vue-compatible escaping, attribute, list, slot, teleport, suspense, and
-  component helpers.
+- `ServerRender` contains the escaping, attribute, list, slot, teleport, suspense, and component
+  helpers, shared by the runtime walker and the future generated render bodies so both produce
+  byte-identical output.
 
 Internally, `ComponentTreeSerializer` dispatches the seven `ComponentKind` values.
 `ServerComponentRenderer` uses Core's shared `MountedComponent` pipeline to create a fresh

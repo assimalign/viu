@@ -7,19 +7,18 @@ using System.Text.RegularExpressions;
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// Class and style value normalization — the C# port of <c>normalizeClass</c>,
-/// <c>normalizeStyle</c>, <c>parseStringStyle</c>, and <c>stringifyStyle</c> from
-/// <c>@vue/shared</c> (<c>packages/shared/src/normalizeProp.ts</c>,
-/// https://vuejs.org/guide/essentials/class-and-style.html). Bindings accept string, nested
-/// enumerable, and dictionary (name → truthy) forms exactly as Vue 3 does; truthiness follows
-/// JavaScript semantics (false, null, numeric zero, NaN, and "" are falsy). These run per vnode
+/// Class and style value normalization: the collapse of every accepted <c>:class</c>/<c>:style</c>
+/// binding shape into the single string or dictionary the host applies. Bindings accept string,
+/// nested enumerable, and dictionary (name → truthy) forms; truthiness follows the host coercion
+/// rules the DOM already imposes (false, null, numeric zero, NaN, and "" are falsy), so a binding
+/// behaves the same whether its value crossed the interop boundary or not. These run per node
 /// on the patch hot path — string inputs take allocation-free fast paths.
 /// </summary>
 public static partial class StyleAndClassNormalization
 {
     /// <summary>
-    /// Normalizes a class binding to its space-joined string form (upstream:
-    /// <c>normalizeClass</c>). Strings pass through trimmed; enumerables recurse; dictionaries
+    /// Normalizes a class binding to its space-joined string form.
+    /// Strings pass through trimmed; enumerables recurse; dictionaries
     /// contribute the keys whose values are truthy, in entry order.
     /// </summary>
     /// <param name="value">The class binding: string, enumerable, dictionary, or null.</param>
@@ -40,7 +39,7 @@ public static partial class StyleAndClassNormalization
     }
 
     /// <summary>
-    /// Normalizes a style binding (upstream: <c>normalizeStyle</c>): enumerables merge into one
+    /// Normalizes a style binding: enumerables merge into one
     /// dictionary with later entries winning (string entries parse via
     /// <see cref="ParseStringStyle"/>); strings and dictionaries pass through.
     /// </summary>
@@ -90,8 +89,8 @@ public static partial class StyleAndClassNormalization
     }
 
     /// <summary>
-    /// Parses a CSS declaration string into a name → value dictionary (upstream:
-    /// <c>parseStringStyle</c>): comments are stripped, declarations split on <c>;</c> except
+    /// Parses a CSS declaration string into a name → value dictionary:
+    /// comments are stripped, declarations split on <c>;</c> except
     /// inside parentheses (so <c>url(data:...)</c> survives), and each declaration splits on
     /// its first <c>:</c>.
     /// </summary>
@@ -124,7 +123,7 @@ public static partial class StyleAndClassNormalization
     }
 
     /// <summary>
-    /// Serializes a style value to inline CSS text (upstream: <c>stringifyStyle</c>): strings
+    /// Serializes a style value to inline CSS text: strings
     /// pass through; dictionary keys emit as-is when kebab-case or <c>--custom</c>, camelCase
     /// keys hyphenate.
     /// </summary>
@@ -159,8 +158,8 @@ public static partial class StyleAndClassNormalization
     }
 
     /// <summary>
-    /// JavaScript truthiness for binding values (upstream's implicit coercion): false, null,
-    /// numeric zero, NaN, and the empty string are falsy; everything else is truthy.
+    /// Truthiness for binding values, following the host coercion rules the DOM imposes: false,
+    /// null, numeric zero, NaN, and the empty string are falsy; everything else is truthy.
     /// </summary>
     /// <param name="value">The value to test.</param>
     public static bool IsTruthy(object? value) => value switch
@@ -250,9 +249,9 @@ public static partial class StyleAndClassNormalization
     }
 
     /// <summary>
-    /// Converts camelCase to kebab-case (upstream: <c>hyphenate</c>, whose <c>\B([A-Z])</c>
-    /// inserts no hyphen before a leading capital: <c>WebkitTransition</c> →
-    /// <c>webkit-transition</c>).
+    /// Converts camelCase to kebab-case. No hyphen is inserted before a leading capital, so a
+    /// vendor-prefixed property survives intact: <c>WebkitTransition</c> →
+    /// <c>webkit-transition</c>.
     /// </summary>
     /// <param name="name">The camelCase name.</param>
     public static string Hyphenate(string name)
@@ -292,11 +291,11 @@ public static partial class StyleAndClassNormalization
         });
     }
 
-    // Upstream listDelimiterRE: split on ';' not inside parentheses.
+    // Declaration delimiter: split on ';' not inside parentheses.
     [GeneratedRegex(@";(?![^(]*\))")]
     private static partial Regex ListDelimiterPattern();
 
-    // Upstream styleCommentRE: strip /* ... */ comments (JS [^] becomes [\s\S] in .NET).
+    // Strip /* ... */ comments. [\s\S] is the .NET spelling of a match-anything class.
     [GeneratedRegex(@"/\*[\s\S]*?\*/")]
     private static partial Regex StyleCommentPattern();
 }

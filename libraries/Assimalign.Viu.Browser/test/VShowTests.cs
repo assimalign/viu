@@ -8,8 +8,8 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the Browser implementation to Vue's vShow behavior:
-// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vShow.ts.
+// Pins Viu's v-show contract: the author-supplied inline display value is captured and restored,
+// an initially falsy element is hidden before insertion, and the element is never destroyed.
 public sealed class VShowTests : IDisposable
 {
     private readonly BrowserDirectiveTestHarness _harness = new();

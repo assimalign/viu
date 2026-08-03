@@ -7,10 +7,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, describe('Errors'): each case
-// asserts the complete reported error set — code AND exact offset/line/column — matching upstream's
-// expected arrays verbatim. Codes upstream leaves commented out (not emitted by the 3.4+ state-machine
-// parser, e.g. ABRUPT_CLOSING_OF_EMPTY_COMMENT, MISSING_WHITESPACE_BETWEEN_ATTRIBUTES) have no cases here.
+// Recoverable parse errors. Each case asserts the COMPLETE reported error set for its input — code AND
+// exact offset/line/column — so a new spurious diagnostic fails just as loudly as a missing one. Codes
+// the state-machine parser never emits (ABRUPT_CLOSING_OF_EMPTY_COMMENT,
+// MISSING_WHITESPACE_BETWEEN_ATTRIBUTES) have no cases here; they exist in the catalog for later stages.
 public class ErrorTests
 {
     public static IEnumerable<object[]> ErrorCases()
@@ -138,7 +138,7 @@ public class ErrorTests
         string source,
         (CompilerErrorCode Code, int Offset, int Line, int Column)[] expected)
     {
-        // Mirrors the upstream harness: parseMode 'html' with getNamespace mapping only <svg> to SVG.
+        // The harness these cases run under: HTML parse mode with namespace inference mapping only <svg>.
         var options = new ParserOptions
         {
             Mode = TemplateParseMode.Html,
@@ -173,7 +173,8 @@ public class ErrorTests
     [Fact]
     public void ErrorCatalog_NumericValues_MatchUpstreamErrorCodes()
     {
-        // Pins the numeric parity contract with @vue/compiler-core errors.ts (feeds [V01.01.05.08]).
+        // Pins the frozen band boundaries of the catalog: a code may be added, never renumbered or
+        // reused, because build logs and consumer NoWarn entries key on the number ([V01.01.05.08]).
         ((int)CompilerErrorCode.AbruptClosingOfEmptyComment).ShouldBe(0);
         ((int)CompilerErrorCode.UnexpectedSolidusInTag).ShouldBe(22);
         ((int)CompilerErrorCode.XInvalidEndTag).ShouldBe(23);

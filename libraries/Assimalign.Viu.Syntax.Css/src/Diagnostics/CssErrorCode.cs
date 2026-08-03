@@ -4,9 +4,9 @@ namespace Assimalign.Viu.Syntax.Css;
 /// The catalog of recoverable diagnostic codes the CSS parser emits. Like the single-file-component
 /// parser's <c>SingleFileComponentErrorCode</c>, these are <b>Viu-defined</b> codes: CSS Syntax Module
 /// Level 3 (https://www.w3.org/TR/css-syntax-3/#error-handling) specifies recovery, not a numeric error
-/// catalog, so there is no upstream numbering to pin to. Values start at 2000 to stay visibly distinct
-/// from the <c>.viu</c> container catalog (1000-based) and the template compiler's upstream-aligned
-/// codes.
+/// catalog. Values start at 2000 so a CSS diagnostic is distinguishable at a glance from the
+/// <c>.viu</c> container catalog (1000-based) and the template compiler's low band: a build surfaces all
+/// three side by side, and a reader must be able to tell which stage reported a code.
 /// </summary>
 public enum CssErrorCode
 {

@@ -4,21 +4,21 @@ using System.Text.RegularExpressions;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Shared query and rewrite helpers over the AST used across the transforms, ported from Vue 3.5's
-/// <c>@vue/compiler-core</c> <c>utils.ts</c> (<c>findDir</c>, <c>findProp</c>, <c>isStaticExp</c>,
-/// <c>injectProp</c>, <c>getMemoedVNodeCall</c>, …) and <c>ast.ts</c> (<c>convertToBlock</c>).
+/// Shared query and rewrite helpers over the AST used across the transforms: locating a directive or
+/// property on an element, testing an expression for staticness, injecting a property into a
+/// already-built props expression, and converting a render-node call into a block.
 /// </summary>
 internal static class TransformUtilities
 {
-    /// <summary>Whether <paramref name="node"/> is a static simple expression (upstream <c>isStaticExp</c>).</summary>
+    /// <summary>Whether <paramref name="node"/> is a static simple expression.</summary>
     public static bool IsStaticExpression(TemplateSyntaxNode? node)
         => node is SimpleExpressionNode { IsStatic: true };
 
-    /// <summary>Whether <paramref name="argument"/> is the static argument <paramref name="name"/> (upstream <c>isStaticArgOf</c>).</summary>
+    /// <summary>Whether <paramref name="argument"/> is the static argument <paramref name="name"/>.</summary>
     public static bool IsStaticArgumentOf(ExpressionNode? argument, string name)
         => argument is SimpleExpressionNode { IsStatic: true } simple && simple.Content == name;
 
-    /// <summary>Finds a directive by name (upstream <c>findDir</c>).</summary>
+    /// <summary>Finds a directive by name.</summary>
     public static DirectiveNode? FindDirective(ElementNode element, string name, bool allowEmpty = false)
     {
         foreach (var property in element.Properties)
@@ -33,7 +33,7 @@ internal static class TransformUtilities
         return null;
     }
 
-    /// <summary>Finds a directive whose name matches <paramref name="pattern"/> (upstream <c>findDir</c> regex form).</summary>
+    /// <summary>Finds a directive whose name matches the <paramref name="pattern"/> regular expression.</summary>
     public static DirectiveNode? FindDirective(ElementNode element, Regex pattern, bool allowEmpty = false)
     {
         foreach (var property in element.Properties)
@@ -48,7 +48,7 @@ internal static class TransformUtilities
         return null;
     }
 
-    /// <summary>Finds a plain attribute or static <c>v-bind</c> by name (upstream <c>findProp</c>).</summary>
+    /// <summary>Finds a plain attribute or static <c>v-bind</c> by name.</summary>
     public static PropertyNode? FindProperty(ElementNode element, string name, bool dynamicOnly = false, bool allowEmpty = false)
     {
         foreach (var property in element.Properties)
@@ -76,7 +76,7 @@ internal static class TransformUtilities
         return null;
     }
 
-    /// <summary>Whether the element has a <c>v-bind</c> with a dynamic key (upstream <c>hasDynamicKeyVBind</c>).</summary>
+    /// <summary>Whether the element has a <c>v-bind</c> with a dynamic key.</summary>
     public static bool HasDynamicKeyVBind(ElementNode element)
     {
         foreach (var property in element.Properties)
@@ -93,15 +93,15 @@ internal static class TransformUtilities
         return false;
     }
 
-    /// <summary>Whether <paramref name="node"/> is a <c>&lt;template&gt;</c> container (upstream <c>isTemplateNode</c>).</summary>
+    /// <summary>Whether <paramref name="node"/> is a <c>&lt;template&gt;</c> container.</summary>
     public static bool IsTemplateNode(TemplateSyntaxNode node)
         => node is ElementNode { ElementType: ElementType.Template };
 
-    /// <summary>Whether <paramref name="node"/> is a <c>&lt;slot&gt;</c> outlet (upstream <c>isSlotOutlet</c>).</summary>
+    /// <summary>Whether <paramref name="node"/> is a <c>&lt;slot&gt;</c> outlet.</summary>
     public static bool IsSlotOutlet(TemplateSyntaxNode node)
         => node is ElementNode { ElementType: ElementType.Slot };
 
-    /// <summary>Unwraps a <c>withMemo(...)</c>-wrapped vnode call (upstream <c>getMemoedVNodeCall</c>).</summary>
+    /// <summary>Unwraps a <c>withMemo(...)</c>-wrapped vnode call.</summary>
     public static TemplateSyntaxNode GetMemoedVNodeCall(TemplateSyntaxNode node)
     {
         if (node is CallExpression { Callee: RuntimeHelper helper } call &&
@@ -115,7 +115,7 @@ internal static class TransformUtilities
         return node;
     }
 
-    /// <summary>Turns a vnode call into a block, registering the block helpers (upstream <c>convertToBlock</c>).</summary>
+    /// <summary>Turns a vnode call into a block, registering the block helpers.</summary>
     public static VNodeCall ConvertToBlock(VNodeCall node, TransformContext context)
     {
         if (node.IsBlock)
@@ -131,7 +131,7 @@ internal static class TransformUtilities
 
     /// <summary>
     /// Injects <paramref name="property"/> as the first prop of a vnode call or <c>renderSlot</c> call
-    /// (upstream <c>injectProp</c>), returning the rewritten node.
+    ///, returning the rewritten node.
     /// </summary>
     public static TemplateSyntaxNode InjectProperty(TemplateSyntaxNode node, Property property, TransformContext context)
     {

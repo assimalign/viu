@@ -13,11 +13,9 @@ using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Snapshot, parse-validity, and determinism tests for <see cref="RenderFunctionEmitter"/> — the C# port
-/// of Vue 3.5's <c>generate()</c> (<c>@vue/compiler-core</c> <c>codegen.ts</c>; upstream expectations in
-/// <c>packages/compiler-core/__tests__/codegen.spec.ts</c> and the <c>__snapshots__</c> of
-/// <c>compile.spec.ts</c>). The snapshots pin BOTH upstream output parity (helper spelling and argument
-/// order per <c>helperNameMap</c>) and the Viu C# divergences documented in <c>docs/DESIGN.md</c>:
+/// Snapshot, parse-validity, and determinism tests for <see cref="RenderFunctionEmitter"/>.
+/// The snapshots ARE the emitted-output contract — helper spelling and argument
+/// order, plus every serialization decision C# forces, documented in <c>docs/DESIGN.md</c>:
 /// block sequences ride on argument evaluation order (<c>_createElementBlock(_openBlock(), ...)</c>
 /// instead of the comma operator), object literals emit through <c>_createProps</c>, child arrays emit as
 /// <c>new object?[] { ... }</c>, handler values wrap in <c>_withHandler</c>, and cache slots use
@@ -26,12 +24,12 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </summary>
 public class RenderFunctionEmitterTests
 {
-    // ---- element / props / patch flags (upstream compile.spec.ts element snapshots) ----
+    // ---- element / props / patch flags ----
 
     [Fact]
     public void Element_WithMixedProps_EmitsPropsObjectPatchFlagAndDynamicProps()
     {
-        // Patch-flag numeric parity: TEXT|PROPS = 9 with the upstream PatchFlagNames comment, and the
+        // The emitted patch flag: TEXT|PROPS = 9, with its readable-name comment, and the
         // dynamicProps array emits verbatim as a C# collection expression targeting string[].
         var emitted = EmitPrefixed("<div :id=\"dynamicId\" class=\"static\">{{ message }}</div>");
 
@@ -74,13 +72,13 @@ return _createElementBlock(_openBlock(), "ul", null, new object?[] {
 """);
     }
 
-    // ---- v-if (upstream vIf.spec.ts codegen expectations) ----
+    // ---- v-if ----
 
     [Fact]
     public void VIfChain_EmitsNestedConditionalWithBranchBlocksAndKeys()
     {
         // Each branch opens its own block with the synthetic key (0, 1, 2); the alternate of each
-        // conditional is the next branch, stair-stepped exactly like upstream's needNewline layout.
+        // conditional is the next branch, stair-stepped one level per branch.
         EmitPrefixed("<div v-if=\"visible\">A</div><span v-else-if=\"other\">B</span><p v-else>C</p>").Code.ShouldBeCode(
 """
 return (_ctx.visible)
@@ -95,7 +93,8 @@ return (_ctx.visible)
     [Fact]
     public void LoneVIf_TerminatesChainWithCommentVNode()
     {
-        // Upstream terminates a v-if without v-else with createCommentVNode("v-if", true).
+        // A v-if without a v-else terminates with createCommentVNode("v-if", true), so the branch always
+        // occupies a node position and the diff never has to shift siblings.
         EmitPrefixed("<div v-if=\"ok\">A</div>").Code.ShouldBeCode(
 """
 return (_ctx.ok)
@@ -105,13 +104,13 @@ return (_ctx.ok)
 """);
     }
 
-    // ---- v-for (upstream vFor.spec.ts codegen expectations) ----
+    // ---- v-for ----
 
     [Fact]
     public void KeyedVFor_EmitsDisabledTrackingFragmentWithRenderListLambda()
     {
         // The fragment opens its block with tracking disabled (_openBlock(true)); the iterator is a
-        // braced lambda (upstream newline: true) whose per-item vnode is itself a keyed block.
+        // braced lambda whose per-item render node is itself a keyed block.
         EmitPrefixed("<li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.items, (item) => {
@@ -133,7 +132,7 @@ return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.r
 """);
     }
 
-    // ---- components and slots (upstream vSlot.spec.ts / compile.spec.ts) ----
+    // ---- components and slots ----
 
     [Fact]
     public void ComponentWithSlots_EmitsResolvePreambleWithCtxWrappersAndSlotFlag()
@@ -161,7 +160,7 @@ return _createBlock(_openBlock(), _component_MyButton, _createProps(("kind", _ct
     public void DynamicComponent_EmitsResolveDynamicComponentBlock()
     {
         // <component :is> compiles to a resolveDynamicComponent tag inside a createBlock (issue #52
-        // acceptance criterion; upstream resolveComponentType).
+        // acceptance criterion).
         EmitPrefixed("<component :is=\"viewName\"></component>").Code.ShouldBeCode(
 """
 return _createBlock(_openBlock(), _resolveDynamicComponent(_ctx.viewName));
@@ -172,7 +171,7 @@ return _createBlock(_openBlock(), _resolveDynamicComponent(_ctx.viewName));
     [Fact]
     public void SlotOutlet_EmitsRenderSlotWithContractSlotSourceAndFallback()
     {
-        // Upstream renderSlot($slots, "header", {}, fallback): `$slots` has no legal C# spelling, so
+        // `$slots` has no legal C# spelling, so
         // the contract emits _ctx.__slots (the __event precedent), and the `{}` placeholder becomes
         // the empty _createProps() (docs/DESIGN.md divergence table).
         EmitPrefixed("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>").Code.ShouldBeCode(
@@ -204,12 +203,12 @@ return _createElementBlock(_openBlock(), _Fragment, null, new object?[] { _creat
 """);
     }
 
-    // ---- v-once / cache slots (upstream vOnce.spec.ts) ----
+    // ---- v-once / cache slots ----
 
     [Fact]
     public void VOnce_EmitsCacheSlotWithPausedBlockTracking()
     {
-        // Upstream: _cache[0] || (setBlockTracking(-1, true), (_cache[0] = createElementVNode(...))
+        // The described sequence is: _cache[0] || (setBlockTracking(-1, true), (_cache[0] = createElementVNode(...))
         // .cacheIndex = 0, setBlockTracking(1), _cache[0]). C# has no comma operator, so the sequence
         // collapses into `_cache[0] ??= _setCache(0, _setBlockTracking(-1, true), value)` — argument
         // evaluation order pauses tracking before the value is created, and _setCache stamps the index,
@@ -248,8 +247,8 @@ return _createElementBlock(_openBlock(), "button", _createProps(
         // A single-statement inline call handler emits as a statement-block lambda (__event => { call; })
         // rather than an expression lambda (__event => (call)): a void call has no value to parenthesize
         // and would bind no _withHandler delegate overload, so the block form — which binds
-        // Action<object?> and discards any value like upstream's arrow function — is used
-        // ([V01.01.05.05.01], issue #143; upstream transformOn: vuejs/core v3.5 compiler-core vOn.ts).
+        // Action<object?> and discards any value — is used
+        // ([V01.01.05.05.01], issue #143).
         EmitPrefixed("<button @click=\"save($event)\">x</button>").Code.ShouldBeCode(
 """
 return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withHandler(__event => { _ctx.save(__event); }))), "x", 8 /* PROPS */, ["onClick"]);
@@ -261,7 +260,7 @@ return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _wit
     public void MultiStatementHandlerWithoutTrailingSemicolon_EmitsTerminatedStatementBlockLambda()
     {
         // A multi-statement inline handler emits into `__event => { <body> }`. C# has no automatic
-        // semicolon insertion (JavaScript's, which upstream's handler wrapping relies on), so a body whose
+        // semicolon insertion, so a body whose
         // final statement omits its terminator gains a synthesized `;`, keeping the generated lambda valid
         // C# ([V01.01.05.05.02], issue #150).
         EmitPrefixed("<button @click=\"first(); second()\">x</button>").Code.ShouldBeCode(
@@ -289,10 +288,10 @@ return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _wit
     [Fact]
     public void VModel_EmitsUpdateHandlerWithEventSpellingAndRuntimeDirective()
     {
-        // The v-model assignment handler is authored by the transform with Vue's $event variable;
+        // The v-model assignment handler is authored by the transform using the $event spelling;
         // serialization maps it to the Viu __event spelling, and the vModelText runtime directive
         // carries both the current value and the same write-back lambda. The carrier is Viu's
-        // reflection-free equivalent of Vue reading vnode.props["onUpdate:modelValue"].
+        // reflection-free way to reach the generated "onUpdate:modelValue" prop.
         EmitPrefixed("<input v-model=\"name\" />").Code.ShouldBeCode(
 """
 return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] { _vModelText, new global::Assimalign.Viu.Browser.ViuModelBinding(_ctx.name, __event => { _ctx.name = __event; }) } });
@@ -300,12 +299,12 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps((
 """);
     }
 
-    // ---- runtime directives (upstream withDirectives arrays) ----
+    // ---- runtime directives ----
 
     [Fact]
     public void VShow_EmitsWithDirectivesArray()
     {
-        // Upstream [[_vShow, exp]] emits as nested object?[] arrays (JavaScript array literals have no
+        // A directive entry [[_vShow, exp]] emits as nested object?[] arrays (an untyped array literal has no
         // untyped C# counterpart; docs/DESIGN.md).
         EmitPrefixed("<div v-show=\"visible\">shown</div>").Code.ShouldBeCode(
 """
@@ -331,7 +330,7 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
     [Fact]
     public void TextRoot_ReturnsStringLiteral()
     {
-        // Upstream returns the bare text for a single text root; the runtime normalizes it.
+        // A single text root returns the bare string; the runtime normalizes it into a render node.
         EmitPrefixed("hello").Code.ShouldBeCode("return \"hello\";\n");
     }
 
@@ -408,8 +407,8 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
     [Fact]
     public void HelperSpelling_IsUnderscorePrefixedUpstreamName()
     {
-        // Pins the by-name helper contract's spelling rule: `_` + the upstream helperNameMap name
-        // (matching TransformContext.HelperString and upstream aliasHelper). A change here is a
+        // Pins the by-name helper contract's spelling rule: `_` + the helper name from HelperNames
+        // (the same spelling TransformContext.HelperString emits). A change here is a
         // breaking change to the runtime-side helper surface.
         var emitted = EmitPrefixed("<div>{{ message }}</div>");
         emitted.Code.ShouldContain("_openBlock()");

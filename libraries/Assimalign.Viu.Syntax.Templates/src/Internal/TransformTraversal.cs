@@ -5,8 +5,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The transform traversal: applies node transforms on entry (collecting exit callbacks), recurses into
-/// children, then runs the exit callbacks in reverse. The C# port of Vue 3.5's <c>traverseNode</c> and
-/// <c>traverseChildren</c> (<c>@vue/compiler-core</c> <c>transform.ts</c>).
+/// children, then runs the exit callbacks in reverse.
 /// </summary>
 internal static class TransformTraversal
 {

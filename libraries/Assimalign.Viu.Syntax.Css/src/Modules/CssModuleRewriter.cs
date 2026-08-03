@@ -4,9 +4,8 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Rewrites a parsed <see cref="CssStylesheetNode"/> for CSS Modules — the pure-.NET C# port of Vue 3.5's
-/// <c>@style module</c> compilation (<c>@vue/compiler-sfc</c> <c>compileStyle()</c> with
-/// <c>postcss-modules</c>, https://vuejs.org/api/sfc-css-features.html#css-modules). Every local class
+/// Rewrites a parsed <see cref="CssStylesheetNode"/> for CSS Modules (specified by <c>[STY-2]</c>).
+/// Every local class
 /// selector <c>.foo</c> is renamed to a deterministic, component-scoped hashed name and the original →
 /// hashed map is returned so the composition-root generator can emit the typed <c>$style</c>-equivalent
 /// accessor ([V01.01.06.06], issue #62).
@@ -18,8 +17,8 @@ namespace Assimalign.Viu.Syntax.Css;
 /// passes the component's short scope id (the <c>data-v-</c> hash) as the salt, so the same class in two
 /// components hashes differently (per-component uniqueness) while the same class in the same component is
 /// stable across rebuilds (the asset-caching contract) — consistent with the [V01.01.06.04] scope-id
-/// scheme. Keeping the original name as a readable prefix mirrors <c>postcss-modules</c>' default
-/// <c>[local]_[hash]</c> shape and aids debugging the emitted CSS.
+/// scheme. Keeping the original name as a readable prefix means the emitted CSS is still greppable and
+/// legible in browser dev tools, which a bare hash would not be.
 /// </para>
 /// <para>
 /// <b>Scope of the rename.</b> Only class selectors in normal compound position are renamed. Class names

@@ -4,17 +4,18 @@ The proposed platform-neutral component-tree vocabulary. Every render-tree value
 `IComponent`; specialized interfaces describe element, template, text, comment, static, fragment,
 and teleport behavior.
 
-`ITeleportComponent.IsDeferred` models Vue 3.5's `defer` property. It postpones target-side setup
-until the current render's post-flush phase, allowing a target rendered later in the same tree to
-resolve. Disabled Teleport content still mounts at its logical position immediately; only its
-target-side setup is deferred.
+`ITeleportComponent.IsDeferred` postpones target-side setup until the current render's post-flush
+phase, allowing a target rendered later in the same tree to resolve. Disabled Teleport content still
+mounts at its logical position immediately; only its target-side setup is deferred
+([`[BLT-2]`](../../../docs/SPECIFICATION.md#71-teleport)).
 
 The package also owns the component-resolution contract. `IComponentFactory` creates a fresh
 `IComponentTemplate` per mounted template node without implementing or requiring
-`IServiceProvider`. The built-in factory uses explicit activators and resolves registered names in
-Vue's raw, camel-case, then Pascal-case order, so a `my-widget` request can resolve `myWidget` or
-`MyWidget`. Registrations remain ordinal and exact duplicate names fail; custom factories may use
-any application-selected resolver.
+`IServiceProvider`. The built-in factory uses explicit activators and resolves a registered name by
+trying the raw name, then its camel-case spelling, then the Pascal-case spelling of that, so a
+`my-widget` request can resolve `myWidget` or `MyWidget`. Registrations remain ordinal and exact
+duplicate names fail; custom factories may use any application-selected resolver
+([`[CMP-6]`](../../../docs/SPECIFICATION.md#43-activation)).
 
 An `ITemplateComponent` is a non-activating mount request. It identifies its template by either an
 explicit `Type` or a registered name; Core is the layer that later selects the matching
@@ -32,17 +33,17 @@ still forcing updates for dynamic and effectively dynamic forwarded slots.
 
 `ComponentParameter` supports required values, one default-factory evaluation per mount, and an
 optional validator. The declaration name is the canonical key exposed through
-`IComponentContext.Arguments`; Core accepts both its camel-case and kebab-case parent spellings.
-Like [Vue prop validation](https://vuejs.org/guide/components/props.html#prop-validation), a
-validator failure warns without discarding the resolved value.
+`IComponentContext.Arguments`; Core accepts both its camel-case and kebab-case parent spellings. A
+required-value or validator failure warns without discarding the resolved value, so a bad input is
+reported rather than silently replaced.
 
 `ComponentEvent` optionally validates the complete ordered argument list.
 `IComponentContext.Emit` accepts zero or more arguments, while `ComponentEventListener` supports
 single-payload and all-arguments handlers in synchronous and task-returning forms. The listener can
 be marked `IsOnce`; generated `onSavedOnce` properties use the `savedOnce` listener-map convention.
 Components only transports these contracts. Core owns matching, once-per-mount tracking, task
-observation, and error routing. See [Vue component
-events](https://vuejs.org/guide/components/events.html).
+observation, and error routing
+([`[CMP-14]`–`[CMP-17]`](../../../docs/SPECIFICATION.md#45-parameters-events-and-fallthrough)).
 
 Generated templates expose their style scope through `IComponentTemplate.ScopeIdentifier`.
 Authoring-time `ComponentDirectiveBinding` values identify a registered directive by name and

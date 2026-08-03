@@ -2,7 +2,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// Base class for everything that subscribes to <see cref="Dependency"/> cells — reactive effects
-/// and computeds. The C# port of Vue 3.5's <c>Subscriber</c>. It holds the subscriber's dependency
+/// and computeds. It holds the subscriber's dependency
 /// link list, its flags word, and the batch-queue pointer as plain <b>fields</b> (not interface
 /// properties), so the engine's hot paths — dependency notification, dirty-checking, and batch
 /// flushing — read them with direct field access and dispatch <see cref="Notify"/> /
@@ -37,8 +37,7 @@ public abstract class Subscriber
     /// The head of this subscriber's dependency link list — the first edge to a
     /// <see cref="Dependency"/> this subscriber read, or <see langword="null"/> when it tracks
     /// nothing. Walk <see cref="SubscriberLink.NextDependency"/> from here to enumerate every tracked
-    /// dependency. The C# port of the <c>deps</c> head on Vue 3.5's <c>Subscriber</c>
-    /// (<c>packages/reactivity/src/effect.ts</c>). Read-only: the list is spliced only by the engine.
+    /// dependency (<c>[RCT-9]</c>). Read-only: the list is spliced only by the engine.
     /// </summary>
     public SubscriberLink? FirstDependency => Dependencies;
 
@@ -48,14 +47,14 @@ public abstract class Subscriber
 
     /// <summary>
     /// Called when a tracked dependency triggers. Returns <see langword="true"/> when the subscriber
-    /// is a computed that wants its own readers notified in turn (Vue 3.5 semantics), in which case
+    /// is a computed that wants its own readers notified in turn, in which case
     /// the caller invokes <see cref="NotifyReaders"/>.
     /// </summary>
     internal abstract bool Notify();
 
     /// <summary>
     /// Re-evaluates the subscriber if (and only if) it may be out of date. No-op for effects;
-    /// <see cref="Computed{T}"/> overrides this with the port of Vue 3.5's <c>refreshComputed</c>.
+    /// <see cref="Computed{T}"/> overrides it to re-evaluate its getter when a source has changed.
     /// </summary>
     internal virtual void Refresh()
     {

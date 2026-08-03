@@ -7,9 +7,10 @@ namespace Assimalign.Viu.LanguageService;
 
 /// <summary>
 /// Reads the members a component's <c>@script</c> block declares through the shared projection
-/// core's <see cref="ScriptBlockAnalyzer.DescribeMembers"/> ([V01.01.06.11], #258) — the
-/// completion- and outline-facing analogue of <c>@vue/compiler-sfc</c>'s <c>compileScript()</c>
-/// binding scan ([V01.01.12.07.04], #261). The leading-using split, probe wrapper, and member
+/// core's <see cref="ScriptBlockAnalyzer.DescribeMembers"/> ([V01.01.06.11], #258): the same member
+/// scan the compiler runs, reused to feed completion and document outline so the editor can never
+/// disagree with the build about what a component declares ([V01.01.12.07.04], #261).
+/// The leading-using split, probe wrapper, and member
 /// classification live once in <c>Assimalign.Viu.Tooling.SingleFileComponent</c>; this type
 /// contributes only the service's bounded content-keyed cache, so an edit inside a template or
 /// style block never pays a reparse.

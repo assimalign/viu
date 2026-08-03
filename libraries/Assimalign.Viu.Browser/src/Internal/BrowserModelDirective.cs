@@ -67,8 +67,8 @@ internal static class BrowserModelDirective
         => component.Attributes.TryGetValue(name, out _);
 
     /// <summary>
-    /// Whether the component declares <c>type="number"</c> (upstream:
-    /// <c>vnode.props.type === 'number'</c>).
+    /// Whether the component declares <c>type="number"</c>, which implies numeric coercion even
+    /// without an explicit <c>.number</c> modifier.
     /// </summary>
     /// <param name="component">The immutable element component.</param>
     public static bool IsNumberType(IElementComponent component)
@@ -77,13 +77,13 @@ internal static class BrowserModelDirective
             "number",
             StringComparison.Ordinal);
 
-    /// <summary>Whether a model value is an ordered list (upstream: <c>isArray</c>) — array/set checkbox and multi-select semantics branch here first.</summary>
+    /// <summary>Whether a model value is an ordered list — array/set checkbox and multi-select semantics branch here first.</summary>
     /// <param name="value">The model value.</param>
     public static bool IsList([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] object? value)
         => value is IList; // string does not implement IList, so no explicit exclusion is needed.
 
     /// <summary>
-    /// Whether a model value is a set (upstream: <c>isSet</c>). Reflection-free: after
+    /// Whether a model value is a set. Reflection-free: after
     /// <see cref="IsList(object?)"/> has been ruled out, any non-string, non-dictionary enumerable
     /// is treated as a set — matching the <c>IList</c>-or-<c>ISet</c> model contract for
     /// checkbox/select <c>v-model</c>.
@@ -92,7 +92,7 @@ internal static class BrowserModelDirective
     public static bool IsSet([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] object? value)
         => value is IEnumerable and not string and not IDictionary and not IList;
 
-    /// <summary>Copies an enumerable model collection into a fresh <see cref="List{T}"/> so a reassign triggers reactivity (upstream: <c>modelValue.concat</c> / <c>[...modelValue]</c>).</summary>
+    /// <summary>Copies an enumerable model collection into a fresh <see cref="List{T}"/>: the model is reassigned rather than mutated in place, which is what makes the change observable to a reference binding.</summary>
     /// <param name="values">The source collection.</param>
     public static List<object?> CopyToList(IEnumerable values)
     {
@@ -104,7 +104,7 @@ internal static class BrowserModelDirective
         return copy;
     }
 
-    /// <summary>Copies an enumerable model set into a fresh <see cref="HashSet{T}"/> (upstream: <c>new Set(modelValue)</c>).</summary>
+    /// <summary>Copies an enumerable model set into a fresh <see cref="HashSet{T}"/>, for the same reassign-not-mutate reason as <see cref="CopyToList(IEnumerable)"/>.</summary>
     /// <param name="values">The source set.</param>
     public static HashSet<object?> CopyToSet(IEnumerable values)
     {
@@ -116,7 +116,7 @@ internal static class BrowserModelDirective
         return copy;
     }
 
-    /// <summary>Whether a set contains a value by strict equality (upstream: <c>Set.has</c> — SameValueZero, not looseEqual).</summary>
+    /// <summary>Whether a set contains a value by strict equality — deliberately not loose equality, because a set's membership is defined by its own identity semantics.</summary>
     /// <param name="values">The set.</param>
     /// <param name="value">The value to test.</param>
     public static bool SetContains(IEnumerable values, object? value)

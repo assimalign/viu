@@ -5,10 +5,9 @@ using System.Globalization;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// An immutable set of resolved route parameters with typed accessors. The C# port of vue-router's
-/// <c>RouteParams</c> / <c>PathParams</c> (<c>packages/router/src/matcher/pathParserRanker.ts</c>).
-/// Each parameter is stored as its raw string (or, for a repeatable parameter, an ordered array of
-/// strings); typed reads such as <see cref="GetInteger"/> parse on demand.
+/// An immutable set of resolved route parameters with typed accessors. Each parameter is stored as
+/// its raw string (or, for a repeatable parameter, an ordered array of strings); typed reads such as
+/// <see cref="GetInteger"/> parse on demand. Specified by <c>[RTR-2]</c>.
 /// </summary>
 /// <remarks>
 /// Reads never box: values are stored as strings and parsed to <see cref="int"/> only when

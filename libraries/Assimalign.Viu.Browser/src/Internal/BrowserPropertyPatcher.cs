@@ -5,22 +5,21 @@ using System.Globalization;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The class/style/property-vs-attribute decision tree that decides how each vnode prop lands
-/// on a real DOM node — the C# port of <c>@vue/runtime-dom</c>'s <c>patchProp</c> and its
-/// <c>modules/</c> (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/patchProp.ts).
-/// The tree runs entirely on the .NET side over injected leaf appliers, so each resolution is
-/// at most one interop call and the JS shim stays dumb. Vue reads <c>key in el</c> at runtime
-/// to detect IDL properties; a handle-based bridge cannot without a round-trip, so this port
-/// uses curated knowledge sets for the criteria-named cases and falls back to the attribute
-/// path for unknown keys — full per-tag knowledge tables arrive with [V01.01.01.03].
+/// The class/style/property-vs-attribute decision tree that decides how each render-node property
+/// lands on a real DOM node. The tree runs entirely on the .NET side over injected leaf appliers, so
+/// each resolution is at most one interop call and the JS shim stays dumb — policy in C#, mechanism
+/// in JS. Detecting an IDL property by probing the live element (<c>key in el</c>) would cost a
+/// round-trip per property on a handle-based bridge, which is exactly the cost this area exists to
+/// avoid; the decision instead runs off curated knowledge sets for the criteria-named cases and
+/// falls back to the attribute path for unknown keys — full per-tag knowledge tables arrive with
+/// [V01.01.01.03].
 /// Style map keys are CSS property names (kebab-case or <c>--custom</c>); camelCase
 /// normalization arrives with the [V01.01.01.02] helpers.
 /// </summary>
 internal static class BrowserPropertyPatcher
 {
     // Native boolean IDL properties whose attribute name matches the property name, so a
-    // property write is valid as-written and reflects to the attribute (upstream: the
-    // `key in el` branch of shouldSetAsProp over @vue/shared's isBooleanAttr set).
+    // property write is valid as-written and reflects to the attribute.
     private static readonly HashSet<string> BooleanPropertyNames = new(StringComparer.Ordinal)
     {
         "async", "autofocus", "autoplay", "checked", "controls", "default", "defer",
@@ -29,7 +28,7 @@ internal static class BrowserPropertyPatcher
     };
 
     // Boolean attributes whose IDL property is spelled differently (readonly vs readOnly, …) —
-    // these take the attribute path with present/absent semantics (upstream isBooleanAttr).
+    // these take the attribute path with present/absent semantics.
     private static readonly HashSet<string> BooleanAttributeNames = new(StringComparer.Ordinal)
     {
         "allowfullscreen", "formnovalidate", "ismap", "itemscope", "nomodule", "novalidate",
@@ -37,7 +36,7 @@ internal static class BrowserPropertyPatcher
     };
 
     // Enumerated attributes where false must be WRITTEN as the string "false", not removed
-    // (upstream: isEnumeratedAttribute — spellcheck/draggable/translate).
+    // spellcheck/draggable/translate: removal would mean "inherit", not "off".
     private static readonly HashSet<string> EnumeratedAttributeNames = new(StringComparer.Ordinal)
     {
         "draggable", "spellcheck", "translate",
@@ -70,8 +69,8 @@ internal static class BrowserPropertyPatcher
         }
         else if (IsEventListenerName(propertyName))
         {
-            // Vue keeps component v-model's onUpdate:* assigners as virtual-node metadata; they
-            // are not native DOM events (runtime-dom patchProp's isModelListener exclusion).
+            // A component v-model's onUpdate:* assigner is tree metadata, not a native DOM event;
+            // attaching it as a listener would create an inert listener that never fires.
             if (!IsModelListenerName(propertyName))
             {
                 // The raw prop name flows through: the invoker registry parses the
@@ -91,8 +90,8 @@ internal static class BrowserPropertyPatcher
 
     private static void PatchClass(BrowserPropertyLeafOperations leafOperations, int element, object? nextValue, string? elementNamespace)
     {
-        // Upstream class module: one className write on HTML; setAttribute on SVG/MathML;
-        // null removes the attribute.
+        // One className write on HTML; setAttribute on SVG/MathML (which has no className IDL
+        // property); null removes the attribute.
         if (nextValue is null)
         {
             leafOperations.RemoveAttribute(element, "class");
@@ -109,8 +108,8 @@ internal static class BrowserPropertyPatcher
 
     private static void PatchStyle(BrowserPropertyLeafOperations leafOperations, int element, object? previousValue, object? nextValue)
     {
-        // Upstream style module: string cssText fast path; map patching touches only changed
-        // keys, removes stale keys, and supports --custom properties and !important.
+        // String values take the cssText fast path; map patching touches only changed keys, removes
+        // stale keys, and supports --custom properties and !important.
         if (nextValue is null)
         {
             leafOperations.RemoveAttribute(element, "style");
@@ -166,7 +165,8 @@ internal static class BrowserPropertyPatcher
             return;
         }
         var formatted = FormatValue(styleValue);
-        // "color:red !important" -> setProperty(name, "red", "important") (upstream importantRE).
+        // "color:red !important" -> setProperty(name, "red", "important"): the priority is a
+        // separate argument, not part of the value.
         if (formatted.EndsWith("!important", StringComparison.Ordinal))
         {
             leafOperations.SetStyleProperty(
@@ -183,7 +183,7 @@ internal static class BrowserPropertyPatcher
 
     private static bool ShouldSetAsProperty(string elementTag, string propertyName, string? elementNamespace)
     {
-        // Upstream shouldSetAsProp, minus the runtime `key in el` probe (see class docs).
+        // The property-vs-attribute decision, without a runtime `key in el` probe (see class docs).
         if (elementNamespace is not null)
         {
             // SVG/MathML land as attributes except explicit content properties.
@@ -197,15 +197,15 @@ internal static class BrowserPropertyPatcher
         }
         if (string.Equals(propertyName, "value", StringComparison.Ordinal))
         {
-            // value is a property on form controls; PROGRESS and everything else keep the
-            // attribute (upstream parity).
+            // value is a live IDL property on form controls; everything else (progress, option, ...)
+            // keeps the attribute, where value means the default rather than the current value.
             return string.Equals(elementTag, "input", StringComparison.Ordinal)
                 || string.Equals(elementTag, "textarea", StringComparison.Ordinal)
                 || string.Equals(elementTag, "select", StringComparison.Ordinal);
         }
         if (string.Equals(propertyName, "form", StringComparison.Ordinal))
         {
-            // The form IDL property is readonly — always an attribute (upstream parity).
+            // The form IDL property is readonly — always an attribute.
             return false;
         }
         if (string.Equals(propertyName, "list", StringComparison.Ordinal)
@@ -234,14 +234,13 @@ internal static class BrowserPropertyPatcher
     {
         if (string.Equals(propertyName, "value", StringComparison.Ordinal))
         {
-            // One guarded compare-and-set; null clears (upstream: el.value = value ?? '').
+            // One guarded compare-and-set; null clears to the empty string, never "null".
             leafOperations.SetValueGuarded(element, nextValue is null ? string.Empty : FormatValue(nextValue));
             return;
         }
         if (BooleanPropertyNames.Contains(propertyName))
         {
-            // Property write reflects to the attribute: false/null removes it (upstream
-            // includeBooleanAttr semantics).
+            // Property write reflects to the attribute: false/null removes it.
             leafOperations.SetBooleanProperty(element, propertyName, IsTruthy(nextValue));
             return;
         }
@@ -250,7 +249,7 @@ internal static class BrowserPropertyPatcher
 
     private static void PatchAttribute(BrowserPropertyLeafOperations leafOperations, int element, string propertyName, object? nextValue, string? elementNamespace)
     {
-        // xlink: namespace on SVG (upstream attrs module).
+        // xlink: attributes on SVG must be written into their own namespace.
         if (string.Equals(elementNamespace, "svg", StringComparison.Ordinal)
             && propertyName.StartsWith("xlink:", StringComparison.Ordinal))
         {
@@ -274,12 +273,12 @@ internal static class BrowserPropertyPatcher
             if (EnumeratedAttributeNames.Contains(propertyName))
             {
                 // Enumerated attributes must WRITE "false" — removal would mean "inherit"
-                // (upstream parity: spellcheck/draggable/translate).
+                // (spellcheck/draggable/translate).
                 leafOperations.SetAttribute(element, propertyName, boolValue ? "true" : "false");
             }
             else if (boolValue)
             {
-                // Present boolean attributes are written as the empty string (upstream parity).
+                // Present boolean attributes are written as the empty string.
                 leafOperations.SetAttribute(element, propertyName, string.Empty);
             }
             else
@@ -295,8 +294,7 @@ internal static class BrowserPropertyPatcher
     {
         null => false,
         bool boolValue => boolValue,
-        // Any string — including "" — keeps a boolean on (upstream includeBooleanAttr:
-        // `!!value || value === ''`).
+        // Any string — including "" — keeps a boolean on: disabled="" is set, not unset.
         string => true,
         _ => true,
     };
@@ -321,8 +319,8 @@ internal static class BrowserPropertyPatcher
             && char.IsUpper(attributeName[2]);
     }
 
-    // @vue/shared isModelListener: component v-model assigners remain vnode metadata and never
-    // become inert "update:*" listeners on a native element.
+    // A component v-model assigner stays tree metadata and never becomes an inert "update:*"
+    // listener on a native element.
     private static bool IsModelListenerName(string attributeName)
         => attributeName.StartsWith("onUpdate:", StringComparison.Ordinal);
 }

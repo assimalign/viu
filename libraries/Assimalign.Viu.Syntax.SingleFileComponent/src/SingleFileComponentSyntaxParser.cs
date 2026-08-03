@@ -7,8 +7,8 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// <summary>
 /// The <c>.viu</c> single-file component's <see cref="AggregateSyntaxParser{T}"/>: the
 /// registration-friendly instance adapter over <see cref="SingleFileComponentParser"/>. Block-level
-/// slicing semantics are exactly <see cref="SingleFileComponentParser.Parse(string)"/> — the
-/// <c>@vue/compiler-sfc</c>-parity static entry point stays authoritative and this parser never looks
+/// slicing semantics are exactly <see cref="SingleFileComponentParser.Parse(string)"/> — that static
+/// entry point stays authoritative and this parser never looks
 /// inside a block's content <em>itself</em> — but each block is exposed to the aggregate registration
 /// seam as a <see cref="SyntaxSource"/> (content, block name, <c>lang</c> option), so build tooling
 /// can attach the template parser to <c>&lt;template&gt;</c>, a stylesheet parser to

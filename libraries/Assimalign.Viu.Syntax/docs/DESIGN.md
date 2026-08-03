@@ -6,9 +6,9 @@ scaffold.
 
 ## Registration over hard-wiring
 
-The pipeline exists so **build tooling can register parsers for the sources they understand** — the
-role Vite plugins play in a Vue build, modeled on how a Roslyn incremental generator registers
-outputs for additional files. `SyntaxSource` (text + name + `lang` hint) is the carrier a
+The pipeline exists so **build tooling can register parsers for the sources they understand**,
+modeled on how a Roslyn incremental generator registers outputs for additional files.
+`SyntaxSource` (text + name + `lang` hint) is the carrier a
 registration's `SyntaxSourcePredicate` matches on; `AggregateSyntaxParser<T>` applies registrations
 to a container language's nodes (the `.viu` file being the canonical container). Consequences:
 
@@ -19,9 +19,9 @@ to a container language's nodes (the `.viu` file being the canonical container).
   blocks.
 - **First matching registration wins**, in registration order, so specific predicates
   (`lang`-qualified) register before general ones. Unmatched nodes are simply not dispatched — a
-  registration-free aggregate parse *is* the plain container parse, preserving
-  `@vue/compiler-sfc` parity (`parse()` never looks inside block content).
-- The upstream-parity static entry points (`TemplateParser.Parse`, `SingleFileComponentParser.Parse`)
+  registration-free aggregate parse *is* the plain container parse, preserving the container
+  contract: a container parser slices and never looks inside block content (`[SFC-5]`).
+- The static entry points (`TemplateParser.Parse`, `SingleFileComponentParser.Parse`)
   remain the authoritative parsing semantics; the instance parsers (`TemplateSyntaxParser`,
   `SingleFileComponentSyntaxParser`) are adapters over them, not reimplementations.
 
@@ -34,7 +34,7 @@ incremental generators cache on exactly this. It is why:
 - result `Diagnostics` ride in a `SyntaxList<Diagnostic>` rather than a reference-compared
   `IReadOnlyList<T>`;
 - `SyntaxList<T>` constrains `T : class` only — it also carries diagnostics, block options, and the
-  template IR's upstream-untyped `object` arrays, none of which are nodes;
+  template IR's untyped `object` arrays, none of which are nodes;
 - the analyzer pipeline appends diagnostics with a `with` clone, which preserves the derived result
   record's runtime type and state (pinned by tests).
 
@@ -42,11 +42,11 @@ incremental generators cache on exactly this. It is why:
 
 A base-level kind enum would be a closed catalog that every new language library (or user-supplied
 parser) would need to extend — the opposite of the registration model. Instead each hierarchy owns
-its enum (`NodeType` pinned numerically to `@vue/compiler-core`'s `NodeTypes`; Viu-defined
-catalogs elsewhere) and projects it as `SyntaxNode.RawKind` / `Diagnostic.RawCode` integers for
+its enum — `NodeType` and the single-file component's block kinds are independent, separately frozen
+numberings — and projects it as `SyntaxNode.RawKind` / `Diagnostic.RawCode` integers for
 language-agnostic infrastructure — Roslyn's `SyntaxNode.RawKind` precedent. The same reasoning keeps
-diagnostic *catalogs and delivery* per-language (OnError push for the template compiler versus
-result-errors pull for the single-file component — the upstream split).
+diagnostic *catalogs and delivery* per-language: OnError push for the template compiler versus
+result-errors pull for the single-file component.
 
 ## Synchronous analyzers
 

@@ -5,8 +5,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// The <c>v-text</c> directive transform: compiles to a <c>textContent</c> prop (wrapping non-constant
 /// expressions in <c>toDisplayString</c>) and raises the child-conflict diagnostic when the element also has
-/// template children. The C# port of Vue 3.5's <c>transformVText</c> (<c>@vue/compiler-dom</c>
-/// <c>transforms/vText.ts</c>).
+/// template children.
 /// </summary>
 internal static class VTextTransform
 {

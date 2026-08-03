@@ -3,11 +3,9 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <summary>
 /// One <c>v-bind()</c> CSS binding extracted by <see cref="CssBindingRewriter"/>: the hashed custom-property
 /// <see cref="Name"/> the usage was rewritten to (<c>var(--&lt;Name&gt;)</c>) paired with the original
-/// <see cref="Expression"/> text and the <see cref="Location"/> of that expression. Mirrors an entry of the
-/// <c>cssVars</c> list Vue's <c>@vue/compiler-sfc</c> records for <c>useCssVars</c>
-/// (<c>packages/compiler-sfc/src/style/cssVars.ts</c>, https://vuejs.org/api/sfc-css-features.html#v-bind-in-css)
-/// — the compile-time half of the binding that the <c>UseCssVars</c> runtime evaluates and applies as a custom
-/// property.
+/// <see cref="Expression"/> text and the <see cref="Location"/> of that expression. This is the
+/// compile-time half of the binding; the <c>UseCssVars</c> runtime evaluates the expression and applies
+/// the result as a custom property (specified by <c>[STY-6]</c>).
 /// </summary>
 /// <param name="Name">
 /// The hashed custom-property name (without the leading <c>--</c>) the usage was rewritten to. Deterministic

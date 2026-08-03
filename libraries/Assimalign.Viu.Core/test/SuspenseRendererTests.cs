@@ -14,7 +14,7 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins host-generic Suspense behavior to Vue 3.5's pending, fallback, and reveal model.
+/// Pins host-generic Suspense behavior: the pending, fallback, and reveal state machine.
 /// </summary>
 public sealed class SuspenseRendererTests : IDisposable
 {

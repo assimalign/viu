@@ -8,12 +8,13 @@ namespace Assimalign.Viu.Syntax;
 /// </summary>
 /// <remarks>
 /// This base deliberately unifies <em>only</em> the shape of a diagnostic. Concrete code catalogs and
-/// delivery mechanisms stay per-language and MUST NOT be unified here, mirroring upstream: the template
-/// compiler pins <c>CompilerErrorCode</c> numerically to <c>@vue/compiler-core</c>'s <c>ErrorCodes</c>
-/// and pushes errors through <c>ParserOptions.OnError</c>, while the single-file-component parser owns its
-/// Viu-defined <c>SingleFileComponentErrorCode</c> catalog and returns errors on its result — the same
-/// split as <c>@vue/compiler-core</c> (onError push) versus <c>@vue/compiler-sfc</c> (result errors pull).
-/// Each derived record surfaces its own enum-typed code and projects it here as <see cref="RawCode"/>.
+/// delivery mechanisms stay per-language and MUST NOT be unified here, because the two differ on both
+/// axes: the template compiler owns a frozen <c>CompilerErrorCode</c> numbering and <em>pushes</em>
+/// errors through <c>ParserOptions.OnError</c> as it goes, while the single-file-component parser owns
+/// its own <c>SingleFileComponentErrorCode</c> catalog and <em>returns</em> errors on its result for the
+/// caller to pull. Merging the catalogs would collide the numberings; merging the delivery seams would
+/// force one parser to buffer or the other to stream. Each derived record surfaces its own enum-typed
+/// code and projects it here as <see cref="RawCode"/>.
 /// </remarks>
 public abstract record Diagnostic
 {

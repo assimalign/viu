@@ -4,9 +4,9 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// One entry in the matcher table: a <see cref="RouteRecord"/> paired with its compiled
-/// <see cref="PathParser"/>, its parent link, and its child matchers. The C# port of vue-router's
-/// <c>RouteRecordMatcher</c> (<c>packages/router/src/matcher/pathMatcher.ts</c>). The parent link
-/// is what lets a resolved location report the full parent-to-child matched chain.
+/// <see cref="PathParser"/>, its parent link, and its child matchers. The parent link is what lets a
+/// resolved location report the full parent-to-child matched chain that nested
+/// <see cref="RouterView"/>s walk by depth.
 /// </summary>
 internal sealed class RouteRecordMatcher
 {

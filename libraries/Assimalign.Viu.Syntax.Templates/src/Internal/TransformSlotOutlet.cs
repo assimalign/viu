@@ -5,8 +5,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The slot-outlet transform: compiles a <c>&lt;slot&gt;</c> element to a <c>renderSlot</c> call carrying the
-/// slot name, forwarded props, and fallback content. The C# port of Vue 3.5's <c>transformSlotOutlet</c> and
-/// <c>processSlotOutlet</c> (<c>@vue/compiler-core</c> <c>transforms/transformSlotOutlet.ts</c>).
+/// slot name, forwarded props, and fallback content.
 /// </summary>
 internal static class TransformSlotOutlet
 {

@@ -8,8 +8,9 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the Browser implementation to Vue's vModelRadio behavior:
-// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts.
+// Pins Viu's radio v-model contract: checked state is derived from the model by loose equality
+// against the radio's bound :value, and a change assigns the raw :value back, so object values
+// round-trip without string coercion.
 public sealed class VModelRadioTests : IDisposable
 {
     private readonly BrowserDirectiveTestHarness _harness = new();

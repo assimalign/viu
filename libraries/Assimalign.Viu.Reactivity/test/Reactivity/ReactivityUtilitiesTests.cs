@@ -6,10 +6,10 @@ using Xunit;
 namespace Assimalign.Viu.Reactivity.Tests;
 
 /// <summary>
-/// Pins the reactivity utility surface and escape hatches — the C# port of
-/// <c>@vue/reactivity</c>'s <c>isRef</c>/<c>isReactive</c>/<c>isReadonly</c>/<c>unref</c>/<c>toRef</c>
-/// (https://vuejs.org/api/reactivity-utilities.html) and <c>toRaw</c>/<c>markRaw</c>
-/// (https://vuejs.org/api/reactivity-advanced.html). Track/trigger claims are pinned with run counts.
+/// Pins the reactivity inspection surface (<c>IsRef</c>, <c>IsReactive</c>, <c>IsReadonly</c>,
+/// <c>Unref</c>, <c>ToRef</c>) and the escape hatches out of reactivity (<c>ToRaw</c>,
+/// <c>MarkRaw</c>) — the ratified member list in <c>[RCT-5]</c>. Track/trigger claims are pinned
+/// with run counts.
 /// The generated-object shapes (<see cref="ReactivePerson"/>, <see cref="ReactiveOrder"/>) are declared
 /// in <c>GeneratedReactiveObjectTests</c>.
 /// </summary>

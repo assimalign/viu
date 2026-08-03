@@ -3,10 +3,10 @@ using System.Runtime.CompilerServices;
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// Allocation-free bitwise predicates over <see cref="ShapeFlags"/>, mirroring the
-/// <c>shapeFlag &amp; ShapeFlags.X</c> checks used throughout the upstream renderer. Every
+/// Allocation-free bitwise predicates over <see cref="ShapeFlags"/> — the named form of the
+/// <c>flags &amp; ShapeFlags.X</c> checks the renderer performs on every patch visit. Every
 /// predicate is a plain inlineable bitwise check;
-/// <see cref="System.Enum.HasFlag(System.Enum)"/> is never used.
+/// <see cref="System.Enum.HasFlag(System.Enum)"/> is never used, because it boxes.
 /// </summary>
 public static class ShapeFlagsExtensions
 {

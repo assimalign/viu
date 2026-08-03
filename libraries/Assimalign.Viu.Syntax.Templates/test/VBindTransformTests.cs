@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/vBind.spec.ts: v-bind prop emission,
+// These cases ARE the contract for v-bind prop emission,
 // class/style normalization, dynamic-argument FULL_PROPS escalation, and .prop/.attr/.camel modifiers.
 public class VBindTransformTests
 {

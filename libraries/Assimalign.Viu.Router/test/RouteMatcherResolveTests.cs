@@ -9,8 +9,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// General resolution behavior of the matcher facade (the C# port of createRouterMatcher's resolve,
-// packages/router/src/matcher/index.ts) plus the ticket's dependency-boundary guarantee.
+// General resolution behavior of the matcher facade, plus the dependency-boundary guarantee that the
+// matcher runs in a plain .NET host with no other Viu library ([RTR-1], [RTR-7]).
 public class RouteMatcherResolveTests
 {
     [Fact]

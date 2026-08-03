@@ -4,8 +4,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// A transform that translates a single directive on an element into vnode properties (and optionally a
-/// runtime directive). The C# port of Vue 3.5's <c>DirectiveTransform</c> function type
-/// (<c>@vue/compiler-core</c> <c>transform.ts</c>). Directive transforms are keyed by directive name and run
+/// runtime directive). Directive transforms are keyed by directive name and run
 /// during element prop building. A platform compiler can wrap a base transform through the
 /// <paramref name="augmentor"/>.
 /// </summary>

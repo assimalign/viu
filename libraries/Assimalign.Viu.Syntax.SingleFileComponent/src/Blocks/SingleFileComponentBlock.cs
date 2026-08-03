@@ -4,10 +4,12 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
 /// The base of every parsed single-file-component block: its name, options, raw content, and precise source
-/// spans. Mirrors Vue 3.5's <c>SFCBlock</c> (<c>@vue/compiler-sfc</c> <c>parse.ts</c>) — one immutable,
+/// spans — one immutable,
 /// value-comparable record per block, deriving from the shared <see cref="SyntaxNode"/> for its
-/// <see cref="SyntaxNode.Location"/> span. The block <em>semantics</em> follow the Vue SFC specification
-/// (https://vuejs.org/api/sfc-spec.html). The inherited <see cref="SyntaxNode.Location"/> covers the
+/// <see cref="SyntaxNode.Location"/> span. The <c>.viu</c> container and the <c>.vue</c> compatibility
+/// container ([V01.01.06.09]) both project into this one block hierarchy, so a consumer downstream of
+/// the container parse never branches on which file it came from (<c>[VUE-2]</c>, <c>[VUE-9]</c>).
+/// The inherited <see cref="SyntaxNode.Location"/> covers the
 /// whole block, including either its <c>@name { }</c> or matching tag container.
 /// </summary>
 /// <remarks>
@@ -38,8 +40,10 @@ public abstract record SingleFileComponentBlock : SyntaxNode
     public sealed override int RawKind => (int)Kind;
 
     /// <summary>
-    /// The <c>lang</c> option's value, or <see langword="null"/> when absent. Mirrors Vue's block
-    /// <c>lang</c> attribute (for example, <c>lang="scss"</c> on a style block).
+    /// The <c>lang</c> option's value, or <see langword="null"/> when absent — the block header's
+    /// declaration of what language its content is written in (for example, <c>lang="scss"</c> on a
+    /// style block). The container parser never acts on it; it is the routing key the aggregate
+    /// registration seam and downstream analysis match on.
     /// </summary>
     public string? Lang => GetOptionValue("lang");
 

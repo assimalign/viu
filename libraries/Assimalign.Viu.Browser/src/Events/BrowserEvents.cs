@@ -7,17 +7,15 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The event-handler modifier and key guards — the C# port of <c>withModifiers</c> and
-/// <c>withKeys</c> from <c>@vue/runtime-dom</c>
-/// (<c>packages/runtime-dom/src/directives/vOn.ts</c>,
-/// https://vuejs.org/guide/essentials/event-handling.html). Guards run before the wrapped
+/// The event-handler modifier and key guards a compiled <c>@event.modifier</c> binding wraps its
+/// handler in. Guards run before the wrapped
 /// handler: a failed guard skips it entirely. <c>.stop</c>/<c>.prevent</c> record intents on
 /// the <see cref="BrowserEvent"/>, which the bridge applies to the live JS event when the
 /// synchronous dispatch returns.
 /// </summary>
 public static class BrowserEvents
 {
-    // Upstream keyNames: aliases whose hyphenated event.key form differs from the alias.
+    // Aliases whose hyphenated event.key form differs from the alias a template author writes.
     private static readonly Dictionary<string, string> KeyAliases = new(StringComparer.Ordinal)
     {
         ["esc"] = "escape",
@@ -30,8 +28,8 @@ public static class BrowserEvents
     };
 
     /// <summary>
-    /// Wraps <paramref name="handler"/> with Vue's event modifiers (upstream:
-    /// <c>withModifiers</c>): <c>stop</c>, <c>prevent</c>, <c>self</c>, system modifiers
+    /// Wraps <paramref name="handler"/> with the event modifiers:
+    /// <c>stop</c>, <c>prevent</c>, <c>self</c>, system modifiers
     /// (<c>ctrl</c>/<c>shift</c>/<c>alt</c>/<c>meta</c>), mouse-button guards
     /// (<c>left</c>/<c>middle</c>/<c>right</c>), and <c>exact</c>.
     /// </summary>
@@ -57,7 +55,8 @@ public static class BrowserEvents
     }
 
     /// <summary>
-    /// Wraps a task-returning handler with Vue's event modifiers while preserving the returned task.
+    /// Wraps a task-returning handler with the event modifiers while preserving the returned task,
+    /// so browser dispatch can still observe a fault.
     /// </summary>
     /// <param name="handler">The task-returning handler to guard.</param>
     /// <param name="modifiers">The modifier names, unprefixed.</param>
@@ -83,10 +82,9 @@ public static class BrowserEvents
     }
 
     /// <summary>
-    /// Wraps <paramref name="handler"/> to run only for the named keys (upstream:
-    /// <c>withKeys</c>), matching Vue's key aliases (<c>enter</c>, <c>tab</c>, <c>delete</c>,
-    /// <c>esc</c>, <c>space</c>, <c>up</c>, <c>down</c>, <c>left</c>, <c>right</c>) against
-    /// the hyphenated <c>event.key</c>.
+    /// Wraps <paramref name="handler"/> to run only for the named keys, matching the key aliases
+    /// (<c>enter</c>, <c>tab</c>, <c>delete</c>, <c>esc</c>, <c>space</c>, <c>up</c>, <c>down</c>,
+    /// <c>left</c>, <c>right</c>) against the hyphenated <c>event.key</c>.
     /// </summary>
     /// <param name="handler">The handler to guard.</param>
     /// <param name="keys">The key names.</param>
@@ -117,7 +115,7 @@ public static class BrowserEvents
     }
 
     /// <summary>
-    /// Wraps a task-returning handler with Vue's key guards while preserving the returned task.
+    /// Wraps a task-returning handler with the key guards while preserving the returned task.
     /// </summary>
     /// <param name="handler">The task-returning handler to guard.</param>
     /// <param name="keys">The key names.</param>
@@ -163,7 +161,7 @@ public static class BrowserEvents
 
     private static bool PassesModifierGuard(BrowserEvent browserEvent, string modifier, string[] allModifiers)
     {
-        // Upstream modifierGuards parity, one guard per modifier name.
+        // One guard per modifier name; an unknown modifier passes rather than silently blocking.
         switch (modifier)
         {
             case "stop":
@@ -197,7 +195,7 @@ public static class BrowserEvents
 
     private static bool MatchesExactly(BrowserEvent browserEvent, string[] modifiers)
     {
-        // Upstream .exact: every PRESSED system modifier must be listed on the handler.
+        // .exact: every PRESSED system modifier must be listed on the handler.
         var required = BrowserEventModifiers.None;
         foreach (var modifier in modifiers)
         {

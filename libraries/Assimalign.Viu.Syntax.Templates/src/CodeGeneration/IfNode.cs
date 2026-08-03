@@ -2,8 +2,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// A grouped <c>v-if</c>/<c>v-else-if</c>/<c>v-else</c> chain: the adjacent conditional siblings are folded
-/// into one node with ordered <see cref="Branches"/>. The C# port of Vue 3.5's <c>IfNode</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>). See https://vuejs.org/guide/essentials/conditional.html.
+/// into one node with ordered <see cref="Branches"/>.
 /// </summary>
 /// <remarks>
 /// Each branch compiles to its own block with a stable synthetic <c>key</c> so switching branches replaces

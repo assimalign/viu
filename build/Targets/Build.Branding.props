@@ -8,7 +8,12 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <Authors>Assimalign</Authors>
-        <Description>$(MSBuildProjectName) is part of Viu, a faithful C#/.NET implementation of Vue.js 3 for WebAssembly.</Description>
+        <Description>$(MSBuildProjectName) is part of Viu, a C#/.NET UI framework for WebAssembly.</Description>
+        <!--
+            The Vue tag is nuget.org discoverability for the .vue single-file-component
+            compatibility feature ([V01.01.06.09]), not a statement about Viu's semantics.
+            Whether to keep it is a product decision; see docs/SPECIFICATION.md §9.
+        -->
         <PackageTags>Viu;Vue;WebAssembly;WASM;dotnet</PackageTags>
     </PropertyGroup>
 </Project>

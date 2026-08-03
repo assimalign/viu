@@ -22,32 +22,32 @@ internal static class CompilerDomKnowledge
     private static readonly HashSet<string> KnownHtmlAttributeSet = Build(DomKnowledgeData.KnownHtmlAttributes, StringComparer.Ordinal);
     private static readonly HashSet<string> KnownSvgAttributeSet = Build(DomKnowledgeData.KnownSvgAttributes, StringComparer.Ordinal);
 
-    /// <summary>Whether <paramref name="tag"/> is a known HTML element (upstream <c>isHTMLTag</c>).</summary>
+    /// <summary>Whether <paramref name="tag"/> is a known HTML element.</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
     public static bool IsHtmlTag(string tag) => HtmlTagSet.Contains(tag);
 
-    /// <summary>Whether <paramref name="tag"/> is a known SVG element (upstream <c>isSVGTag</c>).</summary>
+    /// <summary>Whether <paramref name="tag"/> is a known SVG element.</summary>
     /// <param name="tag">The tag name (matched case-sensitively).</param>
     public static bool IsSvgTag(string tag) => SvgTagSet.Contains(tag);
 
-    /// <summary>Whether <paramref name="tag"/> is a known MathML element (upstream <c>isMathMLTag</c>).</summary>
+    /// <summary>Whether <paramref name="tag"/> is a known MathML element.</summary>
     /// <param name="tag">The tag name (matched case-sensitively).</param>
     public static bool IsMathMLTag(string tag) => MathTagSet.Contains(tag);
 
-    /// <summary>Whether <paramref name="tag"/> is a void element (upstream <c>isVoidTag</c>, WHATWG).</summary>
+    /// <summary>Whether <paramref name="tag"/> is a void element per the WHATWG void-element list.</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
     public static bool IsVoidTag(string tag) => VoidTagSet.Contains(tag);
 
-    /// <summary>Whether <paramref name="tag"/> is a native HTML/SVG/MathML element (upstream <c>isNativeTag</c>).</summary>
+    /// <summary>Whether <paramref name="tag"/> is a native HTML/SVG/MathML element.</summary>
     /// <param name="tag">The tag name.</param>
     public static bool IsNativeTag(string tag) => IsHtmlTag(tag) || IsSvgTag(tag) || IsMathMLTag(tag);
 
-    /// <summary>Whether <paramref name="attributeName"/> is a known HTML attribute (upstream <c>isKnownHtmlAttr</c>).</summary>
-    /// <param name="attributeName">The attribute name (matched case-sensitively, as upstream).</param>
+    /// <summary>Whether <paramref name="attributeName"/> is a known HTML attribute.</summary>
+    /// <param name="attributeName">The attribute name (matched case-sensitively).</param>
     public static bool IsKnownHtmlAttribute(string attributeName) => KnownHtmlAttributeSet.Contains(attributeName);
 
-    /// <summary>Whether <paramref name="attributeName"/> is a known SVG attribute (upstream <c>isKnownSvgAttr</c>).</summary>
-    /// <param name="attributeName">The attribute name (matched case-sensitively, as upstream).</param>
+    /// <summary>Whether <paramref name="attributeName"/> is a known SVG attribute.</summary>
+    /// <param name="attributeName">The attribute name (matched case-sensitively).</param>
     public static bool IsKnownSvgAttribute(string attributeName) => KnownSvgAttributeSet.Contains(attributeName);
 
     private static HashSet<string> Build(string list, StringComparer comparer)

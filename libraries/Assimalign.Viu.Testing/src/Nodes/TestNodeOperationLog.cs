@@ -3,10 +3,10 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// The queryable, resettable record of every node operation the test adapter performed —
-/// parity with the op recording in <c>@vue/runtime-test</c>. Op counts are the CoreCLR-side
-/// proxy for host-boundary call counts: one logged text or attribute operation corresponds to one
-/// host operation unless a platform adapter batches it.
+/// The queryable, resettable record of every node operation the test adapter performed. Operation
+/// counts are the CoreCLR-side proxy for host-boundary call counts: one logged text or attribute
+/// operation corresponds to one host operation unless a platform adapter batches it, which is what
+/// makes the interop budget ([RND-IO-1]) assertable without a browser.
 /// </summary>
 public sealed class TestNodeOperationLog
 {

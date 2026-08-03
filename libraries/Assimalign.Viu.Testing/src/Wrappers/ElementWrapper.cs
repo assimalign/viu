@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// A wrapper around one rendered element — the C# port of <c>@vue/test-utils</c>'s
-/// <c>DOMWrapper</c> (https://test-utils.vuejs.org/api/#element). Queries the element's subtree and
-/// dispatches events through the in-memory test adapter; the awaitable
+/// A wrapper around one rendered element: it queries the element's subtree with a small selector
+/// vocabulary and dispatches events through the in-memory test adapter. The awaitable
 /// <see cref="Trigger"/>/<see cref="SetValue"/> complete only after the scheduler flush, so
-/// assertions observe post-update state without a manual next-tick.
+/// assertions observe post-update state without a manual next-tick — the single most common source
+/// of flaky component tests.
 /// </summary>
 public sealed class ElementWrapper
 {
@@ -29,10 +29,10 @@ public sealed class ElementWrapper
     /// <summary>Whether the wrapped element exists (always true for a found wrapper).</summary>
     public bool Exists() => true;
 
-    /// <summary>The element's serialized HTML (upstream: <c>html()</c>).</summary>
+    /// <summary>The element's serialized HTML-like markup, for snapshot-style assertions.</summary>
     public string Html() => TestNodeSerializer.Serialize(_element);
 
-    /// <summary>The element's text content (upstream: <c>text()</c>).</summary>
+    /// <summary>The element's text content, concatenated across every descendant text node.</summary>
     public string Text()
     {
         var builder = new StringBuilder();
@@ -40,7 +40,7 @@ public sealed class ElementWrapper
         return builder.ToString();
     }
 
-    /// <summary>The value of an attribute/property, or null (upstream: <c>attributes(name)</c>).</summary>
+    /// <summary>The value of an attribute or property, or null when the element has none.</summary>
     /// <param name="name">The attribute name.</param>
     public object? Attribute(string name)
     {
@@ -48,7 +48,7 @@ public sealed class ElementWrapper
         return _element.Properties.TryGetValue(name, out var value) ? value : null;
     }
 
-    /// <summary>The first descendant matching <paramref name="selector"/>, or null (upstream: <c>find</c>).</summary>
+    /// <summary>The first descendant matching <paramref name="selector"/>, or null when none does.</summary>
     /// <param name="selector">A tag, <c>#id</c>, <c>.class</c>, or <c>[attr=value]</c> selector.</param>
     public ElementWrapper? Find(string selector)
     {
@@ -63,13 +63,13 @@ public sealed class ElementWrapper
         return null;
     }
 
-    /// <summary>The first descendant matching <paramref name="selector"/>; throws when none (upstream: <c>get</c>).</summary>
+    /// <summary>The first descendant matching <paramref name="selector"/>; throws when none does.</summary>
     /// <param name="selector">A tag, <c>#id</c>, <c>.class</c>, or <c>[attr=value]</c> selector.</param>
     /// <exception cref="InvalidOperationException">No descendant matches.</exception>
     public ElementWrapper Get(string selector)
         => Find(selector) ?? throw new InvalidOperationException($"Unable to find element matching selector: {selector}");
 
-    /// <summary>Every descendant matching <paramref name="selector"/> (upstream: <c>findAll</c>).</summary>
+    /// <summary>Every descendant matching <paramref name="selector"/>, in document order.</summary>
     /// <param name="selector">A tag, <c>#id</c>, <c>.class</c>, or <c>[attr=value]</c> selector.</param>
     public IReadOnlyList<ElementWrapper> FindAll(string selector)
     {
@@ -86,8 +86,8 @@ public sealed class ElementWrapper
     }
 
     /// <summary>
-    /// Dispatches <paramref name="eventName"/> on the element and awaits the scheduler flush
-    /// (upstream: <c>trigger</c>). Assertions after the returned task observe post-update state.
+    /// Dispatches <paramref name="eventName"/> on the element and awaits the scheduler flush, so
+    /// assertions after the returned task observe post-update state.
     /// </summary>
     /// <param name="eventName">The event name (e.g. <c>"click"</c>).</param>
     /// <param name="payload">The payload passed to payload-accepting listeners.</param>
@@ -103,7 +103,7 @@ public sealed class ElementWrapper
 
     /// <summary>
     /// Sets the element's <c>value</c> and dispatches an <c>input</c> event, then awaits the
-    /// scheduler flush (upstream: <c>setValue</c> for input-like elements and v-model bindings).
+    /// scheduler flush — the pairing an input-like element and a <c>v-model</c> binding expect.
     /// </summary>
     /// <param name="value">The new value.</param>
     public async Task SetValue(object? value)

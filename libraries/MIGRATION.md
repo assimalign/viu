@@ -70,4 +70,5 @@ Suspense mount and update behavior is present. Server rendering emits only the r
 branch, and client hydration of a Suspense request fails explicitly. Applications that hydrate
 server output must keep Suspense out of the hydrated root until pending-branch hydration
 coordination is implemented. Boundary timeout/events, fallback-to-reveal transition choreography,
-and hidden-branch post-effect delay also remain outside the current Vue-parity baseline.
+and hidden-branch post-effect delay are likewise not implemented yet — see
+[§17 of the specification](../docs/SPECIFICATION.md#17-non-goals-and-current-limits).

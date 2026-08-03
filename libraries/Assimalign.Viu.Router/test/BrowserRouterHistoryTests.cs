@@ -5,11 +5,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the browser history policy (BrowserRouterHistory) — the C# port of vue-router's
-// useHistoryStateNavigation + useHistoryListeners (packages/router/src/history/html5.ts) — exercised
-// against the instrumented interop seam with no browser. Covers base prepend-on-write /
-// strip-on-read, the position-counter state round-trip, popstate delta/direction, the batched-read
-// call count, silent go, and listener teardown. [V01.01.08.02] browser-mode ACs.
+// Pins the browser history policy (BrowserRouterHistory), exercised against the instrumented
+// interop seam with no browser. Covers base prepend-on-write / strip-on-read, the position-counter
+// state round-trip, popstate delta/direction, the batched-read call count, silent go, and listener
+// teardown. [V01.01.08.02] browser-mode ACs; specified by [RTR-3].
 public class BrowserRouterHistoryTests
 {
     private static BrowserHistorySnapshot Snapshot(

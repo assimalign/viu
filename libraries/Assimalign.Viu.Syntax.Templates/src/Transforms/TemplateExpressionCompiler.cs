@@ -9,8 +9,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// the same identifier classification and <c>Ref&lt;T&gt;</c> unwrapping ([V01.01.05.04]) a template expression
 /// receives, but for an expression that lives outside a template. The composition-root generator uses it for
 /// <c>v-bind()</c> CSS expressions ([V01.01.06.06.01]): routing them through this compiler makes
-/// <c>v-bind(count)</c> unwrap a script <c>Reference&lt;T&gt;</c> to <c>count.Value</c> automatically, matching
-/// upstream's cssVars ergonomics, instead of forcing the author to write <c>v-bind(count.Value)</c>.
+/// <c>v-bind(count)</c> unwrap a script <c>Reference&lt;T&gt;</c> to <c>count.Value</c> automatically, so a
+/// style block and a template read the same member the same way, instead of forcing the author to write
+/// <c>v-bind(count.Value)</c> in one and <c>count</c> in the other.
 /// </summary>
 /// <remarks>
 /// The <c>v-bind()</c> getter runs as an <em>instance member</em> of the component partial class, so this compiles

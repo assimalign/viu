@@ -10,11 +10,10 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// code — the render-body analogue of the <c>@script</c> merge's <c>#line</c> map.
 /// </summary>
 /// <remarks>
-/// The C# counterpart of a segment in the <c>SourceMapGenerator</c> output Vue 3.5's <c>generate()</c>
-/// produces (<c>@vue/compiler-core</c> <c>codegen.ts</c>, gated on <c>sourceMap</c>): upstream records
-/// original/generated line+column pairs into a standard JavaScript source map; Viu records the same
-/// correspondence for the Roslyn <c>#line</c> mechanism instead, because the diagnostics travel through the
-/// C# compiler, not a browser devtools source map.
+/// The mapping targets the Roslyn <c>#line</c> mechanism rather than a browser source map, because a
+/// template diagnostic travels through the C# compiler: the generator emits a <c>#line</c> <em>span</em>
+/// directive per expression-bearing render line, which is what makes a template error resolve to an exact
+/// line <em>and column</em> (<c>[SFC-8]</c>).
 /// <para>
 /// A record so the render result stays value-equatable — equal template input yields an equal map, the
 /// incremental-generator caching contract. Generated positions are zero-based and relative to the emitted

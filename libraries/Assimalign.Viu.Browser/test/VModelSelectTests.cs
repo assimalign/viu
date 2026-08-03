@@ -8,8 +8,9 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the Browser implementation to Vue's vModelSelect behavior:
-// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/directives/vModel.ts.
+// Pins Viu's <select> v-model contract: single and multiple selection, option identity recovered
+// from the mounted descendant elements rather than from the DOM's coerced string values, and list
+// or set model targets for a multi-select.
 public sealed class VModelSelectTests : IDisposable
 {
     private readonly BrowserDirectiveTestHarness _harness = new();

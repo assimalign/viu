@@ -8,11 +8,14 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// parsing, the nested-markup template boundary, raw-text closing-tag search, and malformed-tag
 /// recovery. Extracted from <see cref="VueSingleFileComponentParseEngine"/> so the hybrid
 /// <c>.viu</c> container ([V01.01.06.10]) and the <c>.vue</c> compatibility parser ([V01.01.06.09])
-/// share one implementation and cannot drift. Boundary rules follow Vue 3.5's SFC tokenizer: an HTML
+/// share one implementation and cannot drift (<c>[VUE-3]</c>). Boundary rules: an HTML
 /// <c>template</c> uses nested markup boundaries while every other root block is raw text until its
-/// matching end tag — see
-/// https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts and
-/// https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts.
+/// matching end tag. <c>.viu</c> adopts the <c>.vue</c> container's boundary rules deliberately — one
+/// scanner is what makes the no-drift guarantee mechanical rather than a convention.
+/// Container-format references for the <c>.vue</c> input:
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts">@vue/compiler-core tokenizer.ts</see>
+/// and
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts">@vue/compiler-sfc parse.ts</see>.
 /// </summary>
 /// <remarks>
 /// One scanner is used for one source string; instances are not thread-safe. The owning engine
@@ -423,7 +426,8 @@ internal sealed class SingleFileComponentTagScanner
 
     /// <summary>
     /// Whether the template options describe an HTML template — no <c>lang</c>, or <c>lang="html"</c>.
-    /// A non-HTML template is scanned as raw text, matching Vue 3.5's preprocessed-template handling.
+    /// A non-HTML template declares a preprocessor language, so its content is scanned as raw text —
+    /// markup-aware boundary tracking would misread a syntax the scanner does not know.
     /// </summary>
     /// <param name="options">The block's parsed options.</param>
     /// <returns><see langword="true"/> when the template content is HTML.</returns>

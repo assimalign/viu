@@ -7,13 +7,13 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The DOM <c>&lt;Transition&gt;</c> built-in — the C# port of upstream's <c>Transition</c>
-/// (https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/components/Transition.ts,
-/// https://vuejs.org/guide/built-ins/transition.html). It resolves CSS-class-based enter/leave hooks
-/// from its <c>name</c>/<c>type</c>/<c>duration</c>/<c>css</c> and per-phase class-override properties
-/// (upstream <c>resolveTransitionProps</c>), then renders the platform-agnostic
+/// The DOM <c>&lt;Transition&gt;</c> built-in. It resolves CSS-class-based enter/leave hooks
+/// from its <c>name</c>/<c>type</c>/<c>duration</c>/<c>css</c> and per-phase class-override
+/// properties, then renders the host-neutral
 /// <see cref="BaseTransition"/> with those hooks and the passed-through slot — so a single element or
-/// component child animates on insert/remove.
+/// component child animates on insert/remove. Core owns transition identity, cancellation, mode
+/// sequencing, and deferred removal and knows nothing about CSS; this component owns the class names
+/// and the browser timing ([BLT-7], [BLT-8]).
 /// <para>
 /// The class choreography — <c>v-enter-from</c>/<c>-active</c>/<c>-to</c> and the leave counterparts,
 /// a forced reflow, the next-frame to-class swap, and <c>transitionend</c>/<c>animationend</c>
@@ -101,8 +101,8 @@ public sealed class Transition : IComponentTemplate
     }
 
     /// <summary>
-    /// Builds the CSS-class enter/leave hook set for a supplied transition argument bag (upstream:
-    /// <c>resolveTransitionProps</c>). With <c>css: false</c> the class/end-detection work is skipped
+    /// Builds the CSS-class enter/leave hook set for a supplied transition argument bag.
+    /// With <c>css: false</c> the class/end-detection work is skipped
     /// and only the user hooks pass through.
     /// </summary>
     /// <param name="arguments">The transition component's resolved arguments.</param>
@@ -119,7 +119,7 @@ public sealed class Transition : IComponentTemplate
             (ReadHook(arguments, "onBeforeEnter"), ReadEnterHook(arguments, "onEnter"), ReadHook(arguments, "onAfterEnter"), ReadHook(arguments, "onEnterCancelled"));
         var (userBeforeLeave, userLeave, userAfterLeave, userLeaveCancelled) =
             (ReadHook(arguments, "onBeforeLeave"), ReadEnterHook(arguments, "onLeave"), ReadHook(arguments, "onAfterLeave"), ReadHook(arguments, "onLeaveCancelled"));
-        // Appear hooks default to their enter counterparts (upstream).
+        // Appear hooks default to their enter counterparts.
         var userBeforeAppear = ReadHook(arguments, "onBeforeAppear") ?? userBeforeEnter;
         var userAppear =
             arguments.Contains("onAppear")
@@ -167,7 +167,7 @@ public sealed class Transition : IComponentTemplate
         var (enterDuration, leaveDuration) =
             NormalizeDuration(arguments["duration"]);
 
-        // Removes the enter to+active classes and marks the cancelled flag (upstream finishEnter).
+        // Removes the enter to+active classes and marks the cancelled flag.
         void FinishEnter(
             DomTransitionOperations operations,
             int element,
@@ -179,7 +179,7 @@ public sealed class Transition : IComponentTemplate
             operations.RemoveTransitionClass(element, isAppear ? appearActiveClass : enterActiveClass);
         }
 
-        // Removes all leave classes and clears the leaving flag (upstream finishLeave).
+        // Removes all leave classes and clears the leaving flag.
         void FinishLeave(
             DomTransitionOperations operations,
             int element,
@@ -194,7 +194,7 @@ public sealed class Transition : IComponentTemplate
 
         // The enter/appear hook: add the active+from classes are added by onBeforeEnter; here the
         // next frame removes from-class, adds to-class, and (without an explicit user callback) waits
-        // on the transition end (upstream makeEnterHook).
+        // on the transition end.
         TransitionEnterHook MakeEnterHook(bool isAppear) => (element, done) =>
         {
             var operations = DomTransitionOperations.Require();
@@ -437,8 +437,8 @@ public sealed class Transition : IComponentTemplate
         };
     }
 
-    // Upstream normalizeDuration: a scalar applies to both phases; an {enter, leave} map splits them.
-    // A negative value marks "no explicit duration" so end-detection reads getComputedStyle instead.
+    // A scalar duration applies to both phases; an {enter, leave} map splits them. A negative value
+    // marks "no explicit duration" so end-detection reads getComputedStyle instead.
     private static (int Enter, int Leave) NormalizeDuration(object? duration)
     {
         switch (duration)

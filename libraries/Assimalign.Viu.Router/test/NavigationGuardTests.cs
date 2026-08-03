@@ -7,12 +7,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the guarded navigation pipeline ([V01.01.08.04]) against vue-router's navigation flow
-// (packages/router/src/router.ts navigate()/pushWithRedirect, navigationGuards.ts, errors.ts;
-// https://router.vuejs.org/guide/advanced/navigation-guards.html and
-// https://router.vuejs.org/guide/advanced/navigation-failures.html): the awaitable push/replace
-// result, allow/abort/duplicate/redirect outcomes, the redirect loop cap, per-route beforeEnter,
-// removal handles, and onError routing. All DOM-free through memory history with no mounted view.
+// Pins the guarded navigation pipeline ([V01.01.08.04], specified by [RTR-5] and [RTR-6]): the
+// awaitable push/replace result, allow/abort/duplicate/redirect outcomes, the redirect loop cap,
+// per-route before-enter, removal handles, and OnError routing. All DOM-free through memory history
+// with no mounted view.
 public class NavigationGuardTests
 {
     private static IReadOnlyList<RouteRecord> Routes() =>
@@ -47,7 +45,7 @@ public class NavigationGuardTests
     [Fact]
     public async Task Push_WhenBeforeGuardAborts_LeavesRouteAndHistoryUntouched_AndReturnsAbortedFailure()
     {
-        // vue-router: returning false aborts, currentRoute is untouched, and push resolves with the
+        // Returning Abort stops the navigation, CurrentRoute is untouched, and Push completes with the
         // failure rather than throwing.
         var history = RouterHistory.CreateMemory();
         var router = new Router(history, Routes());
@@ -121,7 +119,7 @@ public class NavigationGuardTests
     [Fact]
     public async Task Push_WhenGuardRedirects_FiresAfterEachForTheFinalTargetOnly()
     {
-        // Upstream recurses before triggerAfterEach, so the intermediate redirected navigation does
+        // The redirect recurses before the after-hooks run, so the intermediate navigation does
         // not surface an afterEach — only the confirmed final one does.
         var afterEachPaths = new List<string>();
         var router = new Router(
@@ -156,7 +154,7 @@ public class NavigationGuardTests
     [Fact]
     public async Task Push_WhenRedirectsLoop_ThrowsDescriptiveErrorRoutedToOnError()
     {
-        // Mirrors vue-router's infinite-redirect detection: Viu enforces a hard depth cap that throws
+        // Infinite-redirect detection: a hard depth cap that throws
         // NavigationRedirectException (routed to onError and faulting the task).
         Exception? captured = null;
         var router = new Router(
@@ -226,7 +224,7 @@ public class NavigationGuardTests
     [Fact]
     public async Task BeforeEach_RemovalHandle_UnregistersTheGuard()
     {
-        // vue-router returns an unregister function from beforeEach; invoking it stops the guard.
+        // BeforeEach returns an unregister delegate; invoking it stops the guard.
         var runs = 0;
         var router = new Router(RouterHistory.CreateMemory(), Routes());
         var remove = router.BeforeEach((_, _, _) =>

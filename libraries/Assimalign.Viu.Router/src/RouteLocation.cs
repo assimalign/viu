@@ -5,10 +5,9 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// An immutable resolved location: the concrete path, the optional matched route name, the parsed
-/// parameters, the parent-to-child matched record chain, and merged metadata. The C# port of the
-/// resolved-location shape returned by vue-router's matcher <c>resolve</c>
-/// (<c>packages/router/src/matcher/index.ts</c>); see also
-/// https://router.vuejs.org/guide/essentials/nested-routes.html for <c>route.matched</c> semantics.
+/// parameters, the parent-to-child matched record chain, and merged metadata. The matched chain
+/// runs outermost-first, so a nested <see cref="RouterView"/> at depth <c>n</c> renders the n-th
+/// entry. Specified by <c>[RTR-2]</c>.
 /// </summary>
 /// <remarks>
 /// Value equality (path, name, parameters, and the matched chain compared by record identity) so a
@@ -38,9 +37,7 @@ public sealed class RouteLocation : IEquatable<RouteLocation>
 
     /// <summary>
     /// The initial (start) location a <see cref="Router.CurrentRoute"/> holds before its first
-    /// navigation confirms — the C# port of vue-router's <c>START_LOCATION_NORMALIZED</c>
-    /// (<c>packages/router/src/location.ts</c>,
-    /// https://router.vuejs.org/api/#Variables-START-LOCATION). It has path <c>"/"</c>, no name, no
+    /// navigation confirms. It has path <c>"/"</c>, no name, no
     /// parameters, and — the defining trait — an <b>empty</b> <see cref="Matched"/> chain, so it is
     /// never equal to any resolved route and never renders through a <see cref="RouterView"/>. The
     /// router compares against this exact instance by reference to recognize the first navigation,
@@ -59,7 +56,7 @@ public sealed class RouteLocation : IEquatable<RouteLocation>
     public RouteParameters Parameters { get; }
 
     /// <summary>
-    /// The matched record chain ordered parent-to-child (upstream <c>route.matched</c>). Empty when
+    /// The matched record chain ordered parent-to-child. Empty when
     /// no route matched.
     /// </summary>
     public IReadOnlyList<RouteRecord> Matched { get; }

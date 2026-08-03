@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Shared.Tests;
 
-// Pins the text-interpolation contract of @vue/shared's toDisplayString.ts —
-// https://vuejs.org/guide/essentials/template-syntax.html. Invariant culture is mandatory so
-// SSR output and client hydration agree byte-for-byte.
+// Pins Viu's text-interpolation contract: what a {{ expression }} renders to. Invariant culture
+// is mandatory so SSR output and client hydration agree byte-for-byte — a culture-sensitive number
+// would produce a hydration mismatch.
 public class DisplayStringFormatterTests
 {
     [Fact]
@@ -74,7 +74,7 @@ public class DisplayStringFormatterTests
     [Fact]
     public void ToDisplayString_NonStringKeyedDictionaries_UseTheMapConvention()
     {
-        // Upstream replacer: Map -> { "Map(n)": { "key =>": value } }.
+        // Map convention: { "Map(n)": { "key =>": value } }.
         var value = new Dictionary<int, object?> { [1] = "one" };
 
         DisplayStringFormatter.ToDisplayString(value)
@@ -84,7 +84,7 @@ public class DisplayStringFormatterTests
     [Fact]
     public void ToDisplayString_Sets_UseTheSetConvention()
     {
-        // Upstream replacer: Set -> { "Set(n)": [ ... ] }.
+        // Set convention: { "Set(n)": [ ... ] }.
         var value = new HashSet<int> { 7 };
 
         DisplayStringFormatter.ToDisplayString(value)

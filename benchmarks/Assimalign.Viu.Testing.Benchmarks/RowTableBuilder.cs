@@ -11,8 +11,10 @@ namespace Assimalign.Viu.Testing.Benchmarks;
 /// renders (a <c>&lt;table&gt;</c> of keyed <c>&lt;tr&gt;</c> rows, each with an id cell and a label
 /// link; https://github.com/krausest/js-framework-benchmark). The <see cref="ScenarioVariant"/> chooses
 /// between the framework's real output (keyed rows, a <see cref="PatchFlags.Text"/> label so a change is
-/// one targeted set-text) and the keyless bypass the interop-count gate is proven against. Building a
-/// fresh tree per frame mirrors Vue, whose render function re-creates vnodes every update.
+/// one targeted set-text) and the keyless bypass the interop-count gate is proven against. A fresh tree
+/// is built per frame because that is exactly what the runtime does: a render function re-creates its
+/// component tree on every update, and the diff — not tree reuse — is what keeps the interop cost down.
+/// Reusing trees here would measure a code path the framework never takes.
 /// </summary>
 public static class RowTableBuilder
 {

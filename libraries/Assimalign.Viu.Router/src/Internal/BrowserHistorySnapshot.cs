@@ -7,9 +7,9 @@ namespace Assimalign.Viu.Router;
 /// <c>popstate</c> dispatch reconstructs for a browser back/forward.
 /// </summary>
 /// <remarks>
-/// The raw components mirror the <c>Location</c> fields vue-router's <c>createCurrentLocation</c>
-/// reads (<c>packages/router/src/history/html5.ts</c>); the policy strips the base off them itself
-/// (<see cref="HistoryPathNormalization.CreateCurrentLocation"/>) rather than doing it JS-side.
+/// The components are carried raw: base stripping happens on the .NET side
+/// (<see cref="HistoryPathNormalization.CreateCurrentLocation"/>) rather than JS-side, so the whole
+/// base policy stays unit-testable without a browser and the JS edge remains a dumb reader.
 /// </remarks>
 /// <param name="Pathname">The raw <c>location.pathname</c>.</param>
 /// <param name="Search">The raw <c>location.search</c> (with any leading <c>?</c>).</param>

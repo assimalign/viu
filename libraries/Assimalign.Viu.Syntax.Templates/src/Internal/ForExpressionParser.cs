@@ -4,27 +4,24 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The minimal <c>v-for</c> alias tokenizer: splits <c>"(value, key, index) in source"</c> into its source
-/// and value/key/index aliases. The C# port of Vue 3.5's <c>parseForExpression</c>
-/// (<c>@vue/compiler-core</c> <c>parser.ts</c>), using the same <c>forAliasRE</c>/<c>forIteratorRE</c>/
-/// <c>stripParensRE</c> regular expressions rather than Babel.
+/// and value/key/index aliases, using regular expressions rather than a full expression parse.
 /// </summary>
 /// <remarks>
 /// This is the single documented exception to the opaque-expression rule of [V01.01.05.02]: the alias list
 /// must be decomposed structurally to build the iterator function's parameter list. Alias bodies themselves
-/// stay opaque; full expression/scope analysis ([V01.01.05.04]) replaces this tokenizer. Upstream performs
-/// this split during parsing; this port performs it in the <c>v-for</c> transform because the [V01.01.05.01]
-/// parser leaves it out.
+/// stay opaque; full expression/scope analysis ([V01.01.05.04]) replaces this tokenizer. The split runs in
+/// the <c>v-for</c> transform rather than the parser, because the [V01.01.05.01] parser deliberately leaves
+/// every expression body untouched.
 /// </remarks>
 internal static class ForExpressionParser
 {
-    // Upstream forAliasRE / forIteratorRE / stripParensRE. [\s\S] matches any character (incl. newlines).
+    // The character classes match newlines too, so a multi-line v-for alias still splits correctly.
     private static readonly Regex ForAliasRegex = new(@"([\s\S]*?)\s+(?:in|of)\s+(\S[\s\S]*)", RegexOptions.Compiled);
     private static readonly Regex ForIteratorRegex = new(@",([^,\}\]]*)(?:,([^,\}\]]*))?$", RegexOptions.Compiled);
     private static readonly Regex StripParenthesesRegex = new(@"^\(|\)$", RegexOptions.Compiled);
 
     /// <summary>
-    /// Parses the <c>v-for</c> expression, or returns <see langword="null"/> when the alias list is malformed
-    /// (upstream reports <c>X_V_FOR_MALFORMED_EXPRESSION</c>).
+    /// Parses the <c>v-for</c> expression, or returns <see langword="null"/> when the alias list is malformed.
     /// </summary>
     /// <param name="input">The raw <c>v-for</c> expression node.</param>
     public static ForParseResult? Parse(SimpleExpressionNode input)

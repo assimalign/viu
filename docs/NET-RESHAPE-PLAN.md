@@ -18,6 +18,40 @@ document is the session-independent source of truth for the reshape arc. Any ses
 resuming this work reads this file first, checks the *State* table, and continues from the first
 incomplete unit. Update the State table in the same commit as any unit's progress.
 
+> **Superseded framing (2026-08-02) — the arc outcomes stand, the framing does not.**
+>
+> On 2026-08-02 the user directed that **Viu is a standalone framework, not a port of Vue.js**. Vue is
+> no longer a normative authority for Viu's semantics; the adopted idea was the **render
+> architecture** — hierarchical virtual-node-tree rendering with compiler-informed diffing — which Viu
+> now owns and specifies on its own terms. [**`docs/SPECIFICATION.md`**](SPECIFICATION.md) is the
+> authority for Viu's semantics, and behavior is pinned by this repository's tests. Vue remains a
+> **performance-research input** only, tracked in
+> [`docs/PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md).
+>
+> This document is preserved as written — it is the historical record of the reshape arc, and an ADR
+> or plan is annotated, never rewritten. Three notes for reading it:
+>
+> 1. **The Motivation section's framing is superseded.** "The faithful Vue 3 re-implementation…
+>    Upstream parity of *behavior* stays" was the policy at the time and is the policy this decision
+>    reverses. There is no upstream and no reference implementation; there is a specification. The
+>    *engineering* motivation — public reactive primitives, browser naming, an application/builder
+>    model, bring-your-own DI over `System.IServiceProvider` — is unaffected and was delivered.
+> 2. **Every "Vue parity" justification in the unit specifications below is superseded as a
+>    justification**, not as a description of what was built. Where a behavior it describes is live,
+>    the specification now carries it as a Viu-owned clause (for example the readonly-setter warning
+>    under R1/R3 is specified in [§5](SPECIFICATION.md#5-reactivity)); where the specification and this
+>    document disagree, the specification wins.
+> 3. **R4's "Boundary to preserve (Vue parity)" was not carried out, and is now the opposite of
+>    policy.** Component-tree `Provide`/`Inject` with a typed `InjectionKey<T>` does not exist in the
+>    tree. Viu deliberately has **no hierarchical component-tree dependency API**
+>    ([`[CMP-24]`](SPECIFICATION.md#48-no-component-tree-provideinject)): dependencies arrive through
+>    parameters and slots, `IComponentContext.Services`, State definitions, or
+>    `IComponentContext.Components`. Reversing that needs a superseding decision, not an edit here.
+>
+> The `.vue` single-file-component compatibility parser is **unaffected** and is a shipping product
+> feature ([V01.01.06.09], #250), specified in
+> [§9](SPECIFICATION.md#9-vue-compatibility--a-shipping-feature).
+
 ## Motivation (recorded 2026-07-20, direction set by Chase)
 
 The faithful Vue 3 re-implementation has reached its Wave 4/5 milestone: the port is functionally

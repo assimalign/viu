@@ -11,8 +11,8 @@ namespace Assimalign.Viu.LanguageService;
 /// <summary>
 /// Pins declared-member completion inside an <c>@script</c> block ([V01.01.12.07.04], #261): a
 /// syntax-only Roslyn parse of the script block offers the file's own fields, properties, and
-/// methods above the scaffold and keyword catalogs — the completion-facing analogue of
-/// <c>@vue/compiler-sfc</c>'s <c>compileScript()</c> binding scan.
+/// methods above the scaffold and keyword catalogs. The parse is syntax-only on purpose: completion
+/// must stay responsive while the file is mid-edit and therefore uncompilable.
 /// </summary>
 public class ScriptDeclarationCompletionTests
 {

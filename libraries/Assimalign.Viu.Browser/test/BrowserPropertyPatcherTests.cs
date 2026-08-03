@@ -6,8 +6,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the [V01.01.04.02] patchProp decision tree against @vue/runtime-dom's patchProp and
-// modules (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/patchProp.ts).
+// Pins the [V01.01.04.02] property-patch decision tree: class/style routing, the
+// property-vs-attribute choice per tag, boolean and enumerated attribute handling, and the
+// xlink namespace. The tree resolves without probing the live element, so these vectors are what
+// stand in for the probe.
 // The tree runs on the .NET side over recorded leaf ops — no DOM, no interop — so every
 // resolution's exact leaf sequence is asserted (each leaf is one interop call in production).
 public class BrowserPropertyPatcherTests
@@ -39,7 +41,7 @@ public class BrowserPropertyPatcherTests
     private void Patch(string tag, string name, object? previous, object? next, string? elementNamespace = null)
         => BrowserPropertyPatcher.Patch(_leaves, Element, tag, name, previous, next, elementNamespace);
 
-    // --- prop-vs-attribute dispatch (upstream shouldSetAsProp) ------------------------------
+    // --- prop-vs-attribute dispatch -----------------------------------------------------------
 
     [Theory]
     [InlineData("input")]
@@ -68,7 +70,7 @@ public class BrowserPropertyPatcherTests
     [Fact]
     public void Form_IsAlwaysAnAttribute()
     {
-        // The form IDL property is readonly (upstream parity).
+        // The form IDL property is readonly, so it can only be written as an attribute.
         Patch("input", "form", null, "checkout");
         _calls.ShouldBe([$"setAttribute({Element},form,checkout)"]);
     }
@@ -138,8 +140,7 @@ public class BrowserPropertyPatcherTests
     [Fact]
     public void Class_OnSvg_UsesSetAttribute()
     {
-        // SVGElement.className is an SVGAnimatedString — must go through setAttribute
-        // (upstream parity).
+        // SVGElement.className is an SVGAnimatedString — must go through setAttribute.
         Patch("circle", "class", null, "dot", "svg");
         _calls.ShouldBe([$"setAttribute({Element},class,dot)"]);
     }
@@ -217,7 +218,7 @@ public class BrowserPropertyPatcherTests
         _calls.ShouldBe([$"removeAttribute({Element},style)"]);
     }
 
-    // --- falsy semantics (upstream attrs module) ---------------------------------------------
+    // --- falsy semantics -----------------------------------------------------------------------
 
     [Fact]
     public void NullValues_RemoveTheAttribute()
@@ -242,7 +243,7 @@ public class BrowserPropertyPatcherTests
     public void False_WritesTheStringFalse_ForEnumeratedAttributes()
     {
         // spellcheck/draggable are enumerated: removal would mean "inherit", so false must be
-        // written out (upstream parity).
+        // written out.
         Patch("div", "spellcheck", null, false);
         Patch("div", "draggable", null, false);
         _calls.ShouldBe(
@@ -298,7 +299,7 @@ public class BrowserPropertyPatcherTests
     public void ModelUpdateListeners_RemainVirtualNodeMetadataAndNeverReachTheDom(
         string propertyName)
     {
-        // Vue runtime-dom excludes isModelListener keys from patchEvent. Native v-model keeps
+        // A component v-model's onUpdate:* assigner is excluded from event patching. Native v-model keeps
         // its assigner in vnode props for directive use, but no "update:*" DOM event exists.
         var handler = (Action<object?>)(_ => { });
 

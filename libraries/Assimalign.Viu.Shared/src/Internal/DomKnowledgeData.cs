@@ -10,13 +10,14 @@
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// The raw comma-joined DOM knowledge lists mirroring <c>@vue/shared</c>'s
-/// <c>domTagConfig.ts</c>/<c>domAttrConfig.ts</c> (upstream's <c>makeMap</c> input format,
-/// cross-checked against WHATWG HTML for void elements and boolean attributes).
+/// The raw comma-joined DOM knowledge lists, in the lowest-common-denominator form the linked
+/// netstandard2.0 generator host can consume: constants only, split at load time by the runtime
+/// side. Each list names its defining specification (WHATWG HTML, SVG 2, MathML Core), which is
+/// the authority for its contents.
 /// </summary>
 internal static class DomKnowledgeData
 {
-    /// <summary>Upstream <c>HTML_TAGS</c>.</summary>
+    /// <summary>HTML element names (WHATWG HTML element index); matched case-insensitively.</summary>
     internal const string HtmlTags =
         "html,body,base,head,link,meta,style,title,address,article,aside,footer,header,hgroup,"
         + "h1,h2,h3,h4,h5,h6,nav,section,div,dd,dl,dt,figcaption,figure,picture,hr,img,li,main,"
@@ -26,7 +27,7 @@ internal static class DomKnowledgeData
         + "th,tr,button,datalist,fieldset,form,input,label,legend,meter,optgroup,option,output,"
         + "progress,select,textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot";
 
-    /// <summary>Upstream <c>SVG_TAGS</c> (case-sensitive per the SVG 2 element tables).</summary>
+    /// <summary>SVG element names (case-sensitive per the SVG 2 element tables).</summary>
     internal const string SvgTags =
         "svg,animate,animateMotion,animateTransform,circle,clipPath,color-profile,defs,desc,"
         + "discard,ellipse,feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,"
@@ -38,7 +39,7 @@ internal static class DomKnowledgeData
         + "radialGradient,rect,set,solidcolor,stop,switch,symbol,text,textPath,title,tspan,"
         + "unknown,use,view";
 
-    /// <summary>Upstream <c>MATH_TAGS</c> (MathML Core element tables).</summary>
+    /// <summary>MathML element names (case-sensitive per the MathML Core element tables).</summary>
     internal const string MathTags =
         "annotation,annotation-xml,maction,maligngroup,malignmark,math,menclose,merror,mfenced,"
         + "mfrac,mfraction,mglyph,mi,mlabeledtr,mlongdiv,mmultiscripts,mn,mo,mover,mpadded,"
@@ -46,19 +47,19 @@ internal static class DomKnowledgeData
         + "msrow,mstack,mstyle,msub,msubsup,msup,mtable,mtd,mtext,mtr,munder,munderover,none,"
         + "semantics";
 
-    /// <summary>Upstream <c>VOID_TAGS</c> (WHATWG void elements).</summary>
+    /// <summary>WHATWG void elements: they take no children and no closing tag.</summary>
     internal const string VoidTags = "area,base,br,col,embed,hr,img,input,link,meta,param,source,track,wbr";
 
     /// <summary>
-    /// Upstream <c>isBooleanAttr</c>'s input: the special boolean attributes plus the common
-    /// set (WHATWG boolean attributes).
+    /// WHATWG boolean attributes: presence means true and the attribute value is ignored, so a
+    /// falsy binding must remove the attribute rather than write an empty value.
     /// </summary>
     internal const string BooleanAttributes =
         "itemscope,allowfullscreen,formnovalidate,ismap,nomodule,novalidate,readonly,"
         + "async,autofocus,autoplay,controls,default,defer,disabled,hidden,inert,loop,open,"
         + "required,reversed,scoped,seamless,checked,muted,multiple,selected";
 
-    /// <summary>Upstream <c>isKnownHtmlAttr</c>'s input.</summary>
+    /// <summary>Known HTML attribute names.</summary>
     internal const string KnownHtmlAttributes =
         "accept,accept-charset,accesskey,action,align,allow,alt,async,autocapitalize,"
         + "autocomplete,autofocus,autoplay,background,bgcolor,border,buffered,capture,challenge,"
@@ -73,7 +74,7 @@ internal static class DomKnowledgeData
         + "scoped,selected,shape,size,sizes,slot,span,spellcheck,src,srcdoc,srclang,srcset,start,"
         + "step,style,summary,tabindex,target,title,translate,type,usemap,value,width,wrap";
 
-    /// <summary>Upstream <c>isKnownSvgAttr</c>'s input (SVG 2 attribute tables).</summary>
+    /// <summary>Known SVG attribute names (SVG 2 attribute tables).</summary>
     internal const string KnownSvgAttributes =
         "xmlns,accent-height,accumulate,additive,alignment-baseline,alphabetic,amplitude,"
         + "arabic-form,ascent,attributeName,attributeType,azimuth,baseFrequency,baseline-shift,"
@@ -112,14 +113,13 @@ internal static class DomKnowledgeData
         + "yChannelSelector,z,zoomAndPan";
 
     /// <summary>
-    /// Upstream's unsafe attribute-name characters (SSR): <c>&gt;</c>, <c>/</c>, <c>=</c>,
-    /// quotes, tab, newline, form feed, and space.
+    /// Characters that make an attribute name unsafe to serialize (SSR): <c>&gt;</c>, <c>/</c>,
+    /// <c>=</c>, quotes, tab, newline, form feed, and space.
     /// </summary>
     internal const string UnsafeAttributeNameCharacters = ">/=\"'\u0009\u000A\u000C\u0020";
 
     /// <summary>
-    /// Upstream <c>propsToAttrMap</c>: the camelCase prop → attribute casing exceptions, as
-    /// alternating name/value entries.
+    /// The camelCase property → attribute casing exceptions, as alternating name/value entries.
     /// </summary>
     internal static readonly string[] PropertyToAttributePairs =
     [

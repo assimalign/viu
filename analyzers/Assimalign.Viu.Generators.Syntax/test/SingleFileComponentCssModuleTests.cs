@@ -32,7 +32,8 @@ public sealed class SingleFileComponentCssModuleTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
-        // The default `module` maps to the `Style` accessor (the C# analogue of Vue's `$style`).
+        // An unnamed `module` attribute maps to the conventional `Style` accessor, so the common case
+        // needs no name; a named module emits an accessor under that name instead.
         generated.ShouldContain("internal static class Style");
         generated.ShouldContain("public const string box = \"box_");
         // The extracted CSS carries the hashed selector, not the original.
@@ -130,8 +131,9 @@ public sealed class SingleFileComponentCssModuleTests
     {
         // [V01.01.06.06.01] `v-bind(count)` with a script IReactiveReference<T> member unwraps to
         // `count.Value` in the
-        // ApplyCssVariables getter — instance-member mode, so no `_ctx.` receiver — matching upstream cssVars
-        // ergonomics instead of forcing `v-bind(count.Value)`.
+        // ApplyCssVariables getter — instance-member mode, so no `_ctx.` receiver. The compiler inserts the
+        // unwrap rather than making the author write `v-bind(count.Value)`: a CSS binding always wants the
+        // current value, never the reference cell, so there is no second meaning to preserve.
         const string source =
             "@script {\n    public Reference<int> count;\n}\n" +
             "<style>\n    .a { width: v-bind(count); }\n</style>\n";

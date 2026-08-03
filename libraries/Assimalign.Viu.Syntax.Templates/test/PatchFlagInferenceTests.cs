@@ -6,12 +6,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// [V01.01.05.06] patch-flag inference. Ported from vuejs/core
-// packages/compiler-core/__tests__/transforms/{transformElement,vBind,vOn}.spec.ts and pinned against the
-// vuejs/core v3.5 template-explorer output for each template. Every expected numeric value is the exact
-// PatchFlags bit combination @vue/shared emits and the runtime diff consumes; the enum lives once in
-// Assimalign.Viu.Shared (see Assimalign.Viu.Shared.Tests.PatchFlagsParityTests for the bit-for-bit table),
-// so these tests are the compiler-side half of that shared-constants contract.
+// [V01.01.05.06] patch-flag inference. Every expected numeric value below IS the contract: the exact
+// PatchFlags bit combination the compiler stamps and the runtime diff consumes. The enum itself lives
+// once in Assimalign.Viu.Shared, so these tests are the compiler-side half of a two-artifact contract —
+// compiled output and runtime must agree on every bit, and a value is additive only, never renumbered.
 public class PatchFlagInferenceTests
 {
     private static VNodeCall RootVNode(string source)
@@ -87,7 +85,7 @@ public class PatchFlagInferenceTests
     [Fact]
     public void DynamicArgument_EscalatesToFullPropsAndReplacesFinerFlags()
     {
-        // A dynamic v-bind argument makes the prop keys themselves dynamic; upstream sets FULL_PROPS *instead*
+        // A dynamic v-bind argument makes the prop keys themselves dynamic, so FULL_PROPS is set *instead*
         // of CLASS/STYLE/PROPS (the else-branch in buildProps is skipped entirely when hasDynamicKeys).
         var codegen = RootVNode("<div :[key]=\"v\" :class=\"c\" :style=\"s\" :foo=\"f\"></div>");
 
@@ -198,12 +196,12 @@ public class PatchFlagInferenceTests
         codegen.ShouldHavePatchFlag(PatchFlags.DynamicSlots);
     }
 
-    // ---- numeric parity centrepiece ----
+    // ---- the numeric contract ----
 
-    // Each row is the exact patchFlag the vuejs/core v3.5 template-explorer stamps for the template (base
-    // compiler options: no prefixIdentifiers, no cacheHandlers). This is the compiler-side mirror of
-    // Assimalign.Viu.Shared.Tests.PatchFlagsParityTests — same numbers, produced by inference rather than by
-    // reading the enum, so a divergence in either the enum or the inference is caught.
+    // Each row is the exact patchFlag the compiler stamps for that template under base compiler options
+    // (no prefixIdentifiers, no cacheHandlers). The same numbers appear in
+    // Assimalign.Viu.Shared.Tests.PatchFlagsParityTests, produced there by reading the enum and here by
+    // inference, so a divergence in either the enum or the inference is caught.
     [Theory]
     [InlineData("<div>{{ x }}</div>", 1)]                    // TEXT
     [InlineData("<div :class=\"c\"></div>", 2)]              // CLASS

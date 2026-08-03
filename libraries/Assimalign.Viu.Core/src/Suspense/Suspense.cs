@@ -10,8 +10,9 @@ namespace Assimalign.Viu;
 /// every dependency in the current pending branch settles.
 /// </summary>
 /// <remarks>
-/// This is Viu's host-generic port of Vue 3.5's <c>Suspense</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/Suspense.ts.
+/// Suspense is host-generic: it coordinates pending asynchronous dependencies and the
+/// fallback-to-content swap entirely through the renderer, so no host-specific knowledge is
+/// required.
 /// Each activated template owns one independent boundary. The boundary does not use
 /// provide/inject or an application service container.
 /// </remarks>

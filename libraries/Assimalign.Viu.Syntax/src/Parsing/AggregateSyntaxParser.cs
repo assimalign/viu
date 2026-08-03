@@ -18,8 +18,9 @@ namespace Assimalign.Viu.Syntax;
 /// </summary>
 /// <remarks>
 /// With no registrations the aggregate parse is exactly the typed parse — embedded content stays raw,
-/// preserving the container language's own contract (the single-file-component parser never looks
-/// inside a block's content by itself, mirroring <c>@vue/compiler-sfc</c>'s <c>parse()</c>).
+/// preserving the container language's own contract: a container parser slices, it does not parse
+/// interiors, so the single-file-component parser never looks inside a block's content by itself
+/// (specified by <c>[SFC-5]</c>).
 /// Implementations' <see cref="SyntaxParser{T}.ParseCore(SyntaxSource, CancellationToken)"/> MUST
 /// return an <see cref="AggregateSyntaxParserResult{T}"/> (or a derived record) — the sealed pipeline
 /// casts to it to attach the dispatched results.

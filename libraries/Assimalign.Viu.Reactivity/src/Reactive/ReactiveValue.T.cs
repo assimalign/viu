@@ -1,8 +1,7 @@
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A strongly-typed reactive value container — the class-based C# counterpart of Vue 3.5's
-/// <c>Ref&lt;T&gt;</c> (https://vuejs.org/api/reactivity-core.html#ref). Reading <see cref="Value"/>
+/// A strongly-typed reactive value container. Reading <see cref="Value"/>
 /// inside an active subscriber establishes a dependency on this value's <see cref="Dependency"/>;
 /// writing a changed value notifies subscribers. Concrete leaves — <see cref="Reference{T}"/>,
 /// <see cref="ShallowReference{T}"/>, <see cref="CustomReference{T}"/>, and <see cref="Computed{T}"/>
@@ -17,11 +16,13 @@ public abstract class ReactiveValue<T> : ReactiveValue, IReactiveReference<T>
     }
 
     /// <summary>
-    /// Gets or sets the contained value (Vue's <c>ref.value</c>). Reads track the ambient subscriber;
-    /// changed writes trigger subscribers. A read-only implementation (a getter-only
-    /// <see cref="Computed{T}"/> or a setter-less projected ref) warns on write and leaves the value
-    /// unchanged — it never throws, matching Vue 3.5's readonly-write behavior
-    /// (<c>packages/reactivity/src/computed.ts</c>).
+    /// Gets or sets the contained value. Reads track the ambient subscriber; changed writes trigger
+    /// subscribers. A read-only implementation (a getter-only <see cref="Computed{T}"/> or a
+    /// setter-less projected reference) warns on write and leaves the value unchanged; it never
+    /// throws. Note that <c>.Value</c> appears in read <em>and</em> write positions in generated
+    /// code — with no proxy to auto-unwrap a reference, the compiler alone decides the access form,
+    /// so changing this member's shape is a change to the expression-binding contract
+    /// (<c>[RCT-8]</c>).
     /// </summary>
     public abstract T Value { get; set; }
 

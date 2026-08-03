@@ -5,9 +5,8 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// A route table and matcher: builds compiled, ranked matchers from a set of route records and
-/// resolves paths and named routes to immutable <see cref="RouteLocation"/>s. The C# port of the
-/// object returned by vue-router's <c>createRouterMatcher</c>
-/// (<c>packages/router/src/matcher/index.ts</c>).
+/// resolves paths and named routes to immutable <see cref="RouteLocation"/>s. Specified by
+/// <c>[RTR-1]</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -135,7 +134,7 @@ public sealed class RouteMatcher : IRouteMatcher
         parent?.Children.Add(matcher);
         if (record.Name is { Length: > 0 } name)
         {
-            // Last registration wins, mirroring vue-router's map assignment.
+            // Last registration wins for a duplicated name.
             namedMatchers[name] = matcher;
         }
         InsertMatcher(matcher);
@@ -146,7 +145,7 @@ public sealed class RouteMatcher : IRouteMatcher
         }
     }
 
-    // Mirrors vue-router's parent-path joining for non-absolute child paths.
+    // Joins a non-absolute child path onto its parent's path.
     private static string NormalizePath(string path, RouteRecordMatcher? parent)
     {
         if (parent is null)
@@ -166,7 +165,7 @@ public sealed class RouteMatcher : IRouteMatcher
         return parentPath + connector + path;
     }
 
-    // Mirrors insertMatcher/findInsertionIndex: binary search by score, then place an empty-path
+    // Binary search by score, then place an empty-path
     // child ahead of an equally scored matchable ancestor so the child wins.
     private void InsertMatcher(RouteRecordMatcher matcher)
     {
@@ -214,7 +213,7 @@ public sealed class RouteMatcher : IRouteMatcher
         return null;
     }
 
-    // Upstream gates on name/components/redirect. Components and redirects are later router
+    // The gate is name/components/redirect. Components and redirects are later router
     // features (see DESIGN.md), so every record is currently matchable — which is what keeps an
     // empty-path default child ordered ahead of its parent.
     private static bool IsMatchable(RouteRecordMatcher matcher)

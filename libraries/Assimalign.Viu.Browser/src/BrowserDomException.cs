@@ -5,8 +5,8 @@ namespace Assimalign.Viu.Browser;
 /// <summary>
 /// A DOM interop failure surfaced as a typed exception carrying the node-op name and the handle
 /// it targeted, instead of an opaque JS error string — the [V01.01.04.01] failure-semantics
-/// contract for the bridge underneath <c>@vue/runtime-dom</c>'s <c>nodeOps</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/nodeOps.ts).
+/// contract for the DOM bridge. Naming the operation and the handle is what makes a bridge failure
+/// diagnosable at all: the JS side has no managed stack to report.
 /// </summary>
 public sealed class BrowserDomException : Exception
 {

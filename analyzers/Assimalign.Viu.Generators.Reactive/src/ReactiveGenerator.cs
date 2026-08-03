@@ -9,13 +9,17 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Assimalign.Viu.Generators.Reactivity;
 
 /// <summary>
-/// The incremental source generator behind <c>[Reactive]</c>/<c>[ShallowReactive]</c> — the compiled
-/// C# substitute for Vue 3.5's <c>reactive()</c>/<c>shallowReactive()</c>
-/// (https://vuejs.org/api/reactivity-core.html#reactive). It fills in each declared <c>partial</c>
-/// property with a per-property <c>Dependency</c>: the getter tracks, the setter triggers only
-/// on an <c>EqualityComparer&lt;T&gt;</c> change, and the type gains an <c>IReactiveObject</c>
-/// implementation for raw access, dependency lookup, and deep traversal. Interception is compiled in
-/// because C# has no <c>Proxy</c> and WASM forbids reflection and runtime code generation.
+/// The incremental source generator behind <c>[Reactive]</c>/<c>[ShallowReactive]</c>: it turns a
+/// plain <c>partial</c> class into a reactive object at build time. It fills in each declared
+/// <c>partial</c> property with a per-property <c>Dependency</c>: the getter tracks, the setter
+/// triggers only on an <c>EqualityComparer&lt;T&gt;</c> change, and the type gains an
+/// <c>IReactiveObject</c> implementation for raw access, dependency lookup, and deep traversal.
+/// <para>
+/// Viu has no object-proxy interception layer, so per-property interception is compiled in rather
+/// than installed at run time: C# has no <c>Proxy</c> equivalent, and WASM/AOT forbids reflection
+/// and runtime code generation. Reactivity is therefore opt-in per class, never implicitly deep.
+/// Specified by <c>[RCT-6]</c> and <c>[RCT-7]</c>.
+/// </para>
 /// <para>
 /// The pipeline is fully incremental: the extracted model is a value-equatable record with no syntax
 /// nodes or symbols, so an unrelated edit re-emits nothing.

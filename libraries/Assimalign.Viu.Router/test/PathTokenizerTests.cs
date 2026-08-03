@@ -5,14 +5,15 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins vue-router's tokenizePath (packages/router/src/matcher/pathTokenizer.ts). Route matching
-// syntax reference: https://router.vuejs.org/guide/essentials/route-matching-syntax.html
+// Pins the path tokenizer: dynamic, optional, repeatable, and custom-pattern parameters, plus
+// sub-segment mixes where literal text and a parameter share one segment. The vectors are the frozen
+// contract for Viu's route-path syntax.
 public class PathTokenizerTests
 {
     [Fact]
     public void Tokenize_EmptyPath_ProducesOneEmptySegment()
     {
-        // Upstream: `if (!path) return [[]]`.
+        // An empty path tokenizes to one empty segment.
         var segments = PathTokenizer.Tokenize(string.Empty);
 
         segments.Count.ShouldBe(1);
@@ -22,7 +23,7 @@ public class PathTokenizerTests
     [Fact]
     public void Tokenize_Root_ProducesSingleEmptyStaticToken()
     {
-        // Upstream ROOT_TOKEN: "/" is one segment holding a Static token with an empty value.
+        // The root path "/" is one segment holding a Static token with an empty value.
         var segments = PathTokenizer.Tokenize("/");
 
         segments.Count.ShouldBe(1);
@@ -94,7 +95,7 @@ public class PathTokenizerTests
     [Fact]
     public void Tokenize_StaticPrefixBeforeRepeatable_IsAllowed()
     {
-        // Upstream guard is `segment.length > 1`, so one preceding static token is fine.
+        // The guard counts only the tokens already pushed, so one preceding static token is fine.
         var segment = PathTokenizer.Tokenize("/user-:id+")[0];
 
         segment.Count.ShouldBe(2);

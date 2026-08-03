@@ -1,10 +1,10 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The states of the WHATWG-derived tokenizer state machine. The C# port of Vue 3.5's <c>State</c>
-/// enum (<c>@vue/compiler-core</c> <c>tokenizer.ts</c>), minus the <c>InEntity</c> state: this port
-/// decodes character references when the parser materialises node content (see
-/// <see cref="HtmlEntityDecoder"/>) rather than incrementally inside the tokenizer.
+/// The states of the WHATWG-derived tokenizer state machine. There is no in-entity state: character
+/// references are decoded when the parser materialises node content (see
+/// <see cref="HtmlEntityDecoder"/>) rather than incrementally inside the tokenizer, which is what keeps
+/// every emitted <c>Location.Source</c> the raw, undecoded slice.
 /// </summary>
 internal enum TokenizerState
 {

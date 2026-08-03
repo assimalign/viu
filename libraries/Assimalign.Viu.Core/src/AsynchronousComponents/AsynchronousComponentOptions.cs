@@ -6,7 +6,7 @@ namespace Assimalign.Viu;
 /// Configures an asynchronous component definition.
 /// </summary>
 /// <remarks>
-/// Mirrors Vue 3.5's <c>AsyncComponentOptions</c>. Render callbacks create fresh immutable tree
+/// Render callbacks create fresh immutable tree
 /// values for each mount; definitions and activated templates are never reused as tree values.
 /// </remarks>
 public sealed class AsynchronousComponentOptions

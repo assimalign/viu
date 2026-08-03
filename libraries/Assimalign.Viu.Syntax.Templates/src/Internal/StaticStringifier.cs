@@ -6,11 +6,9 @@ using System.Text;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The DOM static-stringification pass — the C# port of Vue 3.5's <c>stringifyStatic</c>
-/// (<c>@vue/compiler-dom</c>
-/// <see href="https://github.com/vuejs/core/blob/v3.5.13/packages/compiler-dom/src/transforms/stringifyStatic.ts">transforms/stringifyStatic.ts</see>,
-/// upstream's <c>HoistTransform</c>). It runs at the end of the static-caching walk over a node's children:
-/// contiguous runs of cached, stringifiable static siblings that reach the upstream thresholds
+/// The DOM static-stringification pass (specified by <c>[SFC-OPT-2]</c>–<c>[SFC-OPT-4]</c>).
+/// It runs at the end of the static-caching walk over a node's children:
+/// contiguous runs of cached, stringifiable static siblings that reach the thresholds
 /// (<see cref="NodeCountThreshold"/> nodes, or <see cref="ElementWithBindingCountThreshold"/> elements with
 /// attribute bindings) collapse into a single <c>createStaticVNode(html, nodeCount)</c> call carrying the
 /// serialized HTML, which the runtime inserts via one <c>innerHTML</c> assignment instead of creating each
@@ -19,39 +17,39 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Deliberate divergences from upstream, all AOT- and immutability-driven and pinned by tests
+/// Deliberate scope decisions, all AOT- and immutability-driven and pinned by tests
 /// (see <c>docs/DESIGN.md</c>):
 /// </para>
 /// <list type="bullet">
-/// <item>No constant-expression evaluation. Upstream evaluates constant interpolations and constant
-/// <c>v-bind</c> values with <c>new Function</c>; that is forbidden by the no-dynamic-codegen rule, and in
-/// Viu's opaque-expression model no interpolation or dynamic binding is ever classified constant, so a
+/// <item>No constant-expression evaluation. Evaluating a constant interpolation at compile time would
+/// require generating and running code, which the no-dynamic-codegen rule forbids outright. It also
+/// never arises: no interpolation or dynamic binding is classified constant, so a
 /// stringifiable cached subtree only ever contains static text, comments, and static attributes.
 /// <see cref="AnalyzeNode"/> bails on anything else.</item>
 /// <item>Only runs on a template root's children and a plain element's children (the two containers with
 /// clean immutable write-back). Static descendants inside <c>v-if</c>/<c>v-for</c> bodies are still cached,
 /// just not stringified.</item>
-/// <item>Merged cache slots stay reserved-but-unused rather than being compacted (upstream splices
-/// <c>context.cached</c> and re-indexes), which keeps <see cref="CacheExpression"/> immutable.</item>
+/// <item>Merged cache slots stay reserved-but-unused rather than being compacted and re-indexed, which
+/// keeps <see cref="CacheExpression"/> immutable. The cost is a slightly larger cache array; the benefit
+/// is that no already-emitted slot index is ever invalidated.</item>
 /// </list>
 /// </remarks>
 internal static class StaticStringifier
 {
-    // upstream StringifyThresholds (@vue/compiler-dom stringifyStatic.ts):
-    //   NODE_COUNT = 20, ELEMENT_WITH_BINDING_COUNT = 5.
+    // The stringification thresholds are specified values ([SFC-OPT-2]) and are pinned by tests; below
+    // them the raw-HTML insert costs more than the nodes it replaces.
     private const int NodeCountThreshold = 20;
     private const int ElementWithBindingCountThreshold = 5;
 
-    // upstream isNonStringifiable makeMap: table-section tags that innerHTML would reparent, so they are
-    // never stringified.
+    // Table-section tags that innerHTML would reparent, so they are never stringified ([SFC-OPT-3]).
     private static readonly HashSet<string> NonStringifiableTags = new(StringComparer.Ordinal)
     {
         "caption", "thead", "tr", "th", "tbody", "td", "tfoot", "colgroup", "col",
     };
 
     /// <summary>
-    /// Stringifies eligible contiguous cached-static runs among <paramref name="node"/>'s children (the
-    /// upstream <c>transformHoist</c> invocation at the tail of <c>walk</c>). Bails for slot content, and
+    /// Stringifies eligible contiguous cached-static runs among <paramref name="node"/>'s children.
+    /// Bails for slot content, and
     /// only rewrites a <see cref="RootNode"/>'s working children or a plain element's
     /// <see cref="VNodeCall"/> children.
     /// </summary>
@@ -59,7 +57,8 @@ internal static class StaticStringifier
     /// <param name="context">The transform context.</param>
     public static void Run(TemplateSyntaxNode node, TransformContext context)
     {
-        // Bail stringification for slot content (upstream: if (context.scopes.vSlot > 0) return).
+        // Bail stringification for slot content: a slot's children are rendered by the parent into an
+        // unknown position, so a raw-HTML insert cannot be placed safely.
         if (context.ScopeVSlot > 0)
         {
             return;
@@ -167,8 +166,8 @@ internal static class StaticStringifier
             // Remove the merged nodes (all but the first) from the children list.
             children.RemoveRange(currentIndex - currentChunk.Count + 1, deleteCount);
 
-            // Upstream also compacts context.cached and re-indexes trailing cache expressions; Viu leaves
-            // the merged slots reserved-but-unused to keep CacheExpression immutable (see docs/DESIGN.md).
+            // The merged slots stay reserved-but-unused rather than being compacted and re-indexed, which
+            // keeps CacheExpression immutable and every already-emitted slot index valid (docs/DESIGN.md).
         }
 
         return deleteCount;
@@ -181,7 +180,7 @@ internal static class StaticStringifier
             : null;
 
     /// <summary>
-    /// Analyzes a cached element (upstream <c>analyzeNode</c>): returns the node count and the count of
+    /// Analyzes a cached element: returns the node count and the count of
     /// elements carrying bindings inside it, or <see langword="null"/> when it is not stringifiable.
     /// </summary>
     private static (int NodeCount, int ElementWithBindingCount)? AnalyzeNode(ElementNode node)
@@ -324,9 +323,8 @@ internal static class StaticStringifier
         }
     }
 
-    // Port of @vue/shared escapeHtml (packages/shared/src/escapeHtml.ts): escapes " & ' < > so the
-    // serialized string round-trips through innerHTML to the same DOM. Applied to text, comment, and
-    // attribute-value content, matching upstream's stringifyNode/stringifyElement.
+    // Escapes " & ' < > so the serialized string round-trips through innerHTML to the same DOM
+    // ([SFC-OPT-4]). Applied to text, comment, and attribute-value content alike.
     private static void EscapeHtml(StringBuilder builder, string value)
     {
         foreach (var character in value)

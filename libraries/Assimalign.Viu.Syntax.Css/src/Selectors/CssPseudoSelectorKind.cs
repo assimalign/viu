@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Classifies a pseudo selector by the role it plays in Vue's scoped-CSS rewrite
-/// (<c>@vue/compiler-sfc</c> <c>pluginScoped.ts</c>; https://vuejs.org/api/sfc-css-features.html). The
-/// three functional pseudos Vue reserves each change how (or whether) the scope attribute is applied;
+/// Classifies a pseudo selector by the role it plays in the scoped-CSS rewrite
+/// (<see cref="CssScopedRewriter"/>, specified by <c>[STY-1]</c>). Three functional pseudos are
+/// reserved by the rewrite and each changes how — or whether — the scope attribute is applied;
 /// every other pseudo-class or pseudo-element is <see cref="Normal"/> and merely passes through.
 /// </summary>
 public enum CssPseudoSelectorKind

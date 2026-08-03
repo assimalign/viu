@@ -6,9 +6,9 @@ namespace Assimalign.Viu.Syntax.Css;
 /// The result of the <c>v-bind()</c> rewrite (<see cref="CssBindingRewriter.Rewrite"/>): the stylesheet
 /// with every <c>v-bind(expr)</c> in a declaration value replaced by <c>var(--&lt;hash&gt;)</c>, the
 /// <see cref="Bindings"/> collected for the generated component metadata, and any
-/// <see cref="Diagnostics"/> for malformed usages. Mirrors the two outputs of Vue's <c>cssVars.ts</c> — the
-/// rewritten declaration values and the <c>cssVars</c> expression list <c>useCssVars</c> consumes
-/// (https://vuejs.org/api/sfc-css-features.html#v-bind-in-css).
+/// <see cref="Diagnostics"/> for malformed usages. The rewrite is deliberately two-output: the CSS text
+/// alone cannot tell the generator which expressions to watch, and the binding list alone cannot tell
+/// the stylesheet which property to read.
 /// </summary>
 /// <param name="Stylesheet">
 /// The stylesheet with rewritten declaration values. Feed it to <see cref="CssScopedRewriter.Rewrite"/>

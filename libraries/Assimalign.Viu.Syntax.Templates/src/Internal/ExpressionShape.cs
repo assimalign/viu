@@ -5,19 +5,18 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Lax structural checks over opaque expression text — is it a member expression, is it a function
-/// expression — ported from the browser-build lexers in <c>@vue/compiler-core</c> <c>utils.ts</c>
-/// (<c>isMemberExpressionBrowser</c>, <c>isFnExpressionBrowser</c>). This build never parses expression
-/// bodies into a JavaScript AST ([V01.01.05.04] adds that), so — exactly like upstream's <c>__BROWSER__</c>
-/// path — these string lexers decide the shape. False positives are invalid expressions anyway.
+/// expression. The transform stage needs the shape of an expression before anything parses its body, so
+/// these string lexers decide it. Being lax is safe here: a false positive is an expression that would
+/// not have compiled anyway, and the C# compiler is the backstop.
 /// </summary>
 internal static class ExpressionShape
 {
-    // Upstream fnExpRE.
+    // Function-expression shape.
     private static readonly Regex FunctionExpressionRegex = new(
         @"^\s*(async\s*)?(\([^)]*?\)|[\w$_]+)\s*(:[^=]+)?=>|^\s*(async\s+)?function(?:\s+[\w$]+)?\s*\(",
         RegexOptions.Compiled);
 
-    // Upstream whitespaceRE: whitespace around . or [ is trimmed before member-expression lexing.
+    // Whitespace around . or [ is trimmed before member-expression lexing.
     private static readonly Regex WhitespaceAroundAccessRegex = new(@"\s+[.[]\s*|\s*[.[]\s+", RegexOptions.Compiled);
 
     private enum MemberLexState
@@ -31,14 +30,14 @@ internal static class ExpressionShape
     private static string GetSource(ExpressionNode expression)
         => expression is SimpleExpressionNode simple ? simple.Content : expression.Location.Source;
 
-    /// <summary>Whether <paramref name="expression"/> is a function expression (upstream <c>isFnExpression</c>).</summary>
+    /// <summary>Whether <paramref name="expression"/> is a function expression.</summary>
     /// <param name="expression">The expression to test.</param>
     public static bool IsFunctionExpression(ExpressionNode expression)
         => FunctionExpressionRegex.IsMatch(GetSource(expression));
 
     /// <summary>
-    /// Whether <paramref name="expression"/> is a member expression or plain identifier (upstream
-    /// <c>isMemberExpressionBrowser</c>). Lax: only validates root-level structure, not bracket contents.
+    /// Whether <paramref name="expression"/> is a member expression or plain identifier.
+    /// Lax: only validates root-level structure, not bracket contents.
     /// </summary>
     /// <param name="expression">The expression to test.</param>
     public static bool IsMemberExpression(ExpressionNode expression)

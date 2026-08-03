@@ -4,7 +4,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// A lazily populated map of per-key <see cref="Dependency"/> cells shared by the reactive
-/// collections — the C# analogue of one entry's dependency bucket in Vue 3.5's <c>targetMap</c>
+/// collections — one bucket of per-key dependency cells for a single tracked target
 /// (<c>packages/reactivity/src/dep.ts</c>). Reading a key tracks its cell; mutating a key triggers
 /// only that cell, giving the per-key granularity that keeps an effect reading one entry from
 /// re-running when a different entry changes. Cells are created on first tracked read (the one-time

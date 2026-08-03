@@ -8,8 +8,9 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the Browser implementation to Vue's vModelDynamic/resolveDynamicModel behavior:
-// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/directives/vModel.ts.
+// Pins Viu's dynamic v-model contract: the concrete model directive is re-resolved from the
+// element's current tag and type on every hook, so a control that changes type is re-bound rather
+// than left on the directive it first matched.
 public sealed class VModelDynamicTests : IDisposable
 {
     private readonly BrowserDirectiveTestHarness _harness = new();

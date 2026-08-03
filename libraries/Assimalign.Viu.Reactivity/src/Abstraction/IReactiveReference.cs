@@ -1,10 +1,9 @@
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// The non-generic contract for every ref-like reactive value. It is the C# counterpart of Vue
-/// 3.5's untyped <c>Ref</c> shape
-/// (https://vuejs.org/api/reactivity-core.html#ref) and enables reflection-free reference
-/// inspection.
+/// The non-generic contract for every reference-like reactive value: the untyped face of a
+/// reference, so a caller can inspect and read one without knowing its element type. This is what
+/// makes reference inspection reflection-free.
 /// </summary>
 /// <remarks>
 /// First-party implementations should also derive from the internal engine's

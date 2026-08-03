@@ -29,8 +29,8 @@ public interface ITemplateComponent : IComponent
 
     /// <summary>
     /// Gets the optional parent listeners for component-emitted events. Listener keys use event
-    /// names such as <c>saved</c>; the <c>savedOnce</c> key carries Vue's <c>onSavedOnce</c>
-    /// convention.
+    /// names such as <c>saved</c>; a <c>savedOnce</c> key carries the listener a parent declared as
+    /// <c>onSavedOnce</c>, which Core runs at most once per mounted instance.
     /// </summary>
     IReadOnlyDictionary<string, ComponentEventListener>? Listeners { get; }
 

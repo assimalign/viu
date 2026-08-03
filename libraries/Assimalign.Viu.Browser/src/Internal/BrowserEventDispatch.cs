@@ -12,8 +12,8 @@ namespace Assimalign.Viu.Browser;
 /// call for <c>&lt;select multiple&gt;</c> so <c>v-model</c> ([V01.01.04.06]) never issues a
 /// per-event follow-up read; it is null for every non-multi-select event.
 /// <c>defaultPrevented</c> carries the live event's arrival-time
-/// <c>event.defaultPrevented</c> so a host bridge honors upstream RouterLink <c>guardEvent</c>'s
-/// already-prevented bail ([V01.01.08.03.01]).
+/// <c>event.defaultPrevented</c> so a host bridge can honor a router link's already-prevented bail
+/// ([V01.01.08.03.01]).
 /// </summary>
 [SupportedOSPlatform("browser")]
 internal static partial class BrowserEventDispatch

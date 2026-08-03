@@ -3,9 +3,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the factory base-resolution helpers of RouterHistory — the C# port of how createWebHistory
-// defaults its base from <base href> and how createWebHashHistory computes a hash base
-// (packages/router/src/history/html5.ts, hash.ts) — plus the memory mode's no-browser guarantee.
+// Pins the factory base-resolution helpers of RouterHistory — how the web mode defaults its base
+// from a document <base href> and how the hash mode computes a hash base — plus the memory mode's
+// no-browser guarantee.
 public class RouterHistoryFactoryTests
 {
     private static FakeBrowserHistoryInterop Interop(

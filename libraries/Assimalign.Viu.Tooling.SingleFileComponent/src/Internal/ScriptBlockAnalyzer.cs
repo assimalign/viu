@@ -14,16 +14,16 @@ using Assimalign.Viu.Syntax.Templates;
 namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
-/// Analyzes a parsed <c>@script</c> block's C# — the Viu analogue of <c>@vue/compiler-sfc</c>'s
-/// <c>compileScript()</c> adapted to a C# partial-class body. It does two jobs, both purely syntactic
+/// Analyzes a parsed <c>@script</c> block's C# for emission into a partial-class body. It does two jobs,
+/// both purely syntactic
 /// (the build host has no semantic model for code it is itself generating, and reflection is forbidden):
 /// <list type="number">
 /// <item>
 /// <b>Region split ([V01.01.06.03.01]).</b> Leading <c>using</c> directives are separated from the class
 /// members: a raw compilation-unit parse locates the leading using run, and the block is cut at the line
 /// boundary after it into a hoisted <em>using region</em> and a class-body <em>member region</em>
-/// (<see cref="ScriptRegions"/>). Vue hoists a <c>&lt;script setup&gt;</c> block's imports out of the
-/// render scope the same way.
+/// (<see cref="ScriptRegions"/>). The split is forced by C#: a top-level <c>using</c> directive and a
+/// bare member declaration have no common legal syntactic context.
 /// </item>
 /// <item>
 /// <b>Validation.</b> Each region is Roslyn-parsed in the context the emitter places it — the using region
@@ -35,8 +35,8 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// diagnostics and with the emitter's two <c>#line</c> anchors by construction.
 /// </item>
 /// <item>
-/// <b>Binding-metadata extraction.</b> Each top-level member is classified into a <see cref="BindingType"/>
-/// (the C# port of Vue's <c>BindingTypes</c>), driving where the template compiler inserts
+/// <b>Binding-metadata extraction.</b> Each top-level member is classified into a <see cref="BindingType"/>,
+/// driving where the template compiler inserts
 /// <c>.Value</c>. Classification is conservative: only a field/property whose declared type is a known
 /// <c>Assimalign.Viu.Reactivity</c> reference contract or implementation becomes
 /// <see cref="BindingType.SetupReference"/> (the
@@ -47,8 +47,8 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// The editor shares this exact core through <see cref="DescribeMembers"/> ([V01.01.06.11]): the probe
 /// wrapper, the leading-using split, and member discovery exist <em>once</em>, killing the drift the
 /// language service's hand-mirrored reader used to carry.
-/// See https://vuejs.org/api/sfc-script-setup.html and <c>docs/FORMAT.md</c> (the <c>@script</c> content
-/// contract). Work items [V01.01.06.03] and [V01.01.06.03.01].
+/// See <c>docs/FORMAT.md</c> for the <c>@script</c> content contract. Work items [V01.01.06.03] and
+/// [V01.01.06.03.01].
 /// </summary>
 internal static class ScriptBlockAnalyzer
 {
@@ -79,11 +79,10 @@ internal static class ScriptBlockAnalyzer
     private static readonly CSharpParseOptions DescribeParseOptions =
         new(LanguageVersion.Preview, DocumentationMode.Parse, SourceCodeKind.Regular);
 
-    // The Assimalign.Viu.Reactivity reference-carrying contracts and implementations — the C# ports of
-    // Vue's ref/computed/shallowRef/customRef. A field or property of one of these holds a reactive
-    // reference the template compiler must unwrap through .Value (BindingType.SetupReference, upstream
-    // SETUP_REF). Matched by simple type name because classification is syntactic; the projection
-    // references no runtime library.
+    // The Assimalign.Viu.Reactivity reference-carrying contracts and implementations. A field or property
+    // of one of these holds a reactive reference the template compiler must unwrap through .Value
+    // (BindingType.SetupReference). Matched by simple type name because classification is syntactic; the
+    // projection references no runtime library.
     private static readonly HashSet<string> ReferenceTypeNames = new(StringComparer.Ordinal)
     {
         "IReactiveReference",
@@ -548,8 +547,8 @@ internal static class ScriptBlockAnalyzer
                 break;
 
             case MethodDeclarationSyntax method:
-                // A method is a fixed callable, never a reactive reference and never unwrapped
-                // (upstream SETUP_CONST) — the render path emits a direct call, not a .Value access.
+                // A method is a fixed callable, never a reactive reference and never unwrapped — the
+                // render path emits a direct call, not a .Value access.
                 bindings.Add(new ScriptBinding(method.Identifier.Text, BindingType.SetupConstant));
                 break;
         }

@@ -4,8 +4,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts describe('decodeEntities option'),
-// exercising the embedded WHATWG table through the parser (content decoded, loc.Source raw).
+// Character-reference decoding through the parser, per the WHATWG named and numeric reference rules.
+// The invariant these cases pin: a node's Content is decoded while its Location.Source stays the raw,
+// undecoded slice.
 public class EntityTests
 {
     [Fact]

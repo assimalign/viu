@@ -5,13 +5,12 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The expression node transform: rewrites the identifiers inside interpolations and element directive
-/// expressions and arguments against the template scope and binding metadata. The C# port of Vue 3.5's
-/// <c>transformExpression</c> (<c>@vue/compiler-core</c> <c>transforms/transformExpression.ts</c>).
+/// expressions and arguments against the template scope and binding metadata.
 /// </summary>
 /// <remarks>
-/// Only installed in the pipeline when <see cref="TransformOptions.PrefixIdentifiers"/> is set, mirroring
-/// upstream's <c>!__BROWSER__ &amp;&amp; prefixIdentifiers</c> gate; the default opaque-expression pipeline is
-/// unchanged. Like upstream it skips <c>v-for</c> (its source and aliases are handled by
+/// Only installed in the pipeline when <see cref="TransformOptions.PrefixIdentifiers"/> is set; the
+/// default opaque-expression pipeline is unchanged. It skips <c>v-for</c> (its source and aliases are
+/// handled by
 /// <see cref="VForTransform"/>) and the expression of a <c>v-on</c> that has an argument (handled by
 /// <see cref="VOnTransform"/>); <c>v-slot</c> expressions are validated as parameter declarations.
 /// </remarks>
@@ -67,7 +66,7 @@ internal static class TransformExpression
                 }
             }
 
-            // Rewrite a dynamic argument (upstream processes non-static SIMPLE_EXPRESSION args).
+            // Rewrite a dynamic argument; a static one is a literal name and needs no rewrite.
             if (directive.Argument is SimpleExpressionNode { IsStatic: false } argument)
             {
                 var processedArgument = ExpressionProcessor.ProcessExpression(argument, context);

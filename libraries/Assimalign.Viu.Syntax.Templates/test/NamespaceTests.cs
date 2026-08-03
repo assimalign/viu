@@ -4,8 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Namespace inference mirrors @vue/compiler-dom parserOptions.getNamespace and the WHATWG
-// tree-construction dispatcher: https://html.spec.whatwg.org/multipage/parsing.html#tree-construction-dispatcher.
+// Namespace inference per the WHATWG tree-construction dispatcher:
+// https://html.spec.whatwg.org/multipage/parsing.html#tree-construction-dispatcher.
 public class NamespaceTests
 {
     private static RootNode ParseHtml(string source) => TemplateParser.Parse(source, ParserOptions.CreateHtml());

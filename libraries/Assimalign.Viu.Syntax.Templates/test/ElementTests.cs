@@ -4,7 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, describe('Element').
+// Element parsing: these cases ARE the contract for tag and attribute recognition, self-closing and
+// void handling, and the ElementType classification an element receives when its close tag is seen.
 public class ElementTests
 {
     [Fact]

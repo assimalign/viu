@@ -6,8 +6,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, the directive cases in
-// describe('Element').
+// Directive parsing: these cases ARE the contract for how a directive's name, argument, modifiers, and
+// expression are split out of an attribute, and how each shorthand (:, @, #) resolves.
 public class DirectiveTests
 {
     [Fact]

@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A text child pre-converted to a <c>createTextVNode(...)</c> call so the runtime skips normalization. The
-/// C# port of Vue 3.5's <c>TextCallNode</c> (<c>@vue/compiler-core</c> <c>ast.ts</c>). Produced by the text
-/// transform when an element has mixed or multiple text/interpolation children.
+/// A text child pre-converted to a <c>createTextVNode(...)</c> call so the runtime skips normalization.
+/// Produced by the text transform when an element has mixed or multiple text/interpolation children —
+/// exactly the case where the runtime would otherwise have to inspect each child's type.
 /// </summary>
 public sealed record TextCallNode : TemplateChildNode
 {

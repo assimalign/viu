@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-dom/__tests__/transforms/vModel.spec.ts: the runtime model
+// These cases ARE the contract for the runtime model
 // directive selected by element and input type, and the component modelValue/onUpdate pair.
 public class VModelTransformTests
 {

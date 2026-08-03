@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/vSlot.spec.ts: buildSlots, the
+// These cases ARE the contract for buildSlots, the
 // SlotFlags fingerprint (STABLE/DYNAMIC/FORWARDED), and the slot-misuse diagnostics.
 public class VSlotTransformTests
 {

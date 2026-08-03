@@ -11,9 +11,12 @@ namespace Assimalign.Viu.Browser;
 /// Applies generated single-file-component <c>v-bind()</c> values as CSS custom properties.
 /// </summary>
 /// <remarks>
-/// This is Viu's C# port of Vue 3.5's <c>useCssVars</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/helpers/useCssVars.ts.
-/// The component context is explicit; Browser never reads an ambient component instance.
+/// A <c>v-bind()</c> in a component's style block compiles to a getter over the component's reactive
+/// state; this type is what turns each evaluated result into a CSS custom property on the
+/// component's outermost elements, so the stylesheet rule that reads the variable updates without
+/// re-rendering the component at all. The component context is passed explicitly — Browser never
+/// reads an ambient component instance, because there is none to read in an AOT build. Specified by
+/// <c>[STY-6]</c> through <c>[STY-8]</c>.
 /// </remarks>
 public static class CssVariables
 {

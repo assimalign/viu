@@ -16,8 +16,6 @@ namespace Assimalign.Viu;
 /// values in the unified <see cref="IComponent"/> tree.
 /// </summary>
 /// <remarks>
-/// Mirrors Vue 3.5's runtime-core render helpers:
-/// https://github.com/vuejs/core/tree/v3.5.29/packages/runtime-core/src.
 /// The underscore-prefixed names deliberately match the compiler's generated-code contract and are
 /// therefore a narrow exception to the repository naming rules. Deviates from the repository
 /// whole-word naming rule per design decision: generated render bodies bind these helper names
@@ -504,7 +502,11 @@ public static class RenderHelpers
         return result;
     }
 
-    /// <summary>Merges generated property sources using Vue-compatible class, style, and event rules.</summary>
+    /// <summary>
+    /// Merges generated property sources: <c>class</c> and <c>style</c> values from every source are
+    /// normalized and combined rather than overwritten, event handlers for the same name accumulate
+    /// into a list, and any other repeated name takes the last source's value.
+    /// </summary>
     /// <param name="sources">The property sources.</param>
     /// <returns>The merged property bag.</returns>
     public static IReadOnlyDictionary<string, object?> _mergeProps(params object?[] sources)

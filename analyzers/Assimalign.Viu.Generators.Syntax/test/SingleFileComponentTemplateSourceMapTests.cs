@@ -26,9 +26,10 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// resolves to the offending <c>.viu</c> template line and column, never to opaque generated code. This is
 /// the render-body analogue of the <c>@script</c> merge's <c>#line</c> map (see
 /// <see cref="SingleFileComponentScriptTests"/>), and it is proved the same way: through the real C#
-/// compiler, asserting <c>GetMappedLineSpan()</c>. Upstream analogue: the <c>SourceMapGenerator</c> output
-/// of <c>@vue/compiler-core</c>'s <c>generate()</c> (<c>codegen.ts</c>), adapted to the Roslyn <c>#line</c>
-/// mechanism because Viu diagnostics travel through the C# compiler.
+/// compiler, asserting <c>GetMappedLineSpan()</c>. Viu carries the mapping on Roslyn <c>#line</c>
+/// directives rather than a side-car source map because every Viu diagnostic already travels through the
+/// C# compiler — one mechanism the compiler, the debugger, and the editor all honor without a second
+/// artifact to keep in sync.
 /// </summary>
 public sealed class SingleFileComponentTemplateSourceMapTests
 {

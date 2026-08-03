@@ -2,8 +2,8 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// How the guard pipeline resolved for one navigation, before it is turned into a
-/// <see cref="NavigationFailure"/> or a confirmed navigation. The internal counterpart of the
-/// short-circuit outcomes vue-router's <c>navigate()</c> produces.
+/// <see cref="NavigationFailure"/> or a confirmed navigation. Every pass through the pipeline
+/// produces exactly one of these, including a pass that short-circuits at the first guard.
 /// </summary>
 internal enum NavigationOutcomeKind
 {

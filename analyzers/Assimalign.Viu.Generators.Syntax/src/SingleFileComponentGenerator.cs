@@ -11,8 +11,7 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// <summary>
 /// The incremental source generator for canonical <c>.viu</c> and compatible tag-based <c>.vue</c>
 /// single-file components — the composition root of the
-/// <c>Assimalign.Viu.Syntax.*</c> cluster ([V01.01.06.02]). It is the C# analog of consuming
-/// <c>@vue/compiler-sfc</c> through <c>@vitejs/plugin-vue</c>: MSBuild flows every <c>.viu</c> file in as
+/// <c>Assimalign.Viu.Syntax.*</c> cluster ([V01.01.06.02]). MSBuild globs every component file in as
 /// an <see cref="AdditionalText"/>, this generator projects each one through the shared
 /// <see cref="SingleFileComponentProjection"/> core ([V01.01.06.11] — the same parse/analyze/compile
 /// pipeline the language service runs in the editor), and emits a partial class scaffold per component.

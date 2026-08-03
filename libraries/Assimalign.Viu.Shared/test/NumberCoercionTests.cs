@@ -3,8 +3,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Shared.Tests;
 
-// Pins Vue's numeric coercion (looseToNumber/toNumber in @vue/shared general.ts) — the semantics
-// behind v-model's .number modifier (https://vuejs.org/guide/essentials/forms.html#lazy).
+// Pins Viu's numeric coercion of DOM string values — the semantics behind v-model's .number
+// modifier: prefix coercion never destroys a partially typed entry, whole-string coercion is
+// stricter. The vectors below are the frozen contract.
 public class NumberCoercionTests
 {
     [Theory]
@@ -32,7 +33,7 @@ public class NumberCoercionTests
     [InlineData("+")]
     [InlineData(".")]
     public void LooseToNumber_LeavesNonNumericInputUntouched(string input)
-        // Upstream: isNaN(parseFloat(val)) ? val : n — the original string is returned unchanged.
+        // No numeric prefix: the original string is returned unchanged, never NaN.
         => NumberCoercion.LooseToNumber(input).ShouldBe(input);
 
     [Fact]

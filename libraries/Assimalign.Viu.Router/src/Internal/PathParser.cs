@@ -8,9 +8,9 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// A compiled path pattern: a regular expression, a specificity <see cref="Score"/>, the ordered
 /// parameter <see cref="Keys"/>, and the token segments used to interpolate params back into a
-/// path. The C# port of vue-router's <c>PathParser</c>
-/// (<c>packages/router/src/matcher/pathParserRanker.ts</c>) — its <see cref="TryParse"/> mirrors
-/// <c>parse</c> and <see cref="Stringify"/> mirrors <c>stringify</c>.
+/// path. <see cref="TryParse"/> is the match direction and <see cref="Stringify"/> the interpolate
+/// direction; both read the same token segments, so a path a pattern matches is a path it can
+/// regenerate.
 /// </summary>
 /// <remarks>
 /// The regular expression is built from runtime route-table data and constructed with the
@@ -40,10 +40,9 @@ internal sealed class PathParser
     public string Pattern => regularExpression.ToString();
 
     /// <summary>
-    /// Attempts to match <paramref name="path"/> and extract its parameters. Mirrors vue-router's
-    /// <c>parse</c>: a captured value for a repeatable key is split on <c>/</c> into multiple
-    /// values; every other value is stored as a single string (an empty capture stays a single
-    /// empty string, matching upstream).
+    /// Attempts to match <paramref name="path"/> and extract its parameters. A captured value for a
+    /// repeatable key is split on <c>/</c> into multiple values; every other value is stored as a
+    /// single string, and an empty capture stays a single empty string rather than becoming absent.
     /// </summary>
     /// <param name="path">The path to match.</param>
     /// <param name="parameters">The extracted parameters when the match succeeds.</param>
@@ -73,8 +72,9 @@ internal sealed class PathParser
     }
 
     /// <summary>
-    /// Interpolates <paramref name="parameters"/> into a concrete path. Mirrors vue-router's
-    /// <c>stringify</c>, including optional-parameter slash elision and the array/repeatable checks.
+    /// Interpolates <paramref name="parameters"/> into a concrete path, eliding the slash that would
+    /// precede an omitted optional parameter and rejecting an array supplied for a parameter that is
+    /// not repeatable.
     /// </summary>
     /// <param name="parameters">The parameter values to substitute.</param>
     /// <returns>The generated path.</returns>

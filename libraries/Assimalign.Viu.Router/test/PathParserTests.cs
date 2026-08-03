@@ -5,7 +5,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins vue-router's tokensToParser parse/stringify (packages/router/src/matcher/pathParserRanker.ts).
+// Pins the compiled path parser in both directions: matching a path back to its parameters, and
+// interpolating parameters into a concrete path. The vectors are the frozen contract for the
+// matching semantics — treat a change to one as a behavior change, not a test fix.
 public class PathParserTests
 {
     private static PathParser Compile(string path, PathMatchingOptions? options = null)

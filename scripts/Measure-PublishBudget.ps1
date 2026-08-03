@@ -5,8 +5,6 @@
     sample exceeds the budget recorded in the checked-in manifest.
 
 .DESCRIPTION
-    The Viu analog of vuejs/core's size-check CI job
-    (https://github.com/vuejs/core/blob/main/.github/workflows/size-data.yml).
     Every published byte is network payload for a WebAssembly app, so a
     per-sample brotli budget is the enforcement mechanism for the framework's
     source-generator-first, reflection-free architecture ([V01.01.12.06], #95).

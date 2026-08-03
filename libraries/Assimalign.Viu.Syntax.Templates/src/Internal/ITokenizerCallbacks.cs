@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The sink the <see cref="Tokenizer"/> emits token events to, implemented by the parser. The C# port
-/// of Vue 3.5's <c>Callbacks</c> interface (<c>@vue/compiler-core</c> <c>tokenizer.ts</c>). All ranges
-/// are half-open <c>[start, end)</c> offsets into the source buffer.
+/// The sink the <see cref="Tokenizer"/> emits token events to, implemented by the parser. All ranges
+/// are half-open <c>[start, end)</c> offsets into the source buffer — the tokenizer never allocates a
+/// substring, so the parser decides what to materialise and when.
 /// </summary>
 /// <remarks>
 /// An interface (rather than the repo's hot-path abstract-base-class guidance) because the parser is the

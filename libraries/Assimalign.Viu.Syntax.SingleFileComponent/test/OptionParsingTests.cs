@@ -4,8 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
-// Block options/attributes are honored per the Vue SFC spec (https://vuejs.org/api/sfc-spec.html,
-// sfc-css-features): scoped, module[="name"], and lang on <style>; lang on <template>; lang on
+// The honored (typed) block options, per docs/FORMAT.md: scoped, module[="name"], and lang on
+// <style>; lang on <template>; lang on
 // @script; custom blocks keep their @-options. The [V01.01.06.10] hybrid container has two header
 // grammars — HTML attributes on tag blocks ('"'/'\''/unquoted values, whitespace around '=') and the
 // stricter @-options on @-blocks (double-quoted only, no whitespace around '=') — surfacing through

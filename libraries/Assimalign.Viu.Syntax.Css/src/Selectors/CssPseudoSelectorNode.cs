@@ -3,7 +3,8 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <summary>
 /// A pseudo-class or pseudo-element selector. For an ordinary pseudo (<see cref="CssPseudoSelectorKind.Normal"/>)
 /// the serializer emits <see cref="SyntaxNode.Location"/><c>.Source</c> verbatim, so <c>:hover</c>,
-/// <c>::before</c>, and <c>:not(.x)</c> round-trip unchanged. For Vue's reserved functional pseudos
+/// <c>::before</c>, and <c>:not(.x)</c> round-trip unchanged. For the three functional pseudos the
+/// scoped rewrite reserves
 /// (<c>:deep()</c>, <c>:slotted()</c>, <c>:global()</c>) the parsed <see cref="Argument"/> carries the
 /// inner selector list the scoped rewrite consumes.
 /// </summary>
@@ -19,7 +20,7 @@ public sealed record CssPseudoSelectorNode : CssSelectorPartNode
     public required bool IsElement { get; init; }
 
     /// <summary>
-    /// The parsed inner selector list for Vue's reserved functional pseudos (<c>:deep()</c>,
+    /// The parsed inner selector list for the reserved functional pseudos (<c>:deep()</c>,
     /// <c>:slotted()</c>, <c>:global()</c>), or <see langword="null"/> for an ordinary pseudo (whose raw
     /// text is emitted verbatim).
     /// </summary>

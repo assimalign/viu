@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/transformExpression.spec.ts: identifier
+// These cases ARE the contract for identifier
 // prefixing, binding-metadata classification, ref unwrapping, v-for/v-slot scope, and expression validation.
 // Viu divergences (C# .Value unwrapping in read and write positions, _ctx member access, the strict
 // unresolved-identifier diagnostic) are pinned here and documented in
@@ -20,7 +20,8 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_ComponentDataMember_PrefixesWithContext()
     {
-        // Unknown-source members resolve to _ctx.<name>, mirroring Vue's default _ctx prefix.
+        // Unknown-source members resolve to _ctx.<name>, the permissive fallback that keeps the C# compiler
+        // as the backstop.
         SingleInterpolation("{{ message }}", Bindings(("message", BindingType.Data)))
             .ShouldBe("_ctx.message");
     }
@@ -28,7 +29,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_SetupReference_InsertsValueAccessor()
     {
-        // upstream SETUP_REF -> `foo.value`; Viu uses the C# settable Ref<T>.Value.
+        // A definite reference unwraps through the settable ReactiveValue<T>.Value.
         SingleInterpolation("{{ count }}", Bindings(("count", BindingType.SetupReference)))
             .ShouldBe("_ctx.count.Value");
     }
@@ -36,7 +37,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_SetupConstant_StaysBare()
     {
-        // upstream SETUP_CONST in inline mode returns the raw name (a render-closure local); never unwrapped.
+        // A non-reference setup constant is never unwrapped.
         SingleInterpolation("{{ total }}", Bindings(("_ctx.total", BindingType.SetupConstant)))
             .ShouldBe("_ctx.total");
     }
@@ -44,7 +45,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_SetupMaybeReference_GuardsReadWithUnref()
     {
-        // upstream SETUP_MAYBE_REF read -> `unref(x)`.
+        // A maybe-reference read is guarded through unref.
         SingleInterpolation("{{ maybe }}", Bindings(("maybe", BindingType.SetupMaybeReference)))
             .ShouldBe("_unref(_ctx.maybe)");
     }
@@ -108,7 +109,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_AllowedGlobal_IsNeverRewritten()
     {
-        // Math is an allowed global; a and b are members. Mirrors upstream isGloballyAllowed skipping.
+        // Math is an allowed global and is left untouched; a and b are component members.
         SingleInterpolation("{{ Math.Max(a, b) }}", Bindings(("a", BindingType.Data), ("b", BindingType.Data)))
             .ShouldBe("Math.Max(_ctx.a, _ctx.b)");
     }
@@ -125,7 +126,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_PrefixingDisabled_LeavesExpressionOpaque()
     {
-        // Without PrefixIdentifiers the pipeline matches Vue's browser build: expression bodies are untouched.
+        // Without PrefixIdentifiers expression bodies are untouched.
         var interpolation = TransformTestHelpers.Transform("{{ count }}").SingleChild().ShouldBeOfType<InterpolationNode>();
         Flatten(interpolation.Content).ShouldBe("count");
     }
@@ -135,7 +136,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_IncrementOnReference_UnwrapsWriteTarget()
     {
-        // upstream: `count++` on a ref becomes `count.value++` inside the inline handler.
+        // `count++` on a reference becomes `count.Value++` inside the inline handler.
         HandlerBody("<button @click=\"count++\"></button>", Bindings(("count", BindingType.SetupReference)))
             .ShouldBe("__event => (_ctx.count.Value++)");
     }
@@ -178,8 +179,7 @@ public class ExpressionBindingTests
     public void ProcessExpression_MultiStatementHandlerWithoutTrailingSemicolon_SynthesizesTerminator()
     {
         // A multi-statement inline handler is emitted into `__event => { <body> }`. C# has no automatic
-        // semicolon insertion — JavaScript's ASI, which upstream's `$event => { ... }` handler wrapping
-        // relies on — so a body whose final statement omits its terminator (`first(); second()`) must gain a
+        // semicolon insertion, so a body whose final statement omits its terminator (`first(); second()`) must gain a
         // synthesized `;` or the generated lambda is invalid C#; both statements are still rewritten.
         // [V01.01.05.05.02], issue #150.
         HandlerBody(
@@ -250,7 +250,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_DefaultCssModuleAccessor_ResolvesToAccessorClass()
     {
-        // `$style.box` resolves to the generated `Style` accessor class (the C# analogue of Vue's runtime
+        // `$style.box` resolves to the generated `Style` accessor class (the compile-time stand-in for a runtime
         // `$style` object); `$` is not a legal C# identifier char, so it is parsed against the `_style`
         // substitution and rewritten to the accessor class name.
         var modules = Modules(strict: true, ("$style", "_style", "Style", "box"));
@@ -275,7 +275,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_CssModuleAccessor_ShadowsSameNamedComponentBinding()
     {
-        // A module accessor takes precedence over a same-named component binding, matching Vue's render
+        // A module accessor takes precedence over a same-named component binding ([STY-3]); see the render
         // context exposing `$style`/named modules over component state.
         var modules = Modules(strict: true, ("theme", "theme", "Theme", "active"));
         var result = TransformWithModules(
@@ -434,7 +434,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_OpaqueModeMalformedExpression_IsNotValidated()
     {
-        // Without prefixing there is no Roslyn validation, matching Vue's browser build.
+        // Without prefixing there is no Roslyn validation.
         TransformTestHelpers.Transform("<div>{{ a + }}</div>", out var errors);
         errors.ShouldBeEmpty();
     }
@@ -456,7 +456,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_UnknownIdentifierUnderPermissiveMetadata_FallsBackToContext()
     {
-        // Default (non-strict) metadata never errors: unknown identifiers use the _ctx fallback like Vue.
+        // Default (non-strict) metadata never errors: unknown identifiers use the _ctx fallback.
         var result = TransformPrefixed("<div>{{ mystery }}</div>", BindingMetadata.Empty, out var errors);
         errors.ShouldBeEmpty();
         FlattenTree(result.RootCodegen()).ShouldContain("_ctx.mystery");
@@ -492,8 +492,8 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_VIfCondition_RewritesUnderPrefixing()
     {
-        // Upstream processIf runs processExpression on dir.exp under prefixIdentifiers because vIf is a
-        // structural transform applied before transformExpression (vuejs/core v3.5 transforms/vIf.ts).
+        // v-if is a structural transform that consumes its directive before TransformExpression runs, so the
+        // condition must be rewritten by the v-if transform itself or never at all.
         var result = TransformPrefixed(
             "<span v-if=\"visible\">a</span><span v-else-if=\"other\">b</span>",
             Bindings(("visible", BindingType.SetupReference), ("other", BindingType.Data)),
@@ -509,7 +509,7 @@ public class ExpressionBindingTests
     public void ProcessExpression_TemplateVForSlot_AliasStaysLocalAndSourceRewrites()
     {
         // The structural-directive factory skips template-with-v-slot, so trackVForSlotScopes registers
-        // the v-for aliases and buildSlots processes the source (vuejs/core v3.5 transforms/vSlot.ts).
+        // the v-for aliases and the slot builder rewrites the source.
         var result = TransformPrefixed(
             "<Comp><template v-for=\"item in items\" v-slot:row><span>{{ item }}</span></template></Comp>",
             Bindings(("items", BindingType.Data)),
@@ -525,12 +525,12 @@ public class ExpressionBindingTests
             .ShouldBe("item");
     }
 
-    // ---- write-position unwrapping (upstream rewriteIdentifier assignment/update handling) ----
+    // ---- write-position unwrapping ----
 
     [Fact]
     public void ProcessExpression_MaybeReferenceWrite_UnwrapsToValue()
     {
-        // upstream SETUP_MAYBE_REF in assignment position -> `.value`: a write to a const binding is
+        // A maybe-reference in assignment position unwraps to .Value: such a write is
         // only legal when it is a ref (transformExpression.ts rewriteIdentifier).
         SingleInterpolation("{{ maybe = 1 }}", Bindings(("maybe", BindingType.SetupMaybeReference)))
             .ShouldBe("_ctx.maybe.Value = 1");
@@ -539,7 +539,7 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_SetupLetRead_GuardsWithUnref()
     {
-        // upstream SETUP_LET read -> `unref(x)`; the guarded write stays bare (documented divergence,
+        // A let binding reads through unref; the write stays bare (documented decision,
         // docs/DESIGN.md).
         SingleInterpolation("{{ letBinding }}", Bindings(("letBinding", BindingType.SetupLet)))
             .ShouldBe("_unref(_ctx.letBinding)");
@@ -557,8 +557,8 @@ public class ExpressionBindingTests
     [Fact]
     public void ProcessExpression_StatementHandlerLocal_IsNotPrefixed()
     {
-        // A local declared in a multi-statement handler is a scope identifier, mirroring upstream
-        // walkIdentifiers' variable-declaration handling.
+        // A local declared in a multi-statement handler is a scope identifier, so it shadows a component
+        // binding of the same name and is never rewritten.
         var result = TransformPrefixed(
             "<button @click=\"var next = count + 1; total = next;\"></button>",
             Bindings(("count", BindingType.SetupReference), ("_ctx.total", BindingType.Data)),

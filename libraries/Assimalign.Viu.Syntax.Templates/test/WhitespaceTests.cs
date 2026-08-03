@@ -6,8 +6,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts,
-// describe('whitespace management when adopting strategy condense') and ('... strategy preserve').
+// Whitespace management: these cases ARE the contract for both strategies — which whitespace-only text
+// nodes Condense removes or collapses, and that Preserve keeps every one as authored.
 public class WhitespaceTests
 {
     private static RootNode ParseCondense(string source) => TestHelpers.Parse(source);
@@ -107,7 +107,7 @@ public class WhitespaceTests
         element.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
 
         // ...but whitespace between elements (even with newline) is kept — condensed to one space,
-        // matching upstream's 'should preserve whitespaces w/ newline between interpolations'.
+        // so a newline between two interpolations is preserved rather than condensed away.
         var root = ParsePreserve("<div/> \n <div/>");
         root.Children.Count.ShouldBe(3);
         root.Children[1].ShouldBeOfType<TextNode>().Content.ShouldBe(" ");

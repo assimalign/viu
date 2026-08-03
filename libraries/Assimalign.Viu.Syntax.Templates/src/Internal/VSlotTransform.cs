@@ -9,9 +9,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The <c>v-slot</c> compilation: builds a component's slots object annotated with <see cref="SlotFlags"/>,
-/// and tracks slot scopes so nested slots are marked dynamic. The C# port of Vue 3.5's <c>buildSlots</c> and
-/// <c>trackSlotScopes</c> (<c>@vue/compiler-core</c> <c>transforms/vSlot.ts</c>).
-/// See https://vuejs.org/guide/components/slots.html.
+/// and tracks slot scopes so nested slots are marked dynamic.
 /// </summary>
 internal static class VSlotTransform
 {
@@ -28,7 +26,7 @@ internal static class VSlotTransform
             TransformUtilities.FindDirective(element, "slot", allowEmpty: true) is { } slotDirective)
         {
             // Register the slot props so the slot children's expressions treat them as template-locals
-            // (upstream addIdentifiers of the slot exp, gated on prefixIdentifiers).
+            // rather than component bindings.
             var slotProperties = slotDirective.Expression;
             if (context.PrefixIdentifiers && slotProperties is not null)
             {
@@ -36,8 +34,7 @@ internal static class VSlotTransform
             }
 
             // A dynamic slot's v-for aliases are registered here too: the structural-directive factory
-            // deliberately skips template-with-v-slot nodes, so no other transform sees this v-for —
-            // the C# port of trackVForSlotScopes (vuejs/core v3.5 compiler-core transforms/vSlot.ts).
+            // deliberately skips template-with-v-slot nodes, so no other transform ever sees this v-for.
             ForParseResult? forAliases = null;
             if (context.PrefixIdentifiers &&
                 element.ElementType == ElementType.Template &&
@@ -106,7 +103,7 @@ internal static class VSlotTransform
         }
     }
 
-    /// <summary>Compiles a component's slots into a slots object (upstream <c>buildSlots</c>).</summary>
+    /// <summary>Compiles a component's slots into a slots object.</summary>
     /// <param name="element">The component element.</param>
     /// <param name="context">The active transform context.</param>
     /// <param name="children">The component's transformed working children.</param>
@@ -237,8 +234,8 @@ internal static class VSlotTransform
                 {
                     if (context.PrefixIdentifiers && parseResult.Source is SimpleExpressionNode sourceExpression)
                     {
-                        // Upstream finalizes a slot v-for's parse result with processExpression under
-                        // prefixIdentifiers (vSlot.ts buildSlots); mirror VForTransform's source rewrite.
+                        // The slot v-for source is rewritten here, the same way VForTransform rewrites an
+                        // ordinary v-for source, so both forms classify identifiers identically.
                         parseResult = parseResult with { Source = ExpressionProcessor.ProcessExpression(sourceExpression, context) };
                     }
 

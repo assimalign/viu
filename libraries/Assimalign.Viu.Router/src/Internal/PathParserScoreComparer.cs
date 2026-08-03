@@ -3,10 +3,9 @@ using System;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// Compares two compiled path patterns by their specificity score. The C# port of vue-router's
-/// <c>compareScoreArray</c> and <c>comparePathParserScore</c>
-/// (<c>packages/router/src/matcher/pathParserRanker.ts</c>). A negative result means the first
-/// pattern is more specific (should sort earlier); positive means less specific; zero means equal.
+/// Compares two compiled path patterns by their specificity score. A negative result means the
+/// first pattern is more specific (should sort earlier); positive means less specific; zero means
+/// equal.
 /// </summary>
 /// <remarks>
 /// This is what makes ranking table-order-independent: static segments outrank dynamic ones,
@@ -16,8 +15,7 @@ namespace Assimalign.Viu.Router;
 internal static class PathParserScoreComparer
 {
     /// <summary>
-    /// Compares two full scores (one inner array per path segment). Mirrors
-    /// <c>comparePathParserScore</c>.
+    /// Compares two full scores (one inner array per path segment).
     /// </summary>
     public static double CompareScore(double[][] left, double[][] right)
     {
@@ -48,7 +46,7 @@ internal static class PathParserScoreComparer
         return right.Length - left.Length;
     }
 
-    // Mirrors compareScoreArray: element-wise until they differ, then a length tie-break that keeps
+    // Element-wise until the scores differ, then a length tie-break that keeps
     // a single static segment sorted ahead of a longer sub-segmented one.
     private static double CompareScoreArray(double[] left, double[] right)
     {
@@ -74,7 +72,7 @@ internal static class PathParserScoreComparer
         return 0;
     }
 
-    // Mirrors isLastScoreNegative: whether the final sub-segment of the final segment is a penalty
+    // Whether the final sub-segment of the final segment is a penalty
     // (a wildcard/optional/repeatable), used to order a catch-all below its more-specific siblings.
     private static bool IsLastScoreNegative(double[][] score)
     {

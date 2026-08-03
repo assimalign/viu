@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins vue-router's ranking model (comparePathParserScore, packages/router/src/matcher/
-// pathParserRanker.ts): static beats dynamic beats catch-all, independent of table order.
-// Reference: https://router.vuejs.org/guide/essentials/route-matching-syntax.html
+// Pins the specificity ranking model: static beats dynamic beats catch-all, independent of the order
+// routes were added to the table. These cases are what freezes the PathScore weight scale — a change
+// to any weight shows up here first.
 public class RouteRankingTests
 {
     private static IReadOnlyList<string> OrderedPaths(RouteMatcher matcher)

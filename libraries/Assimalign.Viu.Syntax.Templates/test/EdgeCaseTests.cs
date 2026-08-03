@@ -4,7 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, describe('Edge Cases').
+// Malformed and adversarial input: these cases ARE the contract for the parser's recovery behaviour —
+// it reports diagnostics and still returns a tree, never throwing.
 public class EdgeCaseTests
 {
     [Fact]
@@ -46,7 +47,7 @@ public class EdgeCaseTests
     [Fact]
     public void Parse_InvalidHtml_RecoversAndReportsErrors()
     {
-        // parse.spec.ts 'invalid html': </span> mismatches; the parser recovers per Vue semantics.
+        // A mismatched </span>: the parser reports it and recovers, never throwing.
         var root = TestHelpers.Parse("<div>\n<span>\n</div>\n</span>", out var errors);
 
         errors.Count.ShouldBe(2);

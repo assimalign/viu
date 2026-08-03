@@ -6,15 +6,15 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Decodes HTML character references (named and numeric) in template text, attribute values, and
-/// interpolation expressions. The C# port of the decoding behaviour Vue 3.5 gets from the
-/// <c>entities</c> package (<c>decodeHTML</c> / <c>DecodingMode</c>): longest-match over the embedded
-/// <see cref="HtmlNamedCharacterReferences"/> table, the legacy no-semicolon rule, and the WHATWG
-/// numeric code-point sanitisation. Purely table-driven — no runtime DOM or network access.
+/// interpolation expressions per the WHATWG rules: longest-match over the embedded
+/// <see cref="HtmlNamedCharacterReferences"/> table, the legacy no-semicolon rule, and numeric
+/// code-point sanitisation. Purely table-driven — no runtime DOM or network access, which is what lets
+/// the compiler front end run inside a Roslyn analyzer host.
 /// </summary>
 /// <remarks>
-/// Whereas Vue's tokenizer decodes incrementally and splits text around each reference, this port
-/// decodes a whole raw slice when the parser materialises a node's content. The observable AST is the
-/// same: the node's <c>Content</c> is decoded while its <c>Location.Source</c> stays the raw slice.
+/// Decoding happens once over a whole raw slice, when the parser materialises a node's content, rather
+/// than incrementally while tokenizing. That keeps the exact-slice invariant intact: the node's
+/// <c>Content</c> is decoded while its <c>Location.Source</c> stays the raw, undecoded slice.
 /// Numeric reference rules: https://html.spec.whatwg.org/multipage/parsing.html#numeric-character-reference-end-state.
 /// </remarks>
 internal static class HtmlEntityDecoder

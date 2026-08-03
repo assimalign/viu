@@ -80,7 +80,8 @@ It does not implement or inherit `IServiceProvider`. The application supplies an
 `IComponentFactory` and an `IServiceProvider` as separate values on `IApplicationContext`.
 
 The default `ComponentFactory` dispatches through explicit `ComponentRegistration` delegates and
-uses Vue's raw, camel-case, then Pascal-case asset-name lookup for registered names. Applications
+resolves a registered name by trying the raw name, then its camel-case form, then its Pascal-case
+form, so a template may spell a registration in whichever casing reads naturally. Applications
 may close those delegates over a generated resolver, a standard dependency-injection container, or
 hand-written composition. Viu never discovers constructors, scans assemblies, calls
 `Activator.CreateInstance`, or generates code at runtime.
@@ -124,8 +125,9 @@ chooses cancellation or serialization where required.
 
 ## Reactivity
 
-The standalone `Assimalign.Viu.Reactivity` package restores the Vue-shaped separation while
-retaining engine improvements made after the earlier consolidation.
+The standalone `Assimalign.Viu.Reactivity` package restores the package boundary between the
+reactivity engine and the component model, while retaining the engine improvements made after the
+earlier consolidation.
 
 The public reference contracts are `IReactiveReference` and `IReactiveReference<T>`. All
 Reactivity-owned interfaces use the `IReactive*` prefix. First-party reference implementations
@@ -163,7 +165,9 @@ No state-shape reflection is used.
 
 ## Block-tree updates
 
-The unified component tree retains Vue's compiler-informed block-tree strategy.
+The unified component tree uses a compiler-informed block-tree strategy ([`[RND-BLOCK-1]`](../docs/SPECIFICATION.md#63-the-block-tree));
+the origin of that technique is acknowledged once, centrally, in
+[§19 of the specification](../docs/SPECIFICATION.md#19-prior-art-and-influences).
 `ComponentOptimization` carries:
 
 - `PatchFlags`;
@@ -210,12 +214,12 @@ The staging implementation includes:
 - testing renderer and wrappers; and
 - Router plus Browser history integration.
 
-Suspense has explicit parity limits. Server rendering awaits and serializes only the resolved
+Suspense has explicit limits. Server rendering awaits and serializes only the resolved
 default branch. Client hydration throws a descriptive `NotSupportedException` instead of
 attempting a partial or incorrect claim of server-rendered pending/fallback branches. Boundary
 timeout/events, fallback-to-reveal transition choreography, and delaying mounted/post-render
-effects from the hidden default branch are also not yet at Vue parity; those effects currently run
-when the detached branch mounts.
+effects from the hidden default branch are also not implemented; those effects currently run when
+the detached branch mounts.
 
 Dynamic registered names are supported. A plain dynamic string means an element tag because
 `IComponentFactory` intentionally has no registration-probe API; use

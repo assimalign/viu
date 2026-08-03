@@ -2,9 +2,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The literal character sequences the tokenizer matches to delimit CDATA, comments, and raw-text /
-/// RCDATA elements. The C# port of Vue 3.5's <c>Sequences</c> table (<c>@vue/compiler-core</c>
-/// <c>tokenizer.ts</c>). Instances are compared by reference, so both the tokenizer and the parser use
-/// these singletons.
+/// RCDATA elements. Instances are compared by reference, so both the tokenizer and the parser must use
+/// these singletons — a freshly constructed equal sequence would not match.
 /// </summary>
 internal static class TokenizerSequences
 {

@@ -16,9 +16,7 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// is split at a <b>line boundary</b>: the using region ends at the start of the first line after the last
 /// leading using directive, and the member region begins there. Canonical blocks and split member regions
 /// start at column 1. An inline tag-based script can begin later on its first line, so that region retains
-/// its authored start column for emission padding. Vue hoists a <c>&lt;script setup&gt;</c> block's imports
-/// out of the render scope for the same reason
-/// (https://vuejs.org/api/sfc-script-setup.html).
+/// its authored start column for emission padding.
 /// </para>
 /// </summary>
 /// <param name="UsingRegion">The verbatim leading <c>using</c> directives to hoist above the namespace, or <see langword="null"/> when the block has none.</param>

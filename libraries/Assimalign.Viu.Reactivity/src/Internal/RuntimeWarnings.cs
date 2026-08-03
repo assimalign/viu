@@ -7,7 +7,7 @@ namespace Assimalign.Viu.Reactivity;
 internal static class RuntimeWarnings
 {
     internal static Action<string> Sink { get; set; }
-        = static message => Debug.WriteLine($"[Vue warn] {message}");
+        = static message => Debug.WriteLine($"[Viu warn] {message}");
 
     internal static void Warn(string message)
         => Sink(message);

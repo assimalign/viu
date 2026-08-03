@@ -8,41 +8,42 @@ using Assimalign.Viu.Reactivity;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The router instance the built-in components consume — the C# stand-in for the object vue-router's
-/// <c>createRouter</c> returns (<c>packages/router/src/router.ts</c>,
-/// https://router.vuejs.org/api/#createRouter). It owns the reactive <see cref="CurrentRoute"/>
-/// (a <c>shallowRef</c> over the resolved location, mirroring upstream's <c>currentRoute</c>),
-/// resolves targets and hrefs through the matcher and history, and drives navigations through the
-/// asynchronous, guarded, cancellable pipeline with <see cref="Push"/>/<see cref="Replace"/>.
+/// The router instance the built-in components consume. It owns the reactive
+/// <see cref="CurrentRoute"/> — a shallow reference over the resolved location, so a navigation is
+/// one trigger rather than one per changed field — resolves targets and hrefs through the matcher
+/// and history, and drives navigations through the asynchronous, guarded, cancellable pipeline with
+/// <see cref="Push"/>/<see cref="Replace"/>.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The navigation pipeline</b> runs guards in vue-router's documented order — in-component
-/// <c>beforeRouteLeave</c> (deepest child first) → global <see cref="BeforeEach"/> → reused-record
-/// <c>beforeRouteUpdate</c> → per-record <see cref="RouteRecord.BeforeEnter"/> → (async component
-/// resolution, currently a no-op seam for <c>[V01.01.03.16]</c>) → in-component
-/// <see cref="IRouteEnterGuard"/> → global <see cref="BeforeResolve"/> → confirm (history write +
+/// <b>The navigation pipeline</b> runs guards in a fixed order — in-component before-leave (deepest
+/// child first) → global <see cref="BeforeEach"/> → reused-record before-update → per-record
+/// <see cref="RouteRecord.BeforeEnter"/> → (async component resolution, currently a no-op seam for
+/// <c>[V01.01.03.16]</c>) → in-component <see cref="IRouteEnterGuard"/> → global
+/// <see cref="BeforeResolve"/> → confirm (history write +
 /// <see cref="CurrentRoute"/> update, one trigger) → <see cref="AfterEach"/>. A guard may allow,
 /// abort, or redirect; a redirect re-enters the pipeline (with infinite-redirect protection), an
 /// abort leaves <see cref="CurrentRoute"/> and history untouched, and a later navigation cancels an
 /// in-flight one through a cooperative <see cref="CancellationToken"/>.
 /// </para>
 /// <para>
-/// <b>The initial navigation</b> mirrors upstream's START-location semantics: <see cref="CurrentRoute"/>
-/// begins at <see cref="RouteLocation.Start"/> (empty matched chain), not the eagerly resolved initial
-/// location. <see cref="ReadyAsync"/> runs the first navigation to the history location through the
-/// same full pipeline with <c>from</c> = the START sentinel — so a global <see cref="BeforeEach"/>
-/// redirect fires for a direct page load — and its confirm step replaces (never pushes) the current
-/// history entry, exactly as upstream forces a replace when <c>from === START_LOCATION_NORMALIZED</c>.
-/// The same-location dedup is skipped whenever <c>from</c> has an empty matched chain, so START never
-/// short-circuits the initial pass while in-session duplicates still do.
+/// <b>The initial navigation</b> starts from a sentinel, not from a pre-resolved route:
+/// <see cref="CurrentRoute"/> begins at <see cref="RouteLocation.Start"/> (empty matched chain).
+/// <see cref="ReadyAsync"/> runs the first navigation to the history location through the same full
+/// pipeline with <c>from</c> = that sentinel, so a global <see cref="BeforeEach"/> redirect fires for
+/// a direct page load, and its confirm step replaces (never pushes) the current history entry — a
+/// push would leave a bogus back target pointing at the URL the user actually opened. The
+/// same-location dedup is skipped whenever <c>from</c> has an empty matched chain, so the sentinel
+/// never short-circuits the initial pass while in-session duplicates still do.
 /// </para>
 /// <para>
-/// <b>Deliberate C# divergences from vue-router</b> (see <c>docs/DESIGN.md</c>): guards return a
-/// <see cref="NavigationGuardResult"/> instead of calling <c>next()</c>; <see cref="Push"/> resolves
-/// with a <see cref="NavigationFailure"/> for abort/cancel/duplicate and faults only on genuinely
-/// unexpected guard exceptions (routed to <see cref="OnError"/>); and an infinite redirect throws a
-/// <see cref="NavigationRedirectException"/> in every configuration rather than only warning in dev.
+/// <b>Three deliberate API shapes</b> (see <c>docs/DESIGN.md</c>): a guard returns a
+/// <see cref="NavigationGuardResult"/> rather than invoking a continuation, so it decides exactly
+/// once ([RTR-5]); <see cref="Push"/> completes with a <see cref="NavigationFailure"/> for
+/// abort/cancel/duplicate and faults only on a genuinely unexpected guard exception (routed to
+/// <see cref="OnError"/>), keeping routine outcomes out of exception control flow; and a redirect
+/// loop throws <see cref="NavigationRedirectException"/> in every configuration, not only in
+/// development builds.
 /// </para>
 /// <para>Not thread-safe: the router targets the single-threaded JS event loop.</para>
 /// </remarks>
@@ -51,8 +52,8 @@ public sealed class Router : IDisposable
     private const string DefaultLinkActiveClass = "router-link-active";
     private const string DefaultLinkExactActiveClass = "router-link-exact-active";
 
-    // The redirect-depth safety cap (Viu-specific; upstream relies on a dev-only same-location
-    // warning). Kept well above any legitimate redirect chain so only a genuine loop trips it.
+    // The redirect-depth safety cap, enforced in every configuration. Kept well above any legitimate
+    // redirect chain so only a genuine loop trips it.
     private const int MaximumRedirectDepth = 20;
 
     private readonly IRouteMatcher _matcher;
@@ -81,8 +82,8 @@ public sealed class Router : IDisposable
         _matcher = matcher;
         // Seed the current route with the START sentinel (empty matched chain), not the eagerly
         // resolved initial location, so the first navigation runs the full guard pipeline instead of
-        // being deduplicated against a pre-resolved route (upstream: currentRoute starts at
-        // START_LOCATION_NORMALIZED; the initial navigation is a real push from START — [V01.01.08.07]).
+        // being deduplicated against a pre-resolved route: the initial navigation is a real pass
+        // through the pipeline from the sentinel ([V01.01.08.07]).
         _currentRoute = Reactive.ShallowReference(RouteLocation.Start);
         _unlisten = history.Listen(OnHistoryNavigation);
     }
@@ -97,27 +98,27 @@ public sealed class Router : IDisposable
     }
 
     /// <summary>
-    /// The reactive current location (upstream: <c>router.currentRoute</c>, a <c>shallowRef</c>): one
-    /// trigger per completed navigation drives every <see cref="RouterView"/> and the active-class
-    /// computation of every <see cref="RouterLink"/> through the normal reactivity graph.
+    /// The reactive current location, held in a shallow reference: one trigger per completed
+    /// navigation drives every <see cref="RouterView"/> and the active-class computation of every
+    /// <see cref="RouterLink"/> through the normal reactivity graph.
     /// </summary>
     public IReactiveReference<RouteLocation> CurrentRoute => _currentRoute;
 
     /// <summary>
     /// The default active class applied to a <see cref="RouterLink"/> whose target is an inclusive
-    /// match of the current route (upstream: the <c>linkActiveClass</c> router option). A per-link
-    /// <c>activeClass</c> prop overrides it. Defaults to <c>"router-link-active"</c>.
+    /// match of the current route. A per-link <c>activeClass</c> argument overrides it. Defaults to
+    /// <c>"router-link-active"</c>.
     /// </summary>
     public string LinkActiveClass { get; set; } = DefaultLinkActiveClass;
 
     /// <summary>
     /// The default exact-active class applied to a <see cref="RouterLink"/> whose target is the exact
-    /// current route (upstream: the <c>linkExactActiveClass</c> router option). A per-link
-    /// <c>exactActiveClass</c> prop overrides it. Defaults to <c>"router-link-exact-active"</c>.
+    /// current route. A per-link <c>exactActiveClass</c> argument overrides it. Defaults to
+    /// <c>"router-link-exact-active"</c>.
     /// </summary>
     public string LinkExactActiveClass { get; set; } = DefaultLinkExactActiveClass;
 
-    /// <summary>Resolves a path to a location through the matcher (upstream: <c>router.resolve</c>).</summary>
+    /// <summary>Resolves a path to a location through the matcher.</summary>
     /// <param name="location">The base-stripped location to resolve (path portion).</param>
     /// <returns>The resolved location; an unmatched path yields an empty matched chain.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
@@ -127,7 +128,7 @@ public sealed class Router : IDisposable
         return _matcher.Resolve(location);
     }
 
-    /// <summary>Resolves a named route with interpolated parameters (upstream: <c>router.resolve({ name, params })</c>).</summary>
+    /// <summary>Resolves a named route with interpolated parameters.</summary>
     /// <param name="name">The route name.</param>
     /// <param name="parameters">The parameter values to interpolate.</param>
     /// <returns>The resolved location.</returns>
@@ -141,8 +142,7 @@ public sealed class Router : IDisposable
     }
 
     /// <summary>
-    /// Builds the anchor <c>href</c> for a location, prefixing the configured base (upstream:
-    /// <c>router.resolve(...).href</c> via <c>history.createHref</c>).
+    /// Builds the anchor <c>href</c> for a location, prefixing the configured base.
     /// </summary>
     /// <param name="location">The base-stripped location.</param>
     /// <returns>The href, base included.</returns>
@@ -164,19 +164,17 @@ public sealed class Router : IDisposable
     }
 
     /// <summary>
-    /// Registers a global guard that runs before every navigation (upstream:
-    /// <c>router.beforeEach</c>, https://router.vuejs.org/api/#beforeEach). Guards run in registration
-    /// order after the leaving guards.
+    /// Registers a global guard that runs before every navigation. Guards run in registration order,
+    /// after the in-component leaving guards.
     /// </summary>
     /// <param name="guard">The guard to register.</param>
-    /// <returns>A delegate that unregisters <paramref name="guard"/> when invoked (upstream's returned remover).</returns>
+    /// <returns>A delegate that unregisters <paramref name="guard"/> when invoked.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="guard"/> is null.</exception>
     public Action BeforeEach(NavigationGuard guard) => Add(_beforeGuards, guard);
 
     /// <summary>
     /// Registers a global guard that runs after per-record and in-component enter guards, just before
-    /// a navigation is confirmed (upstream: <c>router.beforeResolve</c>,
-    /// https://router.vuejs.org/api/#beforeResolve).
+    /// a navigation is confirmed — the last chance to abort or redirect.
     /// </summary>
     /// <param name="guard">The guard to register.</param>
     /// <returns>A delegate that unregisters <paramref name="guard"/> when invoked.</returns>
@@ -184,9 +182,9 @@ public sealed class Router : IDisposable
     public Action BeforeResolve(NavigationGuard guard) => Add(_beforeResolveGuards, guard);
 
     /// <summary>
-    /// Registers a hook that runs after every navigation completes or fails (upstream:
-    /// <c>router.afterEach</c>). It receives the resolved <see cref="NavigationFailure"/> (or
-    /// <see langword="null"/> on success) and cannot change the outcome.
+    /// Registers a hook that runs after every navigation completes or fails. It receives the resolved
+    /// <see cref="NavigationFailure"/> (or <see langword="null"/> on success) and cannot change the
+    /// outcome.
     /// </summary>
     /// <param name="hook">The hook to register.</param>
     /// <returns>A delegate that unregisters <paramref name="hook"/> when invoked.</returns>
@@ -194,9 +192,8 @@ public sealed class Router : IDisposable
     public Action AfterEach(AfterNavigationHook hook) => Add(_afterHooks, hook);
 
     /// <summary>
-    /// Registers a handler for unexpected exceptions thrown by guards during navigation (upstream:
-    /// <c>router.onError</c>, https://router.vuejs.org/api/#onError). Navigation
-    /// <see cref="NavigationFailure"/>s are returned from <see cref="Push"/> rather than routed here.
+    /// Registers a handler for unexpected exceptions thrown by guards during navigation. A
+    /// <see cref="NavigationFailure"/> is returned from <see cref="Push"/> rather than routed here.
     /// </summary>
     /// <param name="handler">The error handler to register.</param>
     /// <returns>A delegate that unregisters <paramref name="handler"/> when invoked.</returns>
@@ -205,7 +202,7 @@ public sealed class Router : IDisposable
 
     /// <summary>
     /// Navigates to <paramref name="location"/> through the guard pipeline, pushing a new history
-    /// entry and updating <see cref="CurrentRoute"/> on success (upstream: <c>router.push</c>). The
+    /// entry and updating <see cref="CurrentRoute"/> on success. The
     /// returned task resolves with <see langword="null"/> on success or a <see cref="NavigationFailure"/>
     /// when the navigation is aborted, cancelled, or duplicated; it faults only on an unexpected guard
     /// exception (also routed to <see cref="OnError"/>).
@@ -217,8 +214,8 @@ public sealed class Router : IDisposable
 
     /// <summary>
     /// Navigates to <paramref name="location"/> through the guard pipeline, replacing the current
-    /// history entry and updating <see cref="CurrentRoute"/> on success (upstream:
-    /// <c>router.replace</c>). Resolves with the same navigation result as <see cref="Push"/>.
+    /// history entry and updating <see cref="CurrentRoute"/> on success. Resolves with the same
+    /// navigation result as <see cref="Push"/>.
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
     /// <returns>The navigation outcome.</returns>
@@ -226,9 +223,7 @@ public sealed class Router : IDisposable
     public Task<NavigationFailure?> Replace(string location) => Navigate(location, replace: true);
 
     /// <summary>
-    /// Runs the initial navigation and resolves when it settles — the C# port of vue-router's
-    /// <c>router.isReady()</c> combined with the install-time initial push
-    /// (<c>packages/router/src/router.ts</c>, https://router.vuejs.org/api/#isReady). The first call
+    /// Runs the initial navigation and resolves when it settles. The first call
     /// navigates to the current history location through the <b>full</b> guard pipeline with
     /// <c>from</c> = <see cref="RouteLocation.Start"/>, so a global <see cref="BeforeEach"/> redirect
     /// (the classic <c>/</c> → <c>/x</c>) fires even for a page loaded directly at that URL; the
@@ -239,9 +234,9 @@ public sealed class Router : IDisposable
     /// A Viu bootstrap awaits this before mounting so the first render already reflects the resolved
     /// (or redirected) route. The returned task resolves with the initial navigation's
     /// <see cref="NavigationFailure"/> (or <see langword="null"/> on success) and faults only on an
-    /// unexpected guard exception. Because there is no <c>app.use(router)</c> install hook in Viu, this
-    /// single method folds upstream's separate install-time trigger and <c>isReady()</c> await; unlike
-    /// upstream's <c>isReady()</c>, it always settles (never hangs) for an aborted initial navigation.
+    /// unexpected guard exception. Viu has no router-install hook, so triggering the first navigation
+    /// and awaiting it are one method rather than two, and it always settles — an aborted initial
+    /// navigation completes with its failure instead of hanging.
     /// </remarks>
     /// <returns>The initial navigation outcome, settling when it completes.</returns>
     /// <exception cref="ObjectDisposedException">The router has been disposed.</exception>
@@ -253,8 +248,8 @@ public sealed class Router : IDisposable
 
     /// <summary>
     /// Moves through the history stack by <paramref name="delta"/> entries, driving the same guard
-    /// pipeline as a browser back/forward (upstream: <c>router.go</c>). The resulting navigation runs
-    /// asynchronously through the history listener.
+    /// pipeline as a browser back/forward. The resulting navigation runs asynchronously through the
+    /// history listener, so this method returns before it settles.
     /// </summary>
     /// <param name="delta">The signed number of entries to move (negative is backward).</param>
     public void Go(int delta)
@@ -263,10 +258,10 @@ public sealed class Router : IDisposable
         _history.Go(delta);
     }
 
-    /// <summary>Moves one entry back in history (upstream: <c>router.back</c>).</summary>
+    /// <summary>Moves one entry back in history.</summary>
     public void Back() => Go(-1);
 
-    /// <summary>Moves one entry forward in history (upstream: <c>router.forward</c>).</summary>
+    /// <summary>Moves one entry forward in history.</summary>
     public void Forward() => Go(1);
 
     /// <summary>Removes the history listener and cancels any in-flight navigation so nothing outlives the router.</summary>
@@ -330,14 +325,14 @@ public sealed class Router : IDisposable
         }
         catch (Exception exception)
         {
-            // Unexpected guard exception (or an infinite-redirect abort): route it to onError and let
-            // the task fault, mirroring vue-router's triggerError + promise rejection.
+            // Unexpected guard exception (or an infinite-redirect abort): route it to the error
+            // handlers and let the task fault.
             TriggerError(exception, to, _currentRoute.Value);
             throw;
         }
     }
 
-    // Upstream pushWithRedirect: resolve, run the pipeline, then confirm / abort / cancel / recurse on
+    // Resolve, run the pipeline, then confirm / abort / cancel / recurse on
     // redirect. from is the current route for the whole chain (no confirm happens until the end).
     private async Task<NavigationFailure?> PushWithRedirect(
         RouteLocation to,
@@ -348,12 +343,13 @@ public sealed class Router : IDisposable
         var token = BeginNavigation();
         var from = _currentRoute.Value;
         NavigationFailure? failure;
-        // Dedup only when `from` already has a matched chain (upstream gates on `from.matched.length`):
+        // Dedup only when `from` already has a matched chain:
         // the START sentinel has an empty chain, so the initial navigation is never deduplicated and
         // always runs the full pipeline, while in-session same-location navigations still short-circuit.
         if (from.Matched.Count > 0 && IsSameLocation(from, to))
         {
-            // Duplicated: skip the pipeline entirely but still notify afterEach (upstream parity).
+            // Duplicated: skip the pipeline entirely but still notify afterEach, so a hook that
+            // mirrors navigation state stays in sync even for a no-op navigation.
             failure = new NavigationFailure(NavigationFailureType.Duplicated, to, from);
         }
         else
@@ -367,8 +363,8 @@ public sealed class Router : IDisposable
                         throw NavigationRedirectException.LoopExceeded(from, to, redirectCount);
                     }
                     var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
-                    // afterEach fires for the final navigation only (upstream: the redirect recurses
-                    // before triggerAfterEach), so return the recursion's result directly.
+                    // afterEach fires for the final navigation only — the redirect recurses before
+                    // the after-hooks run — so return the recursion's result directly.
                     return await PushWithRedirect(redirectTarget, replace, redirectedFrom ?? to, redirectCount + 1);
                 case NavigationOutcomeKind.Abort:
                     failure = new NavigationFailure(NavigationFailureType.Aborted, to, from);
@@ -387,8 +383,7 @@ public sealed class Router : IDisposable
                     {
                         // The first navigation (from the START sentinel) replaces the current history
                         // entry rather than pushing a new one, so the app's entry URL is not left as a
-                        // stale back-target (upstream: isFirstNavigation forces a replace in
-                        // finalizeNavigation). ReferenceEquals stays true through a redirect chain
+                        // stale back-target. ReferenceEquals stays true through a redirect chain
                         // because nothing is committed until this confirm.
                         var isFirstNavigation = ReferenceEquals(from, RouteLocation.Start);
                         FinalizeNavigation(to, isPush: true, replace || isFirstNavigation);
@@ -401,7 +396,7 @@ public sealed class Router : IDisposable
         return failure;
     }
 
-    // Upstream navigate(): the ordered guard queue. Each phase runs its guards in order; the first
+    // The ordered guard queue. Each phase runs its guards in order; the first
     // non-allow decision short-circuits. Cancellation is re-checked at the head of every phase and
     // once more before finalize, so a superseded chain runs no further guards.
     private async Task<NavigationOutcome> RunNavigationPipeline(RouteLocation to, RouteLocation from, CancellationToken token)
@@ -431,8 +426,8 @@ public sealed class Router : IDisposable
             return outcome;
         }
         // 4.5. Resolve async route components — a no-op seam until [V01.01.03.16]; every route
-        // component is eager today. The stage is preserved so the ordering stays faithful to
-        // vue-router (beforeEnter -> resolve components -> beforeRouteEnter).
+        // component is eager today. The stage is kept so the ordering does not shift when lazy
+        // components land: before-enter -> resolve components -> in-component before-enter.
         // 5. in-component beforeRouteEnter on entering records.
         outcome = await RunPhase(CollectRouteEnterGuards(from, to), to, from, token);
         if (!outcome.IsAllow)
@@ -475,7 +470,7 @@ public sealed class Router : IDisposable
         return NavigationOutcome.Allow;
     }
 
-    // Leaving records = in `from` but not `to`, deepest child first (upstream leavingRecords.reverse()).
+    // Leaving records = in `from` but not `to`, deepest child first.
     private List<NavigationGuard> CollectLeaveGuards(RouteLocation from, RouteLocation to)
     {
         var guards = new List<NavigationGuard>();
@@ -554,9 +549,10 @@ public sealed class Router : IDisposable
             : _matcher.Resolve(redirect.RedirectLocation!);
 
     // Commits a confirmed navigation: write history (push/replace) for an application navigation, then
-    // set CurrentRoute (one shallowRef trigger). A pop leaves history alone — the URL already moved —
-    // and only updates CurrentRoute. The trigger queues the render flush; it is deliberately committed
-    // before afterEach runs and before the render-phase flush (Vue's microtask ordering).
+    // set CurrentRoute (one shallow-reference trigger). A pop leaves history alone — the URL already
+    // moved — and only updates CurrentRoute. The trigger queues the render flush; it is deliberately
+    // committed before afterEach runs and before the render-phase flush, so a hook observes the new
+    // route but the DOM has not been touched yet.
     private void FinalizeNavigation(RouteLocation to, bool isPush, bool replace)
     {
         if (isPush)
@@ -584,7 +580,7 @@ public sealed class Router : IDisposable
             catch (Exception exception)
             {
                 // An afterEach hook throwing must not undo a completed navigation; route it to the
-                // error handlers (a small robustness divergence from upstream's un-guarded forEach).
+                // error handlers — one misbehaving hook must not strand the rest.
                 TriggerError(exception, to, from);
             }
         }
@@ -614,7 +610,7 @@ public sealed class Router : IDisposable
 
     // Browser back/forward and memory Go route through the history listener. They drive the same
     // guarded pipeline as an application navigation, but the URL has already moved, so a failure
-    // restores it with a compensating history.go (upstream's popstate handling). Fire-and-forget: the
+    // restores it with a compensating history.go. Fire-and-forget: the
     // async body catches everything, so its task never faults.
     private void OnHistoryNavigation(string to, string from, NavigationInformation information)
         => _ = HandlePopNavigation(to, information);
@@ -643,7 +639,7 @@ public sealed class Router : IDisposable
                 {
                     case NavigationOutcomeKind.Redirect:
                         // Restore the popped URL, then re-navigate to the redirect target as a push
-                        // (upstream: routerHistory.go(-delta, false) + pushWithRedirect).
+                        // (a silent go back by -delta, then the redirected navigation).
                         RestorePopLocation(information);
                         urlRestored = true;
                         var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
@@ -682,7 +678,7 @@ public sealed class Router : IDisposable
         if (failure is not null)
         {
             // Aborted / cancelled / duplicated pop: undo the browser's position change so the URL
-            // matches the untouched CurrentRoute (upstream's compensating history.go).
+            // matches the untouched CurrentRoute.
             RestorePopLocation(information);
         }
         TriggerAfterEach(to, from, failure);

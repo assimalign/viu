@@ -5,8 +5,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The <c>v-show</c> directive transform: it contributes no props and requests the runtime <c>vShow</c>
-/// directive. The C# port of Vue 3.5's <c>transformShow</c> (<c>@vue/compiler-dom</c>
-/// <c>transforms/vShow.ts</c>). See https://vuejs.org/api/built-in-directives.html#v-show.
+/// directive.
 /// </summary>
 internal static class VShowTransform
 {

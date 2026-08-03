@@ -5,9 +5,9 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <summary>
 /// The result of the CSS Modules rewrite (<see cref="CssModuleRewriter.Rewrite"/>): the stylesheet with
 /// every local class selector renamed to its hashed form, and the <see cref="Classes"/> map from each
-/// original class name to that hashed name. Mirrors the two outputs of <c>@vue/compiler-sfc</c>'s
-/// <c>compileStyle</c> CSS-Modules mode — the rewritten CSS and the <c>modules</c> object the generated
-/// <c>$style</c> accessor exposes (https://vuejs.org/api/sfc-css-features.html#css-modules).
+/// original class name to that hashed name. Both outputs are required: the CSS carries the hashed names
+/// the browser matches, and the map is what the generator turns into the typed accessor class a template
+/// binds against (specified by <c>[STY-2]</c>).
 /// </summary>
 /// <param name="Stylesheet">
 /// The stylesheet with local class selectors renamed. Feed it to <see cref="CssScopedRewriter.Rewrite"/>

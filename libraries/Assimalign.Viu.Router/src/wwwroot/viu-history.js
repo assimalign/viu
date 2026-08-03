@@ -1,11 +1,10 @@
-// The JS half of the Assimalign.Viu.Router history interop — the browser edge of vue-router's
-// HTML5/hash history (createWebHistory / useHistoryStateNavigation / useHistoryListeners:
-// https://github.com/vuejs/router/blob/main/packages/router/src/history/html5.ts).
+// The JS half of the Assimalign.Viu.Router history interop — the browser edge of the web and hash
+// history modes (see BrowserRouterHistory / JavaScriptBrowserHistoryInterop on the .NET side).
 //
 // Contract notes:
 // - The .NET policy (BrowserRouterHistory) owns every URL and every state object; these functions
 //   are dumb appliers. The one thing the DOM owns is the live window scroll saved on the leaving
-//   entry during a push (upstream computeScrollPosition()).
+//   entry during a push.
 // - Reads are batched: readSnapshot() returns the whole location + state in ONE call, so .NET never
 //   issues chatty per-property getters ([V01.01.08.02]).
 // - State crosses as a flat, primitives-only payload: back/current/forward strings ('' encodes
@@ -17,7 +16,7 @@
 let dispatchPopState = null            // the single [JSExport] popstate dispatch
 const popstateListeners = new Map()    // subscription id -> popstate handler
 
-// Upstream computeScrollPosition(): the document scroll offset recorded on the leaving entry.
+// The document scroll offset recorded on the leaving entry.
 function computeScroll() {
     return { left: window.scrollX, top: window.scrollY }
 }

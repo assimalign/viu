@@ -6,8 +6,9 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// Collects every effect and cleanup callback created while it is the ambient current scope, and
-/// disposes them in bulk — the C# port of Vue's <c>effectScope()</c>. Computeds are never owned
-/// by a scope (upstream Vue 3.5 parity): a computed created inside a scope keeps serving fresh
+/// disposes them in bulk. A scope is a <b>lifetime boundary, not a subscription broadcast</b>
+/// (<c>[RCT-10]</c>). Computeds are deliberately never owned
+/// by a scope (<c>[RCT-11]</c>): a computed created inside a scope keeps serving fresh
 /// values after <see cref="Stop()"/>; its cleanup is automatic, driven by the subscriber count
 /// (losing the last subscriber soft-detaches it from its sources). Nested scopes register with
 /// (and stop with) their parent unless created detached. The ambient <see cref="Current"/> scope
@@ -100,7 +101,7 @@ public sealed class EffectScope : IReactiveEffectScope
         }
     }
 
-    /// <summary>Pauses all contained effects and child scopes (Vue 3.5 parity).</summary>
+    /// <summary>Pauses all contained effects and child scopes; pair with resume.</summary>
     public void Pause()
     {
         if (!_active || _paused)
@@ -145,7 +146,7 @@ public sealed class EffectScope : IReactiveEffectScope
     /// <summary>
     /// Stops every collected effect, runs cleanup callbacks in registration order, stops child
     /// scopes, and detaches from the parent. Computeds are unaffected — they are never owned by a
-    /// scope (upstream Vue 3.5 parity). Exception-safe: a throwing
+    /// scope (<c>[RCT-11]</c>). Exception-safe: a throwing
     /// <see cref="ReactiveEffect.OnStop"/>, cleanup callback, or child scope does not abandon the
     /// remaining teardown; the first exception is rethrown after everything has been stopped.
     /// Idempotent.
@@ -173,7 +174,7 @@ public sealed class EffectScope : IReactiveEffectScope
         }
         _active = false;
 
-        // Exception safety (mirrors the EndBatch pattern): capture the FIRST exception thrown by
+        // Exception safety (the same pattern as EndBatch): capture the FIRST exception thrown by
         // user code, keep tearing everything else down, and rethrow at the end — one throwing
         // callback must not leave live effects or unstopped child scopes behind.
         ExceptionDispatchInfo? error = null;
@@ -220,7 +221,8 @@ public sealed class EffectScope : IReactiveEffectScope
                 }
             }
         }
-        // O(1) swap-removal from the parent's child list (Vue parity).
+        // O(1) swap-removal from the parent's child list: order among siblings is not observable,
+        // so the last entry moves into the freed slot instead of shifting the tail.
         if (!_detached && !fromParent && _parent?._scopes is { Count: > 0 } siblings)
         {
             var last = siblings[^1];

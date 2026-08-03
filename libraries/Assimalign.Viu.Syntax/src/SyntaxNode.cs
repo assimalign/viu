@@ -3,9 +3,8 @@ namespace Assimalign.Viu.Syntax;
 /// <summary>
 /// The shared root of every <c>Assimalign.Viu.Syntax.*</c> node hierarchy: an immutable,
 /// value-comparable record carrying the node's <see cref="SourceLocation"/>. Each language library
-/// derives its own abstract root from it — the template parser's <c>TemplateSyntaxNode</c> (the C#
-/// port of Vue 3.5's <c>Node</c>, <c>@vue/compiler-core</c> <c>ast.ts</c>), the single-file-component
-/// parser's <c>SingleFileComponentBlock</c>, and the browser-language scaffolds (<c>CssSyntaxNode</c>,
+/// derives its own abstract root from it — the template parser's <c>TemplateSyntaxNode</c>, the
+/// single-file-component parser's <c>SingleFileComponentBlock</c>, and the browser-language scaffolds (<c>CssSyntaxNode</c>,
 /// <c>HtmlSyntaxNode</c>, <c>JavaScriptSyntaxNode</c>) — so every parser shares one located,
 /// structurally-equatable node contract that <see cref="SyntaxParser"/> and the code-generation layer
 /// can consume without knowing the language.
@@ -34,9 +33,8 @@ public abstract record SyntaxNode
     /// The node's kind discriminator as an integer, projected from the derived hierarchy's enum-typed
     /// kind. Mirrors Roslyn's <c>SyntaxNode.RawKind</c> and this base's <see cref="Diagnostic.RawCode"/>:
     /// the base deliberately does <em>not</em> define a shared kind enum, because each language owns its
-    /// own catalog (the template parser's <c>NodeType</c> is pinned numerically to
-    /// <c>@vue/compiler-core</c>'s <c>NodeTypes</c>; the single-file-component parser's block kinds are
-    /// Viu-defined) and a closed base enum could not be extended by additional language libraries or
+    /// own catalog (the template parser's <c>NodeType</c> and the single-file-component parser's block
+    /// kinds are independent, separately frozen numberings) and a closed base enum could not be extended by additional language libraries or
     /// custom registered parsers. Language-agnostic infrastructure switches on this projection; typed
     /// consumers use the derived hierarchy's own kind property.
     /// </summary>

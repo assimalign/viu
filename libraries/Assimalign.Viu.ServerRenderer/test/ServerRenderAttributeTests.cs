@@ -5,9 +5,11 @@ using Xunit;
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
 /// <summary>
-/// Pins <c>SsrRenderAttrs</c>/<c>SsrRenderAttr</c>/<c>SsrRenderDynamicAttr</c> against upstream
-/// <c>@vue/server-renderer/src/helpers/ssrRenderAttrs.ts</c>: boolean-by-presence, enumerated values,
-/// SSR-safe-name skipping, class/style routing, and the reserved/handler/textarea exclusions.
+/// Pins Viu's attribute-serialization contract for
+/// <c>SsrRenderAttrs</c>/<c>SsrRenderAttr</c>/<c>SsrRenderDynamicAttr</c>: boolean attributes render
+/// by presence, enumerated values render their string, an SSR-unsafe dynamic name is dropped rather
+/// than escaped, <c>class</c>/<c>style</c> route through their normalizers, and renderer metadata,
+/// event handlers, and a textarea's <c>value</c> are excluded ([SSR-6]).
 /// </summary>
 public class ServerRenderAttributeTests
 {

@@ -14,8 +14,10 @@ using Assimalign.Viu.Testing;
 namespace Assimalign.Viu.Browser.Tests;
 
 /// <summary>
-/// Pins the explicit-context <see cref="CssVariables.UseCssVariables"/> runtime — the C# port of
-/// Vue 3.5's <c>useCssVars</c>. Tests run DOM-free over the redesigned component tree.
+/// Pins the explicit-context <see cref="CssVariables.UseCssVariables"/> runtime against the
+/// <c>v-bind()</c>-in-CSS contract of [STY-6] through [STY-8]: the post-flush watcher applies each
+/// hashed custom property to every current outermost host element, reapplies when the component's
+/// roots change, and stops before unmount. Tests run DOM-free over the component tree.
 /// </summary>
 [SupportedOSPlatform("browser")]
 public sealed class CssVariablesTests

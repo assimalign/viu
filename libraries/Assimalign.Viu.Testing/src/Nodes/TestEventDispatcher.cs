@@ -4,10 +4,10 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// Dispatches named events to the listeners an element registered through <c>patchProp</c> —
-/// the C# port of <c>triggerEvent</c> in <c>@vue/runtime-test</c>
-/// (<c>packages/runtime-test/src/triggerEvent.ts</c>). Listeners are invoked synchronously on
-/// the test node; multicast delegates (merged handlers) invoke every target in order.
+/// Dispatches named events to the listeners an element registered through the node-ops property
+/// patch, so a test can drive a component the way a user would without a DOM. Listeners are invoked
+/// synchronously on the test node; multicast delegates (merged handlers) invoke every target in
+/// order.
 /// </summary>
 public static class TestEventDispatcher
 {

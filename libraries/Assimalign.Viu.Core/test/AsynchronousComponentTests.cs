@@ -13,7 +13,9 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins asynchronous components against Vue 3.5's loader, caching, and presentation semantics.
+/// Pins asynchronous-component loader sharing, caching, and the loading/error/delay presentation
+/// states. Asynchronous definitions retain explicit factory activation and deduplicate concurrent
+/// loads for the same definition ([BLT-14]).
 /// </summary>
 public sealed class AsynchronousComponentTests : IDisposable
 {

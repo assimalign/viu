@@ -11,11 +11,17 @@ namespace Assimalign.Viu.Components;
 /// virtual-node model.
 /// </summary>
 /// <remarks>
-/// Mirrors Vue 3.5's vnode optimization fields and block collection contract:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/vnode.ts.
+/// This type is the block-tree contract between compiled output and the renderer: what may change
+/// (<see cref="PatchFlags"/>), which properties may change, which descendants of a block root are
+/// dynamic, and whether suspended block tracking (<c>v-once</c>) occurred inside the block.
 /// <para>
-/// A non-null <see cref="DynamicChildren"/> value marks a block root, including an empty list.
-/// The renderer may patch that list directly when the old and new roots preserve the block shape.
+/// <see cref="DynamicChildren"/> is three-state and the distinction is normative: <see langword="null"/>
+/// means the value is not a block and its children are walked in full; a non-null but <b>empty</b>
+/// list means an optimized block with no dynamic descendants, so the renderer skips every child
+/// visit; a non-null non-empty list is patched directly. Confusing the null and empty cases is the
+/// single most consequential error a producer of this metadata can make. Direct patching is
+/// attempted only while the old and new roots agree on block shape; otherwise the renderer falls
+/// back to a full child diff. Specified by <c>[RND-BLOCK-1]</c> through <c>[RND-BLOCK-4]</c>.
 /// </para>
 /// </remarks>
 public sealed class ComponentOptimization

@@ -2,12 +2,12 @@
 
 The build-time CSS language area of the `Assimalign.Viu.Syntax.*` cluster: it tokenizes and rule-parses
 CSS per [CSS Syntax Module Level 3](https://www.w3.org/TR/css-syntax-3/) into a located,
-value-equatable tree, rewrites that tree into attribute-scoped CSS — the pure-.NET port of Vue 3.5's
-scoped-CSS feature (`@vue/compiler-sfc` `compileStyle()` with the scoped PostCSS plugin) — and
+value-equatable tree, rewrites that tree into attribute-scoped CSS — the compile-time half of Viu's
+scoped-CSS feature (`[STY-1]`) — and
 **constructs the same tree programmatically** so a build-time generator can emit CSS from scratch. It is
 reached through the aggregate-parser registration seam: the [V01.01.06.02] generator composition root
 registers `CssSyntaxParser` for `.viu` `@style` blocks, and runs `CssScopedRewriter` for the `scoped`
-ones. See [the Vue scoped-CSS docs](https://vuejs.org/api/sfc-css-features.html).
+ones.
 
 ## Public surface
 

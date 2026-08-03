@@ -5,9 +5,8 @@ using System.Text;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Rewrites <c>v-bind()</c> occurrences in a parsed <see cref="CssStylesheetNode"/>'s declaration values —
-/// the pure-.NET C# port of Vue 3.5's <c>v-bind()</c>-in-CSS compilation (<c>@vue/compiler-sfc</c>
-/// <c>cssVars.ts</c>, https://vuejs.org/api/sfc-css-features.html#v-bind-in-css). Each
+/// Rewrites <c>v-bind()</c> occurrences in a parsed <see cref="CssStylesheetNode"/>'s declaration values,
+/// the compile-time half of reactive CSS values (specified by <c>[STY-6]</c>). Each
 /// <c>v-bind(expression)</c> is replaced with a component-scoped custom-property reference
 /// <c>var(--&lt;hash&gt;)</c>, and the referenced expressions are collected so the composition-root
 /// generator can record them as component metadata for the <c>UseCssVars</c> runtime ([V01.01.06.06],
@@ -17,19 +16,19 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <para>
 /// <b>The variable scheme.</b> A usage <c>v-bind(expr)</c> becomes <c>var(--&lt;hash&gt;)</c>, where
 /// <c>&lt;hash&gt;</c> is the eight-hex-digit FNV-1a of <c>&lt;localHashSalt&gt;-&lt;expr&gt;</c>
-/// (<see cref="CssHash"/>). The caller passes the component's short scope id as the salt — Vue's
-/// <c>genVarName</c> likewise folds the file id into the hash — so the property is deterministic and
-/// component-scoped, and the CSS <c>var(--&lt;hash&gt;)</c> matches the runtime's
+/// (<see cref="CssHash"/>). The caller passes the component's short scope id as the salt, so two
+/// components binding the same expression text still get distinct properties, and the CSS
+/// <c>var(--&lt;hash&gt;)</c> matches the runtime's
 /// <c>style.setProperty("--&lt;hash&gt;", …)</c> by construction because both derive from the same hash of
-/// the same expression. Distinct expressions are de-duplicated by their trimmed, unquoted text (upstream's
-/// <c>if (!vars.includes(variable))</c>), so a repeated <c>v-bind(color)</c> yields one binding.
+/// the same expression. Distinct expressions are de-duplicated by their trimmed, unquoted text,
+/// so a repeated <c>v-bind(color)</c> yields one binding.
 /// </para>
 /// <para>
-/// <b>Extraction.</b> The scan mirrors upstream's <c>lexBinding</c>: it walks each declaration value,
+/// <b>Extraction.</b> The scan is lexical, not a full value parse: it walks each declaration value,
 /// skipping string literals and <c>/* … */</c> comments so a <c>v-bind(</c> inside them never matches, and
 /// balances nested parentheses to find the closing <c>)</c>. A surrounding pair of matching quotes on the
-/// expression is stripped (<c>v-bind('theme.color')</c> → <c>theme.color</c>), matching
-/// <c>normalizeExpression</c>. An unterminated <c>v-bind(</c> or an empty <c>v-bind()</c> reports a
+/// expression is stripped (<c>v-bind('theme.color')</c> → <c>theme.color</c>) so a quoted expression
+/// hashes to the same property as its bare form. An unterminated <c>v-bind(</c> or an empty <c>v-bind()</c> reports a
 /// recoverable <see cref="CssError"/> (the 2000-band catalog) located on the declaration and is left in
 /// place, never throwing.
 /// </para>
@@ -199,7 +198,7 @@ public static class CssBindingRewriter
         }
 
         // Deduplicates by the normalized expression so a repeated v-bind(color) shares one hashed name and
-        // one recorded binding (upstream vars.includes check). The first occurrence's location is retained.
+        // one recorded binding. The first occurrence's location is retained.
         private string ResolveName(string expression, SourceLocation location)
         {
             if (_namesByExpression.TryGetValue(expression, out var name))
@@ -266,7 +265,7 @@ public static class CssBindingRewriter
     }
 
     // Finds the index of the ')' that closes the '(' whose content starts at argumentStart, balancing
-    // nested parens and skipping string literals (upstream lexBinding). Returns -1 when unterminated.
+    // nested parens and skipping string literals. Returns -1 when unterminated.
     private static int LexBinding(string value, int argumentStart)
     {
         var depth = 1;
@@ -299,7 +298,8 @@ public static class CssBindingRewriter
         return -1;
     }
 
-    // Strips one pair of matching surrounding quotes (upstream normalizeExpression) after trimming.
+    // Strips one pair of matching surrounding quotes after trimming, so a quoted expression hashes to the
+    // same property as its bare form.
     private static string NormalizeExpression(string raw)
     {
         var expression = raw.Trim();

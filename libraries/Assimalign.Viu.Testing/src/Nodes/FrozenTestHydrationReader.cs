@@ -10,9 +10,10 @@ namespace Assimalign.Viu.Testing;
 /// Reads hydration data from an immutable pre-walk of an in-memory test subtree.
 /// </summary>
 /// <remarks>
-/// Host mutations performed after construction never change this reader. This mirrors a browser
-/// or WebView2 adapter that crosses the interop boundary once to snapshot the server tree and
-/// detects hydration algorithms that mutate before collecting a complete recovery range.
+/// Host mutations performed after construction never change this reader — the same shape a browser
+/// or WebView2 adapter has when it crosses the interop boundary once to snapshot the server tree.
+/// This is what catches a hydration algorithm that mutates before it has collected a complete
+/// recovery range.
 /// </remarks>
 public sealed class FrozenTestHydrationReader : HydrationNodeReader<TestNode>
 {

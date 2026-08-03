@@ -8,8 +8,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The text transform: merges adjacent text and interpolation children into a single compound expression and
-/// pre-converts text children to <c>createTextVNode</c> calls so the runtime skips normalization. The C# port
-/// of Vue 3.5's <c>transformText</c> (<c>@vue/compiler-core</c> <c>transforms/transformText.ts</c>).
+/// pre-converts text children to <c>createTextVNode</c> calls so the runtime skips normalization.
 /// </summary>
 internal static class TransformText
 {

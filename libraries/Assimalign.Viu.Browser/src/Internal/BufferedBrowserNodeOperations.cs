@@ -30,8 +30,8 @@ namespace Assimalign.Viu.Browser;
 /// <para>
 /// Transition class writes, reflow barriers, and FLIP transforms share this command stream.
 /// Timing and layout reads first flush pending writes, while next-frame and completion callbacks
-/// commit the writes they produce. This preserves Vue's from/active/reflow/to ordering without
-/// turning each class mutation into an interop call.
+/// commit the writes they produce. This preserves the from/active/reflow/to class ordering a CSS
+/// transition depends on without turning each class mutation into an interop call.
 /// </para>
 /// Ambient by activation: <see cref="Activate"/> points event dispatch, directive operations, and
 /// transition operations at this instance and <see cref="Deactivate"/> restores them.

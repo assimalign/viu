@@ -6,7 +6,8 @@ namespace Assimalign.Viu.Syntax.Css;
 /// a rule is a qualified rule or an at-rule; declarations live inside rule blocks. The prelude of a
 /// qualified rule is parsed into a selector list (sufficient for scoped-CSS rewriting per the W3C
 /// Selectors grammar, https://www.w3.org/TR/selectors-4/), so the catalog also covers the selector tree.
-/// The catalog is Viu-defined (there is no upstream Vue numbering to pin) and grew from the scaffold
+/// The catalog is Viu's own; values are additive only, because <see cref="CssSyntaxNode.RawKind"/>
+/// projects them for language-agnostic infrastructure. It grew from the scaffold
 /// with the scoped-CSS work ([V01.01.06.04]); CSS Modules ([V01.01.06.06]) extends it further.
 /// </summary>
 public enum CssSyntaxNodeKind

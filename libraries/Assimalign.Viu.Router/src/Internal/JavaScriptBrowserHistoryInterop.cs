@@ -11,8 +11,9 @@ namespace Assimalign.Viu.Router;
 /// (<see cref="BrowserRouterHistory"/>) computes every URL and <see cref="RouterHistoryState"/>, and
 /// this class marshals them into flat, primitives-only interop crossings (no object-graph
 /// marshaling): a null <c>back</c>/<c>forward</c> link and an absent scroll are encoded as an empty
-/// string / <see langword="false"/> flag rather than a null. Mirrors the
-/// <c>BrowserDomBridge</c>/<c>viu-dom.js</c> pattern of <c>Assimalign.Viu.Browser</c>.
+/// string / <see langword="false"/> flag rather than a null. It follows the same
+/// <c>BrowserDomBridge</c>/<c>viu-dom.js</c> pattern <c>Assimalign.Viu.Browser</c> uses, so every
+/// JS module in the framework is loaded and torn down the same way.
 /// Single-threaded by design — never call off the main WASM thread.
 /// </summary>
 [SupportedOSPlatform("browser")]

@@ -4,7 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, describe('Comment').
+// Comment parsing: these cases ARE the contract for what the parser treats as a comment, where its
+// Location boundaries fall, and when KeepComments drops it.
 public class CommentTests
 {
     [Fact]

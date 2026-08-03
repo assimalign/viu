@@ -14,7 +14,8 @@ namespace Assimalign.Viu.Browser;
 /// response flags re-cross the interop boundary in the single dispatch return).
 /// <para>
 /// The DOM runtime stays agnostic of any concrete payload type — the canonical consumer is the
-/// Router's DOM bridge, which maps the click metadata to vue-router's <c>guardEvent</c> contract.
+/// Router's DOM bridge, which maps the click metadata onto the router's own link-activation guard
+/// (modifier keys, non-primary button, and an already-prevented event all decline to navigate).
 /// </para>
 /// </summary>
 /// <param name="handler">The component's object-payload handler (from an <c>onX</c> prop).</param>

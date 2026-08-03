@@ -7,10 +7,8 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The <c>v-model</c> directive for radio buttons — the C# port of upstream's <c>vModelRadio</c>
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts,
-/// https://vuejs.org/guide/essentials/forms.html#radio). The element is <c>checked</c> when the
-/// model loosely equals the radio's bound <c>:value</c> (upstream <c>looseEqual</c>), so object
+/// The <c>v-model</c> directive for radio buttons. The element is <c>checked</c> when the
+/// model loosely equals the radio's bound <c>:value</c>, so object
 /// values round-trip without string coercion; on change the model is assigned the radio's raw
 /// <c>:value</c>. Stateless singleton (<see cref="Instance"/>); per-element state lives in
 /// <see cref="BrowserModelState"/>.
@@ -44,7 +42,7 @@ public sealed class VModelRadio : IDirective
         var state = operations.GetState(handle);
         state.ElementValue = BrowserModelDirective.Property(component, "value");
         state.Assign = BrowserModelDirective.Carrier(binding)?.Setter;
-        // Upstream: el.checked = looseEqual(value, vnode.props.value).
+        // Checked state is derived, never read back: the model decides, loosely compared.
         operations.SetBooleanProperty(handle, "checked",
             LooseEquality.LooseEqual(BrowserModelDirective.Carrier(binding)?.Value, state.ElementValue));
         operations.SetModelListener(handle, "onChange",
@@ -63,7 +61,7 @@ public sealed class VModelRadio : IDirective
         state.Assign = BrowserModelDirective.Carrier(binding)?.Setter; // refresh assigner
         state.ElementValue = BrowserModelDirective.Property(component, "value");
         var value = BrowserModelDirective.Carrier(binding)?.Value;
-        // Upstream: if (value !== oldValue) el.checked = looseEqual(value, vnode.props.value).
+        // Only re-derive checked state when the model actually changed.
         if (!Equals(
             value,
             BrowserModelDirective.ModelValue(binding.PreviousValue)))

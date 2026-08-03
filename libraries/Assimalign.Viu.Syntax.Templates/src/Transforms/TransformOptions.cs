@@ -4,63 +4,62 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Configures <see cref="Transformer"/>. The C# port of the transform-relevant members of Vue 3.5's
-/// <c>TransformOptions</c> (<c>@vue/compiler-core</c> <c>options.ts</c>). Defaults reproduce the platform-
-/// agnostic base compiler; <see cref="CreateDom"/> installs the DOM directive transforms mirroring
-/// <c>@vue/compiler-dom</c>.
+/// Configures <see cref="Transformer"/>. The defaults are the platform-agnostic compiler;
+/// <see cref="CreateDom"/> adds the DOM host's component recognition.
 /// </summary>
 public sealed class TransformOptions
 {
     /// <summary>
-    /// Additional node transforms, appended after the built-in preset (upstream's user
-    /// <c>nodeTransforms</c>). Lets third parties inject custom transforms.
+    /// Additional node transforms, appended after the built-in preset. Lets third parties inject custom
+    /// transforms without forking the pipeline.
     /// </summary>
     public IReadOnlyList<NodeTransform> NodeTransforms { get; set; } = Array.Empty<NodeTransform>();
 
     /// <summary>
-    /// Additional or overriding directive transforms, keyed by directive name (upstream's user
-    /// <c>directiveTransforms</c>). Entries override the built-in transforms of the same name.
+    /// Additional or overriding directive transforms, keyed by directive name. Entries override the
+    /// built-in transforms of the same name.
     /// </summary>
     public IReadOnlyDictionary<string, DirectiveTransform> DirectiveTransforms { get; set; }
         = new Dictionary<string, DirectiveTransform>();
 
     /// <summary>
-    /// Resolves a built-in component tag to its runtime helper, or <see langword="null"/> (upstream
-    /// <c>isBuiltInComponent</c>).
+    /// Resolves a built-in component tag to its runtime helper, or <see langword="null"/> when the tag
+    /// is not a built-in.
     /// </summary>
     public Func<string, RuntimeHelper?>? IsBuiltInComponent { get; set; }
 
-    /// <summary>Whether a tag is a custom element (never a component); defaults to never (upstream <c>isCustomElement</c>).</summary>
+    /// <summary>Whether a tag is a custom element (never a component); defaults to never.</summary>
     public Func<string, bool> IsCustomElement { get; set; } = static _ => false;
 
     /// <summary>Receives transform diagnostics. Defaults to swallowing them (recoverable).</summary>
     public Action<CompilerError>? OnError { get; set; }
 
     /// <summary>
-    /// Whether the expression and scope analysis pass runs (upstream <c>prefixIdentifiers</c>). Defaults to
-    /// <see langword="false"/>, keeping expression bodies opaque like Vue's browser build; set it, together with
-    /// <see cref="BindingMetadata"/>, to enable identifier classification and <c>Ref&lt;T&gt;</c> unwrapping
+    /// Whether the expression and scope analysis pass runs. Defaults to
+    /// <see langword="false"/>, keeping expression bodies opaque, which is what a caller wants when it only
+    /// needs the structural transform; set it, together with
+    /// <see cref="BindingMetadata"/>, to enable identifier classification and reference unwrapping
     /// ([V01.01.05.04]).
     /// </summary>
     public bool PrefixIdentifiers { get; set; }
 
     /// <summary>
-    /// The component binding classifications expression rewriting resolves identifiers against (upstream
-    /// <c>bindingMetadata</c>), produced by the component/setup source model. Defaults to
+    /// The component binding classifications expression rewriting resolves identifiers against, produced
+    /// by the component/setup source model. Defaults to
     /// <see cref="BindingMetadata.Empty"/> and is only consulted when <see cref="PrefixIdentifiers"/> is set.
     /// </summary>
     public BindingMetadata? BindingMetadata { get; set; }
 
     /// <summary>
     /// The CSS Modules accessors ([V01.01.05.04.01]) expression classification resolves <c>$style</c> (and
-    /// named-module) references against — the Viu stand-in for Vue's runtime <c>$style</c> object, supplied by
+    /// named-module) references against, supplied by
     /// the composition-root generator ([V01.01.06.06]). Defaults to <see cref="CssModuleAccessors.Empty"/> and is
     /// only consulted when <see cref="PrefixIdentifiers"/> is set.
     /// </summary>
     public CssModuleAccessors? CssModules { get; set; }
 
     /// <summary>
-    /// How a rewritten binding spells its receiver (upstream has no counterpart — one render context). Defaults to
+    /// How a rewritten binding spells its receiver. Defaults to
     /// <see cref="BindingRewriteMode.RenderContext"/> (the <c>_ctx.</c> render form); the composition-root
     /// generator sets <see cref="BindingRewriteMode.InstanceMember"/> only for the standalone <c>v-bind()</c> CSS
     /// getter compile ([V01.01.06.06.01]).
@@ -68,7 +67,7 @@ public sealed class TransformOptions
     public BindingRewriteMode BindingRewriteMode { get; set; } = BindingRewriteMode.RenderContext;
 
     /// <summary>
-    /// Whether static event handlers are cached so blocks are not invalidated (upstream <c>cacheHandlers</c>).
+    /// Whether static event handlers are cached so blocks are not invalidated.
     /// Defaults to <see langword="false"/>.
     /// </summary>
     public bool CacheHandlers { get; set; }
@@ -96,7 +95,7 @@ public sealed class TransformOptions
     /// recognized as built-in components, and <paramref name="isCustomElement"/> reporting custom elements.
     /// The DOM directive transforms (<c>v-model</c>, <c>v-on</c>, <c>v-show</c>, <c>v-html</c>, <c>v-text</c>,
     /// <c>v-cloak</c>) are always installed as the pipeline's built-ins, so this only configures component
-    /// recognition. Mirrors the setup <c>@vue/compiler-dom</c> applies in its <c>compile()</c>.
+    /// recognition.
     /// </summary>
     /// <param name="isCustomElement">Whether a tag is a custom element; defaults to never.</param>
     public static TransformOptions CreateDom(Func<string, bool>? isCustomElement = null) => new()

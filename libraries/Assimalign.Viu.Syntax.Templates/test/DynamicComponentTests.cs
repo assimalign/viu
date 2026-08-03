@@ -4,8 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/transformElement.spec.ts: component
-// type resolution, including dynamic components (<component :is>) and built-in components.
+// Component type resolution: these cases ARE the contract for how a tag resolves to a component, a
+// built-in, or a dynamic component (<component :is>), and what each form emits.
 public class DynamicComponentTests
 {
     [Fact]

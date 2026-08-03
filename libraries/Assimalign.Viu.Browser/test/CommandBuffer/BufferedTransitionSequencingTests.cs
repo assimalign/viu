@@ -18,9 +18,8 @@ namespace Assimalign.Viu.Browser.Tests;
 // battery drives the REAL renderer + REAL DOM <Transition> through the BUFFERED node-ops over the
 // in-memory command-buffer applier and proves the browser-observable sequence survives: from/active in
 // one frame, the to-swap in a distinct later frame, and the leave reflow barrier landing between the
-// from- and active-class writes inside a single one-crossing frame. Upstream contract: @vue/runtime-dom
-// components/Transition.ts forceReflow + double-requestAnimationFrame nextFrame
-// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/components/Transition.ts).
+// from- and active-class writes inside a single one-crossing frame. The ordering under test is the
+// forced reflow plus the double-requestAnimationFrame next-frame schedule.
 // Browser-annotated like the other command-buffer tests (nothing crosses a real interop boundary — the
 // applier is the in-memory CommandBufferDecoder and the timing seam is a recording fake).
 [SupportedOSPlatform("browser")]
@@ -67,7 +66,8 @@ public sealed class BufferedTransitionSequencingTests
 
         // Toggle out: within a SINGLE flush the buffered adaptor commits leave-from, then a real reflow
         // (the ForceReflow barrier op — document.body.offsetHeight), then leave-active, in that order —
-        // upstream #2593. The barrier does not split the flush; it is one op inside the one crossing.
+        // Without the barrier the two class writes coalesce into one style recalc and nothing animates.
+        // The barrier does not split the flush; it is one op inside the one crossing.
         show.Value = false;
         world.RunUntilIdle();
         var leaveFrame = world.FirstTransitionFrameContaining("add:fade-leave-from");
@@ -147,7 +147,7 @@ public sealed class BufferedTransitionSequencingTests
         world.Dom.ReflowCount.ShouldBe(0); // no appear -> the initial mount runs no choreography or reflow
 
         // Toggle hide: within a SINGLE flush the buffered adaptor commits leave-from, a real reflow barrier
-        // (document.body.offsetHeight), then leave-active, in that order (upstream #2593) — one crossing. The
+        // (document.body.offsetHeight), then leave-active, in that order — one crossing. The
         // element stays MOUNTED and visible; the removal path is never taken (v-show persists it).
         show.Value = false;
         world.RunUntilIdle();

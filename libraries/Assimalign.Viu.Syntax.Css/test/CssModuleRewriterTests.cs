@@ -6,9 +6,8 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Pins the CSS Modules class-name rewrite (<see cref="CssModuleRewriter"/>, [V01.01.06.06]) against the
-/// behavior of Vue 3.5's <c>@style module</c> compilation (<c>@vue/compiler-sfc</c> <c>compileStyle()</c>
-/// modules mode, https://vuejs.org/api/sfc-css-features.html#css-modules): local class selectors are
+/// Pins the CSS Modules class-name rewrite (<see cref="CssModuleRewriter"/>, [V01.01.06.06], specified
+/// by <c>[STY-2]</c>): local class selectors are
 /// renamed to deterministic, component-scoped hashed names, the original → hashed map is returned for the
 /// generated <c>$style</c> accessor, and the rewrite composes with <c>scoped</c>.
 /// </summary>

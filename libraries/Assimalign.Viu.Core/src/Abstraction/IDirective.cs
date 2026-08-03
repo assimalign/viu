@@ -4,9 +4,9 @@ namespace Assimalign.Viu;
 /// Defines the optional renderer lifecycle hooks for one reusable runtime directive.
 /// </summary>
 /// <remarks>
-/// This is Viu's host-neutral counterpart to Vue's object directive:
-/// https://vuejs.org/guide/reusability/custom-directives.html. Hooks receive the boxed host node
-/// because the application registry is independent of a renderer's <c>TNode</c>.
+/// A directive bundles renderer-lifecycle behavior that would otherwise be repeated at every use
+/// site. Hooks receive the boxed host node because the application registry is independent of a
+/// renderer's <c>TNode</c>.
 /// </remarks>
 public interface IDirective
 {

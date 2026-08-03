@@ -77,38 +77,39 @@ internal enum DomCommandOpcode : byte
     RemoveEventListener = 20,
 
     /// <summary>
-    /// Add one transition CSS class: <c>[handle][class]</c> (upstream <c>addTransitionClass</c> —
-    /// <c>packages/runtime-dom/src/components/Transition.ts</c>). Buffered so the enter/leave class
+    /// Add one transition CSS class: <c>[handle][class]</c>. Buffered so the enter/leave class
     /// choreography is ordered with the node create/insert ops in the same frame ([V01.01.04.07.02]).
     /// </summary>
     AddTransitionClass = 21,
 
-    /// <summary>Remove one transition CSS class: <c>[handle][class]</c> (upstream <c>removeTransitionClass</c>).</summary>
+    /// <summary>Remove one transition CSS class: <c>[handle][class]</c>.</summary>
     RemoveTransitionClass = 22,
 
     /// <summary>
     /// The reflow barrier — no operands. When the applier reaches it while draining a frame it performs
-    /// a real synchronous reflow (upstream <c>forceReflow</c>'s <c>document.body.offsetHeight</c> read),
+    /// a real synchronous reflow (a <c>document.body.offsetHeight</c> read),
     /// committing every class write <em>before</em> it in the frame to its own style recalc before the
     /// writes after it. This is what keeps a buffered leave's <c>*-leave-from</c> class from coalescing
-    /// with <c>*-leave-active</c> (upstream #2593) without splitting the flush — the frame still crosses
-    /// the interop boundary exactly once ([V01.01.04.07.02]).
+    /// with <c>*-leave-active</c> — which would make the transition start from the wrong state — without
+    /// splitting the flush: the frame still crosses the interop boundary exactly once
+    /// ([V01.01.04.07.02]).
     /// </summary>
     ForceReflow = 23,
 
     /// <summary>
-    /// Apply a FLIP inverting transform: <c>[handle][deltaX:float64][deltaY:float64]</c> (upstream
-    /// <c>applyTranslation</c>'s <c>style.transform = translate(dx,dy); style.transitionDuration = '0s'</c>
-    /// — <c>packages/runtime-dom/src/components/TransitionGroup.ts</c>). Buffered so the whole FLIP write
+    /// Apply a FLIP inverting transform: <c>[handle][deltaX:float64][deltaY:float64]</c>, written as
+    /// <c>style.transform = translate(dx,dy)</c> with <c>style.transitionDuration = '0s'</c> so the
+    /// inversion itself is not animated. Buffered so the whole FLIP write
     /// pass — every element's transform, the <see cref="ForceReflow"/> barrier, then the move class and
-    /// the transform clear — rides one frame in upstream order, one interop crossing ([V01.01.04.07.03]).
+    /// the transform clear — rides one frame in order, one interop crossing ([V01.01.04.07.03]).
     /// The <c>float64</c> deltas are the first non-int32/bool operands in the wire format.
     /// </summary>
     SetMoveTransform = 24,
 
     /// <summary>
     /// Clear the FLIP transform and zero transition-duration so the move class animates the element back
-    /// to its settled spot: <c>[handle]</c> (upstream <c>style.transform = style.transitionDuration = ''</c>).
+    /// to its settled spot: <c>[handle]</c> — clearing both inline <c>transform</c> and
+    /// <c>transition-duration</c>.
     /// Buffered after the reflow barrier and the move class in the same FLIP write frame ([V01.01.04.07.03]).
     /// </summary>
     ClearMoveStyles = 25,

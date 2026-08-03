@@ -11,11 +11,9 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The <c>v-model</c> directive for <c>&lt;select&gt;</c> — the C# port of Vue's
-/// <c>vModelSelect</c>.
+/// The <c>v-model</c> directive for <c>&lt;select&gt;</c>, single and multiple.
 /// </summary>
 /// <remarks>
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/directives/vModel.ts.
 /// The directive uses <see cref="DirectiveBinding.GetDescendantElements(string)"/> to pair each
 /// immutable option component with its mounted browser handle. Raw bound option values therefore
 /// retain object identity without reflection or a browser read.
@@ -213,7 +211,7 @@ public sealed class VModelSelect : IDirective
         if (multiple && !isListValue && !isSetValue)
         {
             Debug.WriteLine(
-                "[Vue warn] <select multiple v-model> expects an Array or Set value for its binding.");
+                "[Viu warn] <select multiple v-model> expects an Array or Set value for its binding.");
             return;
         }
 

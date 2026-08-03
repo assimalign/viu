@@ -4,9 +4,8 @@ namespace Assimalign.Viu.Syntax.Html;
 
 /// <summary>
 /// The plain-HTML language's <see cref="SyntaxParser{T}"/> — the parser build tooling registers for
-/// <c>.html</c> sources, above all the WASM host page (<c>wwwroot/index.html</c> entry rewriting, the
-/// role Vite's HTML entry processing plays in a Vue build). Vue <em>template</em> markup is the
-/// separate <c>Assimalign.Viu.Syntax.Templates</c> parser.
+/// <c>.html</c> sources, above all the WASM host page (<c>wwwroot/index.html</c> entry rewriting).
+/// Viu <em>template</em> markup is the separate <c>Assimalign.Viu.Syntax.Templates</c> parser.
 /// </summary>
 /// <remarks>
 /// Scaffold: the parse currently produces a single located <see cref="HtmlDocumentNode"/> carrying the

@@ -8,8 +8,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// The template language's <see cref="SyntaxParser{T}"/>: the registration-friendly instance adapter
 /// over <see cref="TemplateParser"/> that build tooling plugs into the shared parser pipeline (e.g.
 /// registered on an aggregate parser for a single-file component's <c>@template</c> block). Parsing
-/// semantics are exactly <see cref="TemplateParser.Parse(string, ParserOptions)"/> — the upstream-pinned
-/// <c>baseParse</c> port stays the authoritative entry point — with the recoverable
+/// semantics are exactly <see cref="TemplateParser.Parse(string, ParserOptions)"/> — that static entry
+/// point stays authoritative — with the recoverable
 /// <see cref="ParserOptions.OnError"/> errors additionally surfaced as the result's
 /// <see cref="SyntaxParserResult.Diagnostics"/> so registration-based consumers read them uniformly.
 /// </summary>
@@ -24,7 +24,7 @@ public sealed class TemplateSyntaxParser : SyntaxParser<TemplateSyntaxNode>
     }
 
     /// <summary>Creates the parser with the given template <paramref name="parserOptions"/> and no analyzers.</summary>
-    /// <param name="parserOptions">The upstream-pinned template parser options.</param>
+    /// <param name="parserOptions">The template parser options.</param>
     /// <exception cref="ArgumentNullException"><paramref name="parserOptions"/> is <see langword="null"/>.</exception>
     public TemplateSyntaxParser(ParserOptions parserOptions)
         : this(parserOptions, new SyntaxParserOptions<TemplateSyntaxNode>())
@@ -32,7 +32,7 @@ public sealed class TemplateSyntaxParser : SyntaxParser<TemplateSyntaxNode>
     }
 
     /// <summary>Creates the parser with the given template and pipeline options.</summary>
-    /// <param name="parserOptions">The upstream-pinned template parser options.</param>
+    /// <param name="parserOptions">The template parser options.</param>
     /// <param name="options">The shared pipeline options — analyzers and the analysis timeout.</param>
     /// <exception cref="ArgumentNullException"><paramref name="parserOptions"/> or <paramref name="options"/> is <see langword="null"/>.</exception>
     public TemplateSyntaxParser(ParserOptions parserOptions, SyntaxParserOptions<TemplateSyntaxNode> options)
@@ -64,7 +64,7 @@ public sealed class TemplateSyntaxParser : SyntaxParser<TemplateSyntaxNode>
 
         // Intercept OnError on a per-parse shallow copy so the recoverable errors land on the result
         // without mutating the caller's options; a caller-supplied OnError still sees every error
-        // (upstream's push model is preserved, the result channel is additive).
+        // the push channel is preserved and the result channel is purely additive.
         var effectiveOptions = parserOptions.Clone();
         var callerOnError = effectiveOptions.OnError;
         effectiveOptions.OnError = error =>

@@ -7,11 +7,10 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The factory facade for the router's history modes — the C# port of vue-router's
-/// <c>createMemoryHistory</c>, <c>createWebHistory</c>, and <c>createWebHashHistory</c>
-/// (<c>packages/router/src/history/</c>). Each returns an <see cref="IRouterHistory"/>; the memory
-/// mode is pure and needs no browser, while the web and hash modes drive the History API over
-/// interop and require <see cref="InitializeAsync"/> to have completed first.
+/// The factory facade for the router's three history modes. Each returns an
+/// <see cref="IRouterHistory"/>; the memory mode is pure and needs no browser, while the web and hash
+/// modes drive the History API over interop and require <see cref="InitializeAsync"/> to have
+/// completed first. Specified by <c>[RTR-3]</c>.
 /// </summary>
 public static class RouterHistory
 {
@@ -28,7 +27,7 @@ public static class RouterHistory
         => initialization ??= InitializeCoreAsync(cancellationToken);
 
     /// <summary>
-    /// Creates an in-memory history (upstream <c>createMemoryHistory</c>) — pure, interop-free, and
+    /// Creates an in-memory history — pure, interop-free, and
     /// the mode used for tests and non-browser hosts.
     /// </summary>
     /// <param name="basePath">The base path, or <see langword="null"/> for none.</param>
@@ -36,7 +35,7 @@ public static class RouterHistory
         => new MemoryRouterHistory(basePath);
 
     /// <summary>
-    /// Creates an HTML5 History API history (upstream <c>createWebHistory</c>): clean URLs driven by
+    /// Creates an HTML5 History API history: clean URLs driven by
     /// <c>pushState</c>/<c>replaceState</c> with a <c>popstate</c> listener. When no
     /// <paramref name="basePath"/> is given, the document <c>&lt;base&gt;</c> href (origin stripped)
     /// or <c>"/"</c> is used.
@@ -52,7 +51,7 @@ public static class RouterHistory
     }
 
     /// <summary>
-    /// Creates a hash-mode history (upstream <c>createWebHashHistory</c>): the whole route lives in
+    /// Creates a hash-mode history: the whole route lives in
     /// <c>location.hash</c>, so navigation never triggers a server request. The base defaults from
     /// the current <c>location.pathname</c>/<c>search</c>, with a <c>#</c> ensured.
     /// </summary>
@@ -67,7 +66,7 @@ public static class RouterHistory
     }
 
     // Web base: a configured base wins; otherwise the <base> href (origin stripped) or "/".
-    // Mirrors normalizeBase's <base>-element branch. Interop-agnostic, so unit-testable with a fake.
+    // The <base>-element branch of base resolution. Interop-agnostic, so unit-testable with a fake.
     internal static string ResolveWebBase(IBrowserHistoryInterop interop, string? basePath)
     {
         string raw;

@@ -2,9 +2,8 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// Describes one capturing parameter in a compiled path pattern — its name and the modifiers that
-/// govern how its captured value is read back. The C# port of vue-router's
-/// <c>PathParserParamKey</c> (<c>packages/router/src/matcher/pathParserRanker.ts</c>). Keys are
-/// stored in pattern order so the i-th capturing group maps to the i-th key.
+/// govern how its captured value is read back. Keys are stored in pattern order, so the i-th
+/// capturing group of the compiled expression maps to the i-th key.
 /// </summary>
 internal readonly struct PathParameterKey
 {

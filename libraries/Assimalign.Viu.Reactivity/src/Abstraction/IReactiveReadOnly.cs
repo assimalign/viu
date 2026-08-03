@@ -1,9 +1,8 @@
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Reports whether a reactive value rejects writes. This is the interface-based counterpart of
-/// Vue 3.5's read-only reactive flag
-/// (https://vuejs.org/api/reactivity-utilities.html#isreadonly).
+/// Reports whether a reactive value rejects writes. Implementing this interface is what makes a
+/// value answer <see cref="Reactive.IsReadonly"/> without a type test per concrete kind.
 /// </summary>
 public interface IReactiveReadOnly
 {

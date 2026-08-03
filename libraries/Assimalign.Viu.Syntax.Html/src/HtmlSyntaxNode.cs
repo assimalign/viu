@@ -8,8 +8,8 @@ namespace Assimalign.Viu.Syntax.Html;
 /// </summary>
 /// <remarks>
 /// This hierarchy covers plain HTML <em>documents</em> processed by build tooling — above all the WASM
-/// host page (<c>wwwroot/index.html</c> entry rewriting, the role Vite's HTML entry processing plays in
-/// a Vue build). The Vue template language — HTML-flavored markup plus directives and interpolation —
+/// host page (<c>wwwroot/index.html</c> entry rewriting). The Viu template language — HTML-flavored
+/// markup plus directives and interpolation —
 /// is the separate <c>Assimalign.Viu.Syntax.Templates</c> area; this scaffold never grows template
 /// semantics. Scaffold: the tree currently carries only the raw <see cref="HtmlDocumentNode"/>
 /// produced by <see cref="HtmlSyntaxParser"/>.

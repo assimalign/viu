@@ -2,11 +2,10 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// The click information a <see cref="RouterLink"/> inspects to decide whether to intercept a
-/// navigation — the DOM-free stand-in for the <c>MouseEvent</c> vue-router's <c>guardEvent</c> reads
-/// (<c>packages/router/src/RouterLink.ts</c>). The platform-agnostic components never touch the DOM
-/// event directly; a host's event bridge constructs this from the native event, and tests construct
-/// it directly. The link navigates only for an unmodified primary-button click that has not been
-/// prevented.
+/// navigation: a DOM-free carrier for the button and modifier-key state of a mouse click. The
+/// platform-agnostic components never touch a native DOM event; a host's event bridge constructs
+/// this from the native event, and tests construct it directly. The link navigates only for an
+/// unmodified primary-button click that has not already been prevented.
 /// </summary>
 public sealed class RouterLinkClickEvent
 {
@@ -50,14 +49,14 @@ public sealed class RouterLinkClickEvent
 
     /// <summary>
     /// Whether <see cref="PreventDefault"/> has been called — a link never intercepts an
-    /// already-prevented event (upstream <c>guardEvent</c> bails on <c>e.defaultPrevented</c>).
+    /// already-prevented event, so an outer handler that already claimed the click wins.
     /// </summary>
     public bool DefaultPrevented { get; private set; }
 
     /// <summary>
     /// Records the intent to prevent the browser's default navigation, so the host's event bridge
-    /// suppresses the full page load when the synchronous dispatch returns (upstream:
-    /// <c>e.preventDefault()</c>).
+    /// suppresses the full page load when the synchronous dispatch returns. The bridge calls the
+    /// native <c>preventDefault()</c>; this type only records the intent.
     /// </summary>
     public void PreventDefault() => DefaultPrevented = true;
 }

@@ -1,8 +1,9 @@
 # Asynchronous and dynamic components
 
-Core implements Vue-shaped dynamic selection and asynchronous loading without weakening the
-approved component-factory boundary. Neither feature performs constructor discovery, reflection,
-service lookup, or component-tree provide/inject.
+Core implements dynamic component selection and asynchronous loading without weakening the
+component-factory boundary. Neither feature performs constructor discovery, reflection,
+service lookup, or component-tree provide/inject. Specified by
+[`docs/SPECIFICATION.md` §7.5](../../../docs/SPECIFICATION.md#75-asynchronous-and-dynamic-components).
 
 ## Factory identity remains authoritative
 
@@ -127,14 +128,10 @@ with a client-side pending branch needs an explicit hydration protocol rather th
 branch owns the existing nodes. Applications must client-render the boundary until that protocol
 exists.
 
-Current parity limits are boundary timeout and event options, transition choreography across
+Not yet implemented: boundary timeout and event options, transition choreography across
 fallback and reveal, and deferral of mounted/post-render effects from the detached default branch.
 Those effects currently run when the hidden branch mounts, before it becomes visible. Suspense does
 not use provide/inject or an application service container.
 
-The behavior follows Vue 3.5's
-[`apiAsyncComponent.ts`](https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/apiAsyncComponent.ts)
-and [`Suspense.ts`](https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/components/Suspense.ts),
-plus dynamic-component
-[`resolveAssets.ts`](https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/helpers/resolveAssets.ts),
-subject to the explicit factory and string-selector decisions above.
+Everything above is subject to the explicit factory and string-selector decisions recorded in this
+document; those decisions are the reason the shape differs from a reflection-based design.

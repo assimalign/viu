@@ -9,7 +9,8 @@ using Xunit;
 namespace Assimalign.Viu.ServerRenderer.Tests;
 
 /// <summary>
-/// Pins primitive component-tree serialization to Vue's server-renderer marker and escaping rules.
+/// Pins primitive component-tree serialization: the per-kind output shapes and hydration markers of
+/// [SSR-MARKERS-1] and the escaping rules of [SSR-6].
 /// </summary>
 public class ServerRendererElementTests
 {

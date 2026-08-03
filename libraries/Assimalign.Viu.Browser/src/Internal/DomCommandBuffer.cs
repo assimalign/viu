@@ -10,7 +10,7 @@ namespace Assimalign.Viu.Browser;
 /// each DOM mutation as an opcode + operands into one growable, reused <see cref="byte"/> array, and
 /// a single interop call hands the whole frame to the JS applier (<c>viu-dom.js</c>'s
 /// <c>applyCommandBuffer</c>) per scheduler flush — collapsing hundreds of boundary crossings into
-/// one. There is no upstream Vue counterpart; the prior art is Blazor's <c>RenderBatch</c>. The
+/// one ([RND-IO-1]). The prior art is Blazor's <c>RenderBatch</c>. The
 /// design is behaviorally invisible: buffered and direct modes produce identical DOM.
 /// <para>
 /// <b>Handles are pre-allocated on the .NET side.</b> A buffered <c>createElement/Text/Comment</c>
@@ -86,8 +86,9 @@ internal sealed class DomCommandBuffer
     internal byte[] BackingArray => _buffer;
 
     /// <summary>
-    /// Reserves and returns the next node handle from the .NET-side counter (upstream: the JS
-    /// <c>registerNode</c> id, moved to .NET so a one-way create op can name its result).
+    /// Reserves and returns the next node handle from the .NET-side counter. Handle allocation
+    /// lives in managed code precisely so a one-way create op can name its own result
+    /// ([RND-IO-4]).
     /// </summary>
     internal int AllocateHandle() => _nextHandle++;
 

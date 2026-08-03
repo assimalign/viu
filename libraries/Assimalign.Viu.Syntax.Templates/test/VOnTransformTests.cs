@@ -4,8 +4,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/vOn.spec.ts and
-// packages/compiler-dom/__tests__/transforms/vOn.spec.ts: event-name resolution, inline-statement wrapping,
+// These cases ARE the contract for event-name resolution, inline-statement wrapping,
 // and key/system/event-option modifier handling.
 public class VOnTransformTests
 {

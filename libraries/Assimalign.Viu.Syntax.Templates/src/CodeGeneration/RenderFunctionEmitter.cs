@@ -4,10 +4,9 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Serializes a <see cref="TransformResult"/>'s code-generation tree into a C# render-function body —
-/// the C# port of Vue 3.5's <c>generate()</c> (<c>@vue/compiler-core</c> <c>codegen.ts</c>,
-/// https://vuejs.org/guide/extras/rendering-mechanism.html). Every vnode becomes a direct invocation of a
-/// runtime helper referenced <b>by name</b> using upstream's aliased spelling (<c>_openBlock</c>,
+/// Serializes a <see cref="TransformResult"/>'s code-generation tree into a C# render-function body.
+/// Every render node becomes a direct invocation of a
+/// runtime helper referenced <b>by name</b> in its underscore-prefixed alias form (<c>_openBlock</c>,
 /// <c>_createElementBlock</c>, <c>_toDisplayString</c>, …, per <see cref="HelperNames"/> and
 /// <see cref="TransformContext.HelperString(RuntimeHelper)"/>); this library never references the runtime
 /// assembly, and the composition root (the source generator, [V01.01.06.02]) binds the names via a
@@ -16,12 +15,10 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </summary>
 /// <remarks>
 /// The emission is deterministic — ordinal string handling, invariant-culture numbers, LF newlines — and
-/// pure: equal input produces an equal <see cref="RenderFunctionEmitterResult"/>. JavaScript constructs
-/// with no C# counterpart are emitted through documented equivalents; the load-bearing one is the block
-/// sequence: upstream's comma expression <c>(openBlock(), createElementBlock(...))</c> becomes
-/// <c>_createElementBlock(_openBlock(), ...)</c>, relying on C#'s guaranteed left-to-right argument
-/// evaluation to open the block before the child arguments are evaluated. See <c>docs/DESIGN.md</c> for
-/// the full divergence table.
+/// pure: equal input produces an equal <see cref="RenderFunctionEmitterResult"/>. The load-bearing
+/// emission detail is the block sequence: opening a block must happen <em>before</em> the child arguments
+/// are evaluated, which is expressed as <c>_createElementBlock(_openBlock(), ...)</c> and relies on C#'s
+/// guaranteed left-to-right argument evaluation. See <c>docs/DESIGN.md</c> for the full emission table.
 /// </remarks>
 public static class RenderFunctionEmitter
 {

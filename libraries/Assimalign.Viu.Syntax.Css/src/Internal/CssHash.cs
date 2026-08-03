@@ -14,8 +14,8 @@ namespace Assimalign.Viu.Syntax.Css;
 /// <remarks>
 /// The caller salts the input with the component's short scope id (the <c>data-v-</c> hash), so the same
 /// class name or expression in two different components hashes differently — the per-component uniqueness
-/// the CSS Modules and <c>v-bind()</c> acceptance criteria require, mirroring Vue's <c>compileStyle</c>
-/// modules hashing and <c>cssVars.ts</c> <c>genVarName</c> both folding the file id into the hash.
+/// the CSS Modules and <c>v-bind()</c> acceptance criteria require. Without the salt, two components
+/// declaring <c>.button</c> would collide into one rule and silently overwrite each other.
 /// </remarks>
 internal static class CssHash
 {

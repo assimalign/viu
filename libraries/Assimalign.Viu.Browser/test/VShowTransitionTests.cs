@@ -15,10 +15,9 @@ namespace Assimalign.Viu.Browser.Tests;
 // each binding toggle WITHOUT unmounting the element, captures the original display once and restores it,
 // and converges a toggle-during-transition interruption to the final visibility with no orphaned classes.
 // The <Transition persisted> stands in for the compiler's transformTransition injection (persisted:true
-// whenever a <transition> wraps a single v-show child). Upstream contract: @vue/runtime-dom
-// directives/vShow.ts persisted handling + components/Transition.ts
-// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vShow.ts,
-// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/components/Transition.ts).
+// whenever a <transition> wraps a single v-show child). The contract under test is persisted-hook
+// handling: the directive drives the enter/leave phases and the renderer skips its own, so the two
+// never both drive the same phase ([BLT-10]).
 public sealed class VShowTransitionTests : IDisposable
 {
     private readonly VShowTransitionTestHarness _harness = new();
@@ -94,8 +93,8 @@ public sealed class VShowTransitionTests : IDisposable
         Reference<object?> show = Reactive.Reference<object?>(false);
         _harness.Render(PersistedHost(show));
         var div = _harness.FindElement("div");
-        // beforeMount hides an initially-falsy element directly (upstream: transition && value is false, so
-        // setDisplay(el, false)) — no enter/leave classes and no reflow on the first mount.
+        // beforeMount hides an initially-falsy element directly — no enter/leave classes and no reflow
+        // on the first mount, because there is nothing to transition from.
         _harness.Display(div).ShouldBe("none");
         _harness.Classes(div).ShouldBeEmpty();
         _harness.ReflowCount.ShouldBe(0);
@@ -126,7 +125,7 @@ public sealed class VShowTransitionTests : IDisposable
         _harness.Display(div).ShouldBe("none");
 
         // Show again -> the SAME original "flex" is restored: captured once at mount, never lost to the
-        // toggles (upstream vShowOriginalDisplay is set only in beforeMount).
+        // toggles: the original display is captured only in beforeMount, never re-read.
         show.Value = true;
         _harness.RunUntilIdle();
         _harness.Display(div).ShouldBe("flex");
@@ -150,7 +149,7 @@ public sealed class VShowTransitionTests : IDisposable
         _harness.Display(div).ShouldBeNull(); // revealed for the enter
 
         // Interrupt with a hide before the enter finishes: the enter is cancelled (its classes removed by
-        // finishEnter, upstream el[enterCbKey](true)) and the leave classes take over, with no orphaned
+        // the early enter finish) and the leave classes take over, with no orphaned
         // enter class. The element is still visible and mounted — hiding waits for the leave to complete.
         show.Value = false;
         _harness.RunUntilIdle();
@@ -185,7 +184,7 @@ public sealed class VShowTransitionTests : IDisposable
         _harness.Display(div).ShouldBeNull(); // still visible while leaving
 
         // Interrupt with a show before the leave finishes: the leave is cancelled (its classes removed by
-        // finishLeave, upstream el[leaveCbKey](true)) and the enter classes take over, with no orphaned
+        // the early leave finish) and the enter classes take over, with no orphaned
         // leave class.
         show.Value = true;
         _harness.RunUntilIdle();
@@ -201,8 +200,8 @@ public sealed class VShowTransitionTests : IDisposable
         _harness.Classes(div).ShouldBeEmpty();
         _harness.Display(div).ShouldBeNull(); // visible
         _harness.IsMounted(div).ShouldBeTrue();
-        // Run count: the cancelled leave's done callback wrote a transient display:none (upstream
-        // done(cancelled) still calls remove), immediately overwritten by the show's reveal — final: visible.
+        // Run count: the cancelled leave's done callback still wrote a transient display:none,
+        // immediately overwritten by the show's reveal — final: visible.
         _harness.DisplayLog.ShouldBe(["none", VShowTransitionTestHarness.DisplayRemoved]);
     }
 

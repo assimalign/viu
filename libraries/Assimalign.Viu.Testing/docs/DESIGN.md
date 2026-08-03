@@ -1,8 +1,8 @@
 # Assimalign.Viu.Testing — design
 
-Why the testing package is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md). Upstream
-counterparts: [`@vue/runtime-test`](https://github.com/vuejs/core/tree/main/packages/runtime-test)
-and [`@vue/test-utils`](https://test-utils.vuejs.org).
+Why the testing package is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md). The
+host abstraction this package implements is specified in
+[§6.7 of the Viu Specification](../../../docs/SPECIFICATION.md#67-host-abstraction).
 
 ## A second platform for the one renderer
 
@@ -11,9 +11,9 @@ and [`@vue/test-utils`](https://test-utils.vuejs.org).
 [`Assimalign.Viu.Core/docs/DESIGN.md`](../../Assimalign.Viu.Core/docs/DESIGN.md)).
 `TestNodeOperations.Create(log, teleportTargetRoots?)` supplies node-ops over a plain in-memory tree
 (`TestElement`/`TestText`/`TestComment`), so component behavior is exercised through the *same*
-mount/hydrate/patch/unmount pipeline the browser uses — just with no DOM and no interop. This is
-exactly `@vue/runtime-test`'s role, and it is why a component tested here behaves as it will in the
-browser.
+mount/hydrate/patch/unmount pipeline the browser uses — just with no DOM and no interop. That
+sameness is the whole point: a component tested here behaves as it will in the browser because
+nothing about the renderer changed, only the node primitives underneath it.
 
 `RegisterQueryRoot` retains detached roots for `RendererOptions.ResolveTeleportTarget`. A string
 target searches each registered root and its descendants with the same tag, identifier, class, and
@@ -23,9 +23,10 @@ path.
 
 ## The op log is the assertion surface
 
-Every node operation the renderer issues lands in `TestNodeOperationLog` as a `TestNodeOperation`
-(`@vue/runtime-test`'s `nodeOps` op log). Tests assert *what the renderer did* — which inserts,
-removes, and text writes happened, in order — not only the final tree. `TestNodeSerializer` renders
+Every node operation the renderer issues lands in `TestNodeOperationLog` as a `TestNodeOperation`.
+Tests assert *what the renderer did* — which inserts, removes, and text writes happened, in order —
+not only the final tree, which is what makes the interop budget (`[RND-IO-1]`) assertable without a
+browser. `TestNodeSerializer` renders
 the tree to a string for snapshot-style assertions. Container creation is intentionally **not**
 logged, so the log isolates the renderer's own work.
 
@@ -101,10 +102,10 @@ test cannot leak reactive subscriptions or queued jobs into the next.
 Lifecycle and component-event tasks are observed by Core rather than awaited as phase barriers, so
 tests that control those tasks should complete them and then call `NextTickAsync` or `FlushAsync`.
 
-## Deltas from Vue 3
+## Platform decisions
 
-- **No jsdom.** `@vue/test-utils` normally mounts into a jsdom DOM; Viu's platform here is a pure
-  in-memory node tree, keeping the whole harness dependency-light and AOT-clean.
+- **No simulated DOM.** The platform here is a plain in-memory node tree rather than a headless DOM
+  implementation, keeping the whole harness dependency-light and AOT-clean.
 - **The root template instance is caller-supplied.** Child templates still use the configured
   `IComponentFactory`; neither path uses reflection activation.
 - **Mounted child traversal is testing-only.** Applications still do not receive mutable mounted

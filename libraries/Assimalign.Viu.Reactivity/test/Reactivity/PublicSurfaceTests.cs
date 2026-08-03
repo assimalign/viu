@@ -10,9 +10,8 @@ namespace Assimalign.Viu.Reactivity.Tests;
 /// <see cref="Subscriber.FirstDependency"/>, and the <see cref="ReactiveValue"/> class hierarchy
 /// (R6, [V01.01.03.25]): the dependency graph is publicly <b>readable</b> but never publicly
 /// <b>mutable</b>. No public member can construct a link, splice a link list, move a version counter,
-/// or swap out a reactive value's <see cref="ReactiveValue.Dependency"/>. Upstream shape parity:
-/// vuejs/core <c>packages/reactivity/src/dep.ts</c> (the <c>Link</c> class) and
-/// <c>packages/reactivity/src/ref.ts</c> (the ref's <c>dep</c>).
+/// or swap out a reactive value's <see cref="ReactiveValue.Dependency"/>. Specified by
+/// <c>[RCT-9]</c>: introspection is allowed, mutation is not.
 /// </summary>
 public sealed class PublicSurfaceTests
 {
@@ -114,7 +113,7 @@ public sealed class PublicSurfaceTests
     public void TriggerReference_OnAnyReactiveValue_ForceNotifies_NoSilentNoOp()
     {
         // The old IReference-not-IDependencyReference silent no-op branch is gone: every ReactiveValue
-        // owns a dependency, so a plain ref force-notifies (upstream triggerRef parity).
+        // owns a dependency, so a plain reference force-notifies.
         var count = Reactive.Reference(0);
         var runs = 0;
         Reactive.Effect(() =>
@@ -150,8 +149,8 @@ public sealed class PublicSurfaceTests
     [Fact]
     public void ReadonlyComputed_SetterWarns_ThroughTheWarningsSink_AndDoesNotThrow()
     {
-        // Vue 3.5 parity (packages/reactivity/src/computed.ts): writing a getter-only computed warns
-        // in dev and is a no-op — it never throws. The warning routes through the runtime sink.
+        // Writing a getter-only computed warns in dev and is a no-op — it never throws. The warning
+        // routes through the runtime sink.
         var captured = new System.Collections.Generic.List<string>();
         var previousSink = RuntimeWarnings.Sink;
         RuntimeWarnings.Sink = captured.Add;

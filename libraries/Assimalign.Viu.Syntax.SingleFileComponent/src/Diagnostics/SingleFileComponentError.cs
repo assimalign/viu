@@ -7,9 +7,9 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// location. Modeled on <c>Assimalign.Viu.Syntax.Templates</c>'s <c>CompilerError</c> but carrying the
 /// SingleFileComponent area's own <see cref="SingleFileComponentErrorCode"/> catalog. The parser reports
 /// these through <see cref="SingleFileComponentParseResult.Errors"/> or
-/// <see cref="VueSingleFileComponentParseResult.Errors"/> and never throws for malformed input,
-/// matching Vue's recoverable-parsing model (<c>@vue/compiler-sfc</c> <c>parse().errors</c>). A
-/// <see cref="Diagnostic"/> whose Viu-defined code catalog and result-errors delivery stay
+/// <see cref="VueSingleFileComponentParseResult.Errors"/> and never throws for malformed input
+/// (specified by <c>[SFC-DIAG-1]</c>). A
+/// <see cref="Diagnostic"/> whose code catalog and result-errors delivery stay
 /// distinct from the template compiler's, per the shared base's per-language contract.
 /// </summary>
 public sealed record SingleFileComponentError : Diagnostic
@@ -26,7 +26,7 @@ public sealed record SingleFileComponentError : Diagnostic
         Location = location;
         // Severity is a catalog decision, made per code, never per instance: the [V01.01.06.10]
         // legacy-container codes are warnings (the block still parses during the migration window);
-        // every other code stays a recoverable error, mirroring @vue/compiler-sfc's parse().errors.
+        // every other code stays a recoverable error, reported rather than thrown ([SFC-DIAG-1]).
         Severity = SingleFileComponentErrorMessages.GetSeverity(code);
     }
 

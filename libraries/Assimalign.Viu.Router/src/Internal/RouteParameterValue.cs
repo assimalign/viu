@@ -5,8 +5,8 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// The stored value of a single route parameter — either one string or, for a repeatable
-/// parameter, an ordered array of strings. Mirrors vue-router's <c>PathParams</c> value union
-/// (<c>string | string[]</c>) from <c>packages/router/src/matcher/pathParserRanker.ts</c>.
+/// parameter, an ordered array of strings. The two shapes are the only ones a matched path can
+/// produce, so the union is closed.
 /// </summary>
 /// <remarks>
 /// A <see langword="readonly struct"/> holding raw strings only — never a boxed <see cref="object"/>

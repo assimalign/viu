@@ -75,9 +75,9 @@ namespace Demo
         internal const int RenderCacheSize = 0;
 
         /// <summary>
-        /// The compiled render function for the component's template block ([V01.01.05.05]) — the C#
-        /// analogue of the component's compiled <c>render</c> in Vue 3.5 (vuejs/core
-        /// packages/compiler-core/src/codegen.ts). The runtime normalizes the returned value.
+        /// The compiled render function for the component's template block ([V01.01.05.05]) — the
+        /// output of the Viu template compiler for this component's template. The runtime
+        /// normalizes the returned value.
         /// </summary>
         internal static object? Render(Counter _ctx, object?[] _cache)
         {
@@ -89,8 +89,8 @@ namespace Demo
         // [V01.01.06.07] The IComponentTemplate bridge: the generated context and Setup make this
         // compiled template component activatable and mountable with no hand-written wiring.
         /// <summary>
-        /// The component's display name (upstream: the component <c>name</c> option, inferred from the
-        /// <c>.viu</c> file name) — surfaced to runtime warnings and devtools.
+        /// The component's display name, inferred from the <c>.viu</c> file name — surfaced to
+        /// runtime warnings and devtools.
         /// </summary>
         string? global::Assimalign.Viu.Components.IComponentTemplate.Name => "Counter";
 
@@ -104,8 +104,7 @@ namespace Demo
         partial void OnSetup();
 
         /// <summary>
-        /// The component setup entry point (upstream: <c>setup(props, context)</c>,
-        /// https://vuejs.org/api/composition-api-setup.html) generated for this template component
+        /// The component setup entry point generated for this template component
         /// ([V01.01.06.07]). It runs once per mount, assigns <see cref="Context"/>, invokes
         /// <see cref="OnSetup"/>, allocates the per-instance render cache, and returns the renderer.
         /// The renderer re-executes the
@@ -137,7 +136,7 @@ namespace Demo
         // data-v-<hash> scope id and non-scoped blocks pass through unmodified. The renderer stamps
         // ScopeId on the component's elements; static-web-asset bundling is the MSBuild follow-up.
         /// <summary>
-        /// The scoped-CSS scope id — the C# analogue of Vue 3.5's component <c>__scopeId</c>. The runtime
+        /// The scoped-CSS scope id, derived from the component's project-relative path. The runtime
         /// renderer stamps this <c>data-v-&lt;hash&gt;</c> attribute on the component's own elements.
         /// </summary>
         internal const string ScopeId = "data-v-9d968641";
@@ -318,8 +317,8 @@ namespace Demo
     public void MalformedTemplate_SurfacesTemplateDiagnostic_ViaRegistrationSeam()
     {
         // The template block is dispatched to the registered TemplateSyntaxParser (the composition
-        // root's registration seam). An unterminated interpolation is XMissingInterpolationEnd upstream;
-        // it maps to the VIU1101 template error on the .viu file, proving the seam actually parses the
+        // root's registration seam). An unterminated interpolation is a template-parse error, not a
+        // container error; it maps to the VIU1101 template error on the .viu file, proving the seam actually parses the
         // block content (the .viu container parser never would on its own).
         const string source =
             "<template>\n" +

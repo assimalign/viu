@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Testing;
 /// <summary>
 /// Drives the captured scheduler flush deterministically for a mounted wrapper — the bridge
 /// between <see cref="TestSchedulerPump"/> (which captures scheduled flushes) and the awaitable
-/// <c>NextTick</c> semantics (https://vuejs.org/api/general.html#nexttick). <see cref="RunAsync"/>
+/// <see cref="Scheduler.NextTick"/> contract. <see cref="RunAsync"/>
 /// captures the pending flush's completion, pumps every captured flush to completion, then awaits —
 /// so a caller awaiting <c>Trigger</c>/<c>SetValue</c>/<c>NextTickAsync</c> observes post-update
 /// state without a wall-clock delay and without an ambient <c>SynchronizationContext</c>.

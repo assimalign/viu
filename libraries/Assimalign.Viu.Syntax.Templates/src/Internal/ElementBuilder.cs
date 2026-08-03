@@ -4,9 +4,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The mutable working state for an element while its open tag, children, and close tag are being
-/// parsed, materialised into an immutable <see cref="ElementNode"/> when the element closes. Vue 3.5's
-/// parser mutates the node object in place (pushing children, refining <c>tagType</c>, back-patching
-/// <c>loc.end</c>); this port keeps the mutation on a builder so the emitted AST records stay immutable.
+/// parsed, materialised into an immutable <see cref="ElementNode"/> when the element closes. An element
+/// cannot be materialised earlier — children accumulate, <c>ElementType</c> is refined, and the end
+/// location is back-patched — so the mutation lives here and the emitted AST records stay immutable.
 /// </summary>
 internal sealed class ElementBuilder
 {

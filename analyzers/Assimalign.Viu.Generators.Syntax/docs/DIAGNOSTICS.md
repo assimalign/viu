@@ -19,13 +19,13 @@ members `Hidden`/`Information`/`Warning`/`Error`), and a `RawCode` integer proje
 enum. The generator is a **mapping over that shape** (`SingleFileComponentDiagnostics`), not a re-derivation:
 
 - **`RawCode` → descriptor ID.** The base deliberately keeps per-language code catalogs (the template
-  compiler's upstream-pinned `CompilerErrorCode`, the `.viu` container's Viu-defined
+  compiler's `CompilerErrorCode`, whose numbering is frozen for `.vue` compatibility, the `.viu` container's Viu-defined
   `SingleFileComponentErrorCode`, both unbounded). A generator cannot enumerate those into one descriptor each
   without mirroring them, so diagnostics are enveloped by their **origin** (single-file-component
   container, dispatched template parse, dispatched style CSS parse, or Roslyn parse of the C# script)
   and severity, and the per-language `RawCode` rides on the message text (e.g. `... (template compiler code
   25)`, `... (CSS code 2006)`) so the exact catalog code stays visible.
-- **Base `Severity` → Roslyn severity.** Vue's error-vs-warning split is pinned on the base `Diagnostic` at
+- **Base `Severity` → Roslyn severity.** The error-vs-warning split is decided on the base `Diagnostic` at
   parse time, not re-derived here. `Error`/`Warning`/`Information` map to the same-tier descriptor; `Hidden`
   collapses into the informational descriptor (surfaced, never dropped).
 - **Template `SourceLocation` → Roslyn `Location`.** Block-relative positions are composed with the block's
@@ -106,7 +106,9 @@ second partial class.
 ### VIU1101
 
 Single-file component template parse error — a recoverable error from the dispatched template parse
-(a `CompilerErrorCode` numerically pinned to `@vue/compiler-core` `ErrorCodes` — parse errors such as an
+(a `CompilerErrorCode` whose numbering is aligned with the `.vue` container format's published
+`@vue/compiler-core` `ErrorCodes`, so a component ported into Viu reports the code its author expects —
+parse errors such as an
 unterminated interpolation, and transform errors such as `v-if`/`v-for`/`v-slot`/`v-on`/`v-bind` misuse).
 
 ### VIU1102

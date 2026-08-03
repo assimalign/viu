@@ -2,8 +2,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// A <c>v-for</c> loop: the iterated source, the decomposed aliases, and the repeated children, which
-/// compile to a fragment block rendered via <c>renderList</c>. The C# port of Vue 3.5's <c>ForNode</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>). See https://vuejs.org/guide/essentials/list.html.
+/// compile to a fragment block rendered via <c>renderList</c>.
 /// </summary>
 /// <remarks>
 /// The fragment's keyed/unkeyed classification (carried on <see cref="CodegenNode"/>'s patch flag) feeds

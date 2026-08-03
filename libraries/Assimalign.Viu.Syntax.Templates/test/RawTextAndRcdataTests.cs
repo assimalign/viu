@@ -4,8 +4,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Raw-text (script/style) and RCDATA (title/textarea) handling in HTML mode, per
-// @vue/compiler-dom and the WHATWG spec.
+// Raw-text (script/style) and RCDATA (title/textarea) handling in HTML mode, per the WHATWG spec.
 public class RawTextAndRcdataTests
 {
     private static RootNode ParseHtml(string source) => TemplateParser.Parse(source, ParserOptions.CreateHtml());

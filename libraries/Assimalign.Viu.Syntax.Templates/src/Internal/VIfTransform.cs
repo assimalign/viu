@@ -8,9 +8,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// The <c>v-if</c>/<c>v-else-if</c>/<c>v-else</c> transform: groups adjacent conditional siblings into one
 /// <see cref="WorkingIf"/> with ordered branches and compiles it to a conditional-expression chain where each
-/// branch is its own block with a stable synthetic key. The C# port of Vue 3.5's <c>transformIf</c> and
-/// <c>processIf</c> (<c>@vue/compiler-core</c> <c>transforms/vIf.ts</c>).
-/// See https://vuejs.org/guide/essentials/conditional.html.
+/// branch is its own block with a stable synthetic key.
 /// </summary>
 internal static class VIfTransform
 {
@@ -145,9 +143,7 @@ internal static class VIfTransform
     private static WorkingIfBranch CreateIfBranch(ElementNode element, DirectiveNode directive, TransformContext context)
     {
         // The structural v-if transform runs before TransformExpression and consumes the directive, so
-        // the condition must be rewritten here — upstream processIf calls processExpression(dir.exp)
-        // under prefixIdentifiers for exactly this reason (vuejs/core v3.5 compiler-core
-        // transforms/vIf.ts).
+        // the condition must be rewritten here — no later pass will ever see it.
         var condition = directive.Name == "else" ? null : directive.Expression;
         if (context.PrefixIdentifiers && condition is SimpleExpressionNode simpleCondition)
         {

@@ -4,8 +4,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/parse.spec.ts, describe('Text') and
-// describe('Interpolation').
+// Text and interpolation parsing: these cases ARE the contract for where a text run ends, how
+// interpolation delimiters are recognized, and what span each node reports.
 public class TextAndInterpolationTests
 {
     [Fact]

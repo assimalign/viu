@@ -4,10 +4,10 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The WHATWG-derived HTML tokenizer, driving character data, tags, attributes, directives, comments,
-/// CDATA, raw-text/RCDATA content, and Vue interpolation delimiters. The C# port of Vue 3.5's
-/// <c>Tokenizer</c> (<c>@vue/compiler-core</c> <c>tokenizer.ts</c>, itself adapted from
-/// <c>htmlparser2</c>). Scanning is index-based over the source string — allocation-free per character,
-/// no regex — matching upstream's <c>charCodeAt</c> loop. Character references are decoded later by the
+/// CDATA, raw-text/RCDATA content, and interpolation delimiters. Scanning is index-based over the source
+/// string — allocation-free per character,
+/// no regex — because the tokenizer runs over every template in a project on every incremental build.
+/// Character references are decoded later by the
 /// parser (see <see cref="HtmlEntityDecoder"/>), so the <c>InEntity</c> state and its callbacks are
 /// intentionally omitted; the observable AST is unchanged.
 /// </summary>

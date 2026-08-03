@@ -3,26 +3,24 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// Resolves locations against a route table. The public contract of the C# port of vue-router's
-/// route matcher (the object returned by <c>createRouterMatcher</c>,
-/// <c>packages/router/src/matcher/index.ts</c>). Implemented by <see cref="RouteMatcher"/>. A
+/// Resolves locations against a route table: a path to the highest-ranked route that matches it, or
+/// a route name plus parameters back to a concrete path. Implemented by <see cref="RouteMatcher"/>. A
 /// later router feature (the navigation pipeline) depends on this abstraction rather than the
 /// concrete matcher.
 /// </summary>
 /// <remarks>
 /// The matcher is pure: it has no dependency on the DOM, JavaScript interop, or the runtime
-/// renderer, and is fully exercisable in a plain .NET test host.
+/// renderer, and is fully exercisable in a plain .NET test host. Specified by <c>[RTR-1]</c>.
 /// </remarks>
 public interface IRouteMatcher
 {
-    /// <summary>Adds a route record (and its children) to the table. Mirrors <c>addRoute</c>.</summary>
+    /// <summary>Adds a route record, and every descendant it declares, to the table.</summary>
     /// <param name="record">The route record to add.</param>
     void AddRoute(RouteRecord record);
 
     /// <summary>
-    /// Resolves a path to a location. Mirrors the path branch of <c>resolve</c>: the highest-ranked
-    /// matching route wins. A path that matches nothing yields a location with an empty matched
-    /// chain (it does not throw).
+    /// Resolves a path to a location: the highest-ranked matching route wins. A path that matches
+    /// nothing yields a location with an empty matched chain (it does not throw).
     /// </summary>
     /// <param name="path">The path to resolve (path portion only — no query or fragment).</param>
     RouteLocation Resolve(string path);
@@ -36,7 +34,6 @@ public interface IRouteMatcher
 
     /// <summary>
     /// Resolves a named route, interpolating <paramref name="parameters"/> into the full path.
-    /// Mirrors the name branch of <c>resolve</c>.
     /// </summary>
     /// <param name="name">The route name.</param>
     /// <param name="parameters">The parameter values to interpolate.</param>
@@ -51,8 +48,7 @@ public interface IRouteMatcher
     bool HasNamedRoute(string name);
 
     /// <summary>
-    /// The records of every registered matcher, ordered by descending specificity. Mirrors
-    /// <c>getRoutes</c>.
+    /// The records of every registered matcher, ordered by descending specificity.
     /// </summary>
     IReadOnlyList<RouteRecord> GetRoutes();
 }

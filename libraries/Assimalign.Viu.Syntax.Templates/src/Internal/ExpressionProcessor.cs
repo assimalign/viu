@@ -10,22 +10,21 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Parses a template expression with Roslyn, validates it, classifies each referenced identifier against the
-/// template scope and <see cref="BindingMetadata"/>, and rewrites the expression for code generation. The C#
-/// analogue of Vue 3.5's <c>processExpression</c> and <c>rewriteIdentifier</c> (<c>@vue/compiler-core</c>
-/// <c>transforms/transformExpression.ts</c>), with Roslyn (<c>SyntaxFactory.ParseExpression</c>) standing in
-/// for the <c>@babel/parser</c> walk.
+/// template scope and <see cref="BindingMetadata"/>, and rewrites the expression for code generation.
+/// Roslyn (<c>SyntaxFactory.ParseExpression</c>) does the parse, so the compiler's idea of an expression
+/// is exactly the C# compiler's.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Viu diverges from Vue where C# semantics require it, and those divergences are the compiler's contract
-/// with code generation ([V01.01.05.05]) and the reactivity area, documented in the feature design notes:
+/// The rewriting rules below are the compiler's contract with code generation ([V01.01.05.05]) and the
+/// reactivity area; the normative table is <c>[SFC-6]</c>.
 /// </para>
 /// <list type="bullet">
 /// <item>
-/// Vue relies on a runtime <c>Proxy</c> for automatic ref unwrapping; C# has none, so a
+/// There is no runtime proxy to auto-unwrap a reference (<c>[RCT-8]</c>), so a
 /// <see cref="BindingType.SetupReference"/> is rewritten to a <c>.Value</c> access in <b>both</b> read and
-/// write positions (a settable <c>Ref&lt;T&gt;.Value</c> makes <c>count += 1</c>/<c>count++</c> work directly),
-/// rather than Vue's read-time <c>unref</c> plus an <c>isRef</c> assignment guard.
+/// write positions. Because <c>ReactiveValue&lt;T&gt;.Value</c> is settable, that single rule makes
+/// <c>count += 1</c> and <c>count++</c> work directly with no assignment guard in the emitted code.
 /// </item>
 /// <item>
 /// Rewriting is always inline-mode: setup non-reference bindings stay bare (they are locals of the generated
@@ -34,15 +33,17 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </item>
 /// <item>
 /// An identifier absent from the scope, the global allow-list, and the binding metadata is prefixed with
-/// <c>_ctx.</c> exactly as Vue does, but additionally surfaces a diagnostic when the metadata is the strict,
-/// component-model-complete form (<see cref="BindingMetadata.ReportsUnresolvedIdentifiers"/>).
+/// <c>_ctx.</c> so the C# compiler remains the backstop, and additionally surfaces a diagnostic when the
+/// metadata is the strict, component-model-complete form
+/// (<see cref="BindingMetadata.ReportsUnresolvedIdentifiers"/>).
 /// </item>
 /// </list>
 /// <para>
 /// Intra-expression lambda/query scopes are handled by conservatively excluding any name declared anywhere in
-/// the expression from rewriting; deeply nested same-name shadowing is therefore approximated (a documented
-/// simplification versus Vue's exact per-scope walk). Template-scope shadowing — the case the acceptance
-/// criteria pin — is exact, driven by the <see cref="TransformContext"/> identifier stack.
+/// the expression from rewriting, rather than tracking a scope per nested construct. Deeply nested same-name
+/// shadowing is therefore approximated — the approximation only ever <em>under</em>-rewrites, which the C#
+/// compiler catches, and never silently rewrites the wrong identifier. Template-scope shadowing — the case the
+/// acceptance criteria pin — is exact, driven by the <see cref="TransformContext"/> identifier stack.
 /// </para>
 /// </remarks>
 internal static class ExpressionProcessor
@@ -51,7 +52,7 @@ internal static class ExpressionProcessor
 
     /// <summary>
     /// Processes <paramref name="node"/>: a no-op when prefixing is disabled, otherwise validates it and, unless
-    /// <paramref name="asParams"/>, rewrites its identifiers (upstream <c>processExpression</c>).
+    /// <paramref name="asParams"/>, rewrites its identifiers.
     /// </summary>
     /// <param name="node">The expression to process.</param>
     /// <param name="context">The active transform context.</param>
@@ -92,7 +93,7 @@ internal static class ExpressionProcessor
             raw = context.CssModules.Substitute(raw);
         }
 
-        // Fast path: a lone identifier (upstream's isSimpleIdentifier branch).
+        // Fast path: a lone identifier needs no rewrite walk.
         if (!asParams && CompilerText.IsSimpleIdentifier(raw))
         {
             if (context.IsLocalIdentifier(raw) || GlobalAllowList.IsAllowed(raw))
@@ -110,8 +111,7 @@ internal static class ExpressionProcessor
         if (asRawStatements)
         {
             // A multi-statement inline handler is emitted into `__event => { <raw> }`. C# has no automatic
-            // semicolon insertion — JavaScript's ASI, which upstream's `$event => { ... }` handler wrapping
-            // relies on — so a body whose final statement omits its terminator (`foo(); bar()`) would emit
+            // semicolon insertion, so a body whose final statement omits its terminator (`foo(); bar()`) would emit
             // invalid C#. Synthesize the terminator from the same statement-list parse that validates the
             // body: if `{ raw }` does not parse clean but `{ raw; }` does, the only fault was the missing
             // terminator, so append one and reuse the clean tree; a genuine syntax error leaves `raw`
@@ -164,13 +164,13 @@ internal static class ExpressionProcessor
         return BuildCompound(node, raw, references, context);
     }
 
-    // ---- identifier classification and rewriting (upstream rewriteIdentifier) ----
+    // ---- identifier classification and rewriting ----
 
     private static string RewriteIdentifier(string raw, TransformContext context, bool isWriteTarget, SourceLocation location)
     {
         // A CSS Modules accessor ([V01.01.05.04.01]) resolves to its generated accessor class, taking
-        // precedence over component bindings and the unresolved-identifier fallback — the compile-time analogue
-        // of Vue's render context exposing `$style`/named modules over same-named component state.
+        // precedence over component bindings and the unresolved-identifier fallback: a module accessor
+        // shadows a same-named component member ([STY-3]).
         if (context.CssModules.Count > 0 && context.CssModules.TryResolve(raw, out var accessor))
         {
             return accessor.AccessorClass;
@@ -213,25 +213,23 @@ internal static class ExpressionProcessor
         return type switch
         {
             // Every setup binding routes through _ctx: the generated render function is a static
-            // method receiving the component instance (the C# analogue of upstream's non-inline
-            // function mode, where SETUP bindings resolve through $setup on the ctx proxy). Viu has
-            // no proxy to auto-unref, so a definite ref additionally unwraps with the settable
-            // Ref<T>.Value contract.
+            // method receiving the component instance, so there is no closure to read from. With no
+            // proxy to auto-unwrap ([RCT-8]), a definite reference additionally unwraps through the
+            // settable ReactiveValue<T>.Value contract.
             BindingType.SetupReference => "_ctx." + raw + ".Value",
 
-            // A maybe-ref: guard reads through unref; a WRITE unwraps to .Value — upstream rewrites
-            // SETUP_MAYBE_REF to `.value` in assignment/update position because a write to a const
-            // binding is only legal when it is a ref (vuejs/core v3.5 transformExpression.ts
-            // rewriteIdentifier).
+            // A maybe-reference: guard reads through unref, but a WRITE unwraps to .Value
+            // unconditionally, because a write to a binding classified maybe-reference is only legal
+            // at all when it does hold a reference ([SFC-6]).
             BindingType.SetupMaybeReference => isWriteTarget
                 ? "_ctx." + raw + ".Value"
                 : context.HelperString(HelperNames.Unref) + "(_ctx." + raw + ")",
 
-            // A let binding may or may not hold a ref: reads guard through unref, matching upstream.
-            // Writes assign the member directly — upstream emits an `isRef(x) ? x.value = y : x = y`
-            // runtime guard, which is not expressible as a C# expression without a runtime helper; the
-            // divergence is deliberate, recorded in docs/DESIGN.md, and a helper-backed guarded write
-            // is deferred to the codegen work ([V01.01.05.05]).
+            // A let binding may or may not hold a reference: reads guard through unref. Writes assign the
+            // member directly — a write that had to decide at runtime whether to assign the member or its
+            // .Value is not expressible as a C# expression without a runtime helper. The choice is
+            // deliberate and recorded in docs/DESIGN.md; a helper-backed guarded write is deferred to the
+            // codegen work ([V01.01.05.05]).
             BindingType.SetupLet => isWriteTarget
                 ? "_ctx." + raw
                 : context.HelperString(HelperNames.Unref) + "(_ctx." + raw + ")",
@@ -396,7 +394,7 @@ internal static class ExpressionProcessor
         return new CompilerError(CompilerErrorCode.XInvalidExpression, message, location);
     }
 
-    // ---- position mapping (upstream advancePositionWithClone) ----
+    // ---- position mapping ----
 
     private static SourceLocation SubLocation(SourceLocation expressionLocation, string source, int offset, int length)
     {
@@ -480,7 +478,7 @@ internal static class ExpressionProcessor
         public override void VisitVariableDeclarator(VariableDeclaratorSyntax node)
         {
             // Locals declared in a multi-statement inline handler (`var next = …;`) are scope
-            // identifiers, mirroring upstream walkIdentifiers' variable-declaration handling.
+            // identifiers: they shadow component bindings and are never rewritten.
             declared.Add(node.Identifier.ValueText);
             base.VisitVariableDeclarator(node);
         }
@@ -563,7 +561,7 @@ internal static class ExpressionProcessor
             VariableDeclarationSyntax declaration when declaration.Type == node => false,
             ForEachStatementSyntax forEach when forEach.Type == node => false,
             // The member name in an object initializer (`new Point { X = x }`) names a member of the
-            // constructed type, never a component binding (upstream's walk never rewrites object keys).
+            // constructed type, never a component binding.
             AssignmentExpressionSyntax initializerAssignment
                 when initializerAssignment.Left == node &&
                      initializerAssignment.Parent is InitializerExpressionSyntax => false,

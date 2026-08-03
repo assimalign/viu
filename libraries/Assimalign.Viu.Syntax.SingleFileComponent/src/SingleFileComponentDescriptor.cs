@@ -1,9 +1,8 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The parsed shape of a <c>.viu</c> single-file component: its blocks and their source spans. The C#
-/// port of Vue 3.5's <c>SFCDescriptor</c> (<c>@vue/compiler-sfc</c> <c>parse.ts</c>), adapted to the
-/// <c>.viu</c> hybrid container ([V01.01.06.10], decided 2026-08-02): tag-based
+/// The parsed shape of a <c>.viu</c> single-file component: its blocks and their source spans, from the
+/// hybrid container ([V01.01.06.10], decided 2026-08-02; specified by <c>[SFC-3]</c>) — tag-based
 /// <c>&lt;template&gt;</c>/<c>&lt;style&gt;</c> blocks plus the @-form <c>@script { }</c> and custom
 /// blocks. Immutable and value-equatable: identical file content yields an equal descriptor — the
 /// incremental-caching prerequisite of [V01.01.06.02].
@@ -11,9 +10,13 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// <remarks>
 /// A file has at most one <see cref="Template"/> and at most one <see cref="Script"/> (a second of
 /// either is reported as a duplicate-block diagnostic and ignored, keeping the first), any number of
-/// <see cref="Styles"/>, and any number of <see cref="CustomBlocks"/> — mirroring Vue's tolerance for
-/// multiple <c>&lt;style&gt;</c> and custom blocks. The Vue <c>&lt;script setup&gt;</c> distinction is
-/// script analysis and is deferred to [V01.01.06.03]. See https://vuejs.org/api/sfc-spec.html.
+/// <see cref="Styles"/>, and any number of <see cref="CustomBlocks"/>. Style and custom blocks are
+/// deliberately unlimited: several style blocks can carry different options (one scoped, one global,
+/// one module) and each contributes, while a custom block's meaning belongs to whatever tooling
+/// registered for it, so the container has no basis for a limit. Template and script are singular
+/// because both merge into one generated partial class, where a second of either has no coherent
+/// meaning. Unlike the <c>.vue</c> compatibility descriptor, this one has a single script slot
+/// (<c>[VUE-2]</c>).
 /// </remarks>
 public sealed record SingleFileComponentDescriptor
 {

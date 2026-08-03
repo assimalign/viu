@@ -1,10 +1,9 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// A template block — the component's markup. Mirrors Vue 3.5's <c>SFCTemplateBlock</c>
-/// (<c>@vue/compiler-sfc</c>). The content is standard Vue template syntax and is <em>not</em> parsed
-/// here; the template compiler ([V01.01.05.01]) consumes <see cref="SingleFileComponentBlock.Content"/>. See
-/// https://vuejs.org/api/sfc-spec.html#template.
+/// A template block — the component's markup, written in the Viu template language. The content is
+/// <em>not</em> parsed here; the container parse only slices, and the template compiler
+/// ([V01.01.05.01]) consumes <see cref="SingleFileComponentBlock.Content"/>.
 /// </summary>
 public sealed record SingleFileComponentTemplateBlock : SingleFileComponentBlock
 {

@@ -23,7 +23,7 @@ internal sealed class ViuLanguageService :
             // Hybrid .viu container ([V01.01.06.10]): <template>/<style> are the canonical tag
             // containers, @script stays an @-block, and the legacy @template/@style containers hover
             // as migration guidance during the transition window.
-            ["template"] = "**`<template>`** contains Vue-compatible template markup for the component.",
+            ["template"] = "**`<template>`** contains the component's template markup, compiled to a render function at build time.",
             ["@script"] = "**`@script`** contains C# members merged into the generated partial component.",
             ["style"] = "**`<style>`** contains component CSS and can be `scoped` or a CSS `module`.",
             ["@template"] = "**`@template { }`** is the legacy Viu template container. Rewrite the block as `<template>...</template>`; block options become tag attributes.",
@@ -41,7 +41,7 @@ internal sealed class ViuLanguageService :
             ["Context.Slots"] = "**`Context.Slots`** exposes the component's current named slots.",
             ["Context.Emit"] = "**`Context.Emit`** emits a declared component event to the parent.",
             ["Context.Expose"] = "**`Context.Expose`** selects the public surface returned through template references.",
-            ["Reactive"] = "**`Reactive`** is Viu's Vue-compatible reactivity facade.",
+            ["Reactive"] = "**`Reactive`** is Viu's reactivity facade: references, computeds, effects, watchers, and the tracking escape hatches.",
             ["Reactive.Reference"] = "**`Reactive.Reference(value)`** creates a reactive `Reference<T>` read and written through `.Value`.",
             ["Reactive.Computed"] = "**`Reactive.Computed(getter)`** creates a lazy cached computed value.",
             ["Reactive.Watch"] = "**`Reactive.Watch`** observes a reactive source and returns a disposable `WatchHandle`.",

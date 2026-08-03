@@ -7,6 +7,8 @@ using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Shared.Tests;
 
+// Pins the ShapeFlags bit layout — a frozen contract between compiled output and the runtime,
+// additive only ([RND-FLAGS-4]).
 public class ShapeFlagsParityTests
 {
     [Theory]

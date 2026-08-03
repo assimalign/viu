@@ -2,8 +2,9 @@ namespace Assimalign.Viu.Syntax.Html;
 
 /// <summary>
 /// Discriminates the kinds of node the HTML parser produces, following the WHATWG HTML parsing model
-/// (https://html.spec.whatwg.org/multipage/parsing.html). The catalog is Viu-defined (there is no
-/// upstream Vue numbering to pin) and grows as element-level parsing lands.
+/// (https://html.spec.whatwg.org/multipage/parsing.html). The catalog is Viu's own; values are
+/// additive only, because <see cref="HtmlSyntaxNode.RawKind"/> projects them for language-agnostic
+/// infrastructure. It grows as element-level parsing lands.
 /// </summary>
 public enum HtmlSyntaxNodeKind
 {

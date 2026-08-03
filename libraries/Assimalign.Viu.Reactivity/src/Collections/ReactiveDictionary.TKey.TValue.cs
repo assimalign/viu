@@ -6,20 +6,18 @@ using System.Diagnostics.CodeAnalysis;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A reactive <see cref="IDictionary{TKey,TValue}"/> — the Viu counterpart of Vue 3.5's <c>Map</c>
-/// instrumentation (<c>packages/reactivity/src/collectionHandlers.ts</c>). Because C# cannot proxy
-/// <see cref="Dictionary{TKey,TValue}"/>, this is a first-class implementation wrapping private
-/// storage with tracking built in.
+/// A reactive <see cref="IDictionary{TKey,TValue}"/>. With no object-proxy interception layer
+/// (<c>[RCT-6]</c>), reactive collections are dedicated types that implement the BCL collection
+/// interfaces over private storage with tracking built in, rather than wrappers around a BCL type.
 /// <para>
-/// Granularity mirrors upstream: each key has its own <see cref="Dependency"/>, plus one entry
-/// iteration dependency (upstream <c>ITERATE_KEY</c>) and one keys-only iteration dependency
-/// (upstream <c>MAP_KEY_ITERATE_KEY</c>). Reading <c>dict[key]</c>, <see cref="ContainsKey"/>, or
-/// <see cref="TryGetValue"/> tracks that key; <see cref="Count"/>, <see cref="Values"/>, and
-/// enumerating track entry iteration; <see cref="Keys"/> tracks keys-only iteration. Assigning an
-/// <em>existing</em> key triggers that key <b>and entry iteration</b> but not keys-only iteration —
-/// upstream <c>dep.ts trigger()</c> runs <c>ITERATE_KEY</c> for a Map <c>SET</c> because
-/// <c>values()</c>/<c>entries()</c> observe values, while <c>keys()</c> re-runs only on
-/// <c>ADD</c>/<c>DELETE</c>. Adding or removing a key triggers that key and both iteration
+/// Tracking is per key, not per collection: each key has its own <see cref="Dependency"/>, plus one
+/// entry-iteration dependency and one keys-only iteration dependency. Reading <c>dict[key]</c>,
+/// <see cref="ContainsKey"/>, or <see cref="TryGetValue"/> tracks that key; <see cref="Count"/>,
+/// <see cref="Values"/>, and enumerating track entry iteration; <see cref="Keys"/> tracks keys-only
+/// iteration. Assigning an <em>existing</em> key triggers that key <b>and entry iteration</b> but
+/// not keys-only iteration: a value change is observable through <c>Values</c> and enumeration, but
+/// the key set did not change, so a reader that only enumerated <see cref="Keys"/> must not re-run.
+/// Adding or removing a key triggers that key and both iteration
 /// dependencies. Indexer get and <see cref="Count"/> are allocation-free once a key's dependency
 /// exists. Not thread-safe (single-threaded JS event-loop model).
 /// </para>
@@ -57,7 +55,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     /// <summary>
     /// The live underlying storage, exposed to
     /// <see cref="Reactive.ToRaw{TKey,TValue}(ReactiveDictionary{TKey,TValue})"/> as the untracked raw
-    /// view (Vue's <c>toRaw</c> on a reactive Map). Reads off it never track and writes through it never
+    /// view. Reads off it never track and writes through it never
     /// trigger — it is the same data, minus the instrumentation.
     /// </summary>
     internal Dictionary<TKey, TValue> RawStorage => _items;
@@ -76,8 +74,8 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     public bool IsReadOnly => false;
 
     /// <summary>
-    /// The keys (reading the collection tracks keys-only iteration — upstream
-    /// <c>MAP_KEY_ITERATE_KEY</c>, so a value replacement does not re-run a keys-only effect).
+    /// The keys (reading the collection tracks keys-only iteration, so a value replacement does not
+    /// re-run a keys-only effect).
     /// </summary>
     public ICollection<TKey> Keys
     {
@@ -104,9 +102,9 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 
     /// <summary>
     /// Gets or sets the value for <paramref name="key"/>. The getter tracks that key. The setter
-    /// triggers that key and entry iteration when it already exists and the value changes (upstream
-    /// <c>SET</c> runs <c>ITERATE_KEY</c> — <c>values()</c>/<c>entries()</c> observe values), or the
-    /// key and both iteration dependencies when the key is new (upstream <c>ADD</c>).
+    /// triggers that key and entry iteration when it already exists and the value changes (a value
+    /// change is observable through <see cref="Values"/> and enumeration, but the key set did not
+    /// change), or the key and both iteration dependencies when the key is new.
     /// </summary>
     /// <param name="key">The key.</param>
     /// <returns>The value.</returns>
@@ -137,7 +135,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         }
     }
 
-    /// <summary>Adds a new entry; triggers the key and both iteration dependencies (upstream <c>ADD</c>).</summary>
+    /// <summary>Adds a new entry; triggers the key and both iteration dependencies.</summary>
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
     /// <exception cref="ArgumentException"><paramref name="key"/> already exists.</exception>
@@ -246,7 +244,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     void IReactiveTraversable.Traverse(ReactiveTraversal traversal)
     {
         // Entry iteration alone covers a deep watch — every mutation (value replacement included,
-        // per the upstream Map-SET rule) triggers it, so per-key tracking here would only allocate
+        // per the assign-existing-key rule above) triggers it, so per-key tracking here would only allocate
         // cells without adding coverage. Recurses into entry values.
         _iterate.Track();
         foreach (var pair in _items)

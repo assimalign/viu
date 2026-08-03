@@ -7,9 +7,8 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.Css;
 
 /// <summary>
-/// Pins the <c>v-bind()</c>-in-CSS rewrite (<see cref="CssBindingRewriter"/>, [V01.01.06.06]) against the
-/// behavior of Vue 3.5's <c>cssVars.ts</c> (<c>@vue/compiler-sfc</c>,
-/// https://vuejs.org/api/sfc-css-features.html#v-bind-in-css): each <c>v-bind(expr)</c> becomes a
+/// Pins the <c>v-bind()</c>-in-CSS rewrite (<see cref="CssBindingRewriter"/>, [V01.01.06.06], specified
+/// by <c>[STY-6]</c>): each <c>v-bind(expr)</c> becomes a
 /// component-scoped <c>var(--&lt;hash&gt;)</c>, expressions are collected (and de-duplicated) for the
 /// runtime, malformed usages surface recoverable diagnostics, and the rewrite composes with <c>scoped</c>.
 /// </summary>
@@ -58,7 +57,7 @@ public sealed class CssBindingRewriterTests
             CssTestHelpers.ParseStylesheet(".a { color: v-bind(c); } .b { background: v-bind(c); }"),
             Salt);
 
-        // A repeated expression yields one binding and one custom property (upstream vars.includes dedupe).
+        // A repeated expression yields one binding and one custom property.
         var binding = result.Bindings.ShouldHaveSingleItem();
         Regex.Matches(CssStylesheetWriter.Write(result.Stylesheet), Regex.Escape("var(--" + binding.Name + ")")).Count.ShouldBe(2);
     }
@@ -91,7 +90,7 @@ public sealed class CssBindingRewriterTests
     {
         var result = CssBindingRewriter.Rewrite(CssTestHelpers.ParseStylesheet(".a { content: \"v-bind(x)\"; }"), Salt);
 
-        // A v-bind inside a string literal is not a binding (upstream strips comments/strings before matching).
+        // A v-bind inside a string literal is not a binding: the scan skips string literals and comments.
         result.Bindings.ShouldBeEmpty();
         result.Diagnostics.ShouldBeEmpty();
     }

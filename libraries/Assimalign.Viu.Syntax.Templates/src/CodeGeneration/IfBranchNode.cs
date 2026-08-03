@@ -2,7 +2,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// A single branch of a grouped <see cref="IfNode"/> chain — one <c>v-if</c>, <c>v-else-if</c>, or
-/// <c>v-else</c>. The C# port of Vue 3.5's <c>IfBranchNode</c> (<c>@vue/compiler-core</c> <c>ast.ts</c>).
+/// <c>v-else</c>.
 /// </summary>
 public sealed record IfBranchNode : TemplateSyntaxNode
 {

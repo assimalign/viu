@@ -5,16 +5,16 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Shared;
 
 /// <summary>
-/// Vue's loose equality — the C# port of <c>looseEqual</c>/<c>looseIndexOf</c> from
-/// <c>@vue/shared</c> (<c>packages/shared/src/looseEqual.ts</c>). Checkbox and select
-/// <c>v-model</c> value matching depends on these semantics: dates compare by instant,
-/// enumerables element-wise, dictionaries key-wise, and everything else falls back to
-/// invariant display-string comparison (JavaScript's <c>String(a) === String(b)</c> coercion,
-/// so <c>1</c> loosely equals <c>"1"</c>).
+/// Value-matching semantics for form bindings. <c>v-model</c> on a checkbox or
+/// <c>&lt;select&gt;</c> must decide whether a candidate option equals the bound model value
+/// after the type coercion an HTML form round-trip introduces — the DOM hands back strings
+/// regardless of the model's CLR type. Dates compare by instant, enumerables element-wise,
+/// dictionaries key-wise, and everything else falls back to invariant display-string comparison
+/// (the host's <c>String(a) === String(b)</c> coercion), so <c>1</c> matches <c>"1"</c>.
 /// </summary>
 public static class LooseEquality
 {
-    /// <summary>Whether <paramref name="left"/> and <paramref name="right"/> are loosely equal (upstream: <c>looseEqual</c>).</summary>
+    /// <summary>Whether <paramref name="left"/> and <paramref name="right"/> are loosely equal.</summary>
     /// <param name="left">The first value.</param>
     /// <param name="right">The second value.</param>
     public static bool LooseEqual(object? left, object? right)
@@ -46,7 +46,7 @@ public static class LooseEquality
             return leftIsEnumerable && rightIsEnumerable
                 && SequencesLooselyEqual((IEnumerable)left, (IEnumerable)right);
         }
-        // JavaScript's final fallback: String(a) === String(b).
+        // Final fallback, matching the host's String(a) === String(b) coercion.
         return string.Equals(
             DisplayStringFormatter.FormatScalar(left),
             DisplayStringFormatter.FormatScalar(right),
@@ -54,9 +54,8 @@ public static class LooseEquality
     }
 
     /// <summary>
-    /// The index of the first element loosely equal to <paramref name="value"/>, or -1
-    /// (upstream: <c>looseIndexOf</c>) — how <c>v-model</c> matches a checkbox/select value
-    /// against a bound collection.
+    /// The index of the first element loosely equal to <paramref name="value"/>, or -1 — how
+    /// <c>v-model</c> matches a checkbox/select value against a bound collection.
     /// </summary>
     /// <param name="values">The collection to search.</param>
     /// <param name="value">The value to match.</param>

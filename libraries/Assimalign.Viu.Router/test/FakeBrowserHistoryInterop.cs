@@ -6,8 +6,8 @@ namespace Assimalign.Viu.Router.Tests;
 // An instrumented stand-in for the browser edge (the same seam the real
 // JavaScriptBrowserHistoryInterop implements): it records every crossing and lets a test drive a
 // popstate, so the whole BrowserRouterHistory policy — base handling, state round-trip, listener
-// bookkeeping, and interop-call counting — is exercised with no browser. Mirrors the recorded-bridge
-// approach of Browser's BrowserEventInvokerRegistryTests.
+// bookkeeping, and interop-call counting — is exercised with no browser. It follows the same
+// recorded-bridge approach as Browser's BrowserEventInvokerRegistryTests.
 internal sealed class FakeBrowserHistoryInterop : IBrowserHistoryInterop
 {
     private Action<BrowserHistorySnapshot>? popStateHandler;

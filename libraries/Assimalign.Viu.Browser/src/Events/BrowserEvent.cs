@@ -5,9 +5,10 @@ namespace Assimalign.Viu.Browser;
 
 /// <summary>
 /// The typed event arguments a Viu handler receives — the fields of the underlying DOM event
-/// (W3C UI Events, https://www.w3.org/TR/uievents/) that Vue's modifier and key guards need,
-/// extracted JS-side and marshaled in the single dispatch call ([V01.01.04.03]): no per-field
-/// <c>JSObject</c> property reads and no proxy retained per event.
+/// (<see href="https://www.w3.org/TR/uievents/">W3C UI Events</see>) that the modifier and key
+/// guards need, extracted JS-side and marshaled in the single dispatch call ([V01.01.04.03]): no
+/// per-field <c>JSObject</c> property reads and no proxy retained per event. Which fields exist is
+/// therefore a deliberate, closed set — adding one costs marshaling on every dispatch.
 /// <see cref="StopPropagation"/>/<see cref="PreventDefault"/> record intents the bridge applies
 /// to the live JS event when the synchronous dispatch returns.
 /// <para>
@@ -21,8 +22,8 @@ public sealed class BrowserEvent
     // The live DOM event's arrival-time preventDefault state, kept apart from a handler's own
     // PreventDefault request: the browser already applied the arrival one, so only handler-requested
     // prevention re-crosses the boundary in the response flags. A guard still observes the combined
-    // state through DefaultPrevented, matching the DOM's event.defaultPrevented (upstream RouterLink
-    // guardEvent bails on it).
+    // state through DefaultPrevented, matching the DOM's event.defaultPrevented (a router link's
+    // activation guard bails on it).
     private readonly bool _defaultPreventedOnArrival;
     private bool _preventDefaultRequested;
 
@@ -104,7 +105,7 @@ public sealed class BrowserEvent
 
     /// <summary>
     /// The values of the selected <c>&lt;option&gt;</c>s when the target is a <c>&lt;select
-    /// multiple&gt;</c> (upstream reads <c>el.selectedOptions</c>), or null for every other event.
+    /// multiple&gt;</c>, or null for every other event.
     /// Carried so <c>VModelSelect</c> maps a multi-select change to its bound list or set without a
     /// follow-up interop read.
     /// </summary>
@@ -116,21 +117,20 @@ public sealed class BrowserEvent
     /// <summary>
     /// Whether the browser default is prevented — true if the live event already arrived prevented
     /// (an earlier listener called <c>preventDefault</c>) or a handler has since called
-    /// <see cref="PreventDefault"/>. Mirrors the DOM's <c>event.defaultPrevented</c>; a host event
-    /// bridge reads it to honor upstream RouterLink <c>guardEvent</c>, which never intercepts an
-    /// already-prevented click.
+    /// <see cref="PreventDefault"/>. This is the DOM's <c>event.defaultPrevented</c>; a host event
+    /// bridge reads it so a router link never intercepts an already-prevented click.
     /// </summary>
     public bool DefaultPrevented => _defaultPreventedOnArrival || _preventDefaultRequested;
 
     /// <summary>
     /// Requests <c>stopPropagation()</c> on the live event when this synchronous dispatch
-    /// returns (Vue's <c>.stop</c> modifier calls this).
+    /// returns; the <c>.stop</c> event modifier calls this.
     /// </summary>
     public void StopPropagation() => PropagationStopped = true;
 
     /// <summary>
     /// Requests <c>preventDefault()</c> on the live event when this synchronous dispatch
-    /// returns (Vue's <c>.prevent</c> modifier calls this).
+    /// returns; the <c>.prevent</c> event modifier calls this.
     /// </summary>
     public void PreventDefault() => _preventDefaultRequested = true;
 

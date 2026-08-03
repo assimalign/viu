@@ -13,9 +13,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// diagnostic whose <see cref="SourceLocation"/> points at the exact offending span (the directive, its
 /// argument, its expression, or the element), so the source-mapped Roslyn diagnostic lands a squiggle on the
 /// right template characters rather than on the whole element or a zero-width guess. The precise span each
-/// transform passes is the upstream contract (<c>@vue/compiler-core</c> / <c>@vue/compiler-dom</c>
-/// <c>transforms/*</c>); this pins that <c>Location.Source</c> equals the exact slice and the start position
-/// is correct.
+/// transform passes IS the contract; this pins that <c>Location.Source</c> equals the exact slice and that
+/// the start position is correct.
 /// </summary>
 public sealed class TransformDiagnosticLocationTests
 {

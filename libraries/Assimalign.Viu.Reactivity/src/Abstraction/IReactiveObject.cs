@@ -2,7 +2,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// The contract implemented by source-generated reactive objects. It is Viu's reflection-free,
-/// trimming-safe counterpart to the object returned by Vue 3.5's <c>reactive()</c>.
+/// trimming-safe alternative to intercepting member access at runtime (<c>[RCT-6]</c>).
 /// </summary>
 public interface IReactiveObject : IReactiveTraversable, IReactiveReadOnly
 {

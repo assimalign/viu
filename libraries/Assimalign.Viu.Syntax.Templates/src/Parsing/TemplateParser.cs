@@ -3,14 +3,13 @@ using System;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The template parser entry point: turns template markup into a fully located, immutable AST. The C#
-/// port of Vue 3.5's <c>baseParse</c> (<c>@vue/compiler-core</c> <c>parser.ts</c>). Parsing is
+/// The template parser entry point: turns template markup into a fully located, immutable AST. Parsing is
 /// recoverable — malformed input is reported through <see cref="ParserOptions.OnError"/> and never
 /// throws — and produces value-comparable output suitable for incremental-generator caching.
 /// </summary>
 /// <remarks>
-/// Runs entirely at build time inside a Roslyn generator: no runtime DOM, no file or network I/O. See
-/// https://vuejs.org/guide/essentials/template-syntax.html and the WHATWG parsing spec
+/// Runs entirely at build time inside a Roslyn generator: no runtime DOM, no file or network I/O — there
+/// is no runtime compilation path (<c>[SFC-1]</c>). HTML tokenization follows the WHATWG parsing spec:
 /// https://html.spec.whatwg.org/multipage/parsing.html.
 /// </remarks>
 public static class TemplateParser

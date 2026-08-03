@@ -11,30 +11,30 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The code-generation worker behind <see cref="RenderFunctionEmitter"/>: a line-oriented writer over the
-/// transformed code-generation tree, the C# port of the <c>CodegenContext</c> plus the <c>genNode</c>
-/// family in Vue 3.5's <c>@vue/compiler-core</c> <c>codegen.ts</c>. Each <c>EmitXxx</c> method mirrors the
-/// upstream <c>genXxx</c> function of the same node kind; the divergences forced by C# (no comma operator,
-/// no object/array literals with untyped targets, no <c>undefined</c>) are centralized in
+/// transformed code-generation tree with one <c>EmitXxx</c> method per code-generation
+/// node kind. The constructs C# lacks — a comma operator, untyped object/array literals, and
+/// <c>undefined</c> — are handled in exactly four places:
 /// <see cref="EmitVNodeCall"/>, <see cref="EmitObjectExpression"/>, <see cref="EmitNodeListAsArray{T}"/>,
 /// and <see cref="MapRawLiteral"/>, and documented in the library's <c>docs/DESIGN.md</c>.
 /// </summary>
 internal sealed class RenderCodeWriter
 {
-    // ---- Viu-defined contract helper names (no upstream counterpart; see docs/DESIGN.md). ----
+    // ---- Contract helper names bound by name on the runtime helper surface (see docs/DESIGN.md). ----
 
-    // JavaScript object literals have no C# equivalent, so props/slots objects emit through this helper.
+    // An untyped object literal has no C# equivalent, so props/slots objects emit through this helper.
     private const string CreatePropsHelper = "_createProps";
 
     // C# lambdas and method groups have no natural type in an object-typed position, so event-handler
     // property values emit through this delegate-typed helper.
     private const string WithHandlerHelper = "_withHandler";
 
-    // Upstream's cached-vnode comma sequence (setBlockTracking(-1), (_cache[n] = ...).cacheIndex = n,
-    // setBlockTracking(1), _cache[n]) collapses into this helper; C# left-to-right argument evaluation
-    // keeps the pause-create-resume ordering.
+    // Pausing block tracking, creating the value, stamping its cache index, resuming, and yielding the
+    // slot must happen in that order. C# has no comma operator, so the sequence collapses into this
+    // helper and rides on guaranteed left-to-right argument evaluation.
     private const string SetCacheHelper = "_setCache";
 
-    // Upstream's cached-array spread [...(_cache[n] || ...)] becomes a cloning helper call.
+    // A cached array must be copied before use, so a consumer cannot mutate the cached instance;
+    // C# has no spread in this position, so a cloning helper call takes its place.
     private const string SpreadCacheHelper = "_spreadCache";
 
     private readonly TransformResult result;
@@ -64,8 +64,8 @@ internal sealed class RenderCodeWriter
     }
 
     /// <summary>
-    /// Emits the full render-method body: the asset-resolution statements (upstream <c>genAssets</c>)
-    /// followed by the <c>return</c> of the root block expression (the tail of upstream <c>generate</c>).
+    /// Emits the full render-method body: the asset-resolution statements
+    /// followed by the <c>return</c> of the root block expression.
     /// </summary>
     /// <returns>The emitted statements, LF-terminated.</returns>
     public string EmitRenderBody()
@@ -111,7 +111,7 @@ internal sealed class RenderCodeWriter
 
         if (hasAssets)
         {
-            // A separating blank line between the asset preamble and the return, as upstream emits.
+            // A separating blank line between the asset preamble and the return.
             builder.Append('\n').Append('\n');
             AppendIndent();
         }
@@ -123,7 +123,7 @@ internal sealed class RenderCodeWriter
         }
         else
         {
-            // An empty template renders nothing (upstream: push("null")).
+            // An empty template renders nothing.
             Push("null");
         }
 
@@ -167,7 +167,7 @@ internal sealed class RenderCodeWriter
                 EmitNode(textCall.CodegenNode);
                 break;
             case TextNode text:
-                // genText: the static text as a string literal (upstream JSON.stringify).
+                // Static text emits as a C# string literal.
                 Push(StringLiteral(text.Content));
                 break;
             case SimpleExpressionNode simple:
@@ -207,8 +207,8 @@ internal sealed class RenderCodeWriter
                 EmitBlockStatement(block);
                 break;
             default:
-                // The transform pipeline only produces the kinds above (upstream's switch is likewise
-                // exhaustive); anything else is a pipeline bug worth failing loudly in tests.
+                // The transform pipeline only produces the kinds above; anything else is a pipeline bug
+                // worth failing loudly in tests rather than emitting silently wrong code.
                 throw new InvalidOperationException(
                     $"Unsupported code-generation node '{node.GetType().Name}'.");
         }
@@ -232,8 +232,8 @@ internal sealed class RenderCodeWriter
 
         if (node.IsBlock)
         {
-            // Upstream emits the comma sequence `(openBlock(), createElementBlock(...))`; C# has no
-            // comma operator, so the open-block call rides as the first argument — C# guarantees
+            // The block must open before any child argument is evaluated. C# has no comma operator, so
+            // the open-block call rides as the first argument — C# guarantees
             // left-to-right argument evaluation, so the block opens before any child argument is
             // evaluated and the block factory closes it (see docs/DESIGN.md).
             Push(Helper(HelperNames.OpenBlock));
@@ -283,7 +283,7 @@ internal sealed class RenderCodeWriter
             return;
         }
 
-        // Upstream splits multi-property objects across lines; a single property stays inline.
+        // Multi-property objects split across lines; a single property stays inline.
         var multiline = properties.Count > 1;
         if (multiline)
         {
@@ -332,9 +332,8 @@ internal sealed class RenderCodeWriter
         Push(")");
     }
 
-    // Port of genExpressionAsPropertyKey. Upstream emits bare identifiers for static keys and
-    // `[expression]` computed keys; the C# props entry is a (string, object?) tuple, so a static key is
-    // a string literal and a dynamic key is emitted as its (string-typed by contract) expression.
+    // A props entry is a (string, object?) tuple, so a static key emits as a string literal and a
+    // dynamic key emits as its expression, which the transforms guarantee is string-typed.
     private void EmitPropertyKey(ExpressionNode key)
     {
         switch (key)
@@ -356,7 +355,7 @@ internal sealed class RenderCodeWriter
         }
     }
 
-    // The upstream isOn discipline (@vue/shared onRE /^on[^a-z]/) plus the transforms' explicit
+    // A key of the form `on` followed by a non-lowercase character, plus the transforms explicit
     // IsHandlerKey marks: these properties carry event handlers, whose values need the delegate-typed
     // _withHandler wrapper in C# (a lambda or method group has no natural type in an object position).
     private static bool IsHandlerKey(ExpressionNode key) => key switch
@@ -434,7 +433,7 @@ internal sealed class RenderCodeWriter
 
             if (node.Newline)
             {
-                // C# return statements are semicolon-terminated (upstream JavaScript omits it).
+                // C# return statements are semicolon-terminated.
                 Push(";");
             }
         }
@@ -541,8 +540,8 @@ internal sealed class RenderCodeWriter
 
         if (node.NeedPauseTracking)
         {
-            // Upstream pauses block tracking, creates the value, stamps value.cacheIndex, resumes, and
-            // yields the slot — a comma sequence. The C# form rides on argument evaluation order: the
+            // Block tracking must pause, the value be created, its cache index stamped, tracking resume,
+            // and the slot be yielded, in that order. The C# form rides on argument evaluation order: the
             // setBlockTracking(-1) argument pauses tracking before the value argument is evaluated, and
             // _setCache stamps the index, resumes tracking, and returns the value.
             Push(SetCacheHelper);
@@ -601,9 +600,9 @@ internal sealed class RenderCodeWriter
         }
     }
 
-    // JavaScript array literals `[...]` have no untyped C# counterpart, so child/argument arrays emit as
-    // `new object?[] { ... }` — the runtime helper surface accepts object-typed children and normalizes,
-    // exactly as Vue's runtime normalizes unknown children (see docs/DESIGN.md).
+    // An untyped array literal has no C# counterpart, so child/argument arrays emit as
+    // `new object?[] { ... }`; the runtime helper surface accepts object-typed children and normalizes
+    // them (see docs/DESIGN.md).
     private void EmitNodeListAsArray<T>(IReadOnlyList<T?> nodes)
         where T : class
     {
@@ -752,7 +751,7 @@ internal sealed class RenderCodeWriter
         for (var index = 0; index < node.Body.Count; index++)
         {
             EmitNode(node.Body[index]);
-            // C# statements are semicolon-terminated (upstream JavaScript relies on ASI).
+            // C# statements are semicolon-terminated.
             Push(";");
             if (index < node.Body.Count - 1)
             {
@@ -761,7 +760,7 @@ internal sealed class RenderCodeWriter
         }
     }
 
-    // ---- patch-flag formatting: numeric parity plus upstream's PatchFlagNames comment. ----
+    // ---- patch-flag formatting: the numeric value plus a human-readable name comment. ----
 
     private static string? PatchFlagText(PatchFlags? patchFlag)
     {
@@ -777,8 +776,8 @@ internal sealed class RenderCodeWriter
 
     private static string PatchFlagNames(int value)
     {
-        // The upstream PatchFlagNames map (@vue/shared patchFlags.ts, v3.5 spelling — CACHED, not the
-        // pre-3.5 HOISTED). Negative flags are whole-value sentinels, never combined.
+        // The readable names emitted in the trailing comment beside each numeric flag. Negative flags are
+        // whole-value sentinels, never combined.
         if (value < 0)
         {
             return value == -1 ? "CACHED" : "BAIL";
@@ -810,8 +809,8 @@ internal sealed class RenderCodeWriter
 
     // ---- literal bridging: the JavaScript spellings the transforms carry as raw strings. ----
 
-    // The transform pipeline mirrors upstream IR literally, including a handful of JavaScript literal
-    // spellings inside raw strings; serialization maps them to their C# equivalents (see docs/DESIGN.md).
+    // A few transforms carry literal spellings inside raw expression strings; serialization maps them to
+    // their C# equivalents (see docs/DESIGN.md).
     private static string MapRawLiteral(string raw)
     {
         switch (raw)
@@ -823,8 +822,8 @@ internal sealed class RenderCodeWriter
                 // The empty props object (renderSlot's placeholder argument).
                 return CreatePropsHelper + "()";
             case "$slots":
-                // The slot outlet source: inline-mode upstream emits _ctx.$slots; `$` is not legal in a
-                // C# identifier, so the contract spelling is _ctx.__slots (the __event precedent).
+                // The slot outlet source: `$` is not legal in a C# identifier, so the contract spelling
+                // is _ctx.__slots, the same length-preserving substitution as __event ([SFC-7]).
                 return "_ctx.__slots";
             default:
                 break;
@@ -839,7 +838,7 @@ internal sealed class RenderCodeWriter
 
         if (mapped.IndexOf("$event", StringComparison.Ordinal) >= 0)
         {
-            // Vue's event variable, wherever a transform spelled it into a raw part (the v-model
+            // The event variable, wherever a transform spelled it into a raw part (the v-model
             // assignment handler builds `$event => (... = $event)` itself): the Viu C# spelling is
             // __event, the same substitution v-on applies under prefixing ([V01.01.05.04]).
             mapped = mapped.Replace("$event", "__event");

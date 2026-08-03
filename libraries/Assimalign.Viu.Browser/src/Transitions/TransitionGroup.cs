@@ -10,8 +10,6 @@ namespace Assimalign.Viu.Browser;
 /// Animates insertion, removal, and keyed reordering for a group of browser-rendered children.
 /// </summary>
 /// <remarks>
-/// This is Viu's browser-hosted port of Vue 3.5's <c>TransitionGroup</c>:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-dom/src/components/TransitionGroup.ts.
 /// Core supplies host-neutral keyed child snapshots and shared transition state; this component owns
 /// CSS transition resolution and the DOM-specific FLIP measurement and mutation sequence. Position
 /// reads are batched so each before/after pass crosses the browser interop boundary once. The

@@ -8,10 +8,12 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// Pins the [V01.01.06.09] tag-container compatibility grammar to Vue 3.5's SFC root parsing model.
-/// Upstream references:
-/// https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts and
-/// https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts.
+/// Pins the [V01.01.06.09] compatibility parser's conformance to the <c>.vue</c> single-file-component
+/// container format — a documented external compatibility target, so here the citation <em>is</em> the
+/// requirement (<c>[VUE-1]</c>). Container-format references for the input this parser accepts:
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts">@vue/compiler-sfc parse.ts</see>
+/// and
+/// <see href="https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts">@vue/compiler-core tokenizer.ts</see>.
 /// </summary>
 public class VueSingleFileComponentParserTests
 {

@@ -7,11 +7,9 @@ using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins RouterLink against vue-router's <RouterLink> (packages/router/src/RouterLink.ts,
-// https://router.vuejs.org/api/#Component-RouterLink): href resolved through the router (base
-// included), active/exact-active classes by route matching
-// (https://router.vuejs.org/guide/essentials/active-links.html), and the guardEvent click
-// conditions (only an unmodified, primary-button, un-prevented, non-_blank click navigates). All
+// Pins RouterLink: the href is resolved through the router with the base included, the
+// active/exact-active classes follow inclusive and exact route matching, and only an unmodified,
+// primary-button, un-prevented, non-_blank click is intercepted for client-side navigation. All
 // DOM-free through the Testing renderer with memory history.
 public class RouterLinkTests
 {

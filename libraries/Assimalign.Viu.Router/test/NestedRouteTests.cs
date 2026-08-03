@@ -6,8 +6,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins vue-router's nested-route resolution and route.matched semantics.
-// Reference: https://router.vuejs.org/guide/essentials/nested-routes.html
+// Pins nested-route resolution and RouteLocation.Matched semantics: a child path joins onto its
+// parent's, an empty child path resolves to the parent's path, and the matched chain runs
+// parent-to-child.
 public class NestedRouteTests
 {
     [Fact]

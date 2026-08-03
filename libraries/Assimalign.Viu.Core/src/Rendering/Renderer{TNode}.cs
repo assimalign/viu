@@ -11,8 +11,12 @@ namespace Assimalign.Viu;
 /// Mounts, patches, moves, and unmounts immutable component trees through host-supplied operations.
 /// </summary>
 /// <remarks>
-/// This is the host-neutral foundation of Vue 3.5's renderer:
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/renderer.ts.
+/// The host-neutral core of Viu's rendering pipeline: every host — the browser DOM, the in-memory
+/// test host, a future native host — supplies node primitives through
+/// <see cref="RendererOptions{TNode}"/> and gets mounting, block-aware patching, moves, and
+/// unmounting without reimplementing the tree walk. A render produces a fresh immutable tree and
+/// the renderer reconciles it against the mounted representation of the previous one, emitting the
+/// minimal host operations that reconcile them (<c>[RND-1]</c>).
 /// Mounted host state remains internal and never leaks back onto the public
 /// <see cref="IComponent"/> values. The renderer is not thread-safe.
 /// </remarks>
@@ -976,7 +980,7 @@ public sealed partial class Renderer<TNode>
         }
         else if (component.IsDisabled)
         {
-            // Vue mounts a disabled deferred Teleport in place immediately. Only target resolution
+            // A disabled deferred Teleport mounts in place immediately; only target resolution
             // waits for the post-flush phase.
             childrenMounted = true;
             children = MountChildren(
@@ -1342,8 +1346,9 @@ public sealed partial class Renderer<TNode>
                 next.Attributes,
                 nextOptimization,
                 ownNamespace);
-            // Vue's patchElement applies the TEXT fast path even after patchBlockChildren:
-            // https://github.com/vuejs/core/blob/v3.5.25/packages/runtime-core/src/renderer.ts
+            // The TEXT fast path still applies after block-children patching: a block root may
+            // itself carry PatchFlags.Text, and its own text content is not one of the dynamic
+            // descendants the block walk visited.
             if ((patchFlags & PatchFlags.Text) != 0)
             {
                 mounted.Children = PatchUnkeyedChildren(

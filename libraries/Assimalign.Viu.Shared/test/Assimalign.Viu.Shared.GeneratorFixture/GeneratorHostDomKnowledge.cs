@@ -6,8 +6,8 @@ namespace Assimalign.Viu.Shared;
 /// <summary>
 /// The generator-host consumption path of the DOM knowledge data: builds plain
 /// <see cref="HashSet{T}"/> lookups from the linked <c>DomKnowledgeData</c> source exactly as
-/// the Roslyn template compiler will. The runtime test suite asserts full membership parity
-/// between this surface and the net10.0 <c>DomKnowledge</c> frozen tables, pinning the
+/// the Roslyn template compiler will. The runtime test suite asserts that this surface and the
+/// net10.0 <c>DomKnowledge</c> frozen tables agree member-for-member, pinning the
 /// one-authoritative-definition contract of [V01.01.01.03].
 /// </summary>
 public static class GeneratorHostDomKnowledge

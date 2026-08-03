@@ -24,11 +24,10 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// receives at build time) and the shared library facade driven directly (path B: the
 /// <see cref="SingleFileComponentProjection.Project"/> call shape the language service uses in the
 /// editor) — and asserts the full generated C# is ordinal-equal, the hint names match, and the
-/// diagnostic sets match on id, severity, mapped <c>.viu</c> path/line/column, and message. This is
-/// the upstream <c>@vue/compiler-sfc</c> guarantee restated for C#: the same <c>compileScript()</c>/
-/// <c>compileTemplate()</c> pipeline serves the build plugin and Volar, so editor squiggles can never
-/// drift from build errors. This test lives in the generator's suite because it is the only project
-/// that can legally see both hosts.
+/// diagnostic sets match on id, severity, mapped <c>.viu</c> path/line/column, and message. One
+/// projection serving both hosts is the guarantee: an editor squiggle can never drift from a build
+/// error, because there is no second parse or second code path for it to drift through. This test
+/// lives in the generator's suite because it is the only project that can legally see both hosts.
 /// </summary>
 public sealed class SingleFileComponentProjectionConformanceTests
 {

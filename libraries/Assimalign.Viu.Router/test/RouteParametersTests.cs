@@ -6,8 +6,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Typed, boxing-free, reflection-free parameter accessors — the C# counterpart of vue-router's
-// RouteParams (packages/router/src/matcher/pathParserRanker.ts, PathParams).
+// Typed, boxing-free, reflection-free parameter accessors, plus the immutable With/WithMany
+// builders and value equality. Specified by [RTR-2].
 public class RouteParametersTests
 {
     [Fact]

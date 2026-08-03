@@ -195,9 +195,10 @@ public sealed class EffectScopeTests
     [Fact]
     public void ComputedIsNotOwnedByTheScopeAndStaysReactiveAfterStop()
     {
-        // Upstream Vue 3.5 contract: effectScope() never collects computeds. After scope.stop()
-        // a computed keeps serving FRESH values and stays fully reactive; unused computeds detach
-        // from their sources automatically via the soft-unsubscribe protocol instead.
+        // [RCT-11]: a scope never owns a computed. Scope ownership exists to stop side effects and
+        // a computed has none, so after scope.stop() a computed keeps serving FRESH values and stays
+        // fully reactive; unused computeds detach from their sources automatically via the
+        // soft-unsubscribe protocol instead.
         var count = Reactive.Reference(1);
         Computed<int>? doubled = null;
         var scope = Reactive.EffectScope();

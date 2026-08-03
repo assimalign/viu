@@ -7,8 +7,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The mutable state threaded through the transform pipeline: helper/component/directive registration, scope
-/// tracking, node replacement/removal, and the hoist/cache hooks later stages consume. The C# port of Vue
-/// 3.5's <c>TransformContext</c> (<c>@vue/compiler-core</c> <c>transform.ts</c>).
+/// tracking, node replacement/removal, and the hoist/cache hooks later stages consume.
 /// </summary>
 /// <remarks>
 /// This type is single-threaded, matching the compiler's single-pass model. Because the parse AST is
@@ -72,19 +71,19 @@ public sealed class TransformContext
     /// <summary>Whether a tag is a custom element.</summary>
     public Func<string, bool> IsCustomElement { get; }
 
-    /// <summary>Whether static event handlers are cached (upstream <c>cacheHandlers</c>).</summary>
+    /// <summary>Whether static event handlers are cached.</summary>
     public bool CacheHandlers { get; }
 
     /// <summary>
-    /// Whether identifier prefixing and scope analysis is enabled (upstream <c>prefixIdentifiers</c>). When
-    /// <see langword="false"/> expression bodies stay opaque, matching Vue's browser build; when
+    /// Whether identifier prefixing and scope analysis is enabled. When
+    /// <see langword="false"/> expression bodies stay opaque; when
     /// <see langword="true"/> the <see cref="TransformExpression"/> pass rewrites identifiers ([V01.01.05.04]).
     /// </summary>
     public bool PrefixIdentifiers { get; }
 
     /// <summary>
-    /// The component binding classifications expression rewriting resolves identifiers against (upstream
-    /// <c>bindingMetadata</c>). Defaults to <see cref="BindingMetadata.Empty"/>.
+    /// The component binding classifications expression rewriting resolves identifiers against.
+    /// Defaults to <see cref="BindingMetadata.Empty"/>.
     /// </summary>
     public BindingMetadata BindingMetadata { get; }
 
@@ -109,13 +108,13 @@ public sealed class TransformContext
     /// <summary>The scoped-styles id, or <see langword="null"/>.</summary>
     public string? ScopeId { get; }
 
-    /// <summary>The number of <c>v-for</c> scopes currently open (upstream <c>scopes.vFor</c>).</summary>
+    /// <summary>The number of <c>v-for</c> scopes currently open.</summary>
     public int ScopeVFor { get; set; }
 
-    /// <summary>The number of <c>v-slot</c> scopes currently open (upstream <c>scopes.vSlot</c>).</summary>
+    /// <summary>The number of <c>v-slot</c> scopes currently open.</summary>
     public int ScopeVSlot { get; set; }
 
-    /// <summary>Whether transformation is inside a <c>v-once</c> subtree (upstream <c>inVOnce</c>).</summary>
+    /// <summary>Whether transformation is inside a <c>v-once</c> subtree.</summary>
     public bool InVOnce { get; set; }
 
     // ---- traversal state ----
@@ -137,21 +136,20 @@ public sealed class TransformContext
 
     // ---- diagnostics ----
 
-    /// <summary>Reports a transform diagnostic (never throws; recoverable), matching upstream's <c>onError</c>.</summary>
+    /// <summary>Reports a transform diagnostic (never throws; recoverable).</summary>
     /// <param name="error">The diagnostic to report.</param>
     public void ReportError(CompilerError error) => onError?.Invoke(error);
 
-    // ---- template-local identifier scope (upstream context.identifiers / addIdentifiers / removeIdentifiers) ----
+    // ---- template-local identifier scope ----
 
     /// <summary>
     /// Whether <paramref name="name"/> is currently a template-local (a <c>v-for</c> alias or <c>v-slot</c> prop
-    /// in scope). Such identifiers shadow bindings and are never prefixed or unwrapped (upstream reads
-    /// <c>context.identifiers</c>).
+    /// in scope). Such identifiers shadow component bindings and are never prefixed or unwrapped.
     /// </summary>
     /// <param name="name">The identifier name.</param>
     public bool IsLocalIdentifier(string name) => identifiers.TryGetValue(name, out var count) && count > 0;
 
-    /// <summary>Pushes <paramref name="name"/> onto the local scope (upstream <c>addIdentifiers</c>).</summary>
+    /// <summary>Pushes <paramref name="name"/> onto the local scope.</summary>
     /// <param name="name">The identifier name.</param>
     public void AddIdentifiers(string name)
     {
@@ -161,7 +159,7 @@ public sealed class TransformContext
 
     /// <summary>
     /// Pushes the identifiers <paramref name="expression"/> declares onto the local scope — a plain alias, a
-    /// tuple, or a deconstruction (upstream <c>addIdentifiers</c> over an expression's declared identifiers).
+    /// tuple, or a deconstruction.
     /// </summary>
     /// <param name="expression">The alias or slot-prop expression.</param>
     public void AddIdentifiers(ExpressionNode expression)
@@ -172,7 +170,7 @@ public sealed class TransformContext
         }
     }
 
-    /// <summary>Pops <paramref name="name"/> from the local scope (upstream <c>removeIdentifiers</c>).</summary>
+    /// <summary>Pops <paramref name="name"/> from the local scope.</summary>
     /// <param name="name">The identifier name.</param>
     public void RemoveIdentifiers(string name)
     {
@@ -189,7 +187,7 @@ public sealed class TransformContext
         }
     }
 
-    /// <summary>Pops the identifiers <paramref name="expression"/> declares (upstream <c>removeIdentifiers</c>).</summary>
+    /// <summary>Pops the identifiers <paramref name="expression"/> declares.</summary>
     /// <param name="expression">The alias or slot-prop expression.</param>
     public void RemoveIdentifiers(ExpressionNode expression)
     {
@@ -206,7 +204,7 @@ public sealed class TransformContext
 
     // ---- helper / component / directive registration ----
 
-    /// <summary>Registers a use of <paramref name="helper"/> and returns it (upstream <c>helper</c>).</summary>
+    /// <summary>Registers a use of <paramref name="helper"/> and returns it.</summary>
     /// <param name="helper">The runtime helper.</param>
     public RuntimeHelper Helper(RuntimeHelper helper)
     {
@@ -215,7 +213,7 @@ public sealed class TransformContext
         return helper;
     }
 
-    /// <summary>Removes a use of <paramref name="helper"/> (upstream <c>removeHelper</c>).</summary>
+    /// <summary>Removes a use of <paramref name="helper"/>.</summary>
     /// <param name="helper">The runtime helper.</param>
     public void RemoveHelper(RuntimeHelper helper)
     {
@@ -232,21 +230,21 @@ public sealed class TransformContext
         }
     }
 
-    /// <summary>Registers and returns the <c>_name</c> reference string for <paramref name="helper"/> (upstream <c>helperString</c>).</summary>
+    /// <summary>Registers and returns the <c>_name</c> reference string for <paramref name="helper"/>.</summary>
     /// <param name="helper">The runtime helper.</param>
     public string HelperString(RuntimeHelper helper) => "_" + Helper(helper).Name;
 
-    /// <summary>Registers a resolved component name (upstream <c>components.add</c>).</summary>
+    /// <summary>Registers a resolved component name.</summary>
     /// <param name="name">The component tag name.</param>
     public void AddComponent(string name) => components.Add(name);
 
-    /// <summary>Registers a resolved directive name (upstream <c>directives.add</c>).</summary>
+    /// <summary>Registers a resolved directive name.</summary>
     /// <param name="name">The directive name.</param>
     public void AddDirective(string name) => directives.Add(name);
 
     // ---- node replacement / removal ----
 
-    /// <summary>Replaces the current node with <paramref name="node"/> (upstream <c>replaceNode</c>).</summary>
+    /// <summary>Replaces the current node with <paramref name="node"/>.</summary>
     /// <param name="node">The replacement node.</param>
     public void ReplaceNode(TemplateSyntaxNode node)
     {
@@ -258,7 +256,7 @@ public sealed class TransformContext
         CurrentNode = node;
     }
 
-    /// <summary>Removes <paramref name="node"/> (or the current node) from the sibling list (upstream <c>removeNode</c>).</summary>
+    /// <summary>Removes <paramref name="node"/> (or the current node) from the sibling list.</summary>
     /// <param name="node">The node to remove, or <see langword="null"/> for the current node.</param>
     public void RemoveNode(TemplateSyntaxNode? node = null)
     {
@@ -293,7 +291,7 @@ public sealed class TransformContext
     // ---- hoist / cache hooks ([V01.01.05.07] consumes these) ----
 
     /// <summary>
-    /// Registers a hoisted constant and returns a placeholder identifier (upstream <c>hoist</c>). The hoisting
+    /// Registers a hoisted constant and returns a placeholder identifier. The hoisting
     /// pass itself is [V01.01.05.07]; this records the slot so that pass can plug in without reshaping the
     /// pipeline.
     /// </summary>
@@ -308,7 +306,7 @@ public sealed class TransformContext
             ConstantType.CanCache);
     }
 
-    /// <summary>Wraps <paramref name="expression"/> in a cache slot (upstream <c>cache</c>).</summary>
+    /// <summary>Wraps <paramref name="expression"/> in a cache slot.</summary>
     /// <param name="expression">The expression to cache.</param>
     /// <param name="isVNode">Whether the cached value is a vnode.</param>
     /// <param name="inVOnce">Whether the cache is produced inside a <c>v-once</c>.</param>
@@ -319,17 +317,17 @@ public sealed class TransformContext
         return cacheExpression;
     }
 
-    /// <summary>The current cache slot count (upstream <c>context.cached.length</c>).</summary>
+    /// <summary>The current cache slot count.</summary>
     public int CacheCount => cached.Count;
 
-    /// <summary>Reserves an empty cache slot, incrementing the count (upstream <c>context.cached.push(null)</c>).</summary>
+    /// <summary>Reserves an empty cache slot, incrementing the count.</summary>
     public void AppendEmptyCacheSlot() => cached.Add(null);
 
     // ---- vnode-call construction ----
 
     /// <summary>
-    /// Builds a <see cref="VNodeCall"/> and registers the block/vnode helpers it needs (upstream
-    /// <c>createVNodeCall</c>).
+    /// Builds a <see cref="VNodeCall"/> and registers the block/render-node helpers it needs, so a caller
+    /// can never construct one that references a helper the emitter did not import.
     /// </summary>
     public VNodeCall CreateVNodeCall(
         object tag,
@@ -373,11 +371,11 @@ public sealed class TransformContext
         };
     }
 
-    /// <summary>The vnode-creation helper for the given SSR/component flags (upstream <c>getVNodeHelper</c>).</summary>
+    /// <summary>The vnode-creation helper for the given SSR/component flags.</summary>
     public static RuntimeHelper GetVNodeHelper(bool ssr, bool isComponent)
         => ssr || isComponent ? HelperNames.CreateVNode : HelperNames.CreateElementVNode;
 
-    /// <summary>The block-vnode-creation helper for the given SSR/component flags (upstream <c>getVNodeBlockHelper</c>).</summary>
+    /// <summary>The block-vnode-creation helper for the given SSR/component flags.</summary>
     public static RuntimeHelper GetVNodeBlockHelper(bool ssr, bool isComponent)
         => ssr || isComponent ? HelperNames.CreateBlock : HelperNames.CreateElementBlock;
 
@@ -429,13 +427,12 @@ public sealed class TransformContext
 
     internal HashSet<TemplateSyntaxNode> SeenMemo => seenMemo;
 
-    // The memoization table for the static-caching pass's element constant analysis (upstream
-    // context.constantCache, @vue/compiler-core transforms/cacheStatic.ts). Keyed by node reference so a
-    // subtree's constant type is computed once; [V01.01.05.07] populates it.
+    // The memoization table for the static-caching pass's element constant analysis. Keyed by node
+    // reference so a subtree's constant type is computed once; [V01.01.05.07] populates it.
     internal Dictionary<TemplateSyntaxNode, ConstantType> ConstantCache => constantCache;
 
-    // The C# analogue of upstream's directiveImportMap: records the runtime helper a directive transform
-    // requested, so the element transform can emit a helper reference instead of a resolveDirective call.
+    // Records the runtime helper a directive transform requested, so the element transform can emit a
+    // helper reference instead of a resolveDirective call.
     internal void SetDirectiveRuntime(DirectiveNode directive, RuntimeHelper helper) => directiveRuntime[directive] = helper;
 
     internal RuntimeHelper? GetDirectiveRuntime(DirectiveNode directive)

@@ -22,9 +22,11 @@ public sealed class SingleFileComponentHotReloadMetadataTests
 
     /// <summary>
     /// Debug metadata uses a project-relative, content-independent identifier, while edits invalidate
-    /// only the matching template, script, or style category hash. This is the generator-side input to
-    /// Vue-parity re-render, reload, and stylesheet-swap decisions:
-    /// https://github.com/vuejs/core/blob/v3.5.34/packages/runtime-core/src/hmr.ts.
+    /// only the matching template, script, or style category hash. Those two properties together are
+    /// what let a development host pick the cheapest correct action for an edit — remount, reload the
+    /// component definition, or swap only the stylesheet — instead of reloading everything: the
+    /// identifier survives a rebuild so a host can still find the mounted instances, and the per-block
+    /// hashes say which of the three kinds of work an edit actually requires ([V01.01.06.05]).
     /// </summary>
     /// <param name="extension">The canonical or compatibility source extension.</param>
     [Theory]

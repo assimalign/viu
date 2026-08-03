@@ -4,12 +4,14 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// One CSS Modules accessor a template expression may reference — the Viu equivalent of Vue 3.5's
-/// <c>$style</c> (and named-module) render-context object (https://vuejs.org/api/sfc-css-features.html#css-modules).
-/// Vue exposes the class map as a runtime object indexed dynamically; Viu has no such render-context object, so
-/// the composition-root generator ([V01.01.06.06]) emits the map as a compile-time nested <c>const</c> class and
+/// One CSS Modules accessor a template expression may reference: the compile-time stand-in for a
+/// <c>$style</c> (or named-module) class map. There is no runtime render-context object to index into
+/// (<c>[RCT-8]</c>), so the composition-root generator ([V01.01.06.06]) emits the map as a compile-time
+/// nested <c>const</c> class and
 /// supplies this descriptor to expression classification ([V01.01.05.04.01]) so <c>$style.box</c> resolves to that
-/// class's <c>box</c> member instead of a phantom component binding.
+/// class's <c>box</c> member instead of a phantom component binding. Because the generator supplies the
+/// <em>complete</em> map, an undeclared class is decidably wrong and reports a diagnostic
+/// (<c>[STY-4]</c>).
 /// </summary>
 /// <remarks>
 /// This is transform <i>input</i>, like <see cref="BindingMetadata"/>: a plain immutable class (not a value-

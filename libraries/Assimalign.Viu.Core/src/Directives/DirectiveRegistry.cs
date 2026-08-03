@@ -4,12 +4,12 @@ using System.Collections.Generic;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// An immutable, application-owned runtime directive registry with Vue-compatible asset-name
+/// An immutable, application-owned runtime directive registry with the standard asset-name
 /// lookup.
 /// </summary>
 /// <remarks>
-/// Resolution tries the raw name, its camel-case form, and then its Pascal-case form. See
-/// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/helpers/resolveAssets.ts.
+/// Resolution tries the raw name, its camel-case form, and then its Pascal-case form, so a
+/// template may spell a directive in the casing that reads naturally at the use site.
 /// Registration keys remain ordinal, so exact duplicate registrations fail while
 /// alias-equivalent registrations retain raw-name precedence.
 /// </remarks>

@@ -6,9 +6,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The template transform entry point: runs the ordered node and directive transforms over a parsed
-/// <see cref="RootNode"/> and produces the render-function code-generation tree. The C# port of Vue 3.5's
-/// <c>transform()</c> plus the base preset from <c>getBaseTransformPreset</c> (<c>@vue/compiler-core</c>
-/// <c>transform.ts</c>/<c>compile.ts</c>), merged with the DOM directive transforms.
+/// <see cref="RootNode"/> and produces the render-function code-generation tree. The built-in preset —
+/// the structural directives, the element/slot/text passes, and the DOM directive transforms — is
+/// installed unconditionally; <see cref="TransformOptions"/> only appends to it.
 /// </summary>
 /// <remarks>
 /// This type has no instance state; each call is a fresh, deterministic, pure transform over its input,
@@ -34,7 +34,7 @@ public static class Transformer
         {
             // The static-caching/stringification pass ([V01.01.05.07]): cache fully static subtrees
             // (marking them PatchFlags.Cached) and collapse contiguous static runs into stringified static
-            // vnodes, before the root code-generation node is built (upstream runs cacheStatic here).
+            // vnodes, before the root code-generation node is built.
             StaticCache.Cache(root, context);
         }
 
@@ -53,8 +53,8 @@ public static class Transformer
     }
 
     // The base preset order: structural transforms, then (when prefixing) expression rewriting, then slot
-    // outlet, element, slot-scope tracking, and text. transformExpression slots in before transformSlotOutlet,
-    // exactly as upstream inserts it in getBaseTransformPreset when !__BROWSER__ && prefixIdentifiers.
+    // outlet, element, slot-scope tracking, and text. Expression rewriting must run before the slot-outlet
+    // transform, which consumes already-rewritten expressions.
     private static IReadOnlyList<NodeTransform> BuildNodeTransforms(TransformOptions options)
     {
         var transforms = new List<NodeTransform>

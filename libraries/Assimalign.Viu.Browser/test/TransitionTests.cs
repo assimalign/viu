@@ -12,8 +12,8 @@ namespace Assimalign.Viu.Browser.Tests;
 
 // Pins the DOM <Transition> CSS-class choreography through the deterministic in-memory adapter — the
 // enter/leave class add/remove sequence, the forced reflow, the next-frame to-class swap, appear, and
-// cancellation. Upstream contract: @vue/runtime-dom components/Transition.ts resolveTransitionProps
-// (https://vuejs.org/guide/built-ins/transition.html). Real-browser end-detection is the e2e harness.
+// cancellation. The contract under test is the resolved class/hook set and its ordering ([BLT-7],
+// [BLT-8]). Real-browser end-detection is the e2e harness.
 public sealed class TransitionTests : IDisposable
 {
     private readonly TransitionTestHarness _harness = new();
@@ -27,7 +27,7 @@ public sealed class TransitionTests : IDisposable
         _harness.Render(Host(show, ("name", "fade")));
 
         // Toggle in: from+active classes land immediately (onBeforeEnter), then the next frame swaps
-        // from -> to, then the transition end removes to+active (upstream enter choreography).
+        // from -> to, then the transition end removes to+active.
         show.Value = true;
         _harness.RunUntilIdle();
         var div = _harness.FindElement("div");
@@ -54,7 +54,7 @@ public sealed class TransitionTests : IDisposable
 
         show.Value = false;
         _harness.RunUntilIdle();
-        // from+active land, and a reflow is forced between them (upstream onLeave).
+        // from+active land, and a reflow is forced between them so they do not coalesce.
         _harness.Classes(div).ShouldBe(["fade-leave-from", "fade-leave-active"], ignoreOrder: true);
         _harness.ReflowCount.ShouldBe(1);
         _harness.IsMounted(div).ShouldBeTrue(); // removal deferred behind the leave
@@ -94,7 +94,7 @@ public sealed class TransitionTests : IDisposable
         _harness.Classes(div).ShouldContain("fade-enter-active");
 
         // Interrupt with a leave before the enter finishes: the enter is cancelled (its active class is
-        // removed by finishEnter) and the leave classes take over (upstream el[enterCbKey](true)).
+        // removed as the enter finishes early) and the leave classes take over.
         show.Value = false;
         _harness.RunUntilIdle();
         _harness.Classes(div).ShouldNotContain("fade-enter-active");
@@ -115,7 +115,7 @@ public sealed class TransitionTests : IDisposable
         _harness.RunUntilIdle();
         _harness.AdvanceFrame();
 
-        // :css="false" -> no transition classes and no reflow are ever applied (upstream returns baseProps).
+        // :css="false" -> no transition classes and no reflow are ever applied; only the user hooks run.
         _harness.ClassLog.ShouldBeEmpty();
         _harness.ReflowCount.ShouldBe(0);
         var div = _harness.FindElement("div");

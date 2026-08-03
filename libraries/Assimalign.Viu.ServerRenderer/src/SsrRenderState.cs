@@ -6,9 +6,8 @@ using Assimalign.Viu;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The write surface threaded through a server render — the C# counterpart of the <c>push</c>
-/// function plus the ambient <c>SSRContext</c> that <c>@vue/server-renderer</c> passes down its
-/// pipeline (<c>packages/server-renderer/src/render.ts</c>). It is the object the component-tree
+/// The write surface threaded through a server render: the append target plus the ambient
+/// <see cref="SsrContext"/>. It is the object the component-tree
 /// runtime renderer carries, and the same surface the compiler-generated <c>ssrRender</c> bodies
 /// ([V01.01.07.02]) will receive, so both paths append to one buffer and share one
 /// <see cref="Context"/>. Instances are created by the renderer; helpers and generated code receive
@@ -34,7 +33,7 @@ public sealed class SsrRenderState
         CancellationToken = cancellationToken;
     }
 
-    /// <summary>The render's <see cref="SsrContext"/> (upstream: the ambient <c>SSRContext</c>).</summary>
+    /// <summary>The render's <see cref="SsrContext"/>, shared by every nested state.</summary>
     public SsrContext Context { get; }
 
     /// <summary>Gets the application composition context for the rendered tree.</summary>
@@ -52,7 +51,7 @@ public sealed class SsrRenderState
     }
 
     /// <summary>
-    /// Appends an already-escaped HTML fragment to the render buffer (upstream: <c>push(item)</c>).
+    /// Appends an already-escaped HTML fragment to the render buffer.
     /// Callers escape before pushing — this method never transforms its input, so raw markup
     /// (<c>v-html</c>, static components, comment markers) passes through verbatim.
     /// </summary>

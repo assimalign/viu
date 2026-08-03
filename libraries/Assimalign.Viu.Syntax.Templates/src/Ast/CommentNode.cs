@@ -1,8 +1,7 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// An HTML comment. The C# port of Vue 3.5's <c>CommentNode</c> (<c>@vue/compiler-core</c>
-/// <c>ast.ts</c>). <see cref="Content"/> is the text between <c>&lt;!--</c> and <c>--&gt;</c>; the
+/// An HTML comment. <see cref="Content"/> is the text between <c>&lt;!--</c> and <c>--&gt;</c>; the
 /// node's <see cref="SyntaxNode.Location"/> covers the delimiters.
 /// </summary>
 public sealed record CommentNode : TemplateChildNode

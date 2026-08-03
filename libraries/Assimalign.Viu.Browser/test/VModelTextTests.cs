@@ -8,8 +8,9 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins the Browser implementation to Vue's vModelText behavior:
-// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/directives/vModel.ts.
+// Pins Viu's text v-model contract: IME composition suppression, the .lazy/.number/.trim
+// modifiers (trim before number coercion), and the focus gate that keeps a re-render from
+// rewriting the value a user is editing.
 public sealed class VModelTextTests : IDisposable
 {
     private readonly BrowserDirectiveTestHarness _harness = new();

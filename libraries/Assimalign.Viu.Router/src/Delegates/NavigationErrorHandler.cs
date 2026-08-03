@@ -3,13 +3,12 @@ using System;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// A global navigation error handler — the C# port of the callback registered through vue-router's
-/// <c>router.onError</c> (<c>packages/router/src/router.ts</c>,
-/// https://router.vuejs.org/api/#onError). It receives any unexpected exception thrown by a guard (or
-/// the infinite-redirect safeguard) during navigation, along with the target and current locations.
-/// Navigation <see cref="NavigationFailure"/>s (abort/cancel/duplicate) are <b>not</b> routed here —
-/// those are returned from <see cref="Router.Push"/>/<see cref="Router.Replace"/> instead, mirroring
-/// upstream's split between resolved failures and rejected errors.
+/// A global navigation error handler, registered through <see cref="Router.OnError"/>. It receives
+/// any unexpected exception thrown by a guard, or by the infinite-redirect safeguard, during
+/// navigation, along with the target and current locations. A <see cref="NavigationFailure"/>
+/// (abort, cancel, duplicate) is <b>not</b> routed here: an expected non-completion is a value
+/// returned from <see cref="Router.Push"/>/<see cref="Router.Replace"/>, while this handler exists
+/// only for the unexpected — the split keeps a routine aborted navigation from reading as a bug.
 /// </summary>
 /// <param name="error">The exception thrown during navigation.</param>
 /// <param name="to">The location that was being navigated to.</param>

@@ -6,11 +6,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// [V01.01.05.06] block-tree emission. Ported from vuejs/core
-// packages/compiler-core/__tests__/transforms/{vFor,vIf}.spec.ts and the "tree flattening" section of
-// https://vuejs.org/guide/extras/rendering-mechanism.html. Pins which vnodes open an optimization block
-// (openBlock + createElementBlock/createBlock), how v-if branches and v-for fragments become blocks, and
-// where block tracking is disabled — the compiler half of the compiler-informed VDOM contract.
+// [V01.01.05.06] block-tree emission. These cases ARE the contract for which render nodes open an
+// optimization block (openBlock + createElementBlock/createBlock), how v-if branches and v-for fragments
+// become blocks, and where block tracking is disabled — the compiler half of the compiler-informed
+// rendering contract the runtime relies on (docs/SPECIFICATION.md §6.3, the block tree).
 public class BlockTreeEmissionTests
 {
     // ---- the template root opens a block ----
@@ -198,7 +197,7 @@ public class BlockTreeEmissionTests
     [Fact]
     public void VIfBranchContainingVFor_UsesTheForFragmentAsTheBranchBlock()
     {
-        // When a branch's only child is a v-for, upstream injects the branch key into the v-for fragment
+        // When a branch's only child is a v-for, the branch key is injected into the v-for fragment
         // instead of adding a wrapper — the fragment itself becomes the branch block.
         var result = TransformTestHelpers.Transform("<template v-if=\"ok\"><div v-for=\"i in list\"></div></template>");
         var ifNode = result.SingleChild().ShouldBeOfType<IfNode>();

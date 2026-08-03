@@ -7,15 +7,13 @@ namespace Assimalign.Viu.Router.Browser;
 /// <summary>
 /// The browser integration layer that lets <see cref="RouterLink"/> navigate on a real click — it
 /// adapts the DOM adapter's dispatched <see cref="BrowserEvent"/> into the DOM-free
-/// <see cref="RouterLinkClickEvent"/> the link's guard reads, then mirrors the guard's
-/// <see cref="RouterLinkClickEvent.PreventDefault"/> decision back onto the live event. This is the
-/// C# home for the coupling vue-router's <c>guardEvent</c> keeps inline (it reads the DOM
-/// <c>MouseEvent</c> and calls <c>e.preventDefault()</c> directly,
-/// <c>packages/router/src/RouterLink.ts</c>, https://github.com/vuejs/router); Viu keeps
-/// <see cref="RouterLink"/> renderer-agnostic (it never references the
-/// <c>Assimalign.Viu.Browser</c> DOM adapter), so the mapping lives here instead — a package that
-/// depends on both the Router and the DOM adapter, kept out of every non-router app's framework
-/// closure ([V01.01.08.03.01], issue #191).
+/// <see cref="RouterLinkClickEvent"/> the link's guard reads, then propagates the guard's
+/// <see cref="RouterLinkClickEvent.PreventDefault"/> decision back onto the live event. The
+/// DOM-to-router coupling lives in this package, and only in this package, because
+/// <see cref="RouterLink"/> stays renderer-agnostic and never references the
+/// <c>Assimalign.Viu.Browser</c> DOM adapter. A separate assembly for the join keeps the adapter out
+/// of every non-router application's framework closure ([V01.01.08.03.01], issue #191).
+/// Specified by <c>[RTR-7]</c>.
 /// <para>
 /// Install once at app bootstrap, before mounting (the Viu DOM bridge itself is loaded inside the
 /// app's <c>MountAsync</c> path). Not thread-safe (browser main thread only); the installed bridge is
@@ -63,7 +61,7 @@ public static class RouterLinkDomBridge
 
         // The live event's arrival-time prevented state, captured before the guard runs: an event
         // that arrived prevented was already suppressed by the browser, so the guard bails and this
-        // bridge must not re-signal (upstream guardEvent bails on e.defaultPrevented).
+        // bridge must not re-signal.
         var arrivedPrevented = browserEvent.DefaultPrevented;
         var click = CreateClickEvent(browserEvent, arrivedPrevented);
         handler(click);
@@ -75,9 +73,9 @@ public static class RouterLinkDomBridge
         }
     }
 
-    // Maps the browser click metadata onto RouterLink's DOM-free event: the mouse button and the
-    // four system modifiers vue-router's guardEvent inspects, plus the already-prevented state seeded
-    // so the guard sees the same e.defaultPrevented the DOM would.
+    // Maps the browser click metadata onto RouterLink's DOM-free event: the mouse button, the four
+    // system modifiers, and the already-prevented state, seeded so the guard sees exactly the
+    // defaultPrevented value the DOM reported.
     private static RouterLinkClickEvent CreateClickEvent(BrowserEvent browserEvent, bool arrivedPrevented)
     {
         var modifiers = browserEvent.Modifiers;

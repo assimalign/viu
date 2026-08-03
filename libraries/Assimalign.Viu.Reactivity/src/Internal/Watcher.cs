@@ -3,7 +3,7 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Shared machinery behind <c>Watch</c> and <c>WatchEffect</c> — the C# port of the state Vue 3.5's
+/// Shared machinery behind <c>Watch</c> and <c>WatchEffect</c> — the state
 /// <c>baseWatch</c> keeps per watcher (<c>packages/reactivity/src/watch.ts</c>): the underlying
 /// <see cref="ReactiveEffect"/>, the pending cleanup, the flush routing, and the stop/pause plumbing.
 /// A trigger re-enters through <see cref="OnTrigger"/>, which either reacts synchronously or hands a
@@ -41,10 +41,10 @@ internal abstract class Watcher
     /// <summary>Stops the watcher: unlinks dependencies and runs the pending cleanup. Idempotent.</summary>
     internal void Stop() => Effect.Stop();
 
-    /// <summary>Defers callbacks until <see cref="Resume"/> (Vue 3.5 <c>WatchHandle.pause</c>).</summary>
+    /// <summary>Defers callbacks until <see cref="Resume"/>.</summary>
     internal void Pause() => Effect.Pause();
 
-    /// <summary>Resumes callback delivery (Vue 3.5 <c>WatchHandle.resume</c>).</summary>
+    /// <summary>Resumes callback delivery.</summary>
     internal void Resume() => Effect.Resume();
 
     /// <summary>

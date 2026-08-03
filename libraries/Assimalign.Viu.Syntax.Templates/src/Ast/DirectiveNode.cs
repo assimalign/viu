@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A directive such as <c>v-if</c>, <c>:class</c>, <c>@click</c>, or <c>#slot</c>. The C# port of
-/// Vue 3.5's <c>DirectiveNode</c> (<c>@vue/compiler-core</c> <c>ast.ts</c>). The <c>:</c>/<c>@</c>/<c>#</c>
-/// shorthands are resolved into <see cref="Name"/> (<c>bind</c>/<c>on</c>/<c>slot</c>).
+/// A directive such as <c>v-if</c>, <c>:class</c>, <c>@click</c>, or <c>#slot</c>. The <c>:</c>/<c>@</c>/<c>#</c>
+/// shorthands are resolved into <see cref="Name"/> (<c>bind</c>/<c>on</c>/<c>slot</c>), so a transform
+/// keys on one spelling; <see cref="RawName"/> keeps the authored form for diagnostics.
 /// </summary>
 public sealed record DirectiveNode : PropertyNode
 {

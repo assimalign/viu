@@ -12,7 +12,9 @@ using Assimalign.Viu.Tests;
 namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
-/// Pins dynamic selection against Vue 3.5's replace-on-identity-change behavior.
+/// Pins dynamic selection: a change of selected component identity replaces the mounted subtree
+/// rather than patching it, because the two components share no state. A plain dynamic string
+/// resolves to an element tag, never a registered component ([BLT-15]).
 /// </summary>
 public sealed class DynamicComponentTests : IDisposable
 {

@@ -26,7 +26,7 @@ namespace Assimalign.Viu.Syntax.Css;
 /// </para>
 /// <para>
 /// The surface is language-agnostic generic CSS construction: it knows nothing about utilities, variants,
-/// or themes. It builds ordinary selectors and Vue's reserved functional pseudos (<c>:deep()</c>,
+/// or themes. It builds ordinary selectors, and the reserved functional pseudos (<c>:deep()</c>,
 /// <c>:slotted()</c>, <c>:global()</c>) — which only the parser produces, and which the scoped rewrite,
 /// not construction, consumes — are intentionally out of scope; the factory builds ordinary pseudos only.
 /// Invalid arguments throw <see cref="ArgumentNullException"/>, matching the serializer entry points; the

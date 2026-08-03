@@ -4,10 +4,11 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
-// The [V01.01.06.10] canonical tag containers in .viu: <template> closes on the Vue nested-markup
+// The [V01.01.06.10] canonical tag containers in .viu: <template> closes on the nested-markup
 // boundary (attributes, comments, and nested raw-text elements cannot close it) and <style> is raw
-// text to its matching end tag — the exact rules the .vue engine uses, shared through
-// SingleFileComponentTagScanner. Upstream references:
+// text to its matching end tag — the exact rules the .vue engine uses, shared through one
+// SingleFileComponentTagScanner so the two containers cannot drift ([VUE-3]).
+// Container-format references for the .vue input:
 // https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-sfc/src/parse.ts and
 // https://github.com/vuejs/core/blob/v3.5.34/packages/compiler-core/src/tokenizer.ts.
 public class TagBlockParsingTests
@@ -42,8 +43,8 @@ public class TagBlockParsingTests
     [Fact]
     public void Parse_TemplateWithNonHtmlLang_IsRawText()
     {
-        // lang != "html" makes the template raw text (Vue's preprocessed-template rule), so nested
-        // tag-shaped text is not interpreted.
+        // lang != "html" declares a preprocessor language, so the template is scanned as raw text and
+        // nested tag-shaped text is not interpreted.
         var source = "<template lang=\"pug\">div\n  template this is text\n</template>\n";
 
         var result = SingleFileComponentParser.Parse(source);

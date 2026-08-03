@@ -5,11 +5,8 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The in-component navigation guard composables — the C# port of vue-router's
-/// <c>onBeforeRouteLeave</c> and <c>onBeforeRouteUpdate</c>
-/// (<c>packages/router/src/navigationGuards.ts</c>,
-/// https://router.vuejs.org/guide/advanced/navigation-guards.html#In-Component-Guards). Call them
-/// during a route component's <c>Setup</c>, passing its explicit
+/// The two in-component navigation guard registrations that need a live component instance. Call
+/// them during a route component's <c>Setup</c>, passing its explicit
 /// <see cref="IComponentContext"/>, to bind a guard to the record at that outlet depth. The guard
 /// runs while the record is <b>leaving</b> or being <b>reused</b> and is removed automatically when
 /// the component unmounts.
@@ -18,8 +15,9 @@ namespace Assimalign.Viu.Router;
 /// <b>Registration hooks the component lifecycle, not reflection.</b> Each call resolves the router
 /// from <see cref="IComponentContext.Services"/>, selects the current matched record at the explicit
 /// depth, and registers teardown through <see cref="IComponentLifecycle.OnUnmounted(Action)"/>.
-/// There is no hierarchical component-dependency fallback. The <c>beforeRouteEnter</c> guard, which has
-/// no mounted instance, is supplied explicitly on <see cref="RouteRecord"/>.
+/// There is no hierarchical component-dependency fallback ([CMP-24]), which is why the depth is
+/// explicit. The before-enter guard, which has no mounted instance to hook, is supplied explicitly on
+/// <see cref="RouteRecord.RouteEnterGuard"/> instead.
 /// </remarks>
 public static class RouterGuards
 {
@@ -87,8 +85,7 @@ public static class RouterGuards
         var remove = leaving
             ? router.RegisterLeaveGuard(record, guard)
             : router.RegisterUpdateGuard(record, guard);
-        // Bind removal to the component's teardown so a guard never outlives its instance (upstream:
-        // registerGuard -> onUnmounted(removeFromList)).
+        // Bind removal to the component's teardown so a guard never outlives its instance.
         context.Lifecycle.OnUnmounted(remove);
     }
 }

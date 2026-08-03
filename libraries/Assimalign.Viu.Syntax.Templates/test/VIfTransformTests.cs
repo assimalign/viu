@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
-// Ported from vuejs/core packages/compiler-core/__tests__/transforms/vIf.spec.ts: branch grouping into a
+// These cases ARE the contract for branch grouping into a
 // single IfNode, the conditional-expression codegen, stable per-branch keys, and the diagnostics.
 public class VIfTransformTests
 {

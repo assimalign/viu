@@ -24,8 +24,8 @@ every language library roots on. It ships no language of its own.
 
 | Library | Language |
 | --- | --- |
-| `Assimalign.Viu.Syntax.Templates` | The Vue template language (`@vue/compiler-core` + `compiler-dom` port) |
-| `Assimalign.Viu.Syntax.SingleFileComponent` | The `.viu` @-block container (`@vue/compiler-sfc` parity) |
+| `Assimalign.Viu.Syntax.Templates` | The Viu template language — HTML-flavored markup with directives and interpolation |
+| `Assimalign.Viu.Syntax.SingleFileComponent` | The `.viu` container, plus the `.vue` compatibility parser ([V01.01.06.09]) |
 | `Assimalign.Viu.Syntax.Css` | CSS (scaffold — raw stylesheet root today) |
 | `Assimalign.Viu.Syntax.Html` | Plain HTML documents, e.g. the WASM host page (scaffold) |
 | `Assimalign.Viu.Syntax.JavaScript` | JavaScript around the JS-interop boundary (scaffold) |

@@ -10,9 +10,10 @@ namespace Assimalign.Viu.Testing;
 /// A ready-to-use in-memory renderer for DOM-free component-tree tests.
 /// </summary>
 /// <remarks>
-/// This is the C# counterpart of Vue's runtime-test host:
-/// https://github.com/vuejs/core/tree/main/packages/runtime-test. Every host operation is recorded
-/// in <see cref="OperationLog"/>.
+/// A complete host implementation of the renderer's node-ops contract over an in-memory node tree,
+/// so component behavior is testable on a plain CoreCLR host with no DOM and no browser. Every host
+/// operation is recorded in <see cref="OperationLog"/>, which makes the <em>number</em> of host calls
+/// assertable — the property the interop budget depends on ([RND-IO-1]).
 /// </remarks>
 public sealed class TestRenderer
 {

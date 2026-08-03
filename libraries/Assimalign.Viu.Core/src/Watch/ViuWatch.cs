@@ -5,13 +5,12 @@ using Assimalign.Viu.Reactivity;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The runtime-bound watch API — the C# port of <c>watch</c>/<c>watchEffect</c> as Vue itself
-/// exports them (<c>packages/runtime-core/src/apiWatch.ts</c>,
-/// https://vuejs.org/api/reactivity-core.html#watch), layered over
+/// The runtime-bound watch API, layered over
 /// <see cref="Reactive.Watch{T}(Func{T}, WatchCallback{T}, WatchOptions)"/>. Two things distinguish
 /// it from the standalone reactivity watch: callbacks default to <see cref="WatchFlushMode.Pre"/>
-/// timing on the runtime scheduler (batched into, and running ahead of, the render flush —
-/// upstream's default), and a callback, effect-body, or getter exception routes through the
+/// timing on the runtime scheduler (batched into, and running ahead of, the render flush, so a
+/// watcher's own writes still land in the same render), and a callback, effect-body, or getter
+/// exception routes through the
 /// component <c>OnErrorCaptured</c> chain to the app-level
 /// <see cref="IApplicationContext.ErrorHandler"/> instead of tearing down the flush
 /// ([V01.01.03.12], issue #28). Call during <c>Setup</c> so the watcher joins the component's
@@ -23,7 +22,7 @@ namespace Assimalign.Viu;
 /// </summary>
 public static class ViuWatch
 {
-    /// <summary>Watches a reference source (upstream: <c>watch(ref, callback)</c>).</summary>
+    /// <summary>Watches a single reference source.</summary>
     /// <typeparam name="T">The watched value type.</typeparam>
     /// <param name="source">The reference to watch.</param>
     /// <param name="callback">Receives <c>(value, oldValue, onCleanup)</c> after a change.</param>
@@ -41,7 +40,7 @@ public static class ViuWatch
             RuntimeOptions(options, context));
     }
 
-    /// <summary>Watches a getter source (upstream: <c>watch(() =&gt; expr, callback)</c>).</summary>
+    /// <summary>Watches a getter source; its reactive reads define the dependency set.</summary>
     /// <typeparam name="T">The watched value type.</typeparam>
     /// <param name="source">The tracked getter.</param>
     /// <param name="callback">Receives <c>(value, oldValue, onCleanup)</c> after a change.</param>
@@ -60,8 +59,8 @@ public static class ViuWatch
     }
 
     /// <summary>
-    /// Watches a source-generated reactive object, deep by default (upstream:
-    /// <c>watch(reactiveObject, callback)</c>).
+    /// Watches a source-generated reactive object; deep by definition, since the object is mutated
+    /// in place rather than replaced.
     /// </summary>
     /// <typeparam name="TReactive">The reactive object type.</typeparam>
     /// <param name="source">The reactive object to watch.</param>
@@ -81,7 +80,7 @@ public static class ViuWatch
             RuntimeOptions(options, context));
     }
 
-    /// <summary>Watches multiple reference sources (upstream: <c>watch([refA, refB], callback)</c>).</summary>
+    /// <summary>Watches multiple reference sources, preserving each source's own previous value.</summary>
     /// <param name="sources">The references to watch.</param>
     /// <param name="callback">Receives the value and old-value arrays, index-aligned with <paramref name="sources"/>.</param>
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
@@ -98,7 +97,7 @@ public static class ViuWatch
             RuntimeOptions(options, context));
     }
 
-    /// <summary>Watches multiple getter sources (upstream: <c>watch([() =&gt; a, () =&gt; b], callback)</c>).</summary>
+    /// <summary>Watches multiple getter sources, preserving each source's own previous value.</summary>
     /// <param name="sources">The tracked getters.</param>
     /// <param name="callback">Receives the value and old-value arrays, index-aligned with <paramref name="sources"/>.</param>
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
@@ -124,7 +123,7 @@ public static class ViuWatch
 
     /// <summary>
     /// Runs <paramref name="effect"/> immediately and re-runs it when its tracked dependencies
-    /// change (upstream: <c>watchEffect(effect)</c>), on pre-flush runtime timing by default.
+    /// change, on pre-flush runtime timing by default.
     /// </summary>
     /// <param name="effect">The effect body; receives <c>onCleanup</c> for pre-re-run cleanup.</param>
     /// <param name="options">The watch options; null means pre-flush runtime defaults.</param>
@@ -158,7 +157,7 @@ public static class ViuWatch
             context?.WatchScheduler ?? new ApplicationWatchScheduler();
         if (options is null)
         {
-            // Upstream default: flush 'pre' on the runtime scheduler.
+            // Runtime default: pre-flush timing on the runtime scheduler.
             return new WatchOptions
             {
                 Flush = WatchFlushMode.Pre,
@@ -190,7 +189,7 @@ public static class ViuWatch
             }
             catch (Exception exception)
             {
-                // Upstream ErrorCodes.WATCH_CALLBACK: route up the captured chain to the app
+                // A throwing watch callback routes up the captured chain to the app
                 // handler; with no handler the error rethrows with its original stack.
                 ComponentErrorHandling.Handle(exception, context, "watcher callback");
             }
@@ -205,7 +204,7 @@ public static class ViuWatch
             }
             catch (Exception exception)
             {
-                // Upstream ErrorCodes.WATCH_GETTER; a handled getter error yields default so the
+                // A throwing watch getter routes the same way; a handled getter error yields default so the
                 // watcher stays alive, matching callWithErrorHandling returning undefined.
                 ComponentErrorHandling.Handle(exception, context, "watcher getter");
                 return default!;

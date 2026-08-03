@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Assimalign.Viu.Shared.Tests;
 
-// Pins the DOM knowledge tables of @vue/shared's domTagConfig.ts/domAttrConfig.ts,
-// cross-checked against WHATWG void elements and boolean attributes, plus the
-// one-authoritative-definition contract: the netstandard2.0 generator fixture (linked
+// Pins Viu's DOM knowledge tables against their defining specifications (WHATWG HTML for void
+// elements and boolean attributes, SVG 2 and MathML Core for the element and attribute tables),
+// plus the one-authoritative-definition contract: the netstandard2.0 generator fixture (linked
 // shared-source) must agree with the net10.0 frozen tables member-for-member.
 public class DomKnowledgeTests
 {
@@ -199,7 +199,7 @@ public class DomKnowledgeTests
         DomKnowledge.IsSsrSafeAttributeName(default(ReadOnlySpan<char>)).ShouldBeFalse(); // empty
     }
 
-    // --- generator-fixture parity: both consumption paths read one data definition ----------
+    // --- generator fixture: both consumption paths read one data definition -----------------
 
     [Fact]
     public void GeneratorFixture_HtmlTags_AgreeWithTheRuntimeTables()

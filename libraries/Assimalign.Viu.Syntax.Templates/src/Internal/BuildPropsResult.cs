@@ -6,9 +6,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The result of building an element's props: the props expression, the runtime directives to apply, the
-/// accumulated patch flag, the dynamic prop names, and whether the element must be forced into a block. The
-/// C# port of the return shape of Vue 3.5's <c>buildProps</c> (<c>@vue/compiler-core</c>
-/// <c>transforms/transformElement.ts</c>).
+/// accumulated patch flag, the dynamic prop names, and whether the element must be forced into a block.
 /// </summary>
 internal sealed record BuildPropsResult
 {

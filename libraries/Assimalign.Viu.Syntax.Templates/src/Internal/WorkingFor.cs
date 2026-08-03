@@ -4,8 +4,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// The mutable working form of a <see cref="ForNode"/> used while the transform pipeline traverses the tree.
-/// Mirrors the mutable <c>ForNode</c> upstream mutates in <c>@vue/compiler-core</c> <c>transforms/vFor.ts</c>;
-/// frozen into an immutable <see cref="ForNode"/> when consumed.
+/// Structural rewriting needs stable node identity and in-place child lists, which immutable records
+/// cannot provide; this working node is frozen into an immutable <see cref="ForNode"/> when consumed.
 /// </summary>
 internal sealed record WorkingFor : TemplateChildNode
 {

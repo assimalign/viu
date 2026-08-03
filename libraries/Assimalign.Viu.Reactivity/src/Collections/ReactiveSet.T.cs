@@ -5,16 +5,15 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// A reactive <see cref="ISet{T}"/> — the Viu counterpart of Vue 3.5's <c>Set</c> instrumentation
-/// (<c>packages/reactivity/src/collectionHandlers.ts</c>). Because C# cannot proxy
-/// <see cref="HashSet{T}"/>, this is a first-class implementation wrapping private storage with
-/// tracking built in.
+/// A reactive <see cref="ISet{T}"/>. With no object-proxy interception layer (<c>[RCT-6]</c>),
+/// reactive collections are dedicated types that implement the BCL collection interfaces over
+/// private storage with tracking built in, rather than wrappers around a BCL type.
 /// <para>
-/// Granularity mirrors upstream: each member has its own membership <see cref="Dependency"/> and
-/// there is one iteration dependency. <see cref="Contains"/> tracks that member; reading
-/// <see cref="Count"/> or enumerating tracks iteration. <see cref="Add(T)"/> of a new member or
-/// <see cref="Remove"/> of a present one triggers that member and iteration (upstream
-/// <c>ADD</c>/<c>DELETE</c>); a no-op add or remove triggers nothing. <see cref="Count"/> is
+/// Tracking is per member, not per collection: each member has its own membership
+/// <see cref="Dependency"/> and there is one iteration dependency. <see cref="Contains"/> tracks
+/// that member; reading <see cref="Count"/> or enumerating tracks iteration. <see cref="Add(T)"/>
+/// of a new member or <see cref="Remove"/> of a present one triggers that member and iteration;
+/// a no-op add or remove triggers nothing. <see cref="Count"/> is
 /// allocation-free once a member's dependency exists. Not thread-safe (single-threaded JS event-loop
 /// model).
 /// </para>
@@ -44,7 +43,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlyCollection<T>, IReactiveT
 
     /// <summary>
     /// The live underlying storage, exposed to <see cref="Reactive.ToRaw{T}(ReactiveSet{T})"/> as the
-    /// untracked raw view (Vue's <c>toRaw</c> on a reactive Set). Reads off it never track and writes
+    /// untracked raw view. Reads off it never track and writes
     /// through it never trigger — it is the same data, minus the instrumentation.
     /// </summary>
     internal HashSet<T> RawStorage => _items;

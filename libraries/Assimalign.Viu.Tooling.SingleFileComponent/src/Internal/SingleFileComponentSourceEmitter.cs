@@ -25,10 +25,10 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 internal static class SingleFileComponentSourceEmitter
 {
     /// <summary>
-    /// The fully qualified runtime render-helper surface the emitted render body binds against — the C#
-    /// analogue of upstream's function-mode <c>const { ... } = _Vue</c> helper import. The type ships
-    /// with the runtime block/vnode helpers ([V01.01.05.02] and follow-ups); the generator only ever
-    /// names it.
+    /// The fully qualified runtime render-helper surface the emitted render body binds against,
+    /// imported by a file-level <c>using static</c> so every emitted helper call resolves by simple
+    /// name. The type ships with the runtime block/render-node helpers ([V01.01.05.02] and
+    /// follow-ups); the generator only ever names it.
     /// </summary>
     private const string RenderHelperSurface = "global::Assimalign.Viu.RenderHelpers";
 
@@ -71,8 +71,8 @@ internal static class SingleFileComponentSourceEmitter
         if (model.RenderBody is not null)
         {
             // The by-name binding site for every emitted helper invocation (_openBlock,
-            // _createElementBlock, _toDisplayString, ...): file-level static imports, mirroring
-            // upstream's aliased helper preamble. The platform-neutral Core helper surface is always
+            // _createElementBlock, _toDisplayString, ...): file-level static imports, so the emitted
+            // body needs no per-call qualification. The platform-neutral Core helper surface is always
             // present. The Browser helper surface is imported only when the emitted body contains a
             // Browser-only helper, preserving host neutrality for ordinary components.
             builder.Append("using static ").Append(RenderHelperSurface).Append(";\n");
@@ -159,8 +159,7 @@ internal static class SingleFileComponentSourceEmitter
         if (model.RenderBody is { } renderBody)
         {
             // [V01.01.05.05] The compiled template render function. The body was serialized by the
-            // template compiler's RenderFunctionEmitter (the Vue 3.5 codegen.ts analogue) and is
-            // already indented for this nesting depth.
+            // template compiler's RenderFunctionEmitter and is already indented for this nesting depth.
             AppendIndent(builder, bodyIndent);
             builder.Append("/// <summary>\n");
             AppendIndent(builder, bodyIndent);
@@ -182,11 +181,11 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, bodyIndent);
             builder.Append("/// <summary>\n");
             AppendIndent(builder, bodyIndent);
-            builder.Append("/// The compiled render function for the component's template block ([V01.01.05.05]) — the C#\n");
+            builder.Append("/// The compiled render function for the component's template block ([V01.01.05.05]) — the\n");
             AppendIndent(builder, bodyIndent);
-            builder.Append("/// analogue of the component's compiled <c>render</c> in Vue 3.5 (vuejs/core\n");
+            builder.Append("/// output of the Viu template compiler for this component's template. The runtime\n");
             AppendIndent(builder, bodyIndent);
-            builder.Append("/// packages/compiler-core/src/codegen.ts). The runtime normalizes the returned value.\n");
+            builder.Append("/// normalizes the returned value.\n");
             AppendIndent(builder, bodyIndent);
             builder.Append("/// </summary>\n");
             AppendIndent(builder, bodyIndent);
@@ -372,9 +371,9 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// <summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("/// The component's display name (upstream: the component <c>name</c> option, inferred from the\n");
+        builder.Append("/// The component's display name, inferred from the <c>.viu</c> file name — surfaced to\n");
         AppendIndent(builder, indent);
-        builder.Append("/// <c>.viu</c> file name) — surfaced to runtime warnings and devtools.\n");
+        builder.Append("/// runtime warnings and devtools.\n");
         AppendIndent(builder, indent);
         builder.Append("/// </summary>\n");
         AppendIndent(builder, indent);
@@ -403,7 +402,7 @@ internal static class SingleFileComponentSourceEmitter
             builder.Append('\n');
             AppendIndent(builder, indent);
             builder.Append("/// <summary>\n");
-            builder.Append("/// The current parent-provided slots (upstream: <c>_ctx.$slots</c>), exposed under\n");
+            builder.Append("/// The current parent-provided slots — the template's <c>$slots</c> — exposed under\n");
             AppendIndent(builder, indent);
             builder.Append("/// the C#-legal name consumed by the compiled render function.\n");
             AppendIndent(builder, indent);
@@ -423,9 +422,7 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// <summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("/// The component setup entry point (upstream: <c>setup(props, context)</c>,\n");
-        AppendIndent(builder, indent);
-        builder.Append("/// https://vuejs.org/api/composition-api-setup.html) generated for this template component\n");
+        builder.Append("/// The component setup entry point generated for this template component\n");
         AppendIndent(builder, indent);
         builder.Append("/// ([V01.01.06.07]). It runs once per mount, assigns <see cref=\"Context\"/>, invokes\n");
         AppendIndent(builder, indent);
@@ -648,8 +645,8 @@ internal static class SingleFileComponentSourceEmitter
     // [V01.01.06.04] The style seam — emitted at the tail of the class body so it never interleaves with
     // the @script merge region. When the component declares style blocks, their compiled CSS rides as an
     // ExtractedStyles value and, for scoped components, the ScopeId constant carries the data-v-<hash>
-    // the renderer stamps on elements (the C# analogue of Vue's component __scopeId). No style block
-    // leaves the seam as a documenting comment, matching the render/script seams.
+    // the renderer stamps on elements. No style block leaves the seam as a documenting comment,
+    // matching the render/script seams.
     private static void AppendStyleSeam(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
         if (model.ExtractedStyles is not { } styles)
@@ -674,7 +671,7 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, indent);
             builder.Append("/// <summary>\n");
             AppendIndent(builder, indent);
-            builder.Append("/// The scoped-CSS scope id — the C# analogue of Vue 3.5's component <c>__scopeId</c>. The runtime\n");
+            builder.Append("/// The scoped-CSS scope id, derived from the component's project-relative path. The runtime\n");
             AppendIndent(builder, indent);
             builder.Append("/// renderer stamps this <c>data-v-&lt;hash&gt;</c> attribute on the component's own elements.\n");
             AppendIndent(builder, indent);
@@ -707,9 +704,9 @@ internal static class SingleFileComponentSourceEmitter
     }
 
     // [V01.01.06.06] The style module accessor seam. Each `module` block's original -> hashed class map is
-    // emitted as a nested static class (the C# analogue of Vue's `$style` / useCssModule()) whose const
-    // members mirror the declared class names, so a reference to a class that does not exist is a compile
-    // error. Blocks that share an accessor (several `module` style blocks, or `module="name"` repeated)
+    // emitted as a nested static class — the compiled form of the template's `$style` object — whose
+    // const members carry the declared class names, so a reference to a class that does not exist is a
+    // compile error. Blocks that share an accessor (several `module` style blocks, or `module="name"` repeated)
     // merge into one class; a duplicate member is emitted once.
     private static void AppendModuleAccessors(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
@@ -745,9 +742,9 @@ internal static class SingleFileComponentSourceEmitter
             AppendIndent(builder, indent);
             builder.Append("/// <summary>\n");
             AppendIndent(builder, indent);
-            builder.Append("/// The typed CSS Modules accessor for this component's <c>module</c> style block — the C#\n");
+            builder.Append("/// The typed CSS Modules accessor for this component's <c>module</c> style block — the\n");
             AppendIndent(builder, indent);
-            builder.Append("/// analogue of Vue 3.5's <c>$style</c> / <c>useCssModule()</c>. Each member is the locally-hashed\n");
+            builder.Append("/// compiled form of the template's <c>$style</c> object. Each member is the locally-hashed\n");
             AppendIndent(builder, indent);
             builder.Append("/// name of the like-named source class, so a reference to an undeclared class fails to compile.\n");
             AppendIndent(builder, indent);
@@ -789,11 +786,11 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// <summary>\n");
         AppendIndent(builder, indent);
-        builder.Append("/// Registers this component's <c>v-bind()</c> CSS custom properties with <c>UseCssVariables</c>\n");
+        builder.Append("/// Registers this component's <c>v-bind()</c> CSS custom properties with the\n");
         AppendIndent(builder, indent);
-        builder.Append("/// runtime ([V01.01.06.06]) — the C# analogue of the compiled <c>useCssVars(...)</c> call in Vue\n");
+        builder.Append("/// <c>UseCssVariables</c> runtime ([V01.01.06.06]).\n");
         AppendIndent(builder, indent);
-        builder.Append("/// 3.5's setup. Call once during the component's setup; the runtime applies the evaluated values as\n");
+        builder.Append("/// Call once during the component's setup; the runtime applies the evaluated values as\n");
         AppendIndent(builder, indent);
         builder.Append("/// <c>--&lt;hash&gt;</c> custom properties on the root element(s) and re-applies them on the next flush\n");
         AppendIndent(builder, indent);

@@ -5,11 +5,10 @@ using System.Text;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// Splits a route path string into segments of <see cref="PathToken"/>s. The C# port of
-/// vue-router's <c>tokenizePath</c> (<c>packages/router/src/matcher/pathTokenizer.ts</c>),
-/// reproducing its character-by-character state machine so that dynamic (<c>:id</c>), optional
-/// (<c>:id?</c>), repeatable (<c>:id+</c>/<c>:id*</c>), and custom-pattern (<c>:id(\d+)</c>)
-/// parameters — plus sub-segment mixes like <c>/user-:id</c> — tokenize identically to upstream.
+/// Splits a route path string into segments of <see cref="PathToken"/>s. A character-by-character
+/// state machine covering dynamic (<c>:id</c>), optional (<c>:id?</c>), repeatable
+/// (<c>:id+</c>/<c>:id*</c>), and custom-pattern (<c>:id(\d+)</c>) parameters, plus sub-segment
+/// mixes such as <c>/user-:id</c> where literal text and a parameter share one segment.
 /// </summary>
 /// <remarks>
 /// This is compile-time-free tokenization (no regular expressions, no reflection), so it is fully
@@ -17,8 +16,8 @@ namespace Assimalign.Viu.Router;
 /// </remarks>
 internal static class PathTokenizer
 {
-    // Upstream ROOT_TOKEN: tokenizePath("/") is a single segment holding one empty Static token,
-    // which the ranker scores as Segment + Static (not the empty-segment Root bonus).
+    // The root path "/" tokenizes to a single segment holding one empty Static token, which the
+    // ranker scores as Segment + Static (not the empty-segment Root bonus).
     private static readonly PathToken[] RootSegment = [PathToken.Static(string.Empty)];
 
     private enum TokenizerState
@@ -45,7 +44,7 @@ internal static class PathTokenizer
 
         if (path.Length == 0)
         {
-            // Upstream: `if (!path) return [[]]` — one empty segment.
+            // An empty path tokenizes to one empty segment.
             return [[]];
         }
         if (path == "/")
@@ -92,7 +91,7 @@ internal static class PathTokenizer
             {
                 var repeatable = triggeringCharacter is '*' or '+';
                 var optional = triggeringCharacter is '*' or '?';
-                // Upstream checks `segment.length > 1` — counting only the tokens already pushed
+                // Counting only the tokens already pushed
                 // ahead of this parameter — so a static prefix like "/user-:id+" is allowed.
                 if (segment!.Count > 1 && repeatable)
                 {
@@ -206,7 +205,7 @@ internal static class PathTokenizer
         return tokens;
     }
 
-    // Upstream VALID_PARAM_RE = /[a-zA-Z0-9_]/ — checked directly to avoid a regular expression.
+    // Valid parameter-name characters, checked directly to avoid a regular expression.
     private static bool IsValidParameterNameCharacter(char character)
         => char.IsAsciiLetterOrDigit(character) || character == '_';
 }

@@ -8,10 +8,9 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// An immutable route definition: a path, an optional name, optional nested children, optional
 /// metadata, the component (with its props resolver) the route renders, and an optional per-record
-/// <see cref="BeforeEnter"/> navigation guard. The C# port of vue-router's route record (the
-/// <c>RouteRecordRaw</c> input and the normalized <c>RouteRecord</c>; see https://router.vuejs.org and
-/// <c>packages/router/src/types/index.ts</c>). Redirects and aliases belong to later router features
-/// and are intentionally not modeled here.
+/// <see cref="BeforeEnter"/> navigation guard. One record type serves as both the declaration and
+/// the normalized table entry, so there is no second shape to keep in sync. Redirects and aliases
+/// belong to later router features and are intentionally not modeled here.
 /// </summary>
 /// <remarks>
 /// A reference type with identity semantics: the same instance appears in every resolved
@@ -31,23 +30,22 @@ public sealed class RouteRecord
     /// </param>
     /// <param name="name">An optional unique route name, used for named resolution.</param>
     /// <param name="children">Optional nested child records.</param>
-    /// <param name="meta">Optional arbitrary metadata (upstream <c>meta</c>).</param>
+    /// <param name="meta">Optional arbitrary metadata, merged into every resolved location that matches this record.</param>
     /// <param name="component">
-    /// The component <see cref="RouterView"/> renders for this record (upstream <c>component</c> /
-    /// <c>components.default</c>), or <see langword="null"/> when the record is a component-less
-    /// grouping path.
+    /// The component <see cref="RouterView"/> renders for this record, or <see langword="null"/> when
+    /// the record is a component-less grouping path.
     /// </param>
     /// <param name="argumentsResolver">
-    /// Resolves the arguments passed to <paramref name="component"/> (upstream <c>props</c>): use
-    /// <see cref="RouteComponentArguments.FromParameters"/> for the <c>props: true</c> form,
-    /// <see cref="RouteComponentArguments.FromValues"/> for static props, or a hand-written resolver
-    /// for the function form. <see langword="null"/> passes no props.
+    /// Resolves the arguments passed to <paramref name="component"/>: use
+    /// <see cref="RouteComponentArguments.FromParameters"/> to forward the route parameters,
+    /// <see cref="RouteComponentArguments.FromValues"/> for a fixed argument set, or a hand-written
+    /// resolver for anything else. <see langword="null"/> passes no arguments.
     /// </param>
     /// <param name="beforeEnter">
-    /// An optional guard run when this record is entered (upstream <c>beforeEnter</c>): the pipeline
-    /// invokes it, after the global <c>beforeEach</c> and reused-record <c>beforeRouteUpdate</c> guards
-    /// and before any in-component <see cref="IRouteEnterGuard"/>, only for a navigation in which this
-    /// record is newly matched. <see langword="null"/> registers no per-record enter guard.
+    /// An optional guard run when this record is entered: the pipeline invokes it after the global
+    /// before-each and reused-record before-update guards and before any in-component
+    /// <see cref="IRouteEnterGuard"/>, only for a navigation in which this record is newly matched.
+    /// <see langword="null"/> registers no per-record enter guard.
     /// </param>
     /// <param name="routeEnterGuard">
     /// An optional component-associated enter guard that runs after async component resolution and
@@ -87,37 +85,36 @@ public sealed class RouteRecord
         RouteEnterGuard = routeEnterGuard;
     }
 
-    /// <summary>The route path as declared (before parent joining). Upstream <c>path</c>.</summary>
+    /// <summary>The route path as declared, before parent joining.</summary>
     public string Path { get; }
 
-    /// <summary>The optional unique route name. Upstream <c>name</c>.</summary>
+    /// <summary>The optional unique route name; the key for named resolution.</summary>
     public string? Name { get; }
 
-    /// <summary>The nested child records. Upstream <c>children</c>.</summary>
+    /// <summary>The nested child records.</summary>
     public IReadOnlyList<RouteRecord> Children { get; }
 
-    /// <summary>Arbitrary metadata carried by the record and merged into resolved locations. Upstream <c>meta</c>.</summary>
+    /// <summary>Arbitrary metadata carried by the record and merged into resolved locations.</summary>
     public IReadOnlyDictionary<string, object?> Meta { get; }
 
     /// <summary>
-    /// The component <see cref="RouterView"/> renders when this record is matched at its depth
-    /// (upstream <c>component</c>), or <see langword="null"/> for a component-less grouping path. The
-    /// matcher ignores this field — it is consumed only by the view components.
+    /// The component <see cref="RouterView"/> renders when this record is matched at its depth, or
+    /// <see langword="null"/> for a component-less grouping path. The matcher ignores this field — it
+    /// is consumed only by the view components.
     /// </summary>
     public IComponent? Component { get; }
 
     /// <summary>
-    /// Resolves the props passed to <see cref="Component"/> from the resolved location (upstream
-    /// <c>props</c>), or <see langword="null"/> to pass none. See
-    /// <see cref="RouteComponentArguments"/> for the <c>props: true</c> and static-object forms.
+    /// Resolves the arguments passed to <see cref="Component"/> from the resolved location, or
+    /// <see langword="null"/> to pass none. See <see cref="RouteComponentArguments"/> for the two
+    /// declarative forms.
     /// </summary>
     public RouteComponentArgumentsResolver? ArgumentsResolver { get; }
 
     /// <summary>
-    /// The per-record guard run when this record is entered (upstream <c>beforeEnter</c>,
-    /// https://router.vuejs.org/guide/advanced/navigation-guards.html#Per-Route-Guard), or
-    /// <see langword="null"/>. It fires only for a navigation in which this record is newly matched
-    /// (not reused), consistent with vue-router.
+    /// The per-record guard run when this record is entered, or <see langword="null"/>. It fires only
+    /// for a navigation in which this record is newly matched — a record that stays matched across a
+    /// navigation is reused, not re-entered, so its guard does not run again.
     /// </summary>
     public NavigationGuard? BeforeEnter { get; }
 

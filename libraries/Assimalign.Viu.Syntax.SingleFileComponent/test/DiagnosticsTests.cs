@@ -7,8 +7,9 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 // Malformed input produces structured, located diagnostics; the parser recovers and never throws for
-// bad content, reporting multiple problems in one pass. These are Viu-defined codes
-// (SingleFileComponentErrorCode) — the hybrid container has no upstream vuejs/core numbering to mirror.
+// bad content, reporting multiple problems in one pass ([SFC-DIAG-1]). The codes come from the
+// container's own 1000-based SingleFileComponentErrorCode catalog, kept distinct from the template
+// compiler's CompilerErrorCode so a reader can tell which stage reported a code.
 // Legacy-container migration warnings (1015/1016) are pinned in LegacyBlockSyntaxTests; the
 // <script>-tag rejection (1017) in ScriptTagDiagnosticTests.
 public class DiagnosticsTests

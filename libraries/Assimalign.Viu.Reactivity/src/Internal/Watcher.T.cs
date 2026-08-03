@@ -3,8 +3,8 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// The value-watching <see cref="Watcher"/> behind <c>Watch(source, callback)</c> — the C# port of
-/// the getter/old-value/callback loop in Vue 3.5's <c>baseWatch</c>
+/// The value-watching <see cref="Watcher"/> behind <c>Watch(source, callback)</c> — the
+/// getter/old-value/callback loop underneath
 /// (<c>packages/reactivity/src/watch.ts</c>). Each reaction re-runs the (possibly deep-traversing)
 /// getter inside the effect to collect the new value and refresh dependencies, then delivers the
 /// callback when the value changed — or unconditionally for a deep/forced watcher. The previous value
@@ -41,7 +41,7 @@ internal sealed class Watcher<T> : Watcher
         Initialize();
         try
         {
-            // Initial tracked run: collect dependencies and the baseline value (upstream runs the
+            // Initial tracked run: collect dependencies and the baseline value (the getter runs the
             // getter immediately so oldValue is populated for the first real change).
             Effect.Run();
             var initial = _pendingValue;
@@ -55,7 +55,7 @@ internal sealed class Watcher<T> : Watcher
         }
         catch
         {
-            // A throwing initial run leaves no live subscription (Reactive.Effect parity).
+            // A throwing initial run leaves no live subscription, matching Reactive.Effect.
             Stop();
             throw;
         }

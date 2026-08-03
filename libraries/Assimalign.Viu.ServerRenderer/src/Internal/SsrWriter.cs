@@ -7,9 +7,7 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The single character sink every node serializes into — the C# realization of the <c>push</c>
-/// function threaded through <c>@vue/server-renderer</c>'s render pipeline
-/// (<c>packages/server-renderer/src/render.ts</c>). One <see cref="StringBuilder"/> is threaded
+/// The single character sink every node serializes into. One <see cref="StringBuilder"/> is threaded
 /// through the whole render (never per-node string concatenation, the throughput reason the area
 /// exists): <see cref="Append(string)"/> is the hot path and never allocates beyond the builder's own
 /// growth. In string mode (<c>sink</c> null) the builder accumulates the whole document,
@@ -38,14 +36,13 @@ internal sealed class SsrWriter
     /// <summary>Whether this writer streams to a backing <see cref="TextWriter"/> (as opposed to accumulating).</summary>
     public bool IsStreaming => _sink is not null;
 
-    /// <summary>Appends a serialized chunk (upstream: <c>push(string)</c>). The hot path — no I/O.</summary>
+    /// <summary>Appends a serialized chunk. The hot path — no I/O.</summary>
     /// <param name="chunk">The already-escaped HTML fragment.</param>
     public void Append(string chunk) => _builder.Append(chunk);
 
     /// <summary>
-    /// Drains buffered content to the backing writer and awaits its flush (upstream: the point where an
-    /// unrolled buffer segment is written). A no-op for an accumulating writer, so the same call sites
-    /// serve both modes.
+    /// Drains buffered content to the backing writer and awaits its flush. A no-op for an accumulating
+    /// writer, so the same call sites serve both modes.
     /// </summary>
     /// <param name="cancellationToken">Cancels a pending write/flush.</param>
     public async Task FlushAsync(CancellationToken cancellationToken = default)

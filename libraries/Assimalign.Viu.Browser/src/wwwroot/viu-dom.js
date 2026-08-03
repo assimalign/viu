@@ -1,6 +1,5 @@
-// The JS half of the Assimalign.Viu.Browser interop bridge — the browser implementation of
-// Vue's nodeOps contract (@vue/runtime-dom nodeOps:
-// https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/nodeOps.ts).
+// The JS half of the Assimalign.Viu.Browser interop bridge: the dumb applier behind the host
+// operations Core's renderer needs. Policy lives in C#; this file only executes.
 //
 // Contract notes:
 // - Handles are positive integers; 0 is the reserved "no node" sentinel.
@@ -190,9 +189,10 @@ function readCommandStrings(bytes, view, offset) {
 }
 
 // --- transition end-detection ([V01.01.04.07]) -----------------------------------------------------
-// Ported from @vue/runtime-dom Transition.ts getTransitionInfo/getTimeout/toMs: read getComputedStyle,
-// distinguish transition vs animation, pick the longer when both exist, and count transitioned
-// properties. Used by dom.whenTransitionEnds and dom.hasCssTransform.
+// Read getComputedStyle, distinguish transition vs animation, pick the longer when both exist, and
+// count transitioned properties. This runs JS-side because it is a computed-style read: doing it in
+// .NET would cost one boundary crossing per property. Used by dom.whenTransitionEnds and
+// dom.hasCssTransform.
 
 const TRANSITION = 'transition'
 const ANIMATION = 'animation'
@@ -373,14 +373,14 @@ export const dom = {
     },
 
     // Inserts a multi-node static HTML chunk in ONE interop call via a detached <template>,
-    // returning [firstHandle, lastHandle] as anchors for later patches (upstream:
-    // insertStaticContent).
+    // returning [firstHandle, lastHandle] as anchors for later patches.
     insertStaticContent: (content, parentHandle, anchorHandle, namespaceName) => {
         const parent = getNode('insertStaticContent', parentHandle)
         const anchor = anchorHandle === 0 ? null : getNode('insertStaticContent', anchorHandle)
         const template = document.createElement('template')
         if (namespaceName === 'svg' || namespaceName === 'mathml') {
-            // Parse inside the foreign-content root, then unwrap (upstream approach).
+            // Parse inside the foreign-content root, then unwrap: SVG and MathML markup only parses
+            // correctly under its own root element.
             template.innerHTML = namespaceName === 'svg' ? `<svg>${content}</svg>` : `<math>${content}</math>`
             const wrapper = template.content.firstChild
             const fragment = document.createDocumentFragment()
@@ -438,7 +438,7 @@ export const dom = {
     },
 
     // Compare-and-set in one interop call so an unchanged value never touches the DOM —
-    // protects caret position and in-progress IME composition (upstream value handling).
+    // protects caret position and in-progress IME composition.
     setValueGuarded: (nodeHandle, value) => {
         const element = getNode('setValueGuarded', nodeHandle)
         if (element.value !== value) {
@@ -461,7 +461,7 @@ export const dom = {
 
     // Batches the v-bind() CSS custom properties for one root element into a single crossing
     // ([V01.01.06.06]): the .NET UseCssVariables runtime passes index-aligned name/value arrays (names include
-    // the leading '--') and this loops style.setProperty, matching upstream setVarsOnNode.
+    // the leading '--') and this loops style.setProperty.
     setCssVars: (nodeHandle, names, values) => {
         const style = getNode('setCssVars', nodeHandle).style
         for (let index = 0; index < names.length; index++) {
@@ -471,8 +471,8 @@ export const dom = {
 
     // --- events (invoker pattern: one listener per (element, event, capture); handler
     // changes are .NET-side delegate swaps with no listener churn; the attach-timestamp guard
-    // ignores events that fired before their listener was attached, matching Vue's
-    // e.timeStamp < invoker.attached check) --------------------------------------------------
+    // ignores events that fired before their listener was attached, by comparing e.timeStamp
+    // against the attach time) ----------------------------------------------------------------
 
     addEventListener: (nodeHandle, eventName, once, capture, passive) => {
         const node = getNode('addEventListener', nodeHandle)
@@ -489,8 +489,8 @@ export const dom = {
 
         const attached = performance.now()
         const listener = event => {
-            // Upstream parity: an event that fired before this listener attached (e.g. one
-            // bubbling into a parent whose handler landed in the same patch) is ignored.
+            // An event that fired before this listener attached (e.g. one bubbling into a parent
+            // whose handler landed in the same patch) is ignored: it predates the handler.
             if (event.timeStamp < attached) {
                 return
             }
@@ -521,8 +521,8 @@ export const dom = {
                 target === event.currentTarget,
                 hasValue ? String(target.value) : null,
                 !!(target && target.checked),
-                // The live event's arrival-time preventDefault: a host bridge honors upstream
-                // RouterLink guardEvent's already-prevented bail ([V01.01.08.03.01]).
+                // The live event's arrival-time preventDefault, so a host bridge can honor a router
+                // link's already-prevented bail ([V01.01.08.03.01]).
                 event.defaultPrevented,
                 selectedValues)
             if (flags & 1) {
@@ -590,15 +590,15 @@ export const dom = {
     },
 
     // Wait for two animation frames so the from-class has painted before the to-class is applied
-    // (upstream nextFrame): the browser coalesces same-frame class add+remove otherwise.
+    // the browser coalesces a same-frame class add+remove otherwise, and nothing animates.
     nextFrame: callback => {
         requestAnimationFrame(() => requestAnimationFrame(() => callback()))
     },
 
     forceReflow: () => document.body.offsetHeight,
 
-    // Resolve when the element's transition/animation ends, or after a fallback timeout (upstream
-    // whenTransitionEnds). A stale-guard (el.__endId) ignores a resolve superseded by a newer call.
+    // Resolve when the element's transition/animation ends, or after a fallback timeout.
+    // A stale-guard (el.__endId) ignores a resolve superseded by a newer call.
     whenTransitionEnds: (nodeHandle, expectedType, explicitTimeout, resolve) => {
         const el = getNode('whenTransitionEnds', nodeHandle)
         const id = (el.__endId = (el.__endId || 0) + 1)
@@ -619,8 +619,9 @@ export const dom = {
 
     // Batched FLIP snapshot read ([V01.01.04.07.03]): N element handles cross the boundary once and the
     // flat [left0, top0, scaleX0, scaleY0, ...] result returns once, so reordering N children costs a
-    // single interop crossing per pass rather than one per child. The scale terms preserve Vue 3.5's
-    // move distance under transformed ancestors. Decision logic (deltas, who moved) stays .NET-side.
+    // single interop crossing per pass rather than one per child. The scale terms keep the measured
+    // move distance correct under transformed ancestors, where a raw rect delta would be scaled.
+    // Decision logic (deltas, who moved) stays .NET-side.
     measurePositions: handles => {
         const result = new Array(handles.length * 4)
         for (let index = 0; index < handles.length; index++) {
@@ -652,7 +653,8 @@ export const dom = {
     },
 
     // Clone the element (minus its live transition classes), add the move class, and read whether it
-    // gains a transform transition (upstream hasCSSTransform) — skips the FLIP when nothing animates.
+    // gains a transform transition — skips the FLIP when nothing would animate. Probing a clone
+    // keeps the live element's in-flight transition undisturbed.
     hasCssTransform: (nodeHandle, rootHandle, moveClass) => {
         const el = getNode('hasCssTransform', nodeHandle)
         const clone = el.cloneNode()
@@ -669,7 +671,7 @@ export const dom = {
         return hasTransform
     },
 
-    // Resolve when the FLIP transform transition ends (upstream _moveCb): only a transform property
+    // Resolve when the FLIP transform transition ends: only a transform property
     // (or a forced no-event finish) counts, so unrelated transitionend events are ignored.
     whenMoveEnds: (nodeHandle, resolve) => {
         const el = getNode('whenMoveEnds', nodeHandle)
@@ -747,7 +749,7 @@ export const dom = {
                 case 23: dom.forceReflow(); break
                 // FLIP move write pass ([V01.01.04.07.03]): every reordered child's inverting transform,
                 // then the reflow barrier (23), then the move class (21) + transform clear (25) ride one
-                // frame in upstream order, so N moved children commit in a single interop crossing.
+                // frame in that order, so N moved children commit in a single interop crossing.
                 case 24: dom.setMoveTransform(int(), num(), num()); break
                 case 25: dom.clearMoveStyles(int()); break
                 default: fail('applyCommandBuffer', 0, `unknown opcode ${opcode}`)

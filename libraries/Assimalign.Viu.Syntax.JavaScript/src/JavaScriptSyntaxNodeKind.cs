@@ -3,8 +3,9 @@ namespace Assimalign.Viu.Syntax.JavaScript;
 /// <summary>
 /// Discriminates the kinds of node the JavaScript parser produces, following the ECMAScript grammar's
 /// top-level shape (ECMA-262,
-/// https://tc39.es/ecma262/#sec-ecmascript-language-scripts-and-modules). The catalog is Viu-defined
-/// (there is no upstream Vue numbering to pin) and grows as statement-level parsing lands.
+/// https://tc39.es/ecma262/#sec-ecmascript-language-scripts-and-modules). The catalog is Viu's own;
+/// values are additive only, because <see cref="JavaScriptSyntaxNode.RawKind"/> projects them for
+/// language-agnostic infrastructure. It grows as statement-level parsing lands.
 /// </summary>
 public enum JavaScriptSyntaxNodeKind
 {

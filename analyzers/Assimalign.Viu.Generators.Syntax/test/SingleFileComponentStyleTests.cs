@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// <c>data-v-&lt;hash&gt;</c> scope id and surface as the <c>ScopeId</c>/<c>ExtractedStyles</c> constants,
 /// non-scoped blocks pass through unmodified, and CSS parse diagnostics flow through the style-origin
 /// envelope onto exact <c>.viu</c> coordinates. The scoped-selector semantics themselves are pinned in the
-/// Css library's <c>CssScopedRewriterTests</c> against upstream; these tests pin the generator wiring.
+/// Css library's <c>CssScopedRewriterTests</c>; these tests pin the generator wiring.
 /// </summary>
 public sealed class SingleFileComponentStyleTests
 {
@@ -40,7 +40,8 @@ public sealed class SingleFileComponentStyleTests
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
         generated.ShouldContain("internal const string ScopeId = \"data-v-");
-        // The scoped rewrite lands the attribute on the last compound only (upstream scoping parity).
+        // The scoped rewrite lands the attribute on the last compound only, so a descendant selector still
+        // matches through untagged intermediate elements instead of requiring every level to be scoped.
         generated.ShouldContain(".box .inner[data-v-");
         generated.ShouldContain("internal const string ExtractedStyles =");
     }

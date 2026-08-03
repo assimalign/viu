@@ -3,9 +3,9 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// A listener invoked when the history location changes outside an application-initiated
 /// <see cref="IRouterHistory.Push"/>/<see cref="IRouterHistory.Replace"/> — a browser back/forward
-/// (<c>popstate</c>) or a memory <see cref="IRouterHistory.Go"/>. The C# port of vue-router's
-/// <c>NavigationCallback</c> (<c>packages/router/src/history/common.ts</c>); the navigation
-/// pipeline ([V01.01.08.04]) registers one to drive resolution and guards on browser navigation.
+/// (<c>popstate</c>) or a memory <see cref="IRouterHistory.Go"/>. The navigation pipeline
+/// ([V01.01.08.04]) registers one through <see cref="IRouterHistory.Listen"/> to drive resolution
+/// and guards for a navigation the application did not initiate.
 /// </summary>
 /// <param name="to">The location navigated to (base already stripped).</param>
 /// <param name="from">The location navigated from.</param>

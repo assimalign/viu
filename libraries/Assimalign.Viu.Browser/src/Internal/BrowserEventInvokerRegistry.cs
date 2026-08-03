@@ -6,22 +6,22 @@ using System.Threading.Tasks;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The invoker pattern of <c>@vue/runtime-dom</c>'s events module
-/// (https://github.com/vuejs/core/blob/main/packages/runtime-dom/src/modules/events.ts):
-/// exactly one DOM listener is attached per (element, event, options-signature), and a
-/// re-render that changes the handler only swaps the invoker's .NET delegate — zero
-/// <c>addEventListener</c>/<c>removeEventListener</c> interop calls. Prop-name suffixes parse
-/// per Vue (<c>onClickOnce</c>, <c>onClickCapture</c>, <c>onClickPassive</c>, combined).
+/// The invoker pattern ([RND-IO-2]): exactly one DOM listener is attached per (element, event,
+/// options-signature), and a re-render that changes the handler only swaps the invoker's .NET
+/// delegate — zero <c>addEventListener</c>/<c>removeEventListener</c> interop calls. That is the
+/// difference between per-render listener churn and none at all, which is why handler identity is
+/// never allowed to reach the bridge. Prop-name suffixes parse from the name
+/// (<c>onClickOnce</c>, <c>onClickCapture</c>, <c>onClickPassive</c>, combined).
 /// Bridge calls are injected delegates so the registry is unit-testable with no browser.
 /// Handler exceptions route to <see cref="ErrorSink"/> instead of escaping into the JS
 /// listener (the app-level pipeline plugs in with [V01.01.03.12]).
 /// <para>
 /// Each invoker carries two independent handler channels for the same DOM event: the
 /// <em>property</em> channel (a template <c>@event</c> / <c>onX</c> prop) and the <em>model</em>
-/// channel (a <c>v-model</c> directive listener, [V01.01.04.06]). Upstream adds the directive's
-/// listener with a separate raw <c>addEventListener</c>; a single shared DOM listener plus two
-/// .NET channels reproduces that coexistence without a second interop listener — both fire, in
-/// property-then-model order.
+/// channel (a <c>v-model</c> directive listener, [V01.01.04.06]). A directive listener and a
+/// template handler on the same element must coexist; one shared DOM listener plus two .NET
+/// channels achieves that without a second interop listener — both fire, in property-then-model
+/// order.
 /// </para>
 /// Not thread-safe (single-threaded JS event-loop model).
 /// </summary>
@@ -44,14 +44,14 @@ internal sealed class BrowserEventInvokerRegistry
     /// pipeline ([V01.01.03.12]) replaces it. Never null.
     /// </summary>
     internal Action<Exception> ErrorSink { get; set; } = static exception =>
-        Debug.WriteLine($"[Vue warn] Unhandled error in event handler: {exception}");
+        Debug.WriteLine($"[Viu warn] Unhandled error in event handler: {exception}");
 
     /// <summary>The number of live invokers (diagnostics).</summary>
     internal int InvokerCount => _invokers.Count;
 
     /// <summary>
-    /// Sets, swaps, or removes the property-channel handler for a raw event prop (upstream:
-    /// <c>patchEvent</c>).
+    /// Sets, swaps, or removes the property-channel handler for a raw event prop — the handler a
+    /// template <c>@event</c> / <c>onX</c> binding produced.
     /// </summary>
     /// <param name="nodeHandle">The element handle.</param>
     /// <param name="rawPropertyName">The full prop name (e.g. <c>"onClickCaptureOnce"</c>).</param>
@@ -62,8 +62,7 @@ internal sealed class BrowserEventInvokerRegistry
     /// <summary>
     /// Sets, swaps, or removes the model-channel handler for a raw event prop — the listener a
     /// <c>v-model</c> directive attaches ([V01.01.04.06]). Independent of the property channel, so
-    /// a directive listener and a template <c>@event</c> handler on the same element coexist
-    /// (upstream: v-model uses a separate raw listener).
+    /// a directive listener and a template <c>@event</c> handler on the same element coexist.
     /// </summary>
     /// <param name="nodeHandle">The element handle.</param>
     /// <param name="rawPropertyName">The full prop name (e.g. <c>"onInput"</c>, <c>"onChange"</c>).</param>
@@ -164,8 +163,7 @@ internal sealed class BrowserEventInvokerRegistry
                     // payload, not the BrowserEvent. The installed bridge builds that payload, invokes
                     // the handler, and applies its prevent/stop decision back to browserEvent (whose
                     // response flags re-cross the boundary). With no bridge installed the handler cannot
-                    // be serviced, so surface it — upstream has no equivalent, since JS handlers always
-                    // receive the DOM event.
+                    // be serviced, so surface it rather than dropping the event silently.
                     if (BrowserObjectEvents.Invoker is { } objectInvoker)
                     {
                         objectInvoker(objectHandler, browserEvent);
@@ -308,7 +306,7 @@ internal sealed class BrowserEventInvokerRegistry
     }
 
     /// <summary>
-    /// Parses a Vue event prop name (upstream: <c>parseName</c>): the trailing
+    /// Parses an event prop name: the trailing
     /// <c>Once</c>/<c>Capture</c>/<c>Passive</c> suffixes map to listener options, in any
     /// combination; the rest is the lower-cased event name.
     /// </summary>

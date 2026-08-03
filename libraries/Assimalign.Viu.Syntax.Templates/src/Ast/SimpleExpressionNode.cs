@@ -2,10 +2,10 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// A leaf expression — either a static string (a static directive argument or modifier) or a raw
-/// dynamic JavaScript expression string. The C# port of Vue 3.5's <c>SimpleExpressionNode</c>
-/// (<c>@vue/compiler-core</c> <c>ast.ts</c>), reduced to the members the parser sets. This build does
-/// not parse expression bodies into a JavaScript AST (the <c>prefixIdentifiers</c> path), so the Babel
-/// <c>ast</c> field has no counterpart here.
+/// dynamic expression string. The parser does <em>not</em> parse expression bodies into a syntax tree:
+/// at parse time an expression is opaque text plus its exact span, and only the transform stage
+/// (<see cref="TransformOptions.PrefixIdentifiers"/>) classifies and rewrites identifiers. Keeping the
+/// body opaque is what lets a parse stay a pure, cacheable function of the template source alone.
 /// </summary>
 public sealed record SimpleExpressionNode : ExpressionNode
 {
@@ -19,7 +19,7 @@ public sealed record SimpleExpressionNode : ExpressionNode
     public ConstantType ConstantType { get; init; }
 
     /// <summary>
-    /// Whether this expression is an event-handler key (upstream's <c>isHandlerKey</c>). Set by the
+    /// Whether this expression is an event-handler key. Set by the
     /// <c>v-on</c> transform ([V01.01.05.03]) so prop normalization does not treat a dynamic handler key as a
     /// dynamic prop key. The parser never sets this.
     /// </summary>

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Lazily evaluated, version-cached derived state — the C# port of Vue 3.5's <c>computed()</c>.
+/// Lazily evaluated, version-cached derived state.
 /// A computed plays a dual role in the dependency graph: it is a <see cref="Dependency"/> to its
 /// readers (the cell it inherits from <see cref="ReactiveValue"/>) and, through its internal
 /// <see cref="ComputedSubscriber"/>, a <see cref="Subscriber"/> to its sources. The getter never
@@ -12,10 +12,11 @@ namespace Assimalign.Viu.Reactivity;
 /// cached value unless a dependency changed (with a global-version fast path that skips traversal
 /// entirely when nothing reactive changed anywhere). Recomputing to an equal value (per
 /// <see cref="EqualityComparer{T}.Default"/>) does not notify downstream subscribers.
-/// Computeds are never owned by an <see cref="EffectScope"/> (upstream Vue 3.5 parity): a
-/// computed created inside a scope stays fully reactive after the scope stops. Cleanup is
-/// automatic instead — when the last subscriber unsubscribes, the computed soft-detaches from its
-/// sources, and the next tracked read re-attaches it.
+/// Computeds are deliberately never owned by an <see cref="EffectScope"/>: scope ownership exists
+/// to stop side effects, and a computed has none — a computed created inside a scope keeps serving
+/// fresh values after that scope stops. Cleanup is driven by the subscriber count instead: when the
+/// last subscriber unsubscribes the computed soft-detaches from its sources, and the next tracked
+/// read re-attaches it. Specified by <c>[RCT-11]</c>.
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The computed value type.</typeparam>
@@ -29,8 +30,8 @@ public sealed class Computed<T> : ReactiveValue<T>
 
     /// <summary>
     /// Creates a computed over <paramref name="getter"/>; pass a <paramref name="setter"/> for the
-    /// writable variant. Unlike effects, computeds never register with the active
-    /// <see cref="EffectScope"/> (upstream Vue 3.5 parity): cleanup is driven by the subscriber
+    /// writable variant. Unlike effects, computeds deliberately never register with the active
+    /// <see cref="EffectScope"/> (<c>[RCT-11]</c>): cleanup is driven by the subscriber
     /// count instead — losing the last subscriber soft-detaches the computed from its sources.
     /// </summary>
     /// <param name="getter">The derivation function (not invoked until the first read).</param>
@@ -49,21 +50,24 @@ public sealed class Computed<T> : ReactiveValue<T>
         _subscriber.Flags = SubscriberFlags.Dirty;
     }
 
-    /// <summary>Whether this computed has a setter (Vue's writable computed).</summary>
+    /// <summary>
+    /// Whether this computed has a setter, making <see cref="Value"/> assignable.
+    /// </summary>
     public bool IsWritable => _setter is not null;
 
     /// <summary>
-    /// A getter-only computed is read-only (the port of Vue's readonly <c>ComputedRef</c>); a
-    /// writable computed is not. Surfaced through <see cref="Reactive.IsReadonly"/>.
+    /// A getter-only computed is read-only; a writable computed is not. Surfaced through
+    /// <see cref="Reactive.IsReadonly"/>.
     /// </summary>
     public override bool IsReadOnly => _setter is null;
 
     /// <summary>
     /// Gets the (possibly recomputed) value, tracking the ambient subscriber; or routes assignment
     /// through the setter delegate. Reads always track and always serve a fresh value — a computed
-    /// never enters a stopped state (upstream Vue 3.5 parity; see the type remarks on automatic
-    /// subscriber-count-driven detach). Writing a getter-only computed warns and is a no-op
-    /// (upstream <c>computed</c> parity, <c>packages/reactivity/src/computed.ts</c>); it never throws.
+    /// never enters a stopped state, by design (see the type remarks on automatic
+    /// subscriber-count-driven detach). Writing a getter-only computed warns and is a no-op rather
+    /// than throwing: a template binding that assigns a derived value is an authoring mistake to
+    /// report, not a reason to tear down a render.
     /// </summary>
     public override T Value
     {
@@ -89,11 +93,10 @@ public sealed class Computed<T> : ReactiveValue<T>
     }
 
     /// <summary>
-    /// The subscriber half of a computed's dual dependency/subscriber role (upstream: a
-    /// <c>ComputedRefImpl</c> <em>is</em> a subscriber). Kept as a sealed, composed
-    /// <see cref="Subscriber"/> rather than a base type of <see cref="Computed{T}"/> so the computed
-    /// can be a <see cref="ReactiveValue{T}"/> — a nested type reaches the owner's private
-    /// getter/value/version state without widening it.
+    /// The subscriber half of a computed's dual dependency/subscriber role, realized by
+    /// <b>composition</b> rather than inheritance (<c>[RCT-3]</c>): a computed must already be a
+    /// <see cref="ReactiveValue{T}"/>, and C# has no second base class to spend. A nested type
+    /// reaches the owner's private getter/value/version state without widening it.
     /// </summary>
     private sealed class ComputedSubscriber : Subscriber
     {
@@ -104,7 +107,9 @@ public sealed class Computed<T> : ReactiveValue<T>
             _owner = owner;
         }
 
-        /// <summary>Port of Vue 3.5's <c>refreshComputed</c>.</summary>
+        /// <summary>
+        /// Re-evaluates the getter when a source has changed, and updates the cached value.
+        /// </summary>
         internal override void Refresh()
         {
             // Fast bail: a tracked computed that no dependency has dirtied cannot be stale.

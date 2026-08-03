@@ -29,8 +29,7 @@ public sealed partial class Renderer<TNode>
     /// Matching nodes are retained, interactive bindings and directive hooks are attached, and
     /// later reactive updates patch the adopted nodes. A structural mismatch is recovered at the
     /// smallest subtree by removing that server range and mounting the client component in its
-    /// place. This follows Vue 3.5's <c>createHydrationFunctions</c> contract:
-    /// https://github.com/vuejs/core/blob/v3.5.29/packages/runtime-core/src/hydration.ts.
+    /// place.
     /// </remarks>
     /// <param name="component">The client component tree.</param>
     /// <param name="container">The host container holding server-rendered children.</param>

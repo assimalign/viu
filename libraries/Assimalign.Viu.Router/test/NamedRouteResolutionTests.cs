@@ -3,8 +3,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins vue-router's named-route resolution (the name branch of resolve, packages/router/src/
-// matcher/index.ts). Reference: https://router.vuejs.org/guide/essentials/named-routes.html
+// Pins named-route resolution: a route name plus parameters interpolates back into a concrete path,
+// and an unknown name or a missing required parameter throws rather than resolving.
 public class NamedRouteResolutionTests
 {
     [Fact]

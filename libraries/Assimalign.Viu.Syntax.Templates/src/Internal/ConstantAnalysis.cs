@@ -1,9 +1,9 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The constant-type analysis that drives static caching and stringification — the C# port of Vue 3.5's
-/// <c>getConstantType</c> family (<c>@vue/compiler-core</c>
-/// <see href="https://github.com/vuejs/core/blob/v3.5.13/packages/compiler-core/src/transforms/cacheStatic.ts">transforms/cacheStatic.ts</see>).
+/// The constant-type analysis that drives static caching and stringification: how far up the
+/// <see cref="ConstantType"/> ladder a node reaches, which decides whether it can be cached once per
+/// instance (<c>[SFC-OPT-1]</c>) or collapsed into a raw static insert (<c>[SFC-OPT-2]</c>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,11 +15,11 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// analysis the static-caching walk ([V01.01.05.07]) uses: it resolves an element's
 /// <see cref="VNodeCall"/> through the transform side table, propagates <see cref="ConstantType.NotConstant"/>
 /// from any non-constant child, prop, or <c>v-bind</c> expression, memoizes each element's level in
-/// <see cref="TransformContext.ConstantCache"/>, and — matching upstream — demotes a fully static
+/// <see cref="TransformContext.ConstantCache"/>, and deliberately demotes a fully static
 /// <c>svg</c>/<c>foreignObject</c>/<c>math</c> block back to a plain vnode as a side effect.
 /// </para>
 /// <para>
-/// Because Viu keeps expression bodies opaque (upstream's non-<c>prefixIdentifiers</c> mode), an
+/// Because expression bodies stay opaque to this analysis, an
 /// interpolation or a dynamic <c>v-bind</c> value is never classified above
 /// <see cref="ConstantType.NotConstant"/>; only static text, static attributes, and compiler-injected
 /// literal constants (<c>v-if</c> branch keys, <c>v-model</c> modifier objects) reach the higher levels.
@@ -28,8 +28,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 internal static class ConstantAnalysis
 {
     /// <summary>
-    /// Returns the static-ness level of <paramref name="node"/> without a transform context (upstream
-    /// <c>getConstantType</c> reduced to the cases the patch-flag pass needs). Element and container nodes
+    /// Returns the static-ness level of <paramref name="node"/> without a transform context, reduced to the cases the patch-flag pass needs. Element and container nodes
     /// report <see cref="ConstantType.NotConstant"/>; use the context-aware overload for subtree analysis.
     /// </summary>
     /// <param name="node">The node to analyze.</param>
@@ -79,7 +78,7 @@ internal static class ConstantAnalysis
 
     /// <summary>
     /// Returns the static-ness level of <paramref name="node"/>, resolving elements' code-generation nodes
-    /// through <paramref name="context"/> — the full port of upstream <c>getConstantType</c>. Memoized in
+    /// through <paramref name="context"/> — the full subtree analysis. Memoized in
     /// <see cref="TransformContext.ConstantCache"/>.
     /// </summary>
     /// <param name="node">The node to analyze.</param>
@@ -214,7 +213,7 @@ internal static class ConstantAnalysis
     }
 
     /// <summary>
-    /// The constant-type of an element's generated props object (upstream <c>getGeneratedPropsConstantType</c>):
+    /// The constant-type of an element's generated props object:
     /// every key and value must be constant, and helper-wrapped values (<c>normalizeClass</c>, …) are
     /// unwrapped to their argument's constant-type.
     /// </summary>
@@ -291,8 +290,7 @@ internal static class ConstantAnalysis
         return ConstantType.NotConstant;
     }
 
-    // Upstream allowHoistedHelperSet: the pure prop-normalization helpers whose result is constant when
-    // their argument is (@vue/compiler-core cacheStatic.ts).
+    // The pure prop-normalization helpers whose result is constant when their argument is.
     private static bool IsHoistableHelper(RuntimeHelper helper)
         => helper == HelperNames.NormalizeClass ||
            helper == HelperNames.NormalizeStyle ||

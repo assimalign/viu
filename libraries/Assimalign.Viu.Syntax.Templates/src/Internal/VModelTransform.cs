@@ -5,11 +5,10 @@ using System.Text;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The <c>v-model</c> directive transform. Combines Vue 3.5's base <c>transformModel</c>
-/// (<c>@vue/compiler-core</c> <c>transforms/vModel.ts</c> — the <c>modelValue</c> prop plus the
-/// <c>onUpdate:modelValue</c> handler and, on components, the modifiers object) with the DOM
-/// <c>transformModel</c> (<c>@vue/compiler-dom</c> <c>transforms/vModel.ts</c> — selecting the runtime model
-/// directive by element and input type). See https://vuejs.org/guide/essentials/forms.html.
+/// The <c>v-model</c> directive transform. It does two jobs in one pass: the platform-neutral half emits
+/// the <c>modelValue</c> prop, the <c>onUpdate:modelValue</c> handler, and — on a component — the
+/// modifiers object; the DOM half selects the runtime model directive by element and input type. They
+/// are one transform because the DOM half needs the element classification the neutral half computes.
 /// </summary>
 internal static class VModelTransform
 {
