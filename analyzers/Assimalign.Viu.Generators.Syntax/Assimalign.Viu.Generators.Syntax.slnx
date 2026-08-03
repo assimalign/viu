@@ -1,4 +1,6 @@
 <Solution>
 	<Project Path="src/Assimalign.Viu.Generators.Syntax.csproj" />
 	<Project Path="test/Assimalign.Viu.Generators.Syntax.Tests.csproj" />
+	<Project Path="../../libraries/Assimalign.Viu.Tooling.SingleFileComponent/src/Assimalign.Viu.Tooling.SingleFileComponent.csproj" />
+	<Project Path="../../libraries/Assimalign.Viu.Tooling.SingleFileComponent/test/Assimalign.Viu.Tooling.SingleFileComponent.Tests.csproj" />
 </Solution>

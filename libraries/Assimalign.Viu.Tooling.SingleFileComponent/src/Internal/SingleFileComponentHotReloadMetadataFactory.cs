@@ -5,7 +5,7 @@ using System.Globalization;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Tooling.Css;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// Produces the deterministic [V01.01.06.05] development metadata for a parsed single-file component.

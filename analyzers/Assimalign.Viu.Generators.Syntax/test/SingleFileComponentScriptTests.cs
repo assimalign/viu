@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
+using Assimalign.Viu.Tooling.SingleFileComponent;
 
 using Shouldly;
 using Xunit;

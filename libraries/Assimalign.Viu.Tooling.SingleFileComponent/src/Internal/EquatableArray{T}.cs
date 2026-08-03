@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// An immutable array with value equality, used inside the incremental generator's model records so
@@ -56,11 +56,14 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IRea
     /// <inheritdoc />
     public override int GetHashCode()
     {
+        // A defaulted struct (null backing) and Empty (zero-length backing) compare equal, so they
+        // must hash equally: both take the bare seed. Returning 0 for null violated the hash
+        // contract and would miss caches keyed on a model whose array field was defaulted.
+        var hash = 17;
         if (_items is null)
         {
-            return 0;
+            return hash;
         }
-        var hash = 17;
         foreach (var item in _items)
         {
             hash = (hash * 31) + (item?.GetHashCode() ?? 0);

@@ -4,7 +4,7 @@ using System.Text;
 
 using Assimalign.Viu.Tooling.Css;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// Derives the deterministic, trimming-safe C# names for a generated component from its <c>.viu</c> or

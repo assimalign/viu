@@ -1,6 +1,6 @@
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// One classified <c>@script</c> member: its declared name and the <see cref="BindingType"/> the

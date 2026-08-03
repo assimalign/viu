@@ -252,6 +252,17 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.Css/test/">
 		<Project Path="libraries/Assimalign.Viu.Tooling.Css/test/Assimalign.Viu.Tooling.Css.Tests.csproj" />
 	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.SingleFileComponent/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.SingleFileComponent/docs/">
+		<File Path="libraries/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Tooling.SingleFileComponent/docs/OVERVIEW.md" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.SingleFileComponent/src/">
+		<Project Path="libraries/Assimalign.Viu.Tooling.SingleFileComponent/src/Assimalign.Viu.Tooling.SingleFileComponent.csproj" />
+	</Folder>
+	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.SingleFileComponent/test/">
+		<Project Path="libraries/Assimalign.Viu.Tooling.SingleFileComponent/test/Assimalign.Viu.Tooling.SingleFileComponent.Tests.csproj" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.UtilityCss/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Tooling.UtilityCss/docs/">
 		<File Path="libraries/Assimalign.Viu.Tooling.UtilityCss/docs/DESIGN.md" />

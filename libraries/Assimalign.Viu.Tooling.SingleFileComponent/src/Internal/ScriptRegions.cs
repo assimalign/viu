@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// The two emission regions an <c>@script</c> block splits into ([V01.01.06.03.01]): the leading

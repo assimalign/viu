@@ -1,20 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// Analyzes a parsed <c>@script</c> block's C# — the Viu analogue of <c>@vue/compiler-sfc</c>'s
 /// <c>compileScript()</c> adapted to a C# partial-class body. It does two jobs, both purely syntactic
-/// (the generator has no semantic model for code it is itself generating, and reflection is forbidden):
+/// (the build host has no semantic model for code it is itself generating, and reflection is forbidden):
 /// <list type="number">
 /// <item>
 /// <b>Region split ([V01.01.06.03.01]).</b> Leading <c>using</c> directives are separated from the class
@@ -42,21 +44,22 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// It is unaffected by the region split — only members are classified, exactly as if the usings were absent.
 /// </item>
 /// </list>
+/// The editor shares this exact core through <see cref="DescribeMembers"/> ([V01.01.06.11]): the probe
+/// wrapper, the leading-using split, and member discovery exist <em>once</em>, killing the drift the
+/// language service's hand-mirrored reader used to carry.
 /// See https://vuejs.org/api/sfc-script-setup.html and <c>docs/FORMAT.md</c> (the <c>@script</c> content
 /// contract). Work items [V01.01.06.03] and [V01.01.06.03.01].
 /// </summary>
 internal static class ScriptBlockAnalyzer
 {
-    // Mirrored by the language service's ScriptDeclarationReader
-    // (extensions\VisualStudio\Assimalign.Viu.LanguageService\src\Internal\ScriptDeclarationReader.cs),
-    // which reimplements the region split and probe wrapper for completion; keep the split rules in sync.
     // The raw @script content is parsed wrapped in this synthetic partial class so Roslyn parses it in
     // the same syntactic context the emitter places it — a partial-class body. Members (fields,
     // properties, methods) are therefore legal; a stray using directive or malformed member surfaces as
     // the mapped diagnostic the consumer's own compile would also raise. The two-newline prefix puts the
     // first content line at wrapper line index 2 (zero-based), so a wrapper-relative line maps to a
     // content-relative line by subtracting ProbeLineOffset; content columns are unchanged because each
-    // content line keeps its own leading whitespace (nothing is prepended per line).
+    // content line keeps its own leading whitespace (nothing is prepended per line). Shared by Analyze
+    // (the build path) and DescribeMembers (the editor path) — the single source of the probe rules.
     private const string ProbePrefix = "partial class __ViuScriptProbe\n{\n";
     private const string ProbeSuffix = "\n}\n";
     private const int ProbeLineOffset = 2;
@@ -65,13 +68,21 @@ internal static class ScriptBlockAnalyzer
 
     // The stable analyzer parse options: the repo compiles with LangVersion=preview, so the script is
     // validated against the same language surface it will ultimately be compiled under.
+    // DocumentationMode.None on the build path — switching it to Parse would add doc-comment trivia cost
+    // and potentially new XML-doc diagnostics to every build.
     private static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview, DocumentationMode.None, SourceCodeKind.Regular);
+
+    // The editor parse options: DocumentationMode.Parse — deliberately different from the build path's
+    // None — because DescribeMembers wants the /// summary text as structured trivia. The divergence is a
+    // parameter of the shared split/probe core, never a second implementation of the rules.
+    private static readonly CSharpParseOptions DescribeParseOptions =
+        new(LanguageVersion.Preview, DocumentationMode.Parse, SourceCodeKind.Regular);
 
     // The Assimalign.Viu.Reactivity reference-carrying contracts and implementations — the C# ports of
     // Vue's ref/computed/shallowRef/customRef. A field or property of one of these holds a reactive
     // reference the template compiler must unwrap through .Value (BindingType.SetupReference, upstream
-    // SETUP_REF). Matched by simple type name because classification is syntactic; the generator
+    // SETUP_REF). Matched by simple type name because classification is syntactic; the projection
     // references no runtime library.
     private static readonly HashSet<string> ReferenceTypeNames = new(StringComparer.Ordinal)
     {
@@ -106,13 +117,6 @@ internal static class ScriptBlockAnalyzer
         var content = script.Content;
         var contentStart = script.ContentLocation.Start;
 
-        // Parse the raw block content to locate the leading using run. In a compilation unit the usings are
-        // legal top-level nodes (they are illegal in the member-region probe below), so this parse serves
-        // only to find the split point; its member-region parse errors are validated by the member probe,
-        // not collected here.
-        var splitTree = CSharpSyntaxTree.ParseText(content, ParseOptions);
-        var leadingUsings = ((CompilationUnitSyntax)splitTree.GetRoot()).Usings;
-
         string? usingRegion = null;
         var usingRegionStartLine = 0;
         var usingRegionStartColumn = 0;
@@ -121,26 +125,15 @@ internal static class ScriptBlockAnalyzer
         var memberRegionStartColumn = contentStart.Column;
         var memberRegionOffset = 0;
 
-        if (leadingUsings.Count > 0)
+        if (LocateLeadingUsingSplit(content, ParseOptions) is { } split)
         {
-            // Split at the START of the first line after the last leading using directive, so both regions
-            // begin at .viu column 1 and map cleanly under their own #line anchor. C# forbids members before
-            // usings, so CompilationUnitSyntax.Usings is exactly the leading run. A member sharing a line
-            // with the last using is a pathological, illegal case that stays in the using region; it still
-            // surfaces a recoverable diagnostic rather than crashing.
-            var lastUsing = leadingUsings[leadingUsings.Count - 1];
-            var lastUsingEndLine = lastUsing.GetLocation().GetLineSpan().EndLinePosition.Line;
-            var memberLineIndex = lastUsingEndLine + 1;
-            var lines = splitTree.GetText().Lines;
-            var splitOffset = memberLineIndex < lines.Count ? lines[memberLineIndex].Start : content.Length;
-
-            usingRegion = content.Substring(0, splitOffset);
+            usingRegion = content.Substring(0, split.SplitOffset);
             usingRegionStartLine = contentStart.Line;
             usingRegionStartColumn = contentStart.Column;
-            memberRegionText = content.Substring(splitOffset);
-            memberRegionStartLine = contentStart.Line + memberLineIndex;
+            memberRegionText = content.Substring(split.SplitOffset);
+            memberRegionStartLine = contentStart.Line + split.MemberLineIndex;
             memberRegionStartColumn = 1;
-            memberRegionOffset = splitOffset;
+            memberRegionOffset = split.SplitOffset;
 
             // Validate the hoisted using region. Parsed bare (no probe wrapper), its Roslyn positions are
             // already relative to the region's content start (= the script content start), so it composes
@@ -178,6 +171,84 @@ internal static class ScriptBlockAnalyzer
             memberRegion is null ? 0 : memberRegionStartLine,
             memberRegion is null ? 0 : memberRegionStartColumn);
         return new ScriptAnalysis(regions, bindings);
+    }
+
+    /// <summary>
+    /// Describes the fields, properties, and methods declared by <paramref name="scriptContent"/> for the
+    /// editor ([V01.01.06.11]) — the same leading-using split and probe wrapper <see cref="Analyze"/>
+    /// uses, parsed with <c>DocumentationMode.Parse</c> so <c>///</c> summaries surface as completion
+    /// documentation. Parse diagnostics are ignored here: Roslyn error recovery still yields the
+    /// well-formed members, and diagnostics remain <see cref="Analyze"/>'s job. Locations are
+    /// block-content-relative (see <see cref="ScriptDeclaredMember"/>), so the description is a pure
+    /// function of the script text and cacheable by content.
+    /// </summary>
+    /// <param name="scriptContent">The raw <c>@script</c> block content.</param>
+    /// <returns>The declared members in declaration order (empty when the block declares none).</returns>
+    public static EquatableArray<ScriptDeclaredMember> DescribeMembers(string scriptContent)
+    {
+        var memberRegionText = scriptContent;
+        var memberRegionOffset = 0;
+        var memberRegionLineIndex = 0;
+        if (LocateLeadingUsingSplit(scriptContent, DescribeParseOptions) is { } split)
+        {
+            memberRegionText = scriptContent.Substring(split.SplitOffset);
+            memberRegionOffset = split.SplitOffset;
+            memberRegionLineIndex = split.MemberLineIndex;
+        }
+
+        if (string.IsNullOrWhiteSpace(memberRegionText))
+        {
+            return EquatableArray<ScriptDeclaredMember>.Empty;
+        }
+
+        var tree = CSharpSyntaxTree.ParseText(
+            ProbePrefix + memberRegionText + ProbeSuffix,
+            DescribeParseOptions);
+        var probe = FindProbe((CompilationUnitSyntax)tree.GetRoot());
+        if (probe is null)
+        {
+            return EquatableArray<ScriptDeclaredMember>.Empty;
+        }
+
+        var members = new List<ScriptDeclaredMember>();
+        foreach (var member in probe.Members)
+        {
+            DescribeMember(member, memberRegionText, memberRegionOffset, memberRegionLineIndex, members);
+        }
+
+        return members.Count == 0
+            ? EquatableArray<ScriptDeclaredMember>.Empty
+            : new EquatableArray<ScriptDeclaredMember>(members.ToArray());
+    }
+
+    // The line-boundary cut after the leading using run — THE region-split rule, shared by the build path
+    // (DocumentationMode.None) and the editor path (DocumentationMode.Parse) so it exists once. In a
+    // compilation unit the usings are legal top-level nodes (they are illegal in the member-region probe),
+    // so this parse serves only to find the split point; member-region parse errors are validated by the
+    // member probe, not collected here. C# forbids members before usings, so CompilationUnitSyntax.Usings
+    // is exactly the leading run. A member sharing a line with the last using is a pathological, illegal
+    // case that stays in the using region; it still surfaces a recoverable diagnostic rather than
+    // crashing. Returns null when the block has no leading usings (the whole content is the member
+    // region).
+    private static (int SplitOffset, int MemberLineIndex)? LocateLeadingUsingSplit(
+        string content,
+        CSharpParseOptions parseOptions)
+    {
+        var splitTree = CSharpSyntaxTree.ParseText(content, parseOptions);
+        var leadingUsings = ((CompilationUnitSyntax)splitTree.GetRoot()).Usings;
+        if (leadingUsings.Count == 0)
+        {
+            return null;
+        }
+
+        // Split at the START of the first line after the last leading using directive, so both regions
+        // begin at .viu column 1 and map cleanly under their own #line anchor.
+        var lastUsing = leadingUsings[leadingUsings.Count - 1];
+        var lastUsingEndLine = lastUsing.GetLocation().GetLineSpan().EndLinePosition.Line;
+        var memberLineIndex = lastUsingEndLine + 1;
+        var lines = splitTree.GetText().Lines;
+        var splitOffset = memberLineIndex < lines.Count ? lines[memberLineIndex].Start : content.Length;
+        return (splitOffset, memberLineIndex);
     }
 
     // Parses the class-body member region inside the synthetic partial-class probe (so member declarations
@@ -262,6 +333,197 @@ internal static class ScriptBlockAnalyzer
         }
 
         return null;
+    }
+
+    // Describes one top-level member for the editor. Fields, properties, and methods are the
+    // author-facing declarations completion and document symbols offer; constructors, events, operators,
+    // delegates, indexers, and nested types are skipped — the same exclusions as the binding
+    // classification. All accessibilities and modifiers are offered: it is the author's own class body.
+    private static void DescribeMember(
+        MemberDeclarationSyntax member,
+        string memberRegionText,
+        int memberRegionOffset,
+        int memberRegionLineIndex,
+        List<ScriptDeclaredMember> members)
+    {
+        switch (member)
+        {
+            case FieldDeclarationSyntax field:
+            {
+                var detail = field.Declaration.Type.ToString();
+                var summary = GetDocumentationSummary(field);
+                var memberLocation = DescribeLocation(
+                    field.Span, memberRegionText, memberRegionOffset, memberRegionLineIndex);
+                foreach (var variable in field.Declaration.Variables)
+                {
+                    members.Add(new ScriptDeclaredMember(
+                        variable.Identifier.Text,
+                        ScriptDeclaredMemberKind.Field,
+                        detail,
+                        summary,
+                        memberLocation,
+                        DescribeLocation(
+                            variable.Identifier.Span, memberRegionText, memberRegionOffset, memberRegionLineIndex)));
+                }
+
+                break;
+            }
+
+            case PropertyDeclarationSyntax property:
+                members.Add(new ScriptDeclaredMember(
+                    property.Identifier.Text,
+                    ScriptDeclaredMemberKind.Property,
+                    property.Type.ToString(),
+                    GetDocumentationSummary(property),
+                    DescribeLocation(property.Span, memberRegionText, memberRegionOffset, memberRegionLineIndex),
+                    DescribeLocation(
+                        property.Identifier.Span, memberRegionText, memberRegionOffset, memberRegionLineIndex)));
+                break;
+
+            case MethodDeclarationSyntax method:
+                members.Add(new ScriptDeclaredMember(
+                    method.Identifier.Text,
+                    ScriptDeclaredMemberKind.Method,
+                    Normalize(
+                        $"{method.ReturnType} {method.Identifier.Text}{method.ParameterList}"),
+                    GetDocumentationSummary(method),
+                    DescribeLocation(method.Span, memberRegionText, memberRegionOffset, memberRegionLineIndex),
+                    DescribeLocation(
+                        method.Identifier.Span, memberRegionText, memberRegionOffset, memberRegionLineIndex)));
+                break;
+        }
+    }
+
+    // Maps a probe-tree span to a block-content-relative SourceLocation: the wrapper prefix is un-shifted
+    // by ProbePrefix.Length / ProbeLineOffset (the same arithmetic CreateScript uses for diagnostics), and
+    // the member region's own cut (offset and cut line count) is re-added so positions are relative to the
+    // WHOLE block content — the frame ComposeToFilePosition expects. Lines/columns are one-based (the base
+    // cluster's Position convention); columns transfer verbatim because the member region begins at a line
+    // boundary and the probe prepends nothing per line.
+    private static SourceLocation DescribeLocation(
+        TextSpan span,
+        string memberRegionText,
+        int memberRegionOffset,
+        int memberRegionLineIndex)
+    {
+        var regionStart = Math.Max(0, span.Start - ProbePrefix.Length);
+        var regionEnd = Math.Max(0, span.End - ProbePrefix.Length);
+        var text = memberRegionText.Substring(regionStart, regionEnd - regionStart);
+
+        var (startLine, startColumn) = RegionPosition(memberRegionText, regionStart);
+        var (endLine, endColumn) = RegionPosition(memberRegionText, regionEnd);
+        return new SourceLocation(
+            new Position(
+                memberRegionOffset + regionStart,
+                memberRegionLineIndex + startLine,
+                startColumn),
+            new Position(
+                memberRegionOffset + regionEnd,
+                memberRegionLineIndex + endLine,
+                endColumn),
+            text);
+    }
+
+    // The one-based (line, column) of a character offset within the member region text. Counted directly
+    // over the region text (not the probe tree) so the mapping cannot depend on the wrapper's own lines.
+    private static (int Line, int Column) RegionPosition(string memberRegionText, int offset)
+    {
+        var line = 1;
+        var lineStart = 0;
+        for (var index = 0; index < offset && index < memberRegionText.Length; index++)
+        {
+            if (memberRegionText[index] == '\n')
+            {
+                line++;
+                lineStart = index + 1;
+            }
+        }
+
+        return (line, offset - lineStart + 1);
+    }
+
+    // The first surviving /// text line, cheaply: no XML document model, just trivia line scans with
+    // inline <...> tag removal. Requires DescribeParseOptions (DocumentationMode.Parse) — under the build
+    // path's DocumentationMode.None the trivia kind never appears.
+    private static string? GetDocumentationSummary(MemberDeclarationSyntax member)
+    {
+        foreach (var trivia in member.GetLeadingTrivia())
+        {
+            if (!trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia))
+            {
+                continue;
+            }
+
+            foreach (var line in trivia.ToFullString().Split('\n'))
+            {
+                var text = StripDocumentationLine(line);
+                if (text.Length > 0)
+                {
+                    return text;
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private static string StripDocumentationLine(string line)
+    {
+        var text = line.TrimStart();
+        if (text.StartsWith("///", StringComparison.Ordinal))
+        {
+            text = text.Substring(3);
+        }
+
+        var builder = new StringBuilder(text.Length);
+        var index = 0;
+        while (index < text.Length)
+        {
+            if (text[index] == '<')
+            {
+                var close = text.IndexOf('>', index + 1);
+                if (close < 0)
+                {
+                    break;
+                }
+
+                index = close + 1;
+                continue;
+            }
+
+            builder.Append(text[index]);
+            index++;
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    // Collapses any whitespace run (including newlines from a multi-line parameter list) to a single
+    // space so a method signature stays a one-line completion detail.
+    private static string Normalize(string text)
+    {
+        var builder = new StringBuilder(text.Length);
+        var pendingSpace = false;
+        foreach (var character in text)
+        {
+            if (char.IsWhiteSpace(character))
+            {
+                pendingSpace = builder.Length > 0;
+                continue;
+            }
+
+            if (pendingSpace)
+            {
+                builder.Append(' ');
+                pendingSpace = false;
+            }
+
+            builder.Append(character);
+        }
+
+        return builder.ToString();
     }
 
     // Classifies one top-level member. Fields, properties, and methods are template-facing bindings;
@@ -410,7 +672,7 @@ internal static class ScriptBlockAnalyzer
     //   readonly (non-reference) -> SetupConstant    (SETUP_CONST; fixed after construction, never unwrapped)
     //   otherwise (mutable)     -> SetupLet         (SETUP_LET; a reassignable binding, never unwrapped)
     // The finer SETUP_MAYBE_REF / SETUP_REACTIVE_CONST buckets need reassignment/factory-call flow analysis
-    // over a semantic model the generator cannot obtain here, so they are deliberately not produced.
+    // over a semantic model the projection cannot obtain here, so they are deliberately not produced.
     private static BindingType ClassifyField(FieldDeclarationSyntax field)
     {
         if (IsReferenceType(field.Declaration.Type))

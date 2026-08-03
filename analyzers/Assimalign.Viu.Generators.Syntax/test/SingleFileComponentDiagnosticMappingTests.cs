@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 
 using Assimalign.Viu.Syntax;
+using Assimalign.Viu.Tooling.SingleFileComponent;
 
 using Shouldly;
 using Xunit;
@@ -14,10 +15,12 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// <summary>
 /// Pins the generator-surfacing conventions ([V01.01.05.08]): the stable VIU descriptor shape (ID,
 /// category, help link, default severity, enabled-by-default) and the base-<see cref="SyntaxDiagnostic"/>
-/// severity → Roslyn-descriptor mapping across every severity, including the Warning/Information/Hidden
+/// severity → descriptor mapping across every severity, including the Warning/Information/Hidden
 /// branches no current parser produces yet but the machinery must already route (Vue's error-vs-warning
-/// split is pinned on the base diagnostic at parse time, per the addendum on issue #55). Roslyn diagnostics/
-/// analyzer conventions: https://learn.microsoft.com/dotnet/csharp/roslyn-sdk/.
+/// split is pinned on the base diagnostic at parse time, per the addendum on issue #55). Since
+/// [V01.01.06.11] the severity mapping produces the shared projection library's neutral catalog entries;
+/// the Roslyn descriptors here are the generator adapter's materialization of that catalog. Roslyn
+/// diagnostics/analyzer conventions: https://learn.microsoft.com/dotnet/csharp/roslyn-sdk/.
 /// </summary>
 public sealed class SingleFileComponentDiagnosticMappingTests
 {
@@ -28,15 +31,15 @@ public sealed class SingleFileComponentDiagnosticMappingTests
     {
         var descriptors = new (DiagnosticDescriptor Descriptor, string Id, RoslynDiagnosticSeverity Severity)[]
         {
-            (SingleFileComponentDiagnostics.SingleFileComponentError, "VIU1001", RoslynDiagnosticSeverity.Error),
-            (SingleFileComponentDiagnostics.SingleFileComponentWarning, "VIU1002", RoslynDiagnosticSeverity.Warning),
-            (SingleFileComponentDiagnostics.SingleFileComponentInformation, "VIU1003", RoslynDiagnosticSeverity.Info),
-            (SingleFileComponentDiagnostics.TemplateError, "VIU1101", RoslynDiagnosticSeverity.Error),
-            (SingleFileComponentDiagnostics.TemplateWarning, "VIU1102", RoslynDiagnosticSeverity.Warning),
-            (SingleFileComponentDiagnostics.TemplateInformation, "VIU1103", RoslynDiagnosticSeverity.Info),
-            (SingleFileComponentDiagnostics.ScriptError, "VIU1201", RoslynDiagnosticSeverity.Error),
-            (SingleFileComponentDiagnostics.ScriptWarning, "VIU1202", RoslynDiagnosticSeverity.Warning),
-            (SingleFileComponentDiagnostics.ScriptInformation, "VIU1203", RoslynDiagnosticSeverity.Info),
+            (SingleFileComponentDiagnosticAdapter.SingleFileComponentError, "VIU1001", RoslynDiagnosticSeverity.Error),
+            (SingleFileComponentDiagnosticAdapter.SingleFileComponentWarning, "VIU1002", RoslynDiagnosticSeverity.Warning),
+            (SingleFileComponentDiagnosticAdapter.SingleFileComponentInformation, "VIU1003", RoslynDiagnosticSeverity.Info),
+            (SingleFileComponentDiagnosticAdapter.TemplateError, "VIU1101", RoslynDiagnosticSeverity.Error),
+            (SingleFileComponentDiagnosticAdapter.TemplateWarning, "VIU1102", RoslynDiagnosticSeverity.Warning),
+            (SingleFileComponentDiagnosticAdapter.TemplateInformation, "VIU1103", RoslynDiagnosticSeverity.Info),
+            (SingleFileComponentDiagnosticAdapter.ScriptError, "VIU1201", RoslynDiagnosticSeverity.Error),
+            (SingleFileComponentDiagnosticAdapter.ScriptWarning, "VIU1202", RoslynDiagnosticSeverity.Warning),
+            (SingleFileComponentDiagnosticAdapter.ScriptInformation, "VIU1203", RoslynDiagnosticSeverity.Info),
         };
 
         foreach (var (descriptor, id, severity) in descriptors)

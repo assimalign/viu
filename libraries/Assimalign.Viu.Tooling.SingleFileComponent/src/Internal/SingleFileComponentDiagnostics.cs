@@ -1,33 +1,33 @@
-using Microsoft.CodeAnalysis;
+using System.Collections.Generic;
 
 using Assimalign.Viu.Syntax;
 
-// The project namespace is nested under Assimalign.Viu.Syntax, so the base cluster's Diagnostic and
-// DiagnosticSeverity are ambient and shadow Roslyn's; alias both sides for unambiguous mapping.
+// The base cluster's Diagnostic and DiagnosticSeverity are ambient through the Assimalign.Viu.Syntax
+// using and would shadow Roslyn's; alias both sides for unambiguous mapping.
 using SyntaxDiagnostic = Assimalign.Viu.Syntax.Diagnostic;
 using SyntaxDiagnosticSeverity = Assimalign.Viu.Syntax.DiagnosticSeverity;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
+using RoslynLocation = Microsoft.CodeAnalysis.Location;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
-/// Maps the base <c>Assimalign.Viu.Syntax</c> <see cref="SyntaxDiagnostic"/> surface onto stable,
-/// VIU-prefixed Roslyn <see cref="DiagnosticDescriptor"/>s. The base deliberately keeps per-language
+/// Maps the base <c>Assimalign.Viu.Syntax</c> <see cref="SyntaxDiagnostic"/> surface onto the stable,
+/// VIU-prefixed host-neutral catalog ([V01.01.06.11]). The base deliberately keeps per-language
 /// code catalogs (the <c>.viu</c> container's <c>SingleFileComponentErrorCode</c> starting at 1000, the
-/// template compiler's upstream-pinned <c>CompilerErrorCode</c>); a generator cannot enumerate those
-/// unbounded catalogs into one descriptor each without mirroring them, so this composition root instead
-/// envelopes each diagnostic by its <em>origin</em> (the <c>.viu</c> block container, a dispatched
-/// template parse, or the Roslyn parse of the <c>@script</c> block's C# — [V01.01.06.03]) and its
-/// severity, and carries the parser's original message verbatim. The descriptor <c>defaultSeverity</c>
-/// follows the parser severity because <c>Diagnostic.Create(descriptor, location, args)</c> reports at the
-/// descriptor's severity. Generator-owned script-contract rules use the same location snapshot and mapping
-/// path under the reserved VIU1204+ range.
+/// template compiler's upstream-pinned <c>CompilerErrorCode</c>); the projection cannot enumerate those
+/// unbounded catalogs into one descriptor each without mirroring them, so it instead envelopes each
+/// diagnostic by its <em>origin</em> (the <c>.viu</c> block container, a dispatched template parse, the
+/// Roslyn parse of the <c>@script</c> block's C# — [V01.01.06.03] — or a dispatched style CSS parse) and
+/// its severity, and carries the parser's original message verbatim. Projection-owned script-contract
+/// rules use the same location snapshot and mapping path under the reserved VIU1204+ range. Roslyn types
+/// appear only as <em>inputs</em> (the script probe parse produces Roslyn diagnostics inside this
+/// library); the output is the neutral <see cref="DiagnosticInfo"/> both hosts consume — the generator's
+/// adapter owns the Roslyn descriptors so RS2008 release tracking stays in the analyzer project.
 /// </summary>
 internal static class SingleFileComponentDiagnostics
 {
-    private const string Category = "Assimalign.Viu.Generators.Syntax";
-
     // The stable per-id help-link target: the VIU diagnostic catalog documents every descriptor's ID,
     // origin, severity, and configuration ([V01.01.05.08]). Each descriptor links its own heading anchor.
     private const string HelpLinkBase =
@@ -36,164 +36,141 @@ internal static class SingleFileComponentDiagnostics
     private static string HelpLink(string id) => HelpLinkBase + "#" + id.ToLowerInvariant();
 
     /// <summary>A recoverable error reported by the <c>.viu</c> block-container parser.</summary>
-    internal static readonly DiagnosticDescriptor SingleFileComponentError = new(
-        id: "VIU1001",
-        title: "Single-file component parse error",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1001"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor SingleFileComponentError = new(
+        Id: "VIU1001",
+        Title: "Single-file component parse error",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1001"));
 
     /// <summary>A warning reported by the <c>.viu</c> block-container parser.</summary>
-    internal static readonly DiagnosticDescriptor SingleFileComponentWarning = new(
-        id: "VIU1002",
-        title: "Single-file component parse warning",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1002"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor SingleFileComponentWarning = new(
+        Id: "VIU1002",
+        Title: "Single-file component parse warning",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Warning,
+        HelpLink: HelpLink("VIU1002"));
 
     /// <summary>An informational message reported by the <c>.viu</c> block-container parser.</summary>
-    internal static readonly DiagnosticDescriptor SingleFileComponentInformation = new(
-        id: "VIU1003",
-        title: "Single-file component parse information",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1003"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor SingleFileComponentInformation = new(
+        Id: "VIU1003",
+        Title: "Single-file component parse information",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Information,
+        HelpLink: HelpLink("VIU1003"));
 
     /// <summary>A compatibility <c>.vue</c> file is shadowed by its canonical same-base <c>.viu</c> source.</summary>
-    internal static readonly DiagnosticDescriptor ConflictingComponentFormats = new(
-        id: "VIU1004",
-        title: "Conflicting single-file component formats",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1004"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor ConflictingComponentFormats = new(
+        Id: "VIU1004",
+        Title: "Conflicting single-file component formats",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1004"));
 
     /// <summary>A recoverable error reported by the dispatched template parse.</summary>
-    internal static readonly DiagnosticDescriptor TemplateError = new(
-        id: "VIU1101",
-        title: "Single-file component template parse error",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1101"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor TemplateError = new(
+        Id: "VIU1101",
+        Title: "Single-file component template parse error",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1101"));
 
     /// <summary>A warning reported by the dispatched template parse.</summary>
-    internal static readonly DiagnosticDescriptor TemplateWarning = new(
-        id: "VIU1102",
-        title: "Single-file component template parse warning",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1102"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor TemplateWarning = new(
+        Id: "VIU1102",
+        Title: "Single-file component template parse warning",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Warning,
+        HelpLink: HelpLink("VIU1102"));
 
     /// <summary>An informational message reported by the dispatched template parse.</summary>
-    internal static readonly DiagnosticDescriptor TemplateInformation = new(
-        id: "VIU1103",
-        title: "Single-file component template parse information",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1103"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor TemplateInformation = new(
+        Id: "VIU1103",
+        Title: "Single-file component template parse information",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Information,
+        HelpLink: HelpLink("VIU1103"));
 
     /// <summary>A recoverable error reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
-    internal static readonly DiagnosticDescriptor ScriptError = new(
-        id: "VIU1201",
-        title: "Single-file component script parse error",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1201"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor ScriptError = new(
+        Id: "VIU1201",
+        Title: "Single-file component script parse error",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1201"));
 
     /// <summary>A warning reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
-    internal static readonly DiagnosticDescriptor ScriptWarning = new(
-        id: "VIU1202",
-        title: "Single-file component script parse warning",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1202"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor ScriptWarning = new(
+        Id: "VIU1202",
+        Title: "Single-file component script parse warning",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Warning,
+        HelpLink: HelpLink("VIU1202"));
 
     /// <summary>An informational message reported by the Roslyn parse of the <c>@script</c> block's C#.</summary>
-    internal static readonly DiagnosticDescriptor ScriptInformation = new(
-        id: "VIU1203",
-        title: "Single-file component script parse information",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1203"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor ScriptInformation = new(
+        Id: "VIU1203",
+        Title: "Single-file component script parse information",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Information,
+        HelpLink: HelpLink("VIU1203"));
 
     /// <summary>A script member conflicts with a member reserved by the generated component scaffold.</summary>
-    internal static readonly DiagnosticDescriptor ReservedScriptMember = new(
-        id: "VIU1204",
-        title: "Single-file component script member is reserved",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1204"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor ReservedScriptMember = new(
+        Id: "VIU1204",
+        Title: "Single-file component script member is reserved",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1204"));
 
     /// <summary>An asynchronous script callback returns void and therefore cannot be observed.</summary>
-    internal static readonly DiagnosticDescriptor AsynchronousVoidCallback = new(
-        id: "VIU1205",
-        title: "Asynchronous void callback cannot be observed",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1205"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor AsynchronousVoidCallback = new(
+        Id: "VIU1205",
+        Title: "Asynchronous void callback cannot be observed",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1205"));
 
     /// <summary>A tag-based script block does not explicitly select Viu's C# script language.</summary>
-    internal static readonly DiagnosticDescriptor UnsupportedScriptLanguage = new(
-        id: "VIU1206",
-        title: "Unsupported single-file component script language",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1206"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor UnsupportedScriptLanguage = new(
+        Id: "VIU1206",
+        Title: "Unsupported single-file component script language",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1206"));
 
     /// <summary>A recoverable error reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
-    internal static readonly DiagnosticDescriptor StyleError = new(
-        id: "VIU1301",
-        title: "Single-file component style parse error",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1301"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor StyleError = new(
+        Id: "VIU1301",
+        Title: "Single-file component style parse error",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1301"));
 
     /// <summary>A warning reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
-    internal static readonly DiagnosticDescriptor StyleWarning = new(
-        id: "VIU1302",
-        title: "Single-file component style parse warning",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1302"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor StyleWarning = new(
+        Id: "VIU1302",
+        Title: "Single-file component style parse warning",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Warning,
+        HelpLink: HelpLink("VIU1302"));
 
     /// <summary>An informational message reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
-    internal static readonly DiagnosticDescriptor StyleInformation = new(
-        id: "VIU1303",
-        title: "Single-file component style parse information",
-        messageFormat: "{0}",
-        category: Category,
-        defaultSeverity: RoslynDiagnosticSeverity.Info,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink("VIU1303"));
+    internal static readonly SingleFileComponentDiagnosticDescriptor StyleInformation = new(
+        Id: "VIU1303",
+        Title: "Single-file component style parse information",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Information,
+        HelpLink: HelpLink("VIU1303"));
+
+    /// <summary>
+    /// Every entry of the neutral catalog, in id order. Each host's materialization must cover this list
+    /// 1:1 — the generator's adapter-coverage test enumerates it so a new catalog entry without an
+    /// adapter mapping fails a test rather than throwing at generation time.
+    /// </summary>
+    internal static IReadOnlyList<SingleFileComponentDiagnosticDescriptor> Catalog { get; } = new[]
+    {
+        SingleFileComponentError,
+        SingleFileComponentWarning,
+        SingleFileComponentInformation,
+        ConflictingComponentFormats,
+        TemplateError,
+        TemplateWarning,
+        TemplateInformation,
+        ScriptError,
+        ScriptWarning,
+        ScriptInformation,
+        ReservedScriptMember,
+        AsynchronousVoidCallback,
+        UnsupportedScriptLanguage,
+        StyleError,
+        StyleWarning,
+        StyleInformation,
+    };
 
     /// <summary>
     /// Envelopes <paramref name="diagnostic"/> as a value-equatable <see cref="DiagnosticInfo"/> located
@@ -277,35 +254,35 @@ internal static class SingleFileComponentDiagnostics
         return new DiagnosticInfo(descriptor, location, message);
     }
 
-    /// <summary>Creates a generator-owned rule diagnostic on an exact source location.</summary>
-    /// <param name="descriptor">The stable generator diagnostic descriptor.</param>
+    /// <summary>Creates a projection-owned rule diagnostic on an exact source location.</summary>
+    /// <param name="descriptor">The stable neutral diagnostic descriptor.</param>
     /// <param name="message">The diagnostic message.</param>
     /// <param name="filePath">The originating single-file-component path.</param>
     /// <param name="location">The exact file-relative source location.</param>
     /// <returns>The value-equatable located diagnostic.</returns>
     public static DiagnosticInfo CreateRule(
-        DiagnosticDescriptor descriptor,
+        SingleFileComponentDiagnosticDescriptor descriptor,
         string message,
         string filePath,
         SourceLocation location)
         => new(descriptor, BuildLocation(filePath, location, blockContentStart: null), message);
 
-    /// <summary>Creates a generator-owned file-level rule diagnostic at the start of a source file.</summary>
-    /// <param name="descriptor">The stable generator diagnostic descriptor.</param>
+    /// <summary>Creates a projection-owned file-level rule diagnostic at the start of a source file.</summary>
+    /// <param name="descriptor">The stable neutral diagnostic descriptor.</param>
     /// <param name="message">The diagnostic message.</param>
     /// <param name="filePath">The originating single-file-component path.</param>
     /// <returns>The value-equatable file-start diagnostic.</returns>
     public static DiagnosticInfo CreateFileRule(
-        DiagnosticDescriptor descriptor,
+        SingleFileComponentDiagnosticDescriptor descriptor,
         string message,
         string filePath)
         => new(descriptor, new LocationInfo(filePath, 0, 0, 0, 0, 0, 0), message);
 
     /// <summary>
-    /// Creates a generator-owned script-rule diagnostic from a token located in the synthetic script
+    /// Creates a projection-owned script-rule diagnostic from a token located in the synthetic script
     /// probe, mapping it back to the originating <c>.viu</c> member region.
     /// </summary>
-    /// <param name="descriptor">The generator-owned script diagnostic descriptor.</param>
+    /// <param name="descriptor">The projection-owned script diagnostic descriptor.</param>
     /// <param name="message">The diagnostic message.</param>
     /// <param name="filePath">The originating <c>.viu</c> file.</param>
     /// <param name="probeLocation">The token location inside the synthetic script probe.</param>
@@ -314,10 +291,10 @@ internal static class SingleFileComponentDiagnostics
     /// <param name="probeLineOffset">The synthetic probe's leading line count.</param>
     /// <returns>The mapped, value-equatable diagnostic.</returns>
     public static DiagnosticInfo CreateScriptRule(
-        DiagnosticDescriptor descriptor,
+        SingleFileComponentDiagnosticDescriptor descriptor,
         string message,
         string filePath,
-        Location probeLocation,
+        RoslynLocation probeLocation,
         Position memberRegionStart,
         int probePrefixLength,
         int probeLineOffset)
@@ -365,7 +342,7 @@ internal static class SingleFileComponentDiagnostics
         return new DiagnosticInfo(descriptor, location, message);
     }
 
-    private static DiagnosticDescriptor MapStyle(SyntaxDiagnosticSeverity severity)
+    private static SingleFileComponentDiagnosticDescriptor MapStyle(SyntaxDiagnosticSeverity severity)
         // Info and Hidden collapse into the informational descriptor, matching the container/template
         // mapping's treatment of the low end.
         => severity switch
@@ -375,9 +352,9 @@ internal static class SingleFileComponentDiagnostics
             _ => StyleInformation,
         };
 
-    private static DiagnosticDescriptor Map(bool fromTemplate, SyntaxDiagnosticSeverity severity)
+    private static SingleFileComponentDiagnosticDescriptor Map(bool fromTemplate, SyntaxDiagnosticSeverity severity)
     {
-        // Hidden collapses into the informational descriptor: the generator surfaces it rather than
+        // Hidden collapses into the informational descriptor: the projection surfaces it rather than
         // dropping it, and no parser in the cluster emits Hidden today.
         if (fromTemplate)
         {
@@ -397,8 +374,8 @@ internal static class SingleFileComponentDiagnostics
         };
     }
 
-    private static DiagnosticDescriptor MapScript(RoslynDiagnosticSeverity severity)
-        // Info and Hidden collapse into the informational descriptor: the generator surfaces the message
+    private static SingleFileComponentDiagnosticDescriptor MapScript(RoslynDiagnosticSeverity severity)
+        // Info and Hidden collapse into the informational descriptor: the projection surfaces the message
         // rather than dropping it, matching the container/template mapping's treatment of the low end.
         => severity switch
         {

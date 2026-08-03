@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// The development-only hot-reload identity and independent block-category content hashes emitted for

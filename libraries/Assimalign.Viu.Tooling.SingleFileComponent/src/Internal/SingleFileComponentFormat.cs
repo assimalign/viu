@@ -1,4 +1,4 @@
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>The outer container format of an additional single-file-component source.</summary>
 internal enum SingleFileComponentFormat

@@ -17,6 +17,9 @@ on:
       - 'analyzers/Assimalign.Viu.Generators.Syntax/**'
       - 'libraries/Assimalign.Viu.Reactivity/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
+      # The shared .viu -> C# projection core ([V01.01.06.11]) is the syntax generator's extracted
+      # pipeline (and the language service's editor projection); its tests run in this area's slnx.
+      - 'libraries/Assimalign.Viu.Tooling.SingleFileComponent/**'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
@@ -31,6 +34,9 @@ on:
       - 'analyzers/Assimalign.Viu.Generators.Syntax/**'
       - 'libraries/Assimalign.Viu.Reactivity/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
+      # The shared .viu -> C# projection core ([V01.01.06.11]) is the syntax generator's extracted
+      # pipeline (and the language service's editor projection); its tests run in this area's slnx.
+      - 'libraries/Assimalign.Viu.Tooling.SingleFileComponent/**'
       - 'build/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'

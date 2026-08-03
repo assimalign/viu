@@ -1,9 +1,10 @@
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
-/// The value-equatable read of one single-file-component additional file: its format, path, full text,
-/// collision state, and resolved
-/// C# names. This is the first pipeline stage's output — a pure data record with no Roslyn
+/// The value-equatable read of one single-file-component source: its format, path, full text,
+/// collision state, and resolved C# names — everything
+/// <see cref="SingleFileComponentProjection.Project"/> needs, and nothing host-specific. In the
+/// generator this is the first pipeline stage's output — a pure data record with no Roslyn
 /// <c>AdditionalText</c>, <c>SourceText</c>, or compilation reference — so downstream parse/codegen
 /// stages re-run only when the file's text or resolved names actually change, keeping the incremental
 /// pipeline and IDE responsiveness intact.
@@ -22,9 +23,11 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// </param>
 /// <param name="HasCanonicalPeer">
 /// Whether this is a <c>.vue</c> compatibility file whose same-directory, same-base <c>.viu</c> source
-/// takes precedence. Such a file reports VIU1004 and does not generate a second partial class.
+/// takes precedence. Such a file reports VIU1004 and does not generate a second partial class. A
+/// multi-file host concern carried alongside the input for the generator's pipeline filters;
+/// <see cref="SingleFileComponentProjection.Project"/> never reads it.
 /// </param>
-internal readonly record struct SingleFileComponentFile(
+internal readonly record struct SingleFileComponentProjectionInput(
     SingleFileComponentFormat Format,
     string FilePath,
     string FileName,

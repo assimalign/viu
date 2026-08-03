@@ -3,6 +3,8 @@ using System.Linq;
 
 using Microsoft.CodeAnalysis;
 
+using Assimalign.Viu.Tooling.SingleFileComponent;
+
 using Shouldly;
 
 using Xunit;

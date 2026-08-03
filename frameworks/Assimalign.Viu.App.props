@@ -48,9 +48,10 @@
     <!-- ================================================================
          Assimalign.Viu.App: the browser framework. Bundled with every Viu
          app via Assimalign.Viu.Sdk. Compile-time-only libraries (the
-         Syntax.* parsers, Tooling.Css) are deliberately NOT framework
-         assemblies - they reach consumers only inside analyzers/dotnet/cs
-         of the Ref pack. Assimalign.Viu.Testing is a dev-time harness, not
+         Syntax.* parsers, Tooling.Css, Tooling.SingleFileComponent) are
+         deliberately NOT framework assemblies - they reach consumers only
+         inside analyzers/dotnet/cs of the Ref pack.
+         Assimalign.Viu.Testing is a dev-time harness, not
          a runtime framework member.
          ================================================================ -->
     <ItemGroup Condition="'$(ViuFrameworkName)' == 'Assimalign.Viu.App'">

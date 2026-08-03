@@ -153,6 +153,30 @@ jobs:
           Assert-FrameworkPackage -Package $referencePackage[0] -ManifestPath 'data/FrameworkList.xml'
           Assert-FrameworkPackage -Package $runtimePackage[0] -ManifestPath 'data/RuntimeList.xml'
 
+          # The ref pack's analyzer payload is the computed ProjectReference closure of the syntax
+          # generator ([V01.01.06.11]): the shared projection core must ride along, and Roslyn must
+          # not - PackageReference assets never enter _ResolvedProjectReferencePaths, so a
+          # Microsoft.CodeAnalysis*.dll here means the closure mechanics regressed (the analyzer
+          # host provides Roslyn; shipping a second copy would break generator loading).
+          $referenceArchive = [System.IO.Compression.ZipFile]::OpenRead($referencePackage[0].FullName)
+          try {
+            $analyzerEntries = @(
+              $referenceArchive.Entries |
+                Where-Object { $_.FullName.StartsWith('analyzers/dotnet/cs/', [System.StringComparison]::Ordinal) } |
+                ForEach-Object { $_.FullName.Substring('analyzers/dotnet/cs/'.Length) }
+            )
+            if ($analyzerEntries -notcontains 'Assimalign.Viu.Tooling.SingleFileComponent.dll') {
+              throw "$($referencePackage[0].Name) analyzer payload is missing the shared projection core Assimalign.Viu.Tooling.SingleFileComponent.dll"
+            }
+            $roslynEntries = @($analyzerEntries | Where-Object { $_ -like 'Microsoft.CodeAnalysis*.dll' })
+            if ($roslynEntries.Count -ne 0) {
+              throw "$($referencePackage[0].Name) analyzer payload must not carry host-provided Roslyn assemblies: $($roslynEntries -join ', ')"
+            }
+          }
+          finally {
+            $referenceArchive.Dispose()
+          }
+
           $sdkArchive = [System.IO.Compression.ZipFile]::OpenRead($sdkPackage[0].FullName)
           try {
             $requiredSdkEntries = @(
@@ -181,6 +205,12 @@ jobs:
               'Tasks/Microsoft.Build.Framework.dll',
               'Tasks/Microsoft.Build.Utilities.Core.dll',
               'Tasks/Microsoft.NET.StringTools.dll',
+              # The shared .viu -> C# projection core ([V01.01.06.11]) belongs to the generator +
+              # language-service graph only. If it (or its Roslyn dependency) ever appears here, a
+              # reference leaked into the Sdk.Tasks/Tooling.Css graph, whose whole OutDir sweeps
+              # into the SDK package's Tasks/ payload.
+              'Tasks/Assimalign.Viu.Tooling.SingleFileComponent.dll',
+              'Tasks/Microsoft.CodeAnalysis.CSharp.dll',
               'Targets/Assimalign.Viu.Syntax.Generators.props',
               'Targets/Assimalign.Viu.Syntax.Generators.targets'
             )

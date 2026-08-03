@@ -3,10 +3,10 @@ using System.Collections.Generic;
 
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
-/// The value-equatable description of the partial-class scaffold the generator emits for one <c>.viu</c>
+/// The value-equatable description of the partial-class scaffold emitted for one <c>.viu</c>
 /// component. Deliberately free of syntax nodes, symbols, and parser records so the incremental pipeline
 /// caches on it: a <c>.viu</c> edit that re-parses to an equal descriptor shape re-emits nothing. The
 /// block-presence counts summarize the parsed <see cref="Assimalign.Viu.Syntax.SingleFileComponent.SingleFileComponentDescriptor"/>
@@ -111,7 +111,7 @@ internal readonly record struct SingleFileComponentModel(
 
     /// <summary>
     /// Builds the template compiler's <see cref="BindingMetadata"/> from the classified script bindings — the
-    /// standalone form the generator needs before the model exists (the <c>v-bind()</c> CSS compile
+    /// standalone form the projection needs before the model exists (the <c>v-bind()</c> CSS compile
     /// [V01.01.06.06.01] rewrites its expressions with the same metadata the render path uses).
     /// </summary>
     /// <param name="hasScript">Whether the component declares a script block.</param>
@@ -140,14 +140,3 @@ internal readonly record struct SingleFileComponentModel(
         return new BindingMetadata(map, isScriptSetup: true);
     }
 }
-
-/// <summary>
-/// One <c>.viu</c> file's pipeline result: the scaffold model to emit (always present — the descriptor
-/// is produced even for malformed input) and the mapped diagnostics to report. Both are value-equatable
-/// so the pipeline stays cacheable.
-/// </summary>
-/// <param name="Model">The scaffold model to emit.</param>
-/// <param name="Diagnostics">The mapped Roslyn diagnostics to report.</param>
-internal readonly record struct SingleFileComponentGeneratorResult(
-    SingleFileComponentModel Model,
-    EquatableArray<DiagnosticInfo> Diagnostics);

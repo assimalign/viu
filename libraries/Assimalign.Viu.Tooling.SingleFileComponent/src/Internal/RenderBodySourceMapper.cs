@@ -5,7 +5,7 @@ using System.Text;
 using Assimalign.Viu.Syntax;
 using Assimalign.Viu.Syntax.Templates;
 
-namespace Assimalign.Viu.Generators.Syntax;
+namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// Injects C# <c>#line</c> span directives into a compiled template render body so a C# compile

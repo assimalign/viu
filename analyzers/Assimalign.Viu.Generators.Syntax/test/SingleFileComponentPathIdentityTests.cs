@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 
 using Microsoft.CodeAnalysis;
 
+using Assimalign.Viu.Tooling.SingleFileComponent;
+
 using Shouldly;
 
 using Xunit;
