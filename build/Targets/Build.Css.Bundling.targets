@@ -316,7 +316,7 @@
     manifest (a manifest-aware host: `dotnet run`, ASP.NET Core, a configured CDN). A statically hosted
     published WASM app has no such middleware, so a hashed href would 404. The plain route works everywhere
     and still revalidates via the endpoint's ETag/integrity; the fingerprinted endpoint remains registered for
-    hosted scenarios. See libraries/Assimalign.Viu.Tooling.Css/docs/DESIGN.md. Override the href with
+    hosted scenarios. See tooling/Assimalign.Viu.Tooling.Css/docs/DESIGN.md. Override the href with
     $(ViuSingleFileComponentCssBundleLinkHref) for a manifest-aware deployment that wants the immutable URL.
   -->
 

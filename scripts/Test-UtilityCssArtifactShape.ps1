@@ -228,7 +228,7 @@ if (-not [string]::IsNullOrWhiteSpace($VisualStudioExtension)) {
         )
         foreach ($runtimeIdentifier in $runtimeIdentifiers) {
             $requiredEntries += @(
-                "LanguageServer/$runtimeIdentifier/Assimalign.Viu.LanguageServer.exe",
+                "LanguageServer/$runtimeIdentifier/Assimalign.Viu.Tooling.LanguageServer.exe",
                 "LanguageServer/$runtimeIdentifier/Assimalign.Viu.Tooling.UtilityCss.THIRD-PARTY-NOTICES.md"
             )
         }

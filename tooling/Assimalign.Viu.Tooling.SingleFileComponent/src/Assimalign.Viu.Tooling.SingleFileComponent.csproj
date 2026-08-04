@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
+         per design decision: this is the shared .viu -> C# projection core ([V01.01.06.11]). It runs in
+         TWO build-time hosts — the Assimalign.Viu.Generators.Syntax Roslyn source generator (analyzer
+         sandbox, netstandard2.0) AND the net10.0 Assimalign.Viu.Tooling.LanguageService — so it targets the
+         analyzer TFM alias, the same central property the Assimalign.Viu.Syntax.* parsers and the sibling
+         Assimalign.Viu.Tooling.Css core use, never a hardcoded string. Its net10.0 test project
+         references it normally. -->
+    <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <!-- Build-time-hosted code must target the stable analyzer surface: opt out of the repo-wide
+         preview-features switch (see build/Targets/Build.TargetFramework.props) so no
+         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the sibling parsers. -->
+    <EnablePreviewFeatures>false</EnablePreviewFeatures>
+    <!-- The projection core was extracted from the generator project, whose
+         EnforceExtendedAnalyzerRules=true kept the RS1035 no-I/O guard on this code (the name resolver's
+         string-only design relies on it). Keep the guard here so the extraction cannot silently start
+         using banned analyzer APIs. -->
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- IsAotCompatible is intentionally not set: the AOT analyzers require net8.0+, so the central
+         libraries targets clear the inherited IsAotCompatible=true for this netstandard2.0 TFM. This
+         assembly is consumed at build time by the generator and the language service, never shipped into
+         the WASM app; the runtime AOT boundary is enforced on the generator's OUTPUT. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The parser cluster the projection composes: the .viu block parser ([V01.01.06.02]), the template
+         compiler it dispatches ([V01.01.05.05]) and whose BindingMetadata/render emission it consumes, and
+         the shared build-time CSS core ([V01.01.12.12]) that owns the parser composition, the scope-id
+         hash, and the style compilation. Syntax.Css flows transitively through Tooling.Css; no moved
+         signature names a CSS AST type, so it is not referenced directly. -->
+    <ViuProjectReference Include="Assimalign.Viu.Syntax" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.Templates" />
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.Css" />
+    <!-- The @script block's C# is Roslyn-parsed here (the region split, member classification, and the
+         editor's member description); the version is the central 5.3.0 pin both hosts already share. -->
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Linked netstandard2.0 shims ([V01.01.05.09]): IsExternalInit and the required-member attributes
+         are authored once in Assimalign.Viu.Syntax and <Compile Include>'d here (still internal) because an
+         internal shim in a referenced assembly is not visible to this compilation — each netstandard2.0
+         assembly needs its own copy to light up `init`/`record`/`required`. -->
+    <Compile Include="..\..\..\libraries\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
+    <Compile Include="..\..\..\libraries\Assimalign.Viu.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
+  </ItemGroup>
+</Project>

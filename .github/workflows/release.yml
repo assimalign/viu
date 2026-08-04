@@ -57,10 +57,7 @@ jobs:
                   'libraries/Assimalign.Viu.Syntax',
                   [System.StringComparison]::Ordinal) -or
                 $_.StartsWith(
-                  'libraries/Assimalign.Viu.Tooling.SingleFileComponent/',
-                  [System.StringComparison]::Ordinal) -or
-                $_.StartsWith(
-                  'libraries/Assimalign.Viu.Tooling.UtilityCss/',
+                  'tooling/',
                   [System.StringComparison]::Ordinal)
               }
           ).Count -gt 0

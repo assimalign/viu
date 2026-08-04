@@ -19,6 +19,10 @@ evaluating other frameworks' performance work — including Vue's — for possib
 - `libraries/` — framework libraries, inverted layout: `libraries/Assimalign.Viu.<Name>/{src|test}`
   (the folder name is the assembly/package id; `src/` holds the shipping project, `test/` its tests —
   no area wrapper folders)
+- `tooling/` — developer-tooling libraries: build-time and editor tooling (the shared `.viu` → C#
+  projection core, the CSS composition core, the Viu Utilities engine) plus the language service and
+  the language server. Same inverted `{src|test}` layout, folder name = assembly id. These never ship
+  into a Viu app's runtime; they run in analyzer/MSBuild hosts and in the editor.
 - `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
 - `.claude/rules/` — the canonical working conventions for this repo (auto-load by path):

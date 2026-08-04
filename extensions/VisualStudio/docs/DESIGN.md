@@ -25,12 +25,17 @@ Visual Studio
   -> Assimalign.Viu.VisualStudio (out of process)
        -> classification tagger
        -> stdio Language Server Protocol connection
-            -> Assimalign.Viu.LanguageServer
-                 -> Assimalign.Viu.LanguageService
+            -> Assimalign.Viu.Tooling.LanguageServer
+                 -> Assimalign.Viu.Tooling.LanguageService
                       -> Assimalign.Viu.Syntax.SingleFileComponent
                       -> Assimalign.Viu.Tooling.SingleFileComponent (the shared build/editor projection, [V01.01.06.11])
                       -> Assimalign.Viu.Tooling.UtilityCss
 ```
+
+Only `Assimalign.Viu.VisualStudio` lives under `extensions/VisualStudio/`. Everything below the
+stdio boundary is editor-neutral developer tooling and lives under the repository's `tooling/` root
+(`tooling/Assimalign.Viu.Tooling.LanguageServer`, `tooling/Assimalign.Viu.Tooling.LanguageService`,
+and the build-time cores they consume).
 
 `Assimalign.Viu.VisualStudio` performs fast lexical classification using Visual Studio's built-in
 classification categories. It lexes both container syntaxes of the hybrid `.viu` format
@@ -71,11 +76,11 @@ mapping decisions:
 If the Extensibility SDK later adds custom classification registration, the mapping table in
 `ViuClassificationTagger.GetClassificationType` is the single place to upgrade.
 
-`Assimalign.Viu.LanguageServer` owns protocol framing and translates protocol values into
+`Assimalign.Viu.Tooling.LanguageServer` owns protocol framing and translates protocol values into
 editor-neutral contracts. It writes protocol messages only to standard output; standard error is
 reserved for diagnostics.
 
-`Assimalign.Viu.LanguageService` caches the current text and the format-appropriate immutable
+`Assimalign.Viu.Tooling.LanguageService` caches the current text and the format-appropriate immutable
 container parse for each open `.viu` or accepted `.vue` document. It exposes block diagnostics,
 completion catalogs, declaration-aware `@script` member completion ([V01.01.12.07.04] #261 — a
 syntax-only Roslyn parse of the script block, cached on the block text; no compilation, no
@@ -107,9 +112,9 @@ evaluated project-system query and the probe fails closed.
 
 `Assimalign.Viu.Tooling.UtilityCss` is the single compiler/editor authority. Its contract is frozen
 to Tailwind CSS v4.3.3 by
-[`compatibility-v4.3.3.json`](../../../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
+[`compatibility-v4.3.3.json`](../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
 and independently authored
-[`golden-vectors-v4.3.3.json`](../../../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 The manifest enumerates 382 utility roots, 88 variants, 21 theme namespaces, value and modifier
 modes, source forms, directives, functions, and canonical ordering. The language service consumes
 that registry directly; completion detail and hover display executable compiler output.
@@ -179,7 +184,7 @@ Project-aware IntelliSense requires one authoritative `.viu`/`.vue` to C# projec
 1. **Delivered ([V01.01.06.11], #258).** The generator's component-name, script-region,
    generated-context, and source-mapping logic is extracted into the shared
    `Assimalign.Viu.Tooling.SingleFileComponent` library
-   (`libraries/Assimalign.Viu.Tooling.SingleFileComponent`, see its `docs/DESIGN.md`); the source
+   (`tooling/Assimalign.Viu.Tooling.SingleFileComponent`, see its `docs/DESIGN.md`); the source
    generator and this language service both consume it, and the two-host conformance test
    (`analyzers/Assimalign.Viu.Generators.Syntax/test/SingleFileComponentProjectionConformanceTests.cs`)
    pins ordinal-identical generated source, hint names, and diagnostics.
@@ -317,9 +322,9 @@ Assimalign.Viu.VisualStudio/
   language-server.json
   LanguageServer/
     win-x64/
-      Assimalign.Viu.LanguageServer.exe
+      Assimalign.Viu.Tooling.LanguageServer.exe
     win-arm64/
-      Assimalign.Viu.LanguageServer.exe
+      Assimalign.Viu.Tooling.LanguageServer.exe
 ```
 
 The server path is resolved relative to the installed extension and rejected if configuration tries

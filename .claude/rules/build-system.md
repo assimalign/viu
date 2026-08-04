@@ -22,7 +22,9 @@ Never write a raw `<ProjectReference Include="..\..\...csproj" />` or `<PackageR
 test, or example csproj. Use the by-name item groups the build system resolves:
 
 - **`<ViuProjectReference Include="Assimalign.Viu.Shared" />`** — public project reference (flows as a
-  `.nupkg` dependency). Resolved by assembly name against `libraries/**/*.csproj`.
+  `.nupkg` dependency). Resolved by assembly name against every indexed code root —
+  `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `extensions/`, and `benchmarks/` — see
+  `build/Targets/Build.References.Projects.targets`.
 - **`<ViuPrivateProjectReference Include="..." />`** — private reference (`PrivateAssets=all`; does not
   flow to consumers).
 - **`<ViuPackageReference Include="xunit" />`** — package reference with **no `Version` attribute**;
@@ -88,13 +90,18 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 
 ## Adding a new library
 
-1. `libraries/Assimalign.Viu.<Name>/{src,test}` with the two csproj shapes above.
+1. `libraries/Assimalign.Viu.<Name>/{src,test}` with the two csproj shapes above — or
+   `tooling/Assimalign.Viu.Tooling.<Name>/{src,test}` when the library is developer tooling
+   (build-time or editor code that never ships into a Viu app's runtime).
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
 5. If the library is a runtime framework member (ships in every Viu app), add it to
    `@(ViuFrameworkAssembly)` in `frameworks/Assimalign.Viu.App.props` so the framework packs
    deliver it.
+6. If the library is packable, add its package id to `$script:ViuLibraryPackageIds` in
+   `scripts/modules/ViuPackaging.psm1`; the drift guard scans both `libraries/` and `tooling/` and
+   fails the pack when a packable project is missing from the inventory.
 
 ## SDK and shared-framework packaging ([V01.01.12.19], #174)
 

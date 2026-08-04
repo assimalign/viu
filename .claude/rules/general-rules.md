@@ -24,6 +24,12 @@ Viu.
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
   folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
   `assimalign/viu`).
+- Developer-tooling libraries live under `tooling/Assimalign.Viu.Tooling.<Name>/{src|test}` — the same
+  inverted layout and the same folder-name-is-the-assembly-id rule. That root holds the build-time
+  cores (`Assimalign.Viu.Tooling.Css`, `Assimalign.Viu.Tooling.SingleFileComponent`,
+  `Assimalign.Viu.Tooling.UtilityCss`) and the editor tooling
+  (`Assimalign.Viu.Tooling.LanguageService`, `Assimalign.Viu.Tooling.LanguageServer`); none of them
+  ship into a Viu app's runtime.
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
   shared-framework pack producers live in `frameworks/` (see [build-system.md](build-system.md)).

@@ -33,8 +33,9 @@ if (-not [string]::IsNullOrWhiteSpace($Version)) {
 $visualStudioDirectory = $PSScriptRoot
 $repositoryDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $visualStudioDirectory '..\..'))
-$languageServerProject = Join-Path $visualStudioDirectory `
-    'Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj'
+# The language-server project itself is never named here: the publish recipe below drives the shared
+# ViuPublishLanguageServer target, which resolves it from ViuLanguageServerProjectPath (now
+# tooling\Assimalign.Viu.Tooling.LanguageServer\src). Naming it a second time would let the two drift.
 $extensionProject = Join-Path $visualStudioDirectory `
     'Assimalign.Viu.VisualStudio\src\Assimalign.Viu.VisualStudio.csproj'
 $extensionOutputDirectory = Join-Path $repositoryDirectory `

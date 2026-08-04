@@ -7,11 +7,12 @@ on:
     branches: [main]
     paths:
       - 'extensions/VisualStudio/**'
+      # The language service, the language server, and the build-time tooling libraries they
+      # carry (the shared .viu -> C# projection core [V01.01.06.11] and the utility engine) all
+      # ship inside the language-server payload, so any tooling change must re-verify the
+      # extension build and the packaged VSIX.
+      - 'tooling/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
-      # The shared .viu -> C# projection core ([V01.01.06.11]) ships inside the language-server
-      # payload, so a change to it must re-verify the extension build and the packaged VSIX.
-      - 'libraries/Assimalign.Viu.Tooling.SingleFileComponent/**'
-      - 'libraries/Assimalign.Viu.Tooling.UtilityCss/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
@@ -32,11 +33,12 @@ on:
     branches: [main]
     paths:
       - 'extensions/VisualStudio/**'
+      # The language service, the language server, and the build-time tooling libraries they
+      # carry (the shared .viu -> C# projection core [V01.01.06.11] and the utility engine) all
+      # ship inside the language-server payload, so any tooling change must re-verify the
+      # extension build and the packaged VSIX.
+      - 'tooling/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
-      # The shared .viu -> C# projection core ([V01.01.06.11]) ships inside the language-server
-      # payload, so a change to it must re-verify the extension build and the packaged VSIX.
-      - 'libraries/Assimalign.Viu.Tooling.SingleFileComponent/**'
-      - 'libraries/Assimalign.Viu.Tooling.UtilityCss/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'

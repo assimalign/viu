@@ -16,9 +16,9 @@ Assimalign.Viu.VisualStudio/
   language-server.json
   LanguageServer/
     win-x64/
-      Assimalign.Viu.LanguageServer.exe
+      Assimalign.Viu.Tooling.LanguageServer.exe
     win-arm64/
-      Assimalign.Viu.LanguageServer.exe
+      Assimalign.Viu.Tooling.LanguageServer.exe
 ```
 
 Set the `ViuLanguageServerPublishPath` MSBuild property to a directory containing the `win-x64` and

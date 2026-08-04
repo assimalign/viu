@@ -31,13 +31,13 @@ public class ViuLanguageServerConfigurationTests
                 extensionDirectory,
                 "LanguageServer",
                 "win-x64",
-                "Assimalign.Viu.LanguageServer.exe"));
+                "Assimalign.Viu.Tooling.LanguageServer.exe"));
         arm64ExecutablePath.ShouldBe(
             Path.Combine(
                 extensionDirectory,
                 "LanguageServer",
                 "win-arm64",
-                "Assimalign.Viu.LanguageServer.exe"));
+                "Assimalign.Viu.Tooling.LanguageServer.exe"));
     }
 
     [Fact]

@@ -38,6 +38,7 @@
              against, so a generator's own snapshot tests resolve it as a ViuPrivateProjectReference. -->
         <_ViuProject Include="$(ViuRepositoryDirectory)libraries\**\*.csproj" />
         <_ViuProject Include="$(ViuRepositoryDirectory)analyzers\**\*.csproj" />
+        <_ViuProject Include="$(ViuRepositoryDirectory)tooling\**\*.csproj" />
         <!-- SDK tasks and development tools are code projects too. Indexing them lets an SDK
              pack producer express build-order-only edges by assembly name while retaining any
              explicit ReferenceOutputAssembly/SkipGetTargetFrameworkProperties metadata. -->

@@ -23,10 +23,10 @@
     <ViuSkipLanguageServerPublish Condition="'$(ViuSkipLanguageServerPublish)' == ''">false</ViuSkipLanguageServerPublish>
     <ViuSkipLanguageServerStalenessCheck Condition="'$(ViuSkipLanguageServerStalenessCheck)' == ''">false</ViuSkipLanguageServerStalenessCheck>
 
-    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)extensions\VisualStudio\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj</ViuLanguageServerProjectPath>
+    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Tooling.LanguageServer\src\Assimalign.Viu.Tooling.LanguageServer.csproj</ViuLanguageServerProjectPath>
     <ViuLanguageServerPublishRoot Condition="'$(ViuLanguageServerPublishRoot)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)</ViuLanguageServerPublishRoot>
     <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuLanguageServerPublishRoot)\LanguageServer</ViuLanguageServerPublishPath>
-    <ViuLanguageServerExecutableName Condition="'$(ViuLanguageServerExecutableName)' == ''">Assimalign.Viu.LanguageServer.exe</ViuLanguageServerExecutableName>
+    <ViuLanguageServerExecutableName Condition="'$(ViuLanguageServerExecutableName)' == ''">Assimalign.Viu.Tooling.LanguageServer.exe</ViuLanguageServerExecutableName>
     <ViuLanguageServerX64ExecutablePath>$(ViuLanguageServerPublishPath)\win-x64\$(ViuLanguageServerExecutableName)</ViuLanguageServerX64ExecutablePath>
     <ViuLanguageServerArm64ExecutablePath>$(ViuLanguageServerPublishPath)\win-arm64\$(ViuLanguageServerExecutableName)</ViuLanguageServerArm64ExecutablePath>
 
@@ -62,6 +62,10 @@
                         Exclude="$(ViuRepositoryDirectory)extensions\VisualStudio\**\bin\**\*;$(ViuRepositoryDirectory)extensions\VisualStudio\**\obj\**\*" />
     <UpToDateCheckInput Include="$(ViuRepositoryDirectory)libraries\**\src\**\*.cs"
                         Exclude="$(ViuRepositoryDirectory)libraries\**\bin\**\*;$(ViuRepositoryDirectory)libraries\**\obj\**\*" />
+    <!-- The language service and server themselves, plus the build-time tooling libraries they
+         carry, live under tooling\ — the payload is stale without them in this set. -->
+    <UpToDateCheckInput Include="$(ViuRepositoryDirectory)tooling\**\src\**\*.cs"
+                        Exclude="$(ViuRepositoryDirectory)tooling\**\bin\**\*;$(ViuRepositoryDirectory)tooling\**\obj\**\*" />
     <UpToDateCheckBuilt Include="$(ViuLanguageServerX64ExecutablePath);$(ViuLanguageServerArm64ExecutablePath);$(ViuLanguageServerPublishStampFile)" />
   </ItemGroup>
 
@@ -79,6 +83,8 @@
                                       Exclude="$(ViuRepositoryDirectory)extensions\VisualStudio\**\bin\**\*;$(ViuRepositoryDirectory)extensions\VisualStudio\**\obj\**\*" />
       <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)libraries\**\src\**\*.cs;$(ViuRepositoryDirectory)libraries\**\src\**\*.csproj"
                                       Exclude="$(ViuRepositoryDirectory)libraries\**\bin\**\*;$(ViuRepositoryDirectory)libraries\**\obj\**\*" />
+      <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)tooling\**\src\**\*.cs;$(ViuRepositoryDirectory)tooling\**\src\**\*.csproj"
+                                      Exclude="$(ViuRepositoryDirectory)tooling\**\bin\**\*;$(ViuRepositoryDirectory)tooling\**\obj\**\*" />
       <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)build\Build.props;$(ViuRepositoryDirectory)build\Build.targets;$(ViuRepositoryDirectory)build\Targets\*.props;$(ViuRepositoryDirectory)build\Targets\*.targets" />
       <_ViuLanguageServerPublishInput Include="$(ViuRepositoryDirectory)Directory.Build.props;$(ViuRepositoryDirectory)Directory.Build.targets;$(ViuRepositoryDirectory)global.json" />
     </ItemGroup>

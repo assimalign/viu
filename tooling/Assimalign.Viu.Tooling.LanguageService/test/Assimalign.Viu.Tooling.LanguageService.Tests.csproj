@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLanguageServers)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.LanguageService" />
+    <ViuProjectReference Include="Assimalign.Viu.Tooling.UtilityCss" />
+    <!-- The semantic engine tests ([V01.01.12.23], #259) bind the generated IComponentTemplate
+         bridge's Context property against the real runtime contract assembly: the fixture project
+         context references the test runtime's own copy by path. -->
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+  </ItemGroup>
+</Project>

@@ -51,7 +51,7 @@ The implementation and conformance vectors must cite the narrowest applicable of
 Repository architecture reused by this feature:
 
 - [`Assimalign.Viu.Syntax.Css` design](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
-- [`Assimalign.Viu.Tooling.Css` design](../libraries/Assimalign.Viu.Tooling.Css/docs/DESIGN.md)
+- [`Assimalign.Viu.Tooling.Css` design](../tooling/Assimalign.Viu.Tooling.Css/docs/DESIGN.md)
 - [Viu `.viu` format](../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
 - [Visual Studio language tooling design](../extensions/VisualStudio/docs/DESIGN.md)
 
@@ -89,7 +89,7 @@ AOT release WebAssembly payload.
 Create the inverted-layout library:
 
 ```text
-libraries/Assimalign.Viu.Tooling.UtilityCss/
+tooling/Assimalign.Viu.Tooling.UtilityCss/
   src/Assimalign.Viu.Tooling.UtilityCss.csproj
   test/Assimalign.Viu.Tooling.UtilityCss.Tests.csproj
   conformance/
@@ -153,7 +153,7 @@ valid if the same registry can resolve it.
                 +-> per-source candidates and spans
                      /                                  \
                     /                                    \
- Assimalign.Viu.Generators.Syntax             Assimalign.Viu.LanguageService
+ Assimalign.Viu.Generators.Syntax             Assimalign.Viu.Tooling.LanguageService
  diagnostics + incremental model              completion + hover + diagnostics
                     \                                    /
                      \                                  /
@@ -390,9 +390,9 @@ The repository-owned manifest under the utility library's `conformance/` folder 
 - golden vectors and the authoritative official reference for each behavior.
 
 The frozen contract is
-[`compatibility-v4.3.3.json`](../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json);
+[`compatibility-v4.3.3.json`](../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json);
 its independently authored executable expectations are
-[`golden-vectors-v4.3.3.json`](../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 These files are copied only to the test output and are not embedded in or loaded by the shipping
 tooling assembly.
 
@@ -572,8 +572,8 @@ architecture:
 
 ```text
 Assimalign.Viu.VisualStudio
-  -> Assimalign.Viu.LanguageServer
-       -> Assimalign.Viu.LanguageService
+  -> Assimalign.Viu.Tooling.LanguageServer
+       -> Assimalign.Viu.Tooling.LanguageService
             -> Assimalign.Viu.Tooling.UtilityCss
 ```
 

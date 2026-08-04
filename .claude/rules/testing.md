@@ -11,6 +11,7 @@ paths:
   ([build-system.md](build-system.md)); the test csproj declares them by name via `ViuPackageReference`.
 - Each library has a sibling test project at `libraries/Assimalign.Viu.<Name>/test/`
   (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`, referencing its `src` via `ViuProjectReference`.
+  Developer-tooling libraries follow the same shape under `tooling/Assimalign.Viu.Tooling.<Name>/test/`.
 - Class `{Feature}Tests`; method names describe `Method_Scenario_ExpectedBehavior` (or an equally explicit
   phrase). Arrange / Act / Assert.
 

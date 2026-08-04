@@ -51,6 +51,10 @@ carries a `docs/OVERVIEW.md` (what it is and its public surface) and, where the 
 justifying, a `docs/DESIGN.md` (why it is built that way, the WASM/AOT constraints, and its
 non-goals). Neither may contradict [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
 
+Developer-tooling libraries use the same layout under `tooling/`. The split is what the code runs
+in, not who wrote it: `libraries/` is the runtime a Viu app ships, `tooling/` is the build-time and
+editor code that compiles and understands one.
+
 ### Framework libraries (`libraries/`)
 
 | Library | Responsibility | Docs |
@@ -71,9 +75,20 @@ non-goals). Neither may contradict [`docs/SPECIFICATION.md`](docs/SPECIFICATION.
 | [`Assimalign.Viu.Syntax.Html`](libraries/Assimalign.Viu.Syntax.Html) | The `.html` host-page language, for build-time rewriting of the boot page (scaffold) | [OVERVIEW](libraries/Assimalign.Viu.Syntax.Html/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax.Html/docs/DESIGN.md) |
 | [`Assimalign.Viu.Syntax.JavaScript`](libraries/Assimalign.Viu.Syntax.JavaScript) | The `.js` language around the interop boundary (scaffold) | [OVERVIEW](libraries/Assimalign.Viu.Syntax.JavaScript/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Syntax.JavaScript/docs/DESIGN.md) |
 | [`Assimalign.Viu.Testing`](libraries/Assimalign.Viu.Testing) | The in-memory host (`TNode = TestNode`) and the component test wrappers, so the runtime is exercised without a browser | [OVERVIEW](libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Testing/docs/DESIGN.md) |
-| [`Assimalign.Viu.Tooling.Css`](libraries/Assimalign.Viu.Tooling.Css) | The build-time composition root for `<style>` compilation and bundling that both build-time hosts share | [OVERVIEW](libraries/Assimalign.Viu.Tooling.Css/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Tooling.Css/docs/DESIGN.md) |
-| [`Assimalign.Viu.Tooling.SingleFileComponent`](libraries/Assimalign.Viu.Tooling.SingleFileComponent) | The ONE `.viu`/`.vue` → C# projection (parse, `@script` analysis, render and source maps, diagnostics) that the source generator and the language service both run, so build output and editor understanding cannot drift ([V01.01.06.11]) | [OVERVIEW](libraries/Assimalign.Viu.Tooling.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md) |
-| [`Assimalign.Viu.Tooling.UtilityCss`](libraries/Assimalign.Viu.Tooling.UtilityCss) | The build-time engine for **Viu Utilities** — candidate scanning, the project candidate index, and utility generation — an independent C# implementation pinned to the Tailwind CSS v4.3.3 compatibility target | [OVERVIEW](libraries/Assimalign.Viu.Tooling.UtilityCss/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Tooling.UtilityCss/docs/DESIGN.md) · [THIRD-PARTY-NOTICES](libraries/Assimalign.Viu.Tooling.UtilityCss/docs/THIRD-PARTY-NOTICES.md) |
+
+### Developer tooling (`tooling/`)
+
+Build-time and editor libraries, same inverted layout, folder name = assembly id. None of them ship
+into a Viu app's runtime: the first three run inside the Roslyn source generator and the MSBuild
+tasks, and the last two are the editor stack the Visual Studio extension launches.
+
+| Library | Responsibility | Docs |
+| --- | --- | --- |
+| [`Assimalign.Viu.Tooling.Css`](tooling/Assimalign.Viu.Tooling.Css) | The build-time composition root for `<style>` compilation and bundling that both build-time hosts share | [OVERVIEW](tooling/Assimalign.Viu.Tooling.Css/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Tooling.Css/docs/DESIGN.md) |
+| [`Assimalign.Viu.Tooling.SingleFileComponent`](tooling/Assimalign.Viu.Tooling.SingleFileComponent) | The ONE `.viu`/`.vue` → C# projection (parse, `@script` analysis, render and source maps, diagnostics) that the source generator and the language service both run, so build output and editor understanding cannot drift ([V01.01.06.11]) | [OVERVIEW](tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md) |
+| [`Assimalign.Viu.Tooling.UtilityCss`](tooling/Assimalign.Viu.Tooling.UtilityCss) | The build-time engine for **Viu Utilities** — candidate scanning, the project candidate index, and utility generation — an independent C# implementation pinned to the Tailwind CSS v4.3.3 compatibility target | [OVERVIEW](tooling/Assimalign.Viu.Tooling.UtilityCss/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Tooling.UtilityCss/docs/DESIGN.md) · [THIRD-PARTY-NOTICES](tooling/Assimalign.Viu.Tooling.UtilityCss/docs/THIRD-PARTY-NOTICES.md) |
+| [`Assimalign.Viu.Tooling.LanguageService`](tooling/Assimalign.Viu.Tooling.LanguageService) | The editor-neutral language features — document state, completion, hover, symbols, folding, code actions, and the `@script` semantic engine — with no protocol or editor dependency | [DESIGN](extensions/VisualStudio/docs/DESIGN.md) |
+| [`Assimalign.Viu.Tooling.LanguageServer`](tooling/Assimalign.Viu.Tooling.LanguageServer) | The standalone Language Server Protocol executable over the language service; published self-contained per Windows architecture and shipped inside the Visual Studio extension | [DESIGN](extensions/VisualStudio/docs/DESIGN.md) |
 
 ### Source generators and build tasks (`analyzers/`)
 

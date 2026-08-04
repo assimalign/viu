@@ -6,9 +6,14 @@ components:
 - `Assimalign.Viu.VisualStudio` is a thin out-of-process Visual Studio extension. It contributes the
   canonical `.viu` document type, project-scoped tag-based `.vue` compatibility, immediate `.viu`
   lexical syntax highlighting, and the language-server connection.
-- `Assimalign.Viu.LanguageServer` is an editor-neutral Language Server Protocol executable.
-- `Assimalign.Viu.LanguageService` owns document state and Viu language features without depending on
+- `Assimalign.Viu.Tooling.LanguageServer` is an editor-neutral Language Server Protocol executable.
+- `Assimalign.Viu.Tooling.LanguageService` owns document state and Viu language features without depending on
   Visual Studio.
+
+Only the extension itself lives under `extensions/VisualStudio/`. The language server and the
+language service are editor-neutral developer tooling and live at
+`tooling/Assimalign.Viu.Tooling.LanguageServer` and `tooling/Assimalign.Viu.Tooling.LanguageService`;
+`Assimalign.Viu.VisualStudio.slnx` and `Build.ps1` still drive all three together.
 
 The process boundary is intentional. Viu's parsers, and eventually Roslyn workspaces, remain outside
 `devenv.exe`; the same language server can later serve other editors.
@@ -107,7 +112,7 @@ The complete repository and Marketplace setup is documented in
 The extension and SDK use the same `Assimalign.Viu.Tooling.UtilityCss` parser, frozen
 Tailwind CSS v4.3.3-compatible registry, theme model, and project stylesheet compiler. The
 machine-readable compatibility contract is
-[`compatibility-v4.3.3.json`](../../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json):
+[`compatibility-v4.3.3.json`](../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json):
 382 utility roots, 88 variants, 21 theme namespaces, supported value/modifier modes, and the
 CSS-first directive/function surface. Completion detail and hover are compiler output, not a
 separate editor approximation.

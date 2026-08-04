@@ -931,7 +931,7 @@ file and still appears in the descriptor.
 
 *Authority: `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
 `libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
-`libraries/Assimalign.Viu.Tooling.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
+`tooling/Assimalign.Viu.Tooling.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
 `analyzers/Assimalign.Viu.Generators.Syntax/src/SingleFileComponentGenerator.cs`;
 `docs/adr/0005-no-runtime-template-compilation.md`.*
 
@@ -1064,8 +1064,8 @@ boundary:
   behavior. It is not affiliated with or endorsed by Tailwind Labs.**
 
 *Authority: `docs/UTILITY-CSS-DESIGN.md` (**normative** for §10.4);
-`libraries/Assimalign.Viu.Tooling.Css/docs/{OVERVIEW,DESIGN}.md`;
-`libraries/Assimalign.Viu.Tooling.UtilityCss/docs/{OVERVIEW,DESIGN}.md`;
+`tooling/Assimalign.Viu.Tooling.Css/docs/{OVERVIEW,DESIGN}.md`;
+`tooling/Assimalign.Viu.Tooling.UtilityCss/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`;
 `libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md` §"CSS Modules accessors";
 `libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §"Component CSS variables".*
@@ -1262,7 +1262,7 @@ the after-hook, so it receives the resolved value; faults run error hooks and th
 
 `[TOOL-1]` Editor support is an **out-of-process** `VisualStudio.Extensibility` thin client plus a
 **standalone Language Server Protocol process**. The chain is
-`Assimalign.Viu.VisualStudio → Assimalign.Viu.LanguageServer → Assimalign.Viu.LanguageService →
+`Assimalign.Viu.VisualStudio → Assimalign.Viu.Tooling.LanguageServer → Assimalign.Viu.Tooling.LanguageService →
 {Syntax.SingleFileComponent, Tooling.SingleFileComponent, Tooling.UtilityCss}`.
 
 `[TOOL-2]` **The build/editor equality guarantee.** One projection, conformance-pinned, producing
@@ -1288,7 +1288,7 @@ first directory containing a project so an unrelated nested project is not claim
 for document changes, diagnostics, completion, and hover.
 
 *Authority: `extensions/VisualStudio/docs/DESIGN.md`;
-`libraries/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md`.*
+`tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md`.*
 
 ---
 
@@ -1337,7 +1337,7 @@ it move together.
 | Generator snapshot tests | Emitted source, hint names, diagnostics |
 | `SingleFileComponentProjectionConformanceTests` | Build/editor projection equality [SFC-PIPE-2] |
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
-| `libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
+| `tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
 | `scripts/Measure-PublishBudget.ps1` + `scripts/budgets/PublishBudgets.json` | WASM publish size and startup budgets |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
 | `.github/workflows/area-*.yml`, `budget-gates.yml`, `benchmarks.yml` | Per-area CI |
@@ -1434,7 +1434,7 @@ and does not carry provenance ([`.claude/rules/documentation.md`](../.claude/rul
 `[ART-2]` If any externally authored data table were ever transcribed rather than independently
 derived, the attribution is a licensing matter and belongs in a `THIRD-PARTY-NOTICES` file, not in
 doc comments. Viu Utilities already follows this pattern
-(`libraries/Assimalign.Viu.Tooling.UtilityCss/docs/THIRD-PARTY-NOTICES.md`).
+(`tooling/Assimalign.Viu.Tooling.UtilityCss/docs/THIRD-PARTY-NOTICES.md`).
 
 ---
 

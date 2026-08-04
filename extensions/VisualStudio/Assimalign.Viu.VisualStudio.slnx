@@ -3,13 +3,16 @@
     <File Path="README.md" />
     <File Path="Build.ps1" />
   </Folder>
+  <!-- The language service and server are developer tooling and live under the repository's
+       tooling/ root; this solution still carries them because they are built, debugged, and
+       deployed together with the Visual Studio host. -->
   <Folder Name="/Visual Studio/Language Service/">
-    <Project Path="Assimalign.Viu.LanguageService/src/Assimalign.Viu.LanguageService.csproj" />
-    <Project Path="Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj" />
+    <Project Path="../../tooling/Assimalign.Viu.Tooling.LanguageService/src/Assimalign.Viu.Tooling.LanguageService.csproj" />
+    <Project Path="../../tooling/Assimalign.Viu.Tooling.LanguageService/test/Assimalign.Viu.Tooling.LanguageService.Tests.csproj" />
   </Folder>
   <Folder Name="/Visual Studio/Language Server/">
-    <Project Path="Assimalign.Viu.LanguageServer/src/Assimalign.Viu.LanguageServer.csproj" />
-    <Project Path="Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj" />
+    <Project Path="../../tooling/Assimalign.Viu.Tooling.LanguageServer/src/Assimalign.Viu.Tooling.LanguageServer.csproj" />
+    <Project Path="../../tooling/Assimalign.Viu.Tooling.LanguageServer/test/Assimalign.Viu.Tooling.LanguageServer.Tests.csproj" />
   </Folder>
   <Folder Name="/Visual Studio/Extension/">
     <Project Path="Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj">

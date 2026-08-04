@@ -103,9 +103,9 @@ function Invoke-ViuPack {
 }
 
 if (-not $SkipLibraries) {
-    # Get-ViuLibraryProject carries the drift guard: a library added under
-    # libraries/ but missing from the shared inventory fails here rather than
-    # silently producing an incomplete feed.
+    # Get-ViuLibraryProject carries the drift guard: a packable library added under
+    # either code root — libraries/ or tooling/ — but missing from the shared
+    # inventory fails here rather than silently producing an incomplete feed.
     $libraryProjects = Get-ViuLibraryProject -RepositoryDirectory $repoRoot
     $index = 0
     foreach ($libraryProject in $libraryProjects) {

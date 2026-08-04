@@ -84,11 +84,11 @@ Utility source inclusion and exclusion stay in MSBuild:
 ## Viu Utilities: frozen v4.3.3 surface
 
 Viu Utilities is pinned to Tailwind CSS **v4.3.3** behavior. The machine-readable
-[`compatibility-v4.3.3.json`](../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
+[`compatibility-v4.3.3.json`](../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
 is the authority: it freezes 382 utility roots, 88 variants, 21 theme namespaces, the supported
 value and modifier modes, eight source forms, and the executable customization directives and
 functions. Independently authored
-[`golden-vectors-v4.3.3.json`](../libraries/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json)
+[`golden-vectors-v4.3.3.json`](../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json)
 pins generated CSS and metadata ordering.
 
 `Utilities.css` is the singular CSS-first project entry. A complete entry can use the Viu-owned

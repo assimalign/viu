@@ -3,9 +3,9 @@
     <!-- Analyzer & Build Dependencies -->
     <ItemGroup>
         <_ViuPackage Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" />
-        <!-- Assimalign.Viu.LanguageService consumes Microsoft.CodeAnalysis.CSharp at RUNTIME
+        <!-- Assimalign.Viu.Tooling.LanguageService consumes Microsoft.CodeAnalysis.CSharp at RUNTIME
              ([V01.01.12.07.04], #261): its assets must stay unrestricted so they flow into the
-             self-contained Assimalign.Viu.LanguageServer publish. Do not add PrivateAssets here. -->
+             self-contained Assimalign.Viu.Tooling.LanguageServer publish. Do not add PrivateAssets here. -->
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
         <!-- Removed ([V01.01.12.23], #259): Microsoft.CodeAnalysis.CSharp.Workspaces 5.0.0 and
              Microsoft.CodeAnalysis.Workspaces.MSBuild 5.0.0 had zero consumers, and the semantic

@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'libraries/Assimalign.Viu.Tooling.UtilityCss/**'
+      - 'tooling/Assimalign.Viu.Tooling.UtilityCss/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
       - 'sdks/Assimalign.Viu.Sdk/**'
       - 'build/**'
@@ -22,7 +22,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'libraries/Assimalign.Viu.Tooling.UtilityCss/**'
+      - 'tooling/Assimalign.Viu.Tooling.UtilityCss/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
       - 'sdks/Assimalign.Viu.Sdk/**'
       - 'build/**'
@@ -55,7 +55,7 @@ jobs:
       - name: Build utility engine (warnings are errors)
         run: >-
           dotnet build
-          libraries/Assimalign.Viu.Tooling.UtilityCss/Assimalign.Viu.Tooling.UtilityCss.slnx
+          tooling/Assimalign.Viu.Tooling.UtilityCss/Assimalign.Viu.Tooling.UtilityCss.slnx
           --configuration Release
           -warnaserror
 
@@ -69,7 +69,7 @@ jobs:
       - name: Test
         run: >-
           dotnet test
-          libraries/Assimalign.Viu.Tooling.UtilityCss/Assimalign.Viu.Tooling.UtilityCss.slnx
+          tooling/Assimalign.Viu.Tooling.UtilityCss/Assimalign.Viu.Tooling.UtilityCss.slnx
           --configuration Release
           --no-build
 
@@ -80,7 +80,7 @@ jobs:
           New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
 
           dotnet pack `
-            libraries/Assimalign.Viu.Tooling.UtilityCss/src/Assimalign.Viu.Tooling.UtilityCss.csproj `
+            tooling/Assimalign.Viu.Tooling.UtilityCss/src/Assimalign.Viu.Tooling.UtilityCss.csproj `
             --configuration Release `
             --no-build `
             -p:PackageOutputPath=$packageDirectory

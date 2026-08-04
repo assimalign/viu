@@ -9,9 +9,9 @@ namespace Assimalign.Viu.VisualStudio;
 internal sealed class ViuLanguageServerConfiguration
 {
     private const string DefaultX64ExecutablePath =
-        @"LanguageServer\win-x64\Assimalign.Viu.LanguageServer.exe";
+        @"LanguageServer\win-x64\Assimalign.Viu.Tooling.LanguageServer.exe";
     private const string DefaultArm64ExecutablePath =
-        @"LanguageServer\win-arm64\Assimalign.Viu.LanguageServer.exe";
+        @"LanguageServer\win-arm64\Assimalign.Viu.Tooling.LanguageServer.exe";
 
     private ViuLanguageServerConfiguration(
         string relativeX64ExecutablePath,

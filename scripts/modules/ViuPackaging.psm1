@@ -7,15 +7,17 @@
     Both scripts/Install-Local.ps1 (the local dogfooding feed) and
     scripts/Pack-Release.ps1 (the release set) import this module, so the two can
     never disagree about what ships. Get-ViuLibraryProject carries the drift guard:
-    a new library under libraries/ that is not in the inventory fails the pack
-    rather than silently shipping an incomplete set.
+    a new packable library under either code root — libraries/ (the runtime
+    framework) or tooling/ (developer tooling: build-time and editor libraries) —
+    that is not in the inventory fails the pack rather than silently shipping an
+    incomplete set.
 #>
 
 Set-StrictMode -Version Latest
 
 # Every independently published Viu library, in dependency-safe order. A library
-# added here must exist at libraries/<id>/src/<id>.csproj; a packable library that
-# exists but is missing here fails Get-ViuLibraryProject.
+# added here must exist at <root>/<id>/src/<id>.csproj under one of $script:ViuCodeRoot;
+# a packable library that exists but is missing here fails Get-ViuLibraryProject.
 $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Reactivity',
     'Assimalign.Viu.Shared',
@@ -38,6 +40,38 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Router.Browser'
 )
 
+# The repository's code roots that hold independently published libraries, each using the
+# inverted <root>/<assembly id>/{src,test} layout. libraries/ holds the runtime framework;
+# tooling/ holds developer tooling (the build-time cores, the language service, the language
+# server). Both are scanned so a new project in either is caught by the drift guard.
+$script:ViuCodeRoot = @('libraries', 'tooling')
+
+function Test-ViuProjectPackable {
+    <#
+    .SYNOPSIS
+        Whether a project produces a NuGet package, read from its declared IsPackable.
+
+    .DESCRIPTION
+        Non-packable projects (the language service and the language server) live beside the
+        packable tooling libraries and must never enter the published inventory, so discovery
+        filters on the same property the build honors. Reading the csproj directly keeps the
+        guard free of an MSBuild evaluation; every Viu project that opts out declares
+        IsPackable literally.
+
+    .PARAMETER ProjectPath
+        The project file to inspect.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectPath
+    )
+
+    $project = [xml](Get-Content -LiteralPath $ProjectPath -Raw)
+    $isPackable = $project.SelectSingleNode('/Project/PropertyGroup/IsPackable')
+    return -not ($isPackable -and $isPackable.InnerText.Trim() -eq 'false')
+}
+
 function Get-ViuLibraryPackageId {
     <#
     .SYNOPSIS
@@ -54,7 +88,13 @@ function Get-ViuLibraryProject {
     <#
     .SYNOPSIS
         Resolves the library project files, failing when the inventory and the
-        libraries directory disagree.
+        code roots disagree.
+
+    .DESCRIPTION
+        An inventory id is resolved against every code root in $script:ViuCodeRoot, so moving a
+        library between libraries/ and tooling/ needs no inventory edit. The drift guard scans
+        the same roots and compares packable projects only: the non-packable language service
+        and language server sit under tooling/ and are deliberately outside the published set.
 
     .PARAMETER RepositoryDirectory
         The repository root.
@@ -68,12 +108,30 @@ function Get-ViuLibraryProject {
     $configured = @(
         $script:ViuLibraryPackageIds |
             ForEach-Object {
-                [System.IO.Path]::GetFullPath(
-                    (Join-Path $RepositoryDirectory "libraries/$_/src/$_.csproj"))
+                $packageId = $_
+                $candidates = @(
+                    $script:ViuCodeRoot |
+                        ForEach-Object {
+                            [System.IO.Path]::GetFullPath(
+                                (Join-Path $RepositoryDirectory "$_/$packageId/src/$packageId.csproj"))
+                        } |
+                        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+                )
+                if ($candidates.Count -ne 1) {
+                    throw "The Viu library package '$packageId' resolved to $($candidates.Count) project files under $($script:ViuCodeRoot -join ', ')."
+                }
+
+                $candidates[0]
             }
     )
     $discovered = @(
-        Get-ChildItem -LiteralPath (Join-Path $RepositoryDirectory 'libraries') -Directory |
+        $script:ViuCodeRoot |
+            ForEach-Object {
+                Get-ChildItem `
+                    -LiteralPath (Join-Path $RepositoryDirectory $_) `
+                    -Directory `
+                    -ErrorAction SilentlyContinue
+            } |
             ForEach-Object {
                 Get-ChildItem `
                     -LiteralPath (Join-Path $_.FullName 'src') `
@@ -81,7 +139,8 @@ function Get-ViuLibraryProject {
                     -File `
                     -ErrorAction SilentlyContinue
             } |
-            ForEach-Object { [System.IO.Path]::GetFullPath($_.FullName) }
+            ForEach-Object { [System.IO.Path]::GetFullPath($_.FullName) } |
+            Where-Object { Test-ViuProjectPackable -ProjectPath $_ }
     )
 
     $difference = @(Compare-Object ($configured | Sort-Object) ($discovered | Sort-Object))

@@ -38,7 +38,7 @@
     <ViuProjectReference Include="Assimalign.Viu.Tooling.Css" />
     <!-- Shared .viu -> C# projection core ([V01.01.06.11]): the whole parse -> analyze -> compile -> model
          pipeline (script regions, name resolution, source emission, render mapping, neutral diagnostics)
-         was lifted here so this generator and the Assimalign.Viu.LanguageService run ONE implementation
+         was lifted here so this generator and the Assimalign.Viu.Tooling.LanguageService run ONE implementation
          and the editor can never drift from the build. This project keeps only the incremental pipeline,
          file reads, hot-reload gating, .vue-shadowing, and the Roslyn diagnostic adapter. The library is
          bundled into the analyzer payload automatically by ViuAnalyzerBundlesProjectReferenceOutputs. -->
