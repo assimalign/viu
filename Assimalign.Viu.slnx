@@ -15,7 +15,7 @@
 		<File Path="README.md" />
 	</Folder>
 	<Folder Name="/viu/.claude/">
-		<File Path=".claude/CLAUDE.md" />
+		<File Path="CLAUDE.md" />
 		<File Path=".claude/launch.json" />
 	</Folder>
 	<Folder Name="/viu/.claude/rules/">
