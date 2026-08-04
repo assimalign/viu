@@ -389,8 +389,14 @@ no-install fallback in [`extensions/VisualStudio/README.md`](../../README.md).
 The shared `ViuPublishLanguageServer` target in `build/Targets/Build.LanguageServer.targets`
 publishes self-contained, single-file .NET language-server executables for `win-x64` and
 `win-arm64`; `Build.ps1` and the extension build both drive that one target, so an in-IDE build can
-never package a stale server. The extension selects the executable matching
-`RuntimeInformation.ProcessArchitecture`.
+never package a stale server. The publish is a nested `dotnet publish` process that runs while the
+rest of the solution keeps building, so it stamps `ViuLanguageServerNestedPublish=true` on itself
+and `build/Targets/Build.Global.props` redirects its entire project graph into isolated
+`bin/language-server/` and `obj/language-server/` output roots. Without that isolation the
+publish-only global properties (embedded symbols in Debug) rebuilt the shared libraries into the
+same `bin`/`obj` folders the solution build was reading, deleting their standalone `.pdb` files and
+causing intermittent MSB3030 failures in the test projects that copy those references. The
+extension selects the executable matching `RuntimeInformation.ProcessArchitecture`.
 
 Self-contained packaging is the current implementation, **not an invariant**. Recorded decision
 (2026-08-02, [V01.01.12.23] #259): the fully shipped product is expected to require a locally

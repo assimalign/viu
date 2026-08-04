@@ -13,6 +13,13 @@
       * the extension build itself        -> ViuIncludeLanguageServerPayload depends on it
 
     Everything here is inert unless a project opts in with ViuLanguageServerPublishEnabled=true.
+
+    The nested `dotnet publish` always runs with ViuLanguageServerNestedPublish=true, which
+    build\Targets\Build.Global.props turns into isolated bin\language-server\ and
+    obj\language-server\ output roots for every project in the publish graph. The publish runs
+    concurrently with the rest of the solution build, and its publish-only global properties
+    (DebugType in Debug) must never rewrite the bin\obj folders that build is reading — see the
+    comment on the Exec below.
   -->
 
   <PropertyGroup>
@@ -174,7 +181,16 @@
          Studio's own MSBuild. Left inherited, the nested dotnet CLI resolves the wrong SDK and the
          net10.0 server fails to build. Only those two are unset: clearing the MSBuildExtensionsPath
          family as well breaks Microsoft.NET.Sdk resolution outright. -->
-    <Exec Command="dotnet publish &quot;$(ViuLanguageServerProjectPath)&quot; --nologo --configuration $(Configuration) --runtime %(ViuLanguageServerRuntimeIdentifier.Identity) --self-contained true --output &quot;$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)&quot; -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=$(ViuLanguageServerPublishDebugType)$(_ViuLanguageServerVersionArguments)"
+    <!-- ViuLanguageServerNestedPublish=true makes build\Targets\Build.Global.props redirect this
+         nested build's ENTIRE project graph into sibling bin\language-server\ and
+         obj\language-server\ roots. The publish-only global properties on this command line —
+         DebugType above all — flow into every ProjectReference, so without the redirect the nested
+         process rewrites the shared libraries' ordinary bin\obj folders (deleting their standalone
+         .pdb files in Debug) while the rest of the solution builds against them in parallel: the
+         intermittent MSB3030 missing-.pdb failures. Keeping DebugType on the command line, rather
+         than scoping it to the server csproj, is deliberate — it is what embeds symbols for every
+         assembly in the single file, not just the server's own. -->
+    <Exec Command="dotnet publish &quot;$(ViuLanguageServerProjectPath)&quot; --nologo --configuration $(Configuration) --runtime %(ViuLanguageServerRuntimeIdentifier.Identity) --self-contained true --output &quot;$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)&quot; -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:ViuLanguageServerNestedPublish=true -p:DebugType=$(ViuLanguageServerPublishDebugType)$(_ViuLanguageServerVersionArguments)"
           WorkingDirectory="$(ViuRepositoryDirectory)" />
 
     <Touch Files="$(ViuLanguageServerPublishStampFile)" AlwaysCreate="true" />
