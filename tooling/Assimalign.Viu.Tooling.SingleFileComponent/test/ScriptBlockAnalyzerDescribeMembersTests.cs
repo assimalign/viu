@@ -119,6 +119,26 @@ public sealed class ScriptBlockAnalyzerDescribeMembersTests
     }
 
     [Fact]
+    public void DescribeMembers_RecoveredSpanReachingTheProbeSuffix_StaysWithinTheRegion()
+    {
+        // The mid-keystroke shape: an incomplete `using ` statement makes Roslyn's recovery swallow the
+        // method's closing brace, so the described method's span runs into the probe wrapper's own
+        // suffix. The editor calls this on every keystroke, so the span is clamped to the region rather
+        // than thrown on.
+        const string content =
+            "public void Handle()\n" +
+            "{\n" +
+            "    using \n" +
+            "}\n";
+
+        var members = ScriptBlockAnalyzer.DescribeMembers(content);
+
+        var member = members.ShouldHaveSingleItem();
+        member.Name.ShouldBe("Handle");
+        member.MemberLocation.End.Offset.ShouldBeLessThanOrEqualTo(content.Length);
+    }
+
+    [Fact]
     public void DescribeMembers_IdenticalContent_ProducesValueEqualDescriptions()
     {
         // The description is a pure function of the script text: the language service caches it keyed on

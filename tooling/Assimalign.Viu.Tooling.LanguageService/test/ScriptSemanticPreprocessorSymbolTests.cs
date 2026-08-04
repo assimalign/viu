@@ -40,6 +40,7 @@ public class ScriptSemanticPreprocessorSymbolTests
             ComponentSource,
             OffsetAfter(ComponentSource, "#endif\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -60,6 +61,7 @@ public class ScriptSemanticPreprocessorSymbolTests
             ComponentSource,
             OffsetAfter(ComponentSource, "#endif\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();

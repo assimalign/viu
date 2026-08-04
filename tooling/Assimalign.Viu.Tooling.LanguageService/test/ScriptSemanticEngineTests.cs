@@ -41,6 +41,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             OffsetAfter(ComponentSource, "set; }\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -72,6 +73,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             OffsetAfter(ComponentSource, "set; }\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -96,6 +98,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             OffsetAfter(ComponentSource, "set; }\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -126,6 +129,7 @@ public class ScriptSemanticEngineTests
             source,
             OffsetAfter(source, "    Title."),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -161,6 +165,7 @@ public class ScriptSemanticEngineTests
             source,
             OffsetAfter(source, "    Title."),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -192,6 +197,7 @@ public class ScriptSemanticEngineTests
             source,
             OffsetAfter(source, "    Context."),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -223,6 +229,7 @@ public class ScriptSemanticEngineTests
             source,
             OffsetAfter(source, "System.Str"),
             "Str",
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldNotBeNull();
@@ -256,6 +263,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             offset,
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
         first.ShouldNotBeNull();
         first.Items.ShouldContain(item => item.Label == "Alpha");
@@ -270,6 +278,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             offset,
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
         second.ShouldNotBeNull();
         engine.ProjectStateBuildCount.ShouldBe(1);
@@ -286,6 +295,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             offset,
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
         third.ShouldNotBeNull();
         third.Items.ShouldContain(item => item.Label == "Gamma");
@@ -314,6 +324,7 @@ public class ScriptSemanticEngineTests
             ComponentSource,
             OffsetAfter(ComponentSource, "set; }\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
 
         result.ShouldBeNull();
@@ -332,6 +343,7 @@ public class ScriptSemanticEngineTests
                 ComponentSource,
                 OffsetAfter(ComponentSource, "set; }\n    "),
                 string.Empty,
+                ScriptCompletionContextKind.Expression,
                 new CancellationToken(canceled: true)));
     }
 
@@ -353,6 +365,7 @@ public class ScriptSemanticEngineTests
             source,
             OffsetAfter(source, "set; }\n    "),
             string.Empty,
+            ScriptCompletionContextKind.Expression,
             CancellationToken.None);
         result.ShouldNotBeNull();
 

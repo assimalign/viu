@@ -897,6 +897,13 @@ internal sealed class ViuLanguageService :
         string linePrefix,
         CancellationToken cancellationToken)
     {
+        // Every completion source is gated by the position's syntactic context first: the member
+        // lookup, the Viu scaffold catalog, and the keyword catalog are all illegal inside a
+        // using directive's namespace-or-type name, and offering them there — the component's own
+        // private field included — reads as the editor ignoring the C# grammar entirely.
+        var contextKind = ScriptCompletionContext.Classify(
+            script.Content,
+            offset - script.ContentLocation.Start.Offset);
         var word = GetTrailingIdentifier(linePrefix);
         var semantic = GetScriptSemanticCompletions(
             documentUri,
@@ -904,16 +911,25 @@ internal sealed class ViuLanguageService :
             script,
             offset,
             word,
+            contextKind,
             cancellationToken);
         if (semantic is null)
         {
             // ANY engine miss — no project context, an unmapped position, a binder failure —
             // falls through to the existing syntax-only path unchanged: the fallback is the
-            // existing code, not a new one.
-            return GetSyntaxOnlyScriptCompletions(linePrefix, document.Syntax);
+            // existing code, not a new one. A using directive is the one exception: without a
+            // compilation the service knows no namespace, and the honest degraded answer is
+            // nothing rather than the member-and-snippet list that is illegal there.
+            return contextKind == ScriptCompletionContextKind.UsingDirective
+                ? Array.Empty<LanguageCompletionItem>()
+                : GetSyntaxOnlyScriptCompletions(linePrefix, document.Syntax);
         }
 
-        return MergeScriptSemanticCompletions(semantic, word);
+        // The engine already restricted a using directive's lookup to namespaces and types and
+        // ordered namespaces first; appending the scaffold or keyword catalogs would put them back.
+        return contextKind == ScriptCompletionContextKind.UsingDirective
+            ? semantic.Items
+            : MergeScriptSemanticCompletions(semantic, word);
     }
 
     // The semantic gate ([V01.01.12.23], #259): only an (implicitly or explicitly) C# script
@@ -925,6 +941,7 @@ internal sealed class ViuLanguageService :
         SingleFileComponentScriptBlock script,
         int offset,
         string word,
+        ScriptCompletionContextKind contextKind,
         CancellationToken cancellationToken)
     {
         if (script.Lang is not null &&
@@ -953,6 +970,7 @@ internal sealed class ViuLanguageService :
             document.Text,
             offset,
             word,
+            contextKind,
             cancellationToken);
     }
 

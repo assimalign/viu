@@ -133,6 +133,11 @@ internal sealed class ScriptSemanticEngine
     /// <param name="documentText">The document's live editor text.</param>
     /// <param name="documentOffset">The zero-based cursor offset within <paramref name="documentText"/>.</param>
     /// <param name="typedPrefix">The partially typed identifier at the cursor, or empty.</param>
+    /// <param name="contextKind">
+    /// The position's syntactic context. <see cref="ScriptCompletionContextKind.UsingDirective"/>
+    /// restricts the lookup to namespaces and types and orders namespaces first, because nothing
+    /// else is legal in a using directive's namespace-or-type name.
+    /// </param>
     /// <param name="cancellationToken">The token cancelling the computation.</param>
     /// <returns>The semantic completion result, or <see langword="null"/> on a miss.</returns>
     internal ScriptSemanticCompletionResult? GetCompletions(
@@ -142,6 +147,7 @@ internal sealed class ScriptSemanticEngine
         string documentText,
         int documentOffset,
         string typedPrefix,
+        ScriptCompletionContextKind contextKind,
         CancellationToken cancellationToken)
     {
         try
@@ -157,6 +163,7 @@ internal sealed class ScriptSemanticEngine
                     documentText,
                     documentOffset,
                     typedPrefix,
+                    contextKind,
                     cancellationToken);
             }
             finally
@@ -232,6 +239,7 @@ internal sealed class ScriptSemanticEngine
         string documentText,
         int documentOffset,
         string typedPrefix,
+        ScriptCompletionContextKind contextKind,
         CancellationToken cancellationToken)
     {
         var state = GetOrCreateProjectState(context, cancellationToken);
@@ -275,12 +283,23 @@ internal sealed class ScriptSemanticEngine
             return null;
         }
 
+        // The syntactic gate, applied to the bound symbols rather than to the finished items: the
+        // item list is capped at LanguageCompletionLimits.MaximumItems, so filtering afterwards
+        // would let a class-body lookup's members crowd out the namespaces the position asked for.
+        if (contextKind == ScriptCompletionContextKind.UsingDirective)
+        {
+            symbols = symbols
+                .Where(symbol => symbol.Kind is SymbolKind.Namespace or SymbolKind.NamedType)
+                .ToArray();
+        }
+
         var resolutionEntries = new Dictionary<string, ResolutionEntry>(StringComparer.Ordinal);
         var items = CreateCompletionItems(
             symbols,
             semanticModel,
             generatedPosition,
             typedPrefix,
+            contextKind == ScriptCompletionContextKind.UsingDirective,
             resolutionEntries);
         if (items.Count == 0)
         {
@@ -434,6 +453,7 @@ internal sealed class ScriptSemanticEngine
         SemanticModel semanticModel,
         int position,
         string typedPrefix,
+        bool orderNamespacesFirst,
         Dictionary<string, ResolutionEntry> resolutionEntries)
     {
         var items = new List<LanguageCompletionItem>();
@@ -442,7 +462,12 @@ internal sealed class ScriptSemanticEngine
             .Where(symbol => symbol.CanBeReferencedByName && symbol.Name.Length > 0)
             .Where(symbol => typedPrefix.Length == 0 ||
                 symbol.Name.StartsWith(typedPrefix, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(symbol => symbol.Name, StringComparer.Ordinal)
+            // A using directive names a namespace far more often than a type (`using static` and
+            // the alias form are the exceptions), so its two-band order puts every namespace above
+            // every type; every other context keeps the single "00:" semantic band that sorts
+            // above the appended scaffold and keyword catalogs.
+            .OrderBy(symbol => orderNamespacesFirst && symbol.Kind != SymbolKind.Namespace ? 1 : 0)
+            .ThenBy(symbol => symbol.Name, StringComparer.Ordinal)
             .ThenBy(symbol => (int)symbol.Kind);
         foreach (var symbol in ordered)
         {
@@ -454,6 +479,9 @@ internal sealed class ScriptSemanticEngine
             }
 
             var detail = symbol.ToMinimalDisplayString(semanticModel, position, DetailFormat);
+            var sortBand = orderNamespacesFirst && symbol.Kind != SymbolKind.Namespace
+                ? "01:"
+                : "00:";
             items.Add(new LanguageCompletionItem(
                 symbol.Name,
                 ToCompletionKind(symbol),
@@ -463,7 +491,7 @@ internal sealed class ScriptSemanticEngine
                 Documentation: string.Empty,
                 symbol.Name,
                 IsSnippet: false,
-                SortText: "00:" + symbol.Name));
+                SortText: sortBand + symbol.Name));
             resolutionEntries[symbol.Name] = new ResolutionEntry(detail, symbol);
             if (items.Count == LanguageCompletionLimits.MaximumItems)
             {

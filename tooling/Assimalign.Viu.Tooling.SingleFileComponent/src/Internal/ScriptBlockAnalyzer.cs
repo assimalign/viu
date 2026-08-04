@@ -423,8 +423,17 @@ internal static class ScriptBlockAnalyzer
         int memberRegionOffset,
         int memberRegionLineIndex)
     {
-        var regionStart = Math.Max(0, span.Start - ProbePrefix.Length);
-        var regionEnd = Math.Max(0, span.End - ProbePrefix.Length);
+        // Both ends are clamped to the region because Roslyn error recovery can extend a member's span
+        // past it into the probe's own suffix: an incomplete `using ` statement inside a method body
+        // swallows the method's closing brace, so the described method runs to the wrapper's brace. The
+        // editor reads declarations on every keystroke, and mid-keystroke text is exactly the text that
+        // recovers this way, so an unclamped span throws while the author is simply typing.
+        var regionStart = Math.Min(
+            Math.Max(0, span.Start - ProbePrefix.Length),
+            memberRegionText.Length);
+        var regionEnd = Math.Min(
+            Math.Max(regionStart, span.End - ProbePrefix.Length),
+            memberRegionText.Length);
         var text = memberRegionText.Substring(regionStart, regionEnd - regionStart);
 
         var (startLine, startColumn) = RegionPosition(memberRegionText, regionStart);
