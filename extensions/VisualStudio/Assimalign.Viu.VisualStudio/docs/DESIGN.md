@@ -78,6 +78,36 @@ does not live there yet). The recorded mapping decisions:
 If the Extensibility SDK later adds custom classification registration, the mapping table in
 `ViuClassificationTagger.GetClassificationType` is the single place to upgrade.
 
+### Reporting granularity
+
+`ViuClassificationTagger` reports the **whole document** on every report, not the ranges Visual
+Studio asked about. Visual Studio caches what a tagger reports: `UpdateTagsAsync` takes the
+calculated ranges separately from the tags so the range set can mark a region as answered
+independently of whether that answer held any tags ("all previous tags that are fully overlapping
+`updatedRanges` will be considered outdated"), and the companion `GetAllRequestedRangesAsync` — "all
+the ranges for which tags have been requested so far" — exists only because that cache survives
+across requests.
+
+Out of process, each request and each report is a JSON-RPC round trip. Reporting only the requested
+lines therefore left every line the user had not scrolled to yet uncalculated on the Visual Studio
+side, so scrolling drew those lines in the default text color until the round trip completed — a
+visible colorization flicker. Classification is whole-document lexing anyway (the lexer must see the
+container sections above a line to color it), so widening the report costs nothing to compute and
+lets Visual Studio answer later scrolling from its own cache with no round trip.
+
+Two guards keep the wider payload cheap. The lexer result is cached on the document version, because
+Visual Studio raises a text-view change and then requests tags for the same snapshot — one keystroke
+reaches the tagger twice. And a version already delivered is not reported again unless
+`recalculateAll` says Visual Studio's copy is stale; the version watermark advances only after the
+report completes, so a cancelled or failed report cannot leave the document uncolored. The change
+notification no longer calls `GetAllRequestedRangesAsync` at all: it is a round trip that returns a
+strict subset of what is reported regardless.
+
+The reporting policy is expressed in offsets rather than editor types
+(`ViuClassificationReportHandler`) because `ITextDocumentSnapshot` carries internal members and
+cannot be implemented outside the Visual Studio SDK; only the thin snapshot adapter in the tagger
+touches editor types, and it is the one part of the path that unit tests cannot reach.
+
 ### Bespoke Viu colors and the companion package
 
 The `Assimalign.Viu.VisualStudio.Registration` companion (see "File extension ownership") is a
