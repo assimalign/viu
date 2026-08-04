@@ -71,6 +71,36 @@
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
+        <!-- The classic in-process Language Server Protocol client API: ILanguageClient, the
+             Connection stream pair ViuLanguageClient hands Visual Studio, and the
+             CodeRemoteContentDefinition base the viu content type derives from so the editor's
+             language-server features attach to a .viu buffer. Same 17.14 line and same
+             compile-only stance as the editor packages above; Visual Studio's own LanguageServer
+             extension registers a 0.0.0.0-18.x binding redirect for the assembly, so an extension
+             compiled against 17.14 binds to whatever the running IDE ships. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.14.60">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <!-- AsyncEventHandler<T>, the type of ILanguageClient's StartAsync/StopAsync events, which
+             ViuLanguageClient declares and raises. A transitive dependency of the client package,
+             pinned explicitly because it is compiled against directly. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Threading" Version="17.13.2">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <!-- Two more transitive dependencies of the client package whose requested builds were never
+             published, so NuGet resolves upward and warns (NU1603) - the same situation as
+             Imaging.Interop above. Pinned at the builds NuGet picks anyway, which makes the
+             resolution explicit rather than approximate. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Telemetry" Version="17.14.2">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <_ViuPackage Include="Microsoft.VisualStudio.Utilities" Version="17.13.40008">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
         <!-- ViuLanguageServerConfiguration parses language-server.json. On the .NET Framework line a
              classic VSIX compiles against, System.Text.Json is a package rather than part of the
              framework; devenv.exe.config redirects the whole 0.0.0.0-10.x range onto the copy

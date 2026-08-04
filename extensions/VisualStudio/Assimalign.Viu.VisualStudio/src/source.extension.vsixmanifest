@@ -48,7 +48,8 @@
   </Prerequisites>
   <Assets>
     <!-- The MEF parts: the viu content type, the Viu classification types and their format
-         definitions, and the classifier that ties them to the lexer. -->
+         definitions, the classifier that ties them to the lexer, and the language client that
+         starts the standalone Viu language server and hands Visual Studio its stream pair. -->
     <Asset Type="Microsoft.VisualStudio.MefComponent"
            d:Source="Project"
            d:ProjectName="%CurrentProject%"

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 
 namespace Assimalign.Viu.VisualStudio;
@@ -12,6 +14,10 @@ internal sealed class ViuLanguageServerConfiguration
         @"LanguageServer\win-x64\Assimalign.Viu.Tooling.LanguageServer.exe";
     private const string DefaultArm64ExecutablePath =
         @"LanguageServer\win-arm64\Assimalign.Viu.Tooling.LanguageServer.exe";
+
+    // The set CommandLineToArgvW treats as significant. An argument free of all of them round-trips
+    // unquoted; anything else is quoted and its backslash runs doubled.
+    private static readonly char[] CharactersRequiringQuotes = [' ', '\t', '\n', '\v', '"'];
 
     private ViuLanguageServerConfiguration(
         string relativeX64ExecutablePath,
@@ -28,6 +34,30 @@ internal sealed class ViuLanguageServerConfiguration
     public string RelativeArm64ExecutablePath { get; }
 
     public IReadOnlyList<string> Arguments { get; }
+
+    /// <summary>
+    /// Derives the installed extension's directory from the location of the assembly the extension
+    /// was loaded from.
+    /// </summary>
+    /// <remarks>
+    /// In process, the extension has no host-supplied installation path: the assembly Visual Studio
+    /// loaded from the VSIX layout sits beside <c>language-server.json</c> and the
+    /// <c>LanguageServer\</c> payload, so its own directory is the extension directory. An assembly
+    /// with no on-disk location (loaded from bytes) falls back to the current directory rather than
+    /// failing, and the caller's <c>File.Exists</c> guard then reports the missing executable.
+    /// </remarks>
+    public static string GetExtensionDirectory(string assemblyLocation)
+    {
+        if (assemblyLocation is null || string.IsNullOrWhiteSpace(assemblyLocation))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        string? directory = Path.GetDirectoryName(assemblyLocation);
+        return directory is null || string.IsNullOrWhiteSpace(directory)
+            ? Directory.GetCurrentDirectory()
+            : directory;
+    }
 
     public static ViuLanguageServerConfiguration Load(string extensionDirectory)
     {
@@ -108,6 +138,105 @@ internal sealed class ViuLanguageServerConfiguration
         }
 
         return executablePath;
+    }
+
+    /// <summary>
+    /// Builds the start information for one language-server session: a redirected standard input and
+    /// output pair, no console window, and no shell.
+    /// </summary>
+    /// <remarks>
+    /// Standard error is deliberately left inherited. The server reserves it for diagnostics, and a
+    /// redirected pipe nobody drains fills its buffer and blocks the server mid-write.
+    /// </remarks>
+    public ProcessStartInfo CreateProcessStartInformation(
+        string executablePath,
+        string extensionDirectory)
+    {
+        string? executableDirectory = Path.GetDirectoryName(executablePath);
+        return new ProcessStartInfo
+        {
+            FileName = executablePath,
+            Arguments = FormatArguments(this.Arguments),
+            WorkingDirectory = executableDirectory is null ||
+                string.IsNullOrWhiteSpace(executableDirectory)
+                    ? extensionDirectory
+                    : executableDirectory,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+    }
+
+    /// <summary>
+    /// Joins configured arguments into one command line using the quoting rules
+    /// <c>CommandLineToArgvW</c> reverses, so an argument survives the round trip unchanged.
+    /// </summary>
+    /// <remarks>
+    /// The .NET Framework surface a classic extension compiles against has no
+    /// <c>ProcessStartInfo.ArgumentList</c> — that collection, which quotes on the caller's behalf,
+    /// arrived with .NET Core. The quoting is therefore performed here.
+    /// </remarks>
+    public static string FormatArguments(IReadOnlyList<string> arguments)
+    {
+        if (arguments is null || arguments.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder builder = new();
+        foreach (string argument in arguments)
+        {
+            if (builder.Length != 0)
+            {
+                builder.Append(' ');
+            }
+
+            AppendArgument(builder, argument);
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendArgument(StringBuilder builder, string argument)
+    {
+        if (argument.Length != 0 && argument.IndexOfAny(CharactersRequiringQuotes) < 0)
+        {
+            builder.Append(argument);
+            return;
+        }
+
+        builder.Append('"');
+        for (int index = 0; index < argument.Length; index++)
+        {
+            int backslashCount = 0;
+            while (index < argument.Length && argument[index] == '\\')
+            {
+                backslashCount++;
+                index++;
+            }
+
+            if (index == argument.Length)
+            {
+                // A backslash run ending the argument precedes the closing quote, so it doubles.
+                builder.Append('\\', backslashCount * 2);
+                break;
+            }
+
+            if (argument[index] == '"')
+            {
+                // A backslash run before a quote doubles, and the quote itself is escaped.
+                builder.Append('\\', (backslashCount * 2) + 1);
+            }
+            else
+            {
+                builder.Append('\\', backslashCount);
+            }
+
+            builder.Append(argument[index]);
+        }
+
+        builder.Append('"');
     }
 
     private static string GetExecutablePath(

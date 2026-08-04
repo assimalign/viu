@@ -72,6 +72,14 @@
     <ViuPackageReference Include="Microsoft.VisualStudio.Text.Logic" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
     <ViuPackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" />
+    <!-- The classic in-process language-server client API (ILanguageClient, Connection) and the
+         threading primitives its events are typed with. -->
+    <ViuPackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Threading" />
+    <!-- Transitive dependencies of the client package pinned to silence NU1603, exactly as
+         Imaging.Interop is above. -->
+    <ViuPackageReference Include="Microsoft.VisualStudio.Telemetry" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Utilities" />
     <ViuPackageReference Include="System.Text.Json" />
   </ItemGroup>
 
