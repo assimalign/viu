@@ -39,15 +39,33 @@ public class ViuLanguageServerProviderTests
     /// glob alongside it forms a conjunction nothing can satisfy. The tagger therefore declares a
     /// single document-type filter and no pattern.
     /// </summary>
+    /// <remarks>
+    /// The filter names the built-in <c>text</c> base type rather than a Viu container type: the
+    /// container content types are created at runtime when the extension applies its
+    /// <c>documentTypes</c>, so a filter naming them cannot match a document whose buffer already
+    /// exists. Container selection happens in
+    /// <see cref="ViuClassificationTaggerProvider.IsSingleFileComponent"/> instead.
+    /// </remarks>
     [Fact]
-    public void GeneratedManifest_GivesTheClassificationTaggerExactlyOneDocumentTypeFilter()
+    public void GeneratedManifest_FiltersClassificationOnTheAlwaysSatisfiableTextDocumentType()
     {
         (var documentTypesByPart, var patternsByPart) = ReadAppliesToFromGeneratedManifest();
         string taggerProvider = typeof(ViuClassificationTaggerProvider).FullName!;
 
-        documentTypesByPart[taggerProvider].Distinct().ShouldBe(["viu"]);
+        documentTypesByPart[taggerProvider].Distinct().ShouldBe(["text"]);
         patternsByPart[taggerProvider].ShouldBeEmpty();
     }
+
+    [Theory]
+    [InlineData("C:/Source/repos/app/Components/FeatureCard.viu", true)]
+    [InlineData("C:/Source/repos/app/Components/UtilitiesView.vue", true)]
+    [InlineData("C:/Source/repos/app/Components/FEATURECARD.VIU", true)]
+    [InlineData("C:/Source/repos/app/Program.cs", false)]
+    [InlineData("C:/Source/repos/app/viu/Program.cs", false)]
+    [InlineData("C:/Source/repos/app/appsettings.json", false)]
+    public void IsSingleFileComponent_SelectsOnlyContainerDocuments(string localPath, bool expected) =>
+        ViuClassificationTaggerProvider.IsSingleFileComponent(new Uri($"file:///{localPath}"))
+            .ShouldBe(expected);
 
     /// <summary>
     /// The <c>.vue</c> container is a declared compatibility target ([V01.01.06.09]) and must stay

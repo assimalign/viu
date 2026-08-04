@@ -17,20 +17,27 @@ internal sealed class ViuClassificationTagger : TextViewTagger<ClassificationTag
     private readonly ViuClassificationTaggerProvider provider;
     private readonly Uri documentUri;
     private readonly TraceSource traceSource;
+    private readonly bool isSingleFileComponent;
 
     public ViuClassificationTagger(
         ViuClassificationTaggerProvider provider,
         Uri documentUri,
-        TraceSource traceSource)
+        TraceSource traceSource,
+        bool isSingleFileComponent)
     {
         this.provider = provider;
         this.documentUri = documentUri;
         this.traceSource = traceSource;
+        this.isSingleFileComponent = isSingleFileComponent;
     }
 
     public override void Dispose()
     {
-        this.provider.RemoveTagger(this.documentUri, this);
+        if (this.isSingleFileComponent)
+        {
+            this.provider.RemoveTagger(this.documentUri, this);
+        }
+
         base.Dispose();
     }
 
@@ -68,6 +75,13 @@ internal sealed class ViuClassificationTagger : TextViewTagger<ClassificationTag
         IEnumerable<TextRange> requestedRanges,
         CancellationToken cancellationToken)
     {
+        // The provider applies to every text document, so a tagger exists for documents Viu does not
+        // own. Those produce no tags rather than running the Viu lexer over unrelated source.
+        if (!this.isSingleFileComponent)
+        {
+            return;
+        }
+
         HashSet<int> requestedLineNumbers = requestedRanges
             .SelectMany(range =>
             {
