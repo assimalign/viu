@@ -64,6 +64,7 @@ severity tier its own stable ID.
 | dispatched template parse | `VIU1101` | `VIU1102` | `VIU1103` |
 | `@script` C# parse | `VIU1201` | `VIU1202` | `VIU1203` |
 | script generated-member and compatibility contract | `VIU1204`–`VIU1206` | — | — |
+| attribute-declared component surface | `VIU1207`–`VIU1209` | — | — |
 | dispatched style CSS parse | `VIU1301` | `VIU1302` | `VIU1303` |
 
 ### VIU1001
@@ -151,6 +152,34 @@ cancellation and error-routing policy.
 Unsupported compatibility script language — every tag-based `<script>` block must explicitly declare
 `lang="csharp"`. Missing or different language attributes are rejected and their content is never
 merged or executed.
+
+### VIU1207
+
+Conflicting component parameter or event declaration — the component declares the same kind of surface
+twice: once with `[Parameter]`/`[Event]` attributes and once with its own `Parameters`/`Events` member.
+The generated declaration is an explicit interface implementation, so it would silently win over the
+authored collection; the mix is rejected instead of resolved by an invisible precedence rule
+(`[CMP-31]`). The rule is **per kind** — a component may keep an imperative `Parameters` collection while
+declaring its events by attribute.
+
+### VIU1208
+
+Duplicate component parameter or event declaration — two attributed members resolve to the same canonical
+name, either because their derived names collide or because an explicit `Name` repeats one. Core's
+parameter/event alias table rejects a duplicate at mount, so the duplicate is a build error.
+
+### VIU1209
+
+Unsupported component parameter or event declaration — the attribute is on a member shape the generated
+scaffold cannot implement, or carries an argument it cannot read at build time:
+
+- `[Parameter]` on a static property, or on a property with no `set` accessor (the scaffold assigns the
+  supplied argument to it before every render).
+- `[Event]` on anything other than a non-generic, instance `partial void` method with no body, or on a
+  method with a by-reference parameter.
+- a `Name` argument that is not a non-empty constant string literal, or an `IsRequired` argument that is
+  not the literal `true`/`false`. The declaration is emitted at build time, so it cannot depend on a value
+  only a semantic model or the runtime could resolve.
 
 ### VIU1301
 

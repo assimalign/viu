@@ -37,6 +37,20 @@ optional validator. The declaration name is the canonical key exposed through
 required-value or validator failure warns without discarding the resolved value, so a bad input is
 reported rather than silently replaced.
 
+`ParameterAttribute` and `EventAttribute` are the declarative form of the same two contracts. A
+single-file component may put `[Parameter]` on the settable property that receives an argument and
+`[Event]` on the `partial void` method that emits an event; the source generator reads both at build
+time and synthesizes the equivalent `ComponentParameter`/`ComponentEvent` declarations, the
+per-render assignment from `IComponentContext.Arguments`, and the typed `Emit` implementation. Nothing
+is discovered by reflection — the attributes never exist at runtime as a lookup key, only as the
+build-time input that produced the same static declarations an imperative component writes by hand.
+The canonical name is the camel-case spelling of the member name (`Title` -> `title`, `URL` -> `url`),
+overridable with an explicit constant `Name`; requiredness comes from `IsRequired` or the C#
+`required` modifier; and the property's initializer is captured once per mounted instance as its
+default. The two forms are exclusive per kind: a component declares its parameters either with
+attributes or with its own `Parameters` member, never both
+([`[CMP-26]`-`[CMP-31]`](../../../docs/SPECIFICATION.md#49-attribute-declared-parameters-and-events)).
+
 `ComponentEvent` optionally validates the complete ordered argument list.
 `IComponentContext.Emit` accepts zero or more arguments, while `ComponentEventListener` supports
 single-payload and all-arguments handlers in synchronous and task-returning forms. The listener can

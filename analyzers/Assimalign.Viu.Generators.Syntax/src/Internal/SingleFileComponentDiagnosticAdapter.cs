@@ -161,6 +161,42 @@ internal static class SingleFileComponentDiagnosticAdapter
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1206"));
 
+    /// <summary>
+    /// A component declares the same kind of surface both by attribute and with its own
+    /// <c>Parameters</c>/<c>Events</c> member ([CMP-31]).
+    /// </summary>
+    internal static readonly DiagnosticDescriptor ConflictingComponentDeclaration = new(
+        id: "VIU1207",
+        title: "Conflicting component parameter or event declaration",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1207"));
+
+    /// <summary>Two attributed members declare the same component parameter or event name.</summary>
+    internal static readonly DiagnosticDescriptor DuplicateComponentDeclaration = new(
+        id: "VIU1208",
+        title: "Duplicate component parameter or event declaration",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1208"));
+
+    /// <summary>
+    /// A <c>[Parameter]</c> or <c>[Event]</c> declaration is on a member shape the generated scaffold
+    /// cannot implement, or carries a non-constant argument.
+    /// </summary>
+    internal static readonly DiagnosticDescriptor UnsupportedComponentDeclaration = new(
+        id: "VIU1209",
+        title: "Unsupported component parameter or event declaration",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1209"));
+
     /// <summary>A recoverable error reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
     internal static readonly DiagnosticDescriptor StyleError = new(
         id: "VIU1301",
@@ -217,6 +253,9 @@ internal static class SingleFileComponentDiagnosticAdapter
             "VIU1204" => ReservedScriptMember,
             "VIU1205" => AsynchronousVoidCallback,
             "VIU1206" => UnsupportedScriptLanguage,
+            "VIU1207" => ConflictingComponentDeclaration,
+            "VIU1208" => DuplicateComponentDeclaration,
+            "VIU1209" => UnsupportedComponentDeclaration,
             "VIU1301" => StyleError,
             "VIU1302" => StyleWarning,
             "VIU1303" => StyleInformation,

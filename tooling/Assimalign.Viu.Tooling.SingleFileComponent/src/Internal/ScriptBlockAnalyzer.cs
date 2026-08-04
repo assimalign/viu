@@ -146,6 +146,7 @@ internal static class ScriptBlockAnalyzer
         var memberRegion = string.IsNullOrWhiteSpace(memberRegionText) ? null : memberRegionText;
 
         var bindings = EquatableArray<ScriptBinding>.Empty;
+        var declarations = ScriptDeclarations.None;
         if (memberRegion is not null)
         {
             // The member region begins at a .viu line boundary (column 1); compose diagnostics and the
@@ -159,7 +160,8 @@ internal static class ScriptBlockAnalyzer
                 filePath,
                 memberRegionStart,
                 diagnostics,
-                reservesGeneratedMembers);
+                reservesGeneratedMembers,
+                out declarations);
         }
 
         var regions = new ScriptRegions(
@@ -169,7 +171,7 @@ internal static class ScriptBlockAnalyzer
             memberRegion,
             memberRegion is null ? 0 : memberRegionStartLine,
             memberRegion is null ? 0 : memberRegionStartColumn);
-        return new ScriptAnalysis(regions, bindings);
+        return new ScriptAnalysis(regions, bindings, declarations);
     }
 
     /// <summary>
@@ -259,8 +261,10 @@ internal static class ScriptBlockAnalyzer
         string filePath,
         Position memberRegionStart,
         List<DiagnosticInfo> diagnostics,
-        bool reservesGeneratedMembers)
+        bool reservesGeneratedMembers,
+        out ScriptDeclarations declarations)
     {
+        declarations = ScriptDeclarations.None;
         var tree = CSharpSyntaxTree.ParseText(ProbePrefix + memberRegion + ProbeSuffix, ParseOptions);
         var root = (CompilationUnitSyntax)tree.GetRoot();
 
@@ -278,6 +282,20 @@ internal static class ScriptBlockAnalyzer
         if (probe is null)
         {
             return EquatableArray<ScriptBinding>.Empty;
+        }
+
+        // [CMP-26]/[CMP-30] The attribute-declared component surface. Only a template-bearing component
+        // gets an IComponentTemplate bridge to hang the declarations on, so a style-only .viu never
+        // reads them.
+        if (reservesGeneratedMembers)
+        {
+            declarations = ComponentDeclarationReader.Read(
+                probe,
+                filePath,
+                memberRegionStart,
+                ProbePrefix.Length,
+                ProbeLineOffset,
+                diagnostics);
         }
 
         var bindings = new List<ScriptBinding>();

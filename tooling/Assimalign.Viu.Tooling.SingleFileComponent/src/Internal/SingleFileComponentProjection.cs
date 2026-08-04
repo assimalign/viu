@@ -113,6 +113,7 @@ internal static class SingleFileComponentProjection
     {
         var scriptRegions = ScriptRegions.None;
         var scriptBindings = EquatableArray<ScriptBinding>.Empty;
+        var scriptDeclarations = ScriptDeclarations.None;
         if (script is not null)
         {
             var analysis = ScriptBlockAnalyzer.Analyze(
@@ -122,10 +123,12 @@ internal static class SingleFileComponentProjection
                 reservesGeneratedMembers: template is not null);
             scriptRegions = analysis.Regions;
             scriptBindings = analysis.Bindings;
+            scriptDeclarations = analysis.Declarations;
         }
 
         var scriptSetupRegions = ScriptRegions.None;
         var scriptSetupBindings = EquatableArray<ScriptBinding>.Empty;
+        var scriptSetupDeclarations = ScriptDeclarations.None;
         if (scriptSetup is not null)
         {
             var analysis = ScriptBlockAnalyzer.Analyze(
@@ -135,6 +138,7 @@ internal static class SingleFileComponentProjection
                 reservesGeneratedMembers: template is not null);
             scriptSetupRegions = analysis.Regions;
             scriptSetupBindings = analysis.Bindings;
+            scriptSetupDeclarations = analysis.Declarations;
         }
 
         var bindings = MergeBindingsInSourceOrder(
@@ -174,6 +178,7 @@ internal static class SingleFileComponentProjection
                 ? EquatableArray<CssVariableBindingEntry>.Empty
                 : new EquatableArray<CssVariableBindingEntry>(cssVariableBindings.ToArray()))
         {
+            Declarations = MergeDeclarations(scriptDeclarations, scriptSetupDeclarations),
             ScriptSetup = scriptSetupRegions,
             IsScriptSetupFirst =
                 scriptSetup is not null &&
@@ -253,6 +258,73 @@ internal static class SingleFileComponentProjection
         {
             destination.Add(binding);
         }
+    }
+
+    // A tag-based .vue component may carry both a <script> and a <script setup> block, each analyzed on
+    // its own; the attribute-declared surfaces ([CMP-26]/[CMP-30]) union here. A name declared in both
+    // blocks keeps its first declaration, because two declarations of one name would make the runtime
+    // parameter/event alias table throw at mount — the emitted surface must be valid by construction.
+    private static ScriptDeclarations MergeDeclarations(
+        ScriptDeclarations script,
+        ScriptDeclarations scriptSetup)
+    {
+        if (scriptSetup.IsEmpty && !scriptSetup.DeclaresConstructor)
+        {
+            return script;
+        }
+
+        if (script.IsEmpty && !script.DeclaresConstructor)
+        {
+            return scriptSetup;
+        }
+
+        var parameters = new List<ComponentParameterDeclaration>(
+            script.Parameters.Count + scriptSetup.Parameters.Count);
+        var parameterNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var parameter in script.Parameters)
+        {
+            if (parameterNames.Add(parameter.Name))
+            {
+                parameters.Add(parameter);
+            }
+        }
+
+        foreach (var parameter in scriptSetup.Parameters)
+        {
+            if (parameterNames.Add(parameter.Name))
+            {
+                parameters.Add(parameter);
+            }
+        }
+
+        var events = new List<ComponentEventDeclaration>(
+            script.Events.Count + scriptSetup.Events.Count);
+        var eventNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var componentEvent in script.Events)
+        {
+            if (eventNames.Add(componentEvent.Name))
+            {
+                events.Add(componentEvent);
+            }
+        }
+
+        foreach (var componentEvent in scriptSetup.Events)
+        {
+            if (eventNames.Add(componentEvent.Name))
+            {
+                events.Add(componentEvent);
+            }
+        }
+
+        return new ScriptDeclarations(
+            parameters.Count == 0
+                ? EquatableArray<ComponentParameterDeclaration>.Empty
+                : new EquatableArray<ComponentParameterDeclaration>(parameters.ToArray()),
+            events.Count == 0
+                ? EquatableArray<ComponentEventDeclaration>.Empty
+                : new EquatableArray<ComponentEventDeclaration>(events.ToArray()),
+            script.DeclaresRequiredMember || scriptSetup.DeclaresRequiredMember,
+            script.DeclaresConstructor || scriptSetup.DeclaresConstructor);
     }
 
     private static void AddParseDiagnostics(

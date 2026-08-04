@@ -375,6 +375,7 @@
 		<Project Path="libraries/Assimalign.Viu.Testing/src/Assimalign.Viu.Testing.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/test/">
+		<Project Path="libraries/Assimalign.Viu.Testing/test/Assimalign.Viu.Testing.CompiledComponentTests/Assimalign.Viu.Testing.CompiledComponentTests.csproj" />
 		<Project Path="libraries/Assimalign.Viu.Testing/test/Assimalign.Viu.Testing.Tests.csproj" />
 	</Folder>
 </Solution>

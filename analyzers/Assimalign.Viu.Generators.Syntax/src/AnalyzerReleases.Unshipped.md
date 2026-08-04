@@ -18,6 +18,9 @@ VIU1203 | Assimalign.Viu.Generators.Syntax | Info | Single-file component script
 VIU1204 | Assimalign.Viu.Generators.Syntax | Error | Script member conflicts with generated Context or OnSetup
 VIU1205 | Assimalign.Viu.Generators.Syntax | Error | Asynchronous void script callback cannot be observed
 VIU1206 | Assimalign.Viu.Generators.Syntax | Error | Tag-based script language is not explicitly csharp
+VIU1207 | Assimalign.Viu.Generators.Syntax | Error | Conflicting component parameter or event declaration
+VIU1208 | Assimalign.Viu.Generators.Syntax | Error | Duplicate component parameter or event declaration
+VIU1209 | Assimalign.Viu.Generators.Syntax | Error | Unsupported component parameter or event declaration
 VIU1301 | Assimalign.Viu.Generators.Syntax | Error | Single-file component style parse error
 VIU1302 | Assimalign.Viu.Generators.Syntax | Warning | Single-file component style parse warning
 VIU1303 | Assimalign.Viu.Generators.Syntax | Info | Single-file component style parse information

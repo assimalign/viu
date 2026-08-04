@@ -45,6 +45,8 @@ internal readonly record struct ScriptRegions(
 /// </summary>
 /// <param name="Regions">The using-hoist and class-body member regions to emit.</param>
 /// <param name="Bindings">The classified top-level script members, for the template compiler's ref-unwrapping decisions.</param>
+/// <param name="Declarations">The attribute-declared component parameters and events ([CMP-26], [CMP-30]) the scaffold synthesizes.</param>
 internal readonly record struct ScriptAnalysis(
     ScriptRegions Regions,
-    EquatableArray<ScriptBinding> Bindings);
+    EquatableArray<ScriptBinding> Bindings,
+    ScriptDeclarations Declarations);

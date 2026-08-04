@@ -100,6 +100,16 @@ internal readonly record struct SingleFileComponentModel(
     public SingleFileComponentHotReloadMetadata? HotReloadMetadata { get; init; }
 
     /// <summary>
+    /// The attribute-declared component surface merged from every script block ([CMP-26], [CMP-30]):
+    /// the <c>[Parameter]</c> properties and <c>[Event]</c> methods the scaffold turns into the
+    /// partial's <c>IComponentTemplate.Parameters</c>/<c>Events</c>, the per-render argument
+    /// assignment, and the typed emit implementations. <see cref="ScriptDeclarations.None"/> for a
+    /// component that declares its surface imperatively or not at all — the form that keeps compiling
+    /// unchanged [CMP-31].
+    /// </summary>
+    public ScriptDeclarations Declarations { get; init; }
+
+    /// <summary>
     /// Materializes the template compiler's <see cref="BindingMetadata"/> from the classified
     /// <see cref="Bindings"/>. This is the consumable form the render-code-generation path
     /// ([V01.01.05.04]/[V01.01.05.05]) reads to decide where a <c>Reference&lt;T&gt;.Value</c> unwrap

@@ -412,6 +412,9 @@ internal static class SingleFileComponentSourceEmitter
                 .Append(ComponentsNamespace).Append(".ComponentSlot> __slots => Context.Slots;\n");
         }
 
+        AppendDeclaredParameters(builder, indent, model);
+        AppendDeclaredEvents(builder, indent, model);
+
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("/// <summary>Runs developer-authored synchronous setup after <see cref=\"Context\"/> is assigned.</summary>\n");
@@ -449,6 +452,15 @@ internal static class SingleFileComponentSourceEmitter
 
         AppendIndent(builder, indent + 1);
         builder.Append("Context = context;\n");
+        if (model.Declarations.Parameters.Count > 0)
+        {
+            // [CMP-29] Capture the authored initializers as this instance's defaults and take the first
+            // argument snapshot before OnSetup runs, so setup code reads the same values the first render
+            // will.
+            AppendIndent(builder, indent + 1);
+            builder.Append("__ViuBindParameters();\n");
+        }
+
         AppendIndent(builder, indent + 1);
         builder.Append("OnSetup();\n");
         builder.Append('\n');
@@ -480,18 +492,279 @@ internal static class SingleFileComponentSourceEmitter
             builder.Append("ApplyCssVariables();\n");
         }
 
-        AppendIndent(builder, indent + 1);
-        if (model.HotReloadMetadata is null)
+        var cacheExpression = model.HotReloadMetadata is null ? "_cache" : "_hotReloadRenderCache";
+        if (model.Declarations.Parameters.Count == 0)
         {
-            builder.Append("return () => ").Append(RenderHelperSurface).Append(".NormalizeRoot(Render(this, _cache));\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("return () => ").Append(RenderHelperSurface)
+                .Append(".NormalizeRoot(Render(this, ").Append(cacheExpression).Append("));\n");
         }
         else
         {
-            builder.Append("return () => ").Append(RenderHelperSurface)
-                .Append(".NormalizeRoot(Render(this, _hotReloadRenderCache));\n");
+            // [CMP-29] Every render pass re-reads the current arguments first. Core replaces the context's
+            // argument snapshot when the parent re-renders and before the child's render effect runs, so
+            // binding here — rather than once at setup — is what makes an attribute-declared parameter
+            // track its parent.
+            AppendIndent(builder, indent + 1);
+            builder.Append("return () =>\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("{\n");
+            AppendIndent(builder, indent + 2);
+            builder.Append("__ViuBindParameters();\n");
+            AppendIndent(builder, indent + 2);
+            builder.Append("return ").Append(RenderHelperSurface)
+                .Append(".NormalizeRoot(Render(this, ").Append(cacheExpression).Append("));\n");
+            AppendIndent(builder, indent + 1);
+            builder.Append("};\n");
         }
+
         AppendIndent(builder, indent);
         builder.Append("}\n");
+
+        AppendRequiredMemberConstructor(builder, indent, model);
+        AppendParameterBinding(builder, indent, model);
+        AppendEventEmitters(builder, indent, model);
+    }
+
+    // [CMP-26] The attribute-declared input surface. The declarations are a static array of immutable
+    // ComponentParameter values, so Core reads the component's inputs with no reflection and no
+    // per-instance allocation; the array is also what a CONSUMER's template validates against, because it
+    // survives into metadata as the [Parameter] attributes that produced it.
+    private static void AppendDeclaredParameters(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        var parameters = model.Declarations.Parameters;
+        if (parameters.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// The component's declared input parameters ([CMP-26]), synthesized from its\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// <c>[Parameter]</c> properties. Emitted as an explicit interface implementation so it can\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// never collide with an authored member of the same name.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("private static readonly ").Append(ComponentsNamespace)
+            .Append(".IComponentParameter[] __ViuDeclaredParameters =\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        foreach (var parameter in parameters)
+        {
+            AppendIndent(builder, indent + 1);
+            builder.Append("new ").Append(ComponentsNamespace).Append(".ComponentParameter(")
+                .Append(Literal(parameter.Name));
+            if (parameter.IsRequired)
+            {
+                builder.Append(", isRequired: true");
+            }
+
+            builder.Append("),\n");
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("};\n");
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Collections.Generic.IReadOnlyList<").Append(ComponentsNamespace)
+            .Append(".IComponentParameter>? ").Append(ComponentsNamespace)
+            .Append(".IComponentTemplate.Parameters => __ViuDeclaredParameters;\n");
+    }
+
+    // [CMP-30] The attribute-declared output surface, and nothing else: the attributed partial methods
+    // themselves are implemented by AppendEventEmitters.
+    private static void AppendDeclaredEvents(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        var events = model.Declarations.Events;
+        if (events.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// The component's declared output events ([CMP-30]), synthesized from its <c>[Event]</c>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// methods. Each validator asserts the emitted argument count; the payload types are already\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// guaranteed by the generated, strongly typed emit call site.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("private static readonly ").Append(ComponentsNamespace)
+            .Append(".IComponentEvent[] __ViuDeclaredEvents =\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        foreach (var componentEvent in events)
+        {
+            AppendIndent(builder, indent + 1);
+            builder.Append("new ").Append(ComponentsNamespace).Append(".ComponentEvent(")
+                .Append(Literal(componentEvent.Name))
+                .Append(", static arguments => arguments.Count == ")
+                .Append(Count(componentEvent.ArgumentCount))
+                .Append("),\n");
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("};\n");
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("global::System.Collections.Generic.IReadOnlyList<").Append(ComponentsNamespace)
+            .Append(".IComponentEvent>? ").Append(ComponentsNamespace)
+            .Append(".IComponentTemplate.Events => __ViuDeclaredEvents;\n");
+    }
+
+    // [CMP-28] A `required` [Parameter] property declares requiredness to VIU, not to C#: the AOT
+    // activator is a parameterless `new T()` (no object initializer exists to satisfy the C# rule), so the
+    // scaffold supplies a [SetsRequiredMembers] constructor and Viu enforces the requirement itself. The
+    // pragma covers the nullable warning that suppression re-enables — the properties are assigned from
+    // the component's arguments before setup and before every render, never left at their default.
+    private static void AppendRequiredMemberConstructor(
+        StringBuilder builder,
+        int indent,
+        in SingleFileComponentModel model)
+    {
+        if (!model.Declarations.DeclaresRequiredMember || model.Declarations.DeclaresConstructor)
+        {
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// Creates the component for the AOT activator. A <c>required</c> <c>[Parameter]</c> is\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// satisfied from the parent's arguments ([CMP-28]), not by an object initializer, so this\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// constructor takes responsibility for the required members.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("#pragma warning disable CS8618 // Assigned from component arguments before setup and every render.\n");
+        AppendIndent(builder, indent);
+        builder.Append("[global::System.Diagnostics.CodeAnalysis.SetsRequiredMembers]\n");
+        AppendIndent(builder, indent);
+        builder.Append("public ").Append(model.ClassName).Append("()\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        AppendIndent(builder, indent);
+        builder.Append("}\n");
+        AppendIndent(builder, indent);
+        builder.Append("#pragma warning restore CS8618\n");
+    }
+
+    // [CMP-29] The argument-to-property binding. The authored initializer is captured once per mounted
+    // instance as the parameter's default and restored whenever the parent supplies no argument, which is
+    // the attribute form's equivalent of ComponentParameter.DefaultFactory. Values are read through the
+    // typed IComponentArguments.Get<T>, so no conversion, boxing dance, or reflection is involved: an
+    // argument whose runtime value is not of the property's type yields that type's default, deliberately
+    // and without coercion magic.
+    private static void AppendParameterBinding(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        var parameters = model.Declarations.Parameters;
+        if (parameters.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>Whether this instance's parameter defaults have been captured.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("private bool __viuParameterDefaultsCaptured;\n");
+        foreach (var parameter in parameters)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>The captured authored default for the <c>")
+                .Append(parameter.Name).Append("</c> parameter.</summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append("private ").Append(parameter.TypeText).Append(" __viuParameterDefault_")
+                .Append(parameter.PropertyName).Append(" = default!;\n");
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// Assigns the parent's current arguments to this component's <c>[Parameter]</c>\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// properties ([CMP-29]). Runs once during setup and again at the start of every render\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// pass, after Core has replaced the context's argument snapshot.\n");
+        AppendIndent(builder, indent);
+        builder.Append("/// </summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("private void __ViuBindParameters()\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("if (!__viuParameterDefaultsCaptured)\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("{\n");
+        foreach (var parameter in parameters)
+        {
+            AppendIndent(builder, indent + 2);
+            builder.Append("__viuParameterDefault_").Append(parameter.PropertyName)
+                .Append(" = ").Append(parameter.PropertyName).Append(";\n");
+        }
+
+        AppendIndent(builder, indent + 2);
+        builder.Append("__viuParameterDefaultsCaptured = true;\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("}\n");
+
+        foreach (var parameter in parameters)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent + 1);
+            builder.Append(parameter.PropertyName).Append(" = Context.Arguments.Contains(")
+                .Append(Literal(parameter.Name)).Append(")\n");
+            AppendIndent(builder, indent + 2);
+            builder.Append("? Context.Arguments.Get<").Append(parameter.TypeText).Append(">(")
+                .Append(Literal(parameter.Name)).Append(")!\n");
+            AppendIndent(builder, indent + 2);
+            builder.Append(": __viuParameterDefault_").Append(parameter.PropertyName).Append(";\n");
+        }
+
+        AppendIndent(builder, indent);
+        builder.Append("}\n");
+    }
+
+    // [CMP-30] The implementing half of each attributed `partial void` emit method. The declared event
+    // name appears exactly once — in the attribute — so the component's own code calls a strongly typed
+    // method instead of repeating a string literal. The payload is materialized explicitly rather than
+    // through the params overload, so a single array-typed argument stays ONE emitted argument.
+    private static void AppendEventEmitters(StringBuilder builder, int indent, in SingleFileComponentModel model)
+    {
+        foreach (var componentEvent in model.Declarations.Events)
+        {
+            builder.Append('\n');
+            AppendIndent(builder, indent);
+            builder.Append("/// <summary>Emits this component's declared <c>").Append(componentEvent.Name)
+                .Append("</c> event to the parent ([CMP-30]).</summary>\n");
+            AppendIndent(builder, indent);
+            builder.Append(componentEvent.Modifiers).Append(" void ").Append(componentEvent.MethodName)
+                .Append(componentEvent.ParameterList).Append('\n');
+            AppendIndent(builder, indent + 1);
+            builder.Append("=> Context.Emit(").Append(Literal(componentEvent.Name)).Append(", ");
+            if (componentEvent.ArgumentCount == 0)
+            {
+                builder.Append("global::System.Array.Empty<object?>());\n");
+            }
+            else
+            {
+                builder.Append("new object?[] { ").Append(componentEvent.ArgumentList).Append(" });\n");
+            }
+        }
     }
 
     // [V01.01.06.03]/[V01.01.06.03.01] The @script member seam. Leading using directives are hoisted

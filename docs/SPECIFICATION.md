@@ -334,8 +334,62 @@ consequences elsewhere: `RouterView` takes its nesting depth as an explicit argu
 over an already-composed application. They do not imply a mutable component or directive registry; a
 developer who wants plugin-driven registration supplies a mutable custom resolver.
 
+### 4.9 Attribute-declared parameters and events
+
+`[CMP-26]` A component MAY declare its inputs on the **properties that receive them**: `[Parameter]`
+on a settable instance property of a `.viu` / `.vue` `@script` class. The single-file-component source
+generator reads the attribute at build time and synthesizes the equivalent `ComponentParameter` into
+the generated partial's `IComponentTemplate.Parameters`. The attribute is a **compile-time
+declaration only** — nothing is discovered by reflection, and the resulting declaration is the same
+static value an imperative one produces [CMP-12]. The attributes take effect only inside a compiled
+single-file component's script block; a hand-authored `IComponentTemplate` declares its surface
+imperatively.
+
+`[CMP-27]` **Name derivation.** The canonical argument or event name is the **camel-case spelling of
+the declaring member's name**: the leading run of upper-case letters lower-cases whole, except that a
+run longer than one keeps its last letter capitalized when a lower-case letter follows it (`Title` →
+`title`, `ModelValue` → `modelValue`, `URL` → `url`, `HTMLContent` → `htmlContent`). The attribute's
+`Name` overrides the derivation and MUST be a non-empty constant string literal, which is how a
+spelling no C# identifier can produce — `update:modelValue`, `model-value` — is declared. The derived
+name is canonical in `IComponentContext.Arguments`, and a parent's kebab-case spelling still resolves
+to it [CMP-13].
+
+`[CMP-28]` **Requiredness.** A parameter is required when the attribute sets `IsRequired` **or** when
+the property carries the C# `required` modifier. Viu activates a template through a parameterless
+`new T()` [EXE-4], so no object initializer exists to satisfy C#'s own required-member rule: a
+`required` declared parameter therefore makes the generated partial emit a `[SetsRequiredMembers]`
+parameterless constructor. The requirement is Viu's to enforce ([CMP-12] warns at mount), not C#'s.
+The scaffold emits no constructor when the script block declares one of its own.
+
+`[CMP-29]` **Binding.** The generated scaffold assigns each declared property from
+`IComponentContext.Arguments` **once during setup, before `OnSetup`, and again at the head of every
+render pass**. Core replaces the argument snapshot before a child re-renders, so a declared property
+always reflects the parent's current value. The property's value at setup time — its initializer, or
+the type's default when it has none — is captured **once per mounted instance** as that parameter's
+default and restored on any pass where the parent supplies no argument; the capture is the attribute
+form's equivalent of `ComponentParameter.DefaultFactory` and shares its at-most-once evaluation
+[CMP-12]. Values are read through the typed `IComponentArguments.Get<T>`: an argument whose runtime
+value is not of the property's type yields that type's default, with no coercion.
+
+`[CMP-30]` **Events.** A component MAY declare an output event on the method that emits it:
+`[Event]` on a non-generic, instance `partial void` method with no body and by-value parameters only.
+The generator synthesizes the `ComponentEvent` — whose validator asserts the emitted argument count —
+and implements the method as an `IComponentContext.Emit` of the declared name with the method's
+parameters as the ordered payload. A method rather than a property is the anchor because an event
+carries a payload *signature* rather than a value; the consequence is that the event name is spelled
+exactly once, in the attribute, and the component's own call site is strongly typed.
+
+`[CMP-31]` **Coexistence.** The imperative and attribute forms are exclusive **per kind**: a
+component that declares `[Parameter]` properties MUST NOT also declare a `Parameters` member, and one
+that declares `[Event]` methods MUST NOT also declare an `Events` member. Either mix is a build
+error. Parameters and events stay independent, so an imperative `Parameters` collection and
+attribute-declared events coexist. The rule has two reasons: the generated declaration is an
+*explicit* interface implementation and would silently shadow an authored collection, and an
+attribute-declared surface is usable as a build-time contract only when it is complete.
+
 *Authority: `libraries/Assimalign.Viu.Components/src/Abstraction/*.cs` (21 interfaces);
-`libraries/Assimalign.Viu.Components/src/{Tree,Metadata,Slots,Activation}/*.cs`;
+`libraries/Assimalign.Viu.Components/src/{Tree,Metadata,Slots,Activation}/*.cs`
+(`Metadata/{ParameterAttribute,EventAttribute}.cs` for [CMP-26]-[CMP-31]);
 `libraries/Assimalign.Viu.Core/src/Internal/{ComponentContext,ComponentLifecycle,MountedComponent}.cs`;
 `libraries/Assimalign.Viu.Core/src/Abstraction/IApplicationContext.cs`;
 `libraries/Assimalign.Viu.Components/docs/OVERVIEW.md`; `libraries/DESIGN.md`;
@@ -894,6 +948,13 @@ a `.viu` component's partial class.
 a file-level `using static`, plus `global::Assimalign.Viu.Browser.DomRenderHelpers` for DOM
 directives. **No `Assimalign.Viu.Syntax.*` assembly references any runtime assembly**; the
 name-binding contract flows one way.
+
+`[SFC-CG-3]` A component that declares its surface by attribute ([CMP-26], [CMP-30]) additionally
+reserves the generated members `__ViuDeclaredParameters`, `__ViuDeclaredEvents`,
+`__ViuBindParameters`, `__viuParameterDefaultsCaptured`, and `__viuParameterDefault_<Property>` in its
+partial class. The two declaration collections are emitted as **explicit** `IComponentTemplate`
+implementations, so they can never collide with an authored member of the same name — which is also
+why declaring both forms is an error [CMP-31].
 
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost

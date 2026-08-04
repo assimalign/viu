@@ -126,6 +126,33 @@ internal static class SingleFileComponentDiagnostics
         DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
         HelpLink: HelpLink("VIU1206"));
 
+    /// <summary>
+    /// A component declares the same kind of surface both by attribute and with its own
+    /// <c>Parameters</c>/<c>Events</c> member ([CMP-31]).
+    /// </summary>
+    internal static readonly SingleFileComponentDiagnosticDescriptor ConflictingComponentDeclaration = new(
+        Id: "VIU1207",
+        Title: "Conflicting component parameter or event declaration",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1207"));
+
+    /// <summary>Two attributed members declare the same component parameter or event name.</summary>
+    internal static readonly SingleFileComponentDiagnosticDescriptor DuplicateComponentDeclaration = new(
+        Id: "VIU1208",
+        Title: "Duplicate component parameter or event declaration",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1208"));
+
+    /// <summary>
+    /// A <c>[Parameter]</c> or <c>[Event]</c> declaration is on a member shape the generated scaffold
+    /// cannot implement, or carries a non-constant argument.
+    /// </summary>
+    internal static readonly SingleFileComponentDiagnosticDescriptor UnsupportedComponentDeclaration = new(
+        Id: "VIU1209",
+        Title: "Unsupported component parameter or event declaration",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1209"));
+
     /// <summary>A recoverable error reported by the dispatched style CSS parse ([V01.01.06.04]).</summary>
     internal static readonly SingleFileComponentDiagnosticDescriptor StyleError = new(
         Id: "VIU1301",
@@ -167,6 +194,9 @@ internal static class SingleFileComponentDiagnostics
         ReservedScriptMember,
         AsynchronousVoidCallback,
         UnsupportedScriptLanguage,
+        ConflictingComponentDeclaration,
+        DuplicateComponentDeclaration,
+        UnsupportedComponentDeclaration,
         StyleError,
         StyleWarning,
         StyleInformation,
