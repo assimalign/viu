@@ -49,13 +49,13 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- Produce the .vsix; never install it into an experimental hive. The VSSDK defaults
-         DeployExtension to true, which would have every build - command line and in-IDE alike -
-         write into the Exp hive as a side effect of compiling. The supported loop is instead
-         explicit: Build.ps1, then install the packaged VSIX. A developer who wants the classic
-         F5-into-Exp loop opts in per build with -p:DeployExtension=true. -->
+    <!-- Produce the .vsix. DeployExtension is split by host: building inside Visual Studio keeps
+         the classic development loop - every Debug build refreshes the experimental hive and F5
+         launches it - while command-line builds (Build.ps1, CI) never write into a hive as a side
+         effect of compiling; their supported loop is explicit: build, then install the packaged
+         VSIX. A command-line build can still opt in per invocation with -p:DeployExtension=true. -->
     <CreateVsixContainer>true</CreateVsixContainer>
-    <DeployExtension>false</DeployExtension>
+    <DeployExtension Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</DeployExtension>
     <!-- The pkgdef is authored by hand, not generated from ProvideX registration attributes: the
          extension contributes MEF parts and a file-extension claim, and has no VSPackage class to
          attribute. -->

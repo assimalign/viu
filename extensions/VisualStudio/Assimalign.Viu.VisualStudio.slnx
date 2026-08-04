@@ -18,8 +18,9 @@
        built and debugged from Visual Studio, but the solution as a whole can no longer be handed to
        `dotnet build`/`dotnet test`: the VSSDK build tasks are .NET Framework MSBuild tasks.
        Command-line packaging goes through Build.ps1, and CI names the test projects individually.
-       The Deploy flag below only takes effect when a build opts into DeployExtension; the project
-       sets it false, so an ordinary build packages the VSIX without touching any hive. -->
+       The Deploy flag below pairs with the project's host-split DeployExtension: building inside
+       Visual Studio refreshes the experimental hive so F5 launches the current code, while
+       command-line builds package the VSIX without touching any hive. -->
   <Folder Name="/Visual Studio/Extension/">
     <Project Path="Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj">
       <Deploy />
