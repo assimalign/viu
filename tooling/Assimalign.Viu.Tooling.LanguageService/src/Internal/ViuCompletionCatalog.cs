@@ -168,8 +168,10 @@ internal static class ViuCompletionCatalog
         Snippet(
             "mounted callback",
             "Lifecycle registration",
-            "Registers asynchronous work for the mounted lifecycle.",
-            "Context.Lifecycle.OnMounted($1);",
+            "Registers asynchronous work for the mounted lifecycle. " +
+                "`Context.Lifecycle.OnMounted($1);` registers exactly the same callback and stays " +
+                "valid; the root form is the shorter idiom every component inherits (`[CMP-32]`).",
+            "OnMounted($1);",
             "05"),
         Snippet(
             "async event handler",
@@ -185,6 +187,60 @@ internal static class ViuCompletionCatalog
             "Implements the generated setup hook. Runs once per mount after `Context` is assigned.",
             "partial void OnSetup()\n{\n\t$0\n}",
             "07"),
+    ];
+
+    /// <summary>
+    /// The root-level lifecycle registration methods every component inherits from
+    /// <c>ComponentTemplateBase</c> (<c>[CMP-32]</c>).
+    /// </summary>
+    /// <remarks>
+    /// These are ordinary inherited members, so the semantic engine already offers them from the
+    /// real compilation and its bound items win the first-wins label dedup. They are listed here so
+    /// the degraded, syntax-only answer — a document with no restored project state — still knows
+    /// the idiomatic authoring surface rather than only the <c>Context.Lifecycle</c> form.
+    /// </remarks>
+    internal static IReadOnlyList<LanguageCompletionItem> RootLifecycleRegistrations { get; } =
+    [
+        Lifecycle(
+            "OnBeforeMount",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs before the initial subtree is mounted"),
+        Lifecycle(
+            "OnMounted",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs after the initial subtree is mounted"),
+        Lifecycle(
+            "OnBeforeUpdate",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs before a later subtree is patched"),
+        Lifecycle(
+            "OnUpdated",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs after a later subtree is patched"),
+        Lifecycle(
+            "OnBeforeUnmount",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs before the component is unmounted"),
+        Lifecycle(
+            "OnUnmounted",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs after the component is unmounted"),
+        Lifecycle(
+            "OnErrorCaptured",
+            "Func<Exception, IComponentContext?, string, bool>",
+            "captures an error from a descendant, returning false to stop propagation"),
+        Lifecycle(
+            "OnServerPrefetch",
+            "Func<Task> | Func<CancellationToken, Task>",
+            "is awaited by server-side rendering before the component is serialized"),
+        Lifecycle(
+            "OnActivated",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs when a cached subtree is reactivated"),
+        Lifecycle(
+            "OnDeactivated",
+            "Action | Func<Task> | Func<CancellationToken, Task>",
+            "runs when a cached subtree is deactivated"),
     ];
 
     /// <summary>
@@ -315,6 +371,19 @@ internal static class ViuCompletionCatalog
         string documentation,
         string sortText)
         => Text(label, LanguageCompletionItemKind.Method, detail, documentation, sortText);
+
+    // One root-level lifecycle registration. Every entry shares the sort band "08": they rank below
+    // the scaffold items an author reaches for first and above the keyword catalog's "90".
+    private static LanguageCompletionItem Lifecycle(
+        string label,
+        string callbackTypes,
+        string behavior)
+        => Method(
+            label,
+            $"void {label}({callbackTypes} callback)",
+            $"Registers a callback that {behavior} — the root-level equivalent of " +
+                $"`Context.Lifecycle.{label}`, inherited by every component. Specified by `[CMP-32]`.",
+            "08");
 
     private static LanguageCompletionItem CssProperty(
         string label,

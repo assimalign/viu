@@ -41,6 +41,19 @@ internal sealed class ViuLanguageService :
             ["Context.Slots"] = "**`Context.Slots`** exposes the component's current named slots.",
             ["Context.Emit"] = "**`Context.Emit`** emits a declared component event to the parent.",
             ["Context.Expose"] = "**`Context.Expose`** selects the public surface returned through template references.",
+            // The root-level lifecycle registrations every component inherits from
+            // ComponentTemplateBase ([CMP-32]). Each is a pass-through to the Context.Lifecycle form
+            // above, so the two are interchangeable and may be mixed within one component.
+            ["OnBeforeMount"] = "**`OnBeforeMount(callback)`** registers a callback that runs before the initial subtree is mounted — the root-level equivalent of `Context.Lifecycle.OnBeforeMount`. Specified by `[CMP-32]`.",
+            ["OnMounted"] = "**`OnMounted(callback)`** registers a callback that runs after the initial subtree is mounted — the root-level equivalent of `Context.Lifecycle.OnMounted`. Specified by `[CMP-32]`.",
+            ["OnBeforeUpdate"] = "**`OnBeforeUpdate(callback)`** registers a callback that runs before a later subtree is patched — the root-level equivalent of `Context.Lifecycle.OnBeforeUpdate`. Specified by `[CMP-32]`.",
+            ["OnUpdated"] = "**`OnUpdated(callback)`** registers a callback that runs after a later subtree is patched — the root-level equivalent of `Context.Lifecycle.OnUpdated`. Specified by `[CMP-32]`.",
+            ["OnBeforeUnmount"] = "**`OnBeforeUnmount(callback)`** registers a callback that runs before the component is unmounted — the root-level equivalent of `Context.Lifecycle.OnBeforeUnmount`. Specified by `[CMP-32]`.",
+            ["OnUnmounted"] = "**`OnUnmounted(callback)`** registers a callback that runs after the component is unmounted — the root-level equivalent of `Context.Lifecycle.OnUnmounted`. Specified by `[CMP-32]`.",
+            ["OnErrorCaptured"] = "**`OnErrorCaptured(callback)`** registers a callback that captures an error from a descendant, returning `false` to stop propagation — the root-level equivalent of `Context.Lifecycle.OnErrorCaptured`. Specified by `[CMP-32]`.",
+            ["OnServerPrefetch"] = "**`OnServerPrefetch(callback)`** registers a task server-side rendering awaits before the component is serialized — the root-level equivalent of `Context.Lifecycle.OnServerPrefetch`. Specified by `[CMP-32]`.",
+            ["OnActivated"] = "**`OnActivated(callback)`** registers a callback that runs when a cached subtree is reactivated — the root-level equivalent of `Context.Lifecycle.OnActivated`. Specified by `[CMP-32]`.",
+            ["OnDeactivated"] = "**`OnDeactivated(callback)`** registers a callback that runs when a cached subtree is deactivated — the root-level equivalent of `Context.Lifecycle.OnDeactivated`. Specified by `[CMP-32]`.",
             ["Reactive"] = "**`Reactive`** is Viu's reactivity facade: references, computeds, effects, watchers, and the tracking escape hatches.",
             ["Reactive.Reference"] = "**`Reactive.Reference(value)`** creates a reactive `Reference<T>` read and written through `.Value`.",
             ["Reactive.Computed"] = "**`Reactive.Computed(getter)`** creates a lazy cached computed value.",
@@ -974,11 +987,11 @@ internal sealed class ViuLanguageService :
             cancellationToken);
     }
 
-    // On an engine hit the semantic items REPLACE the declared-member list; the scaffold and
-    // keyword catalogs still append with the existing first-wins label dedup and SortText bands
-    // ("00:" semantic, "01"–"07" scaffold, "90" keywords). After a member access only the matching
-    // Context./Reactive. member catalog appends — keywords never follow a dot, exactly as the
-    // syntax-only path never offered them there.
+    // On an engine hit the semantic items REPLACE the declared-member list; the scaffold, root
+    // lifecycle, and keyword catalogs still append with the existing first-wins label dedup and
+    // SortText bands ("00:" semantic, "01"–"07" scaffold, "08" root lifecycle, "90" keywords).
+    // After a member access only the matching Context./Reactive. member catalog appends — keywords
+    // never follow a dot, exactly as the syntax-only path never offered them there.
     private static IReadOnlyList<LanguageCompletionItem> MergeScriptSemanticCompletions(
         ScriptSemanticCompletionResult semantic,
         string word)
@@ -986,6 +999,7 @@ internal sealed class ViuLanguageService :
         var completions = new List<LanguageCompletionItem>(
             semantic.Items.Count +
             ViuCompletionCatalog.ScriptGeneral.Count +
+            ViuCompletionCatalog.RootLifecycleRegistrations.Count +
             ViuCompletionCatalog.ScriptKeywords.Count);
         var seenLabels = new HashSet<string>(StringComparer.Ordinal);
         AppendCatalogItems(semantic.Items, completions, seenLabels);
@@ -1009,6 +1023,10 @@ internal sealed class ViuLanguageService :
         else
         {
             AppendCatalogItems(ViuCompletionCatalog.ScriptGeneral, completions, seenLabels);
+            AppendCatalogItems(
+                ViuCompletionCatalog.RootLifecycleRegistrations,
+                completions,
+                seenLabels);
             AppendCatalogItems(ViuCompletionCatalog.ScriptKeywords, completions, seenLabels);
         }
 
@@ -1056,6 +1074,7 @@ internal sealed class ViuLanguageService :
         var word = GetTrailingIdentifier(linePrefix);
         var completions = new List<LanguageCompletionItem>(
             ViuCompletionCatalog.ScriptGeneral.Count +
+            ViuCompletionCatalog.RootLifecycleRegistrations.Count +
             ViuCompletionCatalog.ScriptKeywords.Count);
         var seenLabels = new HashSet<string>(StringComparer.Ordinal);
 
@@ -1064,6 +1083,13 @@ internal sealed class ViuLanguageService :
         AppendDeclaredMembers(syntax.Script, completions, seenLabels);
         AppendDeclaredMembers(syntax.ScriptSetup, completions, seenLabels);
         AppendCatalogItems(ViuCompletionCatalog.ScriptGeneral, completions, seenLabels);
+        // The root-level lifecycle registrations ([CMP-32]) are inherited members the semantic
+        // engine binds for itself; the static catalog carries them so the degraded, compilation-free
+        // answer still knows the idiomatic authoring surface.
+        AppendCatalogItems(
+            ViuCompletionCatalog.RootLifecycleRegistrations,
+            completions,
+            seenLabels);
         AppendCatalogItems(ViuCompletionCatalog.ScriptKeywords, completions, seenLabels);
 
         if (word.Length == 0)
