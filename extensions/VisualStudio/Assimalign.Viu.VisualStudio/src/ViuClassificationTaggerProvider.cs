@@ -38,35 +38,31 @@ internal sealed class ViuClassificationTaggerProvider :
 
     /// <inheritdoc />
     /// <remarks>
-    /// Both container formats are classified. The <c>.vue</c> container is a declared compatibility
-    /// target ([V01.01.06.09]) served by the same language server, so omitting it left <c>.vue</c>
-    /// single-file components with no colorization at all.
+    /// This list must contain exactly one filter, and it must be a document-type filter.
     /// <para>
-    /// Each format is matched two ways. A document-type filter is the intended mechanism, but it can
-    /// only match once the <c>viu</c> content type has materialized, and that binding exists purely at
-    /// runtime — nothing static registers the <c>.viu</c> extension, so a document opened before the
-    /// binding is established never matches and is left permanently unclassified. The glob filters
-    /// match on the document file path instead, which needs no content type at all, so classification
-    /// no longer depends on document-type registration winning a race against the editor.
+    /// Visual Studio does not treat <c>AppliesTo</c> as a set of alternatives. It reduces the list to
+    /// a single effective document type and a single effective glob — each entry overwrites the
+    /// previous one — and then requires <em>both</em> to match. Listing the two container types
+    /// therefore does not widen the filter, it narrows it to the last one; adding glob patterns on top
+    /// narrows it further to a conjunction that no document can satisfy. A glob-only list is worse
+    /// still: the tagger is dropped before it is ever consulted, because the host collects tagger
+    /// document types separately and discards a part that declares none.
     /// </para>
     /// <para>
-    /// The generator evaluates this property at compile time, so the filters are written inline; the
+    /// One filter consequently has to cover both containers, which is why
+    /// <see cref="ViuLanguageServerProvider.VueCompatibilityDocumentType"/> derives from
+    /// <see cref="ViuLanguageServerProvider.ViuDocumentType"/> — a <c>.vue</c> document satisfies this
+    /// filter through content-type inheritance. The <c>.vue</c> container is a declared compatibility
+    /// target ([V01.01.06.09]) and stays classified.
+    /// </para>
+    /// <para>
+    /// The generator evaluates this property at compile time, so the filter is written inline; the
     /// shipped contract is pinned against the generated manifest instead.
     /// </para>
     /// </remarks>
     public TextViewExtensionConfiguration TextViewExtensionConfiguration => new()
     {
-        AppliesTo =
-        [
-            DocumentFilter.FromDocumentType(ViuLanguageServerProvider.ViuDocumentType),
-            DocumentFilter.FromDocumentType(ViuLanguageServerProvider.VueCompatibilityDocumentType),
-            // relativePath: true is required, not incidental. A glob is matched with forward slashes
-            // and the SDK documents that a backslash is not valid within one; only the relative-path
-            // form converts a Windows document path's backslashes to slashes before matching, so the
-            // absolute form cannot match anything on Windows.
-            DocumentFilter.FromGlobPattern("**/*.viu", relativePath: true),
-            DocumentFilter.FromGlobPattern("**/*.vue", relativePath: true),
-        ],
+        AppliesTo = [DocumentFilter.FromDocumentType(ViuLanguageServerProvider.ViuDocumentType)],
     };
 
     /// <inheritdoc />

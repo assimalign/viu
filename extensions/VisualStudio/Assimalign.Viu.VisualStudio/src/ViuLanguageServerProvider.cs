@@ -40,11 +40,18 @@ internal sealed class ViuLanguageServerProvider : LanguageServerProvider
     /// build-property condition in that filter. The language server performs the final
     /// per-document Viu-project check before opening or serving the document.
     /// </remarks>
+    /// <remarks>
+    /// The base is the <c>viu</c> container type rather than the language-server base, so that a
+    /// single <c>viu</c> document filter matches both container formats through
+    /// <c>IContentType.IsOfType</c>. That matters because a text-view part may carry only one
+    /// effective document type — see <see cref="ViuClassificationTaggerProvider"/>. The
+    /// language-server base is still inherited transitively through <see cref="ViuDocumentType"/>.
+    /// </remarks>
     [VisualStudioContribution]
     public static DocumentTypeConfiguration VueCompatibilityDocumentType => new("viu-vue")
     {
         FileExtensions = [".vue"],
-        BaseDocumentType = LanguageServerBaseDocumentType,
+        BaseDocumentType = "viu",
     };
 
     /// <inheritdoc />

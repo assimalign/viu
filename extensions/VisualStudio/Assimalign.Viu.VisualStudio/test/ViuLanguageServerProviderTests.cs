@@ -32,36 +32,62 @@ public class ViuLanguageServerProviderTests
     /// contribution generator evaluates those properties at compile time, and an
     /// <c>ExtensionPart</c> cannot be constructed without a live extension host.
     /// </remarks>
+    /// <summary>
+    /// A text-view part carries exactly one effective document type and one effective glob, and
+    /// Visual Studio requires both to match. Listing several filters does not widen the match — each
+    /// entry replaces the previous one, so a second document type silently becomes the only one and a
+    /// glob alongside it forms a conjunction nothing can satisfy. The tagger therefore declares a
+    /// single document-type filter and no pattern.
+    /// </summary>
     [Fact]
-    public void GeneratedManifest_RegistersEveryPartForBothContainerDocumentTypes()
+    public void GeneratedManifest_GivesTheClassificationTaggerExactlyOneDocumentTypeFilter()
     {
         (var documentTypesByPart, var patternsByPart) = ReadAppliesToFromGeneratedManifest();
-
         string taggerProvider = typeof(ViuClassificationTaggerProvider).FullName!;
-        string languageServerProvider = typeof(ViuLanguageServerProvider).FullName!;
 
-        documentTypesByPart[taggerProvider].Distinct().ShouldBe(["viu", "viu-vue"], ignoreOrder: true);
-        documentTypesByPart[languageServerProvider].Distinct().ShouldBe(["viu", "viu-vue"], ignoreOrder: true);
-
-        // A language server may only be filtered by document type - the contribution generator fails
-        // the build on a glob filter there - so the server carries no path patterns.
-        patternsByPart[languageServerProvider].ShouldBeEmpty();
+        documentTypesByPart[taggerProvider].Distinct().ShouldBe(["viu"]);
+        patternsByPart[taggerProvider].ShouldBeEmpty();
     }
 
     /// <summary>
-    /// Classification must not depend on the container content types having materialized. Nothing
-    /// static registers the <c>.viu</c> extension, so that binding is created only at runtime when the
-    /// extension applies its <c>documentTypes</c>; a document opened before then never matches a
-    /// document-type filter. The tagger therefore also matches on document file path.
+    /// The <c>.vue</c> container is a declared compatibility target ([V01.01.06.09]) and must stay
+    /// classified even though the tagger may name only one document type. It does so by deriving from
+    /// the <c>viu</c> container type, which makes a <c>.vue</c> document satisfy the tagger's single
+    /// <c>viu</c> filter through content-type inheritance.
     /// </summary>
     [Fact]
-    public void GeneratedManifest_MatchesClassificationOnFilePathAsWellAsDocumentType()
+    public void GeneratedManifest_DerivesTheVueContainerFromTheViuContainer()
     {
-        (_, var patternsByPart) = ReadAppliesToFromGeneratedManifest();
+        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(FindGeneratedManifest()));
 
-        patternsByPart[typeof(ViuClassificationTaggerProvider).FullName!]
-            .Distinct()
-            .ShouldBe(["**/*.viu", "**/*.vue"], ignoreOrder: true);
+        Dictionary<string, string[]> basesByDocumentType = manifest.RootElement
+            .GetProperty("documentTypes")
+            .EnumerateArray()
+            .ToDictionary(
+                documentType => documentType.GetProperty("name").GetString()!,
+                documentType => documentType.GetProperty("base")
+                    .EnumerateArray()
+                    .Select(baseName => baseName.GetString()!)
+                    .ToArray());
+
+        basesByDocumentType["viu-vue"].ShouldBe(["viu"]);
+
+        // The language-server base is still required, and is now inherited transitively.
+        basesByDocumentType["viu"].ShouldBe(["code-languageserver-preview"]);
+    }
+
+    /// <summary>
+    /// The language server collects every document type it declares, so it names both containers
+    /// directly. A glob filter is rejected there outright by the contribution generator.
+    /// </summary>
+    [Fact]
+    public void GeneratedManifest_RegistersTheLanguageServerForBothContainerDocumentTypes()
+    {
+        (var documentTypesByPart, var patternsByPart) = ReadAppliesToFromGeneratedManifest();
+        string languageServerProvider = typeof(ViuLanguageServerProvider).FullName!;
+
+        documentTypesByPart[languageServerProvider].Distinct().ShouldBe(["viu", "viu-vue"], ignoreOrder: true);
+        patternsByPart[languageServerProvider].ShouldBeEmpty();
     }
 
     /// <summary>
