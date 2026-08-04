@@ -195,7 +195,10 @@ internal static class SingleFileComponentProjection
             ? EquatableArray<DiagnosticInfo>.Empty
             : new EquatableArray<DiagnosticInfo>(diagnostics.ToArray());
 
-        return new SingleFileComponentProjectionResult(model, array);
+        return new SingleFileComponentProjectionResult(model, array)
+        {
+            ComponentUsages = render.Usages,
+        };
     }
 
     private static SingleFileComponentHotReloadMetadata? CreateHotReloadMetadata(
@@ -415,7 +418,7 @@ internal static class SingleFileComponentProjection
     /// classifications) and the result is serialized by <see cref="RenderFunctionEmitter"/>. Transform
     /// diagnostics surface on the <c>.viu</c> file exactly like dispatched parse diagnostics.
     /// </summary>
-    private static (string? Body, int CacheSize) CompileRenderFunction(
+    private static (string? Body, int CacheSize, EquatableArray<ComponentUsage> Usages) CompileRenderFunction(
         SingleFileComponentProjectionInput input,
         AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         BindingMetadata bindingMetadata,
@@ -451,6 +454,11 @@ internal static class SingleFileComponentProjection
             transformOptions.OnError = error => diagnostics.Add(
                 SingleFileComponentDiagnostics.Create(input.FilePath, error, fromTemplate: true, blockContentStart));
 
+            // [SFC-USE-1] The component-usage manifest is collected from the PARSED tree, before the
+            // transform rewrites it into codegen nodes, so it describes what the developer authored.
+            var usages = ComponentUsageCollector.Collect(
+                templateResult.Root, input.FilePath, blockContentStart);
+
             var transformed = Transformer.Transform(templateResult.Root, transformOptions);
             var emitted = RenderFunctionEmitter.Emit(transformed, new RenderFunctionEmitterOptions
             {
@@ -467,10 +475,10 @@ internal static class SingleFileComponentProjection
                 emitted.Code, emitted.SourceMappings, blockContentStart, input.FilePath);
 
             // The first template block is the component's template (the descriptor carries one).
-            return (body, emitted.CacheSlotCount);
+            return (body, emitted.CacheSlotCount, usages);
         }
 
-        return (null, 0);
+        return (null, 0, EquatableArray<ComponentUsage>.Empty);
     }
 
     /// <summary>

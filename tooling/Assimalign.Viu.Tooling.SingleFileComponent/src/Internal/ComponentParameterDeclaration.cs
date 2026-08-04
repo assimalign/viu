@@ -5,7 +5,7 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// template-facing name, the property that receives the argument, and the declared C# type. The
 /// generator emits the equivalent <c>ComponentParameter</c> plus the per-render assignment from it, and
 /// the same record is what makes a component's input surface readable at build time by a
-/// <em>consumer's</em> template. Specified by <c>[CMP-26]</c>.
+/// <em>consumer's</em> template ([SFC-USE-1]). Specified by <c>[CMP-26]</c>.
 /// A <see langword="readonly"/> <see langword="record"/> <see langword="struct"/> so it rides inside the
 /// incremental generator's cached model without defeating the cache.
 /// </summary>

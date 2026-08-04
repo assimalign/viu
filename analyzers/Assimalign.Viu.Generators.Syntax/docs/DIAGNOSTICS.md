@@ -66,6 +66,7 @@ severity tier its own stable ID.
 | script generated-member and compatibility contract | `VIU1204`–`VIU1206` | — | — |
 | attribute-declared component surface | `VIU1207`–`VIU1209` | — | — |
 | dispatched style CSS parse | `VIU1301` | `VIU1302` | `VIU1303` |
+| component-usage validation | `VIU1402`–`VIU1403` | `VIU1401` | — |
 
 ### VIU1001
 
@@ -199,3 +200,49 @@ Single-file component style parse warning — a warning from the dispatched styl
 
 Single-file component style parse information — an informational message (or `Hidden`) from the dispatched
 style CSS parse.
+
+### VIU1401
+
+Component declares no such parameter — a component usage supplies an attribute (or a `:`-bound
+argument) that matches none of the component's declared parameters (`[SFC-USE-2]`).
+
+**Warning, deliberately not an error.** Fallthrough is a specified feature (`[CMP-17]`): an
+undeclared attribute on a component is legal and lands on the component's rendered root. The
+diagnostic therefore reports a *likely* mistake, never an illegal program.
+
+The check stays silent for listener spellings (`onX`, `@x`), directives, and plausible fallthrough
+attributes — a known HTML or SVG attribute, a hyphenated or namespaced name (`data-*`, `aria-*`,
+`xml:*`, any vendor prefix), and the render pipeline's own (`key`, `ref`, `class`, `style`, `id`,
+`is`, `role`, …).
+
+### VIU1402
+
+Required component parameter is not supplied — a usage omits a parameter the component declares
+required, either through `[Parameter(IsRequired = true)]` or the C# `required` modifier
+(`[SFC-USE-3]`). Unlike an undeclared attribute there is no legitimate reading of the omission, so
+this is an error; the runtime's mount-time warning (`[CMP-12]`) remains for the usages the compiler
+cannot see.
+
+### VIU1403
+
+Component argument type is incompatible — the supplied value's type cannot be the declared
+parameter's type (`[SFC-USE-4]`). Only the two decidable directions are reported:
+
+- a **plain attribute** (`rating="3"`), whose value is always a string, supplied to a parameter of a
+  value type — bind it instead (`:rating="3"`); and
+- a **non-string literal binding** (`:title="3"`) supplied to a `string` parameter.
+
+Both are errors because neither can work at run time: `IComponentArguments.Get<T>` yields the
+parameter type's default when the supplied value is not of the declared type (`[CMP-29]`).
+
+## What component-usage validation deliberately does not see
+
+`VIU1401`–`VIU1403` require a component's parameter surface to be **statically readable**, which
+means attribute-declared (`[CMP-26]`). A component that builds its `Parameters` collection
+imperatively carries nothing a compiler can read — the collection is arbitrary C# — so its usages are
+never validated. That is not a gap to be closed later; it is the reason the attribute form exists.
+
+Validation is likewise skipped, in full, for a tag that resolves to more than one declaration, a
+usage carrying an argument-less `v-bind="…"` spread or a dynamic `:[name]` argument, a bound
+expression that is not a C# literal, and a hyphenated attribute name. A false positive is worse than
+a false negative here, so every undecidable input produces silence (`[SFC-USE-5]`).

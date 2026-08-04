@@ -24,3 +24,6 @@ VIU1209 | Assimalign.Viu.Generators.Syntax | Error | Unsupported component param
 VIU1301 | Assimalign.Viu.Generators.Syntax | Error | Single-file component style parse error
 VIU1302 | Assimalign.Viu.Generators.Syntax | Warning | Single-file component style parse warning
 VIU1303 | Assimalign.Viu.Generators.Syntax | Info | Single-file component style parse information
+VIU1401 | Assimalign.Viu.Generators.Syntax | Warning | Component declares no such parameter
+VIU1402 | Assimalign.Viu.Generators.Syntax | Error | Required component parameter is not supplied
+VIU1403 | Assimalign.Viu.Generators.Syntax | Error | Component argument type is incompatible

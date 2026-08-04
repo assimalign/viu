@@ -44,9 +44,11 @@ public sealed class SingleFileComponentDeclarationTests
             "}\n");
 
         generated.ShouldContain(
-            "new global::Assimalign.Viu.Components.ComponentParameter(\"title\", isRequired: true),");
+            "new global::Assimalign.Viu.Components.ComponentParameter(\"title\", isRequired: true, "
+            + "parameterType: typeof(string)),");
         generated.ShouldContain(
-            "new global::Assimalign.Viu.Components.ComponentParameter(\"eyebrow\"),");
+            "new global::Assimalign.Viu.Components.ComponentParameter(\"eyebrow\", "
+            + "parameterType: typeof(string)),");
         generated.ShouldContain(
             "global::System.Collections.Generic.IReadOnlyList<global::Assimalign.Viu.Components.IComponentParameter>? "
             + "global::Assimalign.Viu.Components.IComponentTemplate.Parameters => __ViuDeclaredParameters;");
@@ -73,7 +75,7 @@ public sealed class SingleFileComponentDeclarationTests
             $"    [Parameter] public string {propertyName} {{ get; set; }} = \"\";\n" +
             "}\n");
 
-        generated.ShouldContain($"ComponentParameter(\"{argumentName}\")");
+        generated.ShouldContain($"ComponentParameter(\"{argumentName}\", parameterType: typeof(string))");
     }
 
     [Fact]
@@ -90,7 +92,7 @@ public sealed class SingleFileComponentDeclarationTests
             "    [Parameter(\"model-value\")] public int Rating { get; set; }\n" +
             "}\n");
 
-        generated.ShouldContain("ComponentParameter(\"model-value\")");
+        generated.ShouldContain("ComponentParameter(\"model-value\", parameterType: typeof(int))");
         generated.ShouldContain("Context.Arguments.Get<int>(\"model-value\")!");
     }
 
@@ -138,7 +140,7 @@ public sealed class SingleFileComponentDeclarationTests
             "    [Parameter] public required string Title { get; set; }\n" +
             "}\n");
 
-        generated.ShouldContain("ComponentParameter(\"title\", isRequired: true)");
+        generated.ShouldContain("ComponentParameter(\"title\", isRequired: true, parameterType: typeof(string))");
         generated.ShouldContain("[global::System.Diagnostics.CodeAnalysis.SetsRequiredMembers]");
         generated.ShouldContain("public Widget()");
     }

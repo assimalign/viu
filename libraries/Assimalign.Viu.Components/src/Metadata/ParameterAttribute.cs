@@ -48,10 +48,10 @@ public sealed class ParameterAttribute : Attribute
     public string? Name { get; set; }
 
     /// <summary>
-    /// Gets or sets whether the caller must supply the parameter. A required parameter that a parent
-    /// omits produces a development warning without discarding anything [CMP-12]. The C#
-    /// <c>required</c> modifier on the property declares the same thing. Specified by
-    /// <c>[CMP-28]</c>.
+    /// Gets or sets whether the caller must supply the parameter. A usage that omits it is a build
+    /// error wherever the usage is statically resolvable ([SFC-USE-3]) and a development warning at
+    /// mount otherwise [CMP-12]. The C# <c>required</c> modifier on the property declares the same
+    /// thing. Specified by <c>[CMP-28]</c>.
     /// </summary>
     public bool IsRequired { get; set; }
 }

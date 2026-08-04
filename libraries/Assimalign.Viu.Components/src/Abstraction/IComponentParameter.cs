@@ -26,4 +26,19 @@ public interface IComponentParameter
     /// warning without rejecting the supplied value.
     /// </summary>
     Func<object?, bool>? Validator { get; }
+
+    /// <summary>
+    /// Gets the parameter's declared value type, or <see langword="null"/> when the declaration does
+    /// not state one.
+    /// </summary>
+    /// <remarks>
+    /// The type is **descriptive**: Core never converts a supplied argument to it, because argument
+    /// resolution stays a dictionary lookup with no reflection [CMP-12]. It exists so a declaration
+    /// carries the same information in metadata that it carries in source, which is what lets a
+    /// consumer's template be type-checked at build time ([SFC-USE-2]). Nullable reference
+    /// annotations are absent — they are not part of a runtime type — while
+    /// <see cref="System.Nullable{T}"/> is preserved. Default-implemented as
+    /// <see langword="null"/> so an existing implementor keeps compiling unchanged.
+    /// </remarks>
+    Type? ParameterType => null;
 }

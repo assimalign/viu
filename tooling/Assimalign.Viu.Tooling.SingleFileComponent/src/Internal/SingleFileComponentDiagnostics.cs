@@ -175,6 +175,33 @@ internal static class SingleFileComponentDiagnostics
         HelpLink: HelpLink("VIU1303"));
 
     /// <summary>
+    /// A component usage supplies an attribute the component declares no parameter for. Warning, not
+    /// error: an undeclared attribute is a legal fallthrough [CMP-17] ([SFC-USE-2]).
+    /// </summary>
+    internal static readonly SingleFileComponentDiagnosticDescriptor UnknownComponentParameter = new(
+        Id: "VIU1401",
+        Title: "Component declares no such parameter",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Warning,
+        HelpLink: HelpLink("VIU1401"));
+
+    /// <summary>A component usage omits a parameter the component declares required ([SFC-USE-3]).</summary>
+    internal static readonly SingleFileComponentDiagnosticDescriptor MissingRequiredComponentParameter = new(
+        Id: "VIU1402",
+        Title: "Required component parameter is not supplied",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1402"));
+
+    /// <summary>
+    /// A component usage supplies a value whose type cannot be the declared parameter's type
+    /// ([SFC-USE-4]).
+    /// </summary>
+    internal static readonly SingleFileComponentDiagnosticDescriptor IncompatibleComponentArgument = new(
+        Id: "VIU1403",
+        Title: "Component argument type is incompatible",
+        DefaultSeverity: SingleFileComponentDiagnosticSeverity.Error,
+        HelpLink: HelpLink("VIU1403"));
+
+    /// <summary>
     /// Every entry of the neutral catalog, in id order. Each host's materialization must cover this list
     /// 1:1 — the generator's adapter-coverage test enumerates it so a new catalog entry without an
     /// adapter mapping fails a test rather than throwing at generation time.
@@ -200,6 +227,9 @@ internal static class SingleFileComponentDiagnostics
         StyleError,
         StyleWarning,
         StyleInformation,
+        UnknownComponentParameter,
+        MissingRequiredComponentParameter,
+        IncompatibleComponentArgument,
     };
 
     /// <summary>
@@ -296,6 +326,22 @@ internal static class SingleFileComponentDiagnostics
         string filePath,
         SourceLocation location)
         => new(descriptor, BuildLocation(filePath, location, blockContentStart: null), message);
+
+    /// <summary>
+    /// Composes a dispatched block's own <paramref name="location"/> onto the containing
+    /// single-file-component's coordinates — the same arithmetic every block-origin diagnostic uses, made
+    /// available so a value-equatable model (the component-usage manifest) can carry already-composed
+    /// positions instead of a block-relative pair the host would have to recompose.
+    /// </summary>
+    /// <param name="filePath">The originating single-file-component path.</param>
+    /// <param name="location">The block-content-relative range.</param>
+    /// <param name="blockContentStart">The file position where the block's content begins.</param>
+    /// <returns>The value-equatable, file-relative location snapshot.</returns>
+    public static LocationInfo ComposeLocation(
+        string filePath,
+        SourceLocation location,
+        Position blockContentStart)
+        => BuildLocation(filePath, location, blockContentStart);
 
     /// <summary>Creates a projection-owned file-level rule diagnostic at the start of a source file.</summary>
     /// <param name="descriptor">The stable neutral diagnostic descriptor.</param>

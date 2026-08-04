@@ -550,6 +550,12 @@ internal static class SingleFileComponentSourceEmitter
         AppendIndent(builder, indent);
         builder.Append("/// </summary>\n");
         AppendIndent(builder, indent);
+        // A declared type may be spelled `Foo?`; typeof() over a nullable REFERENCE type is a warning
+        // (its runtime type is just Foo), while `int?` genuinely means Nullable<int>. The projection
+        // cannot tell the two apart without a semantic model, so the verbatim spelling is emitted — which
+        // is always the correct runtime type — and the informational warning is suppressed here alone.
+        builder.Append("#pragma warning disable CS8639 // The declared spelling is emitted verbatim; typeof erases reference nullability.\n");
+        AppendIndent(builder, indent);
         builder.Append("private static readonly ").Append(ComponentsNamespace)
             .Append(".IComponentParameter[] __ViuDeclaredParameters =\n");
         AppendIndent(builder, indent);
@@ -564,11 +570,15 @@ internal static class SingleFileComponentSourceEmitter
                 builder.Append(", isRequired: true");
             }
 
-            builder.Append("),\n");
+            // [SFC-USE-2] The declared type reaches the runtime declaration and, through the [Parameter]
+            // attribute that produced it, a consumer's build-time check.
+            builder.Append(", parameterType: typeof(").Append(parameter.TypeText).Append(")),\n");
         }
 
         AppendIndent(builder, indent);
         builder.Append("};\n");
+        AppendIndent(builder, indent);
+        builder.Append("#pragma warning restore CS8639\n");
         builder.Append('\n');
         AppendIndent(builder, indent);
         builder.Append("global::System.Collections.Generic.IReadOnlyList<").Append(ComponentsNamespace)
@@ -665,8 +675,8 @@ internal static class SingleFileComponentSourceEmitter
     // instance as the parameter's default and restored whenever the parent supplies no argument, which is
     // the attribute form's equivalent of ComponentParameter.DefaultFactory. Values are read through the
     // typed IComponentArguments.Get<T>, so no conversion, boxing dance, or reflection is involved: an
-    // argument whose runtime value is not of the property's type yields that type's default, deliberately
-    // and without coercion magic.
+    // argument whose runtime value is not of the property's type yields that type's default, and
+    // [SFC-USE-4] is what catches the statically decidable cases of that at build time.
     private static void AppendParameterBinding(StringBuilder builder, int indent, in SingleFileComponentModel model)
     {
         var parameters = model.Declarations.Parameters;

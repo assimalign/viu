@@ -50,6 +50,38 @@ internal static class ComponentDeclarationNames
     }
 
     /// <summary>
+    /// The comparison key for an argument name: its kebab-case spelling folded back to camel case, so a
+    /// template's <c>model-value</c> and a declaration's <c>modelValue</c> compare equal. This mirrors
+    /// the alias set Core builds for every declared parameter [CMP-13], so a name matches here exactly
+    /// when it would resolve at mount.
+    /// </summary>
+    /// <param name="name">The authored or declared name.</param>
+    /// <returns>The comparison key.</returns>
+    public static string Canonicalize(string name)
+    {
+        if (name.IndexOf('-') < 0)
+        {
+            return name;
+        }
+
+        var builder = new StringBuilder(name.Length);
+        var uppercaseNext = false;
+        foreach (var character in name)
+        {
+            if (character == '-')
+            {
+                uppercaseNext = true;
+                continue;
+            }
+
+            builder.Append(uppercaseNext ? char.ToUpperInvariant(character) : character);
+            uppercaseNext = false;
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
     /// Classifies a declared C# type spelling for the build-time compatibility check. Only the
     /// predefined keyword spellings are decided; every other spelling — a named type, an alias, a
     /// generic instantiation — stays <see cref="ComponentValueKind.Unknown"/>, because the projection

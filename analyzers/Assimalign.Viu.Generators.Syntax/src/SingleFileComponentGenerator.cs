@@ -95,7 +95,32 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 "The canonical .viu component takes precedence.",
                 file.FilePath));
 
+        // [SFC-USE-1] The component declarations this compilation can read: the attribute-declared
+        // surfaces of the .viu components being generated here, plus everything Roslyn can see through
+        // symbols (hand-authored components in this compilation, and components in referenced
+        // assemblies, whose [Parameter] attributes survive into metadata).
+        //
+        // The join is deliberately a SEPARATE output branch. The model pipeline above stays uncombined,
+        // so an edit to one .viu still re-emits only that file and every other file's scaffold stays
+        // strictly cached; only the validation branch — which produces diagnostics, never source — sees
+        // the compilation-wide catalog.
+        var localDeclarations = results
+            .Select(static (result, _) => new ComponentDeclarationEntry(
+                result.Model.ClassName,
+                result.Model.Declarations.Parameters))
+            .Where(static entry => entry.Parameters.Count > 0)
+            .Collect();
+        var symbolDeclarations = context.CompilationProvider.Select(
+            static (compilation, cancellationToken) =>
+                ComponentSymbolCatalogReader.Read(compilation, cancellationToken));
+        var catalog = localDeclarations
+            .Combine(symbolDeclarations)
+            .Select(static (pair, _) => BuildCatalog(pair.Left, pair.Right));
+
         context.RegisterSourceOutput(results, static (production, result) => Execute(production, result));
+        context.RegisterSourceOutput(
+            results.Combine(catalog),
+            static (production, pair) => ValidateComponentUsages(production, pair.Left, pair.Right));
         context.RegisterSourceOutput(collisions, static (production, diagnostic) =>
             production.ReportDiagnostic(SingleFileComponentDiagnosticAdapter.ToDiagnostic(diagnostic)));
         context.RegisterSourceOutput(
@@ -203,6 +228,53 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         }
 
         context.AddSource(result.Model.HintName, SingleFileComponentSourceEmitter.Emit(result.Model));
+    }
+
+    // Merges the two declaration sources into one resolvable catalog. The .viu components being generated
+    // in THIS compilation cannot be read through symbols — their partial classes do not exist yet — so
+    // their projections supply them directly.
+    private static ComponentDeclarationCatalog BuildCatalog(
+        ImmutableArray<ComponentDeclarationEntry> local,
+        EquatableArray<ComponentDeclarationEntry> fromSymbols)
+    {
+        if (local.Length == 0 && fromSymbols.Count == 0)
+        {
+            return ComponentDeclarationCatalog.Empty;
+        }
+
+        var entries = new ComponentDeclarationEntry[local.Length + fromSymbols.Count];
+        var index = 0;
+        foreach (var entry in local)
+        {
+            entries[index++] = entry;
+        }
+
+        foreach (var entry in fromSymbols)
+        {
+            entries[index++] = entry;
+        }
+
+        return new ComponentDeclarationCatalog(new EquatableArray<ComponentDeclarationEntry>(entries));
+    }
+
+    // [SFC-USE-2] Reports the component usages this template gets wrong. Diagnostics only — never source
+    // — so the emitted scaffold never depends on the compilation-wide catalog.
+    private static void ValidateComponentUsages(
+        SourceProductionContext context,
+        SingleFileComponentProjectionResult result,
+        ComponentDeclarationCatalog catalog)
+    {
+        if (result.ComponentUsages.Count == 0 || catalog.IsEmpty)
+        {
+            return;
+        }
+
+        var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();
+        ComponentUsageValidator.Validate(result.ComponentUsages, catalog, diagnostics);
+        foreach (var diagnostic in diagnostics)
+        {
+            context.ReportDiagnostic(SingleFileComponentDiagnosticAdapter.ToDiagnostic(diagnostic));
+        }
     }
 
     private static string LeafFileName(string path)

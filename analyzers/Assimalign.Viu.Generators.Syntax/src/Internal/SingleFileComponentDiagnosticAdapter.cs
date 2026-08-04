@@ -227,6 +227,42 @@ internal static class SingleFileComponentDiagnosticAdapter
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1303"));
 
+    /// <summary>
+    /// A component usage supplies an attribute the component declares no parameter for. Warning, not
+    /// error: an undeclared attribute is a legal fallthrough [CMP-17] ([SFC-USE-2]).
+    /// </summary>
+    internal static readonly DiagnosticDescriptor UnknownComponentParameter = new(
+        id: "VIU1401",
+        title: "Component declares no such parameter",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1401"));
+
+    /// <summary>A component usage omits a parameter the component declares required ([SFC-USE-3]).</summary>
+    internal static readonly DiagnosticDescriptor MissingRequiredComponentParameter = new(
+        id: "VIU1402",
+        title: "Required component parameter is not supplied",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1402"));
+
+    /// <summary>
+    /// A component usage supplies a value whose type cannot be the declared parameter's type
+    /// ([SFC-USE-4]).
+    /// </summary>
+    internal static readonly DiagnosticDescriptor IncompatibleComponentArgument = new(
+        id: "VIU1403",
+        title: "Component argument type is incompatible",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1403"));
+
     /// <summary>Materializes the Roslyn diagnostic for reporting.</summary>
     /// <param name="info">The projection's value-equatable neutral diagnostic.</param>
     /// <returns>The diagnostic, located on the originating <c>.viu</c> file.</returns>
@@ -259,6 +295,9 @@ internal static class SingleFileComponentDiagnosticAdapter
             "VIU1301" => StyleError,
             "VIU1302" => StyleWarning,
             "VIU1303" => StyleInformation,
+            "VIU1401" => UnknownComponentParameter,
+            "VIU1402" => MissingRequiredComponentParameter,
+            "VIU1403" => IncompatibleComponentArgument,
             _ => throw new InvalidOperationException(
                 $"The neutral diagnostic catalog entry '{descriptor.Id}' has no Roslyn descriptor mapping."),
         };

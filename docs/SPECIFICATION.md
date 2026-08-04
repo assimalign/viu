@@ -990,10 +990,49 @@ not input.
 downstream tooling has something to work with. An unterminated block yields its content to end of
 file and still appears in the descriptor.
 
+### 8.8 Component-usage validation
+
+`[SFC-USE-1]` A template that uses a component is checked against that component's **declared**
+parameter surface at build time. A declaration is readable when it is attribute-declared [CMP-26] and
+the component is either compiled in the same compilation or visible through Roslyn symbols —
+**including from a referenced assembly**, because `[Parameter]` survives into metadata. The projection
+publishes a value-equatable *usage manifest* per template and the host joins it against the resolved
+catalog, so the per-file projection stays cacheable while the catalog remains a compilation-wide
+input. A tag resolves through the same name ladder the runtime factory uses [CMP-6].
+
+`[SFC-USE-2]` **Unknown parameter** (`VIU1401`, **Warning**). An attribute or `:`-bound argument that
+matches no declared parameter is reported — unless it is a listener spelling (`onX`, `@x`), a
+directive, or a plausible fallthrough attribute: a known HTML or SVG attribute, a hyphenated or
+namespaced name (`data-*`, `aria-*`, `xml:*`, any vendor prefix), or one the render pipeline itself
+consumes (`key`, `ref`, `class`, `style`, `id`, `is`, `role`, …). The severity is **Warning and not
+Error** because fallthrough is a specified feature [CMP-17]: an undeclared attribute is legal and
+lands on the component's rendered root, so the diagnostic reports a likely mistake, never an illegal
+program.
+
+`[SFC-USE-3]` **Missing required parameter** (`VIU1402`, **Error**). A usage that omits a parameter
+declared required is an error. Unlike an undeclared attribute there is no legitimate reading of the
+omission: the declaration states that the caller must supply it, and the runtime's mount-time warning
+[CMP-12] remains only for the usages the compiler cannot see.
+
+`[SFC-USE-4]` **Incompatible argument** (`VIU1403`, **Error**). A supplied value is reported only
+where incompatibility is decidable from the source alone: a **plain attribute** — whose value is
+always a string — supplied to a parameter of a value type, and a **non-string literal binding**
+supplied to a `string` parameter. Both are errors because neither can be right at run time:
+`IComponentArguments.Get<T>` would yield the parameter type's default [CMP-29]. Every other
+combination is left alone.
+
+`[SFC-USE-5]` **The limits, and the silence they buy.** Validation is skipped entirely for: a
+component the catalog does not resolve — which includes **every component that declares its
+parameters imperatively**, because a `Parameters` collection is arbitrary C# no compiler can read, and
+that gap is the reason the attribute form exists; a tag that resolves to more than one declaration; a
+usage carrying an argument-less `v-bind="…"` spread or a dynamic `:[name]` argument; a bound
+expression that is not a C# literal; and a hyphenated attribute name. A false positive is worse than a
+false negative here, so every undecidable input produces silence rather than a guess.
+
 *Authority: `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
 `libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
 `tooling/Assimalign.Viu.Tooling.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
-`analyzers/Assimalign.Viu.Generators.Syntax/src/SingleFileComponentGenerator.cs`;
+`analyzers/Assimalign.Viu.Generators.Syntax/src/{SingleFileComponentGenerator,Internal/ComponentSymbolCatalogReader}.cs`;
 `docs/adr/0005-no-runtime-template-compilation.md`.*
 
 ---

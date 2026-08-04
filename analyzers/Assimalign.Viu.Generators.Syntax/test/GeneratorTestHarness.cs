@@ -24,10 +24,23 @@ internal static class GeneratorTestHarness
 {
     private static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.Preview);
 
-    /// <summary>Builds an empty library compilation (the generator does not read the compilation).</summary>
+    /// <summary>
+    /// Builds a library compilation. Scaffold emission never reads the compilation; component-usage
+    /// validation ([SFC-USE-1]) reads it for the declarations visible through symbols, which is what the
+    /// <paramref name="references"/> overload exists for.
+    /// </summary>
     /// <param name="sources">Optional C# sources to include (used to add unrelated trees for cache tests).</param>
     /// <returns>The compilation.</returns>
     internal static CSharpCompilation CreateCompilation(params string[] sources)
+        => CreateCompilation(Array.Empty<MetadataReference>(), sources);
+
+    /// <summary>Builds a library compilation over extra metadata references.</summary>
+    /// <param name="references">Additional metadata references (a referenced component package, for example).</param>
+    /// <param name="sources">Optional C# sources to include.</param>
+    /// <returns>The compilation.</returns>
+    internal static CSharpCompilation CreateCompilation(
+        IReadOnlyList<MetadataReference> references,
+        params string[] sources)
     {
         var trees = new List<SyntaxTree>();
         foreach (var source in sources)
@@ -35,10 +48,16 @@ internal static class GeneratorTestHarness
             trees.Add(CSharpSyntaxTree.ParseText(source, ParseOptions));
         }
 
+        var allReferences = new List<MetadataReference>(references.Count + 1)
+        {
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+        };
+        allReferences.AddRange(references);
+
         return CSharpCompilation.Create(
             "Assimalign.Viu.Generators.Syntax.TestAssembly",
             trees,
-            new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+            allReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
     }
 
@@ -113,6 +132,34 @@ internal static class GeneratorTestHarness
                 configuration,
                 emitHotReloadMetadata)
             .RunGenerators(CreateCompilation());
+        var result = driver.GetRunResult().Results[0];
+        return new GeneratorOutcome(result.GeneratedSources, result.Diagnostics);
+    }
+
+    /// <summary>
+    /// Runs the generator over several in-memory single-file components at once — the shape
+    /// component-usage validation needs, because one component's declaration is another component's
+    /// build-time contract ([SFC-USE-1]).
+    /// </summary>
+    /// <param name="files">The (path, content) pairs to feed as additional files.</param>
+    /// <param name="rootNamespace">The <c>RootNamespace</c> build property.</param>
+    /// <param name="projectDirectory">The <c>ProjectDir</c> build property.</param>
+    /// <param name="references">Additional metadata references visible to the compilation.</param>
+    /// <returns>The generated sources and reported diagnostics.</returns>
+    internal static GeneratorOutcome RunAll(
+        IReadOnlyList<(string Path, string Content)> files,
+        string? rootNamespace = null,
+        string? projectDirectory = null,
+        IReadOnlyList<MetadataReference>? references = null)
+    {
+        var additionalTexts = ImmutableArray.CreateBuilder<AdditionalText>(files.Count);
+        foreach (var (path, content) in files)
+        {
+            additionalTexts.Add(new InMemoryAdditionalText(path, content));
+        }
+
+        var driver = CreateDriver(additionalTexts.ToImmutable(), rootNamespace, projectDirectory)
+            .RunGenerators(CreateCompilation(references ?? Array.Empty<MetadataReference>()));
         var result = driver.GetRunResult().Results[0];
         return new GeneratorOutcome(result.GeneratedSources, result.Diagnostics);
     }

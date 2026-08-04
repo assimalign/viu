@@ -51,6 +51,17 @@ default. The two forms are exclusive per kind: a component declares its paramete
 attributes or with its own `Parameters` member, never both
 ([`[CMP-26]`-`[CMP-31]`](../../../docs/SPECIFICATION.md#49-attribute-declared-parameters-and-events)).
 
+A declaration also carries its parameter's declared value type through
+`IComponentParameter.ParameterType` (default-implemented as null, so no existing implementor breaks).
+The type is descriptive only -- Core never converts a supplied argument to it, because argument
+resolution stays a reflection-free dictionary lookup -- and exists so a declaration says the same
+thing in metadata that it says in source. That is what lets a consumer's template be checked where it
+is compiled: an attribute the component declares no parameter for, a missing required parameter, and
+a statically decidable type mismatch are all build diagnostics
+([`[SFC-USE-1]`-`[SFC-USE-5]`](../../../docs/SPECIFICATION.md#88-component-usage-validation)). A
+component that builds its `Parameters` collection imperatively carries nothing readable in metadata,
+so its usages are never checked -- the gap the attribute form closes.
+
 `ComponentEvent` optionally validates the complete ordered argument list.
 `IComponentContext.Emit` accepts zero or more arguments, while `ComponentEventListener` supports
 single-payload and all-arguments handlers in synchronous and task-returning forms. The listener can

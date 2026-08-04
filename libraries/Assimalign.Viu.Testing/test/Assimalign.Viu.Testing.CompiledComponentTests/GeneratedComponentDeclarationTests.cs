@@ -183,6 +183,20 @@ public sealed class GeneratedComponentDeclarationTests
     }
 
     [Fact]
+    public void AttributedComponent_DeclarationCarriesTheDeclaredParameterType()
+    {
+        // [SFC-USE-1] The declared type reaches the runtime declaration, and through the [Parameter]
+        // attribute that produced it, a consumer's build-time check. This is the metadata that an
+        // imperative `new ComponentParameter("title")` never carried.
+        var template = (IComponentTemplate)Activator.CreateInstance(
+            GeneratedComponentSupport.CompileToType("ModelCard", ModelCard))!;
+
+        var parameter = template.Parameters.ShouldHaveSingleItem();
+        parameter.Name.ShouldBe("modelValue");
+        parameter.ParameterType.ShouldBe(typeof(int));
+    }
+
+    [Fact]
     public void RequiredModifierParameter_ActivatesAndBinds_ThroughTheParameterlessActivator()
     {
         // [CMP-28] The C# `required` modifier declares requiredness to Viu without breaking activation:

@@ -12,17 +12,24 @@ public sealed class ComponentParameter : IComponentParameter
     /// <param name="validator">
     /// The optional validator that returns whether a resolved value is valid.
     /// </param>
+    /// <param name="parameterType">
+    /// The optional declared value type. It is descriptive only — Core never converts a supplied
+    /// argument to it — and exists so the declaration carries the same information in metadata that
+    /// it carries in source ([SFC-USE-2]).
+    /// </param>
     public ComponentParameter(
         string name,
         bool isRequired = false,
         Func<object?>? defaultFactory = null,
-        Func<object?, bool>? validator = null)
+        Func<object?, bool>? validator = null,
+        Type? parameterType = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         Name = name;
         IsRequired = isRequired;
         DefaultFactory = defaultFactory;
         Validator = validator;
+        ParameterType = parameterType;
     }
 
     /// <inheritdoc/>
@@ -36,4 +43,7 @@ public sealed class ComponentParameter : IComponentParameter
 
     /// <inheritdoc/>
     public Func<object?, bool>? Validator { get; }
+
+    /// <inheritdoc/>
+    public Type? ParameterType { get; }
 }

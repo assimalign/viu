@@ -4,7 +4,7 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// How much a declared parameter's C# type — or a template-supplied value's type — is known to the
 /// build-time checker. The projection classifies types <em>syntactically</em> (it has no semantic model
 /// for the code it is itself generating), so anything it cannot decide from the spelling alone stays
-/// <see cref="Unknown"/> and is never reported.
+/// <see cref="Unknown"/> and is never reported. Specified by <c>[SFC-USE-4]</c>.
 /// </summary>
 internal enum ComponentValueKind
 {
