@@ -24,7 +24,8 @@ So the projection lives **once**, here, and both hosts call it:
    extension) drives the same core for editor features — declared `@script` members
    (`ScriptBlockAnalyzer.DescribeMembers`), block-to-file position composition
    (`SingleFileComponentDiagnostics.ComposeToFilePosition`), and, per the semantic roadmap
-   (`extensions/VisualStudio/docs/DESIGN.md`), the full projected document.
+   (`extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md`), the full projected
+   document.
 
 The two-host equality is not a convention but a pinned contract:
 `SingleFileComponentProjectionConformanceTests` (`analyzers/Assimalign.Viu.Generators.Syntax/test`)
@@ -82,9 +83,9 @@ of it.
 ## Non-goals / future
 
 - **Roslyn-workspace semantics.** Steps 3–6 of the semantic IntelliSense roadmap
-  (`extensions/VisualStudio/docs/DESIGN.md`) — `MSBuildWorkspace` loading, synthetic documents, and
-  mapped semantic features — build ON this projection in the language-server process; none of that
-  belongs here.
+  (`extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md`) — `MSBuildWorkspace`
+  loading, synthetic documents, and mapped semantic features — build ON this projection in the
+  language-server process; none of that belongs here.
 - **Style compilation.** Owned by `Assimalign.Viu.Tooling.Css` ([V01.01.12.12]); this library layers
   the compile-only concerns (module accessor map, `v-bind()` binding-metadata rewrite) on top of it.
 - **A public API.** If a third consumer ever appears, promoting a stable facade to `Abstraction/` is

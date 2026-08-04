@@ -112,9 +112,9 @@ evaluated project-system query and the probe fails closed.
 
 `Assimalign.Viu.Tooling.UtilityCss` is the single compiler/editor authority. Its contract is frozen
 to Tailwind CSS v4.3.3 by
-[`compatibility-v4.3.3.json`](../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
+[`compatibility-v4.3.3.json`](../../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
 and independently authored
-[`golden-vectors-v4.3.3.json`](../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 The manifest enumerates 382 utility roots, 88 variants, 21 theme namespaces, value and modifier
 modes, source forms, directives, functions, and canonical ordering. The language service consumes
 that registry directly; completion detail and hover display executable compiler output.

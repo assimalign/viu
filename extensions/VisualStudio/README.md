@@ -43,7 +43,8 @@ affect a build.
 Syntax colorization works either way and needs no association.
 
 The extension cannot make this association itself without moving in process; see
-[docs/DESIGN.md](docs/DESIGN.md), "File extension ownership", for the decision and the mechanism.
+[Assimalign.Viu.VisualStudio/docs/DESIGN.md](Assimalign.Viu.VisualStudio/docs/DESIGN.md), "File
+extension ownership", for the decision and the mechanism.
 
 ## Build the complete extension
 
@@ -163,7 +164,8 @@ These completions are syntax-aware rather than Roslyn project-semantic. Ordinary
 arbitrary C# strings, and runtime-built class fragments are not scanned. Code-first utility
 discovery is deliberately deferred. Roslyn-backed C# completion, component discovery,
 go-to-definition, rename, references, and source-mapped compiler diagnostics remain the next
-language-service layer; see [docs/DESIGN.md](docs/DESIGN.md).
+language-service layer; see
+[Assimalign.Viu.VisualStudio/docs/DESIGN.md](Assimalign.Viu.VisualStudio/docs/DESIGN.md).
 
 Viu Utilities is an independent Viu feature compatible with documented Tailwind CSS v4.3.3
 behavior. It is not affiliated with or endorsed by Tailwind Labs. The extension does not install,

@@ -1287,7 +1287,7 @@ first directory containing a project so an unrelated nested project is not claim
 `false` marker as an override, and **fails closed** when ownership is ambiguous. The check repeats
 for document changes, diagnostics, completion, and hover.
 
-*Authority: `extensions/VisualStudio/docs/DESIGN.md`;
+*Authority: `extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md`;
 `tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md`.*
 
 ---

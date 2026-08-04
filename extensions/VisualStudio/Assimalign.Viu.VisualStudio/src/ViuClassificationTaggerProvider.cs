@@ -55,7 +55,8 @@ internal sealed class ViuClassificationTaggerProvider :
     /// token is a well-formed start tag — which a <c>&lt;template&gt;</c> container always is. That
     /// factory attaches the XML language service and suppresses further content-type detection, so the
     /// buffer stays XML-derived for its lifetime and a filter naming <c>viu</c> never matches. See
-    /// <c>extensions/VisualStudio/docs/DESIGN.md</c>, "File extension ownership".
+    /// <c>extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md</c>, "File extension
+    /// ownership".
     /// </para>
     /// <para>
     /// Filtering on the text base type is satisfied either way, since both the XML and plain-text

@@ -162,8 +162,8 @@
 		<File Path="extensions/VisualStudio/Build.ps1" />
 		<File Path="extensions/VisualStudio/README.md" />
 	</Folder>
-	<Folder Name="/viu/extensions/VisualStudio/docs/">
-		<File Path="extensions/VisualStudio/docs/DESIGN.md" />
+	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/">
+		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md" />
 	</Folder>
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/src/">
 		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj" />
