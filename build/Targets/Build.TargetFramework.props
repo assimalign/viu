@@ -8,6 +8,10 @@
              Windows runtime. The language server stays editor-neutral on the repository TFM. -->
         <TargetFrameworkForVisualStudioExtensions>net8.0-windows8.0</TargetFrameworkForVisualStudioExtensions>
         <TargetFrameworkForVisualStudioExtensionTests>net9.0-windows8.0</TargetFrameworkForVisualStudioExtensionTests>
+        <!-- A classic VSSDK package (Assimalign.Viu.VisualStudio.Registration, the companion that
+             claims the .viu file extension) loads inside devenv.exe and therefore lives on the
+             .NET Framework line, whatever its payload. -->
+        <TargetFrameworkForVisualStudioClassicExtensions>net48</TargetFrameworkForVisualStudioClassicExtensions>
         <TargetFrameworkForLanguageServers>$(TargetFrameworkLatest)</TargetFrameworkForLanguageServers>
         <!--
             Alias consumed by the framework Ref/Runtime targets (frameworks\Assimalign.Viu.App.targets)

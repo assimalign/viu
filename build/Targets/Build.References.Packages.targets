@@ -39,6 +39,14 @@
              the corresponding VisualStudio.Extensibility SDK surface. -->
         <_ViuPackage Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" />
         <_ViuPackage Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" />
+        <!-- Classic VSSDK packaging for Assimalign.Viu.VisualStudio.Registration, the companion
+             VSIX whose only payload is the .pkgdef claiming the .viu file extension. Its targets
+             run under Visual Studio's MSBuild only, which is why that project stays out of
+             Assimalign.Viu.slnx and builds through extensions\VisualStudio\Build.Registration.ps1. -->
+        <_ViuPackage Include="Microsoft.VSSDK.BuildTools" Version="17.14.2120">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </_ViuPackage>
     </ItemGroup>
 
     <!-- Benchmark Dependencies -->

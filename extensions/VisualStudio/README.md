@@ -6,14 +6,19 @@ components:
 - `Assimalign.Viu.VisualStudio` is a thin out-of-process Visual Studio extension. It contributes the
   canonical `.viu` document type, project-scoped tag-based `.vue` compatibility, immediate `.viu`
   lexical syntax highlighting, and the language-server connection.
+- `Assimalign.Viu.VisualStudio.Registration` is a companion classic VSIX carrying nothing but a
+  `.pkgdef` that claims the `.viu` file extension for the Source Code (Text) Editor. An
+  out-of-process extension cannot ship a `.pkgdef`, so the registration is a separate package.
 - `Assimalign.Viu.Tooling.LanguageServer` is an editor-neutral Language Server Protocol executable.
 - `Assimalign.Viu.Tooling.LanguageService` owns document state and Viu language features without depending on
   Visual Studio.
 
-Only the extension itself lives under `extensions/VisualStudio/`. The language server and the
+Only the two extensions live under `extensions/VisualStudio/`. The language server and the
 language service are editor-neutral developer tooling and live at
 `tooling/Assimalign.Viu.Tooling.LanguageServer` and `tooling/Assimalign.Viu.Tooling.LanguageService`;
-`Assimalign.Viu.VisualStudio.slnx` and `Build.ps1` still drive all three together.
+`Assimalign.Viu.VisualStudio.slnx` and `Build.ps1` still drive all three together. The registration
+package is built on its own by `Build.Registration.ps1` and belongs to no solution, because its
+VSSDK build tasks require Visual Studio's MSBuild.
 
 The process boundary is intentional. Viu's parsers, and eventually Roslyn workspaces, remain outside
 `devenv.exe`; the same language server can later serve other editors.
@@ -28,23 +33,46 @@ The client uses `Microsoft.VisualStudio.Extensibility` 17.14 and executes out of
 
 ### Associate `.viu` with the text editor
 
-Do this once per Visual Studio instance, before expecting semantic features:
+Visual Studio ships no registration for the `.viu` extension, so the file is claimed by the XML
+editor's wildcard factory — it accepts any document starting with a well-formed tag, and a container
+starts with `<template>`. While `.viu` is claimed that way, the buffer keeps an XML content type,
+which means the language server never attaches (**no C# IntelliSense inside `@script`**) and the XML
+parser reports spurious errors against C# and container syntax. Those errors are editor-only and
+never affect a build.
+
+Syntax colorization works either way and needs no association.
+
+**Preferred: install the companion registration VSIX.** `Assimalign.Viu.VisualStudio.Registration`
+is a second, minimal package whose only payload is a `.pkgdef` claiming `.viu` for the
+Source Code (Text) Editor at priority `0x32`, which outranks every wildcard editor factory.
+Install it once and every `.viu` file — including new ones — opens in the right editor with no
+per-file step:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\extensions\VisualStudio\Build.Registration.ps1
+```
+
+```text
+_out/extensions/VisualStudio/Debug/Assimalign.Viu.VisualStudio.Registration.vsix
+```
+
+Double-click the `.vsix` (or run `VSIXInstaller.exe` against it) and restart Visual Studio. Pass
+`-Configuration Release` for a release build. The two extensions are independent packages: the main
+extension works without this one, and this one only changes which editor claims the file extension.
+
+**Fallback (no install): reassociate by hand**, once per Visual Studio instance:
 
 > Right-click any `.viu` file in Solution Explorer → **Open With…** → **Source Code (Text) Editor** →
 > **Set as Default**
 
-Visual Studio ships no registration for the `.viu` extension, so the file is claimed by the XML
-editor's wildcard factory — it accepts any document starting with a well-formed tag, and a container
-starts with `<template>`. Until `.viu` is reassociated, the buffer keeps an XML content type, which
-means the language server never attaches (**no C# IntelliSense inside `@script`**) and the XML parser
-reports spurious errors against C# and container syntax. Those errors are editor-only and never
-affect a build.
-
-Syntax colorization works either way and needs no association.
-
-The extension cannot make this association itself without moving in process; see
+The main extension cannot carry the `.pkgdef` itself without moving in process, which is why the
+registration ships separately; see
 [Assimalign.Viu.VisualStudio/docs/DESIGN.md](Assimalign.Viu.VisualStudio/docs/DESIGN.md), "File
 extension ownership", for the decision and the mechanism.
+
+`Build.Registration.ps1` is separate from `Build.ps1` because the classic VSSDK build tasks are
+.NET Framework MSBuild tasks: the script locates Visual Studio's MSBuild through `vswhere`, and the
+registration project is deliberately in neither solution (both are gated by `dotnet`).
 
 ## Build the complete extension
 

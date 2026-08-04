@@ -1,0 +1,33 @@
+// Claims the .viu file extension for Visual Studio's Source Code (Text) Editor.
+//
+// Nothing in a Visual Studio installation registers .viu, so the file falls through to the
+// wildcard ("*") editor factories. The Microsoft XML Editor wins that ladder at 0x20 by
+// content-sniffing the leading <template> tag, attaches the XML language service, and sets
+// guidVSBufferDetectLangSid to false - which suppresses content-type detection for the life of
+// the buffer. The viu content type contributed by Assimalign.Viu.VisualStudio therefore never
+// reaches the buffer, the document-type-filtered Viu language server never activates, and the XML
+// parser reports spurious errors against C# and container syntax.
+//
+// 0x32/0x31 is the band Visual Studio itself uses for explicitly owned extensions (json, html,
+// css). It outranks every wildcard factory - TextMate 0x25, JSON 0x23, XML Editor Chooser 0x21,
+// Microsoft XML Editor 0x20 - so the text editor claims .viu outright. The paired value on the
+// with-encoding sibling is one less, matching the offset Visual Studio's own registrations use.
+//
+// There is deliberately NO [$RootKey$\Languages\File Extensions\.viu] entry here. That key
+// attaches a legacy language service to the buffer, which would stamp its own content type and
+// re-break the exact thing this file fixes. The text editor attaches no language service, so the
+// buffer takes its content type from the Assimalign.Viu.VisualStudio documentTypes registration.
+//
+// .vue is deliberately not claimed: Web Tools owns it explicitly at 0x33, and overriding a
+// first-party explicit registration is a separate product decision.
+//
+// See extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md, "File extension
+// ownership".
+
+// Source Code (Text) Editor
+[$RootKey$\Editors\{8B382828-6202-11D1-8870-0000F87579D2}\Extensions]
+"viu"=dword:00000032
+
+// Source Code (Text) Editor with Encoding
+[$RootKey$\Editors\{C7747503-0E24-4FBE-BE4B-94180C3947D7}\Extensions]
+"viu"=dword:00000031

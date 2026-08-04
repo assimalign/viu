@@ -32,10 +32,11 @@ Visual Studio
                       -> Assimalign.Viu.Tooling.UtilityCss
 ```
 
-Only `Assimalign.Viu.VisualStudio` lives under `extensions/VisualStudio/`. Everything below the
-stdio boundary is editor-neutral developer tooling and lives under the repository's `tooling/` root
-(`tooling/Assimalign.Viu.Tooling.LanguageServer`, `tooling/Assimalign.Viu.Tooling.LanguageService`,
-and the build-time cores they consume).
+`extensions/VisualStudio/` holds `Assimalign.Viu.VisualStudio` and the payload-free
+`Assimalign.Viu.VisualStudio.Registration` companion (see "File extension ownership"). Everything
+below the stdio boundary is editor-neutral developer tooling and lives under the repository's
+`tooling/` root (`tooling/Assimalign.Viu.Tooling.LanguageServer`,
+`tooling/Assimalign.Viu.Tooling.LanguageService`, and the build-time cores they consume).
 
 `Assimalign.Viu.VisualStudio` performs fast lexical classification using Visual Studio's built-in
 classification categories. It lexes both container syntaxes of the hybrid `.viu` format
@@ -51,8 +52,9 @@ Tools > Options > Fonts and Colors. Every token must borrow one of Visual Studio
 categories, the user's theme owns the actual color values, and LSP semantic tokens share the same
 ceiling (Visual Studio maps them onto the same built-in classifications). The result is a real
 palette upgrade assembled entirely from the theme's existing colors — a bespoke Viu palette would
-require an in-process editor component, which this architecture deliberately rejects. The recorded
-mapping decisions:
+require an in-process editor component, which this extension deliberately is not (see
+"Bespoke Viu colors and the companion package" below for the one place it could live, and why it
+does not live there yet). The recorded mapping decisions:
 
 - PascalCase (or dotted) template tag names classify as components and borrow the `type` category,
   so components render in the same teal Visual Studio uses for C# and Razor type names; lowercase
@@ -75,6 +77,35 @@ mapping decisions:
 
 If the Extensibility SDK later adds custom classification registration, the mapping table in
 `ViuClassificationTagger.GetClassificationType` is the single place to upgrade.
+
+### Bespoke Viu colors and the companion package
+
+The `Assimalign.Viu.VisualStudio.Registration` companion (see "File extension ownership") is a
+classic in-process VSIX, so it *could* host what this extension cannot: MEF
+`ClassificationTypeDefinition` and `ClassificationFormatDefinition` exports, meaning real
+Viu-owned colors, bold/italic, and "Viu Component"-style entries in Tools > Options >
+Fonts and Colors. That capability is recorded here so the option is not rediscovered later; it is
+**deliberately not used today** — the companion's entire payload is the `.pkgdef`.
+
+If bespoke theming is ever prioritized, there are two delivery paths and they are not equally
+credible:
+
+- **(a) Companion defines the classification types; this out-of-process tagger emits their names.**
+  Cheapest if it works, because classification logic stays in one place. It is **unverified and
+  doubtful**: the remote tag bridge already refused a name as ordinary as Roslyn's standard
+  `method` (which is why semantic method spans fall back to `identifier` above), so there is no
+  evidence it will accept names invented by an in-process sibling package. Anyone taking this path
+  must prove the round trip before designing around it.
+- **(b) The companion hosts a thin in-process classifier of its own**, reusing the same lexical
+  logic that `ViuLexicalClassifier` implements, and owns both the classification types and the
+  tagging for `.viu` buffers. This path is **guaranteed to work** — it is the ordinary MEF editor
+  extensibility model — at the cost of running classification in process for `.viu` buffers and
+  keeping one lexer shared by two hosts.
+
+**(b) is the recommended route** if the feature is taken up: a verified in-process classifier is
+worth more than an unverified cross-process name channel, and the lexer is already an isolated,
+Visual Studio-free component that both hosts can share. Neither path changes the language-server
+boundary — semantic work stays out of process either way.
 
 `Assimalign.Viu.Tooling.LanguageServer` owns protocol framing and translates protocol values into
 editor-neutral contracts. It writes protocol messages only to standard output; standard error is
@@ -289,14 +320,39 @@ both the XML and plain-text content types derive from, and selects containers it
 bypasses the sniffer; the text editor attaches no language service, so the buffer then takes its
 content type from this extension's own `documentTypes` registration and the language server starts.
 
-The durable fix is a `.pkgdef` claiming `.viu` for the text editor at `0x32`, which is the band
-Microsoft itself uses for explicitly owned extensions. **This is deliberately not implemented.** A
-`.pkgdef` requires `VssdkCompatibleExtension`, which in turn mandates `RequiresInProcessHosting` —
-the extension would move in-process and lose out-of-process isolation. Recorded decision
-(2026-08-03): keep the extension out of process and document the per-user association instead. Do
-not reach for a TextMate grammar as a workaround either: TextMate's factory outranks XML and would
-evict it, but it would stamp its own TextMate-derived content type on the buffer, trading one wrong
-content type for another and still leaving the language server inactive.
+**The durable fix is a `.pkgdef`** claiming `.viu` for the text editor at `0x32`, the band Microsoft
+itself uses for explicitly owned extensions (`json`, `html`, `css`), with `0x31` on the
+with-encoding sibling factory — the same one-lower offset Visual Studio's own registrations use.
+`0x32` outranks every wildcard factory in the ladder above, so the text editor claims the file
+outright.
+
+This extension still cannot carry that `.pkgdef`: the asset requires `VssdkCompatibleExtension`,
+which in turn mandates `RequiresInProcessHosting`, so the main extension would move in process and
+lose the isolation this architecture is built on. **The in-process conversion remains rejected.**
+The registration therefore ships as a second, minimal classic VSIX,
+[`Assimalign.Viu.VisualStudio.Registration`](../../Assimalign.Viu.VisualStudio.Registration/src/Assimalign.Viu.VisualStudio.Registration.csproj)
+(#264, superseding the 2026-08-03 "not implemented" decision). Its entire payload is the `.pkgdef`;
+it contributes no code, no MEF parts, and no managed assembly to the VSIX. The two packages are
+independent — the main extension works without it, and it only changes which editor factory claims
+the file extension. `Build.Registration.ps1` builds it through Visual Studio's MSBuild located by
+`vswhere`, because the classic VSSDK build tasks are .NET Framework tasks and cannot run under
+`dotnet build`; that is also why the project is in neither solution.
+
+Two omissions in that `.pkgdef` are deliberate:
+
+- There is **no `[$RootKey$\Languages\File Extensions\.viu]` entry**. That key attaches a legacy
+  language service to the buffer, which stamps its own content type and re-breaks precisely what
+  the registration fixes. The text editor attaches no language service, so the buffer takes its
+  content type from this extension's `documentTypes` registration and the language server starts.
+- **`.vue` is not claimed.** Web Tools owns it explicitly at `0x33`; overriding a first-party
+  explicit registration is a separate product decision, not a side effect of fixing `.viu`.
+
+Do not reach for a TextMate grammar as a workaround either: TextMate's factory outranks XML and
+would evict it, but it would stamp its own TextMate-derived content type on the buffer, trading one
+wrong content type for another and still leaving the language server inactive.
+
+The per-user Open With → Set as Default association remains valid and is documented as the
+no-install fallback in [`extensions/VisualStudio/README.md`](../../README.md).
 
 ## Packaging
 
@@ -330,6 +386,21 @@ Assimalign.Viu.VisualStudio/
 The server path is resolved relative to the installed extension and rejected if configuration tries
 to escape that directory. The host build validates both executable paths before packaging, so a
 clean direct build cannot silently emit a VSIX without its language server.
+
+The companion registration package is the opposite extreme — its whole layout is one file, and the
+project sets `IncludeAssemblyInVSIXContainer=false` so the empty assembly the C# compiler produces
+never enters the container:
+
+```text
+Assimalign.Viu.VisualStudio.Registration/
+  Assimalign.Viu.VisualStudio.Registration.pkgdef
+```
+
+Its manifest declares the pkgdef as a single `Microsoft.VisualStudio.VsPackage` file asset and
+takes its identity version from `$(VersionPrefix)` through a local `GetVsixVersion` target, so the
+central repository version reaches the VSIX the same way it reaches the main extension. Both
+packages are Preview and target Community/Professional/Enterprise `[17.14,19.0)` on `amd64` and
+`arm64`.
 
 The semantic IntelliSense increment ([V01.01.12.23] #259) shipped with **zero new packages**: the
 publish already carried `Microsoft.CodeAnalysis` + `Microsoft.CodeAnalysis.CSharp` 5.3.0 with
