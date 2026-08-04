@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0"
+                 xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
+                 xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <!-- The identity is unchanged from the out-of-process implementation this extension replaces:
+         same product, same Marketplace entry, so an installed copy upgrades in place. -->
+    <Identity Id="Assimalign.Viu.VisualStudio.3c6324dd-5c21-46a2-98d1-6b7b5d701f7c"
+              Version="|Assimalign.Viu.VisualStudio;GetVsixVersion|"
+              Language="en-US"
+              Publisher="Assimalign" />
+    <DisplayName>Viu for Visual Studio</DisplayName>
+    <Description xml:space="preserve">Editing support for Viu single-file components: the Viu color theme for templates, styles, and embedded C#, and the .viu file association. Semantic features are served by a separate Viu language-server process.</Description>
+    <MoreInfo>https://github.com/assimalign/viu</MoreInfo>
+    <Preview>true</Preview>
+  </Metadata>
+  <Installation>
+    <!-- Visual Studio 2022 17.14 through the Visual Studio 2026 (18.x) band, on both supported host
+         architectures. Both language-server payloads ship, and the client selects the one matching
+         the host process at run time. -->
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,19.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[17.14,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[17.14,19.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.14,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.14,19.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <!-- The core editor is the whole of what the MEF parts need: content types, classification, and
+       the WPF format definitions carrying the Viu palette. Roslyn's classification types are
+       resolved defensively at run time, so a managed-language workload is an enhancement rather
+       than a prerequisite. -->
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor"
+                  Version="[17.14,19.0)"
+                  DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <!-- The MEF parts: the viu content type, the Viu classification types and their format
+         definitions, and the classifier that ties them to the lexer. -->
+    <Asset Type="Microsoft.VisualStudio.MefComponent"
+           d:Source="Project"
+           d:ProjectName="%CurrentProject%"
+           Path="|%CurrentProject%|" />
+    <!-- Claims the .viu file extension for the Source Code (Text) Editor. Without it the XML
+         editor's wildcard factory takes the file and suppresses content-type detection, so the
+         viu content type - and therefore every MEF part above - never reaches the buffer. -->
+    <Asset Type="Microsoft.VisualStudio.VsPackage"
+           d:Source="File"
+           Path="Assimalign.Viu.VisualStudio.pkgdef" />
+  </Assets>
+</PackageManifest>

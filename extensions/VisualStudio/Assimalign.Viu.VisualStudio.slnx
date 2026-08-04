@@ -14,6 +14,11 @@
     <Project Path="../../tooling/Assimalign.Viu.Tooling.LanguageServer/src/Assimalign.Viu.Tooling.LanguageServer.csproj" />
     <Project Path="../../tooling/Assimalign.Viu.Tooling.LanguageServer/test/Assimalign.Viu.Tooling.LanguageServer.Tests.csproj" />
   </Folder>
+  <!-- The extension is a classic in-process VSSDK package. It is in this solution so it can be
+       built, deployed to an experimental instance, and debugged from Visual Studio, but the
+       solution as a whole can no longer be handed to `dotnet build`/`dotnet test`: the VSSDK build
+       tasks are .NET Framework MSBuild tasks. Command-line packaging goes through Build.ps1, and CI
+       names the test projects individually. -->
   <Folder Name="/Visual Studio/Extension/">
     <Project Path="Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj">
       <Deploy />

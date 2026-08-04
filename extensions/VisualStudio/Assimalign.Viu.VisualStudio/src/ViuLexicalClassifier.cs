@@ -4,6 +4,26 @@ using System.Text.RegularExpressions;
 
 namespace Assimalign.Viu.VisualStudio;
 
+/// <summary>
+/// Lexes a Viu single-file component into <see cref="ViuLexicalSpan"/> values.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Purely lexical and editor-free: it consults no component registry, no semantic model, and no
+/// Visual Studio type. That independence is what lets the same lexer be compiled into the extension
+/// assembly and, through <c>&lt;Compile Include&gt;</c> links, into a <c>dotnet test</c> project.
+/// </para>
+/// <para>
+/// Classification is whole-document by construction — the container sections above a line decide how
+/// that line is colored — so callers lex a document once per snapshot and answer range requests from
+/// the result.
+/// </para>
+/// <para>
+/// The language surface here is deliberately the .NET Framework one this extension compiles against:
+/// no <c>Array.Fill</c>, no <c>char.IsAscii*</c>, no <c>string.Contains(char)</c>. The helpers at the
+/// bottom of this file stand in for them.
+/// </para>
+/// </remarks>
 internal static class ViuLexicalClassifier
 {
     // The hybrid .viu container ([V01.01.06.10], Assimalign.Viu.Syntax.SingleFileComponent
@@ -57,6 +77,10 @@ internal static class ViuLexicalClassifier
         @"\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?=\()",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    private static readonly Regex ScriptIdentifierExpression = new(
+        @"\b[A-Za-z_][A-Za-z0-9_]*",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly Regex NumberExpression = new(
         @"(?<![A-Za-z0-9_])(?:0[xX][0-9A-Fa-f]+|\d+(?:\.\d+)?)(?:[uUlLfFdDmM]+)?\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -77,6 +101,14 @@ internal static class ViuLexicalClassifier
         @"^\s*(?<selector>[^@{}\s][^{]*)(?=\{)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// Lexes a whole document.
+    /// </summary>
+    /// <param name="lines">The document's lines, without their line breaks.</param>
+    /// <returns>
+    /// The classified spans, in the order the passes claimed them. Spans never overlap: the first
+    /// pass to claim a character owns it, which is how a more specific rule wins over a general one.
+    /// </returns>
     public static IReadOnlyList<ViuLexicalSpan> Classify(IReadOnlyList<string> lines)
     {
         List<ViuLexicalSpan> spans = [];
@@ -165,11 +197,17 @@ internal static class ViuLexicalClassifier
                 };
 
                 Group nameGroup = sectionMatch.Groups["name"];
+                // The legacy @template/@style headers name the same containers their tag-delimited
+                // successors do, so they carry the framework-tag color. @script is the C# container's
+                // own header and keeps the keyword classification, which puts it in the same color as
+                // the C# it introduces.
                 AddSpan(
                     lineNumber,
                     nameGroup.Index - 1,
                     nameGroup.Length + 1,
-                    ViuClassificationKind.Keyword,
+                    sectionKind == ViuSectionKind.Script
+                        ? ViuClassificationKind.Keyword
+                        : ViuClassificationKind.FrameworkTag,
                     occupiedCharacters,
                     spans);
 
@@ -358,7 +396,7 @@ internal static class ViuLexicalClassifier
         {
             // Occupy everything past the true closer without emitting spans; whatever follows the
             // section is top-level text this line's template rules must not color.
-            Array.Fill(occupiedCharacters, true, closerEnd, line.Length - closerEnd);
+            Occupy(occupiedCharacters, closerEnd, line.Length - closerEnd);
         }
 
         ClassifyTemplateLine(line, lineNumber, ref isInComment, occupiedCharacters, spans);
@@ -387,7 +425,7 @@ internal static class ViuLexicalClassifier
             int afterCloser = closerIndex + closingTag.Length;
             if (afterCloser < line.Length)
             {
-                Array.Fill(occupiedCharacters, true, afterCloser, line.Length - afterCloser);
+                Occupy(occupiedCharacters, afterCloser, line.Length - afterCloser);
             }
         }
 
@@ -429,9 +467,9 @@ internal static class ViuLexicalClassifier
         return -1;
     }
 
-    // Classifies a top-level container tag header: '<' and '>' and '/' and '=' as operators, the tag
-    // name as a markup node, and attributes (valueless ones such as 'scoped' included) as markup
-    // attributes with their quoted values.
+    // Classifies a top-level container tag header: the tag punctuation as delimiters, the tag name as
+    // the framework tag it always is at this position, and attributes (valueless ones such as
+    // 'scoped' included) as markup attributes with their quoted values.
     private static void ClassifyTagHeader(
         string line,
         int lineNumber,
@@ -451,7 +489,7 @@ internal static class ViuLexicalClassifier
             lineNumber,
             nameStart,
             nameEnd - nameStart,
-            ViuClassificationKind.MarkupNode,
+            GetTagNameClassification(line.Substring(nameStart, nameEnd - nameStart)),
             occupiedCharacters,
             spans);
 
@@ -491,14 +529,14 @@ internal static class ViuLexicalClassifier
                     lineNumber,
                     characterIndex,
                     1,
-                    ViuClassificationKind.Operator,
+                    ViuClassificationKind.Delimiter,
                     occupiedCharacters,
                     spans);
             }
         }
     }
 
-    // Classifies a raw-text section's closing tag ("</style>" or "</script>") as markup.
+    // Classifies a raw-text section's closing tag ("</style>" or "</script>").
     private static void ClassifyClosingTag(
         string line,
         int lineNumber,
@@ -507,19 +545,19 @@ internal static class ViuLexicalClassifier
         bool[] occupiedCharacters,
         List<ViuLexicalSpan> spans)
     {
-        AddSpan(lineNumber, start, 2, ViuClassificationKind.Operator, occupiedCharacters, spans);
+        AddSpan(lineNumber, start, 2, ViuClassificationKind.Delimiter, occupiedCharacters, spans);
         AddSpan(
             lineNumber,
             start + 2,
             length - 3,
-            ViuClassificationKind.MarkupNode,
+            ViuClassificationKind.FrameworkTag,
             occupiedCharacters,
             spans);
         AddSpan(
             lineNumber,
             start + length - 1,
             1,
-            ViuClassificationKind.Operator,
+            ViuClassificationKind.Delimiter,
             occupiedCharacters,
             spans);
     }
@@ -544,11 +582,12 @@ internal static class ViuLexicalClassifier
         {
             Group nameGroup = match.Groups["name"];
             string attributeName = nameGroup.Value;
+            bool isDirective = IsDirectiveName(attributeName);
             AddSpan(
                 lineNumber,
                 nameGroup.Index,
                 nameGroup.Length,
-                IsDirectiveName(attributeName)
+                isDirective
                     ? ViuClassificationKind.Directive
                     : ViuClassificationKind.MarkupAttribute,
                 occupiedCharacters,
@@ -564,6 +603,16 @@ internal static class ViuLexicalClassifier
                     lineNumber,
                     line,
                     valueGroup,
+                    occupiedCharacters,
+                    spans);
+            }
+            else if (isDirective)
+            {
+                ClassifyBindingExpressionValue(
+                    lineNumber,
+                    line,
+                    valueGroup,
+                    IsEventHandlerDirectiveName(attributeName),
                     occupiedCharacters,
                     spans);
             }
@@ -622,19 +671,11 @@ internal static class ViuLexicalClassifier
         foreach (Match match in TemplateTagExpression.Matches(line))
         {
             Group nameGroup = match.Groups["name"];
-            string tagName = nameGroup.Value;
-            // Viu components are named in PascalCase (or as dotted member expressions); a lowercase
-            // tag is an HTML element or a lowercase built-in. The classifier is lexical — it has no
-            // component registry to consult — so casing is the only signal available, and it is a
-            // reliable one because name resolution is ordinal over the authored spelling ([CMP-6]).
-            // Components therefore borrow the type category so they read as types.
             AddSpan(
                 lineNumber,
                 nameGroup.Index,
                 nameGroup.Length,
-                char.IsAsciiLetterUpper(tagName[0]) || tagName.Contains('.')
-                    ? ViuClassificationKind.Component
-                    : ViuClassificationKind.MarkupNode,
+                GetTagNameClassification(nameGroup.Value),
                 occupiedCharacters,
                 spans);
         }
@@ -643,20 +684,118 @@ internal static class ViuLexicalClassifier
             line,
             lineNumber,
             "<>/=",
-            ViuClassificationKind.Operator,
+            ViuClassificationKind.Delimiter,
             occupiedCharacters,
             spans);
     }
+
+    /// <summary>
+    /// Classifies a tag name by what Viu makes of it at that position.
+    /// </summary>
+    /// <remarks>
+    /// Three outcomes. <c>template</c>, <c>slot</c>, <c>style</c>, and <c>script</c> are the container
+    /// and framework tags Viu itself defines, so they are colored as framework tags wherever they
+    /// appear — a nested <c>&lt;template #header&gt;</c> slot fragment included. A PascalCase or
+    /// dotted name is a component: casing is the only signal a purely lexical classifier has, and it
+    /// is a reliable one because name resolution is ordinal over the authored spelling
+    /// (<c>[CMP-6]</c>). Everything else is an HTML element.
+    /// </remarks>
+    private static ViuClassificationKind GetTagNameClassification(string tagName)
+    {
+        if (tagName.Length == 0)
+        {
+            return ViuClassificationKind.MarkupNode;
+        }
+
+        if (IsFrameworkTagName(tagName))
+        {
+            return ViuClassificationKind.FrameworkTag;
+        }
+
+        return tagName[0] is >= 'A' and <= 'Z' || tagName.IndexOf('.') >= 0
+            ? ViuClassificationKind.Component
+            : ViuClassificationKind.MarkupNode;
+    }
+
+    private static bool IsFrameworkTagName(string tagName) =>
+        tagName is "template" or "slot" or "style" or "script";
 
     private static bool IsDirectiveName(string attributeName)
         => attributeName.Length > 0 &&
            (attributeName[0] is '@' or ':' or '#' ||
             attributeName.StartsWith("v-", StringComparison.Ordinal));
 
+    /// <summary>
+    /// Determines whether a directive attribute's value is an event-handler expression.
+    /// </summary>
+    /// <remarks>
+    /// The check is exact rather than a <c>v-on</c> prefix test, because <c>v-once</c> shares that
+    /// prefix and is not a handler binding.
+    /// </remarks>
+    private static bool IsEventHandlerDirectiveName(string attributeName) =>
+        attributeName.Length > 0 &&
+        (attributeName[0] == '@' ||
+         string.Equals(attributeName, "v-on", StringComparison.Ordinal) ||
+         attributeName.StartsWith("v-on:", StringComparison.Ordinal));
+
+    /// <summary>
+    /// Classifies a directive's quoted value: the quotes stay attribute value, the interior runs the
+    /// C# token passes.
+    /// </summary>
+    /// <remarks>
+    /// A binding value is C# source, so it colors as C# — the same passes the <c>@script</c> block and
+    /// interpolation interiors use. Only <c>class</c> values are exempt; they are handled by
+    /// <see cref="ClassifyUtilityClassValue"/>.
+    /// </remarks>
+    private static void ClassifyBindingExpressionValue(
+        int lineNumber,
+        string line,
+        Group valueGroup,
+        bool isEventHandler,
+        bool[] occupiedCharacters,
+        List<ViuLexicalSpan> spans)
+    {
+        int valueStart = valueGroup.Index;
+        int valueEnd = valueStart + valueGroup.Length;
+
+        AddSpan(
+            lineNumber,
+            valueStart,
+            1,
+            ViuClassificationKind.MarkupAttributeValue,
+            occupiedCharacters,
+            spans);
+        AddSpan(
+            lineNumber,
+            valueEnd - 1,
+            1,
+            ViuClassificationKind.MarkupAttributeValue,
+            occupiedCharacters,
+            spans);
+
+        int interiorLength = valueGroup.Length - 2;
+        if (interiorLength > 0)
+        {
+            ClassifyCSharpTokens(
+                line,
+                lineNumber,
+                valueStart + 1,
+                interiorLength,
+                occupiedCharacters,
+                spans,
+                isEventHandler
+                    ? ViuClassificationKind.Method
+                    : ViuClassificationKind.Identifier);
+        }
+    }
+
     // Splits a class attribute value into utility tokens: quotes keep the plain value category, each
     // leading "variant:" segment (colon included) is a utility variant, and the remainder — with
     // [...] arbitrary values never split on their inner colons — is the utility class. Purely
-    // lexical: candidate validation stays in the language server (docs/DESIGN.md).
+    // lexical: candidate validation stays in the language server (docs/DESIGN.md). All three
+    // categories share one classification type, so a class attribute reads as a single value; the
+    // kinds stay distinct because the language server and the Visual Studio Code grammar act on the
+    // distinction.
     private static void ClassifyUtilityClassValue(
         int lineNumber,
         string line,
@@ -803,17 +942,50 @@ internal static class ViuLexicalClassifier
         ClassifyCSharpTokens(line, lineNumber, 0, line.Length, occupiedCharacters, spans);
     }
 
-    // The C# token passes shared by the @script section and template interpolation interiors
-    // (strings, keywords, methods, types, numbers, punctuation, operators — the comment state
-    // machine deliberately excluded). The window bounds keep interpolation classification inside
-    // the mustache delimiters.
+    /// <summary>
+    /// The C# token passes, shared by the <c>@script</c> section, template interpolation interiors,
+    /// and binding-expression interiors (strings, keywords, methods, types, numbers, punctuation,
+    /// operators — the comment state machine deliberately excluded).
+    /// </summary>
+    /// <param name="line">The line being classified.</param>
+    /// <param name="lineNumber">Zero-based line number.</param>
+    /// <param name="windowStart">Offset of the first character the passes may claim.</param>
+    /// <param name="windowLength">Number of characters the passes may claim.</param>
+    /// <param name="occupiedCharacters">Per-character claim map for the line.</param>
+    /// <param name="spans">Accumulator the passes append to.</param>
+    /// <param name="bareIdentifierKind">
+    /// What an identifier that no earlier pass claimed should become, or <see langword="null"/> to
+    /// leave bare identifiers to the type pass.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// The window bounds keep interpolation and binding classification inside their delimiters.
+    /// </para>
+    /// <para>
+    /// The method-position rule has two halves. Call syntax — an identifier immediately followed by
+    /// <c>(</c> — is a method wherever a C# pass runs, the <c>@script</c> block included. In an
+    /// event-handler value the handler slot itself is a method position too, so a bare identifier
+    /// there is a method even without parentheses: <c>@click="Increment"</c> names a method exactly as
+    /// <c>@click="Increment()"</c> does. An identifier followed by <c>.</c> is a receiver rather than
+    /// the handler, so <c>@click="ViewModel.Increment"</c> still colors its two halves apart.
+    /// </para>
+    /// <para>
+    /// A plain binding (<c>:value="Count"</c>, <c>v-if="Visible"</c>) names component state, so its
+    /// bare identifiers stay identifiers. That is why <paramref name="bareIdentifierKind"/> exists at
+    /// all: without it the PascalCase-is-a-type heuristic below would color every bound property as a
+    /// type. The heuristic still runs unchanged in the <c>@script</c> block and in interpolation
+    /// interiors, which are general C# where a PascalCase name really is usually a type; a binding
+    /// value is the one position where the leading name is a member by construction.
+    /// </para>
+    /// </remarks>
     private static void ClassifyCSharpTokens(
         string line,
         int lineNumber,
         int windowStart,
         int windowLength,
         bool[] occupiedCharacters,
-        List<ViuLexicalSpan> spans)
+        List<ViuLexicalSpan> spans,
+        ViuClassificationKind? bareIdentifierKind = null)
     {
         string window = windowStart == 0 && windowLength == line.Length
             ? line
@@ -847,6 +1019,27 @@ internal static class ViuLexicalClassifier
                 spans);
         }
 
+        if (bareIdentifierKind is { } identifierKind)
+        {
+            foreach (Match match in ScriptIdentifierExpression.Matches(window))
+            {
+                int afterMatch = match.Index + match.Length;
+                if (afterMatch < window.Length && window[afterMatch] == '.')
+                {
+                    // A receiver, not the bound member: leave it to the type pass.
+                    continue;
+                }
+
+                AddSpan(
+                    lineNumber,
+                    windowStart + match.Index,
+                    match.Length,
+                    identifierKind,
+                    occupiedCharacters,
+                    spans);
+            }
+        }
+
         ClassifyWindowMatches(
             lineNumber,
             windowStart,
@@ -865,7 +1058,7 @@ internal static class ViuLexicalClassifier
 
         for (int characterIndex = windowStart; characterIndex < windowStart + windowLength; characterIndex++)
         {
-            if ("{}[]();,.<>".IndexOf(line[characterIndex], StringComparison.Ordinal) >= 0)
+            if ("{}[]();,.<>".IndexOf(line[characterIndex]) >= 0)
             {
                 AddSpan(
                     lineNumber,
@@ -879,7 +1072,7 @@ internal static class ViuLexicalClassifier
 
         for (int characterIndex = windowStart; characterIndex < windowStart + windowLength; characterIndex++)
         {
-            if ("+-*/%=!&|?:".IndexOf(line[characterIndex], StringComparison.Ordinal) >= 0)
+            if ("+-*/%=!&|?:".IndexOf(line[characterIndex]) >= 0)
             {
                 AddSpan(
                     lineNumber,
@@ -937,14 +1130,14 @@ internal static class ViuLexicalClassifier
         foreach (Match match in StylePropertyExpression.Matches(line))
         {
             Group nameGroup = match.Groups["name"];
-            // Custom properties ("--name") are the theme's tokens; they borrow the type category so
-            // they stand apart from ordinary declarations.
+            // Custom properties ("--name") are the theme's tokens and carry their own classification
+            // so they stand apart from ordinary declarations, which share the attribute color.
             AddSpan(
                 lineNumber,
                 nameGroup.Index,
                 nameGroup.Length,
                 nameGroup.Value.StartsWith("--", StringComparison.Ordinal)
-                    ? ViuClassificationKind.Type
+                    ? ViuClassificationKind.StyleCustomProperty
                     : ViuClassificationKind.MarkupAttribute,
                 occupiedCharacters,
                 spans);
@@ -957,7 +1150,7 @@ internal static class ViuLexicalClassifier
                 lineNumber,
                 selectorGroup.Index,
                 selectorGroup.Length,
-                ViuClassificationKind.MarkupNode,
+                ViuClassificationKind.StyleSelector,
                 occupiedCharacters,
                 spans);
         }
@@ -1080,7 +1273,7 @@ internal static class ViuLexicalClassifier
     {
         for (int characterIndex = 0; characterIndex < line.Length; characterIndex++)
         {
-            if (characters.IndexOf(line[characterIndex], StringComparison.Ordinal) >= 0)
+            if (characters.IndexOf(line[characterIndex]) >= 0)
             {
                 AddSpan(
                     lineNumber,
@@ -1119,7 +1312,7 @@ internal static class ViuLexicalClassifier
     }
 
     private static bool IsTagNameCharacter(char character)
-        => char.IsAsciiLetterOrDigit(character) || character is '-' or '_';
+        => character is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_';
 
     private static void AddSpan(
         int lineNumber,
@@ -1138,7 +1331,7 @@ internal static class ViuLexicalClassifier
         }
 
         spans.Add(new(lineNumber, start, length, classificationKind));
-        Array.Fill(occupiedCharacters, true, start, length);
+        Occupy(occupiedCharacters, start, length);
     }
 
     private static bool IsAvailable(
@@ -1155,5 +1348,13 @@ internal static class ViuLexicalClassifier
         }
 
         return true;
+    }
+
+    private static void Occupy(bool[] occupiedCharacters, int start, int length)
+    {
+        for (int characterIndex = start; characterIndex < start + length; characterIndex++)
+        {
+            occupiedCharacters[characterIndex] = true;
+        }
     }
 }

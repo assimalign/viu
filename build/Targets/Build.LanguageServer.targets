@@ -205,11 +205,16 @@
          scope (the project's existing Content), not over the files the glob just matched - which
          stamped 'language-server.json' onto the server executables' Link, flattened the runtime
          folders out of the VSIX, and made the extension deploy a payload the provider cannot find. -->
+    <!-- IncludeInVSIX is what carries the payload into the package: GetVsixSourceItems collects
+         Content items marked with it and derives each entry's VSIX subpath from the directory name
+         of its Link, which is why the Link above is load-bearing. The metadata is inert for any
+         other consumer of this target. -->
     <ItemGroup>
       <_ViuLanguageServerPayloadFile Include="$(ViuLanguageServerPublishPath)\**\*" />
       <Content Include="@(_ViuLanguageServerPayloadFile)"
                Link="LanguageServer\%(_ViuLanguageServerPayloadFile.RecursiveDir)%(_ViuLanguageServerPayloadFile.Filename)%(_ViuLanguageServerPayloadFile.Extension)"
-               CopyToOutputDirectory="PreserveNewest" />
+               CopyToOutputDirectory="PreserveNewest"
+               IncludeInVSIX="true" />
     </ItemGroup>
   </Target>
 

@@ -34,18 +34,50 @@
         </_ViuPackage>
         <_ViuPackage Include="Microsoft.Build.Locator" Version="1.11.2" />
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" Version="1.1.4" />
-        <!-- The Visual Studio client remains a thin out-of-process adapter. Keep both packages on
-             the same release line because the build package generates the extension manifest for
-             the corresponding VisualStudio.Extensibility SDK surface. -->
-        <_ViuPackage Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" />
-        <_ViuPackage Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" />
-        <!-- Classic VSSDK packaging for Assimalign.Viu.VisualStudio.Registration, the companion
-             VSIX whose only payload is the .pkgdef claiming the .viu file extension. Its targets
-             run under Visual Studio's MSBuild only, which is why that project stays out of
-             Assimalign.Viu.slnx and builds through extensions\VisualStudio\Build.Registration.ps1. -->
+        <!-- Classic VSSDK packaging for the in-process Visual Studio extension and its companion
+             registration VSIX. Its targets run under Visual Studio's MSBuild only, which is why
+             both projects stay out of Assimalign.Viu.slnx and build through the scripts in
+             extensions\VisualStudio\. -->
         <_ViuPackage Include="Microsoft.VSSDK.BuildTools" Version="17.14.2120">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </_ViuPackage>
+        <!-- The editor contracts the in-process MEF parts of Assimalign.Viu.VisualStudio compile
+             against: content types and ordering metadata (CoreUtility), the buffer/snapshot model
+             (Text.Data), classification (Text.Logic), and the WPF format definitions that carry the
+             Viu palette (Text.UI.Wpf). Pinned at 17.14 because that is the floor the VSIX manifest
+             declares; Visual Studio supplies the implementations, so runtime assets are excluded and
+             nothing from these packages enters the container. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.CoreUtility" Version="17.14.249">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <_ViuPackage Include="Microsoft.VisualStudio.Text.Data" Version="17.14.249">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <_ViuPackage Include="Microsoft.VisualStudio.Text.Logic" Version="17.14.249">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <_ViuPackage Include="Microsoft.VisualStudio.Text.UI.Wpf" Version="17.14.249">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <!-- Text.UI.Wpf asks for an Imaging.Interop.14.0.DesignTime build that was never published,
+             so NuGet resolves upward and warns (NU1603). Pinning the transitive dependency on the
+             same 17.14 line makes the resolution explicit instead of approximate. -->
+        <_ViuPackage Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" Version="17.14.40254">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </_ViuPackage>
+        <!-- ViuLanguageServerConfiguration parses language-server.json. On the .NET Framework line a
+             classic VSIX compiles against, System.Text.Json is a package rather than part of the
+             framework; devenv.exe.config redirects the whole 0.0.0.0-10.x range onto the copy
+             Visual Studio ships, so only compile assets are taken and the VSIX carries none of it. -->
+        <_ViuPackage Include="System.Text.Json" Version="9.0.13">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
         </_ViuPackage>
     </ItemGroup>
 

@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using Microsoft.VisualStudio.Extensibility.Editor;
-
 using Shouldly;
 
 using Xunit;
@@ -31,7 +29,7 @@ public class ViuLexicalClassifierTests
 
         IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
 
-        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.Keyword);
+        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupNode);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupAttribute);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupAttributeValue);
@@ -39,6 +37,23 @@ public class ViuLexicalClassifierTests
         ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.Type);
         ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.Method);
         ClassificationsOnLine(spans, 7).ShouldContain(ViuClassificationKind.MarkupAttribute);
+    }
+
+    [Fact]
+    public void Classify_LegacyScriptHeader_KeepsTheKeywordClassification()
+    {
+        // The @script header introduces C#, so it stays in the C# keyword color rather than joining
+        // the framework-tag palette its @template/@style siblings use for their containers.
+        string[] lines =
+        [
+            "@script {",
+            "}",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 0, ViuClassificationKind.Keyword).ShouldBe(["@script"]);
+        ClassificationsOnLine(spans, 0).ShouldNotContain(ViuClassificationKind.FrameworkTag);
     }
 
     [Fact]
@@ -61,20 +76,20 @@ public class ViuLexicalClassifierTests
 
         IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
 
-        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupNode);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupAttribute);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupAttributeValue);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.Directive);
-        ClassificationsOnLine(spans, 2).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 2).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 3).ShouldContain(ViuClassificationKind.Keyword);
         ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.Keyword);
         ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.Type);
         ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.Method);
-        ClassificationsOnLine(spans, 6).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 6).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 6).ShouldContain(ViuClassificationKind.MarkupAttribute);
         ClassificationsOnLine(spans, 7).ShouldContain(ViuClassificationKind.MarkupAttribute);
-        ClassificationsOnLine(spans, 8).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 8).ShouldContain(ViuClassificationKind.FrameworkTag);
     }
 
     [Fact]
@@ -103,37 +118,48 @@ public class ViuLexicalClassifierTests
     }
 
     [Fact]
-    public void Classify_PascalCaseTemplateTag_ClassifiesAsComponent()
+    public void Classify_TagNames_SplitFrameworkTagsElementsAndComponents()
     {
-        // Viu components are named in PascalCase; a plain lowercase name is an HTML element or a
-        // lowercase built-in. Casing is the only signal a lexical classifier has ([CMP-6]).
-        string[] lines =
-        [
-            "<template>",
-            "    <RouterView></RouterView>",
-            "</template>",
-        ];
-
-        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
-
-        ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.Component);
-        ClassificationsOnLine(spans, 1).ShouldNotContain(ViuClassificationKind.MarkupNode);
-    }
-
-    [Fact]
-    public void Classify_LowercaseTemplateTag_ClassifiesAsMarkupNode()
-    {
+        // Three ownership classes, decided lexically. template/slot/style/script are Viu's own tags
+        // wherever they appear; a PascalCase or dotted name is a component ([CMP-6]); everything else
+        // is an HTML element.
         string[] lines =
         [
             "<template>",
             "    <div><slot /></div>",
+            "    <RouterView></RouterView>",
+            "    <Layout.Header />",
             "</template>",
         ];
 
         IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
 
-        ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupNode);
-        ClassificationsOnLine(spans, 1).ShouldNotContain(ViuClassificationKind.Component);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.MarkupNode).ShouldBe(["div", "div"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.FrameworkTag).ShouldBe(["slot"]);
+        SpanTexts(spans, lines, 2, ViuClassificationKind.Component)
+            .ShouldBe(["RouterView", "RouterView"]);
+        SpanTexts(spans, lines, 3, ViuClassificationKind.Component).ShouldBe(["Layout.Header"]);
+        SpanTexts(spans, lines, 0, ViuClassificationKind.FrameworkTag).ShouldBe(["template"]);
+        SpanTexts(spans, lines, 4, ViuClassificationKind.FrameworkTag).ShouldBe(["template"]);
+    }
+
+    [Fact]
+    public void Classify_TagPunctuation_ClassifiesAsDelimiterRatherThanOperator()
+    {
+        // Tag punctuation carries its own muted classification so structure recedes behind names;
+        // '=' between an attribute and its value belongs to the same family.
+        string[] lines =
+        [
+            "<template>",
+            "    <div id=\"root\" />",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Delimiter).ShouldBe(["<", "=", "/", ">"]);
+        ClassificationsOnLine(spans, 1).ShouldNotContain(ViuClassificationKind.Operator);
+        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.Delimiter);
     }
 
     [Fact]
@@ -154,6 +180,81 @@ public class ViuLexicalClassifierTests
         directiveTexts.ShouldContain("@click");
         directiveTexts.ShouldContain("#header");
         directiveTexts.ShouldContain("v-else");
+    }
+
+    [Fact]
+    public void Classify_EventHandlerBinding_ClassifiesTheBareIdentifierAsMethod()
+    {
+        // The handler slot of an event binding is a method position, with or without parentheses.
+        string[] lines =
+        [
+            "<template>",
+            "    <button @click=\"Increment\" v-on:input=\"Handle\"></button>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Method)
+            .ShouldBe(["Increment", "Handle"]);
+    }
+
+    [Fact]
+    public void Classify_EventHandlerBindingWithReceiver_LeavesTheReceiverToTheTypePass()
+    {
+        string[] lines =
+        [
+            "<template>",
+            "    <button @click=\"ViewModel.Increment\"></button>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Method).ShouldBe(["Increment"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Type).ShouldBe(["ViewModel"]);
+    }
+
+    [Fact]
+    public void Classify_PlainBinding_KeepsIdentifiersAsIdentifiers()
+    {
+        // A plain binding names component state, not a method and not a type. Call syntax is still a
+        // method position anywhere a C# pass runs, so Format(...) stays a method here.
+        string[] lines =
+        [
+            "<template>",
+            "    <p :value=\"Count\" v-if=\"Visible\" :text=\"Format(Count)\"></p>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        string[] identifierTexts = SpanTexts(spans, lines, 1, ViuClassificationKind.Identifier);
+        identifierTexts.ShouldContain("Count");
+        identifierTexts.ShouldContain("Visible");
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Method).ShouldBe(["Format"]);
+    }
+
+    [Fact]
+    public void Classify_BindingExpressionInterior_RunsTheCSharpTokenPasses()
+    {
+        // A binding value is C# source: its strings, numbers, keywords, and operators color as C#,
+        // and only the quotes stay part of the attribute value.
+        string[] lines =
+        [
+            "<template>",
+            "    <p :text='Count > 2 ? \"more\" : null'></p>",
+            "</template>",
+        ];
+
+        IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
+
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Number).ShouldBe(["2"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.String).ShouldBe(["\"more\""]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Keyword).ShouldBe(["null"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.Identifier).ShouldBe(["Count"]);
+        SpanTexts(spans, lines, 1, ViuClassificationKind.MarkupAttributeValue)
+            .ShouldBe(["'", "'"]);
     }
 
     [Fact]
@@ -178,6 +279,9 @@ public class ViuLexicalClassifierTests
     [Fact]
     public void Classify_ClassAttribute_SplitsUtilityVariantsAndClasses()
     {
+        // The lexer keeps variants and classes apart because the language server and the Visual
+        // Studio Code grammar act on the distinction; the Visual Studio palette deliberately maps
+        // both onto the attribute-value color, which ViuClassificationTypeNamesTests pins.
         string[] lines =
         [
             "<template>",
@@ -211,10 +315,10 @@ public class ViuLexicalClassifierTests
 
         IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
 
-        ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.Directive);
         ClassificationsOnLine(spans, 2).ShouldContain(ViuClassificationKind.MarkupNode);
-        ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 4).ShouldContain(ViuClassificationKind.FrameworkTag);
         spans.Where(span => span.LineNumber == 4)
             .ShouldAllBe(span => span.Start < "</template>".Length);
         ClassificationsOnLine(spans, 5).ShouldBeEmpty();
@@ -234,59 +338,15 @@ public class ViuLexicalClassifierTests
 
         IReadOnlyList<ViuLexicalSpan> spans = ViuLexicalClassifier.Classify(lines);
 
-        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 0).ShouldContain(ViuClassificationKind.MarkupAttribute);
-        // Custom properties borrow the type category so theme tokens stand apart from ordinary
-        // declarations.
-        ClassificationsOnLine(spans, 1).ShouldContain(ViuClassificationKind.Type);
+        // Custom properties are the theme's tokens and carry their own classification.
+        SpanTexts(spans, lines, 1, ViuClassificationKind.StyleCustomProperty)
+            .ShouldBe(["--brand-color"]);
+        SpanTexts(spans, lines, 2, ViuClassificationKind.StyleSelector).ShouldBe(["button "]);
         ClassificationsOnLine(spans, 2).ShouldContain(ViuClassificationKind.MarkupAttribute);
-        ClassificationsOnLine(spans, 3).ShouldContain(ViuClassificationKind.MarkupNode);
+        ClassificationsOnLine(spans, 3).ShouldContain(ViuClassificationKind.FrameworkTag);
         ClassificationsOnLine(spans, 4).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void GetClassificationType_Method_UsesVisualStudioSupportedIdentifierClassification()
-    {
-        ClassificationType classificationType =
-            ViuClassificationTagger.GetClassificationType(ViuClassificationKind.Method);
-
-        classificationType.ShouldBe(ClassificationType.KnownValues.Identifier);
-    }
-
-    [Fact]
-    public void GetClassificationType_Punctuation_UsesBaseEditorOperatorClassification()
-    {
-        ClassificationType classificationType =
-            ViuClassificationTagger.GetClassificationType(ViuClassificationKind.Punctuation);
-
-        classificationType.ShouldBe(ClassificationType.KnownValues.Operator);
-    }
-
-    [Fact]
-    public void GetClassificationType_Component_UsesTypeClassification()
-    {
-        ClassificationType classificationType =
-            ViuClassificationTagger.GetClassificationType(ViuClassificationKind.Component);
-
-        classificationType.ShouldBe(ClassificationType.KnownValues.Type);
-    }
-
-    [Fact]
-    public void GetClassificationType_Directive_UsesKeywordClassification()
-    {
-        ClassificationType classificationType =
-            ViuClassificationTagger.GetClassificationType(ViuClassificationKind.Directive);
-
-        classificationType.ShouldBe(ClassificationType.KnownValues.Keyword);
-    }
-
-    [Fact]
-    public void GetClassificationType_UtilityClass_UsesStringClassification()
-    {
-        ClassificationType classificationType =
-            ViuClassificationTagger.GetClassificationType(ViuClassificationKind.UtilityClass);
-
-        classificationType.ShouldBe(ClassificationType.KnownValues.String);
     }
 
     private static ViuClassificationKind[] ClassificationsOnLine(

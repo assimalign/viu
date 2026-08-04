@@ -4,13 +4,11 @@
         <TargetFrameworkForAnalyzers>netstandard2.0</TargetFrameworkForAnalyzers>
         <TargetFrameworkForLibraries>$(TargetFrameworkLatest)</TargetFrameworkForLibraries>
         <TargetFrameworkForSdks>$(TargetFrameworkLatest)</TargetFrameworkForSdks>
-        <!-- VisualStudio.Extensibility executes out of process on the Visual Studio-supported
-             Windows runtime. The language server stays editor-neutral on the repository TFM. -->
-        <TargetFrameworkForVisualStudioExtensions>net8.0-windows8.0</TargetFrameworkForVisualStudioExtensions>
-        <TargetFrameworkForVisualStudioExtensionTests>net9.0-windows8.0</TargetFrameworkForVisualStudioExtensionTests>
-        <!-- A classic VSSDK package (Assimalign.Viu.VisualStudio.Registration, the companion that
-             claims the .viu file extension) loads inside devenv.exe and therefore lives on the
-             .NET Framework line, whatever its payload. -->
+        <!-- A classic VSSDK package loads inside devenv.exe and therefore lives on the .NET
+             Framework line, whatever its payload. Both Visual Studio packages are classic:
+             Assimalign.Viu.VisualStudio (MEF editor parts and the .viu file-extension claim) and the
+             Assimalign.Viu.VisualStudio.Registration companion. The language server stays
+             editor-neutral, out of process, and on the repository TFM. -->
         <TargetFrameworkForVisualStudioClassicExtensions>net48</TargetFrameworkForVisualStudioClassicExtensions>
         <TargetFrameworkForLanguageServers>$(TargetFrameworkLatest)</TargetFrameworkForLanguageServers>
         <!--

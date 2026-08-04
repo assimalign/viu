@@ -455,8 +455,18 @@ jobs:
           -Configuration Release
           -Version $env:VIU_VSIX_VERSION
 
-      - name: Test language tooling
-        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx --configuration Release
+      # Named individually rather than handing over Assimalign.Viu.VisualStudio.slnx: that solution
+      # also carries the extension itself, a classic in-process VSSDK package whose .NET Framework
+      # build tasks cannot load under `dotnet`. Build.ps1 above packages it through Visual Studio's
+      # MSBuild.
+      - name: Test language service
+        run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageService/test/Assimalign.Viu.Tooling.LanguageService.Tests.csproj --configuration Release
+
+      - name: Test language server
+        run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageServer/test/Assimalign.Viu.Tooling.LanguageServer.Tests.csproj --configuration Release
+
+      - name: Test Visual Studio extension
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release
 
       - name: Validate and stage Marketplace preview
         shell: pwsh

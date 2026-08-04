@@ -166,9 +166,13 @@
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/">
 		<File Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md" />
 	</Folder>
-	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/src/">
-		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/src/Assimalign.Viu.VisualStudio.csproj" />
-	</Folder>
+	<!-- extensions/VisualStudio/Assimalign.Viu.VisualStudio/src is deliberately absent: it is a
+	     classic in-process VSSDK package whose build tasks are .NET Framework MSBuild tasks, and
+	     this solution is gated by `dotnet build`. It lives in
+	     extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx and is built by
+	     extensions/VisualStudio/Build.ps1 through Visual Studio's MSBuild. Its test project stays
+	     here, because it compiles the editor-free sources through <Compile Include> links rather
+	     than referencing the package. -->
 	<Folder Name="/viu/extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/">
 		<Project Path="extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj" />
 	</Folder>

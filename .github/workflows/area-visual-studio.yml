@@ -1,5 +1,5 @@
-# Windows-only build and test for the out-of-process Visual Studio client and
-# its editor-neutral Viu language server. Publishing belongs to release.yml.
+# Windows-only build and test for the in-process Visual Studio client and
+# its editor-neutral, out-of-process Viu language server. Publishing belongs to release.yml.
 name: area-visual-studio
 
 on:
@@ -89,8 +89,19 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-LanguageServerSemanticRoundTrip.ps1 -Configuration Release
 
-      - name: Test language tooling
-        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio.slnx --configuration Release
+      # The test projects are named individually rather than handing over
+      # Assimalign.Viu.VisualStudio.slnx: that solution also carries the extension itself, which is a
+      # classic in-process VSSDK package whose build tasks are .NET Framework MSBuild tasks and
+      # cannot load under `dotnet`. The extension is built and packaged by Build.ps1 above, through
+      # Visual Studio's MSBuild.
+      - name: Test language service
+        run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageService/test/Assimalign.Viu.Tooling.LanguageService.Tests.csproj --configuration Release
+
+      - name: Test language server
+        run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageServer/test/Assimalign.Viu.Tooling.LanguageServer.Tests.csproj --configuration Release
+
+      - name: Test Visual Studio extension
+        run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release
 
       - name: Inspect packaged VSIX
         shell: pwsh

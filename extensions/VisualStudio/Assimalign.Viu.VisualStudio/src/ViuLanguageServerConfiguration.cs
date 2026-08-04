@@ -64,8 +64,11 @@ internal sealed class ViuLanguageServerConfiguration
         {
             foreach (JsonElement argumentElement in argumentsElement.EnumerateArray())
             {
+                // The explicit null test is what the compiler reads: the .NET Framework reference
+                // assemblies this extension compiles against carry no nullable annotations, so the
+                // NotNullWhen contract on IsNullOrWhiteSpace is not visible here.
                 string? argument = argumentElement.GetString();
-                if (!string.IsNullOrWhiteSpace(argument))
+                if (argument is not null && !string.IsNullOrWhiteSpace(argument))
                 {
                     arguments.Add(argument);
                 }
@@ -89,13 +92,16 @@ internal sealed class ViuLanguageServerConfiguration
         string normalizedExtensionDirectory = Path.GetFullPath(extensionDirectory);
         string executablePath = Path.GetFullPath(
             Path.Combine(normalizedExtensionDirectory, relativeExecutablePath));
-        string relativePath = Path.GetRelativePath(normalizedExtensionDirectory, executablePath);
 
-        if (Path.IsPathRooted(relativePath) ||
-            relativePath.Equals("..", StringComparison.Ordinal) ||
-            relativePath.StartsWith(
-                $"..{Path.DirectorySeparatorChar}",
-                StringComparison.Ordinal))
+        // Containment is checked by prefix over two normalized absolute paths. A rooted configured
+        // path, a '..' escape, and a sibling directory that merely starts with the same characters
+        // are all rejected, because the prefix always ends in a directory separator.
+        string containmentPrefix = normalizedExtensionDirectory.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+
+        if (!executablePath.StartsWith(containmentPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException(
                 "The Viu language-server executable must remain inside the extension directory.");
@@ -118,7 +124,7 @@ internal sealed class ViuLanguageServerConfiguration
         }
 
         string? executablePath = executablePathElement.GetString();
-        return string.IsNullOrWhiteSpace(executablePath)
+        return executablePath is null || string.IsNullOrWhiteSpace(executablePath)
             ? defaultExecutablePath
             : executablePath;
     }

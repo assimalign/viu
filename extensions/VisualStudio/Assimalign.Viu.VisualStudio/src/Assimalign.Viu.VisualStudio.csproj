@@ -1,6 +1,35 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<!--
+  The Viu Visual Studio extension: a classic, in-process VSSDK package.
+
+  Why in process. The editor surface Viu needs - a content type it owns, its own classification
+  types, and the format definitions that give them colors and bold - exists only as MEF exports
+  inside devenv.exe. The out-of-process VisualStudio.Extensibility model this project used before
+  has no equivalent: it can only borrow the editor's built-in categories, so a Viu palette was
+  impossible there, and its remote tag bridge rejected names as ordinary as Roslyn's `method`.
+  Nothing semantic moved in process with this change: the language server remains a separate stdio
+  executable (tooling\Assimalign.Viu.Tooling.LanguageServer), so Roslyn and the Viu parsers still
+  never load into devenv.exe. See docs\DESIGN.md.
+
+  The Sdk attribute is spelled out as explicit Sdk.props/Sdk.targets imports because
+  Microsoft.VsSDK.targets must be imported AFTER the .NET SDK's own targets, which the attribute
+  form makes impossible. Microsoft.VSSDK.BuildTools contributes only $(VSToolsPath) through its
+  NuGet props; the VSIX packaging targets themselves are imported by hand, exactly as the classic
+  VSIX project template does.
+
+  This project is deliberately absent from Assimalign.Viu.slnx: the VSSDK build tasks are .NET
+  Framework MSBuild tasks that cannot load under `dotnet build`, which gates that solution. It stays
+  in Assimalign.Viu.VisualStudio.slnx for Visual Studio work and is built by
+  extensions\VisualStudio\Build.ps1, which locates Visual Studio's MSBuild through vswhere. Its test
+  project cannot reference it either, and compiles the editor-free sources through <Compile Include>
+  links instead - see test\Assimalign.Viu.VisualStudio.Tests.csproj.
+-->
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
   <PropertyGroup>
-    <TargetFramework>$(TargetFrameworkForVisualStudioExtensions)</TargetFramework>
+    <TargetFramework>$(TargetFrameworkForVisualStudioClassicExtensions)</TargetFramework>
+    <!-- The repository default emits [assembly: RequiresPreviewFeatures], whose attribute does not
+         exist on the .NET Framework surface every classic VSIX compiles against. -->
     <EnablePreviewFeatures>false</EnablePreviewFeatures>
     <IsPackable>false</IsPackable>
     <NeutralLanguage>en-US</NeutralLanguage>
@@ -19,12 +48,82 @@
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Produce the .vsix, but never deploy to an experimental hive from a command-line build. -->
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <DeployExtension>false</DeployExtension>
+    <!-- The pkgdef is authored by hand, not generated from ProvideX registration attributes: the
+         extension contributes MEF parts and a file-extension claim, and has no VSPackage class to
+         attribute. -->
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+    <!-- Visual Studio supplies every assembly this extension compiles against, so nothing copy-local
+         belongs in the container. The package's own payload is its MEF assembly, the pkgdef,
+         language-server.json, and the two language-server executables. -->
+    <IncludeCopyLocalReferencesInVSIXContainer>false</IncludeCopyLocalReferencesInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ViuPackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" PrivateAssets="all" />
-    <ViuPackageReference Include="Microsoft.VisualStudio.Extensibility.Build" PrivateAssets="all" />
+    <!-- Versions and asset flags come from build\Targets\Build.References.Packages.targets. The
+         editor packages are compile-only: Visual Studio owns the implementations at run time. -->
+    <ViuPackageReference Include="Microsoft.VSSDK.BuildTools" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.CoreUtility" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Text.Data" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Text.Logic" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
+    <ViuPackageReference Include="Microsoft.VisualStudio.Imaging.Interop.14.0.DesignTime" />
+    <ViuPackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="language-server.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- MEF composition and the WPF types the classification format definitions are built from.
+         UseWPF is a .NET Core-and-later switch, so on the .NET Framework line the two presentation
+         assemblies are referenced directly. -->
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- ViuLexicalSpan is a record struct, and the .NET Framework does not ship IsExternalInit. This
+         is the repository's single authoritative copy of the shim, linked (still internal) exactly
+         as the netstandard2.0 parser projects link it; its path is frozen. -->
+    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs"
+             Link="Shims\IsExternalInit.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Both files are already in the SDK's default None glob; they are removed and re-declared so
+         the VSSDK metadata is explicit rather than layered onto an implicit item. -->
+    <None Remove="source.extension.vsixmanifest" />
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+    <!-- GetVsixSourceItems honours IncludeInVSIX only on Content items. -->
+    <None Remove="Assimalign.Viu.VisualStudio.pkgdef" />
+    <Content Include="Assimalign.Viu.VisualStudio.pkgdef">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="language-server.json">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!--
+    Resolves the |Assimalign.Viu.VisualStudio;GetVsixVersion| token in source.extension.vsixmanifest.
+    The VSSDK has no built-in version token: the bare |ProjectName| form substitutes the built
+    assembly's file name, not a version. Returning VersionPrefix keeps the VSIX version on the
+    ordinary .NET version properties, so Build.ps1 -Version reaches the manifest through the same
+    central versioning every other Viu artifact uses.
+  -->
+  <Target Name="GetVsixVersion" Returns="$(_ViuExtensionVsixVersion)">
+    <PropertyGroup>
+      <_ViuExtensionVsixVersion>$(VersionPrefix)</_ViuExtensionVsixVersion>
+    </PropertyGroup>
+  </Target>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
 </Project>

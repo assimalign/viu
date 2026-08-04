@@ -1393,8 +1393,11 @@ the after-hook, so it receives the resolved value; faults run error hooks and th
 
 ## 14. The tooling and editor contract
 
-`[TOOL-1]` Editor support is an **out-of-process** `VisualStudio.Extensibility` thin client plus a
-**standalone Language Server Protocol process**. The chain is
+`[TOOL-1]` Editor support is a **thin editor client** plus a **standalone Language Server Protocol
+process**. The client is in process in Visual Studio, because the editor surfaces a Viu palette needs
+— content types, classification types, and format definitions — exist only as MEF exports inside the
+IDE. Nothing semantic follows it in: the parsers and Roslyn stay behind the protocol boundary, in a
+process the IDE does not host. The chain is
 `Assimalign.Viu.VisualStudio → Assimalign.Viu.Tooling.LanguageServer → Assimalign.Viu.Tooling.LanguageService →
 {Syntax.SingleFileComponent, Tooling.SingleFileComponent, Tooling.UtilityCss}`.
 
@@ -1402,10 +1405,12 @@ the after-hook, so it receives the resolved value; faults run error hooks and th
 ordinal-identical generated source, hint names, and diagnostics for both hosts [SFC-PIPE-2]. The
 `DocumentationMode` seam is the only sanctioned divergence [SFC-PIPE-3].
 
-`[TOOL-3]` **The classification ceiling is architectural.** The out-of-process model cannot define
-custom classification types or format definitions, so every token borrows a built-in category and
-the user's theme owns the colors. LSP semantic tokens share the same ceiling. A bespoke palette
-would require an in-process editor component, which this architecture deliberately rejects.
+`[TOOL-3]` **Classification is split by ownership.** Kinds a C# token pass can emit resolve the
+classification types the editor and its managed-language service already register, so script blocks,
+interpolation interiors, and binding-expression interiors inherit the user's own C# colors. Template,
+markup, and style constructs resolve **Viu-owned classification types**, each registered with a
+user-editable format definition carrying a Viu default. Resolution is defensive: a name the host does
+not register degrades along a fixed fallback chain rather than dropping the span.
 
 `[TOOL-4]` `@script` completion has two tiers, neither of which loads a Roslyn workspace: a
 syntax-only parse of the script block for declared members, and — when the host supplies a restored
