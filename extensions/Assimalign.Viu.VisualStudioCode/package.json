@@ -1,0 +1,98 @@
+{
+  "name": "viu",
+  "displayName": "Viu",
+  "description": "Language support for Viu single-file components (.viu): syntax highlighting and the Viu language server.",
+  "version": "0.1.0",
+  "publisher": "assimalign",
+  "license": "MIT",
+  "preview": true,
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/assimalign/viu.git",
+    "directory": "extensions/Assimalign.Viu.VisualStudioCode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "viu",
+    "dotnet",
+    "csharp",
+    "webassembly",
+    "single-file component"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:viu"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "viu",
+        "aliases": [
+          "Viu",
+          "viu"
+        ],
+        "extensions": [
+          ".viu"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "viu",
+        "scopeName": "source.viu",
+        "path": "./syntaxes/viu.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.csharp": "csharp",
+          "meta.embedded.expression.csharp": "csharp",
+          "meta.embedded.block.css": "css"
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Viu",
+      "properties": {
+        "viu.languageServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the Viu language server for .viu documents. Disable to keep syntax highlighting without a server process."
+        },
+        "viu.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a Viu language-server executable. Overrides the payload bundled with this extension; intended for developing the server itself."
+        },
+        "viu.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace the Language Server Protocol traffic between Visual Studio Code and the Viu language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "check": "tsc --noEmit -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

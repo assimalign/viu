@@ -88,7 +88,7 @@ tasks, and the last two are the editor stack the Visual Studio extension launche
 | [`Assimalign.Viu.Tooling.SingleFileComponent`](tooling/Assimalign.Viu.Tooling.SingleFileComponent) | The ONE `.viu`/`.vue` → C# projection (parse, `@script` analysis, render and source maps, diagnostics) that the source generator and the language service both run, so build output and editor understanding cannot drift ([V01.01.06.11]) | [OVERVIEW](tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md) |
 | [`Assimalign.Viu.Tooling.UtilityCss`](tooling/Assimalign.Viu.Tooling.UtilityCss) | The build-time engine for **Viu Utilities** — candidate scanning, the project candidate index, and utility generation — an independent C# implementation pinned to the Tailwind CSS v4.3.3 compatibility target | [OVERVIEW](tooling/Assimalign.Viu.Tooling.UtilityCss/docs/OVERVIEW.md) · [DESIGN](tooling/Assimalign.Viu.Tooling.UtilityCss/docs/DESIGN.md) · [THIRD-PARTY-NOTICES](tooling/Assimalign.Viu.Tooling.UtilityCss/docs/THIRD-PARTY-NOTICES.md) |
 | [`Assimalign.Viu.Tooling.LanguageService`](tooling/Assimalign.Viu.Tooling.LanguageService) | The editor-neutral language features — document state, completion, hover, symbols, folding, code actions, and the `@script` semantic engine — with no protocol or editor dependency | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
-| [`Assimalign.Viu.Tooling.LanguageServer`](tooling/Assimalign.Viu.Tooling.LanguageServer) | The standalone Language Server Protocol executable over the language service; published self-contained per Windows architecture and shipped inside the Visual Studio extension | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
+| [`Assimalign.Viu.Tooling.LanguageServer`](tooling/Assimalign.Viu.Tooling.LanguageServer) | The standalone Language Server Protocol executable over the language service; published self-contained and single-file per runtime identifier, and shipped inside both editor extensions | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
 
 ### Source generators and build tasks (`analyzers/`)
 
@@ -101,6 +101,31 @@ happens here instead. They never ship in the runtime assemblies.
 | `Assimalign.Viu.Generators.Reactivity` | Emits the tracking/triggering property bodies for `[Reactive]`/`[ShallowReactive]` partial classes, so a plain object becomes reactive with no reflection and no runtime interception. |
 | `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
 | `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `<style>` output to a physical stylesheet outside the analyzer sandbox. |
+
+### Editor extensions (`extensions/`)
+
+Both editor hosts are thin clients over the **same** editor-neutral language server
+(`tooling/Assimalign.Viu.Tooling.LanguageServer`, a plain stdio LSP executable with no editor
+coupling). [`build/Targets/Build.LanguageServer.targets`](build/Targets/Build.LanguageServer.targets)
+is the single publish recipe both use, so they cannot drift on trimming, single-file, or debug-type
+settings.
+
+| Extension | Host | Status |
+| --- | --- | --- |
+| [`extensions/VisualStudio`](extensions/VisualStudio) | Visual Studio 2022 17.14+ / Visual Studio 2026 | Published to the Visual Studio Marketplace as a preview |
+| [`extensions/Assimalign.Viu.VisualStudioCode`](extensions/Assimalign.Viu.VisualStudioCode) | Visual Studio Code 1.85+ | Scaffold — compiles and packages, not published |
+
+The two hosts differ in exactly one build property. The Visual Studio VSIX embeds `win-x64` and
+`win-arm64` only, because it ships every payload in one package and each is roughly 18 MB; Visual
+Studio Code ships one platform-specific package per runtime identifier and opts into the full
+`win-x64;win-arm64;linux-x64;osx-arm64;osx-x64` set through
+`ViuLanguageServerPublishAllRuntimeIdentifiers`. Each host publishes to its own output root, and the
+shared target fails the build if a payload the host did not ask for is sitting in its publish
+directory.
+
+Neither extension is an MSBuild project in `Assimalign.Viu.slnx` on the Visual Studio Code side: it
+is a TypeScript/npm package built by
+[its own `Build.ps1`](extensions/Assimalign.Viu.VisualStudioCode/Build.ps1).
 
 ### Packaged SDK showcase
 

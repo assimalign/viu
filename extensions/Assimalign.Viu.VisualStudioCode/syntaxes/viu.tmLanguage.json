@@ -1,0 +1,303 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Viu",
+  "scopeName": "source.viu",
+  "comment": "The .viu hybrid container: tag-based <template>/<style>, the C# @script { } block, and the legacy @template/@style blocks kept during the migration window. The authority for this grammar is libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md; every rule below is traceable to a section of it. Block bodies delegate to source.cs and source.css rather than re-implementing token rules — the container grammar's job is to slice the file and to own the Viu-specific constructs (interpolations, directive attributes, component tags).",
+  "patterns": [
+    { "include": "#container-comment" },
+    { "include": "#script-block" },
+    { "include": "#legacy-template-block" },
+    { "include": "#legacy-style-block" },
+    { "include": "#custom-block" },
+    { "include": "#self-closing-block-tag" },
+    { "include": "#rejected-script-tag-block" },
+    { "include": "#style-tag-block" },
+    { "include": "#template-tag-block" }
+  ],
+  "repository": {
+    "container-comment": {
+      "comment": "FORMAT.md section 2: an HTML comment starting at column 0 is tolerated between blocks and may span lines.",
+      "name": "comment.block.html.viu",
+      "begin": "<!--",
+      "end": "-->",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.comment.begin.viu" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.comment.end.viu" }
+      }
+    },
+
+    "script-block": {
+      "comment": "FORMAT.md sections 3 and 3.2: '@script <options> {' opens at column 0 and closes at the FIRST later line whose first column is '}'. That is the container's real termination rule, so the end pattern anchors on '^}' rather than counting braces — a '}' anywhere else on a line is C#, never a closer.",
+      "name": "meta.block.script.viu",
+      "begin": "^(@script)((?:[ \\t]+[^{]*?)?)[ \\t]*(\\{)[ \\t]*$",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.block.script.viu" },
+        "2": { "patterns": [{ "include": "#at-block-options" }] },
+        "3": { "name": "punctuation.section.block.begin.viu" }
+      },
+      "end": "^(\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.block.end.viu" }
+      },
+      "contentName": "meta.embedded.block.csharp",
+      "patterns": [{ "include": "source.cs" }]
+    },
+
+    "legacy-template-block": {
+      "comment": "FORMAT.md section 6.1: '@template { }' still parses during the migration window (diagnostic 1015, Warning). Highlighted so a not-yet-migrated file stays readable.",
+      "name": "meta.block.template.legacy.viu",
+      "begin": "^(@template)((?:[ \\t]+[^{]*?)?)[ \\t]*(\\{)[ \\t]*$",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.block.template.viu" },
+        "2": { "patterns": [{ "include": "#at-block-options" }] },
+        "3": { "name": "punctuation.section.block.begin.viu" }
+      },
+      "end": "^(\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.block.end.viu" }
+      },
+      "patterns": [{ "include": "#template-content" }]
+    },
+
+    "legacy-style-block": {
+      "comment": "FORMAT.md section 6.1: '@style <options> { }' still parses during the migration window (diagnostic 1016, Warning).",
+      "name": "meta.block.style.legacy.viu",
+      "begin": "^(@style)((?:[ \\t]+[^{]*?)?)[ \\t]*(\\{)[ \\t]*$",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.block.style.viu" },
+        "2": { "patterns": [{ "include": "#at-block-options" }] },
+        "3": { "name": "punctuation.section.block.begin.viu" }
+      },
+      "end": "^(\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.block.end.viu" }
+      },
+      "contentName": "meta.embedded.block.css",
+      "patterns": [{ "include": "source.css" }]
+    },
+
+    "custom-block": {
+      "comment": "FORMAT.md section 3: any other '@name { }' is a custom block, preserved verbatim by the parser. Its content has no known language, so only the header is colored.",
+      "name": "meta.block.custom.viu",
+      "begin": "^(@)([A-Za-z_][A-Za-z0-9_-]*)((?:[ \\t]+[^{]*?)?)[ \\t]*(\\{)[ \\t]*$",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.block.custom.viu" },
+        "2": { "name": "keyword.control.block.custom.viu" },
+        "3": { "patterns": [{ "include": "#at-block-options" }] },
+        "4": { "name": "punctuation.section.block.begin.viu" }
+      },
+      "end": "^(\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.block.end.viu" }
+      }
+    },
+
+    "at-block-options": {
+      "comment": "FORMAT.md section 3.1: valueless flags, or key=\"value\" with no whitespace around '=' and no escape syntax inside the value.",
+      "match": "([A-Za-z_][A-Za-z0-9_-]*)(?:(=)(\"[^\"]*\"))?",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.viu" },
+        "2": { "name": "punctuation.separator.key-value.viu" },
+        "3": { "name": "string.quoted.double.viu" }
+      }
+    },
+
+    "self-closing-block-tag": {
+      "comment": "FORMAT.md section 4: a self-closing <template /> or <style /> is an empty block and opens no content region.",
+      "match": "^(<)(template|style)\\b([^>]*?)(/>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.block.viu" },
+        "3": { "patterns": [{ "include": "#tag-attributes" }] },
+        "4": { "name": "punctuation.definition.tag.end.viu" }
+      }
+    },
+
+    "rejected-script-tag-block": {
+      "comment": "FORMAT.md section 6.2: a top-level <script> tag is an ERROR (diagnostic 1017) and contributes no block — a .viu component's C# lives in '@script { }' only. The tag name is scoped invalid so tag-era muscle memory fails visibly in the editor too; the body is left uncolored because it never reaches compilation.",
+      "name": "meta.block.script.rejected.viu",
+      "begin": "^(<)(script)\\b([^>]*?)(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "invalid.illegal.script-tag.viu" },
+        "3": { "patterns": [{ "include": "#tag-attributes" }] },
+        "4": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "end": "(</)(script)[ \\t]*(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "invalid.illegal.script-tag.viu" },
+        "3": { "name": "punctuation.definition.tag.end.viu" }
+      }
+    },
+
+    "style-tag-block": {
+      "comment": "FORMAT.md sections 4 and 4.1: <style> is raw text to its matching </style>. The body delegates to source.css so the CSS grammar, not a re-implementation, owns declarations, at-rules, and comments.",
+      "name": "meta.block.style.viu",
+      "begin": "(<)(style)\\b([^>]*?)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.block.viu" },
+        "3": { "patterns": [{ "include": "#tag-attributes" }] },
+        "4": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "end": "(</)(style)[ \\t]*(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.block.viu" },
+        "3": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "contentName": "meta.embedded.block.css",
+      "patterns": [{ "include": "source.css" }]
+    },
+
+    "template-tag-block": {
+      "comment": "FORMAT.md section 4.1: <template> closes at its MATCHING </template>, so this rule includes itself — a nested <template #header> slot fragment consumes its own closer and cannot end the outer block.",
+      "name": "meta.block.template.viu",
+      "begin": "(<)(template)\\b([^>]*?)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.block.viu" },
+        "3": { "patterns": [{ "include": "#tag-attributes" }] },
+        "4": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "end": "(</)(template)[ \\t]*(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.block.viu" },
+        "3": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "patterns": [{ "include": "#template-content" }]
+    },
+
+    "template-content": {
+      "patterns": [
+        { "include": "#template-comment" },
+        { "include": "#interpolation" },
+        { "include": "#template-tag-block" },
+        { "include": "#closing-component-tag" },
+        { "include": "#closing-element-tag" },
+        { "include": "#component-tag" },
+        { "include": "#element-tag" }
+      ]
+    },
+
+    "template-comment": {
+      "name": "comment.block.html.viu",
+      "begin": "<!--",
+      "end": "-->",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.comment.begin.viu" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.comment.end.viu" }
+      }
+    },
+
+    "interpolation": {
+      "comment": "Mustache interpolation. The interior is a C# expression, so it delegates to source.cs; the delimiters keep their own scope so a theme can distinguish them from the expression.",
+      "name": "meta.interpolation.viu",
+      "begin": "\\{\\{",
+      "end": "\\}\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.embedded.begin.viu" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.viu" }
+      },
+      "contentName": "meta.embedded.expression.csharp",
+      "patterns": [{ "include": "source.cs" }]
+    },
+
+    "component-tag": {
+      "comment": "A Viu component is named in PascalCase, or as a dotted member expression. Component resolution is ordinal over the authored spelling ([CMP-6]), so casing is a reliable lexical signal and components get their OWN scope rather than borrowing entity.name.tag.",
+      "begin": "(<)([A-Z][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "support.class.component.viu" }
+      },
+      "end": "(/?)(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.viu" },
+        "2": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "patterns": [{ "include": "#tag-attributes" }]
+    },
+
+    "element-tag": {
+      "begin": "(<)([a-z][a-zA-Z0-9:._-]*)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.viu" }
+      },
+      "end": "(/?)(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.viu" },
+        "2": { "name": "punctuation.definition.tag.end.viu" }
+      },
+      "patterns": [{ "include": "#tag-attributes" }]
+    },
+
+    "closing-component-tag": {
+      "match": "(</)([A-Z][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)[ \\t]*(>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "support.class.component.viu" },
+        "3": { "name": "punctuation.definition.tag.end.viu" }
+      }
+    },
+
+    "closing-element-tag": {
+      "match": "(</)([a-z][a-zA-Z0-9:._-]*)[ \\t]*(>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.viu" },
+        "2": { "name": "entity.name.tag.viu" },
+        "3": { "name": "punctuation.definition.tag.end.viu" }
+      }
+    },
+
+    "tag-attributes": {
+      "patterns": [
+        { "include": "#directive-attribute" },
+        { "include": "#directive-flag" },
+        { "include": "#plain-attribute" }
+      ]
+    },
+
+    "directive-attribute": {
+      "comment": "Directive attributes — 'v-*', the ':' bind shorthand, the '@' event shorthand, and the '#' slot shorthand — carry a C# expression as their value, so the value delegates to source.cs. The end pattern backreferences the opening quote so a value may contain the other quote character and may span lines.",
+      "begin": "((?:v-[A-Za-z][A-Za-z0-9-]*|[:@#][A-Za-z_\\[][^\\s=/>\"']*)(?:\\.[A-Za-z0-9_-]+)*)[ \\t]*(=)[ \\t]*(\"|')",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.viu" },
+        "2": { "name": "punctuation.separator.key-value.viu" },
+        "3": { "name": "punctuation.definition.string.begin.viu" }
+      },
+      "end": "(\\3)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.string.end.viu" }
+      },
+      "contentName": "meta.embedded.expression.csharp",
+      "patterns": [{ "include": "source.cs" }]
+    },
+
+    "directive-flag": {
+      "comment": "A valueless directive (v-else, v-once, v-pre) has no '=' for the rule above to anchor on.",
+      "match": "(?<![A-Za-z0-9_-])(v-[A-Za-z][A-Za-z0-9-]*|[:@#][A-Za-z_][A-Za-z0-9_.:-]*)(?![A-Za-z0-9_-]*[ \\t]*=)",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.directive.viu" }
+      }
+    },
+
+    "plain-attribute": {
+      "comment": "An ordinary attribute. 'class' is deliberately NOT split into utility variants and classes here: candidate validation and the generated-CSS preview are language-server features, delivered as semantic tokens and hover rather than guessed lexically.",
+      "match": "([A-Za-z_][A-Za-z0-9_.:-]*)(?:[ \\t]*(=)[ \\t]*(\"[^\"]*\"|'[^']*'))?",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.viu" },
+        "2": { "name": "punctuation.separator.key-value.viu" },
+        "3": { "name": "string.quoted.viu" }
+      }
+    }
+  }
+}

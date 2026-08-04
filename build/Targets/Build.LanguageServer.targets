@@ -26,7 +26,16 @@
     <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Tooling.LanguageServer\src\Assimalign.Viu.Tooling.LanguageServer.csproj</ViuLanguageServerProjectPath>
     <ViuLanguageServerPublishRoot Condition="'$(ViuLanguageServerPublishRoot)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)</ViuLanguageServerPublishRoot>
     <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuLanguageServerPublishRoot)\LanguageServer</ViuLanguageServerPublishPath>
-    <ViuLanguageServerExecutableName Condition="'$(ViuLanguageServerExecutableName)' == ''">Assimalign.Viu.Tooling.LanguageServer.exe</ViuLanguageServerExecutableName>
+
+    <!-- The published file name is RID-shaped: only Windows runtimes get the .exe suffix, so a
+         non-Windows payload is 'Assimalign.Viu.Tooling.LanguageServer' with no extension. Every
+         payload path is therefore derived from the BASE name through
+         _ViuComputeLanguageServerPayloadPaths, which batches over the runtime identifiers and picks
+         the suffix per RID. ViuLanguageServerExecutableName remains the Windows name because the
+         two properties below feed Visual Studio's up-to-date check, which is Windows-only by
+         construction. -->
+    <ViuLanguageServerExecutableBaseName Condition="'$(ViuLanguageServerExecutableBaseName)' == ''">Assimalign.Viu.Tooling.LanguageServer</ViuLanguageServerExecutableBaseName>
+    <ViuLanguageServerExecutableName Condition="'$(ViuLanguageServerExecutableName)' == ''">$(ViuLanguageServerExecutableBaseName).exe</ViuLanguageServerExecutableName>
     <ViuLanguageServerX64ExecutablePath>$(ViuLanguageServerPublishPath)\win-x64\$(ViuLanguageServerExecutableName)</ViuLanguageServerX64ExecutablePath>
     <ViuLanguageServerArm64ExecutablePath>$(ViuLanguageServerPublishPath)\win-arm64\$(ViuLanguageServerExecutableName)</ViuLanguageServerArm64ExecutablePath>
 
@@ -34,9 +43,27 @@
          swept into the payload glob and shipped in the VSIX. -->
     <ViuLanguageServerPublishStampFile>$(ViuLanguageServerPublishRoot)\.languageserver-publish.stamp</ViuLanguageServerPublishStampFile>
 
-    <!-- Both Windows architectures ship; language-server.json selects one at runtime. Narrowing this
-         halves inner-loop publish cost but produces a VSIX that only runs on that architecture, so
-         it must never be narrowed for packaging. -->
+    <!--
+      The complete set of runtime identifiers the server is published for. This is the VS Code
+      packaging set (one platform-specific VSIX per entry) and the reference list for any other
+      editor host; it is deliberately NOT the default, because the Visual Studio VSIX embeds every
+      payload in the publish directory and each one costs roughly 18 MB — five of them would push a
+      single VSIX past the Marketplace size gate.
+
+      A caller opts into the full set with ViuLanguageServerPublishAllRuntimeIdentifiers=true (see
+      extensions\Assimalign.Viu.VisualStudioCode\Build.ps1), or narrows to an explicit subset by
+      passing ViuLanguageServerRuntimeIdentifiers directly. The list lives here so no script owns a
+      second copy of it.
+    -->
+    <ViuLanguageServerAllRuntimeIdentifiers Condition="'$(ViuLanguageServerAllRuntimeIdentifiers)' == ''">win-x64;win-arm64;linux-x64;osx-arm64;osx-x64</ViuLanguageServerAllRuntimeIdentifiers>
+    <ViuLanguageServerPublishAllRuntimeIdentifiers Condition="'$(ViuLanguageServerPublishAllRuntimeIdentifiers)' == ''">false</ViuLanguageServerPublishAllRuntimeIdentifiers>
+    <ViuLanguageServerRuntimeIdentifiers Condition="'$(ViuLanguageServerRuntimeIdentifiers)' == '' and '$(ViuLanguageServerPublishAllRuntimeIdentifiers)' == 'true'">$(ViuLanguageServerAllRuntimeIdentifiers)</ViuLanguageServerRuntimeIdentifiers>
+
+    <!-- Both Windows architectures ship in the Visual Studio VSIX; language-server.json selects one
+         at runtime. Narrowing this halves inner-loop publish cost but produces a VSIX that only runs
+         on that architecture, so it must never be narrowed for packaging — and it must never be
+         WIDENED for the VSIX either, which ViuValidateLanguageServerPayloadRuntimeIdentifiers
+         enforces against the payload glob. -->
     <ViuLanguageServerRuntimeIdentifiers Condition="'$(ViuLanguageServerRuntimeIdentifiers)' == ''">win-x64;win-arm64</ViuLanguageServerRuntimeIdentifiers>
 
     <!-- Debug keeps symbols inside the single file; Release ships none. This mirrors Build.ps1's
@@ -90,12 +117,33 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    The one place the published file name is derived from a runtime identifier. `dotnet publish`
+    names the apphost after the target platform, so only win-* payloads carry '.exe'; assuming the
+    suffix (as this file did while the VSIX was the only consumer) makes every non-Windows payload
+    look permanently missing and republishes it on every build.
+
+    Batching over %(ViuLanguageServerRuntimeIdentifier.Identity) is why this is a TARGET and not an
+    evaluation-time ItemGroup: metadata batching in an item condition is only legal inside a target.
+  -->
+  <Target Name="_ViuComputeLanguageServerPayloadPaths"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
+    <ItemGroup>
+      <_ViuLanguageServerExpectedPayload
+          Include="$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)\$(ViuLanguageServerExecutableBaseName).exe"
+          Condition="$([System.String]::Copy('%(ViuLanguageServerRuntimeIdentifier.Identity)').StartsWith('win-'))" />
+      <_ViuLanguageServerExpectedPayload
+          Include="$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)\$(ViuLanguageServerExecutableBaseName)"
+          Condition="!$([System.String]::Copy('%(ViuLanguageServerRuntimeIdentifier.Identity)').StartsWith('win-'))" />
+    </ItemGroup>
+  </Target>
+
   <!-- The stamp must never claim freshness while a payload is missing: a wiped output directory, a
        partially failed publish, or a hand-deleted runtime folder all have to force a republish. -->
   <Target Name="_ViuInvalidateLanguageServerPublishStamp"
+          DependsOnTargets="_ViuComputeLanguageServerPayloadPaths"
           Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'">
     <ItemGroup>
-      <_ViuLanguageServerExpectedPayload Include="@(ViuLanguageServerRuntimeIdentifier->'$(ViuLanguageServerPublishPath)\%(Identity)\$(ViuLanguageServerExecutableName)')" />
       <_ViuLanguageServerMissingPayload Include="@(_ViuLanguageServerExpectedPayload)"
                                         Condition="!Exists('%(_ViuLanguageServerExpectedPayload.Identity)')" />
     </ItemGroup>
@@ -167,10 +215,15 @@
 
   <!-- Backstop 1: absence. -->
   <Target Name="ViuValidateLanguageServerPayload"
+          DependsOnTargets="_ViuComputeLanguageServerPayloadPaths"
           AfterTargets="ViuIncludeLanguageServerPayload"
           Condition="'$(ViuLanguageServerPublishEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
-    <Error Condition="!Exists('$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)\$(ViuLanguageServerExecutableName)')"
-           Text="The %(ViuLanguageServerRuntimeIdentifier.Identity) Viu language-server payload is missing at '$(ViuLanguageServerPublishPath)\%(ViuLanguageServerRuntimeIdentifier.Identity)\$(ViuLanguageServerExecutableName)'. It is normally produced automatically by the ViuPublishLanguageServer target; if you set ViuSkipLanguageServerPublish=true, run extensions\VisualStudio\Build.ps1 first." />
+    <ItemGroup>
+      <_ViuLanguageServerAbsentPayload Include="@(_ViuLanguageServerExpectedPayload)"
+                                       Condition="!Exists('%(_ViuLanguageServerExpectedPayload.Identity)')" />
+    </ItemGroup>
+    <Error Condition="'@(_ViuLanguageServerAbsentPayload)' != ''"
+           Text="The Viu language-server payload is missing at: @(_ViuLanguageServerAbsentPayload, ', '). It is normally produced automatically by the ViuPublishLanguageServer target; if you set ViuSkipLanguageServerPublish=true, run extensions\VisualStudio\Build.ps1 (or extensions\Assimalign.Viu.VisualStudioCode\Build.ps1) first." />
   </Target>
 
   <!-- Backstop 2: staleness. The same Inputs/Outputs pair the producer uses is handed to MSBuild's
@@ -186,5 +239,29 @@
           Inputs="@(_ViuLanguageServerPublishInput)"
           Outputs="$(ViuLanguageServerPublishStampFile)">
     <Error Text="The Viu language-server payload under '$(ViuLanguageServerPublishPath)' is STALE: language-server or library sources have changed since it was published ('$(ViuLanguageServerPublishStampFile)'). Re-run extensions\VisualStudio\Build.ps1, or clear ViuSkipLanguageServerPublish so the build republishes it." />
+  </Target>
+
+  <!--
+    Backstop 3: excess. ViuIncludeLanguageServerPayload sweeps the publish directory with a
+    wildcard, so a runtime folder nobody asked for still ships. That is the failure mode the
+    cross-platform runtime identifiers introduce: once the full five-RID set can be published from
+    the same shared target, a stray osx-arm64 or linux-x64 folder left in the Visual Studio publish
+    directory would silently add ~18 MB apiece to the VSIX and push it past the Marketplace size
+    gate. Each host publishes to its OWN ViuLanguageServerPublishRoot, and this makes the two-RID
+    guarantee an enforced property of the VSIX build rather than a convention.
+  -->
+  <Target Name="ViuValidateLanguageServerPayloadRuntimeIdentifiers"
+          AfterTargets="ViuIncludeLanguageServerPayload"
+          Condition="'$(ViuLanguageServerPublishEnabled)' == 'true'
+                     and '$(DesignTimeBuild)' != 'true'
+                     and Exists('$(ViuLanguageServerPublishPath)')">
+    <ItemGroup>
+      <_ViuLanguageServerPublishedRuntimeDirectory Include="$([System.IO.Directory]::GetDirectories('$(ViuLanguageServerPublishPath)'))" />
+      <_ViuLanguageServerPublishedRuntimeIdentifier Include="@(_ViuLanguageServerPublishedRuntimeDirectory->'%(Filename)%(Extension)')" />
+      <_ViuLanguageServerUnexpectedRuntimeIdentifier Include="@(_ViuLanguageServerPublishedRuntimeIdentifier)"
+                                                     Exclude="@(ViuLanguageServerRuntimeIdentifier)" />
+    </ItemGroup>
+    <Error Condition="'@(_ViuLanguageServerUnexpectedRuntimeIdentifier)' != ''"
+           Text="The Viu language-server publish directory '$(ViuLanguageServerPublishPath)' contains runtime payloads this build did not ask for: @(_ViuLanguageServerUnexpectedRuntimeIdentifier, ', '). Only '$(ViuLanguageServerRuntimeIdentifiers)' may be packaged from this directory — every folder here is swept into the extension payload. Delete the extra folders, or publish the wider runtime-identifier set to its own ViuLanguageServerPublishRoot." />
   </Target>
 </Project>
