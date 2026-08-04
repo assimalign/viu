@@ -5,10 +5,10 @@
         <TargetFrameworkForLibraries>$(TargetFrameworkLatest)</TargetFrameworkForLibraries>
         <TargetFrameworkForSdks>$(TargetFrameworkLatest)</TargetFrameworkForSdks>
         <!-- A classic VSSDK package loads inside devenv.exe and therefore lives on the .NET
-             Framework line, whatever its payload. Both Visual Studio packages are classic:
-             Assimalign.Viu.VisualStudio (MEF editor parts and the .viu file-extension claim) and the
-             Assimalign.Viu.VisualStudio.Registration companion. The language server stays
-             editor-neutral, out of process, and on the repository TFM. -->
+             Framework line, whatever its payload. Assimalign.Viu.VisualStudio is the repository's
+             one classic package: MEF editor parts, the language client, and the .viu
+             file-extension claim. The language server stays editor-neutral, out of process, and on
+             the repository TFM. -->
         <TargetFrameworkForVisualStudioClassicExtensions>net48</TargetFrameworkForVisualStudioClassicExtensions>
         <TargetFrameworkForLanguageServers>$(TargetFrameworkLatest)</TargetFrameworkForLanguageServers>
         <!--

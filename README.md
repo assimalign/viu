@@ -123,9 +123,18 @@ Studio Code ships one platform-specific package per runtime identifier and opts 
 shared target fails the build if a payload the host did not ask for is sitting in its publish
 directory.
 
-Neither extension is an MSBuild project in `Assimalign.Viu.slnx` on the Visual Studio Code side: it
-is a TypeScript/npm package built by
-[its own `Build.ps1`](extensions/Assimalign.Viu.VisualStudioCode/Build.ps1).
+Neither extension project is in `Assimalign.Viu.slnx`, for different reasons. The Visual Studio
+extension is a classic **in-process** VSSDK package whose build tasks are .NET Framework MSBuild
+tasks and cannot load under `dotnet build`; it is packaged by
+[its own `Build.ps1`](extensions/VisualStudio/Build.ps1) through Visual Studio's MSBuild, and only
+its test project is in the solution. The Visual Studio Code extension is a TypeScript/npm package
+built by [its own `Build.ps1`](extensions/Assimalign.Viu.VisualStudioCode/Build.ps1).
+
+The Visual Studio client runs in process because the editor surfaces a Viu palette needs — a content
+type Viu owns, its own classification types, and the format definitions that color them — exist only
+as MEF exports inside `devenv.exe`. Nothing semantic followed it in: the parsers and Roslyn stay in
+the language-server process. See
+[the area design record](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md).
 
 ### Packaged SDK showcase
 

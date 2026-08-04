@@ -6,8 +6,9 @@
 .DESCRIPTION
     The extension is a classic in-process VSSDK package, so packaging it needs Visual Studio's
     MSBuild: Microsoft.VSSDK.BuildTools ships .NET Framework MSBuild tasks that cannot load under
-    `dotnet build`. This script locates that MSBuild through vswhere, exactly as
-    Build.Registration.ps1 does.
+    `dotnet build`. This script locates that MSBuild through vswhere. It is the only build entry
+    point for the area: the .viu file-extension claim now ships as a pkgdef inside this one VSIX,
+    so the companion registration package and its separate script are gone.
 
     The language-server payload is produced first, by driving the shared ViuPublishLanguageServer
     target through the .NET CLI. That target shells out to `dotnet publish`, so running it under the
