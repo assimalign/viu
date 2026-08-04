@@ -92,7 +92,7 @@ The mounted context exposes:
 generator puts under a component with a template block. Each one registers exactly what the longer
 `Context.Lifecycle.OnMounted(...)` form registers, into the same list in the same order, so a
 component may write either or mix them
-([`[CMP-32]`](../../docs/SPECIFICATION.md#410-root-level-lifecycle-registration)).
+([`[CMP-32]`](SPECIFICATION.md#410-root-level-lifecycle-registration)).
 
 Each mount receives a fresh generated component instance, so `Count` is component-local. The
 generated render function reads `Count.Value`; that read subscribes the component render effect,

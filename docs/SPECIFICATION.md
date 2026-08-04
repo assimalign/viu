@@ -187,7 +187,7 @@ them back, and .NET purges its listener delegates in the same call.
 `libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`;
 `libraries/Assimalign.Viu.Core/src/Scheduling/Scheduler.cs`;
 `libraries/Assimalign.Viu.Components/src/Activation/{ComponentFactory,ComponentRegistration}.cs`;
-`libraries/DESIGN.md` §"AOT and ownership rules".*
+`docs/ARCHITECTURE.md` §"AOT and ownership rules".*
 
 ---
 
@@ -415,7 +415,7 @@ without them.
 `ComponentTemplateBase.cs` for [CMP-32]);
 `libraries/Assimalign.Viu.Core/src/Internal/{ComponentContext,ComponentLifecycle,MountedComponent}.cs`;
 `libraries/Assimalign.Viu.Core/src/Abstraction/IApplicationContext.cs`;
-`libraries/Assimalign.Viu.Components/docs/OVERVIEW.md`; `libraries/DESIGN.md`;
+`libraries/Assimalign.Viu.Components/docs/OVERVIEW.md`; `docs/ARCHITECTURE.md`;
 `libraries/Assimalign.Viu.Core/docs/OVERVIEW.md`.*
 
 ---
@@ -798,7 +798,7 @@ collide.
 `libraries/Assimalign.Viu.Shared/src/{PatchFlags,ShapeFlags,SlotFlags}.cs`;
 `libraries/Assimalign.Viu.Components/src/Optimization/ComponentOptimization.cs`;
 `libraries/Assimalign.Viu.Browser/docs/{DESIGN.md,ADR-0001-interop-marshaling.md}`;
-`libraries/Assimalign.Viu.Core/docs/OVERVIEW.md`; `libraries/DESIGN.md` §"Block-tree updates".*
+`libraries/Assimalign.Viu.Core/docs/OVERVIEW.md`; `docs/ARCHITECTURE.md` §"Block-tree updates".*
 
 ---
 
@@ -881,7 +881,7 @@ which no arbitrary resolver can be required to answer.
 *Authority: `libraries/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.KeepAlive.cs,Renderer.Suspense.cs,Renderer.Hydration.cs}`;
 `libraries/Assimalign.Viu.Core/docs/{OVERVIEW.md,KEEP-ALIVE.md,ASYNCHRONOUS-AND-DYNAMIC-COMPONENTS.md}`;
-`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions; `libraries/DESIGN.md` §"Runtime capabilities".*
+`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions; `docs/ARCHITECTURE.md` §"Runtime capabilities".*
 
 ---
 
@@ -1387,7 +1387,7 @@ helper — there is no interception layer [RCT-6]. Asynchronous helpers await th
 the after-hook, so it receives the resolved value; faults run error hooks and then propagate.
 
 *Authority: `libraries/Assimalign.Viu.State/{src,docs/{OVERVIEW,DESIGN}.md}`;
-`libraries/DESIGN.md` §State.*
+`docs/ARCHITECTURE.md` §State.*
 
 ---
 

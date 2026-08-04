@@ -71,4 +71,4 @@ branch, and client hydration of a Suspense request fails explicitly. Application
 server output must keep Suspense out of the hydrated root until pending-branch hydration
 coordination is implemented. Boundary timeout/events, fallback-to-reveal transition choreography,
 and hidden-branch post-effect delay are likewise not implemented yet — see
-[§17 of the specification](../docs/SPECIFICATION.md#17-non-goals-and-current-limits).
+[§17 of the specification](SPECIFICATION.md#17-non-goals-and-current-limits).

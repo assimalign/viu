@@ -1,4 +1,4 @@
-# Viu abstraction split
+# Viu library architecture
 
 **Status:** Implemented in the isolated `.redesign` staging tree. Source under `libraries/` remains
 unchanged until the user authorizes migration.
@@ -118,7 +118,7 @@ component generator puts under every component with a template block -- re-decla
 registration methods as a protected pass-through to `Context.Lifecycle`, so a component writes
 `OnMounted(...)` at the root of its class. The shorter form is an ergonomic surface, not a second
 mechanism: there is one registrar per mounted component and one registration order, and the base
-holds no lifecycle state of its own ([`[CMP-32]`](../docs/SPECIFICATION.md#410-root-level-lifecycle-registration)).
+holds no lifecycle state of its own ([`[CMP-32]`](SPECIFICATION.md#410-root-level-lifecycle-registration)).
 The wrappers are cold path -- registration happens once per mount during setup -- so putting them on
 a base class costs nothing the engine's hot paths care about.
 
@@ -174,9 +174,9 @@ No state-shape reflection is used.
 
 ## Block-tree updates
 
-The unified component tree uses a compiler-informed block-tree strategy ([`[RND-BLOCK-1]`](../docs/SPECIFICATION.md#63-the-block-tree));
+The unified component tree uses a compiler-informed block-tree strategy ([`[RND-BLOCK-1]`](SPECIFICATION.md#63-the-block-tree));
 the origin of that technique is acknowledged once, centrally, in
-[§19 of the specification](../docs/SPECIFICATION.md#19-prior-art-and-influences).
+[§19 of the specification](SPECIFICATION.md#19-prior-art-and-influences).
 `ComponentOptimization` carries:
 
 - `PatchFlags`;

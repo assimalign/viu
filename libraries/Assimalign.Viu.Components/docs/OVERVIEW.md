@@ -103,5 +103,5 @@ tree for hot-path dispatch, but it must copy this metadata without changing its 
 Components does not reference Reactivity, State, Core, a renderer, or a browser host. Its only
 project dependency is the shared compiler/runtime flag vocabulary.
 
-See the root [DESIGN.md](../../DESIGN.md) for the role/lifetime split and the decisions that guided
+See the root [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) for the role/lifetime split and the decisions that guided
 this implementation.

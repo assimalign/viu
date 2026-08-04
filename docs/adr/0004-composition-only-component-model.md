@@ -19,7 +19,7 @@
 > handler, and performance flag. As of this working tree: `InjectionKey` and `ApplicationConfiguration`
 > do not exist anywhere in the source, `IPlugin` is now `IApplicationPlugin`, and application state
 > moved onto `IApplicationContext`. **Component-tree provide/inject was not ported at all** — it is a
-> recorded decision, not a deferral (`libraries/DESIGN.md` approved decision 8), and the specification
+> recorded decision, not a deferral (`docs/ARCHITECTURE.md` approved decision 8), and the specification
 > states it as `[CMP-24]`: component dependencies are explicit through parameters and slots,
 > `IComponentContext.Services`, State definitions, and `IComponentContext.Components`. Reversing the
 > replacement mechanism recorded in an accepted ADR requires a **superseding ADR**, not an edit to
@@ -77,7 +77,7 @@ runtime machinery — a poor fit for an AOT/trimming target and for C#'s type sy
 ## References
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 5.
-- [`Assimalign.Viu.Core/docs/DESIGN.md`](../../libraries/Assimalign.Viu.Core/docs/DESIGN.md)
+- [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md)
   (formerly `Assimalign.Viu.RuntimeCore`, renamed in [V01.01.12.21]) and `Application<TNode>` /
   `ApplicationConfiguration`.
 - Vue 3: [Composition API FAQ](https://vuejs.org/guide/extras/composition-api-faq.html),

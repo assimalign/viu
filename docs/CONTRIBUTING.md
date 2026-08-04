@@ -6,18 +6,34 @@ to re-decide. The canonical *working* conventions (C# style, build system, testi
 [`.claude/rules/`](../.claude/rules/); this page covers the prose-documentation layout and lifecycle
 and complements [`.claude/rules/documentation.md`](../.claude/rules/documentation.md).
 
+## Placement policy
+
+Three rules decide where a Markdown file lives, and [`docs/README.md`](README.md) indexes the result:
+
+1. **Documentation scoped to one project** lives in `<project folder>/docs/` — under `libraries/`,
+   `tooling/`, `analyzers/`, `sdks/`, `frameworks/`, or `extensions/`.
+2. **`README.md` stays put.** Any folder may carry its own `README.md` as that folder's entry point.
+3. **Everything else** lives in the repository-root `docs/`.
+
+Packaging inputs are exempt because they are not documentation: `THIRD-PARTY-NOTICES.md` files packed
+into nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
+`extensions/VisualStudio/Marketplace.md` (the Marketplace listing body read by `vs-publish.json` and
+the release workflow). So are the agent-configuration trees `.claude/` and `.agents/`.
+
 ## The map
 
 | Document | Location | What it holds |
 | --- | --- | --- |
 | Root `README.md` | repository root | The project mission, the repository map (every project under `libraries/`, `analyzers/`, `sdks/`, `frameworks/`), the external showcase link, and clone/build instructions. |
+| `docs/README.md` | [`docs/README.md`](README.md) | The index of repository-level documentation and the placement policy above. |
 | `SPECIFICATION.md` | [`docs/SPECIFICATION.md`](SPECIFICATION.md) | **Normative.** What Viu is and what it guarantees, in numbered clauses with stable ids. Highest authority for semantics; every other document below is subordinate to it and must not contradict it. |
+| `ARCHITECTURE.md` | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | The cross-library architecture: the package split, the unified component tree, the host-generic application model, and the AOT and ownership rules. Spans every library, so it is repo-level rather than per-library. |
 | `PLAN.md` | [`docs/PLAN.md`](PLAN.md) | The delivery narrative: the wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. The GitHub [Project #15](https://github.com/orgs/assimalign/projects/15) board is the authoritative *backlog*. |
 | Architecture decision records | [`docs/adr/`](adr/) | The append-only log of repo-wide, cross-cutting decisions (see [`adr/README.md`](adr/README.md)). Normative for *rationale*, not for current API shape. |
 | `PERFORMANCE-RESEARCH.md` | [`docs/PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) | The ledger of optimization techniques observed in other rendering frameworks. **Explicitly non-normative**: nothing there constrains Viu until it is measured, adopted, and written into `SPECIFICATION.md` or an ADR. |
-| Per-library `OVERVIEW.md` | `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` | What the library **is**. |
-| Per-library `DESIGN.md` | `libraries/Assimalign.Viu.<Name>/docs/DESIGN.md` | **Why** the library is shaped the way it is. |
-| Per-library topic docs | `libraries/Assimalign.Viu.<Name>/docs/*.md` | Focused specs or local ADRs (e.g. `FORMAT.md`, a library-local `ADR-000N-*.md`). |
+| Per-project `OVERVIEW.md` | `<project folder>/docs/OVERVIEW.md` | What the library **is**. |
+| Per-project `DESIGN.md` | `<project folder>/docs/DESIGN.md` | **Why** the library is shaped the way it is. |
+| Per-project topic docs | `<project folder>/docs/*.md` | Focused specs or local ADRs (e.g. `FORMAT.md`, a library-local `ADR-000N-*.md`). |
 | XML doc comments | in source, on every public member | The API-level reference: what each member does, what it guarantees, and why its shape is what it is (see [`.claude/rules/documentation.md`](../.claude/rules/documentation.md)). |
 
 **Precedence.** `SPECIFICATION.md` → the normative delegates it names (the `.viu` `FORMAT.md`,

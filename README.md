@@ -197,6 +197,8 @@ Pack the local SDK and framework, then follow the
 - [Performance research](docs/PERFORMANCE-RESEARCH.md) — the explicitly non-normative ledger for
   optimization techniques observed elsewhere, measured against Viu's benchmark baselines before any
   are adopted.
+- [Documentation index](docs/README.md) — what lives under `docs/`, and the placement policy that
+  decides whether a document belongs there or with a project.
 - [Documentation conventions](docs/CONTRIBUTING.md) — where `OVERVIEW.md`, `DESIGN.md`, and ADRs
   live, what belongs in each, and when they must be updated.
 - [Getting started guide](docs/guide/getting-started.md) — build, run, and publish a Viu app with the

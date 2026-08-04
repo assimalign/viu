@@ -34,9 +34,9 @@ The packaged-consumer showcase is maintained in
 [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples). The Browser
 compiled-render test project remains the in-repository `.viu` plus renderer integration canary.
 
-Read [DESIGN.md](DESIGN.md) for the implemented boundaries,
-[DEVELOPER-EXAMPLES.md](DEVELOPER-EXAMPLES.md) for consumption examples, and
-[MIGRATION.md](MIGRATION.md) for the later promotion into `libraries/`.
+Read [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) for the implemented boundaries,
+[`docs/DEVELOPER-EXAMPLES.md`](../docs/DEVELOPER-EXAMPLES.md) for consumption examples, and
+[`docs/MIGRATION.md`](../docs/MIGRATION.md) for the later promotion into `libraries/`.
 
 Known limitation: Suspense mount/update behavior is implemented, but Suspense hydration currently
 fails explicitly. Boundary timeout/events, fallback-to-reveal transition choreography, and

@@ -68,7 +68,7 @@ HTML serialization, the Language Server Protocol — name and link that target. 
   `assimalign/viu`).
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
-  shared-framework pack producers live in `frameworks/` (see [build-system.md](build-system.md)).
+  shared-framework pack producers live in `frameworks/` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
 
 ### Namespaces
 
@@ -140,7 +140,7 @@ HTML serialization, the Language Server Protocol — name and link that target. 
   linker-unfriendly activation paths.** Roslyn **source generators** are the sanctioned path for every
   form of metaprogramming — reactive property wrappers, component activation, and template
   compilation all happen at build time, never through runtime interception or emitted IL.
-- Shipping libraries set `<IsAotCompatible>true</IsAotCompatible>` (see [build-system.md](build-system.md)).
+- Shipping libraries set `<IsAotCompatible>true</IsAotCompatible>` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
 - The JS-interop boundary is the dominant performance cost — batch interop, and always clean up JS-side
   handles and event listeners.
 
@@ -357,7 +357,7 @@ paths:
 
 - **xUnit v2 + Shouldly** are the sanctioned frameworks. Shouldly is the single assertion library — do not
   add FluentAssertions or lean on raw `Assert`. Package versions come centrally
-  ([build-system.md](build-system.md)); the test csproj declares them by name via `ViuPackageReference`.
+  ([`.claude/rules/build-system.md`](.claude/rules/build-system.md)); the test csproj declares them by name via `ViuPackageReference`.
 - Each library has a sibling test project at `libraries/Assimalign.Viu.<Name>/test/`
   (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`, referencing its `src` via `ViuProjectReference`.
 - Class `{Feature}Tests`; method names describe `Method_Scenario_ExpectedBehavior` (or an equally explicit
