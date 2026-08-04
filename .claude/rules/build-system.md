@@ -16,6 +16,23 @@ Shared build logic is centralized under `build/` and imported repo-wide via `Dir
 (→ `build/Build.props`) and `Directory.Build.targets` (→ `build/Build.targets`). **Shared build logic
 belongs in `build/`, never duplicated in individual csprojs** — this is the most drift-prone area.
 
+## Where a .props/.targets file lives — exactly two homes
+
+Every MSBuild props/targets file belongs to **one** of these, and per-project `build/` folders scattered
+next to a library's or analyzer's `src/` are not a third option:
+
+1. **`sdks/Assimalign.Viu.Sdk/Targets/`** — it supports the consumer-facing Viu MSBuild experience.
+   `sdks/Directory.Build.targets` packs the whole folder into the SDK nupkg with a `Targets\**\*` glob,
+   and `Sdk/Sdk.props`/`Sdk.targets` import from there. In-repo projects import the *same* file directly
+   (see `Assimalign.Viu.Generators.Syntax.props|.targets`, imported by
+   `build/Targets/Build.References.Analyzers.targets` under `$(ViuUseSingleFileComponents)`), so the
+   packaged and dogfooded paths can never drift.
+2. **`build/`** (repository root) — it supports this repository's own pipeline.
+
+A file that must reach consumers under a *different* packaged name stays in `build/` and is packed with
+an explicit `PackagePath` (the CSS bundling / utility / hot-reload targets do this). An analyzer project
+ships only source and its DLL.
+
 ## Reference projects and packages by name
 
 Never write a raw `<ProjectReference Include="..\..\...csproj" />` or `<PackageReference>` in a library,
@@ -118,10 +135,11 @@ the **in-repo dogfooding** mechanism. The packaging layer mirrors `assimalign/co
 - **`sdks/Assimalign.Viu.Sdk/`** — the SDK package (packable unit: `Tasks/…Tasks.csproj` with
   `PackageId=Assimalign.Viu.Sdk`). `Sdk.props` chains `Microsoft.NET.Sdk.WebAssembly`, imports a
   pack-time-frozen `Build.Version.props` snapshot, and registers the `KnownFrameworkReference` for
-  `Assimalign.Viu.App` (`browser-wasm`). The `.viu` AdditionalFiles wiring and
-  `Build.Css.Bundling.targets` are packed **from their in-repo source files**; the `ViuBundleCss`
-  task ships under `Tasks/`; `viu-dom.js` ships under `assets/` and flows into consumer
-  `wwwroot/_content/`.
+  `Assimalign.Viu.App` (`browser-wasm`). The `.viu` AdditionalFiles wiring lives in `Targets/`
+  (`Assimalign.Viu.Generators.Syntax.props|.targets`) and packs with the folder glob;
+  `Build.Css.Bundling.targets` is packed **from its in-repo source file** under a renamed
+  `PackagePath`; the `ViuBundleCss` task ships under `Tasks/`; `viu-dom.js` ships under `assets/` and
+  flows into consumer `wwwroot/_content/`.
 - **Local loop**: `scripts/Install-Local.ps1` packs SDK → runtime pack(s) → ref pack into
   `_out/packages` (gitignored). Consumption docs: `sdks/README.md`.
 - The `frameworks/` csprojs carry documented deviations from the no-raw-`ProjectReference` rule

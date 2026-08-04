@@ -7,6 +7,11 @@
     without the consumer editing their csproj. The same files flow to dotnet watch so an edit restarts the
     generator/build pipeline.
 
+    THE single authoritative copy - packed into the Assimalign.Viu.Sdk nupkg and imported by
+    Sdk/Sdk.targets for packaged consumers, and imported directly by
+    build/Targets/Build.References.Analyzers.targets for in-repo dogfooding. See the paired .props for
+    the two-home policy that puts it here rather than beside the analyzer's src/.
+
     Opt a single file out by adding it to ViuSingleFileComponentExclude, e.g.:
         <ItemGroup>
           <ViuSingleFileComponentExclude Include="Experimental.viu;Experimental.vue" />

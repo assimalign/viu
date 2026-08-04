@@ -1,11 +1,15 @@
 <Project>
   <!--
     Single-file component (.viu and compatible .vue) build integration
-    ([V01.01.06.02]/[V01.01.06.09]). Delivered to a project that consumes a Viu package hosting the
-    Assimalign.Viu.Generators.Syntax analyzer. This is the MSBuild half of the generator: it flows every
-    component file to the generator by convention, so a project that drops a component file into its tree
-    gets it compiled with no per-project wiring and no hand-maintained item list. The item wiring itself
-    lives in the paired .targets; these properties must be set before it runs.
+    ([V01.01.06.02]/[V01.01.06.09]). This is the MSBuild half of the Assimalign.Viu.Generators.Syntax
+    source generator: it flows every component file to the generator by convention, so a project that
+    drops a component file into its tree gets it compiled with no per-project wiring and no
+    hand-maintained item list. The item wiring itself lives in the paired .targets; these properties
+    must be set before it runs.
+
+    THE single authoritative copy: packed into the Assimalign.Viu.Sdk nupkg and imported by
+    Sdk/Sdk.props, and imported directly by build/Targets/Build.References.Analyzers.targets for
+    in-repo projects that set <ViuUseSingleFileComponents>true</...>. See the paired .targets.
   -->
   <PropertyGroup>
     <!-- Master switch. Set to false to disable single-file-component compilation for a project entirely. -->

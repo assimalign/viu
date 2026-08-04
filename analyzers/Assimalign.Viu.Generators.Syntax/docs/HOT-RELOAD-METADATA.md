@@ -26,7 +26,8 @@ The generator reads two compiler-visible MSBuild properties through `AnalyzerCon
 - `ViuEmitHotReloadMetadata`: when set, this explicit Boolean overrides the configuration default.
   `true` opts any configuration in; `false` opts Debug out.
 
-`Assimalign.Viu.Generators.Syntax.props` publishes both properties as `CompilerVisibleProperty` items.
+`sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props` publishes both properties as
+`CompilerVisibleProperty` items.
 An ordinary Release or AOT build therefore emits no hot-reload interface, hash getters, property
 implementations, assembly attribute, or forwarding handler. The generator does not wrap dormant members in
 conditional code; it omits them from the generated source.

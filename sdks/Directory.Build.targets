@@ -15,18 +15,18 @@
 
         <!--
             Consumer-facing build logic packed FROM ITS IN-REPO SOURCE so the
-            SDK can never drift from the dogfooded implementation:
-              * the .viu AdditionalFiles wiring that
-                build/Targets/Build.References.Analyzers.targets imports for
-                in-repo projects, and
-              * the CSS bundling targets (Sdk.props presets
-                $(ViuBundleCssTaskAssembly) to the packaged Tasks/ copy, so the
-                file's in-repo default path stays dormant).
+            SDK can never drift from the dogfooded implementation: the CSS
+            bundling targets (Sdk.props presets $(ViuBundleCssTaskAssembly) to
+            the packaged Tasks/ copy, so the file's in-repo default path stays
+            dormant).
+
+            The .viu AdditionalFiles wiring is NOT listed here: it lives in
+            Targets\Assimalign.Viu.Generators.Syntax.props|.targets and is
+            already packed by the Targets\**\* glob above. In-repo projects
+            import those same files through
+            build/Targets/Build.References.Analyzers.targets, so the packaged
+            and dogfooded consumers share one authoritative source.
         -->
-        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.props"
-              Pack="true" PackagePath="Targets\Assimalign.Viu.Generators.Syntax.props" Visible="false" />
-        <None Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.targets"
-              Pack="true" PackagePath="Targets\Assimalign.Viu.Generators.Syntax.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
               Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
@@ -57,9 +57,9 @@
     </Target>
     <Target Name="CopyTargetSdkFiles" AfterTargets="Build">
         <ItemGroup>
+            <!-- Targets\*.* now covers the .viu generator wiring too - it lives
+                 in Targets\ rather than a per-project build\ folder. -->
             <_ViuSdkTargetsFile Include="$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))\Targets\*.*" />
-            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.props" />
-            <_ViuSdkTargetsFile Include="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.targets" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkTargetsFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"

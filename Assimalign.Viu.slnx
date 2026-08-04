@@ -76,8 +76,6 @@
 	</Folder>
 	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.Syntax/">
 		<File Path="analyzers/Assimalign.Viu.Generators.Syntax/Assimalign.Viu.Generators.Syntax.slnx" />
-		<File Path="analyzers/Assimalign.Viu.Generators.Syntax/build/Assimalign.Viu.Generators.Syntax.props" />
-		<File Path="analyzers/Assimalign.Viu.Generators.Syntax/build/Assimalign.Viu.Generators.Syntax.targets" />
 	</Folder>
 	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.Syntax/src/">
 		<Project Path="analyzers/Assimalign.Viu.Generators.Syntax/src/Assimalign.Viu.Generators.Syntax.csproj" />
@@ -126,9 +124,12 @@
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/">
 		<File Path="sdks/Assimalign.Viu.Sdk/Sdk/Sdk.props" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Sdk/Sdk.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.targets" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.Common.props" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.StaticWebAssets.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.WebAssembly.targets" />
 	</Folder>
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Tasks/">
 		<Project Path="sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj" />

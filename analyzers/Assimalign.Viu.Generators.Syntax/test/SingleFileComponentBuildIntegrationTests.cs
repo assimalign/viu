@@ -28,9 +28,9 @@ public sealed class SingleFileComponentBuildIntegrationTests
         var repositoryDirectory = FindRepositoryDirectory();
         var propsPath = Path.Combine(
             repositoryDirectory,
-            "analyzers",
-            "Assimalign.Viu.Generators.Syntax",
-            "build",
+            "sdks",
+            "Assimalign.Viu.Sdk",
+            "Targets",
             "Assimalign.Viu.Generators.Syntax.props");
         var temporaryDirectory = Path.Combine(
             Path.GetTempPath(),
@@ -68,9 +68,9 @@ public sealed class SingleFileComponentBuildIntegrationTests
         var repositoryDirectory = FindRepositoryDirectory();
         var targetsPath = Path.Combine(
             repositoryDirectory,
-            "analyzers",
-            "Assimalign.Viu.Generators.Syntax",
-            "build",
+            "sdks",
+            "Assimalign.Viu.Sdk",
+            "Targets",
             "Assimalign.Viu.Generators.Syntax.targets");
         var temporaryDirectory = Path.Combine(
             Path.GetTempPath(),

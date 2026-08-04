@@ -81,23 +81,14 @@
         </ItemGroup>
 
         <!--
-            An analyzer may ship consumer-facing MSBuild logic in a sibling build/ folder next to its src/
-            (e.g. Assimalign.Viu.Generators.Syntax flows .viu files in as AdditionalFiles). Pack those
-            props/targets into the consuming library's nupkg under buildTransitive/ so the packaged
-            consumer picks them up. Dormant for analyzers with no build/ folder (the glob matches nothing).
+            An analyzer ships ONLY its DLL from here. Consumer-facing MSBuild logic never lives in a
+            per-project build/ folder next to an analyzer's src/: every .props/.targets belongs either
+            to sdks/Assimalign.Viu.Sdk/Targets/ (consumer-facing Viu MSBuild experience) or to the
+            repository-root build/ folder (this repo's own pipeline). The .viu AdditionalFiles wiring
+            that used to sit in analyzers/Assimalign.Viu.Generators.Syntax/build/ is now
+            sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props|.targets, delivered
+            to packaged consumers by the SDK package and imported in-repo at the bottom of this file.
         -->
-        <ItemGroup>
-            <_ViuAnalyzerBuildDirectory Include="@(_ViuAnalyzerResolved->'%(RootDir)%(Directory)..\build')" />
-        </ItemGroup>
-        <ItemGroup>
-            <_ViuAnalyzerBuildFile Include="%(_ViuAnalyzerBuildDirectory.Identity)\**\*.props;%(_ViuAnalyzerBuildDirectory.Identity)\**\*.targets" />
-            <!-- NuGet auto-imports only buildTransitive/<PackageId>.props|targets, so the files are
-                 packed under the CONSUMING package's id (also silencing NU5129), never under the
-                 analyzer's own file name. -->
-            <TfmSpecificPackageFile Include="@(_ViuAnalyzerBuildFile)">
-                <PackagePath>buildTransitive\$(PackageId)%(Extension)</PackagePath>
-            </TfmSpecificPackageFile>
-        </ItemGroup>
     </Target>
     <!--
         A generator consumed by ProjectReference (OutputItemType=Analyzer) surfaces only its own DLL to
@@ -118,14 +109,18 @@
     </Target>
 
     <!--
-        In-repo dogfooding seam for the .viu generator: packaged consumers receive its MSBuild wiring
-        (the **/*.viu AdditionalFiles glob and CompilerVisibleProperty declarations) through
-        buildTransitive, but a ViuAnalyzerReference inside this repo would not - imports evaluate
-        before items exist, so the wiring is opted into with a property instead of inferred from the
-        reference: set <ViuUseSingleFileComponents>true</...> alongside the analyzer reference.
+        In-repo dogfooding seam for the .viu generator. Its MSBuild wiring (the **/*.viu
+        AdditionalFiles glob and CompilerVisibleProperty declarations) lives in
+        sdks/Assimalign.Viu.Sdk/Targets/ - the single authoritative copy. Packaged consumers get it
+        because Sdk.props/Sdk.targets import it out of the SDK package's Targets/ folder; in-repo
+        projects get it from the same files through the imports below.
+
+        A ViuAnalyzerReference alone cannot infer the wiring - imports evaluate before items exist -
+        so it is opted into with a property instead: set <ViuUseSingleFileComponents>true</...>
+        alongside the analyzer reference.
     -->
-    <Import Project="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.props"
-            Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.props')" />
-    <Import Project="$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.targets"
-            Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)analyzers\Assimalign.Viu.Generators.Syntax\build\Assimalign.Viu.Generators.Syntax.targets')" />
+    <Import Project="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.props"
+            Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.props')" />
+    <Import Project="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.targets"
+            Condition="'$(ViuUseSingleFileComponents)' == 'true' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
 </Project>
