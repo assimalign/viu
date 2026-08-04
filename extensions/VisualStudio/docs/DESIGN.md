@@ -243,6 +243,56 @@ Parsing remains cancellable and off the Visual Studio UI path: feature requests 
 concurrently with `$/cancelRequest` support, semantic engine work is serialized under its own gate,
 and every cache re-validates by cheap stats on the next request (no file watchers).
 
+## File extension ownership
+
+Nothing in a Visual Studio installation registers the `.viu` file extension — a scan of all 525
+`.pkgdef` files in VS 18 Community finds no entry for it. An extension with no registration falls
+through to the **wildcard** (`"*"`) editor factories, which are offered in descending priority:
+
+| Editor factory | Wildcard priority | Outcome for `.viu` |
+| --- | --- | --- |
+| TextMate | `0x25` | Declines — no `.viu` grammar |
+| XML Editor Chooser | `0x21` | Declines — no designer registered |
+| **Microsoft XML Editor** | `0x20` | **Claims the document** |
+| Source Code (Text) Editor | `0x1e` | Never reached |
+
+`Microsoft.XmlEditor.Sniffer.SniffXmlDocument` accepts any document whose first token is a
+well-formed start tag. A `.viu` container opens with `<template>`, so the sniff succeeds on that
+first tag and never reads the `@script` block below it. The factory then attaches the XML language
+service and sets `guidVSBufferDetectLangSid` to false, which **suppresses later content-type
+detection** — the buffer stays XML-derived for its lifetime.
+
+Three consequences follow, and they explain behavior that otherwise looks like extension bugs:
+
+- The `viu` content type contributed through `documentTypes` never reaches the buffer, so any part
+  filtered on document type `viu` — including `ViuLanguageServerProvider`, whose filter *must* name a
+  document type — is never activated. **Semantic IntelliSense does not work until `.viu` is
+  reassociated.**
+- The XML parser reports its own diagnostics against C# and container syntax: `@script {` becomes
+  "Invalid token 'Text' at root level of document", `Get<string>` becomes "Tag was not closed", and
+  `<style scoped>` becomes "Missing attribute value on attribute 'scoped'". These carry no error
+  code, are editor-only, and never affect a build.
+- `.vue` is unaffected, because Web Tools claims that extension explicitly at `0x33`, outranking the
+  wildcard.
+
+`ViuClassificationTaggerProvider` is therefore filtered on the built-in `text` document type, which
+both the XML and plain-text content types derive from, and selects containers itself in
+`IsSingleFileComponent`. Colorization consequently works regardless of which editor won the file.
+
+**The supported resolution is per-user**: Open With → *Source Code (Text) Editor* → Set as Default.
+`GetDesignerFactory` consults the user-defined editor mapping before the priority ladder, so this
+bypasses the sniffer; the text editor attaches no language service, so the buffer then takes its
+content type from this extension's own `documentTypes` registration and the language server starts.
+
+The durable fix is a `.pkgdef` claiming `.viu` for the text editor at `0x32`, which is the band
+Microsoft itself uses for explicitly owned extensions. **This is deliberately not implemented.** A
+`.pkgdef` requires `VssdkCompatibleExtension`, which in turn mandates `RequiresInProcessHosting` —
+the extension would move in-process and lose out-of-process isolation. Recorded decision
+(2026-08-03): keep the extension out of process and document the per-user association instead. Do
+not reach for a TextMate grammar as a workaround either: TextMate's factory outranks XML and would
+evict it, but it would stamp its own TextMate-derived content type on the buffer, trading one wrong
+content type for another and still leaving the language server inactive.
+
 ## Packaging
 
 The shared `ViuPublishLanguageServer` target in `build/Targets/Build.LanguageServer.targets`

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,19 +21,6 @@ internal sealed class ViuClassificationTaggerProvider :
 {
     private readonly object synchronizationLock = new();
     private readonly Dictionary<Uri, List<ViuClassificationTagger>> taggers = [];
-    private readonly TraceSource traceSource;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ViuClassificationTaggerProvider"/> class.
-    /// </summary>
-    /// <param name="traceSource">
-    /// Trace sink supplied by the extension host. Classification runs entirely out of process, so
-    /// the trace log is the only channel that can show which spans a document actually received.
-    /// </param>
-    public ViuClassificationTaggerProvider(TraceSource traceSource)
-    {
-        this.traceSource = traceSource;
-    }
 
     /// <summary>
     /// Determines whether a document is a Viu single-file component from its file name.
@@ -62,13 +48,21 @@ internal sealed class ViuClassificationTaggerProvider :
     /// and discards a part that declares none.
     /// </para>
     /// <para>
-    /// The one filter is the built-in text document type, not the Viu container types. Those exist
-    /// only once this extension has loaded and its <c>documentTypes</c> have been applied to the
-    /// content-type registry at runtime; nothing static registers the <c>.viu</c> extension, so a
-    /// filter naming them cannot match a document whose buffer was created first, and the tagger is
-    /// never asked for it. Filtering on the text base type is always satisfiable, and
-    /// <see cref="IsSingleFileComponent"/> then does the container selection here, where it cannot be
-    /// lost to a registration race. This costs one rejected callback per non-Viu text view.
+    /// The one filter is the built-in text document type, not the Viu container types, because a
+    /// <c>.viu</c> buffer is not guaranteed to carry the <c>viu</c> content type at all. No editor
+    /// registration in Visual Studio claims the <c>.viu</c> file extension, so the file falls through
+    /// to the wildcard editor factories, and the XML editor's factory claims any document whose first
+    /// token is a well-formed start tag — which a <c>&lt;template&gt;</c> container always is. That
+    /// factory attaches the XML language service and suppresses further content-type detection, so the
+    /// buffer stays XML-derived for its lifetime and a filter naming <c>viu</c> never matches. See
+    /// <c>extensions/VisualStudio/docs/DESIGN.md</c>, "File extension ownership".
+    /// </para>
+    /// <para>
+    /// Filtering on the text base type is satisfied either way, since both the XML and plain-text
+    /// content types derive from it, and <see cref="IsSingleFileComponent"/> then selects containers
+    /// here where no editor-factory decision can interfere. Classification therefore works whether or
+    /// not <c>.viu</c> has been reassociated with the text editor. This costs one rejected callback
+    /// per non-Viu text view.
     /// </para>
     /// <para>
     /// The generator evaluates this property at compile time, so the filter is written inline; the
@@ -112,7 +106,6 @@ internal sealed class ViuClassificationTaggerProvider :
         ViuClassificationTagger tagger = new(
             this,
             textView.Document.Uri,
-            this.traceSource,
             isSingleFileComponent);
 
         if (isSingleFileComponent)

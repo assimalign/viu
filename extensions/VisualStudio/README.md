@@ -21,6 +21,25 @@ The process boundary is intentional. Viu's parsers, and eventually Roslyn worksp
 
 The client uses `Microsoft.VisualStudio.Extensibility` 17.14 and executes out of process.
 
+### Associate `.viu` with the text editor
+
+Do this once per Visual Studio instance, before expecting semantic features:
+
+> Right-click any `.viu` file in Solution Explorer → **Open With…** → **Source Code (Text) Editor** →
+> **Set as Default**
+
+Visual Studio ships no registration for the `.viu` extension, so the file is claimed by the XML
+editor's wildcard factory — it accepts any document starting with a well-formed tag, and a container
+starts with `<template>`. Until `.viu` is reassociated, the buffer keeps an XML content type, which
+means the language server never attaches (**no C# IntelliSense inside `@script`**) and the XML parser
+reports spurious errors against C# and container syntax. Those errors are editor-only and never
+affect a build.
+
+Syntax colorization works either way and needs no association.
+
+The extension cannot make this association itself without moving in process; see
+[docs/DESIGN.md](docs/DESIGN.md), "File extension ownership", for the decision and the mechanism.
+
 ## Build the complete extension
 
 From the Viu repository root:

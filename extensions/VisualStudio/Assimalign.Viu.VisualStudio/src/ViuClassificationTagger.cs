@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,18 +14,15 @@ internal sealed class ViuClassificationTagger : TextViewTagger<ClassificationTag
 {
     private readonly ViuClassificationTaggerProvider provider;
     private readonly Uri documentUri;
-    private readonly TraceSource traceSource;
     private readonly bool isSingleFileComponent;
 
     public ViuClassificationTagger(
         ViuClassificationTaggerProvider provider,
         Uri documentUri,
-        TraceSource traceSource,
         bool isSingleFileComponent)
     {
         this.provider = provider;
         this.documentUri = documentUri;
-        this.traceSource = traceSource;
         this.isSingleFileComponent = isSingleFileComponent;
     }
 
@@ -133,49 +128,7 @@ internal sealed class ViuClassificationTagger : TextViewTagger<ClassificationTag
             })
             .ToList();
 
-        this.TraceUpdate(lines.Count, requestedLineNumbers, lexicalSpans, tags.Count);
-
         await this.UpdateTagsAsync(calculatedRanges, tags, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Records which lines Visual Studio asked for and which classifications were produced for them.
-    /// </summary>
-    /// <remarks>
-    /// Classification is computed in the extension process and applied in the Visual Studio process,
-    /// so a document that renders uncolored gives no local signal about which half failed. This trace
-    /// distinguishes the two: a line absent from <paramref name="requestedLineNumbers"/> was never
-    /// asked for, whereas a requested line that contributes no tag was classified as empty.
-    /// </remarks>
-    private void TraceUpdate(
-        int documentLineCount,
-        HashSet<int> requestedLineNumbers,
-        IReadOnlyList<ViuLexicalSpan> lexicalSpans,
-        int tagCount)
-    {
-        if (!this.traceSource.Switch.ShouldTrace(TraceEventType.Information))
-        {
-            return;
-        }
-
-        string classifications = string.Join(
-            " ",
-            lexicalSpans
-                .Where(span => requestedLineNumbers.Contains(span.LineNumber))
-                .GroupBy(span => span.ClassificationKind)
-                .OrderByDescending(group => group.Count())
-                .Select(group => FormattableString.Invariant($"{group.Key}={group.Count()}")));
-
-        this.traceSource.TraceEvent(
-            TraceEventType.Information,
-            id: 0,
-            format: "Viu classification: {0} lines {1}-{2} of {3} requested, {4} tags [{5}]",
-            this.documentUri.LocalPath,
-            requestedLineNumbers.Min() + 1,
-            requestedLineNumbers.Max() + 1,
-            documentLineCount,
-            tagCount.ToString(CultureInfo.InvariantCulture),
-            classifications);
     }
 
     internal static ClassificationType GetClassificationType(
