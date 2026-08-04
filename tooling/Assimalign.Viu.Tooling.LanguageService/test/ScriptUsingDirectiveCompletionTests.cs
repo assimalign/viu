@@ -53,6 +53,24 @@ public class ScriptUsingDirectiveCompletionTests
         completions.ShouldNotContain(
             completion => completion.Kind == LanguageCompletionItemKind.Keyword);
         completions.ShouldAllBe(completion => !completion.IsSnippet);
+        completions.ShouldAllBe(
+            completion => completion.Kind == LanguageCompletionItemKind.Module ||
+                completion.Kind == LanguageCompletionItemKind.Class);
+    }
+
+    [Fact]
+    public void GetCompletions_NamespaceSymbol_CarriesTheModuleKind()
+    {
+        // The Language Server Protocol has no namespace kind; Module is the value editors render
+        // with the namespace glyph ({} in Visual Studio). Falling through to Text put namespaces
+        // behind the plain-text glyph instead.
+        var service = CreateService(ComponentSource, ScriptSemanticFixture.CreateContext());
+
+        var completions = service.GetCompletions(DocumentUri, UsingDirectivePosition());
+
+        completions.Single(completion => completion.Label == "System")
+            .Kind.ShouldBe(LanguageCompletionItemKind.Module);
+        ((int)LanguageCompletionItemKind.Module).ShouldBe(9);
     }
 
     [Fact]

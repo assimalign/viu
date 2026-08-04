@@ -502,9 +502,13 @@ internal sealed class ScriptSemanticEngine
         return items;
     }
 
+    // A namespace maps to Module, the protocol value editors render with the namespace glyph
+    // ({} in Visual Studio). Without the case it fell to Text and namespaces came back wearing the
+    // plain-text glyph, which reads as anything but a namespace.
     private static LanguageCompletionItemKind ToCompletionKind(ISymbol symbol)
         => symbol switch
         {
+            INamespaceSymbol => LanguageCompletionItemKind.Module,
             IPropertySymbol => LanguageCompletionItemKind.Property,
             IMethodSymbol => LanguageCompletionItemKind.Method,
             IFieldSymbol => LanguageCompletionItemKind.Field,
