@@ -47,14 +47,35 @@ internal static class GeneratedComponentSupport
     /// <summary>Generates, compiles, and loads the component, returning its runtime <see cref="Type"/>.</summary>
     /// <param name="componentName">The component name.</param>
     /// <param name="source">The <c>.viu</c> source text.</param>
+    /// <param name="requireNoWarnings">
+    /// Whether the compiled scaffold must be warning-free. Pass <see langword="false"/> only when the
+    /// warning is itself the behavior under test — a component that hides an inherited member
+    /// ([CMP-32]), for example.
+    /// </param>
     /// <returns>The loaded component type.</returns>
-    internal static Type CompileToType(string componentName, string source)
+    internal static Type CompileToType(string componentName, string source, bool requireNoWarnings = true)
     {
         var generated = Generate(componentName, source);
-        var assembly = Assembly.Load(CompileToAssembly(generated));
+        var assembly = Assembly.Load(CompileToAssembly(generated, requireNoWarnings));
         return assembly.GetType($"{RootNamespace}.{componentName}")
             ?? throw new InvalidOperationException(
                 $"The compiled assembly did not contain {RootNamespace}.{componentName}.");
+    }
+
+    /// <summary>
+    /// Generates and compiles the component, returning the C# error and warning ids the compilation
+    /// reported. This is the shape a test needs when the compiler's own diagnostic is the subject.
+    /// </summary>
+    /// <param name="componentName">The component name.</param>
+    /// <param name="source">The <c>.viu</c> source text.</param>
+    /// <returns>The reported diagnostic ids, in source order.</returns>
+    internal static IReadOnlyList<string> CompileDiagnostics(string componentName, string source)
+    {
+        return CreateCompilation(Generate(componentName, source))
+            .GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)
+            .Select(diagnostic => diagnostic.Id)
+            .ToList();
     }
 
     /// <summary>Runs the generator over one <c>.viu</c> source and returns the generated partial-class text.</summary>
@@ -91,9 +112,9 @@ internal static class GeneratedComponentSupport
             .SourceText.ToString();
     }
 
-    private static byte[] CompileToAssembly(string generatedSource)
+    private static CSharpCompilation CreateCompilation(string generatedSource)
     {
-        var compilation = CSharpCompilation.Create(
+        return CSharpCompilation.Create(
             "Demo.Compiled." + Guid.NewGuid().ToString("N"),
             new[] { CSharpSyntaxTree.ParseText(generatedSource, new CSharpParseOptions(LanguageVersion.Preview)) },
             ResolveReferences(),
@@ -101,6 +122,11 @@ internal static class GeneratedComponentSupport
                 OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
+    }
+
+    private static byte[] CompileToAssembly(string generatedSource, bool requireNoWarnings)
+    {
+        var compilation = CreateCompilation(generatedSource);
 
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
@@ -118,10 +144,14 @@ internal static class GeneratedComponentSupport
 
         // The scaffold is held to the same bar as the rest of the repository: a generated component that
         // warns would make a consumer's zero-warning build impossible to keep.
-        emit.Diagnostics
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning)
-            .Select(diagnostic => diagnostic.ToString())
-            .ShouldBeEmpty();
+        if (requireNoWarnings)
+        {
+            emit.Diagnostics
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning)
+                .Select(diagnostic => diagnostic.ToString())
+                .ShouldBeEmpty();
+        }
+
         return stream.ToArray();
     }
 

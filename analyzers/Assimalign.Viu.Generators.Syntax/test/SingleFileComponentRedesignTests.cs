@@ -38,10 +38,12 @@ public sealed class SingleFileComponentRedesignTests
             outcome,
             "Panel.SingleFileComponent.g.cs");
 
+        // [SFC-CG-4] The base class carries Context and the root-level lifecycle registration surface;
+        // the interface stays on the partial because the declaration members are explicit implementations.
         generated.ShouldContain(
-            "partial class Panel : global::Assimalign.Viu.Components.IComponentTemplate");
-        generated.ShouldContain(
-            "private global::Assimalign.Viu.Components.IComponentContext Context { get; set; } = null!;");
+            "partial class Panel : global::Assimalign.Viu.Components.ComponentTemplateBase, "
+            + "global::Assimalign.Viu.Components.IComponentTemplate");
+        generated.ShouldNotContain("IComponentContext Context { get; set; }");
         generated.ShouldContain("partial void OnSetup();");
         generated.ShouldContain("Context = context;\n            OnSetup();");
         generated.ShouldContain(

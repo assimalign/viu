@@ -387,9 +387,32 @@ attribute-declared events coexist. The rule has two reasons: the generated decla
 *explicit* interface implementation and would silently shadow an authored collection, and an
 attribute-declared surface is usable as a build-time contract only when it is complete.
 
+### 4.10 Root-level lifecycle registration
+
+`[CMP-32]` A component MAY register a lifecycle callback **at the root of its own class** —
+`OnMounted(callback)` — instead of through the context — `Context.Lifecycle.OnMounted(callback)`.
+`ComponentTemplateBase` declares one **protected** pass-through per `IComponentLifecycle` registration
+method, with the identical name and signature, and the compiled single-file component derives from it
+[SFC-CG-4]. The root form is the **specified equivalent** of the context form: it registers the same
+callback with the same registrar, so the two forms carry identical timing [CMP-20], identical
+asynchronous observation [CMP-21], and identical error routing [CMP-23]. Callbacks registered for one
+phase run in **registration order**, and that order is the order the registrations were made
+regardless of which form each used, so the two forms MAY be mixed freely within one component. The
+root form adds no state: there is exactly one registrar per mounted component, reached through
+`IComponentContext.Lifecycle` either way.
+
+A component MAY declare its own member with one of these names. An identical signature **hides** the
+inherited pass-through under ordinary C# member-hiding rules — the authored member wins at every call
+site inside the component, C# reports the hiding as a warning rather than an error, no registration
+happens through it, and the hidden hook stays reachable through the context form. A different
+signature is an ordinary overload and hides nothing. The pass-throughs are therefore *not* reserved
+names in the sense of [SFC-CG-1]: a collision degrades to the behavior the component would have had
+without them.
+
 *Authority: `libraries/Assimalign.Viu.Components/src/Abstraction/*.cs` (21 interfaces);
 `libraries/Assimalign.Viu.Components/src/{Tree,Metadata,Slots,Activation}/*.cs`
-(`Metadata/{ParameterAttribute,EventAttribute}.cs` for [CMP-26]-[CMP-31]);
+(`Metadata/{ParameterAttribute,EventAttribute}.cs` for [CMP-26]-[CMP-31];
+`ComponentTemplateBase.cs` for [CMP-32]);
 `libraries/Assimalign.Viu.Core/src/Internal/{ComponentContext,ComponentLifecycle,MountedComponent}.cs`;
 `libraries/Assimalign.Viu.Core/src/Abstraction/IApplicationContext.cs`;
 `libraries/Assimalign.Viu.Components/docs/OVERVIEW.md`; `libraries/DESIGN.md`;
@@ -955,6 +978,16 @@ reserves the generated members `__ViuDeclaredParameters`, `__ViuDeclaredEvents`,
 partial class. The two declaration collections are emitted as **explicit** `IComponentTemplate`
 implementations, so they can never collide with an authored member of the same name — which is also
 why declaring both forms is an error [CMP-31].
+
+`[SFC-CG-4]` A component with a template block is generated as
+`partial class <Name> : ComponentTemplateBase, IComponentTemplate`. The base class supplies the
+`Context` property the generated `Setup` assigns once per mount before `OnSetup` runs, and the
+protected root-level lifecycle registration surface [CMP-32]. `IComponentTemplate` stays on the
+partial itself because the scaffold's declaration members are *explicit* interface implementations
+[SFC-CG-3], which C# permits only on a type that lists the interface. Because the base type is
+declared by the generated partial, **no other partial declaration of the component may name a
+different base class**. A component with no template block stays a plain partial class with neither
+[V01.01.06.07].
 
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost

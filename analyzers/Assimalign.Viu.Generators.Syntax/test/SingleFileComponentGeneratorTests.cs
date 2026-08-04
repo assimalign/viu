@@ -66,7 +66,7 @@ namespace Demo
     // "Counter.viu" by the Assimalign.Viu.Syntax source generator ([V01.01.06.02]).
     //
     // Parsed blocks: template=present, @script=present, style=1, custom=0.
-    partial class Counter : global::Assimalign.Viu.Components.IComponentTemplate
+    partial class Counter : global::Assimalign.Viu.Components.ComponentTemplateBase, global::Assimalign.Viu.Components.IComponentTemplate
     {
         /// <summary>
         /// The number of render cache slots (<c>v-once</c> subtrees and cached handlers) the
@@ -97,8 +97,10 @@ namespace Demo
         /// <summary>Gets the compiler-produced style scope identifier.</summary>
         string? global::Assimalign.Viu.Components.IComponentTemplate.ScopeIdentifier => ScopeId;
 
-        /// <summary>Gets the mounted component context after generated setup begins.</summary>
-        private global::Assimalign.Viu.Components.IComponentContext Context { get; set; } = null!;
+        // [SFC-CG-4] Context is the protected property inherited from ComponentTemplateBase;
+        // Setup below assigns it once per mount. The same base carries the root-level lifecycle
+        // registration methods (OnMounted(...) and siblings), each a pass-through to
+        // Context.Lifecycle ([CMP-32]).
 
         /// <summary>Runs developer-authored synchronous setup after <see cref="Context"/> is assigned.</summary>
         partial void OnSetup();

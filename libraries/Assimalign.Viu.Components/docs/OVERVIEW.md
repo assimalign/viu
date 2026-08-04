@@ -82,6 +82,20 @@ each lifecycle phase, and gives server prefetch an explicit awaited contract. Or
 hooks do not delay lifecycle progression. Core owns the internal task observation and error-routing
 machinery.
 
+`ComponentTemplateBase` is the authoring base class the single-file-component generator puts under
+every compiled component with a template block. It holds the mounted `IComponentContext` the
+generated setup bridge assigns and re-declares every `IComponentLifecycle` registration method as a
+**protected** pass-through, so a component writes `OnMounted(() => ...)` at the root of its class
+rather than `Context.Lifecycle.OnMounted(() => ...)`. The two forms are specified equivalents --
+same registrar, one shared registration order, so they may be mixed
+([`[CMP-32]`](../../../docs/SPECIFICATION.md#410-root-level-lifecycle-registration),
+[`[SFC-CG-4]`](../../../docs/SPECIFICATION.md#85-the-code-generation-contract)). A component that
+declares a member of its own with one of these names hides the pass-through under ordinary C#
+rules -- a warning, never an error -- and reaches the hook through the context form. The base
+deliberately does not implement `IComponentTemplate`: the generated declaration members are explicit
+interface implementations, which C# allows only on a type that lists the interface itself. A
+hand-authored component may derive from it too, assigning `Context` at the head of its own `Setup`.
+
 `ComponentOptimization` preserves the compiler/runtime block-tree contract on the unified tree:
 patch flags, dynamic property names, dynamic children, and the `v-once` marker. Core may lower the
 tree for hot-path dispatch, but it must copy this metadata without changing its semantics.

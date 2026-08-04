@@ -18,9 +18,12 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// resolve to the <c>.viu</c> source. The script splits into two <c>#line</c>-mapped regions
 /// ([V01.01.06.03.01]): leading <c>using</c> directives are hoisted into the file's using region above the
 /// namespace, and the remaining members are merged into the class body (see <see cref="ScriptRegions"/>).
-/// The scaffold reserves <c>Context</c> and <c>OnSetup</c> for the generated component-context bridge,
+/// A template-bearing component derives from <c>ComponentTemplateBase</c> ([SFC-CG-4]), which supplies
+/// the <c>Context</c> property the bridge assigns and the protected root-level lifecycle registration
+/// methods ([CMP-32]). The scaffold reserves <c>OnSetup</c> for the generated component-context bridge,
 /// plus the compiler-owned render members (<c>Render</c> and <c>RenderCacheSize</c>). The class stays
-/// <c>partial</c>, so a user-authored sibling <c>.cs</c> partial and the merged script otherwise coexist.
+/// <c>partial</c>, so a user-authored sibling <c>.cs</c> partial and the merged script otherwise coexist;
+/// because the base type is declared here, no other partial declaration may name a different one.
 /// </summary>
 internal static class SingleFileComponentSourceEmitter
 {
@@ -129,11 +132,16 @@ internal static class SingleFileComponentSourceEmitter
         if (model.RenderBody is not null)
         {
             // [V01.01.06.07] A template-bearing .viu is a mountable component: the generated partial
-            // implements IComponentTemplate (base list added here, the sole class-declaration site) so it
-            // can be activated by IComponentFactory. A style-only .viu with no render body stays a plain
-            // partial class — no interface and no Setup. Named by global:: reference, never an assembly
-            // reference.
-            builder.Append(" : ").Append(ComponentsNamespace).Append(".IComponentTemplate");
+            // derives from ComponentTemplateBase and implements IComponentTemplate (base list added here,
+            // the sole class-declaration site) so it can be activated by IComponentFactory. The base
+            // carries the mounted Context and the protected root-level lifecycle registration surface
+            // ([SFC-CG-4], [CMP-32]); the interface is still listed on the partial itself because the
+            // scaffold's declaration members are EXPLICIT interface implementations, which C# permits only
+            // on a type that lists the interface. A style-only .viu with no render body stays a plain
+            // partial class — no base type, no interface, and no Setup. Named by global:: reference, never
+            // an assembly reference.
+            builder.Append(" : ").Append(ComponentsNamespace).Append(".ComponentTemplateBase, ")
+                .Append(ComponentsNamespace).Append(".IComponentTemplate");
             if (model.HotReloadMetadata is not null)
             {
                 builder.Append(", ").Append(ComponentsNamespace)
@@ -392,10 +400,13 @@ internal static class SingleFileComponentSourceEmitter
 
         builder.Append('\n');
         AppendIndent(builder, indent);
-        builder.Append("/// <summary>Gets the mounted component context after generated setup begins.</summary>\n");
+        builder.Append("// [SFC-CG-4] Context is the protected property inherited from ComponentTemplateBase;\n");
         AppendIndent(builder, indent);
-        builder.Append("private ").Append(ComponentsNamespace)
-            .Append(".IComponentContext Context { get; set; } = null!;\n");
+        builder.Append("// Setup below assigns it once per mount. The same base carries the root-level lifecycle\n");
+        AppendIndent(builder, indent);
+        builder.Append("// registration methods (OnMounted(...) and siblings), each a pass-through to\n");
+        AppendIndent(builder, indent);
+        builder.Append("// Context.Lifecycle ([CMP-32]).\n");
 
         if (usesSlots)
         {

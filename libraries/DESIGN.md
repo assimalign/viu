@@ -113,6 +113,15 @@ scope deterministically. `IComponentLifecycle` has synchronous and task-returnin
 before-mount, mounted, before-update, updated, before-unmount, unmounted, activated, and deactivated
 callbacks. It also exposes the component-lifetime `CancellationToken`.
 
+Registration is reachable two ways. `ComponentTemplateBase` -- the base class the single-file
+component generator puts under every component with a template block -- re-declares each of those
+registration methods as a protected pass-through to `Context.Lifecycle`, so a component writes
+`OnMounted(...)` at the root of its class. The shorter form is an ergonomic surface, not a second
+mechanism: there is one registrar per mounted component and one registration order, and the base
+holds no lifecycle state of its own ([`[CMP-32]`](../docs/SPECIFICATION.md#410-root-level-lifecycle-registration)).
+The wrappers are cold path -- registration happens once per mount during setup -- so putting them on
+a base class costs nothing the engine's hot paths care about.
+
 Core observes task-returning lifecycle callbacks and component-event listeners and routes faults
 through `OnErrorCaptured` and the application error handler. Browser separately observes
 task-returning host event handlers and routes their faults to the application error handler.

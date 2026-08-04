@@ -246,6 +246,11 @@ public sealed class SingleFileComponentTemplateSourceMapTests
             "        string? Name { get; }\n" +
             "        ComponentRenderer Setup(IComponentContext context);\n" +
             "    }\n" +
+            // [SFC-CG-4] The scaffold's base class: it owns the Context the generated Setup assigns.
+            "    internal abstract class ComponentTemplateBase\n" +
+            "    {\n" +
+            "        protected IComponentContext Context { get; set; } = null!;\n" +
+            "    }\n" +
             "}\n" +
             "namespace Assimalign.Viu\n" +
             "{\n" +
