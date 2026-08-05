@@ -6,10 +6,14 @@
     <ItemGroup>
         <!-- The SDK-shaped nupkg layout: Sdk/ and Targets/ at package root -
              exactly what NuGet's MSBuild SDK resolver expects. -->
-        <None Include="$(MSBuildProjectDirectory)\..\Sdk\**\*" Pack="true" PackagePath="Sdk\%(RecursiveDir)%(Filename)%(Extension)">
+        <!-- Every PackagePath in this file uses '/'. A package path is not a filesystem
+             path: pack only recognises '/' as its separator on every host, and a
+             backslash silently produces malformed entries off Windows (see
+             CollectSdkTaskFiles). -->
+        <None Include="$(MSBuildProjectDirectory)\..\Sdk\**\*" Pack="true" PackagePath="Sdk/%(RecursiveDir)%(Filename)%(Extension)">
             <Visible>false</Visible>
         </None>
-        <None Include="$(MSBuildProjectDirectory)\..\Targets\**\*" Pack="true" PackagePath="Targets\%(RecursiveDir)%(Filename)%(Extension)">
+        <None Include="$(MSBuildProjectDirectory)\..\Targets\**\*" Pack="true" PackagePath="Targets/%(RecursiveDir)%(Filename)%(Extension)">
             <Visible>false</Visible>
         </None>
 
@@ -28,11 +32,11 @@
             and dogfooded consumers share one authoritative source.
         -->
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
-              Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
+              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
-              Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.UtilityCss.targets" Visible="false" />
+              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.UtilityCss.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
-              Pack="true" PackagePath="Targets\Assimalign.Viu.Sdk.Css.HotReload.targets" Visible="false" />
+              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Css.HotReload.targets" Visible="false" />
 
         <!--
             Framework static web assets. A FrameworkReference delivers DLLs
@@ -43,7 +47,7 @@
             build/Targets/Build.StaticWebAssets.targets produces).
         -->
         <None Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*"
-              Pack="true" PackagePath="assets\Assimalign.Viu.Browser\%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
+              Pack="true" PackagePath="assets/Assimalign.Viu.Browser/%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
 
         <None Include="$(ViuRepositoryDirectory)sdks\README.md" Pack="true" PackagePath="README.md" Visible="false" />
     </ItemGroup>
@@ -114,19 +118,43 @@
     <Target Name="CollectShippedVersionProps" DependsOnTargets="GenerateShippedVersionProps">
         <ItemGroup>
             <TfmSpecificPackageFile Include="$(IntermediateOutputPath)Build.Version.props">
-                <PackagePath>Targets\Build.Version.props</PackagePath>
+                <PackagePath>Targets/Build.Version.props</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
     </Target>
     <!-- #endregion -->
 
+    <!--
+        The Tasks/ payload is the complete output closure of the task assembly, swept
+        straight out of $(OutDir) so the shipped task can load its parser dependencies.
+
+        PackagePath names the destination FOLDER only, and must stay that way. NuGet
+        carries a wildcard item's %(RecursiveDir) itself, through the NuGetRecursiveDir
+        metadata its _GetTfmSpecificContentForPackage target copies (the documented
+        msbuild#3121 workaround), and appends it under this folder. Hand-composing
+        "Tasks\%(RecursiveDir)%(Filename)%(Extension)" instead is host-OS dependent: pack
+        running on a non-Windows host does not treat the backslash as a separator, and
+        every swept file lands at the malformed entry "Tasks//<name>" rather than
+        "Tasks/<name>". The package still builds and still validates, so the damage only
+        surfaces at restore time - a consumer finds no Tasks/Assimalign.Viu.Sdk.Tasks.dll
+        where Sdk.props points $(ViuBundleCssTaskAssembly), and every Viu build fails to
+        load the ViuBundleCss task. Folder-only PackagePath is the same form the analyzer
+        and shared-framework packs use (build/Targets/Build.References.Analyzers.targets,
+        frameworks/Assimalign.Viu.App.targets).
+    -->
     <Target Name="CollectSdkTaskFiles">
         <ItemGroup>
             <TfmSpecificPackageFile Include="$(OutDir)**\*"
                                     Exclude="$(OutDir)**\*.nupkg;$(OutDir)**\*.snupkg;$(OutDir)**\*.nuspec;$(OutDir)Assimalign.Viu.Sdk.CssHotReload.*">
-                <PackagePath>Tasks\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+                <PackagePath>Tasks</PackagePath>
             </TfmSpecificPackageFile>
+            <!-- Filtered out of the collected set itself, not probed on disk: this is the
+                 payload that is actually about to be packed. -->
+            <_ViuSdkPrimaryTaskFile Include="@(TfmSpecificPackageFile)"
+                                    Condition="'%(Filename)%(Extension)' == '$(TargetFileName)'" />
         </ItemGroup>
+        <Error Condition="'@(_ViuSdkPrimaryTaskFile)' == ''"
+               Text="CollectSdkTaskFiles swept $(OutDir) but the SDK's primary task assembly $(TargetFileName) is not in the collected set, so the package would ship a Tasks/ payload that cannot load. CopyFilesToOutputDirectory is the target that places it there, and it must run before Pack collects the payload: build before packing (do not pass --no-build or -p:NoBuild=true) and do not clean $(OutDir) in between." />
     </Target>
 
     <Target Name="CollectSdkWatchFiles">
@@ -138,7 +166,7 @@
             <_ViuSdkWatchFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Watch\Assimalign.Viu.Sdk.CssHotReload.deps.json" />
             <_ViuSdkWatchFile Include="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Watch\Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json" />
             <TfmSpecificPackageFile Include="@(_ViuSdkWatchFile)">
-                <PackagePath>Watch\%(_ViuSdkWatchFile.RecursiveDir)%(_ViuSdkWatchFile.Filename)%(_ViuSdkWatchFile.Extension)</PackagePath>
+                <PackagePath>Watch/%(_ViuSdkWatchFile.RecursiveDir)%(_ViuSdkWatchFile.Filename)%(_ViuSdkWatchFile.Extension)</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
     </Target>
