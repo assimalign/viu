@@ -33,6 +33,13 @@ namespace Assimalign.Viu.Tooling.LanguageService;
 /// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange">
 /// Language Server Protocol 3.17 — textDocument/foldingRange</see>.
 /// </para>
+/// <para>
+/// Keeping the end tag visible is the <em>markup</em> convention and is deliberately not the one script
+/// blocks use: C# constructs collapse with both delimiters hidden, beside their signature, the way the
+/// C# editor collapses a <c>.cs</c> file (see <see cref="ScriptFoldingRangeCollector"/>,
+/// [V01.01.12.07.10]). The split is per family and intentional — an author reads a collapsed element by
+/// its tags and a collapsed method by its signature.
+/// </para>
 /// </remarks>
 internal static class TemplateFoldingRangeCollector
 {

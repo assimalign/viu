@@ -16,6 +16,8 @@ namespace Assimalign.Viu.Tooling.LanguageService;
 /// object and collection initializers, collection expressions, nested type bodies, switch bodies, and
 /// <c>#region</c> pairs — in document order, addressed in the document's zero-based line coordinates so
 /// the ranges compose with the section ranges and the template-element ranges the service already emits.
+/// A construct collapses beside its signature with both delimiters hidden, the way the C# editor
+/// collapses a <c>.cs</c> file; see the convention split below.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,20 +29,47 @@ namespace Assimalign.Viu.Tooling.LanguageService;
 /// answers every folding request from the first parse.
 /// </para>
 /// <para>
-/// A range spans a <em>delimiter pair</em>: it starts on the line holding the opening <c>{</c> or
-/// <c>[</c> (the <c>#region</c> line for a region) and ends one line above the line holding the closing
-/// delimiter. Under the Language Server Protocol folding-range contract the folded region runs from the
-/// end of <c>startLine</c> through the end of <c>endLine</c>, so stopping one line short keeps the
-/// closing delimiter visible while the construct is collapsed — the convention the block-container and
-/// template-element ranges already use, which is what lets all three families compose.
+/// <b>The C# collapse convention, and why it is not the markup one.</b> Viu deliberately runs
+/// <em>two</em> folding conventions, one per family, because an author reads a collapsed script block
+/// as C# and a collapsed template as markup ([V01.01.12.07.10], from the requirement that a script
+/// block collapse the way the C# editor collapses a <c>.cs</c> file):
+/// <list type="bullet">
+/// <item>
+/// <b>Markup keeps its closer visible.</b> A template element's fold ends one line <em>above</em> its
+/// end tag, so <c>&lt;/div&gt;</c> still marks where the collapsed element stops
+/// ([V01.01.12.07.07]) — the block-container section ranges do the same for <c>}</c> and
+/// <c>&lt;/template&gt;</c>.
+/// </item>
+/// <item>
+/// <b>C# swallows its closer.</b> A script construct's fold ends <em>on</em> the line holding its
+/// closing <c>}</c> or <c>]</c>, so the collapsed method reads
+/// <c>public void Track(string message) […]</c> with both braces hidden, exactly as a collapsed
+/// method reads in a <c>.cs</c> file.
+/// </item>
+/// </list>
+/// The start line follows from the same requirement. Under the Language Server Protocol folding-range
+/// contract the folded region runs from the <em>end</em> of <c>startLine</c> through the end of
+/// <c>endLine</c>, so whatever line a range starts on is the line the collapse badge sits beside. A
+/// range therefore starts on the line of the last token <em>before</em> the opening delimiter — the
+/// <c>)</c> closing a signature, an accessor keyword, a declared identifier, an <c>=</c> — which puts
+/// the badge beside the signature instead of below it under this repository's brace-on-its-own-line
+/// style. When the delimiter already shares that token's line (<c>void Method() {</c>) the two resolve
+/// to one line and nothing shifts. A <c>#region</c> pair follows the C# editor too: it collapses from
+/// the <c>#region</c> line through and including the <c>#endregion</c> line.
 /// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange">
 /// Language Server Protocol 3.17 — textDocument/foldingRange</see>.
 /// </para>
 /// <para>
-/// An expression-bodied member folds nothing however far its <c>=&gt;</c> body wraps: it carries no
-/// closing delimiter for a fold to leave visible, the same reason a self-closing element folds nothing
-/// ([V01.01.12.07.07]). Parenthesized argument and parameter lists are deliberately not folded for the
-/// same reason a fold there reads badly — the collapsed call would leave a bare <c>)</c> line.
+/// The two conventions still compose. A section's fold ends one line above the block's own closing
+/// delimiter, and a construct's inclusive end is clamped to that line, so a construct always nests
+/// inside its section rather than crossing it — including the <c>.vue</c> case where the last construct
+/// closes on the same line as <c>&lt;/script&gt;</c>.
+/// </para>
+/// <para>
+/// An expression-bodied member folds nothing however far its <c>=&gt;</c> body wraps: it declares no
+/// delimiter pair, and the C# editor does not collapse one either. Parenthesized argument and parameter
+/// lists are deliberately not folded — a collapsed call would swallow the arguments an author reads the
+/// call by.
 /// </para>
 /// </remarks>
 internal static class ScriptFoldingRangeCollector
@@ -83,17 +112,23 @@ internal static class ScriptFoldingRangeCollector
             : right.Close.CompareTo(left.Close));
 
         var lineMap = ContentLineMap.Create(script);
+        // The line the block's own section range ends on, computed exactly as the service computes it.
+        // An inclusive construct end can reach it but must never pass it: a .vue author may close the
+        // last construct on the same line as </script>, and a construct that outlived its section would
+        // cross the section range instead of nesting inside it.
+        var sectionEndLine = Math.Max(script.Location.End.Line - 1, 0) - 1;
         var ranges = new List<LanguageFoldingRange>(spans.Count);
-        // Two constructs can share one delimiter pair's lines (an initializer opened and closed on the
-        // same lines as the block containing it); the editor gets one range for those lines, not two.
+        // Two constructs can share one span's lines (an initializer opened and closed on the same lines
+        // as the block containing it); the editor gets one range for those lines, not two.
         var emitted = new HashSet<LanguageFoldingRange>();
         foreach (var (start, close) in spans)
         {
             var startLine = lineMap.GetDocumentLine(start);
-            var endLine = lineMap.GetDocumentLine(close) - 1;
-            // A single-line construct, and one whose closing delimiter opens the line right after its
-            // opening delimiter, fold nothing — and a range can never invert, whatever span the parse
-            // produced.
+            // Inclusive: the closing delimiter's own line is folded away, so the collapsed construct
+            // hides both braces the way the C# editor does.
+            var endLine = Math.Min(lineMap.GetDocumentLine(close), sectionEndLine);
+            // A single-line construct folds nothing — and a range can never invert, whatever span the
+            // parse produced.
             if (endLine <= startLine)
             {
                 continue;
@@ -155,7 +190,9 @@ internal static class ScriptFoldingRangeCollector
         }
     }
 
-    // The #region/#endregion pairs, matched innermost-first over the directives in source order. An
+    // The #region/#endregion pairs, matched innermost-first over the directives in source order. The
+    // directive lines are their own delimiters, so no signature anchor applies: the fold runs from the
+    // #region line through the #endregion line, which the inclusive end line already covers. An
     // unmatched directive — a #region the author has not closed yet, or an #endregion whose #region sits
     // in the hoisted using region the probe never sees — contributes nothing.
     private static void CollectRegionSpans(
@@ -190,7 +227,23 @@ internal static class ScriptFoldingRangeCollector
             return;
         }
 
-        AddSpan(parse, spans, open.SpanStart, close.SpanStart);
+        // The fold is anchored on the token BEFORE the opening delimiter — one rule covering the ')' of
+        // a signature or a switch's governing parentheses, an accessor keyword, a declared identifier or
+        // base list end, the '=' or '=>' ahead of an initializer, and the 'new' of an anonymous object —
+        // so a brace written on its own line does not push the collapse badge below the signature. The
+        // anchor is used only when it is the author's own text: the probe wrapper's own brace precedes
+        // the first construct in the block, and it is not a line the author can see.
+        var startOffset = open.SpanStart;
+        var anchor = open.GetPreviousToken();
+        if (!anchor.IsMissing &&
+            !anchor.Span.IsEmpty &&
+            anchor.SpanStart < startOffset &&
+            parse.TryGetContentOffset(anchor.SpanStart, out _))
+        {
+            startOffset = anchor.SpanStart;
+        }
+
+        AddSpan(parse, spans, startOffset, close.SpanStart);
     }
 
     private static void AddSpan(

@@ -5,11 +5,14 @@ using Xunit;
 namespace Assimalign.Viu.Tooling.LanguageService;
 
 /// <summary>
-/// Pins folding: a block-container fold covers the block content while the closing delimiter line
-/// stays visible, every multi-line element inside the template block adds a nested fold under the same
-/// convention ([V01.01.12.07.07]), and every multi-line C# construct inside a script block adds one too
-/// ([V01.01.12.07.10]). Ranges follow the Language Server Protocol folding-range contract — the folded
-/// region runs from the end of <c>startLine</c> through the end of <c>endLine</c>:
+/// Pins folding, and the two collapse conventions it deliberately runs. A block-container fold covers
+/// the block content while the closing delimiter line stays visible, and every multi-line element inside
+/// the template block adds a nested fold under the same markup convention ([V01.01.12.07.07]). A
+/// multi-line C# construct inside a script block instead collapses the way the C# editor collapses a
+/// <c>.cs</c> file ([V01.01.12.07.10]): the range starts on the line of the token before the opening
+/// delimiter, so the collapse badge sits beside the signature, and ends <em>on</em> the closing
+/// delimiter's line, so both braces are hidden. Ranges follow the Language Server Protocol folding-range
+/// contract — the folded region runs from the end of <c>startLine</c> through the end of <c>endLine</c>:
 /// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange">
 /// Language Server Protocol 3.17 — textDocument/foldingRange</see>.
 /// </summary>
@@ -302,10 +305,11 @@ public class FoldingRangeTests
         third[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 3));
     }
 
-    // [V01.01.12.07.10] A method's block body folds from its opening brace to one line above its closing
-    // brace, so the '}' stays visible exactly as a section's and an element's closing delimiter does.
+    // [V01.01.12.07.10] A method collapses beside its signature with both braces hidden, as it does in a
+    // .cs file: the range starts on the signature line (the ')' precedes the brace) and ends on the
+    // closing brace's line. The section range around it still keeps the block's own '}' visible.
     [Fact]
-    public void GetFoldingRanges_ScriptMethodBody_FoldsBetweenTheBraces()
+    public void GetFoldingRanges_ScriptMethodBody_CollapsesBesideTheSignature()
     {
         const string source =
             "<template>\n" +                     // 0
@@ -327,12 +331,12 @@ public class FoldingRangeTests
         ranges.Count.ShouldBe(3);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 1));
         ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 3, EndLine: 9));
-        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 7, EndLine: 8));
+        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 6, EndLine: 9));
     }
 
-    // An expression-bodied member folds nothing however far its '=>' body wraps: it carries no closing
-    // delimiter for the fold to leave visible, the same rule that makes a self-closing element fold
-    // nothing. The block-bodied member beside it still folds.
+    // An expression-bodied member folds nothing however far its '=>' body wraps: it declares no
+    // delimiter pair, and the C# editor does not collapse one either. The block-bodied member beside it
+    // still collapses from its signature line.
     [Fact]
     public void GetFoldingRanges_ScriptExpressionBodiedMember_ReturnsNoRange()
     {
@@ -354,11 +358,12 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 8));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 6, EndLine: 7));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 5, EndLine: 8));
     }
 
     // The accessor list and each accessor's own block are separate delimiter pairs, so both fold and
-    // they nest; the expression-bodied 'set' contributes nothing.
+    // they nest — the list anchored on the property identifier, the getter on its 'get' keyword. The
+    // expression-bodied 'set' contributes nothing.
     [Fact]
     public void GetFoldingRanges_ScriptAccessorList_FoldsListAndAccessorBodies()
     {
@@ -380,14 +385,14 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(3);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 8));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 7));
-        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 4, EndLine: 5));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 8));
+        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 3, EndLine: 6));
     }
 
-    // The showcase's declaration shape: a collection expression spanning lines folds on its brackets,
-    // the bracket pair being the delimiters the fold leaves visible.
+    // The showcase's declaration shape: a collection expression spanning lines collapses onto the
+    // declaration line, anchored on the '=' that precedes its opening bracket, with both brackets hidden.
     [Fact]
-    public void GetFoldingRanges_ScriptCollectionExpression_FoldsBetweenTheBrackets()
+    public void GetFoldingRanges_ScriptCollectionExpression_CollapsesOntoTheDeclaration()
     {
         const string source =
             "@script {\n" +                                  // 0
@@ -404,13 +409,13 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 5));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 4));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 5));
     }
 
-    // A multi-line object initializer folds on its own braces, independently of the declaration it
-    // initializes.
+    // A multi-line object initializer collapses onto the declaration line it initializes, anchored on
+    // the ')' of the object creation that precedes its opening brace.
     [Fact]
-    public void GetFoldingRanges_ScriptObjectInitializer_FoldsBetweenTheBraces()
+    public void GetFoldingRanges_ScriptObjectInitializer_CollapsesOntoTheDeclaration()
     {
         const string source =
             "@script {\n" +                                     // 0
@@ -426,10 +431,11 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 4));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 3));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 4));
     }
 
-    // A lambda's block body is a block like any other and folds on the same rule.
+    // A lambda's block body is a block like any other and folds on the same rule, anchored on the '=>'
+    // that precedes its opening brace.
     [Fact]
     public void GetFoldingRanges_ScriptLambdaBlockBody_Folds()
     {
@@ -447,11 +453,11 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 4));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 3));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 4));
     }
 
-    // A local function nested in a method body folds on its own braces, and the two ranges compose:
-    // the enclosing method's range comes first and contains the local function's.
+    // A local function nested in a method body collapses beside its own signature, and the two ranges
+    // compose: the enclosing method's range comes first and contains the local function's.
     [Fact]
     public void GetFoldingRanges_ScriptNestedLocalFunction_ComposesWithTheMethodBody()
     {
@@ -474,11 +480,11 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(3);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 9));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 8));
-        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 4, EndLine: 5));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 9));
+        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 3, EndLine: 6));
     }
 
-    // A type declared inside the script folds like the members it contains.
+    // A type declared inside the script collapses beside its declaration, anchored on the type name.
     [Fact]
     public void GetFoldingRanges_ScriptNestedTypeDeclaration_Folds()
     {
@@ -496,12 +502,13 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 4));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 3));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 4));
     }
 
-    // A matched #region/#endregion pair folds on the directive lines, leaving the #endregion visible.
+    // A matched #region/#endregion pair collapses from the #region line through and INCLUDING the
+    // #endregion line, which is what the C# editor does with a region.
     [Fact]
-    public void GetFoldingRanges_ScriptRegionDirectives_FoldBetweenTheDirectives()
+    public void GetFoldingRanges_ScriptRegionDirectives_CollapseThroughTheEndRegion()
     {
         const string source =
             "@script {\n" +                     // 0
@@ -516,10 +523,11 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 3));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 2));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 3));
     }
 
-    // A single-line member folds nothing: there is no line between its braces to hide.
+    // A single-line member folds nothing: its anchor, its braces, and its body share one line, so the
+    // computed range would not span a line at all.
     [Fact]
     public void GetFoldingRanges_ScriptSingleLineMethod_ReturnsNoRange()
     {
@@ -560,7 +568,7 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 8));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 3));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 4));
         foreach (var range in ranges)
         {
             range.EndLine.ShouldBeGreaterThan(range.StartLine);
@@ -588,7 +596,7 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 6));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 4, EndLine: 5));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 3, EndLine: 6));
     }
 
     // The .vue single-file-component container ([V01.01.06.09]) is a declared external compatibility
@@ -615,7 +623,30 @@ public class FoldingRangeTests
         ranges.Count.ShouldBe(3);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 1));
         ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 3, EndLine: 7));
-        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 5, EndLine: 6));
+        ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 4, EndLine: 7));
+    }
+
+    // A .vue author may close the last construct on the same line as </script>. The construct's
+    // inclusive end is clamped to its section's end so it still nests inside the section instead of
+    // outliving it.
+    [Fact]
+    public void GetFoldingRanges_VueConstructClosingOnTheEndTagLine_StaysInsideItsSection()
+    {
+        const string source =
+            "<script>\n" +                     // 0
+            "public void Increment()\n" +      // 1
+            "{\n" +                            // 2
+            "    Count++;\n" +                 // 3
+            "}</script>\n";                    // 4
+        var service = ViuLanguageServices.Create();
+        service.OpenDocument(VueDocumentUri, source, 1);
+
+        var ranges = service.GetFoldingRanges(VueDocumentUri);
+
+        ranges.Count.ShouldBe(2);
+        ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 3));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 3));
+        ranges[1].EndLine.ShouldBeLessThanOrEqualTo(ranges[0].EndLine);
     }
 
     // The .vue container's second script block — <script setup> ([V01.01.06.09]) — is a script block
@@ -637,12 +668,14 @@ public class FoldingRangeTests
 
         ranges.Count.ShouldBe(2);
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 4));
-        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 3));
+        ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 4));
     }
 
-    // All three folding families in one document: the block sections, a nested template element, and a
-    // script construct, each emitted right after the section it belongs to so the whole result stays in
-    // document order and no two ranges fight over a closing line.
+    // All three folding families in one document, each under its own convention: the block sections and
+    // the nested template element keep their closing delimiters visible, the script construct hides its
+    // braces and collapses beside the signature. Each is emitted right after the section it belongs to,
+    // so the whole result stays in document order, and the construct still closes strictly inside its
+    // section rather than crossing it.
     [Fact]
     public void GetFoldingRanges_SectionElementAndScriptConstruct_ComposeInDocumentOrder()
     {
@@ -667,11 +700,11 @@ public class FoldingRangeTests
         ranges[0].ShouldBe(new LanguageFoldingRange(StartLine: 0, EndLine: 3));
         ranges[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 2));
         ranges[2].ShouldBe(new LanguageFoldingRange(StartLine: 5, EndLine: 9));
-        ranges[3].ShouldBe(new LanguageFoldingRange(StartLine: 7, EndLine: 8));
+        ranges[3].ShouldBe(new LanguageFoldingRange(StartLine: 6, EndLine: 9));
     }
 
     // The document snapshot caches the script ranges too, so repeated requests answer identically; an
-    // edit replaces the snapshot and the ranges move with the edited C#.
+    // edit replaces the snapshot and the range grows with the body it collapses.
     [Fact]
     public void GetFoldingRanges_ScriptAfterEdit_RecomputesAgainstTheEditedDocument()
     {
@@ -697,8 +730,8 @@ public class FoldingRangeTests
 
         second.ShouldBe(first);
         first.Count.ShouldBe(2);
-        first[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 3));
+        first[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 4));
         third.Count.ShouldBe(2);
-        third[1].ShouldBe(new LanguageFoldingRange(StartLine: 2, EndLine: 4));
+        third[1].ShouldBe(new LanguageFoldingRange(StartLine: 1, EndLine: 5));
     }
 }

@@ -106,11 +106,19 @@ public interface IViuLanguageService
     /// nested <c>&lt;template&gt;</c> fragments included — plus one per multi-line C# construct inside
     /// a script block ([V01.01.12.07.10]): member and statement blocks, accessor lists, object and
     /// collection initializers, collection expressions, nested type and switch bodies, and
-    /// <c>#region</c> pairs. Every range ends one line above its closing delimiter, so the delimiter
-    /// stays visible and the three families nest instead of competing for the closing line.
+    /// <c>#region</c> pairs.
+    /// <para>
+    /// Two collapse conventions apply, one per family, because a collapsed template reads as markup and
+    /// a collapsed script reads as C#. A block-container range and a template-element range end one line
+    /// <em>above</em> the closing delimiter, so <c>}</c> and <c>&lt;/div&gt;</c> stay visible. A script
+    /// construct's range instead starts on the line of the token before its opening delimiter and ends
+    /// <em>on</em> the closing delimiter's line, so the construct collapses beside its signature with
+    /// both delimiters hidden — what the C# editor does for a <c>.cs</c> file ([V01.01.12.07.10]).
+    /// Ranges still nest: a construct closes strictly inside its own section.
+    /// </para>
     /// A single-line construct folds nothing; neither does a self-closing element, an expression-bodied
-    /// member (no closing delimiter to keep visible), or a construct the parse had to recover from
-    /// missing markup or missing C#.
+    /// member (no delimiter pair), or a construct the parse had to recover from missing markup or
+    /// missing C#.
     /// </summary>
     /// <param name="documentUri">The document URI used by the editor.</param>
     /// <param name="cancellationToken">
