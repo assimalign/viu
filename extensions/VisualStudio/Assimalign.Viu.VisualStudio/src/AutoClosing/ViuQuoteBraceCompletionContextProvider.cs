@@ -18,13 +18,15 @@ namespace Assimalign.Viu.VisualStudio;
 /// pair registered on one could not be declined; registering the quotes on an
 /// <see cref="IBraceCompletionContextProvider"/> instead makes
 /// <see cref="TryCreateContext"/> the gate. That is also why the quotes are registered <em>here</em>
-/// and nowhere else: adding them to <see cref="ViuBraceCompletionDefaults"/> as well would give the
-/// aggregator an unconditional fallback and defeat the gate entirely.
+/// and nowhere else: registering them a second time on a default provider would give the aggregator
+/// an unconditional fallback and defeat the gate entirely.
 /// </para>
 /// <para>
 /// <b>The gate itself</b> is <see cref="ViuAutoClosingLogic.AllowsQuotePair"/> — pure, section-aware,
 /// and unit-tested. This part only converts the editor's snapshot and point into the line-and-offset
 /// form that decision takes, so the interesting behavior is covered without the editor in the way.
+/// The gating is unchanged by [V01.01.12.07.09]; only the brackets moved onto a context provider of
+/// their own (<see cref="ViuBracketBraceCompletionContextProvider"/>).
 /// </para>
 /// <para>
 /// <b>Auto-surround is metadata-driven and therefore ungated.</b> Selecting text and typing a quote

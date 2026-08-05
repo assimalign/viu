@@ -24,7 +24,114 @@ namespace Assimalign.Viu.VisualStudio;
 /// </remarks>
 public class ViuAutoClosingLogicTests
 {
-    // ---- Character-pair gating -------------------------------------------------------------
+    // ---- Character-pair gating: the brackets ------------------------------------------------
+
+    [Fact]
+    public void AllowsBracketPair_AllThreeBracketsInATemplate_Pair()
+    {
+        // The matrix these four tests pin is [V01.01.12.07.08]'s, unchanged: the brackets pair in
+        // every section. [V01.01.12.07.09] moved them onto a brace-completion context provider so a
+        // '{' block can expand on Return, and moving them is exactly what makes the decision a
+        // question somebody has to answer rather than pure MEF metadata.
+        AllowsBracket('{', "<template>", "    <p>{|", "</template>").ShouldBeTrue();
+        AllowsBracket('(', "<template>", "    <p>{{ Format(|", "</template>").ShouldBeTrue();
+        AllowsBracket('[', "<template>", "    <p>{{ Items[|", "</template>").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_AllThreeBracketsInAScriptSection_Pair()
+    {
+        AllowsBracket('{', "@script {", "    partial void OnSetup() |", "}").ShouldBeTrue();
+        AllowsBracket('(', "@script {", "    partial void OnSetup|", "}").ShouldBeTrue();
+        AllowsBracket('[', "@script {", "    var first = Items|", "}").ShouldBeTrue();
+
+        AllowsBracket('{', "<script>", "    void M() |", "</script>").ShouldBeTrue();
+        AllowsBracket('(', "<script>", "    void M|", "</script>").ShouldBeTrue();
+        AllowsBracket('[', "<script>", "    var first = Items|", "</script>").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_AllThreeBracketsInAStyleSection_Pair()
+    {
+        AllowsBracket('{', "<style>", "    .card |", "</style>").ShouldBeTrue();
+        AllowsBracket('(', "<style>", "    .card { width: calc|", "</style>").ShouldBeTrue();
+        AllowsBracket('[', "<style>", "    a|", "</style>").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_AllThreeBracketsBetweenContainers_Pair()
+    {
+        AllowsBracket('{', "<template></template>", "|", "@script {", "}").ShouldBeTrue();
+        AllowsBracket('(', "<template></template>", "|", "@script {", "}").ShouldBeTrue();
+        AllowsBracket('[', "<template></template>", "|", "@script {", "}").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_ACharacterThatIsNotABracket_DoesNotPair()
+    {
+        // The quotes are gated by AllowsQuotePair and answered by their own provider; a character
+        // this provider is not registered for is never a pair.
+        AllowsBracket('"', "@script {", "    var text = |", "}").ShouldBeFalse();
+        AllowsBracket('<', "<template>", "    |", "</template>").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_APositionOutsideTheDocument_DoesNotPair()
+    {
+        ViuAutoClosingLogic.AllowsBracketPair(["@script {", "}"], 5, 0, '{').ShouldBeFalse();
+        ViuAutoClosingLogic.AllowsBracketPair(["@script {", "}"], 0, 99, '{').ShouldBeFalse();
+    }
+
+    // ---- Return between paired braces --------------------------------------------------------
+
+    [Fact]
+    public void AllowsBlockExpansionOnReturn_ABraceOpenedInAScriptSection_Expands()
+    {
+        // The C#-parity requirement of [V01.01.12.07.09]: a '{' in @script is a C# block, so Return
+        // between its halves produces the indented block Visual Studio's C# editor produces.
+        AllowsBlockExpansion("@script {", "    partial void OnSetup() |", "}").ShouldBeTrue();
+        AllowsBlockExpansion("<script>", "    void M() |", "</script>").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBlockExpansionOnReturn_ABraceOpenedInATemplate_DoesNotExpand()
+    {
+        // Template braces are most often an interpolation - '{{ Count }}' is authored by typing '{'
+        // twice - and pushing its closer onto a line of its own would break the expression.
+        AllowsBlockExpansion("<template>", "    <p>|", "</template>").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsBlockExpansionOnReturn_ABraceOpenedInAStyleSection_DoesNotExpand()
+    {
+        // Recorded decision ([V01.01.12.07.09]): a CSS rule really is a block and expanding it would
+        // be defensible, but style sections keep the pairing they shipped with so this change carries
+        // exactly the behavior the work item specifies.
+        AllowsBlockExpansion("<style>", "    .card |", "</style>").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsBlockExpansionOnReturn_ABraceOpenedBetweenContainers_DoesNotExpand()
+    {
+        AllowsBlockExpansion("<template></template>", "|", "@script {", "}").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsBlockExpansionOnReturn_TheScriptHeaderLineItself_Expands()
+    {
+        // '@script {' is attributed to the section it opens, so the outermost block of the container
+        // expands like any block inside it.
+        AllowsBlockExpansion("|@script {", "}").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBlockExpansionOnReturn_ALineOutsideTheDocument_DoesNotExpand()
+    {
+        ViuAutoClosingLogic.AllowsBlockExpansionOnReturn(["@script {", "}"], -1).ShouldBeFalse();
+        ViuAutoClosingLogic.AllowsBlockExpansionOnReturn(["@script {", "}"], 7).ShouldBeFalse();
+    }
+
+    // ---- Character-pair gating: the quotes ---------------------------------------------------
 
     [Fact]
     public void AllowsQuotePair_DoubleQuoteInTemplateAttributeValuePosition_Pairs()
@@ -436,6 +543,24 @@ public class ViuAutoClosingLogicTests
             lineNumber,
             characterIndex,
             typedCharacter);
+    }
+
+    private static bool AllowsBracket(char openingCharacter, params string[] markedLines)
+    {
+        (IReadOnlyList<string> lines, int lineNumber, int characterIndex) = ReadCaret(markedLines);
+        return ViuAutoClosingLogic.AllowsBracketPair(
+            lines,
+            lineNumber,
+            characterIndex,
+            openingCharacter);
+    }
+
+    // The caret marks the line the opening brace sits on, which is the line the expansion decision
+    // is made from - by the time the editor asks, the caret itself has already moved to a new line.
+    private static bool AllowsBlockExpansion(params string[] markedLines)
+    {
+        (IReadOnlyList<string> lines, int lineNumber, _) = ReadCaret(markedLines);
+        return ViuAutoClosingLogic.AllowsBlockExpansionOnReturn(lines, lineNumber);
     }
 
     private static bool AllowsQuote(char quoteCharacter, params string[] markedLines)

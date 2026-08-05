@@ -195,37 +195,50 @@ did not, and is gone.
 
 ## Auto-closing
 
-Typing an opening delimiter closes it ([V01.01.12.07.08]). Two mechanisms carry that, chosen because
-the editor offers exactly two shapes and they answer different questions.
+Typing an opening delimiter closes it ([V01.01.12.07.08]), and a `{` opened in a script section
+expands into an indented block on `Enter` ([V01.01.12.07.09]). Two mechanisms carry that, chosen
+because the editor offers exactly two shapes and they answer different questions.
 
 **Character pairs ride the editor's brace-completion engine.** The engine already owns everything a
 pair needs after it opens — inserting the closer, tracking the span, typing through the closer, and
-deleting both halves on one backspace — so Viu contributes only which characters pair and where.
-`{ }`, `( )`, and `[ ]` are registered on an `IBraceCompletionDefaultProvider`
-(`ViuBraceCompletionDefaults`), which is metadata with no code, because those pairs need no gating:
-they are balanced constructs in template markup, in C#, and in CSS alike. Interpolation falls out of
-that rather than needing a rule — typing `{` twice yields `{{}}` with the caret in the middle, which
-is the authoring path for `{{ Count }}`.
+deleting both halves on one backspace — so Viu contributes only which characters pair, where, and
+what `Enter` does between them. Interpolation falls out of the brace pair rather than needing a rule
+— typing `{` twice yields `{{}}` with the caret in the middle, which is the authoring path for
+`{{ Count }}`.
 
-The quotes do need gating, and that decides their registration. The editor's aggregator asks the
-providers registered for a character in order — session, dynamic session, context, then default — and
-takes the first that agrees to start; a default provider always agrees, so a pair registered on one
-can never be declined. The quotes are therefore registered on an `IBraceCompletionContextProvider`
-(`ViuQuoteBraceCompletionContextProvider`) and **only** there, making its `TryCreateContext` the gate.
-Adding them to the default provider as well would hand the aggregator an unconditional fallback and
-defeat the gate entirely.
+Both registrations are `IBraceCompletionContextProvider`s filtered on the `viu` content type, for two
+different reasons:
+
+- `ViuBracketBraceCompletionContextProvider` carries `{ }`, `( )`, and `[ ]`. These pairs need no
+  gating — they are balanced constructs in template markup, in C#, and in CSS alike — and they
+  shipped on an `IBraceCompletionDefaultProvider` for exactly that reason ([V01.01.12.07.08]). They
+  moved to a context provider in [V01.01.12.07.09] because a *default* session never calls
+  `OnReturn`: `BraceCompletionDefaultSession.PostReturn` guards on `_context != null`, so a pair with
+  no context can never expand into a block. Nothing else about their behavior changed — the
+  aggregator builds the same `BraceCompletionDefaultSession` either way.
+- `ViuQuoteBraceCompletionContextProvider` carries `"` and `'`, which do need gating. The editor's
+  aggregator asks the providers registered for a character in order — session, dynamic session,
+  context, then default — and takes the first that agrees to start; a default provider always agrees,
+  so a pair registered on one can never be declined. Registering the quotes on a context provider and
+  **only** there makes its `TryCreateContext` the gate; a second registration on a default provider
+  would hand the aggregator an unconditional fallback and defeat it entirely.
+
+Both providers hand out the same stateless `ViuBraceCompletionContext`, which tells the pairs apart
+from the session's own `OpeningBrace`.
 
 **Element and comment closing rides a typed-character command handler**, because there is no
 "pair" to register: what gets inserted depends on the tag name the user just typed.
 `ViuAutoClosingCommandHandler` is an `ICommandHandler<TypeCharCommandArgs>` filtered on the `viu`
 content type.
 
-**All the decisions are pure.** `ViuAutoClosingLogic` answers both questions from document text and a
+**All the decisions are pure.** `ViuAutoClosingLogic` answers every question from document text and a
 caret position alone — no editor type appears in it — and it takes its section attribution from
-`ViuSectionScanner` and its void-element list from the repository's shared `DomKnowledgeData`. The
-MEF parts and the command handler are thin adapters: they convert a snapshot into lines, ask, and
-apply. That is why the behavior below is unit-tested through the source-linked test project while the
-composition and the buffer edit are honestly runtime-verified only.
+`ViuSectionScanner` and its void-element list from the repository's shared `DomKnowledgeData`.
+`ViuBraceIndentation` computes the Return expansion's two indentation strings from a line of text and
+two integers, and is pure for the same reason. The MEF parts, the brace-completion context, and the
+command handler are thin adapters: they convert a snapshot into lines, ask, and apply. That is why the
+behavior below is unit-tested through the source-linked test project while the composition and the
+buffer edits are honestly runtime-verified only.
 
 `ViuSectionScanner` is the single definition of the container grammar in this extension. It owns the
 patterns that open and close a section and the `@`-block and tag-delimited state machines;
@@ -245,6 +258,9 @@ belongs to it, because content may sit on the same line; the column-0 `}` that e
 | `>` after an open tag | inserts `</name>` | — | — | — |
 | `/` immediately after `<` | completes the nearest unclosed element | — | — | — |
 | `-` completing `<!--` | inserts ` -->` | — | — | — |
+
+`Enter` between an auto-completed `{` and `}` expands them into a block **in a script section only**
+([V01.01.12.07.09]) — see "Return between paired braces" below.
 
 Attribute-value position means: inside an open tag header, with `=` as the last non-whitespace
 character before the caret, and not already inside a quoted value. A tag header spanning several
@@ -274,6 +290,83 @@ grew an end tag on every `>` would be unusable. That is why the element behavior
 and why the top-level `<style>`/`<script>` opening tags do not auto-close either — their own line is
 already attributed to the section they open.
 
+### Return between paired braces
+
+Pressing `Enter` with the caret between an auto-completed `{` and `}` produces the three-line block
+Visual Studio's C# editor produces ([V01.01.12.07.09]):
+
+```text
+    partial void OnSetup() {          partial void OnSetup() {
+    |}                          ->        |
+                                      }
+```
+
+The closing brace moves onto a line of its own at the **opening brace line's** indentation, and the
+caret lands on a blank line one level further in. Three things decide the shape, and all three are
+pure and unit-tested:
+
+- **Where it applies.** `ViuAutoClosingLogic.AllowsBlockExpansionOnReturn` allows the expansion only
+  for a brace opened in a **script** section. A template brace is most often an interpolation —
+  `{{ Count }}` is authored by typing `{` twice — and pushing its closer onto its own line would break
+  the expression outright. A `<style>` rule genuinely is a block, so expanding there would be
+  defensible; it is deliberately left alone so this change carries exactly the specified behavior and
+  template and style sections keep the pairing they shipped with. Revisit if CSS authoring asks for it.
+- **What indentation it uses.** The `viu` content type has no `ISmartIndentProvider` — nothing in
+  Visual Studio registers one for it, and writing one would mean teaching the editor the whole
+  container grammar for one keystroke. `ViuBraceIndentation.ComputeBlockExpansion` instead reads the
+  opening brace line's leading whitespace and the buffer's own `Tabs/IndentSize` and
+  `Tabs/ConvertTabsToSpaces` options. Nesting needs no brace counting: the opening line's own
+  indentation already carries the depth.
+- **What it never rewrites.** The copied indentation is verbatim, even when it disagrees with the
+  current tabs-versus-spaces setting — a tab-indented file opened under a spaces setting keeps its
+  tabs, and only the *added* level follows the option. Normalizing it would silently reformat a line
+  the user did not touch. An indent size below one is floored at one space, because a zero-width level
+  would leave the caret's blank line indistinguishable from the closer's.
+
+The edit itself is a single `ITextEdit` replacing the whitespace between the caret's line start and
+the closing brace, which makes it one undo unit. It cannot be merged with the line break the editor
+already committed, because `PostReturn` runs *after* that edit: `Ctrl+Z` steps back through the
+expansion and then the newline. Every precondition in `ViuBraceCompletionContext.OnReturn` is a
+bail-out rather than a repair — a session whose tracking points have gone stale leaves the buffer
+exactly as the editor left it.
+
+### What engages the brace-completion engine — the [V01.01.12.07.09] root cause
+
+[V01.01.12.07.08] shipped the pairs and they read as dead in `@script`. The leading hypothesis was
+that `DefaultTextViewOptions.BraceCompletionEnabledOptionId` is a per-view option real language
+services set for their own views, leaving every Viu pair correct but dormant. **Decompiling the
+shipping editor refutes that**, and the refutation is recorded here so nobody re-derives it:
+
+- `Microsoft.VisualStudio.Platform.VSEditor.dll` →
+  `Microsoft.VisualStudio.Text.BraceCompletion.Implementation.BraceCompletionEnabledOption` is the
+  `EditorOptionDefinition<bool>` behind that key, and its `Default` is **`true`**.
+- A scan of every assembly in the Visual Studio 18 installation finds the name
+  `BraceCompletionEnabledOptionId` in exactly two places: `Microsoft.VisualStudio.Text.UI.dll`, which
+  declares the key, and `Microsoft.VisualStudio.Platform.VSEditor.dll`, which declares the option and
+  reads it in `BraceCompletionManager.GetOptions`. **Nothing in the product ever writes it.** The
+  per-language "Automatic brace completion" checkbox is not wired to it — Roslyn enforces that inside
+  its own `IBraceCompletionSessionProvider`, which a `viu` buffer never reaches.
+
+So brace completion is **already on** for a `viu` view, and there is deliberately **no
+`ITextViewCreationListener`** in this extension: writing `true` onto the view options would be a
+no-op against the default and would *override* the one party that can turn the option off — a user
+or an extension that deliberately set it `false`. Leaving the option untouched is what satisfies the
+work item's requirement to respect the user-facing setting. The MEF side was checked the same way and
+is healthy: the composition cache for the hive carries `ViuBracketBraceCompletionContextProvider`,
+`ViuQuoteBraceCompletionContextProvider`, and `ViuAutoClosingCommandHandler` with no composition
+error, and the deployed assembly's `[BracePair]`/`[ContentType]` metadata decompiles to what the
+source declares.
+
+What actually suppresses a pair is the editor's own start heuristic, and it is worth knowing when
+triaging "it did not close":
+`BraceCompletionManager.ShouldStartSession` → `ShouldStartBraceSessionWithDifferentOpenCloseCharacters`
+refuses to open a session when the first non-whitespace character **after** the caret on that line is
+a letter or digit, the pair's own opening or closing character, another registered opening brace, or
+one of `!`, `_`, `@`. Typing `(` immediately before an identifier — a cast such as `(ViuRouter?` — is
+therefore declined, and declined identically in a `.cs` file. That is C#'s behavior, not a Viu
+divergence, and matching C# means keeping it. The genuine divergence was the missing `OnReturn`, which
+is what this work item fixes.
+
 ### Recorded decisions
 
 - **The comment shape is `<!-- | -->`.** Typing the third `-` inserts `-  -->` with the caret between
@@ -289,11 +382,21 @@ already attributed to the section they open.
   an open completion session. The two names are written as literals — one of them has no published
   constant, so a package reference for the other would buy nothing, and an unrecognized ordering name
   is simply ignored.
-- **The Automatic Brace Completion option is the editor's, and is left alone.** The editor's
-  brace-completion manager reads `DefaultTextViewOptions.BraceCompletionEnabledOptionId` and returns
-  before it consults any provider, so turning the option off turns the Viu pairs off with it and no
-  Viu code needs to read it. Element auto-close has no editor-owned option and ships **always on**;
-  inventing a Viu options page for one toggle was rejected. Revisit if it proves intrusive.
+- **The Automatic Brace Completion option is the editor's, and is left alone — neither read nor
+  written.** The editor's brace-completion manager reads
+  `DefaultTextViewOptions.BraceCompletionEnabledOptionId` and returns before it consults any
+  provider, so turning the option off turns the Viu pairs off with it. It defaults to `true` and
+  nothing in Visual Studio writes it (see the root-cause section above), so there is no view-creation
+  listener to enable it and no Viu code that reads it: the only party who can turn it off is the
+  user, and forcing it on at view creation would take that away. Element auto-close has no
+  editor-owned option and ships **always on**; inventing a Viu options page for one toggle was
+  rejected. Revisit if it proves intrusive.
+- **Over-type and paired backspace come from the editor, not from the context.**
+  `OvertypeSession.PreOverType` consults `IBraceCompletionContext.AllowOverType` only to let a
+  context *veto* over-typing, and `BraceCompletionDefaultSession.PreBackspace` never asks a context at
+  all. `ViuBraceCompletionContext.AllowOverType` therefore returns `true` and adds nothing; it exists
+  because the interface requires it. `OnReturn` is the one behavior the editor delegates outright,
+  and it is the whole reason the brackets carry a context.
 - **Auto-surround is ungated.** Selecting text and typing a quote wraps the selection wherever the
   pair is registered, because the editor answers that from the `[BracePair]` metadata alone and never
   consults the context provider. Accepted rather than worked around: surrounding happens only with an
@@ -313,13 +416,15 @@ already attributed to the section they open.
   custom protocol request between the extension and the language server, which is a protocol change
   this work item deliberately does not make. Recorded as a follow-up candidate.
 - **An options page for element auto-close.** See the recorded decision above: always on for now.
-- **Moving a paired `}` onto its own line on Return.** Observed while verifying the brace engine, and
-  left as it is. The editor's default session only reformats on Return when a brace-completion
-  *context* is present, so pressing Return inside a freshly paired `@script {}` leaves the `}` on the
-  caret's new line rather than pushing it down one further. That is the same thing every language
-  without a context does, and it does not break the container: the closer stays at column 0, which is
-  where the `@`-block grammar needs it. Giving `{` a context purely to reformat would be a
-  runtime-only, untestable addition, so it is recorded here rather than built.
+- **Moving a paired `}` onto its own line on Return** was recorded here by [V01.01.12.07.08] as
+  deferred, on the reasoning that giving `{` a context purely to reformat would be a runtime-only,
+  untestable addition. [V01.01.12.07.09] **built it** — see "Return between paired braces" above. The
+  reasoning was wrong on the second half: the decision about *where* the expansion applies and the
+  computation of *what* indentation it uses are both pure, and only the buffer edit is runtime-only.
+- **Expanding a `{ }` block on Return in a `<style>` section.** A CSS rule is a block and Visual
+  Studio's CSS editor does expand it, so this is a plausible follow-up; it is out of scope here so
+  that [V01.01.12.07.09] carries exactly the C#-parity behavior it specifies. Template sections are
+  not a candidate: a template brace is usually an interpolation.
 
 ## Activation, and where `.vue` stands in Visual Studio
 

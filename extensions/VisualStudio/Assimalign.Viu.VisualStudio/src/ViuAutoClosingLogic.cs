@@ -12,10 +12,11 @@ namespace Assimalign.Viu.VisualStudio;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Two questions, one for each mechanism the extension uses. <see cref="AllowsQuotePair"/> answers
-/// the editor's brace-completion engine — may a quote pair start here — and
-/// <see cref="GetTypedCharacterCompletion"/> answers the typed-character command handler — what text
-/// completes the element or comment the user just opened.
+/// Four questions, across the two mechanisms the extension uses. <see cref="AllowsBracketPair"/>,
+/// <see cref="AllowsQuotePair"/>, and <see cref="AllowsBlockExpansionOnReturn"/> answer the editor's
+/// brace-completion engine — may this pair start here, and does <c>Enter</c> between its halves
+/// expand into a block — and <see cref="GetTypedCharacterCompletion"/> answers the typed-character
+/// command handler: what text completes the element or comment the user just opened.
 /// </para>
 /// <para>
 /// Both answers are section-aware and take their section attribution from
@@ -26,10 +27,12 @@ namespace Assimalign.Viu.VisualStudio;
 /// through the source-linked test project while the MEF and commanding glue stays a thin adapter.
 /// </para>
 /// <para>
-/// Scanning is whole-document per keystroke, which is affordable because it happens only on the five
-/// characters that can trigger anything (<c>&gt;</c>, <c>/</c>, <c>-</c>, and the two quotes) and
-/// only in a <c>.viu</c> buffer: two regular expressions per line, no allocation per line beyond the
-/// result array.
+/// Scanning is whole-document per keystroke, which is affordable because of when it happens: only in
+/// a <c>.viu</c> buffer, and only on the five characters that can trigger a completion
+/// (<c>&gt;</c>, <c>/</c>, <c>-</c>, and the two quotes) plus a <c>Return</c> pressed inside an
+/// already-open brace session. Two regular expressions per line, no allocation per line beyond the
+/// result array. <see cref="AllowsBracketPair"/> does not scan at all — the three brackets pair
+/// everywhere, so it answers from the caret's range alone.
 /// </para>
 /// </remarks>
 internal static class ViuAutoClosingLogic
@@ -47,6 +50,73 @@ internal static class ViuAutoClosingLogic
     /// </returns>
     public static bool IsCompletionTriggerCharacter(char typedCharacter) =>
         typedCharacter is '>' or '/' or '-';
+
+    /// <summary>
+    /// Determines whether a bracket typed at the given position may be paired.
+    /// </summary>
+    /// <param name="lines">The document's lines, without their line breaks.</param>
+    /// <param name="lineNumber">Zero-based line the bracket is being typed on.</param>
+    /// <param name="characterIndex">Zero-based offset within that line where the bracket goes.</param>
+    /// <param name="openingCharacter">The bracket character: <c>{</c>, <c>(</c>, or <c>[</c>.</param>
+    /// <returns><see langword="true"/> when the pair may be completed.</returns>
+    /// <remarks>
+    /// <para>
+    /// The three brackets pair in <em>every</em> section, which is the answer this method exists to
+    /// state rather than to compute: braces, parentheses, and square brackets are balanced constructs
+    /// in template markup, in C#, and in CSS alike, so no position in a Viu container wants them
+    /// treated differently. Interpolation falls out of that rather than needing a rule — typing
+    /// <c>{</c> twice yields <c>{{}}</c> with the caret in the middle, the authoring path for
+    /// <c>{{ Count }}</c>. Quotes are the pairs that do want gating, and
+    /// <see cref="AllowsQuotePair"/> is where that lives.
+    /// </para>
+    /// <para>
+    /// It is a decision rather than metadata because the brackets now carry a brace-completion
+    /// <em>context</em> ([V01.01.12.07.09], for <see cref="AllowsBlockExpansionOnReturn"/>), and a
+    /// context provider is asked whether to start. Keeping the answer here — pure, with the document
+    /// and caret in hand — pins the shipped matrix in a unit test and gives any future position rule
+    /// one place to land.
+    /// </para>
+    /// </remarks>
+    public static bool AllowsBracketPair(
+        IReadOnlyList<string> lines,
+        int lineNumber,
+        int characterIndex,
+        char openingCharacter)
+        => openingCharacter is '{' or '(' or '[' &&
+           IsPositionInRange(lines, lineNumber, characterIndex);
+
+    /// <summary>
+    /// Determines whether pressing <c>Enter</c> between an auto-completed <c>{</c> and <c>}</c>
+    /// should expand them into an indented block ([V01.01.12.07.09]).
+    /// </summary>
+    /// <param name="lines">The document's lines, without their line breaks.</param>
+    /// <param name="openingBraceLineNumber">Zero-based line the opening brace sits on.</param>
+    /// <returns>
+    /// <see langword="true"/> only for a brace opened in a script section, where the pair is a C#
+    /// block and Visual Studio's C# editor is the behavior being matched.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The section restriction is load-bearing rather than conservative. In a template the paired
+    /// braces are most often an interpolation — <c>{{ Count }}</c> is authored by typing <c>{</c>
+    /// twice — and pushing its closer onto a line of its own would break the expression outright. A
+    /// <c>&lt;style&gt;</c> rule really is a block, so expanding there would be defensible; it is
+    /// deliberately left alone so this change carries exactly the behavior the work item specifies
+    /// and template and style sections keep the pairing they shipped with. Recorded in
+    /// <c>docs/DESIGN.md</c>; revisit if CSS authoring asks for it.
+    /// </para>
+    /// <para>
+    /// The <em>opening</em> brace's line decides, not the caret's. By the time the editor asks, the
+    /// caret is already on a line the Return created, and the block belongs to the construct that
+    /// opened it.
+    /// </para>
+    /// </remarks>
+    public static bool AllowsBlockExpansionOnReturn(
+        IReadOnlyList<string> lines,
+        int openingBraceLineNumber)
+        => openingBraceLineNumber >= 0 &&
+           openingBraceLineNumber < lines.Count &&
+           ViuSectionScanner.ScanLineSections(lines)[openingBraceLineNumber] == ViuSectionKind.Script;
 
     /// <summary>
     /// Determines whether a quote typed at the given position means the start of a string, and may
