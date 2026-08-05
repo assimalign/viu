@@ -299,6 +299,30 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps((
 """);
     }
 
+    [Fact]
+    public void VModelWithModifiers_EmitsTheModifierBagThroughTheModifierHelper()
+    {
+        // The fourth directive-tuple slot is a name -> bool modifier bag, so it emits through
+        // _createModifiers, NOT the _createProps property helper: a directive binding types its
+        // modifiers IReadOnlyDictionary<string, bool>, so a property bag (name -> object?) in that
+        // slot type-checks yet reads back as NO modifiers, silently disabling .lazy (which shifts the
+        // update carrier from `input` to `change`), .trim, and .number on every compiled native
+        // v-model ([SFC-CG-6], [V01.01.05.03.01]). The third slot stays the null directive argument.
+        EmitPrefixed("<input v-model.trim.number=\"name\" />").Code.ShouldBeCode(
+"""
+return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] {
+    _vModelText,
+    new global::Assimalign.Viu.Browser.ViuModelBinding(_ctx.name, __event => { _ctx.name = __event; }),
+    null,
+    _createModifiers(
+        ("trim", true),
+        ("number", true)
+    )
+} });
+
+""");
+    }
+
     // ---- runtime directives ----
 
     [Fact]

@@ -1003,6 +1003,35 @@ into it. The hash reads only the component's own path, so a discriminated name i
 build and in any order MSBuild presents the files; a component that collides with nothing keeps its
 readable hint name unchanged [V01.01.06.10.01].
 
+`[SFC-CG-6]` **The runtime-directive tuple.** `_withDirectives` receives one `object?[]` per
+directive, positional: `[0]` the directive reference, `[1]` its bound value, `[2]` its string
+argument or null, `[3]` its modifier bag. Slot `[3]` is `IReadOnlyDictionary<string, bool>` and is
+built by `_createModifiers`, **not** by the `_createProps` property helper — the two bags differ in
+value type (`bool` versus `object?`), and a property bag in the modifier slot type-checks yet reads
+back as *no modifiers at all*. Core therefore rejects any other non-null shape in slot `[3]` rather
+than degrading silently. Slots `[2]` and `[3]` are emitted only when the directive has an argument or
+modifiers; an absent leading slot is filled with `null` so the positions never shift.
+
+`[SFC-CG-7]` **Native `v-model` carriers.** On a native control the compiler selects the runtime
+directive from the element and its `type` — `input`/`textarea` → `_vModelText`, `type="checkbox"` →
+`_vModelCheckbox`, `type="radio"` → `_vModelRadio`, `select` → `_vModelSelect`, and a dynamic
+`:type` (or a dynamically keyed `v-bind`) → `_vModelDynamic`, which re-resolves per render from the
+element's current tag and type. `type="file"` is an error. Each directive reflects the model through
+the DOM property that carries it and commits user edits from the event that carries them: `value` +
+`input` for text-like inputs and `textarea`, `checked` + `change` for checkbox and radio, and option
+`selected` + `change` for `select` — matching the events those controls fire per
+[WHATWG HTML](https://html.spec.whatwg.org/multipage/input.html#common-input-element-events).
+Modifiers shift them: `.lazy` moves the text-input commit from `input` to `change`, `.trim` trims the
+committed value and re-syncs the element on change, and `.number` (implied by `type="number"`)
+coerces it numerically.
+
+Because Viu has no `this`-proxy and no reflection, a native `v-model` cannot recover its setter from
+the `onUpdate:modelValue` prop the way a component `v-model` does. Slot `[1]` therefore carries a
+`ViuModelBinding` holding **both** the current value and the generated write-back delegate; the
+`onUpdate:modelValue` prop is still emitted for uniformity but is inert on a native element, which
+the DOM patcher skips rather than binding as a listener. The `modelValue` prop is not emitted at all
+on a native element.
+
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
 expression and closed with `#line default`. The span form is required because a render expression is

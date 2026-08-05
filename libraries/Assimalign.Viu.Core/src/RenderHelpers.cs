@@ -698,6 +698,35 @@ public static class RenderHelpers
         return new ReadOnlyDictionary<string, object?>(properties);
     }
 
+    /// <summary>
+    /// Creates the generated directive-modifier bag — the fourth slot of a
+    /// <see cref="_withDirectives(IComponent, object?[])"/> tuple.
+    /// </summary>
+    /// <remarks>
+    /// A modifier bag is <c>name → bool</c>, not the <c>name → object?</c> of
+    /// <see cref="_createProps(ValueTuple{string, object}[])"/>, and the two are deliberately
+    /// separate spellings: <see cref="DirectiveBinding.Modifiers"/> is typed
+    /// <c>IReadOnlyDictionary&lt;string, bool&gt;</c>, so a property bag in the modifier slot reads
+    /// back as no modifiers at all rather than as a type error. Emitting modifiers through their own
+    /// helper makes that mismatch unrepresentable. Specified by <c>[SFC-CG-6]</c> ([V01.01.05.03.01]).
+    /// </remarks>
+    /// <param name="entries">The ordered modifier name/state entries.</param>
+    /// <returns>An immutable modifier snapshot.</returns>
+    public static IReadOnlyDictionary<string, bool> _createModifiers(
+        params (string Name, bool Value)[] entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        Dictionary<string, bool> modifiers =
+            new(entries.Length, StringComparer.Ordinal);
+        foreach ((string name, bool value) in entries)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(name);
+            modifiers[name] = value;
+        }
+
+        return new ReadOnlyDictionary<string, bool>(modifiers);
+    }
+
     /// <summary>Target-types a value-returning event handler with a payload.</summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged handler.</returns>
@@ -1578,10 +1607,23 @@ public static class RenderHelpers
         string? argument = tuple.Length > 2 ? tuple[2] as string : existing?.Argument;
         IReadOnlyDictionary<string, bool>? modifiers =
             tuple.Length > 3
-                ? tuple[3] as IReadOnlyDictionary<string, bool>
+                ? ReadModifiers(tuple[3])
                 : existing?.Modifiers;
         return new ComponentDirectiveBinding(name, value, argument, modifiers);
     }
+
+    // The modifier slot of a directive tuple carries the name -> bool bag _createModifiers builds
+    // ([SFC-CG-6]). Any other non-null shape is a compiler/runtime contract break and fails loudly:
+    // reading it as "no modifiers" is what silently disabled .lazy/.trim/.number on compiled
+    // v-model before [V01.01.05.03.01].
+    private static IReadOnlyDictionary<string, bool>? ReadModifiers(object? source) => source switch
+    {
+        null => null,
+        IReadOnlyDictionary<string, bool> modifiers => modifiers,
+        _ => throw new NotSupportedException(
+            $"Directive modifier bag type '{source.GetType().Name}' is not supported; "
+            + "generated code must build it with _createModifiers."),
+    };
 
     private static Dictionary<string, object?> CopyProperties(object? source)
     {

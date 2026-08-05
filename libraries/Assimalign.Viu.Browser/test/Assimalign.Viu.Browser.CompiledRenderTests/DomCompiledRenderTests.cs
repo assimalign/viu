@@ -166,6 +166,70 @@ public sealed class DomCompiledRenderTests
         type.GetProperty("model")!.GetValue(instance).ShouldBe("updated");
     }
 
+    [Theory]
+    // The native control matrix, each with the modifiers that shift its carriers.
+    [InlineData("<input v-model.trim.number=\"model\" />", "trim", "number")]
+    [InlineData("<input type=\"text\" v-model.lazy=\"model\" />", "lazy", null)]
+    [InlineData("<textarea v-model.lazy.trim=\"model\"></textarea>", "lazy", "trim")]
+    [InlineData("<input type=\"checkbox\" v-model.number=\"model\" />", "number", null)]
+    [InlineData("<input type=\"radio\" value=\"a\" v-model.number=\"model\" />", "number", null)]
+    [InlineData("<select v-model.number=\"model\"></select>", "number", null)]
+    [InlineData("<input :type=\"kind\" v-model.lazy.number=\"model\" />", "lazy", "number")]
+    public void NativeVModel_CompiledRenderCarriesItsModifiers_AcrossTheControlMatrix(
+        string element,
+        string firstModifier,
+        string? secondModifier)
+    {
+        // The directive tuple's fourth slot must reach DirectiveBinding.Modifiers, which is typed
+        // IReadOnlyDictionary<string, bool>. Emitting it as a property bag (name -> object?) type-checks
+        // but reads back as NO modifiers, so `.lazy` never shifted the update carrier from `input` to
+        // `change`, and `.trim`/`.number` never transformed the read — on every native control, in every
+        // compiled component. The runtime v-model tests missed it because they construct
+        // ComponentDirectiveBinding directly and so never cross the generated _withDirectives seam
+        // ([SFC-CG-6], [V01.01.05.03.01]).
+        var template = "<template>\n" + element + "\n</template>\n";
+        const string handWritten =
+            "#nullable enable\n" +
+            "namespace Demo\n" +
+            "{\n" +
+            "    partial class ModifierModelWidget\n" +
+            "    {\n" +
+            "        public object? model { get; set; } = \"initial\";\n" +
+            "        public string kind => \"text\";\n" +
+            "    }\n" +
+            "}\n";
+
+        var generated = CompiledRenderSupport.Generate("ModifierModelWidget", template);
+        var type = Assembly.Load(CompiledRenderSupport.CompileToAssembly(generated, handWritten))
+            .GetType("Demo.ModifierModelWidget")
+            ?? throw new InvalidOperationException(
+                "The compiled assembly did not contain Demo.ModifierModelWidget.");
+        var instance = Activator.CreateInstance(type, nonPublic: true)!;
+        var cacheSize = (int)type.GetField(
+            "RenderCacheSize",
+            BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetRawConstantValue()!;
+        var render = type.GetMethod("Render", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        object rendered =
+            render.Invoke(null, new object?[] { instance, new object?[cacheSize] })
+            ?? throw new InvalidOperationException("The generated render returned null.");
+        var binding = rendered.ShouldBeAssignableTo<IElementComponent>()!.Directives.Single();
+
+        // The carrier itself still rides slot 2, unchanged by the modifier slot.
+        binding.Value.ShouldBeOfType<ViuModelBinding>().Value.ShouldBe("initial");
+        binding.Modifiers[firstModifier].ShouldBeTrue();
+        if (secondModifier is null)
+        {
+            binding.Modifiers.Count.ShouldBe(1);
+        }
+        else
+        {
+            binding.Modifiers.Count.ShouldBe(2);
+            binding.Modifiers[secondModifier].ShouldBeTrue();
+        }
+    }
+
     // A template using the <Transition> built-in around a v-if element — the compiled-render proof for
     // [V01.01.04.07]: the compiler resolves <Transition> to the _Transition helper (DomRenderHelpers), and
     // the generated render binds and compiles against the real component.
