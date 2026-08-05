@@ -172,19 +172,65 @@
     </Target>
 
     <!-- Optional: pack every shipping library into the local feed alongside the
-         SDK (dotnet pack -p:PackViuProjects=true on the Tasks csproj). -->
+         SDK (dotnet pack -p:PackViuProjects=true on the Tasks csproj).
+
+         The fan-out reaches projects OUTSIDE this csproj's ProjectReference closure
+         (Assimalign.Viu.Syntax.Html and .JavaScript are the only two netstandard2.0
+         libraries nothing in the SDK task graph references), so the outer `dotnet pack`
+         implicit restore never covers them: on a clean CI checkout they reach the fan-out
+         with an empty obj/.
+
+         That makes the restore/build split load-bearing, and it must be spelled the way
+         MSBuild's own -restore switch spells it: two invocations whose GLOBAL PROPERTIES
+         DIFFER. A single Targets="Restore;Pack" call - or two calls sharing one property
+         set - runs both targets against ONE BuildRequestConfiguration, so the project is
+         evaluated once, BEFORE restore writes obj\*.nuget.g.props. $(ProjectAssetsFile)
+         stays empty for the whole invocation and ResolvePackageAssets silently contributes
+         nothing (the NETSDK1004 guard only fires when the property is set). net10.0
+         projects survive on the SDK's targeting pack; netstandard2.0 gets its reference
+         assemblies solely from the NETStandard.Library package via the assets file, so it
+         compiles against zero references - CS0518/CS0246 on System.Object ([V01.01.12.19.03]).
+
+         MSBuildIsRestoring=true is that differentiator, and is not a marker property:
+         Microsoft.Common.props keys ImportProjectExtensionProps off it to skip the obj/
+         NuGet imports during a restore pass, which is precisely why the restore pass and
+         the build pass must be separate configurations. Setting it here gives the Pack
+         invocation its own configuration, evaluated after restore has written obj/.
+         Restore deliberately carries no ContinueOnError: a swallowed restore failure
+         reproduces exactly the reference-less compile above.
+
+         The restore pass is also NOT parallel. Every entry project's restore walks and
+         writes the assets for its WHOLE ProjectReference closure itself, outside MSBuild's
+         per-project scheduling, so MSBuild cannot dedupe the overlap the way it dedupes a
+         build: run the fan-out entries concurrently and the shared nodes (Assimalign.Viu.Shared
+         sits in nearly every closure) get restored several times at once, racing on the same
+         obj\ files - "Cannot create a file when that file already exists" out of
+         NuGet.targets on a clean checkout. Sequential restore costs a few seconds because
+         each already-restored closure no-ops through obj\project.nuget.cache. The Pack pass
+         stays parallel: that IS one MSBuild graph, so the scheduler dedupes shared nodes. -->
     <Target Name="PackViuProjects" BeforeTargets="GenerateNuspec" Condition="'$(PackViuProjects)' == 'true'">
         <ItemGroup>
             <ViuSdkPackProject Include="$(ViuRepositoryDirectory)libraries\**\src\*.csproj"
                 Exclude="**\bin\**;**\obj\**;**\test\**;**\*.Tests.csproj;**\*Tests.csproj" />
         </ItemGroup>
+        <PropertyGroup>
+            <_ViuSdkPackProperties>Configuration=$(Configuration);PackageOutputPath=$(ViuOutputPathForLibraries)</_ViuSdkPackProperties>
+            <_ViuSdkPackRemoveProperties>OutDir;PackageId;TargetFramework;TargetFrameworks;IncludeBuildOutput;GenerateDependencyFile;CopyLocalLockFileAssemblies</_ViuSdkPackRemoveProperties>
+        </PropertyGroup>
+        <Message Text="Restoring Viu libraries for the pack fan-out" Importance="High" />
+        <MSBuild
+            Projects="@(ViuSdkPackProject)"
+            Targets="Restore"
+            BuildInParallel="false"
+            Properties="$(_ViuSdkPackProperties);MSBuildIsRestoring=true"
+            RemoveProperties="$(_ViuSdkPackRemoveProperties)" />
         <Message Text="Packing Viu libraries into $(ViuOutputPathForLibraries)" Importance="High" />
         <MSBuild
             Projects="@(ViuSdkPackProject)"
-            Targets="Restore;Pack"
+            Targets="Pack"
             BuildInParallel="true"
-            Properties="Configuration=$(Configuration);PackageOutputPath=$(ViuOutputPathForLibraries)"
-            RemoveProperties="OutDir;PackageId;TargetFramework;TargetFrameworks;IncludeBuildOutput;GenerateDependencyFile;CopyLocalLockFileAssemblies"
+            Properties="$(_ViuSdkPackProperties)"
+            RemoveProperties="$(_ViuSdkPackRemoveProperties)"
             ContinueOnError="WarnAndContinue" />
     </Target>
 
