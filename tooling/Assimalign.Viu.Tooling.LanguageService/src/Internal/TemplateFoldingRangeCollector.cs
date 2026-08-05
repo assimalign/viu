@@ -33,6 +33,13 @@ namespace Assimalign.Viu.Tooling.LanguageService;
 /// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange">
 /// Language Server Protocol 3.17 — textDocument/foldingRange</see>.
 /// </para>
+/// <para>
+/// Keeping the end tag visible is the <em>markup</em> convention and is deliberately not the one script
+/// blocks use: C# constructs collapse with both delimiters hidden, beside their signature, the way the
+/// C# editor collapses a <c>.cs</c> file (see <see cref="ScriptFoldingRangeCollector"/>,
+/// [V01.01.12.07.10]). The split is per family and intentional — an author reads a collapsed element by
+/// its tags and a collapsed method by its signature.
+/// </para>
 /// </remarks>
 internal static class TemplateFoldingRangeCollector
 {
@@ -66,10 +73,9 @@ internal static class TemplateFoldingRangeCollector
 
         // Recoverable by contract: malformed markup is reported through OnError and never throws.
         var root = TemplateParser.Parse(template.Content, options);
-        var lineStarts = GetLineStarts(template.Content);
         // Content line 0 sits on the document line the content starts on — the block's own open-tag
         // line for a tag container, the line after the header for an @-block container.
-        var documentLineOffset = Math.Max(template.ContentLocation.Start.Line - 1, 0);
+        var lineMap = ContentLineMap.Create(template);
 
         var ranges = new List<LanguageFoldingRange>();
         var pending = new Stack<ElementNode>();
@@ -80,8 +86,7 @@ internal static class TemplateFoldingRangeCollector
             var range = CreateRange(
                 element,
                 template.Content.Length,
-                lineStarts,
-                documentLineOffset,
+                lineMap,
                 unclosedOffsets);
             if (range is not null)
             {
@@ -112,8 +117,7 @@ internal static class TemplateFoldingRangeCollector
     private static LanguageFoldingRange? CreateRange(
         ElementNode element,
         int contentLength,
-        int[] lineStarts,
-        int documentLineOffset,
+        ContentLineMap lineMap,
         HashSet<int> unclosedOffsets)
     {
         // A self-closing element has no end tag to keep visible, and neither does an element the
@@ -134,8 +138,8 @@ internal static class TemplateFoldingRangeCollector
             return null;
         }
 
-        var startLine = documentLineOffset + GetLineIndex(lineStarts, startOffset);
-        var endLine = documentLineOffset + GetLineIndex(lineStarts, closeTagOffset) - 1;
+        var startLine = lineMap.GetDocumentLine(startOffset);
+        var endLine = lineMap.GetDocumentLine(closeTagOffset) - 1;
         // A single-line element, and an element whose end tag opens the line right after its open
         // tag, fold nothing — and a range can never invert, whatever span the parse produced.
         return endLine > startLine
@@ -169,52 +173,5 @@ internal static class TemplateFoldingRangeCollector
         }
 
         return source[nameStart - 1] == '/' && source[nameStart - 2] == '<';
-    }
-
-    // The start offset of each line in the block content. '\n', '\r\n', and a lone '\r' each end one
-    // line, matching how the container parse numbers the document's lines.
-    private static int[] GetLineStarts(string content)
-    {
-        var starts = new List<int> { 0 };
-        for (var index = 0; index < content.Length; index++)
-        {
-            var character = content[index];
-            if (character == '\r')
-            {
-                if (index + 1 < content.Length && content[index + 1] == '\n')
-                {
-                    index++;
-                }
-            }
-            else if (character != '\n')
-            {
-                continue;
-            }
-
-            starts.Add(index + 1);
-        }
-
-        return starts.ToArray();
-    }
-
-    // The index of the line containing offset (binary search over the line starts).
-    private static int GetLineIndex(int[] lineStarts, int offset)
-    {
-        var low = 0;
-        var high = lineStarts.Length - 1;
-        while (low < high)
-        {
-            var middle = (low + high + 1) >> 1;
-            if (lineStarts[middle] <= offset)
-            {
-                low = middle;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return low;
     }
 }
