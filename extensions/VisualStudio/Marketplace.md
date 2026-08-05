@@ -15,6 +15,12 @@ One package: the `.viu` file association, the Viu color theme, and the Viu langu
   the C# in the file next to it
 - **`.viu` opens in the right editor automatically.** The package registers the file extension, so
   there is no per-file Open With step
+- **Auto-closing that knows which section you are in.** `{`, `(`, and `[` pair everywhere — typing
+  `{` twice gives you `{{}}` for an interpolation. Quotes pair only where they mean a string, so an
+  apostrophe in template prose stays an apostrophe. Typing `>` after an open tag inserts its end tag
+  with the caret between them, `</` completes the nearest unclosed element, and `<!--` completes to
+  `<!-- | -->`. Nothing fires inside `@script` or `<style>`, where `>` is a generic argument or a CSS
+  child combinator, and void elements such as `<br>` insert nothing
 - Diagnostics for malformed single-file-component block structure
 - Completion for block headers and options, common template elements, directives, events, CSS
   properties, `Context.*`, and `Reactive.*`
