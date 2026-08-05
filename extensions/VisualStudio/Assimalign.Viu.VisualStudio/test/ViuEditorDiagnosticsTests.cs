@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 
 using Shouldly;
 
@@ -31,8 +30,16 @@ public class ViuEditorDiagnosticsTests
     }
 
     [Fact]
-    public void Trace_WhileOff_WritesNothingAndNeverRunsTheMessageFactory()
+    public void Trace_WhileOff_NeverRunsTheMessageFactory()
     {
+        // The factory not running is the whole cost story: with the trace off a call site pays a
+        // static field read and does not even build its message.
+        //
+        // This deliberately does not assert that no log file exists. An earlier revision did, and it
+        // failed on a machine where the developer had run the diagnostics for real - it was asserting
+        // about the temporary directory's history rather than about this code. The invariant that
+        // actually belongs to the sink is that it holds no path to write to, which the test above
+        // pins.
         bool messageFactoryRan = false;
         ViuEditorDiagnostics.Trace(
             "test",
@@ -43,7 +50,6 @@ public class ViuEditorDiagnosticsTests
             });
 
         messageFactoryRan.ShouldBeFalse();
-        File.Exists(Path.Combine(Path.GetTempPath(), ViuEditorDiagnostics.LogFileName)).ShouldBeFalse();
     }
 
     [Fact]

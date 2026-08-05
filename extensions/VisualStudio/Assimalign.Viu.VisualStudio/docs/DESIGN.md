@@ -347,15 +347,82 @@ shipping editor refutes that**, and the refutation is recorded here so nobody re
   per-language "Automatic brace completion" checkbox is not wired to it — Roslyn enforces that inside
   its own `IBraceCompletionSessionProvider`, which a `viu` buffer never reaches.
 
-So brace completion is **already on** for a `viu` view, and there is deliberately **no
-`ITextViewCreationListener`** in this extension: writing `true` onto the view options would be a
-no-op against the default and would *override* the one party that can turn the option off — a user
-or an extension that deliberately set it `false`. Leaving the option untouched is what satisfies the
-work item's requirement to respect the user-facing setting. The MEF side was checked the same way and
-is healthy: the composition cache for the hive carries `ViuBracketBraceCompletionContextProvider`,
-`ViuQuoteBraceCompletionContextProvider`, and `ViuAutoClosingCommandHandler` with no composition
-error, and the deployed assembly's `[BracePair]`/`[ContentType]` metadata decompiles to what the
-source declares.
+Both of those facts are true, and the conclusion first drawn from them — that brace completion is
+therefore already on for a `viu` view — was **wrong**. Recorded rather than quietly rewritten,
+because the way it was wrong is the reusable lesson.
+
+**Both greps searched for the wrong thing.** The writer references the option neither by its key
+field nor by an ASCII copy of its name: it passes the option *name* as a C# string literal, and
+literals live in the `#US` metadata heap encoded **UTF-16**. A byte grep for `BraceCompletionEnabled`
+or for `BraceCompletion/Enabled` cannot match a UTF-16 literal, so
+`Microsoft.VisualStudio.Editor.Implementation.dll` never appeared in either result. When a grep for a
+writer comes back empty, that is evidence about the grep.
+
+**The writer, found by the opt-in trace and then read in the decompiler**, is
+`Microsoft.VisualStudio.Editor.Implementation.SimpleTextViewWindow`:
+
+```text
+Init_InitializeWpfTextView()
+  -> SetToolsOptions(fontsAndColorsCategory.LanguageService)
+       -> IVsTextManager.GetUserPreferences7(null, new[]{ new LANGPREFERENCES4 { guidLang = … } }, null)
+       -> AdoptLangPreferences(langPrefs)
+            -> if (_canChangeBraceCompletion)
+                   _editorOptions.SetOptionValue("BraceCompletion/Enabled", val.fBraceCompletion != 0);
+```
+
+`fBraceCompletion` is the legacy per-**language service** preference, backed by the
+`ShowBraceCompletion` value under `[$RootKey$\Languages\Language Services\<Lang>]`. Every language
+that pairs braces registers it: C#, Visual Basic, Razor, TypeScript, the HTML/JSON/REST Web Tools
+languages, and VC all ship `"ShowBraceCompletion"=dword:00000001` in their `.pkgdef`. A `.viu` buffer
+has **no language service at all** — deliberately, because that registry key stamps its own content
+type and re-breaks colorization (see "File extension ownership") — so `ActualLanguageServiceID` falls
+back to the default file type, the preferences come back zeroed, and the option is explicitly written
+`false` on the view.
+
+The trace from a user session says exactly that, and nothing else has to be inferred:
+
+```text
+view.created  … braceCompletion(effective=False definedOnThisView=True globalValue=True)
+              … enabled=False activeSessions=0 openingBraces="({[\"|<*'\u0000`^~_"
+```
+
+The aggregator had resolved the Viu pairs correctly all along — `(`, `{`, `[`, `"` and `'` are all in
+that set — and `BraceCompletionManager.PreTypeChar` returned on `!Enabled` before it consulted any of
+them, which is why no provider ever logged a call. The MEF side was healthy throughout: the hive's
+composition cache carries every Viu part with no error, and the deployed assembly's
+`[BracePair]`/`[ContentType]` metadata decompiles to what the source declares.
+
+This also settles a question [V01.01.12.07.08] left open: **template and style pairing were equally
+broken**, because the option gates the whole engine rather than any one pair. Nobody had noticed.
+
+### Restoring the inherited setting
+
+`ViuBraceCompletionEnablementTextViewCreationListener` **clears** the view-scoped value rather than
+writing `true`. That is the whole off-switch story: the option's own default is `true` and nothing in
+Visual Studio writes the global scope, so the global value *is* the user's Automatic Brace Completion
+choice. `ClearOptionValue` removes the adapter's spurious definition and lets that choice through;
+writing `true` would overwrite it and take the off switch away from a user who had deliberately
+turned the feature off.
+
+The decision is `ViuBraceCompletionEnablement.ShouldClearViewOverride(definedOnThisView,
+effectiveValue, globalValue)` — pure, and unit-tested across all eight states. It clears in exactly
+one: locally defined, off, while the global value is on. The other three declines are each real — an
+inherited value is already the user's, a locally defined `true` needs no help, and a global `false`
+is the off switch.
+
+**Ordering is not a race this part could lose.** The adapter's write happens inside
+`Init_InitializeWpfTextView` *before* the WPF view exists, so it is always ahead of any
+`ITextViewCreationListener` and one clear at view creation repairs the view the user opens. It is not
+the only write, though: `SimpleTextViewWindow.OnUserPreferencesChanged7` calls `AdoptLangPreferences`
+again whenever Tools > Options broadcasts a change for that same language-service GUID, which would
+re-disable a view already open. An `IEditorOptions.OptionChanged` subscription, dropped on
+`ITextView.Closed`, covers that.
+
+**The clear cannot loop**, and the bound comes from the condition rather than from a guard flag.
+Clearing raises `OptionChanged` synchronously and re-enters the handler once; by then the local
+definition is gone, so `ShouldClearViewOverride` answers `false` and the recursion stops at depth two.
+A user toggling the global option raises the same notification and is declined for the same reason —
+an inherited value is never cleared.
 
 What actually suppresses a pair is the editor's own start heuristic, and it is worth knowing when
 triaging "it did not close":
@@ -377,7 +444,8 @@ environment variable `VIU_EDITOR_DIAGNOSTICS` to any non-empty value **in the pr
 
 | Category | Written when | Carries |
 | --- | --- | --- |
-| `view.created` | a `.viu` document view opens | the view buffer's content type and full base chain, the data model's content type, whether the view buffer is the document buffer, the view roles, the Automatic Brace Completion option (effective value, whether defined on this view, global value), and the editor's brace-completion manager if it exists yet |
+| `view.created` | a `.viu` document view opens | the view buffer's content type and full base chain, the data model's content type, whether the view buffer is the document buffer, the view roles, the Automatic Brace Completion option **as observed** (effective value, whether defined on this view, global value), and the editor's brace-completion manager if it exists yet |
+| `brace.reenabled` | the option is inspected at view creation and on every change to it | the trigger, the full before state, whether the view override was cleared, and the full after state — the authoritative before/after pair, because two `ITextViewCreationListener` parts have no defined order and `view.created` may be written on either side of the repair |
 | `buffer.changed` | every buffer edit while the view is open | version before and after, the edit tag, and each change as position, deleted text, inserted text |
 | `context.bracket` / `context.quote` | the editor asks a Viu provider whether a pair may start | the opening and closing characters, line, column, resolved section, the line's text, the allow/deny answer, and the manager's live `Enabled`, active session count, and registered opening/closing brace characters |
 | `typechar.enter` / `typechar.exit` | `ViuAutoClosingCommandHandler` runs | the typed character, whether it is a trigger character, and on exit whether the command was handled — spelled out as `chain=STOPPED` or `chain=CONTINUES`, because a non-chained `ICommandHandler` has no next-handler delegate and `return true` *is* the swallow |
@@ -402,10 +470,10 @@ diagnostics-only, dormant by default, and lives in a .NET Framework in-process e
 never trimmed and never ahead-of-time compiled, so the AOT and trimming constraints that govern the
 shipping WebAssembly runtime are not in play. A missing member degrades to `<absent>`.
 
-Note what this extension deliberately still does **not** contribute: an `ITextViewCreationListener`
-that *writes* `BraceCompletionEnabledOptionId`. `ViuDiagnosticsTextViewCreationListener` only
-observes, for the reason given in the root-cause section — the option is already `true` and forcing
-it would override the only party who can turn it off.
+This trace is what found the root cause: its very first line showed the option defined `false` on the
+view against a global `true`, which no reading of the decompiled editor had suggested. It is kept
+rather than deleted because the same one-line-per-event shape answers the next question of this kind
+too, and because it costs a static field read when it is off.
 
 ### Recorded decisions
 
@@ -422,15 +490,15 @@ it would override the only party who can turn it off.
   an open completion session. The two names are written as literals — one of them has no published
   constant, so a package reference for the other would buy nothing, and an unrecognized ordering name
   is simply ignored.
-- **The Automatic Brace Completion option is the editor's, and is left alone — neither read nor
-  written.** The editor's brace-completion manager reads
+- **The Automatic Brace Completion option is the user's, and Viu only removes what the shell wrote
+  over it.** The editor's brace-completion manager reads
   `DefaultTextViewOptions.BraceCompletionEnabledOptionId` and returns before it consults any
-  provider, so turning the option off turns the Viu pairs off with it. It defaults to `true` and
-  nothing in Visual Studio writes it (see the root-cause section above), so there is no view-creation
-  listener to enable it and no Viu code that reads it: the only party who can turn it off is the
-  user, and forcing it on at view creation would take that away. Element auto-close has no
-  editor-owned option and ships **always on**; inventing a Viu options page for one toggle was
-  rejected. Revisit if it proves intrusive.
+  provider, so the option gates every Viu pair in every section. The global scope holds the user's
+  choice and Viu never writes it; the only thing Viu touches is the *view-scoped* value the legacy
+  editor adapter stamps on from a language service `.viu` does not have, and it clears that value
+  rather than replacing it, so a global `false` still wins. See "Restoring the inherited setting".
+  Element auto-close has no editor-owned option and ships **always on**; inventing a Viu options page
+  for one toggle was rejected. Revisit if it proves intrusive.
 - **Over-type and paired backspace come from the editor, not from the context.**
   `OvertypeSession.PreOverType` consults `IBraceCompletionContext.AllowOverType` only to let a
   context *veto* over-typing, and `BraceCompletionDefaultSession.PreBackspace` never asks a context at
