@@ -202,9 +202,8 @@ because the editor offers exactly two shapes and they answer different questions
 **Character pairs ride the editor's brace-completion engine.** The engine already owns everything a
 pair needs after it opens — inserting the closer, tracking the span, typing through the closer, and
 deleting both halves on one backspace — so Viu contributes only which characters pair, where, and
-what `Enter` does between them. Interpolation falls out of the brace pair rather than needing a rule
-— typing `{` twice yields `{{}}` with the caret in the middle, which is the authoring path for
-`{{ Count }}`.
+what `Enter` does between them. Interpolation does **not** fall out of the brace pair and needs a
+rule of its own; see "The interpolation scaffold".
 
 Both registrations are `IBraceCompletionContextProvider`s filtered on the `viu` content type, for two
 different reasons:
@@ -253,6 +252,8 @@ belongs to it, because content may sit on the same line; the column-0 `}` that e
 | Typed | Template | `@script` / `<script>` | `<style>` | Between containers |
 | --- | --- | --- | --- | --- |
 | `{` `(` `[` | pairs | pairs | pairs | pairs |
+| `{` **immediately after `{`** | writes the interpolation scaffold `{{|}}` — **does not** pair | pairs (a nested block) | pairs (a nested at-rule) | pairs |
+| `}` **with a `}` at the caret** | walks the caret over it | — | — | — |
 | `"` | pairs **only in attribute-value position** | pairs | — | — |
 | `'` | — | pairs | — | — |
 | `>` after an open tag | inserts `</name>` | — | — | — |
@@ -289,6 +290,59 @@ a lambda arrow, and a `>` in `<style>` is the CSS child combinator; a script or 
 grew an end tag on every `>` would be unusable. That is why the element behaviors are template-only,
 and why the top-level `<style>`/`<script>` opening tags do not auto-close either — their own line is
 already attributed to the section they open.
+
+### The interpolation scaffold
+
+**Correction to [V01.01.12.07.08].** That work item recorded that typing `{` twice yields `{{}}`
+"with the caret in the middle, which is the authoring path for `{{ Count }}`". It was aspirational
+and it was false — it never worked, and it cannot work on the brace-completion path. The editor's
+`ShouldStartSession` declines whenever the first non-whitespace character after the caret is a letter
+or digit, the pair's own characters, one of `!`/`_`/`@`, or **any registered opening brace** — and
+`<` is registered (the live set from a user session is `({["|<*'\u0000` plus a few from other
+extensions). So in the ordinary case of authoring an interpolation inside an element,
+`<p>{|</p>`, even the *first* brace never pairs, and the second has nothing to build on.
+
+`{` typed immediately after `{` in a **template** therefore writes the scaffold explicitly
+([V01.01.12.07.09]), from either caret state and with the same result:
+
+| Before | Typed | After |
+| --- | --- | --- |
+| `<p>{\|</p>` (first brace declined) | `{` | `<p>{{\|}}</p>` |
+| `<p>{\|}` (first brace paired) | `{` | `<p>{{\|}}` |
+
+The second case reuses the closer the first brace's session already inserted; the first supplies
+both. A user cannot tell which path they were on, which is the point.
+
+**No inner spaces.** The scaffold writes `{{}}`, not `{{  }}` — matching what the Visual Studio Code
+client already produces from its `language-configuration.json` pair, so the two hosts agree. An
+interpolation reads perfectly well as `{{ Count }}`; typing that space is one keystroke, deleting two
+unwanted ones is two, and the spaces are not part of the syntax.
+
+**Nothing races the scaffold, and that is arranged rather than hoped for.**
+`ViuAutoClosingLogic.AllowsBracketPair` declines the second `{`, so the context provider refuses, the
+aggregator creates nothing, and the manager holds no pending session. Without that decline the
+manager's `PostTypeChar` would validate the caret it finds after the scaffold — the character before
+it really is `{` — push a session, and insert a third brace. The session opened by the *first* `{`,
+where there was one, is left alone: its tracking points survive and widen around the insertion, and
+its over-type path then fails its own validity check because the span's content changed, so it
+declines the closing brace and the walk-over below answers instead.
+
+**`}` walks over an existing `}` in a template.** Nothing tracks a hand-written scaffold, so the
+editor's own type-through does not apply and closing `{{}}` by typing both braces would otherwise
+leave `{{}|}}`. The test is deliberately broader than "inside an interpolation" — just "a `}` is
+already at the caret, in a template" — because matching a closer to its opener would mean parsing the
+template to decide a keystroke. The cost is that a literal `}}}` in template prose cannot be typed
+straight through; it can still be pasted, or typed with an arrow key between the braces. Script and
+style sections are untouched, where a live session owns `}` and a walk-over firing outside one would
+break ordinary C# and CSS authoring. The two can never both act: a live session's `PreOverType` runs
+in the chained brace-completion handler and marks the command handled, so this handler is not reached
+at all when the platform has already walked the caret over.
+
+**Backspace is deliberately not special-cased.** Inside the scaffold it deletes one character at a
+time, so `{{|}}` backspaces to `{|}}`. Collapsing both sides would mean owning a pair's lifetime —
+tracking the span across edits, deciding when it stops being a pair — which is exactly the machinery
+the brace-completion engine exists to provide and which is not available for text no session backs.
+Recorded as accepted rather than built; revisit if it proves annoying in practice.
 
 ### Return between paired braces
 

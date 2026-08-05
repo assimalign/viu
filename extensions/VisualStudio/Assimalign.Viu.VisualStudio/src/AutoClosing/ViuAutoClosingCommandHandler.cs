@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
 
 using Microsoft.VisualStudio.Commanding;
@@ -10,7 +11,8 @@ using Microsoft.VisualStudio.Utilities;
 namespace Assimalign.Viu.VisualStudio;
 
 /// <summary>
-/// Closes elements and comments as they are typed in a <c>.viu</c> template ([V01.01.12.07.08]).
+/// Closes elements and comments, and composes the interpolation scaffold, as they are typed in a
+/// <c>.viu</c> template ([V01.01.12.07.08], [V01.01.12.07.09]).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,6 +20,22 @@ namespace Assimalign.Viu.VisualStudio;
 /// the caret into a line and offset, asks what — if anything — should be inserted, and applies that
 /// answer to the buffer. Every rule about <em>what</em> to insert, and every rule about where an
 /// insertion is forbidden, lives in that pure decision class and is unit-tested there.
+/// </para>
+/// <para>
+/// <b>The interpolation scaffold cannot race a brace-completion session</b>, and that is arranged
+/// rather than hoped for. <see cref="ViuAutoClosingLogic.AllowsBracketPair"/> declines the second
+/// <c>{</c> of a template interpolation, so <see cref="ViuBracketBraceCompletionContextProvider"/>
+/// refuses the context, the aggregator creates nothing, and the editor's manager holds no pending
+/// session to complete after this handler writes. Without that decline the manager's
+/// <c>PostTypeChar</c> would validate the caret it finds after the scaffold — the character before it
+/// really is <c>{</c> — push a session, and insert a third brace.
+/// </para>
+/// <para>
+/// The session opened by the <em>first</em> <c>{</c>, where there was one, is left alone. Its
+/// tracking points survive the scaffold's insertion and simply widen around it; its over-type path
+/// then fails its own validity check because the span's content has changed, so it declines the
+/// closing brace and the walk-over below answers instead. A session that dies quietly here costs
+/// nothing: everything it would have done is done explicitly.
 /// </para>
 /// <para>
 /// <b>Element auto-close has no user option, deliberately.</b> Character pairs ride the editor's
@@ -146,11 +164,30 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
 
         ITextSnapshot snapshot = caretPoint.Value.Snapshot;
         ITextSnapshotLine line = snapshot.GetLineFromPosition(caretPoint.Value.Position);
+        IReadOnlyList<string> lines = ViuSnapshotLines.Read(snapshot);
+        int characterIndex = caretPoint.Value.Position - line.Start.Position;
+
+        // '}' is a caret move rather than an edit: the interpolation scaffold is written by hand, so
+        // no brace-completion session tracks it and the editor's own type-through never applies.
+        // Reaching here at all means the platform declined the character first - a live session's
+        // PreOverType handles it before this chain link runs - so the two can never both act.
+        if (args.TypedChar == '}')
+        {
+            if (!ViuAutoClosingLogic.AllowsClosingBraceWalkover(lines, line.LineNumber, characterIndex))
+            {
+                outcome = "declined: no closing brace to walk over";
+                return false;
+            }
+
+            MoveCaret(textView, subjectBuffer, caretPoint.Value.Position + 1);
+            outcome = "walked over an existing '}'";
+            return true;
+        }
 
         ViuAutoClosingEdit? completion = ViuAutoClosingLogic.GetTypedCharacterCompletion(
-            ViuSnapshotLines.Read(snapshot),
+            lines,
             line.LineNumber,
-            caretPoint.Value.Position - line.Start.Position,
+            characterIndex,
             args.TypedChar);
         if (completion is not { } autoClosingEdit)
         {

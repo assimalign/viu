@@ -29,11 +29,15 @@ public class ViuAutoClosingLogicTests
     [Fact]
     public void AllowsBracketPair_AllThreeBracketsInATemplate_Pair()
     {
-        // The matrix these four tests pin is [V01.01.12.07.08]'s, unchanged: the brackets pair in
-        // every section. [V01.01.12.07.09] moved them onto a brace-completion context provider so a
-        // '{' block can expand on Return, and moving them is exactly what makes the decision a
-        // question somebody has to answer rather than pure MEF metadata.
-        AllowsBracket('{', "<template>", "    <p>{|", "</template>").ShouldBeTrue();
+        // The matrix these four tests pin is [V01.01.12.07.08]'s: the brackets pair in every
+        // section. [V01.01.12.07.09] moved them onto a brace-completion context provider so a '{'
+        // block can expand on Return, and moving them is exactly what makes the decision a question
+        // somebody has to answer rather than pure MEF metadata.
+        //
+        // The '{' sample is a first brace. An earlier revision wrote it as "<p>{|", which is the
+        // second-brace position the interpolation scaffold now owns - the sample, not the rule,
+        // changed. That position is pinned by its own test below.
+        AllowsBracket('{', "<template>", "    <p>|", "</template>").ShouldBeTrue();
         AllowsBracket('(', "<template>", "    <p>{{ Format(|", "</template>").ShouldBeTrue();
         AllowsBracket('[', "<template>", "    <p>{{ Items[|", "</template>").ShouldBeTrue();
     }
@@ -80,6 +84,113 @@ public class ViuAutoClosingLogicTests
     {
         ViuAutoClosingLogic.AllowsBracketPair(["@script {", "}"], 5, 0, '{').ShouldBeFalse();
         ViuAutoClosingLogic.AllowsBracketPair(["@script {", "}"], 0, 99, '{').ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_TheSecondBraceOfATemplateInterpolation_DoesNotPair()
+    {
+        // The scaffold owns that keystroke ([V01.01.12.07.09]). Declining here is what keeps the
+        // editor from holding a pending session that would insert a third brace after the scaffold
+        // has already written a balanced pair.
+        AllowsBracket('{', "<template>", "    <p>{|", "</template>").ShouldBeFalse();
+        AllowsBracket('{', "<template>", "    <p>{|}", "</template>").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_ASecondBraceOutsideATemplate_StillPairs()
+    {
+        // In C# the second brace is a nested block or an interpolated-string brace and must pair on
+        // its own; in CSS it is a nested at-rule block.
+        AllowsBracket('{', "@script {", "    if (Visible) {|", "}").ShouldBeTrue();
+        AllowsBracket('{', "<script>", "    if (Visible) {|", "</script>").ShouldBeTrue();
+        AllowsBracket('{', "<style>", "    @media print {|", "</style>").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsBracketPair_ABraceAfterSomethingElse_StillPairs()
+    {
+        // Only a brace immediately after a brace is the interpolation position.
+        AllowsBracket('{', "<template>", "    <p>|", "</template>").ShouldBeTrue();
+        AllowsBracket('{', "<template>", "    <p>{{ a }}|", "</template>").ShouldBeTrue();
+    }
+
+    // ---- The template interpolation scaffold --------------------------------------------------
+
+    [Fact]
+    public void GetTypedCharacterCompletion_SecondBraceWhereTheFirstOneNeverPaired_WritesBothClosers()
+    {
+        // The ordinary case: '<' is a registered opening brace, so the editor declined to pair the
+        // first '{' inside an element and there is no closer to reuse.
+        Complete('{', "<template>", "    <p>{|</p>", "</template>")
+            .ShouldBe("    <p>{{|}}</p>");
+    }
+
+    [Fact]
+    public void GetTypedCharacterCompletion_SecondBraceWhereTheFirstOnePaired_ReusesTheExistingCloser()
+    {
+        // Same result from the other caret state, so the user cannot tell which path they were on.
+        Complete('{', "<template>", "    <p>{|}", "</template>")
+            .ShouldBe("    <p>{{|}}");
+    }
+
+    [Fact]
+    public void GetTypedCharacterCompletion_SecondBraceAtTheEndOfALine_WritesBothClosers()
+    {
+        Complete('{', "<template>", "    {|", "</template>").ShouldBe("    {{|}}");
+    }
+
+    [Fact]
+    public void GetTypedCharacterCompletion_ABraceThatIsNotTheSecondOne_ScaffoldsNothing()
+    {
+        Completion('{', "<template>", "    <p>|</p>", "</template>").ShouldBeNull();
+        Completion('{', "<template>", "    <p>a|</p>", "</template>").ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetTypedCharacterCompletion_ABraceAtTheStartOfALine_ScaffoldsNothing()
+    {
+        // '{{' is one token and never spans a line break, so a brace ending the line above opens
+        // nothing this could continue.
+        Completion('{', "<template>", "    {", "|", "</template>").ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetTypedCharacterCompletion_ASecondBraceOutsideATemplate_ScaffoldsNothing()
+    {
+        Completion('{', "@script {", "    if (Visible) {|", "}").ShouldBeNull();
+        Completion('{', "<script>", "    if (Visible) {|", "</script>").ShouldBeNull();
+        Completion('{', "<style>", "    @media print {|", "</style>").ShouldBeNull();
+        Completion('{', "<template></template>", "{|", "@script {", "}").ShouldBeNull();
+    }
+
+    // ---- Walking over a closing brace ---------------------------------------------------------
+
+    [Fact]
+    public void AllowsClosingBraceWalkover_WithAClosingBraceAtTheCaretInATemplate_Advances()
+    {
+        // Nothing tracks the hand-written scaffold, so the editor's own type-through never applies:
+        // without this, closing '{{}}' by typing both braces would leave '{{}|}}'.
+        AllowsWalkover("<template>", "    <p>{{ Count |}}</p>", "</template>").ShouldBeTrue();
+        AllowsWalkover("<template>", "    <p>{{ Count }|}</p>", "</template>").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AllowsClosingBraceWalkover_WithoutAClosingBraceAtTheCaret_Inserts()
+    {
+        AllowsWalkover("<template>", "    <p>{{ Count |</p>", "</template>").ShouldBeFalse();
+        AllowsWalkover("<template>", "    <p>|</p>", "</template>").ShouldBeFalse();
+        AllowsWalkover("<template>", "    <p>{{ Count }}|", "</template>").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AllowsClosingBraceWalkover_OutsideATemplate_Inserts()
+    {
+        // Script and style keep the platform's behavior: there a live session owns '}', and a
+        // walk-over firing outside one would break ordinary C# and CSS authoring.
+        AllowsWalkover("@script {", "    if (Visible) {|}", "}").ShouldBeFalse();
+        AllowsWalkover("<script>", "    if (Visible) {|}", "</script>").ShouldBeFalse();
+        AllowsWalkover("<style>", "    .card { color: red; |}", "</style>").ShouldBeFalse();
+        AllowsWalkover("<template></template>", "|}", "@script {", "}").ShouldBeFalse();
     }
 
     // ---- Return between paired braces --------------------------------------------------------
@@ -553,6 +664,12 @@ public class ViuAutoClosingLogicTests
             lineNumber,
             characterIndex,
             openingCharacter);
+    }
+
+    private static bool AllowsWalkover(params string[] markedLines)
+    {
+        (IReadOnlyList<string> lines, int lineNumber, int characterIndex) = ReadCaret(markedLines);
+        return ViuAutoClosingLogic.AllowsClosingBraceWalkover(lines, lineNumber, characterIndex);
     }
 
     // The caret marks the line the opening brace sits on, which is the line the expansion decision

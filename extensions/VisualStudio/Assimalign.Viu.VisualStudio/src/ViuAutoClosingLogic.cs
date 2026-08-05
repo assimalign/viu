@@ -49,7 +49,7 @@ internal static class ViuAutoClosingLogic
     /// every other keystroke without reading the buffer.
     /// </returns>
     public static bool IsCompletionTriggerCharacter(char typedCharacter) =>
-        typedCharacter is '>' or '/' or '-';
+        typedCharacter is '>' or '/' or '-' or '{' or '}';
 
     /// <summary>
     /// Determines whether a bracket typed at the given position may be paired.
@@ -61,20 +61,25 @@ internal static class ViuAutoClosingLogic
     /// <returns><see langword="true"/> when the pair may be completed.</returns>
     /// <remarks>
     /// <para>
-    /// The three brackets pair in <em>every</em> section, which is the answer this method exists to
-    /// state rather than to compute: braces, parentheses, and square brackets are balanced constructs
-    /// in template markup, in C#, and in CSS alike, so no position in a Viu container wants them
-    /// treated differently. Interpolation falls out of that rather than needing a rule — typing
-    /// <c>{</c> twice yields <c>{{}}</c> with the caret in the middle, the authoring path for
-    /// <c>{{ Count }}</c>. Quotes are the pairs that do want gating, and
-    /// <see cref="AllowsQuotePair"/> is where that lives.
+    /// The three brackets pair in every section but one position: braces, parentheses, and square
+    /// brackets are balanced constructs in template markup, in C#, and in CSS alike. Quotes are the
+    /// pairs that want general gating, and <see cref="AllowsQuotePair"/> is where that lives.
     /// </para>
     /// <para>
-    /// It is a decision rather than metadata because the brackets now carry a brace-completion
+    /// <b>The one exception is the second <c>{</c> of a template interpolation.</b> A pair whose
+    /// session starts here could never compose <c>{{}}</c>, and worse, a session that <em>did</em>
+    /// start would race the explicit scaffold that does. Declining is what hands the keystroke to
+    /// <see cref="GetTypedCharacterCompletion"/> cleanly: with no session pending, nothing else
+    /// writes to the buffer for that character. See
+    /// <see cref="GetInterpolationScaffold"/> for the shape it writes and why the session path cannot
+    /// produce it.
+    /// </para>
+    /// <para>
+    /// It is a decision rather than metadata because the brackets carry a brace-completion
     /// <em>context</em> ([V01.01.12.07.09], for <see cref="AllowsBlockExpansionOnReturn"/>), and a
     /// context provider is asked whether to start. Keeping the answer here — pure, with the document
-    /// and caret in hand — pins the shipped matrix in a unit test and gives any future position rule
-    /// one place to land.
+    /// and caret in hand — pins the shipped matrix in a unit test and gives every position rule one
+    /// place to land.
     /// </para>
     /// </remarks>
     public static bool AllowsBracketPair(
@@ -82,8 +87,127 @@ internal static class ViuAutoClosingLogic
         int lineNumber,
         int characterIndex,
         char openingCharacter)
-        => openingCharacter is '{' or '(' or '[' &&
-           IsPositionInRange(lines, lineNumber, characterIndex);
+    {
+        if (openingCharacter is not ('{' or '(' or '['))
+        {
+            return false;
+        }
+
+        if (!IsPositionInRange(lines, lineNumber, characterIndex))
+        {
+            return false;
+        }
+
+        // Only the interpolation position declines, and only for a brace, so the section scan is
+        // paid for exactly when a '{' follows a '{'.
+        return openingCharacter != '{' ||
+            !IsAfterOpeningBrace(lines[lineNumber], characterIndex) ||
+            ViuSectionScanner.ScanLineSections(lines)[lineNumber] != ViuSectionKind.Template;
+    }
+
+    /// <summary>
+    /// Computes the interpolation scaffold a second <c>{</c> writes in a template
+    /// ([V01.01.12.07.09]).
+    /// </summary>
+    /// <param name="lines">The document's lines, without their line breaks.</param>
+    /// <param name="lineNumber">Zero-based line the brace is being typed on.</param>
+    /// <param name="characterIndex">Zero-based offset within that line where the brace goes.</param>
+    /// <returns>
+    /// The insertion that leaves <c>{{|}}</c> around the caret, or <see langword="null"/> when this
+    /// is not the second brace of a template interpolation.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this is explicit rather than a consequence of pairing.</b> [V01.01.12.07.08] claimed
+    /// typing <c>{</c> twice yielded <c>{{}}</c> through the brace-completion engine. That was
+    /// aspirational and is false: the editor's <c>ShouldStartSession</c> declines whenever the first
+    /// non-whitespace character after the caret is a letter or digit, the pair's own characters, or
+    /// <em>any registered opening brace</em> — and <c>&lt;</c> is one, so in the ordinary case of
+    /// typing an interpolation inside an element (<c>&lt;p&gt;{|&lt;/p&gt;</c>) even the <em>first</em>
+    /// brace never pairs. The scaffold therefore has to be written, not inherited.
+    /// </para>
+    /// <para>
+    /// <b>Two caret states, one result.</b> If the first brace did pair, the caret sits at
+    /// <c>{|}</c> and the scaffold inserts <c>{}</c> — the existing closer becomes the inner one. If
+    /// it did not, the caret sits at <c>{|</c> with arbitrary text after it and the scaffold inserts
+    /// <c>{}}</c>. Both leave <c>{{|}}</c>, so the user cannot tell which path they were on.
+    /// </para>
+    /// <para>
+    /// <b>Recorded decision — no inner spaces.</b> The scaffold writes <c>{{}}</c> rather than
+    /// <c>{{  }}</c>, matching what the Visual Studio Code client already produces from its
+    /// <c>language-configuration.json</c> pair. An interpolation reads perfectly well as
+    /// <c>{{ Count }}</c> and typing that space is one keystroke, whereas deleting two unwanted ones
+    /// is two — and the spaces are not part of the syntax.
+    /// </para>
+    /// <para>
+    /// Template-only, for the same reason every other element behavior is: in <c>@script</c> a
+    /// second <c>{</c> is a nested C# block or an interpolated-string brace and must pair
+    /// independently, and in <c>&lt;style&gt;</c> it is a nested at-rule block.
+    /// </para>
+    /// </remarks>
+    public static ViuAutoClosingEdit? GetInterpolationScaffold(
+        IReadOnlyList<string> lines,
+        int lineNumber,
+        int characterIndex)
+    {
+        if (!IsPositionInRange(lines, lineNumber, characterIndex) ||
+            !IsAfterOpeningBrace(lines[lineNumber], characterIndex))
+        {
+            return null;
+        }
+
+        string line = lines[lineNumber];
+        bool closerFollows = characterIndex < line.Length && line[characterIndex] == '}';
+
+        // "{}" reuses the closer the first brace's session already inserted; "{}}" supplies both when
+        // it never started. The caret lands after the typed brace either way.
+        return new ViuAutoClosingEdit(closerFollows ? "{}" : "{}}", 1);
+    }
+
+    /// <summary>
+    /// Determines whether a <c>}</c> typed in a template should walk over the one already at the
+    /// caret instead of inserting a second ([V01.01.12.07.09]).
+    /// </summary>
+    /// <param name="lines">The document's lines, without their line breaks.</param>
+    /// <param name="lineNumber">Zero-based line the brace is being typed on.</param>
+    /// <param name="characterIndex">Zero-based offset within that line where the brace would go.</param>
+    /// <returns><see langword="true"/> when the caret should advance over an existing <c>}</c>.</returns>
+    /// <remarks>
+    /// <para>
+    /// The scaffold is written by hand rather than by a brace-completion session, so nothing tracks
+    /// it and the editor's own type-through does not apply: closing <c>{{}}</c> by typing the two
+    /// braces would otherwise leave <c>{{}|}}</c>. This supplies the walk-over the missing session
+    /// would have given.
+    /// </para>
+    /// <para>
+    /// <b>Deliberately broader than interpolations.</b> The test is only "a <c>}</c> is already at
+    /// the caret, in a template", not "the caret is inside an interpolation" — matching a closer to
+    /// its opener would mean parsing the template to decide a keystroke. The cost is that a literal
+    /// <c>}}}</c> in template prose cannot be typed straight through; it can still be pasted, or
+    /// typed with an arrow key between the braces. Template text containing runs of closing braces is
+    /// rare, and every one of them is a keystroke away from working.
+    /// </para>
+    /// <para>
+    /// Script and style sections are untouched: there the platform's own session owns <c>}</c>, and
+    /// a walk-over that fired outside a session would break ordinary C# and CSS authoring.
+    /// </para>
+    /// </remarks>
+    public static bool AllowsClosingBraceWalkover(
+        IReadOnlyList<string> lines,
+        int lineNumber,
+        int characterIndex)
+        => IsPositionInRange(lines, lineNumber, characterIndex) &&
+           characterIndex < lines[lineNumber].Length &&
+           lines[lineNumber][characterIndex] == '}' &&
+           ViuSectionScanner.ScanLineSections(lines)[lineNumber] == ViuSectionKind.Template;
+
+    // True when the character immediately before the caret is an opening brace. A caret at column
+    // zero has no preceding character on its line, and a brace ending the line above opens nothing
+    // an interpolation could continue - '{{' is a single token that never spans a line break.
+    private static bool IsAfterOpeningBrace(string line, int characterIndex)
+        => characterIndex > 0 &&
+           characterIndex <= line.Length &&
+           line[characterIndex - 1] == '{';
 
     /// <summary>
     /// Determines whether pressing <c>Enter</c> between an auto-completed <c>{</c> and <c>}</c>
@@ -174,10 +298,11 @@ internal static class ViuAutoClosingLogic
     /// <returns>The insertion and caret placement, or <see langword="null"/> for no completion.</returns>
     /// <remarks>
     /// <para>
-    /// Three completions, all confined to template sections. <c>&gt;</c> after an open tag inserts
+    /// Four completions, all confined to template sections. <c>&gt;</c> after an open tag inserts
     /// that tag's end tag and leaves the caret between the two. <c>/</c> immediately after <c>&lt;</c>
     /// completes the nearest unclosed ancestor element, closing brace included. <c>-</c> completing
-    /// <c>&lt;!--</c> inserts the comment terminator.
+    /// <c>&lt;!--</c> inserts the comment terminator. <c>{</c> after a <c>{</c> writes the
+    /// interpolation scaffold.
     /// </para>
     /// <para>
     /// The template restriction is the whole reason this is section-aware: <c>&gt;</c> in a
@@ -208,6 +333,10 @@ internal static class ViuAutoClosingLogic
             '>' => GetEndTagCompletion(lines, lineSections, lineNumber, characterIndex),
             '/' => GetClosingTagCompletion(lines, lineSections, lineNumber, characterIndex),
             '-' => GetCommentCompletion(lines, lineNumber, characterIndex),
+            '{' => GetInterpolationScaffold(lines, lineNumber, characterIndex),
+
+            // '}' inserts nothing; it walks over an existing closer, which is a caret move rather
+            // than an edit and is answered by AllowsClosingBraceWalkover.
             _ => null,
         };
     }
