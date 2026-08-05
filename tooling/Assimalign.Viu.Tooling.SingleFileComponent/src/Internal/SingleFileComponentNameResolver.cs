@@ -14,6 +14,13 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// files in different folders never collide). Uses only string operations — no <c>System.IO</c> — so it
 /// stays inside the analyzer API surface (RS1035). Path containment follows the host operating system:
 /// ordinal-ignore-case on Windows and ordinal elsewhere.
+/// <para>
+/// Hint-name identity is specified by <c>[SFC-CG-5]</c>. Roslyn compares hint names
+/// case-insensitively, so a readable hint name is unique only while no other component in the same
+/// compilation resolves to one that differs from it by case alone; <see cref="SelectCaseCollidingPaths"/>
+/// selects those components and <see cref="Resolve(string, string?, string?, bool)"/> gives each of them
+/// the path-hash discriminator ([V01.01.06.10.01]).
+/// </para>
 /// </summary>
 internal static class SingleFileComponentNameResolver
 {
@@ -21,13 +28,33 @@ internal static class SingleFileComponentNameResolver
     private const string VueExtension = ".vue";
 
     /// <summary>
-    /// Resolves the namespace, class name, and hint name for <paramref name="filePath"/>.
+    /// Resolves the namespace, class name, and hint name for <paramref name="filePath"/>, taking the
+    /// readable hint name (no case discriminator).
     /// </summary>
     /// <param name="filePath">The absolute <c>.viu</c> or <c>.vue</c> file path.</param>
     /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
     /// <param name="rootNamespace">The consuming project's root namespace, or <see langword="null"/> when unknown.</param>
     /// <returns>The resolved names.</returns>
     public static SingleFileComponentName Resolve(string filePath, string? projectDirectory, string? rootNamespace)
+        => Resolve(filePath, projectDirectory, rootNamespace, requiresCaseDiscriminator: false);
+
+    /// <summary>
+    /// Resolves the namespace, class name, and hint name for <paramref name="filePath"/>.
+    /// </summary>
+    /// <param name="filePath">The absolute <c>.viu</c> or <c>.vue</c> file path.</param>
+    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
+    /// <param name="rootNamespace">The consuming project's root namespace, or <see langword="null"/> when unknown.</param>
+    /// <param name="requiresCaseDiscriminator">
+    /// <see langword="true"/> when another component in the same compilation resolves to a hint name
+    /// that differs from this one only by case, as reported by <see cref="SelectCaseCollidingPaths"/>.
+    /// The namespace and class name never depend on it — only the hint name does.
+    /// </param>
+    /// <returns>The resolved names.</returns>
+    public static SingleFileComponentName Resolve(
+        string filePath,
+        string? projectDirectory,
+        string? rootNamespace,
+        bool requiresCaseDiscriminator)
     {
         var normalizedPath = filePath.Replace('\\', '/');
 
@@ -39,9 +66,69 @@ internal static class SingleFileComponentNameResolver
         var relativeDirectory = ResolveRelativeDirectory(normalizedPath, projectDirectory);
 
         var namespaceValue = BuildNamespace(rootNamespace, relativeDirectory);
-        var hintName = BuildHintName(relativeDirectory, baseName, normalizedPath);
+        var hintName = BuildHintName(relativeDirectory, baseName, normalizedPath, requiresCaseDiscriminator);
 
         return new SingleFileComponentName(namespaceValue, className, hintName);
+    }
+
+    /// <summary>
+    /// Selects, out of every component a single compilation emits, the ones whose readable hint names
+    /// are equal ignoring case — the set Roslyn's <c>AddSource</c> would reject as duplicates, because it
+    /// compares hint names with <see cref="StringComparison.OrdinalIgnoreCase"/>. Only members of such a
+    /// colliding group take the discriminator; every other component keeps its readable hint name
+    /// verbatim, so this rule never churns an existing generated-file identity ([V01.01.06.10.01],
+    /// <c>[SFC-CG-5]</c>).
+    /// </summary>
+    /// <param name="componentPaths">
+    /// The paths of the components the compilation actually emits — a shadowed <c>.vue</c> peer
+    /// ([VUE-7]) emits nothing and must not be offered here, or it would discriminate the canonical
+    /// <c>.viu</c> component that suppressed it.
+    /// </param>
+    /// <param name="projectDirectory">The consuming project's directory, or <see langword="null"/> when unknown.</param>
+    /// <returns>
+    /// The colliding paths, ordinally sorted so the result is a pure function of the input set and never
+    /// of the order MSBuild presented the files in. Empty when no two components collide.
+    /// </returns>
+    public static string[] SelectCaseCollidingPaths(
+        IReadOnlyList<string> componentPaths,
+        string? projectDirectory)
+    {
+        if (componentPaths.Count < 2)
+        {
+            return Array.Empty<string>();
+        }
+
+        var groups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in componentPaths)
+        {
+            var hintName = Resolve(path, projectDirectory, rootNamespace: null).HintName;
+            if (!groups.TryGetValue(hintName, out var members))
+            {
+                members = new List<string>();
+                groups.Add(hintName, members);
+            }
+
+            members.Add(path);
+        }
+
+        List<string>? colliding = null;
+        foreach (var group in groups)
+        {
+            if (group.Value.Count > 1)
+            {
+                colliding ??= new List<string>();
+                colliding.AddRange(group.Value);
+            }
+        }
+
+        if (colliding is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        var result = colliding.ToArray();
+        Array.Sort(result, StringComparer.Ordinal);
+        return result;
     }
 
     // Returns null (not empty) when the directory is unknown or the file sits outside it, so hint
@@ -88,13 +175,21 @@ internal static class SingleFileComponentNameResolver
         return parts.Count == 0 ? null : string.Join(".", parts);
     }
 
-    private static string BuildHintName(string? relativeDirectory, string baseName, string normalizedPath)
+    private static string BuildHintName(
+        string? relativeDirectory,
+        string baseName,
+        string normalizedPath,
+        bool requiresCaseDiscriminator)
     {
         // Roslyn's AddSource throws on a duplicate hint name and the exception kills the entire
         // generator run, so hint names must be unique BY CONSTRUCTION: whenever the relative directory
-        // is unknown (linked/out-of-project files) or sanitizing was lossy (distinct names collapsing
-        // to one identifier, e.g. Foo-Bar and Foo_Bar), a short stable hash of the full normalized path
-        // disambiguates. Files properly under the project with clean names keep readable hints.
+        // is unknown (linked/out-of-project files), sanitizing was lossy (distinct names collapsing
+        // to one identifier, e.g. Foo-Bar and Foo_Bar), or a sibling component's hint name differs from
+        // this one only by case (Roslyn compares hint names case-INSENSITIVELY, so Choice and choice are
+        // one name to it), a short stable hash of the full normalized path disambiguates. Because that
+        // hash reads only this file's own exact-cased path, the discriminated name is the same on every
+        // build and in any file order. Files properly under the project with clean, non-colliding names
+        // keep readable hints.
         var lossy = false;
         var builder = new StringBuilder();
         foreach (var segment in (relativeDirectory ?? string.Empty).Split('/'))
@@ -106,7 +201,7 @@ internal static class SingleFileComponentNameResolver
         }
 
         builder.Append(SanitizeTracked(baseName, ref lossy));
-        if (relativeDirectory is null || lossy)
+        if (relativeDirectory is null || lossy || requiresCaseDiscriminator)
         {
             builder.Append('.').Append(HashPath(normalizedPath));
         }
@@ -182,5 +277,5 @@ internal static class SingleFileComponentNameResolver
 /// <summary>The resolved names for a generated component: its namespace (or <see langword="null"/>), class, and hint name.</summary>
 /// <param name="Namespace">The containing namespace, or <see langword="null"/> for the global namespace.</param>
 /// <param name="ClassName">The generated partial class name.</param>
-/// <param name="HintName">The stable <c>AddSource</c> hint name, unique by construction (a path hash disambiguates out-of-project files and lossy sanitizations).</param>
+/// <param name="HintName">The stable <c>AddSource</c> hint name, unique by construction (a path hash disambiguates out-of-project files, lossy sanitizations, and names that collide with a sibling component's only by case).</param>
 internal readonly record struct SingleFileComponentName(string? Namespace, string ClassName, string HintName);

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -49,6 +51,89 @@ public sealed class HintNameCollisionTests
 
         result.Exception.ShouldBeNull();
         result.GeneratedSources.Length.ShouldBe(2);
+    }
+
+    [Fact]
+    public void TwoFilesWhoseBaseNamesDifferOnlyByCase_BothEmit()
+    {
+        // [SFC-CG-5] Roslyn compares hint names with OrdinalIgnoreCase, so Choice and choice are ONE
+        // name to AddSource even though the two files are two distinct components. Two canonical .viu
+        // files are never merged by .vue shadowing [VUE-7], so this collision forms on every operating
+        // system - including Windows, where the case-insensitive path identity that hides the .viu/.vue
+        // form of the collision does not apply ([V01.01.06.10.01]).
+        var fileA = new InMemoryAdditionalText("C:/proj/Components/Choice.viu", Source);
+        var fileB = new InMemoryAdditionalText("C:/proj/Components/choice.viu", Source);
+        var driver = GeneratorTestHarness.CreateDriver(
+            ImmutableArray.Create<AdditionalText>(fileA, fileB), "Demo", "C:/proj");
+
+        driver = driver.RunGenerators(GeneratorTestHarness.CreateCompilation());
+        var result = driver.GetRunResult().Results[0];
+
+        result.Exception.ShouldBeNull();
+        result.GeneratedSources.Length.ShouldBe(2);
+        result.GeneratedSources
+            .Select(source => source.HintName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count()
+            .ShouldBe(2);
+    }
+
+    [Fact]
+    public void CaseCollidingFiles_InEitherEnumerationOrder_TakeTheSameHintNames()
+    {
+        // [SFC-CG-5] The discriminator is a hash of the file's own exact-cased path, so it is a pure
+        // function of the input set: reversing the order MSBuild presents the files in cannot move a
+        // single generated-file identity.
+        var fileA = new InMemoryAdditionalText("C:/proj/Components/Choice.viu", Source);
+        var fileB = new InMemoryAdditionalText("C:/proj/Components/choice.viu", Source);
+
+        var forward = HintNames(ImmutableArray.Create<AdditionalText>(fileA, fileB));
+        var reversed = HintNames(ImmutableArray.Create<AdditionalText>(fileB, fileA));
+
+        forward.ShouldBe(reversed);
+        forward.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ComponentsThatCollideWithNothing_KeepTheirReadableHintNames()
+    {
+        // [SFC-CG-5] The identity-preservation bar: the discriminator appears ONLY inside a colliding
+        // group. Counter and Views/Admin/Panel keep the exact hint names the derivation produced before
+        // the collision rule existed, while the two Choice components - and only they - take the
+        // 8-hex-digit path hash ([V01.01.06.10.01]).
+        var files = ImmutableArray.Create<AdditionalText>(
+            new InMemoryAdditionalText("C:/proj/Counter.viu", Source),
+            new InMemoryAdditionalText("C:/proj/Views/Admin/Panel.viu", Source),
+            new InMemoryAdditionalText("C:/proj/Components/Choice.viu", Source),
+            new InMemoryAdditionalText("C:/proj/Components/choice.viu", Source));
+
+        var hintNames = HintNames(files);
+
+        hintNames.ShouldContain("Counter.SingleFileComponent.g.cs");
+        hintNames.ShouldContain("Views.Admin.Panel.SingleFileComponent.g.cs");
+        hintNames.ShouldNotContain("Components.Choice.SingleFileComponent.g.cs");
+        hintNames.ShouldNotContain("Components.choice.SingleFileComponent.g.cs");
+        hintNames.Count(name => name.StartsWith("Components.", StringComparison.Ordinal)).ShouldBe(2);
+        foreach (var name in hintNames.Where(name => name.StartsWith("Components.", StringComparison.Ordinal)))
+        {
+            // Components.<Base>.<8 hex digits>.SingleFileComponent.g.cs
+            var discriminator = name.Split('.')[2];
+            discriminator.Length.ShouldBe(8);
+            discriminator.ShouldAllBe(character => Uri.IsHexDigit(character));
+        }
+    }
+
+    private static IReadOnlyList<string> HintNames(ImmutableArray<AdditionalText> files)
+    {
+        var driver = GeneratorTestHarness.CreateDriver(files, "Demo", "C:/proj")
+            .RunGenerators(GeneratorTestHarness.CreateCompilation());
+        var result = driver.GetRunResult().Results[0];
+
+        result.Exception.ShouldBeNull();
+        return result.GeneratedSources
+            .Select(source => source.HintName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
     }
 
     [Fact]

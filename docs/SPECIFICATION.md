@@ -989,6 +989,20 @@ declared by the generated partial, **no other partial declaration of the compone
 different base class**. A component with no template block stays a plain partial class with neither
 [V01.01.06.07].
 
+`[SFC-CG-5]` **Generated-file identity.** Each emitted component occupies exactly one `AddSource` hint
+name, derived from its path alone as
+`<relative.directory.>.<BaseName>[.<hash>].SingleFileComponent.g.cs` — the project-relative directory
+segments and the file's base name, each sanitized to a C# identifier. Roslyn compares hint names
+**case-insensitively** and fails the whole generator run on a duplicate, so the derivation appends a
+short stable hash of the exact-cased normalized path whenever the readable form is not unique on its
+own: the file lies outside the project directory, sanitizing was lossy (`Foo-Bar` and `Foo_Bar` both
+sanitize to `Foo_Bar`), **or another component the same compilation emits resolves to a hint name that
+differs from it only by case**. That last group exists wherever path identity is ordinal — every
+non-Windows filesystem [VUE-7] — and a shadowed `.vue` peer, which emits nothing, is never counted
+into it. The hash reads only the component's own path, so a discriminated name is identical on every
+build and in any order MSBuild presents the files; a component that collides with nothing keeps its
+readable hint name unchanged [V01.01.06.10.01].
+
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
 expression and closed with `#line default`. The span form is required because a render expression is
