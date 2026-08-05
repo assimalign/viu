@@ -380,12 +380,21 @@ internal sealed class ViuLanguageService :
                 ranges.Add(new LanguageFoldingRange(startLine, endLine));
             }
 
-            // Element folding ([V01.01.12.07.07]) is additive: the section range above is unchanged
-            // and each multi-line element inside the template contributes a nested range, emitted
-            // right after its section so the whole result stays in document order.
+            // Element folding ([V01.01.12.07.07]) and script-interior folding ([V01.01.12.07.10]) are
+            // additive: the section range above is unchanged and each multi-line construct inside the
+            // block contributes a nested range, emitted right after its section so the whole result
+            // stays in document order.
             if (ReferenceEquals(block, document.Syntax.Template))
             {
                 ranges.AddRange(document.TemplateElementFoldingRanges);
+            }
+            else if (ReferenceEquals(block, document.Syntax.Script))
+            {
+                ranges.AddRange(document.ScriptFoldingRanges);
+            }
+            else if (ReferenceEquals(block, document.Syntax.ScriptSetup))
+            {
+                ranges.AddRange(document.ScriptSetupFoldingRanges);
             }
         }
 

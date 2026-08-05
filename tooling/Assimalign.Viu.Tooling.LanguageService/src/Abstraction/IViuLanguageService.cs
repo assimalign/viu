@@ -103,8 +103,14 @@ public interface IViuLanguageService
     /// <summary>
     /// Gets the foldable ranges for an open document: one range per multi-line block container, plus
     /// one per multi-line element inside the template block ([V01.01.12.07.07]) — nested elements and
-    /// nested <c>&lt;template&gt;</c> fragments included. A single-line element and a self-closing
-    /// element fold nothing, and neither does an element the parse had to recover from missing markup.
+    /// nested <c>&lt;template&gt;</c> fragments included — plus one per multi-line C# construct inside
+    /// a script block ([V01.01.12.07.10]): member and statement blocks, accessor lists, object and
+    /// collection initializers, collection expressions, nested type and switch bodies, and
+    /// <c>#region</c> pairs. Every range ends one line above its closing delimiter, so the delimiter
+    /// stays visible and the three families nest instead of competing for the closing line.
+    /// A single-line construct folds nothing; neither does a self-closing element, an expression-bodied
+    /// member (no closing delimiter to keep visible), or a construct the parse had to recover from
+    /// missing markup or missing C#.
     /// </summary>
     /// <param name="documentUri">The document URI used by the editor.</param>
     /// <param name="cancellationToken">

@@ -16,6 +16,13 @@ internal sealed class LanguageDocument
     // thread-safe because reads run outside the service's synchronization lock.
     private readonly Lazy<IReadOnlyList<LanguageFoldingRange>> templateElementFoldingRanges;
 
+    // Script-interior folding ([V01.01.12.07.10]) needs the block's C# parsed, which the container parse
+    // likewise does not do. The shared projection core's cached member description exposes described
+    // members, not the syntax tree, so folding runs its own probe parse — once per snapshot, on the same
+    // Lazy terms as the template ranges above, which keeps the per-request contract intact.
+    private readonly Lazy<IReadOnlyList<LanguageFoldingRange>> scriptFoldingRanges;
+    private readonly Lazy<IReadOnlyList<LanguageFoldingRange>> scriptSetupFoldingRanges;
+
     private LanguageDocument(
         string documentUri,
         string text,
@@ -28,6 +35,12 @@ internal sealed class LanguageDocument
         Syntax = syntax;
         templateElementFoldingRanges = new Lazy<IReadOnlyList<LanguageFoldingRange>>(
             () => TemplateFoldingRangeCollector.Collect(syntax.Template),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        scriptFoldingRanges = new Lazy<IReadOnlyList<LanguageFoldingRange>>(
+            () => ScriptFoldingRangeCollector.Collect(syntax.Script),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        scriptSetupFoldingRanges = new Lazy<IReadOnlyList<LanguageFoldingRange>>(
+            () => ScriptFoldingRangeCollector.Collect(syntax.ScriptSetup),
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
@@ -46,6 +59,21 @@ internal sealed class LanguageDocument
     /// </summary>
     internal IReadOnlyList<LanguageFoldingRange> TemplateElementFoldingRanges
         => templateElementFoldingRanges.Value;
+
+    /// <summary>
+    /// The folding ranges for the multi-line C# constructs inside this document's script block, in
+    /// document order and in the document's own line coordinates. Computed on first use and cached for
+    /// the life of the snapshot.
+    /// </summary>
+    internal IReadOnlyList<LanguageFoldingRange> ScriptFoldingRanges
+        => scriptFoldingRanges.Value;
+
+    /// <summary>
+    /// The same ranges for the <c>.vue</c> container's <c>&lt;script setup&gt;</c> block, which is a
+    /// second script block on the same document.
+    /// </summary>
+    internal IReadOnlyList<LanguageFoldingRange> ScriptSetupFoldingRanges
+        => scriptSetupFoldingRanges.Value;
 
     internal static LanguageDocument Create(string documentUri, string text, int? version)
     {

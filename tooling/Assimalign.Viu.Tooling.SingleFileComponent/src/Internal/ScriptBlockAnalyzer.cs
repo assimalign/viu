@@ -44,9 +44,10 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// It is unaffected by the region split — only members are classified, exactly as if the usings were absent.
 /// </item>
 /// </list>
-/// The editor shares this exact core through <see cref="DescribeMembers"/> ([V01.01.06.11]): the probe
-/// wrapper, the leading-using split, and member discovery exist <em>once</em>, killing the drift the
-/// language service's hand-mirrored reader used to carry.
+/// The editor shares this exact core through <see cref="DescribeMembers"/> ([V01.01.06.11]) and
+/// <see cref="ParseProbe"/> ([V01.01.12.07.10]): the probe wrapper, the leading-using split, and member
+/// discovery exist <em>once</em>, killing the drift the language service's hand-mirrored reader used to
+/// carry.
 /// See <c>docs/FORMAT.md</c> for the <c>@script</c> content contract. Work items [V01.01.06.03] and
 /// [V01.01.06.03.01].
 /// </summary>
@@ -187,10 +188,56 @@ internal static class ScriptBlockAnalyzer
     /// <returns>The declared members in declaration order (empty when the block declares none).</returns>
     public static EquatableArray<ScriptDeclaredMember> DescribeMembers(string scriptContent)
     {
+        var parse = ParseProbe(scriptContent, DescribeParseOptions);
+        if (parse.Probe is null)
+        {
+            return EquatableArray<ScriptDeclaredMember>.Empty;
+        }
+
+        var members = new List<ScriptDeclaredMember>();
+        foreach (var member in parse.Probe.Members)
+        {
+            DescribeMember(
+                member,
+                parse.MemberRegionText,
+                parse.MemberRegionOffset,
+                parse.MemberRegionLineIndex,
+                members);
+        }
+
+        return members.Count == 0
+            ? EquatableArray<ScriptDeclaredMember>.Empty
+            : new EquatableArray<ScriptDeclaredMember>(members.ToArray());
+    }
+
+    /// <summary>
+    /// Parses <paramref name="scriptContent"/> in the synthetic partial-class probe and hands back the
+    /// tree with the arithmetic that maps its offsets onto the block content
+    /// ([V01.01.12.07.10]) — the same leading-using split and probe wrapper
+    /// <see cref="DescribeMembers"/> uses, so a consumer that needs the syntax itself (folding walks the
+    /// declared constructs rather than describing members) never re-derives the wrapping rules.
+    /// Parse diagnostics are ignored here for the same reason they are in <see cref="DescribeMembers"/>:
+    /// recovery still yields the well-formed constructs, and diagnostics remain <see cref="Analyze"/>'s
+    /// job. Parsed with <c>DocumentationMode.None</c> — a syntax consumer reads no <c>///</c> text, so
+    /// it does not pay for doc-comment trivia.
+    /// </summary>
+    /// <param name="scriptContent">The raw <c>@script</c> block content.</param>
+    /// <returns>
+    /// The parsed probe, or <see cref="ScriptProbeParse.None"/> when the block declares no members.
+    /// </returns>
+    public static ScriptProbeParse ParseProbe(string scriptContent)
+        => ParseProbe(scriptContent, ParseOptions);
+
+    // The shared split-and-wrap core behind DescribeMembers and ParseProbe. The parse options are the
+    // one parameter that differs between the callers (the editor's member description wants /// trivia,
+    // a syntax walk does not); every rule about WHERE the content is cut and HOW it is wrapped lives
+    // here, once.
+    private static ScriptProbeParse ParseProbe(string scriptContent, CSharpParseOptions parseOptions)
+    {
         var memberRegionText = scriptContent;
         var memberRegionOffset = 0;
         var memberRegionLineIndex = 0;
-        if (LocateLeadingUsingSplit(scriptContent, DescribeParseOptions) is { } split)
+        if (LocateLeadingUsingSplit(scriptContent, parseOptions) is { } split)
         {
             memberRegionText = scriptContent.Substring(split.SplitOffset);
             memberRegionOffset = split.SplitOffset;
@@ -199,27 +246,21 @@ internal static class ScriptBlockAnalyzer
 
         if (string.IsNullOrWhiteSpace(memberRegionText))
         {
-            return EquatableArray<ScriptDeclaredMember>.Empty;
+            return ScriptProbeParse.None;
         }
 
         var tree = CSharpSyntaxTree.ParseText(
             ProbePrefix + memberRegionText + ProbeSuffix,
-            DescribeParseOptions);
+            parseOptions);
         var probe = FindProbe((CompilationUnitSyntax)tree.GetRoot());
-        if (probe is null)
-        {
-            return EquatableArray<ScriptDeclaredMember>.Empty;
-        }
-
-        var members = new List<ScriptDeclaredMember>();
-        foreach (var member in probe.Members)
-        {
-            DescribeMember(member, memberRegionText, memberRegionOffset, memberRegionLineIndex, members);
-        }
-
-        return members.Count == 0
-            ? EquatableArray<ScriptDeclaredMember>.Empty
-            : new EquatableArray<ScriptDeclaredMember>(members.ToArray());
+        return probe is null
+            ? ScriptProbeParse.None
+            : new ScriptProbeParse(
+                probe,
+                ProbePrefix.Length,
+                memberRegionText,
+                memberRegionOffset,
+                memberRegionLineIndex);
     }
 
     // The line-boundary cut after the leading using run — THE region-split rule, shared by the build path
