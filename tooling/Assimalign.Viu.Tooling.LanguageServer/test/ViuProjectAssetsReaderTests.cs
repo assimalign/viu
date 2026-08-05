@@ -76,7 +76,7 @@ public class ViuProjectAssetsReaderTests
                  is_global = true
                  build_property.RootNamespace = First.Value
                  build_property.RootNamespace = Fixture.Namespace
-                 build_property.ProjectDir = {projectDirectory}\
+                 build_property.ProjectDir = {projectDirectory}{Path.DirectorySeparatorChar}
                  build_property.Configuration = Debug
                  """);
             WriteAssetsFile(
