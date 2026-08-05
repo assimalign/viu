@@ -188,9 +188,9 @@ internal static class VModelTransform
         => Ir.CompoundExpression("$event => { ", expression, " = $event; }");
 
     /// <summary>
-    /// Builds the Browser runtime carrier for a native <c>v-model</c>. Unlike JavaScript, Viu cannot
-    /// recover a setter from a virtual node property through reflection, so generated code carries the
-    /// current value and its assignment lambda together.
+    /// Builds the Browser runtime carrier for a native <c>v-model</c>. Viu cannot recover a setter
+    /// from a virtual node property through reflection, so generated code carries the current value
+    /// and its assignment lambda together. Specified by <c>[SFC-CG-7]</c>.
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
     /// <returns>The generated <c>ViuModelBinding</c> construction.</returns>

@@ -549,7 +549,12 @@ internal static class TransformElement
                 modifierProperties.Add(Ir.ObjectProperty(modifier, trueExpression));
             }
 
-            arguments.Add(Ir.ObjectExpression(modifierProperties, directive.Location));
+            // The modifier slot is a name -> bool bag, so it emits through the modifier helper rather
+            // than the property helper: the runtime reads this slot as
+            // IReadOnlyDictionary<string, bool> ([SFC-CG-6]).
+            arguments.Add(
+                Ir.ObjectExpression(modifierProperties, directive.Location)
+                    with { IsDirectiveModifiers = true });
         }
 
         return Ir.ArrayExpression(arguments, directive.Location);

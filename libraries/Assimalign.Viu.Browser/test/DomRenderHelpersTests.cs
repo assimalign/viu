@@ -40,6 +40,60 @@ public sealed class DomRenderHelpersTests
     }
 
     [Fact]
+    public void WithDirectives_CarriesTheModifierBag_SoLazyShiftsTheUpdateCarrierToChange()
+    {
+        // The end-to-end proof of the generated v-model seam: an element assembled exactly the way a
+        // compiled render assembles it — the ViuModelBinding carrier in slot 2 and the _createModifiers
+        // bag in slot 4 — mounts, and `.lazy` moves the update carrier from `input` to `change`
+        // (WHATWG HTML fires `input` per keystroke and `change` on commit:
+        // https://html.spec.whatwg.org/multipage/input.html#common-input-element-events). Before
+        // [V01.01.05.03.01] the modifier slot was emitted as a property bag, which reads back as no
+        // modifiers, so this committed on `input` and the user edit reached the model at the wrong time.
+        object? model = "initial";
+        using BrowserDirectiveTestHarness harness = new();
+
+        harness.Render(
+            RenderHelpers._withDirectives(
+                ComponentTree.Element("input"),
+                [
+                    new object?[]
+                    {
+                        DomRenderHelpers._vModelText,
+                        new ViuModelBinding(model, value => model = value),
+                        null,
+                        RenderHelpers._createModifiers(("lazy", true)),
+                    },
+                ]));
+        int input = harness.FindElement("input");
+
+        harness.FireInput(input, "typed");
+        model.ShouldBe("initial");     // .lazy does not commit on input
+
+        harness.FireChange(input, "typed");
+        model.ShouldBe("typed");       // it commits on change
+    }
+
+    [Fact]
+    public void WithDirectives_PropertyBagInTheModifierSlot_FailsLoudly()
+    {
+        // The modifier slot is typed name -> bool. A property bag there is a compiler/runtime contract
+        // break, and silently reading it as "no modifiers" is exactly what hid [V01.01.05.03.01], so the
+        // seam now rejects it instead ([SFC-CG-6]).
+        Should.Throw<NotSupportedException>(() =>
+            RenderHelpers._withDirectives(
+                ComponentTree.Element("input"),
+                [
+                    new object?[]
+                    {
+                        DomRenderHelpers._vModelText,
+                        new ViuModelBinding("v", _ => { }),
+                        null,
+                        RenderHelpers._createProps(("lazy", true)),
+                    },
+                ]));
+    }
+
+    [Fact]
     public void TransitionHelpers_LowerToNamedTemplateRequests()
     {
         ITemplateComponent transition =

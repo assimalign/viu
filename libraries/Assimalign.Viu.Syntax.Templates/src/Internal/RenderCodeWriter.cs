@@ -24,6 +24,12 @@ internal sealed class RenderCodeWriter
     // An untyped object literal has no C# equivalent, so props/slots objects emit through this helper.
     private const string CreatePropsHelper = "_createProps";
 
+    // A directive-modifier bag is name -> bool, not the name -> object? of a property bag, and the
+    // directive binding that receives it is typed that way. It therefore has its own helper: the
+    // props helper in the modifier slot type-checks yet reads back as no modifiers at all
+    // ([SFC-CG-6]).
+    private const string CreateModifiersHelper = "_createModifiers";
+
     // C# lambdas and method groups have no natural type in an object-typed position, so event-handler
     // property values emit through this delegate-typed helper.
     private const string WithHandlerHelper = "_withHandler";
@@ -274,7 +280,7 @@ internal sealed class RenderCodeWriter
 
     private void EmitObjectExpression(ObjectExpression node)
     {
-        Push(CreatePropsHelper);
+        Push(node.IsDirectiveModifiers ? CreateModifiersHelper : CreatePropsHelper);
         Push("(");
         var properties = node.Properties;
         if (properties.Count == 0)

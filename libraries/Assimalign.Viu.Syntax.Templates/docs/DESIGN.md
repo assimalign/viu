@@ -200,6 +200,7 @@ pinned by a snapshot test in `RenderFunctionEmitterTests`.
 | `$slots` / `$event` | `_ctx.__slots` / `__event` | `$` is not legal in C# identifiers; `__event` is the [V01.01.05.04] event-variable contract and `__slots` follows the same spelling rule. |
 | `undefined` / `void 0` | `null` | No `undefined` in C#. |
 | `{}` (renderSlot's empty-props placeholder) | `_createProps()` | Same object-literal rule as props. |
+| `{ trim: true }` directive-modifier bag (`withDirectives` tuple slot 3) | `_createModifiers(("trim", true))` | Same object-literal rule as props, but a **different helper**: a directive binding types its modifiers `IReadOnlyDictionary<string, bool>`, while `_createProps` yields `IReadOnlyDictionary<string, object?>`. The property helper in this slot type-checks and then reads back as *no modifiers*, silently disabling `.lazy`/`.trim`/`.number` on native `v-model` ([SFC-CG-6], [V01.01.05.03.01]). |
 | `const` statements, ` === `/` !== ` (v-memo bodies) | `var`, ` == `/` != ` | Lexical bridging of the JavaScript statement spellings the v-memo transform authors as raw strings. |
 | `JSON.stringify(text)` | C# string literal (`SymbolDisplay.FormatLiteral`) | Same role, C# escaping rules. |
 | 2-space indent | 4-space indent | Repository C# convention; cosmetic. |
@@ -249,8 +250,8 @@ deviation from the repository C# naming rule, because these names ARE the by-nam
 - `_unref(object?) : object?` / `_isRef(object?) : bool` — bridge to `Assimalign.Viu.Core`
   references.
 - Emitter-contract helpers, per the serialization table above: `_createProps(params (string, object?)[] entries)`,
-  `_withHandler(handler)` (delegate-typed overloads), `_setCache(int index, BlockToken tracking, object? value)`,
-  `_spreadCache(object?)`.
+  `_createModifiers(params (string, bool)[] entries)`, `_withHandler(handler)` (delegate-typed overloads),
+  `_setCache(int index, BlockToken tracking, object? value)`, `_spreadCache(object?)`.
 
 ### The DOM render-helper surface (`DomRenderHelpers`, [V01.01.04.09])
 

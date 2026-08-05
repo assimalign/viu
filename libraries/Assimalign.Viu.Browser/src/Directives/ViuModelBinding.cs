@@ -7,7 +7,7 @@ namespace Assimalign.Viu.Browser;
 /// with the setter that writes it back. Viu has no <c>this</c>-proxy and no reflection, so a
 /// directive cannot recover the write-back path from a magically named property on the render node;
 /// the value and its setter are passed explicitly instead. The
-/// <c>v-model</c> transform ([V01.01.05.03]) emits, per render,
+/// <c>v-model</c> transform ([V01.01.05.03], specified by <c>[SFC-CG-7]</c>) emits, per render,
 /// <c>new object?[] { _vModelText, new ViuModelBinding(model, value =&gt; model = value) }</c> inside
 /// the generated <c>withDirectives</c> tuple. Core resolves the directive marker through the
 /// application directive resolver. The getter is the value already read into <see cref="Value"/>
