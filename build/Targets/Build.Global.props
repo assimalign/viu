@@ -12,6 +12,37 @@
 		<ViuOutputPathForDevScripts>$(ViuRepositoryDirectory)scripts\modules</ViuOutputPathForDevScripts>
 	</PropertyGroup>
 
+	<!--
+	  The ViuPublishLanguageServer target (build\Targets\Build.LanguageServer.targets) publishes the
+	  language server through a NESTED `dotnet publish` process while the rest of the solution keeps
+	  building in parallel on other MSBuild nodes. That publish carries publish-only global properties
+	  the ordinary build does not (in Debug, DebugType=embedded so symbols live inside the single
+	  file), and global properties flow into every ProjectReference — so without isolation the nested
+	  process re-compiles the shared netstandard2.0 libraries into the SAME bin\ and obj\ folders the
+	  solution build is using. The embedded-symbol variant produces no standalone .pdb, its
+	  IncrementalClean pass then deletes the .pdb recorded in the previous build's
+	  FileListAbsolute.txt, and any test project copying those references locally fails with MSB3030
+	  "Could not copy ...pdb" — intermittently, because it depends on node scheduling. Redirecting the
+	  nested publish's entire project graph into sibling bin\language-server\ and obj\language-server\
+	  roots removes every such collision by construction, while keeping DebugType global so ALL
+	  assemblies in the single file still carry embedded symbols in Debug.
+
+	  These two properties must be set here, in the Directory.Build.props chain, because
+	  Microsoft.Common.props derives MSBuildProjectExtensionsPath (where NuGet restore writes its
+	  assets) from BaseIntermediateOutputPath immediately after importing Directory.Build.props —
+	  a .targets file is far too late.
+
+	  DefaultItemExcludes must re-exclude the ordinary bin\ and obj\ explicitly: the SDK only
+	  excludes $(BaseOutputPath) and $(BaseIntermediateOutputPath) from the default item globs, so
+	  once those are redirected the outer build's obj\Debug\...\AssemblyInfo.cs would fall into this
+	  evaluation's **\*.cs compile glob and fail with CS0579 duplicate-attribute errors.
+	-->
+	<PropertyGroup Condition="'$(ViuLanguageServerNestedPublish)' == 'true'">
+		<BaseOutputPath>$(MSBuildProjectDirectory)\bin\language-server\</BaseOutputPath>
+		<BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\language-server\</BaseIntermediateOutputPath>
+		<DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+	</PropertyGroup>
+
 	<!-- TODO: Need to verify if this is the correct way for generating the Intermediate path  -->
 	<PropertyGroup>
         <_ViuIntermediateOutputPath Condition=" '$(PlatformName)' == 'AnyCPU' ">$(MSBuildProjectDirectory)\obj$(IntermediateOutputPath)$(Configuration)\</_ViuIntermediateOutputPath>
