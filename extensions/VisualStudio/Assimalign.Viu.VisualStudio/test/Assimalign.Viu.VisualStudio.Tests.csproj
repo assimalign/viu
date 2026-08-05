@@ -31,6 +31,12 @@
     <Compile Include="..\src\ViuSectionScanner.cs" Link="ViuSectionScanner.cs" />
     <Compile Include="..\src\ViuAutoClosingLogic.cs" Link="ViuAutoClosingLogic.cs" />
     <Compile Include="..\src\ViuAutoClosingEdit.cs" Link="ViuAutoClosingEdit.cs" />
+    <Compile Include="..\src\ViuBraceIndentation.cs" Link="ViuBraceIndentation.cs" />
+    <Compile Include="..\src\ViuBlockExpansion.cs" Link="ViuBlockExpansion.cs" />
+    <Compile Include="..\src\ViuBraceCompletionEnablement.cs" Link="ViuBraceCompletionEnablement.cs" />
+    <!-- The diagnostics sink touches no Visual Studio type precisely so its dormancy can be pinned
+         here: a trace that is not opt-in would be a behavior change shipped to every user. -->
+    <Compile Include="..\src\Diagnostics\ViuEditorDiagnostics.cs" Link="Diagnostics\ViuEditorDiagnostics.cs" />
     <Compile Include="..\src\ViuClassificationKind.cs" Link="ViuClassificationKind.cs" />
     <Compile Include="..\src\ViuClassificationTypeNames.cs" Link="ViuClassificationTypeNames.cs" />
     <Compile Include="..\src\ViuLexicalSpan.cs" Link="ViuLexicalSpan.cs" />

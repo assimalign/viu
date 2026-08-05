@@ -119,8 +119,12 @@ The complete repository and Marketplace setup is documented in
 - Embedded C# — the `@script` block, interpolation interiors, and binding-expression interiors —
   colors with the editor's and Roslyn's own classification types, so it inherits whatever theme you
   chose for C#. A `class` value is deliberately one uninterrupted attribute-value color
-- **Auto-closing** as you type. `{`, `(`, and `[` pair in every section — typing `{` twice gives you
-  `{{}}` for an interpolation. Quotes pair only where they mean a string: `"` in attribute-value
+- **Auto-closing** as you type. `{`, `(`, and `[` pair in every section, and pressing Enter between a
+  paired `{ }` in `@script` expands it into an indented block with the closing brace on its own line,
+  the way the C# editor does. In a template, typing `{` immediately after a `{` writes the
+  interpolation scaffold `{{}}` with the caret between — the same shape the Visual Studio Code client
+  produces — and typing `}` where one already sits walks the caret over it. Quotes pair only where
+  they mean a string: `"` in attribute-value
   position and in script, `'` in script only, so an apostrophe in template prose stays an apostrophe.
   Typing `>` after an open tag inserts its end tag with the caret between them, `</` completes the
   nearest unclosed element, and `<!--` completes to `<!-- | -->`; none of that fires inside `@script`

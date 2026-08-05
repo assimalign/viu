@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
 
 using Microsoft.VisualStudio.Commanding;
@@ -10,7 +11,8 @@ using Microsoft.VisualStudio.Utilities;
 namespace Assimalign.Viu.VisualStudio;
 
 /// <summary>
-/// Closes elements and comments as they are typed in a <c>.viu</c> template ([V01.01.12.07.08]).
+/// Closes elements and comments, and composes the interpolation scaffold, as they are typed in a
+/// <c>.viu</c> template ([V01.01.12.07.08], [V01.01.12.07.09]).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,6 +20,22 @@ namespace Assimalign.Viu.VisualStudio;
 /// the caret into a line and offset, asks what — if anything — should be inserted, and applies that
 /// answer to the buffer. Every rule about <em>what</em> to insert, and every rule about where an
 /// insertion is forbidden, lives in that pure decision class and is unit-tested there.
+/// </para>
+/// <para>
+/// <b>The interpolation scaffold cannot race a brace-completion session</b>, and that is arranged
+/// rather than hoped for. <see cref="ViuAutoClosingLogic.AllowsBracketPair"/> declines the second
+/// <c>{</c> of a template interpolation, so <see cref="ViuBracketBraceCompletionContextProvider"/>
+/// refuses the context, the aggregator creates nothing, and the editor's manager holds no pending
+/// session to complete after this handler writes. Without that decline the manager's
+/// <c>PostTypeChar</c> would validate the caret it finds after the scaffold — the character before it
+/// really is <c>{</c> — push a session, and insert a third brace.
+/// </para>
+/// <para>
+/// The session opened by the <em>first</em> <c>{</c>, where there was one, is left alone. Its
+/// tracking points survive the scaffold's insertion and simply widen around it; its over-type path
+/// then fails its own validity check because the span's content has changed, so it declines the
+/// closing brace and the walk-over below answers instead. A session that dies quietly here costs
+/// nothing: everything it would have done is done explicitly.
 /// </para>
 /// <para>
 /// <b>Element auto-close has no user option, deliberately.</b> Character pairs ride the editor's
@@ -78,8 +96,49 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
     /// <inheritdoc />
     public bool ExecuteCommand(TypeCharCommandArgs args, CommandExecutionContext executionContext)
     {
+        if (ViuEditorDiagnostics.IsEnabled)
+        {
+            ViuEditorDiagnostics.Trace("typechar.enter", () => string.Concat(
+                "char=", ViuEditorDiagnostics.Describe(args.TypedChar),
+                " isTriggerCharacter=",
+                ViuAutoClosingLogic.IsCompletionTriggerCharacter(args.TypedChar).ToString(),
+                " ", ViuEditorDiagnosticsDescriptions.DescribeBraceCompletionManager(args.TextView)));
+        }
+
+        bool handled = false;
+        string outcome = "declined: not a trigger character";
+        try
+        {
+            handled = this.TryComplete(args, out outcome);
+            return handled;
+        }
+        finally
+        {
+            // A non-chained ICommandHandler has no next-handler delegate to bracket: the chain
+            // continues precisely when this returns false, and stops - taking the editor's own typing
+            // and BraceCompletionManager.PostTypeChar with it - when it returns true. Recording both
+            // the value and the reason is therefore the same evidence a before/after pair would be
+            // in a chained handler ([V01.01.12.07.09]).
+            if (ViuEditorDiagnostics.IsEnabled)
+            {
+                bool handledOutcome = handled;
+                string reason = outcome;
+                ViuEditorDiagnostics.Trace("typechar.exit", () => string.Concat(
+                    "char=", ViuEditorDiagnostics.Describe(args.TypedChar),
+                    " handled=", handledOutcome.ToString(),
+                    handledOutcome
+                        ? " chain=STOPPED (this handler wrote the text)"
+                        : " chain=CONTINUES (editor default typing and PostTypeChar still run)",
+                    " outcome=", reason));
+            }
+        }
+    }
+
+    private bool TryComplete(TypeCharCommandArgs args, out string outcome)
+    {
         if (!ViuAutoClosingLogic.IsCompletionTriggerCharacter(args.TypedChar))
         {
+            outcome = "declined: not a trigger character";
             return false;
         }
 
@@ -90,6 +149,7 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
         // around a replacement would be guesswork.
         if (!textView.Selection.IsEmpty)
         {
+            outcome = "declined: selection is not empty";
             return false;
         }
 
@@ -98,23 +158,45 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
             PositionAffinity.Successor);
         if (caretPoint is null)
         {
+            outcome = "declined: caret does not map to the subject buffer";
             return false;
         }
 
         ITextSnapshot snapshot = caretPoint.Value.Snapshot;
         ITextSnapshotLine line = snapshot.GetLineFromPosition(caretPoint.Value.Position);
+        IReadOnlyList<string> lines = ViuSnapshotLines.Read(snapshot);
+        int characterIndex = caretPoint.Value.Position - line.Start.Position;
+
+        // '}' is a caret move rather than an edit: the interpolation scaffold is written by hand, so
+        // no brace-completion session tracks it and the editor's own type-through never applies.
+        // Reaching here at all means the platform declined the character first - a live session's
+        // PreOverType handles it before this chain link runs - so the two can never both act.
+        if (args.TypedChar == '}')
+        {
+            if (!ViuAutoClosingLogic.AllowsClosingBraceWalkover(lines, line.LineNumber, characterIndex))
+            {
+                outcome = "declined: no closing brace to walk over";
+                return false;
+            }
+
+            MoveCaret(textView, subjectBuffer, caretPoint.Value.Position + 1);
+            outcome = "walked over an existing '}'";
+            return true;
+        }
 
         ViuAutoClosingEdit? completion = ViuAutoClosingLogic.GetTypedCharacterCompletion(
-            ViuSnapshotLines.Read(snapshot),
+            lines,
             line.LineNumber,
-            caretPoint.Value.Position - line.Start.Position,
+            characterIndex,
             args.TypedChar);
         if (completion is not { } autoClosingEdit)
         {
+            outcome = "declined: no completion at this position";
             return false;
         }
 
         this.ApplyCompletion(textView, subjectBuffer, caretPoint.Value.Position, autoClosingEdit);
+        outcome = "completed with " + ViuEditorDiagnostics.Describe(autoClosingEdit.InsertedText);
         return true;
     }
 
