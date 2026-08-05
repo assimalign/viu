@@ -57,11 +57,26 @@ internal sealed class ViuQuoteBraceCompletionContextProvider : IBraceCompletionC
         ITextSnapshot snapshot = openingPoint.Snapshot;
         ITextSnapshotLine line = snapshot.GetLineFromPosition(openingPoint.Position);
 
-        if (ViuAutoClosingLogic.AllowsQuotePair(
-                ViuSnapshotLines.Read(snapshot),
-                line.LineNumber,
-                openingPoint.Position - line.Start.Position,
-                openingBrace))
+        bool allowed = ViuAutoClosingLogic.AllowsQuotePair(
+            ViuSnapshotLines.Read(snapshot),
+            line.LineNumber,
+            openingPoint.Position - line.Start.Position,
+            openingBrace);
+
+        // Traced for the same reason as the bracket provider ([V01.01.12.07.09]): whether the editor
+        // consults a Viu provider at all is the question, and the quotes answer it for a second
+        // character class.
+        if (ViuEditorDiagnostics.IsEnabled)
+        {
+            ViuEditorDiagnostics.Trace("context.quote", () => string.Concat(
+                "open=", ViuEditorDiagnostics.Describe(openingBrace),
+                " close=", ViuEditorDiagnostics.Describe(closingBrace),
+                " ", ViuEditorDiagnosticsDescriptions.DescribePosition(snapshot, openingPoint.Position),
+                " allowed=", allowed.ToString(),
+                " ", ViuEditorDiagnosticsDescriptions.DescribeBraceCompletionManager(textView)));
+        }
+
+        if (allowed)
         {
             context = ViuBraceCompletionContext.Instance;
             return true;

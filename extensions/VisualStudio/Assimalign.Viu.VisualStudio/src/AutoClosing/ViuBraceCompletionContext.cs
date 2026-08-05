@@ -71,6 +71,17 @@ internal sealed class ViuBraceCompletionContext : IBraceCompletionContext
     /// </remarks>
     public void OnReturn(IBraceCompletionSession session)
     {
+        // Reaching OnReturn proves the session carries a Viu context, which is the whole point of the
+        // provider reshaping ([V01.01.12.07.09]).
+        if (ViuEditorDiagnostics.IsEnabled)
+        {
+            ViuEditorDiagnostics.Trace("context.onreturn", () => string.Concat(
+                "open=", ViuEditorDiagnostics.Describe(session.OpeningBrace),
+                " close=", ViuEditorDiagnostics.Describe(session.ClosingBrace),
+                " hasPoints=",
+                (session.OpeningPoint is not null && session.ClosingPoint is not null).ToString()));
+        }
+
         // Only a brace opens a block. A parenthesis or a square bracket keeps the editor's plain
         // behavior on Return, exactly as C# does.
         if (session.OpeningBrace != '{' ||

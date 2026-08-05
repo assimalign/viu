@@ -78,8 +78,49 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
     /// <inheritdoc />
     public bool ExecuteCommand(TypeCharCommandArgs args, CommandExecutionContext executionContext)
     {
+        if (ViuEditorDiagnostics.IsEnabled)
+        {
+            ViuEditorDiagnostics.Trace("typechar.enter", () => string.Concat(
+                "char=", ViuEditorDiagnostics.Describe(args.TypedChar),
+                " isTriggerCharacter=",
+                ViuAutoClosingLogic.IsCompletionTriggerCharacter(args.TypedChar).ToString(),
+                " ", ViuEditorDiagnosticsDescriptions.DescribeBraceCompletionManager(args.TextView)));
+        }
+
+        bool handled = false;
+        string outcome = "declined: not a trigger character";
+        try
+        {
+            handled = this.TryComplete(args, out outcome);
+            return handled;
+        }
+        finally
+        {
+            // A non-chained ICommandHandler has no next-handler delegate to bracket: the chain
+            // continues precisely when this returns false, and stops - taking the editor's own typing
+            // and BraceCompletionManager.PostTypeChar with it - when it returns true. Recording both
+            // the value and the reason is therefore the same evidence a before/after pair would be
+            // in a chained handler ([V01.01.12.07.09]).
+            if (ViuEditorDiagnostics.IsEnabled)
+            {
+                bool handledOutcome = handled;
+                string reason = outcome;
+                ViuEditorDiagnostics.Trace("typechar.exit", () => string.Concat(
+                    "char=", ViuEditorDiagnostics.Describe(args.TypedChar),
+                    " handled=", handledOutcome.ToString(),
+                    handledOutcome
+                        ? " chain=STOPPED (this handler wrote the text)"
+                        : " chain=CONTINUES (editor default typing and PostTypeChar still run)",
+                    " outcome=", reason));
+            }
+        }
+    }
+
+    private bool TryComplete(TypeCharCommandArgs args, out string outcome)
+    {
         if (!ViuAutoClosingLogic.IsCompletionTriggerCharacter(args.TypedChar))
         {
+            outcome = "declined: not a trigger character";
             return false;
         }
 
@@ -90,6 +131,7 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
         // around a replacement would be guesswork.
         if (!textView.Selection.IsEmpty)
         {
+            outcome = "declined: selection is not empty";
             return false;
         }
 
@@ -98,6 +140,7 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
             PositionAffinity.Successor);
         if (caretPoint is null)
         {
+            outcome = "declined: caret does not map to the subject buffer";
             return false;
         }
 
@@ -111,10 +154,12 @@ internal sealed class ViuAutoClosingCommandHandler : ICommandHandler<TypeCharCom
             args.TypedChar);
         if (completion is not { } autoClosingEdit)
         {
+            outcome = "declined: no completion at this position";
             return false;
         }
 
         this.ApplyCompletion(textView, subjectBuffer, caretPoint.Value.Position, autoClosingEdit);
+        outcome = "completed with " + ViuEditorDiagnostics.Describe(autoClosingEdit.InsertedText);
         return true;
     }
 

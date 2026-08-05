@@ -367,6 +367,46 @@ therefore declined, and declined identically in a `.cs` file. That is C#'s behav
 divergence, and matching C# means keeping it. The genuine divergence was the missing `OnReturn`, which
 is what this work item fixes.
 
+### Opt-in editor diagnostics
+
+Everything above about the *engine* was established by decompiling Visual Studio. What no amount of
+reading establishes is what happens on a particular machine, in a particular hive, with a particular
+set of extensions composed — and brace completion reproduces only when a person types. Setting the
+environment variable `VIU_EDITOR_DIAGNOSTICS` to any non-empty value **in the process that launches
+`devenv.exe`** turns on a plain-text trace at `%TEMP%\viu-editor-diagnostics.log`, one line per event:
+
+| Category | Written when | Carries |
+| --- | --- | --- |
+| `view.created` | a `.viu` document view opens | the view buffer's content type and full base chain, the data model's content type, whether the view buffer is the document buffer, the view roles, the Automatic Brace Completion option (effective value, whether defined on this view, global value), and the editor's brace-completion manager if it exists yet |
+| `buffer.changed` | every buffer edit while the view is open | version before and after, the edit tag, and each change as position, deleted text, inserted text |
+| `context.bracket` / `context.quote` | the editor asks a Viu provider whether a pair may start | the opening and closing characters, line, column, resolved section, the line's text, the allow/deny answer, and the manager's live `Enabled`, active session count, and registered opening/closing brace characters |
+| `typechar.enter` / `typechar.exit` | `ViuAutoClosingCommandHandler` runs | the typed character, whether it is a trigger character, and on exit whether the command was handled — spelled out as `chain=STOPPED` or `chain=CONTINUES`, because a non-chained `ICommandHandler` has no next-handler delegate and `return true` *is* the swallow |
+| `context.onreturn` | `Enter` reaches the Viu brace-completion context | the session's opening and closing characters and whether its tracking points survive |
+
+`view.created` plus `buffer.changed` is the pair that separates the two failure shapes a user cannot
+tell apart: a closer that is never inserted produces one insertion of the typed character, while a
+closer inserted and then withdrawn produces two insertions and a deletion — and whatever ran between
+those lines is the culprit.
+
+Three properties make this shippable rather than a debug branch. It is **dormant**: the variable is
+read once at type initialization, so with it unset `ViuEditorDiagnostics.IsEnabled` is a static field
+read at every call site and no file is ever created — pinned by unit tests, because a trace that was
+not opt-in would be a behavior change shipped to every user. It is **total**: the message factory
+runs inside a guard and every file operation inside another, so a locked file, a full disk, or a bug
+in a message factory costs a log line and never a keystroke. And it is **honest about its one
+deviation**: `ViuEditorDiagnosticsDescriptions.DescribeBraceCompletionManager` reflects over the
+editor's internal `BraceCompletionManager`, read out of the view's property collection under the
+string key the editor stores it as, because its live view of the option and of the registered brace
+characters is precisely the missing evidence. That is the only reflection in the repository; it is
+diagnostics-only, dormant by default, and lives in a .NET Framework in-process extension that is
+never trimmed and never ahead-of-time compiled, so the AOT and trimming constraints that govern the
+shipping WebAssembly runtime are not in play. A missing member degrades to `<absent>`.
+
+Note what this extension deliberately still does **not** contribute: an `ITextViewCreationListener`
+that *writes* `BraceCompletionEnabledOptionId`. `ViuDiagnosticsTextViewCreationListener` only
+observes, for the reason given in the root-cause section — the option is already `true` and forcing
+it would override the only party who can turn it off.
+
 ### Recorded decisions
 
 - **The comment shape is `<!-- | -->`.** Typing the third `-` inserts `-  -->` with the caret between

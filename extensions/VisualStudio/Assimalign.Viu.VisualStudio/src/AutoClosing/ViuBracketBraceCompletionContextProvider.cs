@@ -60,11 +60,26 @@ internal sealed class ViuBracketBraceCompletionContextProvider : IBraceCompletio
         ITextSnapshot snapshot = openingPoint.Snapshot;
         ITextSnapshotLine line = snapshot.GetLineFromPosition(openingPoint.Position);
 
-        if (ViuAutoClosingLogic.AllowsBracketPair(
-                ViuSnapshotLines.Read(snapshot),
-                line.LineNumber,
-                openingPoint.Position - line.Start.Position,
-                openingBrace))
+        bool allowed = ViuAutoClosingLogic.AllowsBracketPair(
+            ViuSnapshotLines.Read(snapshot),
+            line.LineNumber,
+            openingPoint.Position - line.Start.Position,
+            openingBrace);
+
+        // Reaching this method at all is the fact worth recording ([V01.01.12.07.09]): it proves the
+        // editor's aggregator resolved a Viu provider for the typed character, which no amount of
+        // reading the decompiled editor can prove for a particular machine.
+        if (ViuEditorDiagnostics.IsEnabled)
+        {
+            ViuEditorDiagnostics.Trace("context.bracket", () => string.Concat(
+                "open=", ViuEditorDiagnostics.Describe(openingBrace),
+                " close=", ViuEditorDiagnostics.Describe(closingBrace),
+                " ", ViuEditorDiagnosticsDescriptions.DescribePosition(snapshot, openingPoint.Position),
+                " allowed=", allowed.ToString(),
+                " ", ViuEditorDiagnosticsDescriptions.DescribeBraceCompletionManager(textView)));
+        }
+
+        if (allowed)
         {
             context = ViuBraceCompletionContext.Instance;
             return true;
