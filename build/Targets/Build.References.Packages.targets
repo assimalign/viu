@@ -7,6 +7,23 @@
              ([V01.01.12.07.04], #261): its assets must stay unrestricted so they flow into the
              self-contained Assimalign.Viu.Tooling.LanguageServer publish. Do not add PrivateAssets here. -->
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
+        <!-- The transitive netstandard2.0 closure of Microsoft.CodeAnalysis.CSharp 5.3.0, pinned at
+             exactly the versions NuGet resolves for that line so the resolution is explicit rather
+             than approximate (the Imaging.Interop precedent below). Consumed only by the SDK task
+             host (sdks/Assimalign.Viu.Sdk/Tasks), which re-declares each member compile-only so the
+             compiler-host closure never sweeps into the packaged Tasks/ payload — asset stance stays
+             project-local there; do NOT add PrivateAssets/ExcludeAssets here, for the same
+             language-server reason as the CSharp entry above. Bumping Microsoft.CodeAnalysis.CSharp
+             re-derives this list (a stale floor fails loudly as an NU1605 downgrade). -->
+        <_ViuPackage Include="Microsoft.CodeAnalysis.Common" Version="5.3.0" />
+        <_ViuPackage Include="System.Buffers" Version="4.6.1" />
+        <_ViuPackage Include="System.Collections.Immutable" Version="9.0.0" />
+        <_ViuPackage Include="System.Memory" Version="4.6.3" />
+        <_ViuPackage Include="System.Numerics.Vectors" Version="4.6.1" />
+        <_ViuPackage Include="System.Reflection.Metadata" Version="9.0.0" />
+        <_ViuPackage Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.2" />
+        <_ViuPackage Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+        <_ViuPackage Include="System.Threading.Tasks.Extensions" Version="4.6.0" />
         <!-- Removed ([V01.01.12.23], #259): Microsoft.CodeAnalysis.CSharp.Workspaces 5.0.0 and
              Microsoft.CodeAnalysis.Workspaces.MSBuild 5.0.0 had zero consumers, and the semantic
              IntelliSense increment deliberately ships without a workspace (SemanticModel over an

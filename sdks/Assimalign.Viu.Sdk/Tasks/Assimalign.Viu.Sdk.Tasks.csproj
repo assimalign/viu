@@ -45,4 +45,30 @@
     <ViuPackageReference Include="Microsoft.Build.Utilities.Core" />
     <ViuPackageReference Include="Microsoft.Build.Framework" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The Roslyn closure that rides the parser graph (Tooling.Css -> Syntax.Templates, whose
+         template expressions are parsed with the real C# parser) is compile-time-only for THIS host:
+         the bundling task composes the style-only parsers
+         (SingleFileComponentParserFactory.CreateForStyleExtraction), which never dispatch template
+         content, and the v-bind()/module/scoped rewrites live in Assimalign.Viu.Syntax.Css with no
+         Roslyn dependency — Roslyn-backed expression compilation of the recorded bindings runs only
+         in the source generator, where the compiler host supplies Roslyn. Re-declaring the closure
+         with ExcludeAssets=runtime (each member, because asset exclusion is not transitive) keeps
+         CopyLocalLockFileAssemblies from sweeping the ~26 MB compiler set (satellites included) into
+         the packaged Tasks/ payload and keeps the deps.json truthful; the packaging lane asserts the
+         resulting shape ([V01.01.12.19.04]). PrivateAssets=all keeps the SDK nuspec
+         dependency-free, the same stance as the Microsoft.Build references above. Versions are
+         central; this list tracks the Microsoft.CodeAnalysis.CSharp closure pinned in
+         Build.References.Packages.targets. -->
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.Common" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Buffers" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Collections.Immutable" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Memory" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Numerics.Vectors" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Reflection.Metadata" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Runtime.CompilerServices.Unsafe" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Text.Encoding.CodePages" PrivateAssets="all" ExcludeAssets="runtime" />
+    <ViuPackageReference Include="System.Threading.Tasks.Extensions" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
 </Project>
