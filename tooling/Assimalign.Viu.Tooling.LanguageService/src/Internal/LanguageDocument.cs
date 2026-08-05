@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 using Assimalign.Viu.Syntax.SingleFileComponent;
 
@@ -7,6 +9,13 @@ namespace Assimalign.Viu.Tooling.LanguageService;
 
 internal sealed class LanguageDocument
 {
+    // Template element folding ([V01.01.12.07.07]) needs the block's markup parsed, which the
+    // container parse deliberately does not do. The document snapshot is immutable and replaced
+    // whole on every edit, so computing the ranges once here keeps the per-request contract: an
+    // unedited document answers every folding request from one template parse. Publication is
+    // thread-safe because reads run outside the service's synchronization lock.
+    private readonly Lazy<IReadOnlyList<LanguageFoldingRange>> templateElementFoldingRanges;
+
     private LanguageDocument(
         string documentUri,
         string text,
@@ -17,6 +26,9 @@ internal sealed class LanguageDocument
         Text = text;
         Version = version;
         Syntax = syntax;
+        templateElementFoldingRanges = new Lazy<IReadOnlyList<LanguageFoldingRange>>(
+            () => TemplateFoldingRangeCollector.Collect(syntax.Template),
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     internal string DocumentUri { get; }
@@ -26,6 +38,14 @@ internal sealed class LanguageDocument
     internal int? Version { get; }
 
     internal LanguageDocumentSyntax Syntax { get; }
+
+    /// <summary>
+    /// The folding ranges for the multi-line elements inside this document's template block, in
+    /// document order and in the document's own line coordinates. Computed on first use and cached
+    /// for the life of the snapshot.
+    /// </summary>
+    internal IReadOnlyList<LanguageFoldingRange> TemplateElementFoldingRanges
+        => templateElementFoldingRanges.Value;
 
     internal static LanguageDocument Create(string documentUri, string text, int? version)
     {

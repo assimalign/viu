@@ -100,13 +100,22 @@ public interface IViuLanguageService
         string documentUri,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Gets the foldable block-content ranges for an open document.</summary>
+    /// <summary>
+    /// Gets the foldable ranges for an open document: one range per multi-line block container, plus
+    /// one per multi-line element inside the template block ([V01.01.12.07.07]) — nested elements and
+    /// nested <c>&lt;template&gt;</c> fragments included. A single-line element and a self-closing
+    /// element fold nothing, and neither does an element the parse had to recover from missing markup.
+    /// </summary>
     /// <param name="documentUri">The document URI used by the editor.</param>
     /// <param name="cancellationToken">
     /// The token that cancels the computation. Cancellation is cooperative; a canceled call throws
     /// <see cref="System.OperationCanceledException"/> and leaves no service state modified.
     /// </param>
-    /// <returns>The folding ranges, or an empty list when the document is not open.</returns>
+    /// <returns>
+    /// The folding ranges in document order — a container's range ahead of the ranges nested inside
+    /// it — or an empty list when the document is not open. The result is not truncated: a document
+    /// contributes one range per foldable construct, however many that is.
+    /// </returns>
     IReadOnlyList<LanguageFoldingRange> GetFoldingRanges(
         string documentUri,
         CancellationToken cancellationToken = default);

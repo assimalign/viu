@@ -369,6 +369,8 @@ internal sealed class ViuLanguageService :
         var ranges = new List<LanguageFoldingRange>();
         foreach (var block in CollectBlocks(document.Syntax))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // The fold stops one line short of the block end so the closing delimiter ('}' or
             // '</template>') stays visible while the block is collapsed.
             var startLine = ToLanguagePosition(block.Location.Start).Line;
@@ -376,6 +378,14 @@ internal sealed class ViuLanguageService :
             if (endLine > startLine)
             {
                 ranges.Add(new LanguageFoldingRange(startLine, endLine));
+            }
+
+            // Element folding ([V01.01.12.07.07]) is additive: the section range above is unchanged
+            // and each multi-line element inside the template contributes a nested range, emitted
+            // right after its section so the whole result stays in document order.
+            if (ReferenceEquals(block, document.Syntax.Template))
+            {
+                ranges.AddRange(document.TemplateElementFoldingRanges);
             }
         }
 
