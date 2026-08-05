@@ -76,7 +76,7 @@ public class ViuProjectAssetsReaderTests
                  is_global = true
                  build_property.RootNamespace = First.Value
                  build_property.RootNamespace = Fixture.Namespace
-                 build_property.ProjectDir = {projectDirectory}\
+                 build_property.ProjectDir = {projectDirectory}{Path.DirectorySeparatorChar}
                  build_property.Configuration = Debug
                  """);
             WriteAssetsFile(
@@ -148,7 +148,7 @@ public class ViuProjectAssetsReaderTests
             assets.SourceFilePaths.ShouldBe(new[] { Path.Combine(projectDirectory, "Helper.cs") });
             assets.ComponentFilePaths.ShouldBe(new[] { Path.Combine(projectDirectory, "Component.viu") });
             assets.RootNamespace.ShouldBe("Fixture.Namespace");
-            assets.ProjectDirectory.ShouldBe(projectDirectory + "\\");
+            assets.ProjectDirectory.ShouldBe(projectDirectory + Path.DirectorySeparatorChar);
             assets.Configuration.ShouldBe("Debug");
             assets.CacheStamp.ShouldNotBeNullOrEmpty();
         }
@@ -393,7 +393,7 @@ public class ViuProjectAssetsReaderTests
             // The non-evaluating fallback: the last literal assignment wins and unresolved
             // $(...) syntax never leaks into the namespace.
             assets.RootNamespace.ShouldBe("Custom.Namespace");
-            assets.ProjectDirectory.ShouldBe(projectDirectory + "\\");
+            assets.ProjectDirectory.ShouldBe(projectDirectory + Path.DirectorySeparatorChar);
         }
         finally
         {

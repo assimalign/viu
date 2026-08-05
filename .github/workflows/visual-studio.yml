@@ -1,6 +1,11 @@
-# Windows-only build and test for the in-process Visual Studio client and
-# its editor-neutral, out-of-process Viu language server. Publishing belongs to release.yml.
-name: area-visual-studio
+# Windows-only build and test for the in-process Visual Studio client and its editor-neutral,
+# out-of-process Viu language server. Publishing belongs to release.yml.
+#
+# This root deliberately does NOT use .github/actions/build ([V01.01.12.02.02]): the extension is a
+# classic in-process VSSDK package whose build tasks are .NET Framework MSBuild tasks and cannot load
+# under `dotnet build`, so Build.ps1 drives Visual Studio's own MSBuild through vswhere. It stays a
+# hand-written lane for that reason, and its test projects are named individually below.
+name: Visual Studio
 
 on:
   push:
@@ -27,23 +32,17 @@ on:
       - 'global.json'
       - 'nuget.config'
       - '.github/actions/**'
-      - '.github/workflows/area-visual-studio.yml'
+      - '.github/workflows/visual-studio.yml'
       - '.github/workflows/release.yml'
   pull_request:
     branches: [main]
     paths:
       - 'extensions/VisualStudio/**'
-      # The language service, the language server, and the build-time tooling libraries they
-      # carry (the shared .viu -> C# projection core [V01.01.06.11] and the utility engine) all
-      # ship inside the language-server payload, so any tooling change must re-verify the
-      # extension build and the packaged VSIX.
       - 'tooling/**'
       - 'libraries/Assimalign.Viu.Syntax*/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
-      # The packed-consumer round trip consumes the Install-Local feed (SDK + framework packs), so
-      # its lane inputs re-verify this workflow ([V01.01.12.23]).
       - 'scripts/Install-Local.ps1'
       - 'scripts/Test-LanguageServerSemanticRoundTrip.ps1'
       - 'sdks/**'
@@ -53,15 +52,19 @@ on:
       - 'global.json'
       - 'nuget.config'
       - '.github/actions/**'
-      - '.github/workflows/area-visual-studio.yml'
+      - '.github/workflows/visual-studio.yml'
       - '.github/workflows/release.yml'
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   build-test:
-    name: build and test Visual Studio extension
+    name: visual-studio (extension)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -80,7 +83,7 @@ jobs:
       # The packed-consumer semantic round trip ([V01.01.12.23], #259, acceptance criterion 5):
       # pack the SDK + framework feed, then drive the published single-file server over stdio
       # against a restored consumer scaffold. Runs here because this is the only lane that builds
-      # the server payload; area-packaging never does. Cost: roughly six to eight minutes.
+      # the server payload; the packaging lane never does. Cost: roughly six to eight minutes.
       - name: Install local Viu packages
         shell: pwsh
         run: ./scripts/Install-Local.ps1
@@ -93,7 +96,8 @@ jobs:
       # Assimalign.Viu.VisualStudio.slnx: that solution also carries the extension itself, which is a
       # classic in-process VSSDK package whose build tasks are .NET Framework MSBuild tasks and
       # cannot load under `dotnet`. The extension is built and packaged by Build.ps1 above, through
-      # Visual Studio's MSBuild.
+      # Visual Studio's MSBuild. The language service and language server are also built and tested
+      # on Linux by tooling.yml; this run re-verifies them against the Windows payload.
       - name: Test language service
         run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageService/test/Assimalign.Viu.Tooling.LanguageService.Tests.csproj --configuration Release
 

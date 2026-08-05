@@ -1,7 +1,12 @@
-# Area build+pack for the Viu SDK and shared-framework packs ([V01.01.12.19]): proves the
-# Assimalign.Viu.Sdk nupkg and the Assimalign.Viu.App Ref/Runtime pack shapes stay healthy.
-# Path-filtered like the other area workflows; shared build files trigger every area.
-name: area-packaging
+# Packaging lane for the Viu SDK and the shared-framework packs ([V01.01.12.19], generalized by
+# [V01.01.12.02.02]). This is the one root that is not a per-project matrix: Install-Local.ps1 packs
+# the whole SDK -> targeting pack -> runtime pack chain as a single artifact set, and the assertions
+# below are about the SHAPE of that set, not about any one project. It replaces area-packaging.yml
+# and absorbs the artifact assertions the standalone area-utility-css.yml used to duplicate.
+#
+# Nothing here pushes: publishing is release.yml's job (the checksummed, uniquely versioned beta and
+# stable sets), and the per-project canonical-version push lives in .github/actions/build.
+name: Packaging
 
 on:
   push:
@@ -9,9 +14,7 @@ on:
     paths:
       - 'sdks/**'
       - 'frameworks/**'
-      - 'scripts/Install-Local.ps1'
-      - 'scripts/Test-UtilityCssArtifactShape.ps1'
-      - 'scripts/Test-UtilityCssIndependence.ps1'
+      - 'scripts/**'
       - 'libraries/**'
       - 'tooling/**'
       - 'analyzers/**'
@@ -21,15 +24,13 @@ on:
       - 'global.json'
       - 'nuget.config'
       - '.github/actions/**'
-      - '.github/workflows/area-packaging.yml'
+      - '.github/workflows/packaging.yml'
   pull_request:
     branches: [main]
     paths:
       - 'sdks/**'
       - 'frameworks/**'
-      - 'scripts/Install-Local.ps1'
-      - 'scripts/Test-UtilityCssArtifactShape.ps1'
-      - 'scripts/Test-UtilityCssIndependence.ps1'
+      - 'scripts/**'
       - 'libraries/**'
       - 'tooling/**'
       - 'analyzers/**'
@@ -39,22 +40,38 @@ on:
       - 'global.json'
       - 'nuget.config'
       - '.github/actions/**'
-      - '.github/workflows/area-packaging.yml'
+      - '.github/workflows/packaging.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   pack:
-    name: pack SDK + framework
+    name: packaging (SDK + framework)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       # The runtime pack builds the framework closure with -p:RuntimeIdentifier=browser-wasm,
       # which requires the wasm-tools workload (NETSDK1147 without it) — same as the app build.
+      # This is the only lane in the repository that needs it: no Viu library targets browser-wasm.
       - name: Set up .NET (with wasm-tools)
         uses: ./.github/actions/setup-dotnet-wasm
         with:
           install-wasm-tools: 'true'
+
+      # Carried over from area-utility-css.yml: Install-Local.ps1 builds the SDK task host on its
+      # way to packing it, but not with warnings as errors. This keeps that gate explicit.
+      - name: Build SDK task host (warnings are errors)
+        run: dotnet build sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj --configuration Release -warnaserror
 
       - name: Pack SDK, runtime pack, and ref pack
         shell: pwsh
@@ -66,7 +83,10 @@ jobs:
           ./scripts/Test-UtilityCssIndependence.ps1
           -Artifact (Get-ChildItem _out/packages -Filter '*.nupkg' | ForEach-Object FullName)
 
-      - name: Verify SDK utility payload
+      # Both halves of the utility artifact contract in one place: the SDK's packed utility payload
+      # (was area-packaging) and the standalone engine package's own shape (was area-utility-css,
+      # which packed it a second time into its own output directory to assert exactly this).
+      - name: Verify utility artifact shapes
         shell: pwsh
         run: |
           $sdkPackages = @(
@@ -76,8 +96,16 @@ jobs:
             throw "Expected exactly one SDK package, found $($sdkPackages.Count)."
           }
 
+          $utilityPackages = @(
+            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.Tooling.UtilityCss.*.nupkg'
+          )
+          if ($utilityPackages.Count -ne 1) {
+            throw "Expected exactly one utility engine package, found $($utilityPackages.Count)."
+          }
+
           ./scripts/Test-UtilityCssArtifactShape.ps1 `
-            -SdkPackage $sdkPackages[0].FullName
+            -SdkPackage $sdkPackages[0].FullName `
+            -UtilityCssPackage $utilityPackages[0].FullName
 
       - name: Assert package shapes
         shell: pwsh
@@ -245,3 +273,25 @@ jobs:
           }
 
           Get-ChildItem $feed -Filter 'Assimalign.Viu.*.nupkg' | ForEach-Object { Write-Host $_.Name }
+
+  sdk-tests:
+    # The CSS hot-reload worker under sdks/ has a test project that no retired workflow ever ran: it
+    # is in no per-area solution file, and area-packaging only invoked Install-Local.ps1. Generalizing
+    # the pipelines is the moment to close that hole.
+    name: packaging (SDK tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Build CSS hot-reload worker (warnings are errors)
+        run: dotnet build sdks/Assimalign.Viu.Sdk/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release -warnaserror
+
+      - name: Test CSS hot-reload worker
+        run: dotnet test sdks/Assimalign.Viu.Sdk/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release --no-build

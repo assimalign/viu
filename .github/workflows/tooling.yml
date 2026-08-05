@@ -1,0 +1,74 @@
+# Build+test lane for the developer-tooling libraries ([V01.01.12.02.02]): the shared .viu -> C#
+# projection core, the CSS composition core, the Viu Utilities engine, and the editor pair (language
+# service + language server). None of these ship into a Viu app's runtime. Three of the five are
+# packable and publish from a main push; the language service and the language server declare
+# IsPackable=false and the shared build action skips their pack step automatically.
+name: Tooling
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "tooling/**"
+            # The tooling cores compile against the Syntax parser cluster and are consumed by the
+            # generators, so a change on either side must re-verify this root.
+            - "libraries/**"
+            - "analyzers/**"
+            - "build/**"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/actions/**"
+            - ".github/workflows/tooling.yml"
+    pull_request:
+        branches: [main]
+        paths:
+            - "tooling/**"
+            - "libraries/**"
+            - "analyzers/**"
+            - "build/**"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/actions/**"
+            - ".github/workflows/tooling.yml"
+
+permissions:
+    contents: read
+    packages: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+    build:
+        name: tooling (${{ matrix.projects }})
+        runs-on: ubuntu-24.04
+        strategy:
+            fail-fast: false
+            matrix:
+                projects:
+                    [
+                        "Assimalign.Viu.Tooling.Css",
+                        "Assimalign.Viu.Tooling.LanguageServer",
+                        "Assimalign.Viu.Tooling.LanguageService",
+                        "Assimalign.Viu.Tooling.SingleFileComponent",
+                        "Assimalign.Viu.Tooling.UtilityCss"
+                    ]
+        steps:
+            - name: "Checkout: ${{ matrix.projects }}"
+              # actions/checkout v4
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  persist-credentials: false
+
+            - name: "Build: ${{ matrix.projects }}"
+              uses: ./.github/actions/build
+              with:
+                  area: "tooling"
+                  project: ${{ matrix.projects }}
+                  publish-packages: "true"
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
