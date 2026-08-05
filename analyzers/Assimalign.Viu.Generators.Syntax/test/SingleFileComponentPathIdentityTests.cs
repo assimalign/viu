@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -25,6 +26,14 @@ public sealed class SingleFileComponentPathIdentityTests
     [Fact]
     public void Generate_BaseNamesDifferOnlyByCase_ShadowingFollowsOperatingSystemPathIdentity()
     {
+        // [VUE-7] decides how many components exist here, and it is deliberately operating-system
+        // dependent: on Windows the two files are one path identity, so the .vue peer is shadowed and a
+        // single component is emitted; everywhere else they are two components. The two-component branch
+        // is where [SFC-CG-5] earns its keep - Choice and choice are ONE hint name to Roslyn's
+        // case-insensitive AddSource comparison, and before [V01.01.06.10.01] the second AddSource threw
+        // and killed the run. The platform-independent pin for that rule is
+        // HintNameCollisionTests.TwoFilesWhoseBaseNamesDifferOnlyByCase_BothEmit, which uses two .viu
+        // files - a pair no shadowing rule can ever merge - so the collision forms on every host.
         var canonical = new InMemoryAdditionalText(
             "C:/project/Components/Choice.viu",
             ViuSource);
@@ -48,6 +57,11 @@ public sealed class SingleFileComponentPathIdentityTests
         {
             result.GeneratedSources.Length.ShouldBe(2);
             result.Diagnostics.ShouldBeEmpty();
+            result.GeneratedSources
+                .Select(source => source.HintName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count()
+                .ShouldBe(2);
         }
     }
 

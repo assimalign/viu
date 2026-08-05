@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 
 using Microsoft.CodeAnalysis;
@@ -24,6 +25,15 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// tests pin. This project owns only the host concerns: the incremental pipeline, file reads, hot-reload
 /// gating, <c>.vue</c>-shadowing (a multi-file MSBuild concern), and the Roslyn materialization of the
 /// projection's neutral diagnostics (<see cref="SingleFileComponentDiagnosticAdapter"/>).
+/// </para>
+/// <para>
+/// Hint-name identity is the other multi-file concern ([SFC-CG-5], [V01.01.06.10.01]). Roslyn compares
+/// <c>AddSource</c> hint names case-insensitively and kills the whole generator run on a duplicate, so
+/// wherever path identity is ordinal — every non-Windows filesystem [VUE-7] — two components whose base
+/// names differ only by case would otherwise claim one hint name. <see cref="SingleFileComponentFileSet"/>
+/// resolves those groups once per file set and each member takes the resolver's path-hash discriminator;
+/// a component that collides with nothing keeps its readable hint name byte for byte, so no existing
+/// generated-file identity moves.
 /// </para>
 /// <para>
 /// For Debug builds, or when explicitly enabled by <c>ViuEmitHotReloadMetadata</c>, the generator also
@@ -65,15 +75,21 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 ShouldEmitHotReloadMetadata(configuration, emitHotReloadMetadata));
         });
 
-        var canonicalFileKeys = context.AdditionalTextsProvider
-            .Where(static text => IsViuFile(text.Path))
-            .Select(static (text, _) => ComponentBasePath(text.Path))
-            .Collect();
+        // The multi-file view: .vue shadowing [VUE-7] and hint-name case collisions [SFC-CG-5] are both
+        // facts about the SET of component files, so they are resolved once per set — keyed on the
+        // project directory alone, never on the whole option record, so an unrelated property change
+        // cannot invalidate it.
+        var fileSet = context.AdditionalTextsProvider
+            .Where(static text => IsSingleFileComponentFile(text.Path))
+            .Select(static (text, _) => text.Path)
+            .Collect()
+            .Combine(projectOptions.Select(static (options, _) => options.ProjectDirectory))
+            .Select(static (pair, _) => CreateFileSet(pair.Left, pair.Right));
 
         var files = context.AdditionalTextsProvider
             .Where(static text => IsSingleFileComponentFile(text.Path))
             .Combine(projectOptions)
-            .Combine(canonicalFileKeys)
+            .Combine(fileSet)
             .Select(static (pair, cancellationToken) => ReadFile(
                 pair.Left.Left,
                 pair.Left.Right,
@@ -148,12 +164,16 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     private static SingleFileComponentProjectionInput ReadFile(
         AdditionalText additionalText,
         ProjectOptions options,
-        ImmutableArray<string> canonicalFileKeys,
+        SingleFileComponentFileSet fileSet,
         System.Threading.CancellationToken cancellationToken)
     {
         var text = additionalText.GetText(cancellationToken);
         var content = text?.ToString() ?? string.Empty;
-        var names = SingleFileComponentNameResolver.Resolve(additionalText.Path, options.ProjectDirectory, options.RootNamespace);
+        var names = SingleFileComponentNameResolver.Resolve(
+            additionalText.Path,
+            options.ProjectDirectory,
+            options.RootNamespace,
+            fileSet.RequiresCaseDiscriminator(additionalText.Path));
         var scopeId = StyleScopeId.Resolve(additionalText.Path, options.ProjectDirectory);
         var format = IsVueFile(additionalText.Path)
             ? SingleFileComponentFormat.Vue
@@ -172,7 +192,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                     additionalText.Path,
                     options.ProjectDirectory)
                 : null,
-            HasCanonicalPeer(format, additionalText.Path, canonicalFileKeys));
+            HasCanonicalPeer(format, additionalText.Path, fileSet));
     }
 
     private static bool ShouldEmitHotReloadMetadata(
@@ -187,30 +207,59 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         return string.Equals(configuration, "Debug", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool HasCanonicalPeer(
-        SingleFileComponentFormat format,
-        string filePath,
-        ImmutableArray<string> canonicalFileKeys)
+    // Resolves the two cross-file facts for one compilation's component files: the canonical .viu base
+    // paths a .vue peer is shadowed by [VUE-7], and the components whose readable hint names would
+    // collide under Roslyn's case-insensitive AddSource comparison [SFC-CG-5]. Shadowed .vue files are
+    // excluded from the collision input because they emit nothing — counting one would discriminate the
+    // canonical .viu component that suppressed it, churning an identity that never collided.
+    private static SingleFileComponentFileSet CreateFileSet(
+        ImmutableArray<string> componentPaths,
+        string? projectDirectory)
     {
-        if (format != SingleFileComponentFormat.Vue)
+        if (componentPaths.IsDefaultOrEmpty)
         {
-            return false;
+            return SingleFileComponentFileSet.Empty;
         }
 
-        var key = ComponentBasePath(filePath);
-        foreach (var canonicalKey in canonicalFileKeys)
+        var orderedPaths = new string[componentPaths.Length];
+        componentPaths.CopyTo(orderedPaths);
+        Array.Sort(orderedPaths, StringComparer.Ordinal);
+
+        var canonicalBasePaths = new List<string>();
+        foreach (var path in orderedPaths)
         {
-            if (string.Equals(
-                    key,
-                    canonicalKey,
-                    SingleFileComponentPathComparison.Comparison))
+            if (IsViuFile(path))
             {
-                return true;
+                canonicalBasePaths.Add(ComponentBasePath(path));
             }
         }
 
-        return false;
+        var canonicalSet = new SingleFileComponentFileSet(
+            new EquatableArray<string>(canonicalBasePaths.ToArray()),
+            EquatableArray<string>.Empty);
+
+        var emittedPaths = new List<string>(orderedPaths.Length);
+        foreach (var path in orderedPaths)
+        {
+            var format = IsVueFile(path) ? SingleFileComponentFormat.Vue : SingleFileComponentFormat.Viu;
+            if (!HasCanonicalPeer(format, path, canonicalSet))
+            {
+                emittedPaths.Add(path);
+            }
+        }
+
+        return new SingleFileComponentFileSet(
+            canonicalSet.CanonicalBasePaths,
+            new EquatableArray<string>(
+                SingleFileComponentNameResolver.SelectCaseCollidingPaths(emittedPaths, projectDirectory)));
     }
+
+    private static bool HasCanonicalPeer(
+        SingleFileComponentFormat format,
+        string filePath,
+        SingleFileComponentFileSet fileSet)
+        => format == SingleFileComponentFormat.Vue &&
+            fileSet.ContainsCanonicalBasePath(ComponentBasePath(filePath));
 
     private static string ComponentBasePath(string path)
     {

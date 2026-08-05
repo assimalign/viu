@@ -27,7 +27,10 @@ The library is deliberately **all-internal**; the sanctioned consumers are decla
   build path) and `DescribeMembers` (the editor path — declared-member names, kinds, details, doc
   summaries, block-relative locations).
 - **`SingleFileComponentNameResolver`** / **`SingleFileComponentHotReloadMetadataFactory`** — the
-  shared name/namespace/hint-name resolution and the path-stable hot-reload identity.
+  shared name/namespace/hint-name resolution and the path-stable hot-reload identity. Hint names are
+  path-derived and readable; `SelectCaseCollidingPaths` takes the whole emitted set and reports which
+  components must add the path-hash discriminator, because Roslyn's `AddSource` treats hint names
+  differing only by case as one name (`[SFC-CG-5]`, [V01.01.06.10.01]).
 - **`SingleFileComponentDiagnostics`** — the host-neutral VIU diagnostic catalog (`VIU1001` …
   `VIU1303`) and the block-to-file position composition; each host materializes at its own edge (the
   generator's Roslyn adapter, the language service's LSP mapping).
