@@ -42,6 +42,14 @@ dependency arrows point toward the base and the language libraries, never sidewa
   `Shims/` — it loads in Roslyn analyzer hosts alongside the rest of the syntax cluster.
 - **No I/O.** The core never touches the filesystem; the `ViuBundleCss` task (outside the sandbox) reads and
   writes. This is how the engine respects RS1035 while still landing a physical stylesheet.
+- **Roslyn never ships beside the task** (decision [V01.01.12.19.04], #279). The Roslyn dependency this
+  library carries transitively (via `Assimalign.Viu.Syntax.Templates`, whose template expressions are parsed
+  with the real C# parser) is compile-time-only for the SDK task host: the style-extraction parsers above
+  never dispatch template content, and the `v-bind()`/`module`/`scoped` rewrites live in
+  `Assimalign.Viu.Syntax.Css` with no Roslyn dependency — Roslyn-backed expression compilation of the
+  recorded bindings runs only in the source generator, where the compiler host supplies Roslyn. The SDK
+  Tasks csproj therefore re-declares the Roslyn closure `ExcludeAssets=runtime`, and the packaging lane
+  asserts no `Microsoft.CodeAnalysis*` assembly under the SDK package's `Tasks/`.
 - **No reflection, no dynamic codegen.** Recoverable: a malformed `v-bind()` surfaces as a diagnostic carried
   back to the host (`SingleFileComponentStyleDiagnostic`), never thrown; the only expected exception is
   `OperationCanceledException`.
