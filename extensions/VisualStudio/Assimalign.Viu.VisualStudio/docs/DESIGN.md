@@ -193,6 +193,134 @@ in process. Whole-document lexing is a property of the container format and surv
 change; the version watermarking and requested-range bookkeeping that made the round trips bearable
 did not, and is gone.
 
+## Auto-closing
+
+Typing an opening delimiter closes it ([V01.01.12.07.08]). Two mechanisms carry that, chosen because
+the editor offers exactly two shapes and they answer different questions.
+
+**Character pairs ride the editor's brace-completion engine.** The engine already owns everything a
+pair needs after it opens — inserting the closer, tracking the span, typing through the closer, and
+deleting both halves on one backspace — so Viu contributes only which characters pair and where.
+`{ }`, `( )`, and `[ ]` are registered on an `IBraceCompletionDefaultProvider`
+(`ViuBraceCompletionDefaults`), which is metadata with no code, because those pairs need no gating:
+they are balanced constructs in template markup, in C#, and in CSS alike. Interpolation falls out of
+that rather than needing a rule — typing `{` twice yields `{{}}` with the caret in the middle, which
+is the authoring path for `{{ Count }}`.
+
+The quotes do need gating, and that decides their registration. The editor's aggregator asks the
+providers registered for a character in order — session, dynamic session, context, then default — and
+takes the first that agrees to start; a default provider always agrees, so a pair registered on one
+can never be declined. The quotes are therefore registered on an `IBraceCompletionContextProvider`
+(`ViuQuoteBraceCompletionContextProvider`) and **only** there, making its `TryCreateContext` the gate.
+Adding them to the default provider as well would hand the aggregator an unconditional fallback and
+defeat the gate entirely.
+
+**Element and comment closing rides a typed-character command handler**, because there is no
+"pair" to register: what gets inserted depends on the tag name the user just typed.
+`ViuAutoClosingCommandHandler` is an `ICommandHandler<TypeCharCommandArgs>` filtered on the `viu`
+content type.
+
+**All the decisions are pure.** `ViuAutoClosingLogic` answers both questions from document text and a
+caret position alone — no editor type appears in it — and it takes its section attribution from
+`ViuSectionScanner` and its void-element list from the repository's shared `DomKnowledgeData`. The
+MEF parts and the command handler are thin adapters: they convert a snapshot into lines, ask, and
+apply. That is why the behavior below is unit-tested through the source-linked test project while the
+composition and the buffer edit are honestly runtime-verified only.
+
+`ViuSectionScanner` is the single definition of the container grammar in this extension. It owns the
+patterns that open and close a section and the `@`-block and tag-delimited state machines;
+`ViuLexicalClassifier` drives its per-line passes from the same primitives, so colorization and
+auto-closing cannot disagree about where a section starts. Attribution is per line, which is what the
+format supports: every section boundary is line-anchored. A line that opens or closes a section
+belongs to it, because content may sit on the same line; the column-0 `}` that ends a legacy
+`@`-block does not, because it is structure rather than content.
+
+### What pairs, and where
+
+| Typed | Template | `@script` / `<script>` | `<style>` | Between containers |
+| --- | --- | --- | --- | --- |
+| `{` `(` `[` | pairs | pairs | pairs | pairs |
+| `"` | pairs **only in attribute-value position** | pairs | — | — |
+| `'` | — | pairs | — | — |
+| `>` after an open tag | inserts `</name>` | — | — | — |
+| `/` immediately after `<` | completes the nearest unclosed element | — | — | — |
+| `-` completing `<!--` | inserts ` -->` | — | — | — |
+
+Attribute-value position means: inside an open tag header, with `=` as the last non-whitespace
+character before the caret, and not already inside a quoted value. A tag header spanning several
+lines is walked back through. Everything else in a template is text content, where a double quote is
+punctuation rather than a delimiter and an apostrophe is part of ordinary prose — which is the whole
+reason the single quote is script-only.
+
+The three element behaviors each have exclusions, and they are what keeps the feature from being
+intrusive:
+
+- `>` inserts nothing after a **void** element (`<br>`, `<input>`, … — matched case-insensitively
+  against the shared WHATWG table), after a tag the user **self-closed** (`<Component />`), when the
+  matching end tag **already follows the caret**, when the `>` is **inside an attribute value**, and
+  when the caret is not in a tag header at all — template text and interpolation interiors reach a
+  `>` from the enclosing tag first, so they never qualify. Framework tags are ordinary elements here:
+  `<template>` and `<slot>` auto-close like any other.
+- `/` completes only when it is typed **immediately after `<`**, and only when something is still
+  open. The ancestor scan starts at the top of the template run and skips void elements,
+  self-closed elements, comments, and tags written inside attribute values. In a tag-delimited
+  section the container tag is itself an unclosed element, so `</` at the top of a hand-authored
+  `<template>` completes `</template>`.
+- `-` completes only the third hyphen of `<!--`, and not when a `-` already follows.
+
+**Section awareness is the load-bearing part.** A `>` in `@script` closes a generic argument list or
+a lambda arrow, and a `>` in `<style>` is the CSS child combinator; a script or style section that
+grew an end tag on every `>` would be unusable. That is why the element behaviors are template-only,
+and why the top-level `<style>`/`<script>` opening tags do not auto-close either — their own line is
+already attributed to the section they open.
+
+### Recorded decisions
+
+- **The comment shape is `<!-- | -->`.** Typing the third `-` inserts `-  -->` with the caret between
+  the two spaces, so the comment reads `<!-- text -->` the moment the user types. Parking the caret
+  hard against the opener instead would produce `<!--text -->`.
+- **The typed character is part of the insertion.** The handler reports the command as handled and
+  writes the character itself, so the completion is one buffer change inside one transaction: a
+  single `Ctrl+Z` removes the end tag and the character that triggered it together, matching the
+  editor's own brace completion and Visual Studio's HTML editor.
+- **The handler is ordered after the completion and brace-completion handlers.** Both are chained
+  handlers that pass the character along, so they see it first and this one still runs; the order
+  matters because a handled command stops the chain, and running first would hide the keystroke from
+  an open completion session. The two names are written as literals — one of them has no published
+  constant, so a package reference for the other would buy nothing, and an unrecognized ordering name
+  is simply ignored.
+- **The Automatic Brace Completion option is the editor's, and is left alone.** The editor's
+  brace-completion manager reads `DefaultTextViewOptions.BraceCompletionEnabledOptionId` and returns
+  before it consults any provider, so turning the option off turns the Viu pairs off with it and no
+  Viu code needs to read it. Element auto-close has no editor-owned option and ships **always on**;
+  inventing a Viu options page for one toggle was rejected. Revisit if it proves intrusive.
+- **Auto-surround is ungated.** Selecting text and typing a quote wraps the selection wherever the
+  pair is registered, because the editor answers that from the `[BracePair]` metadata alone and never
+  consults the context provider. Accepted rather than worked around: surrounding happens only with an
+  active selection, where the alternative — replacing the selection with the typed character — is the
+  more destructive outcome.
+- **No new package pins were needed.** `Microsoft.VisualStudio.Text.BraceCompletion`,
+  `Microsoft.VisualStudio.Commanding`, `TypeCharCommandArgs`, and the undo history registry all live
+  in the editor packages this project already references compile-only.
+
+### Out of scope, recorded rather than half-built
+
+- **`=` inserting `=""`.** Auto-quoting an attribute the moment `=` is typed is a separate behavior
+  from pairing a quote the user typed, and it interacts with attribute-name completion — a directive
+  such as `v-else` takes no value at all. Deferred as its own decision.
+- **Element auto-close in Visual Studio Code.** That client gets its character pairs from
+  `language-configuration.json` already. Element auto-close there has no declarative form: it needs a
+  custom protocol request between the extension and the language server, which is a protocol change
+  this work item deliberately does not make. Recorded as a follow-up candidate.
+- **An options page for element auto-close.** See the recorded decision above: always on for now.
+- **Moving a paired `}` onto its own line on Return.** Observed while verifying the brace engine, and
+  left as it is. The editor's default session only reformats on Return when a brace-completion
+  *context* is present, so pressing Return inside a freshly paired `@script {}` leaves the `}` on the
+  caret's new line rather than pushing it down one further. That is the same thing every language
+  without a context does, and it does not break the container: the closer stays at column 0, which is
+  where the `@`-block grammar needs it. Giving `{` a context purely to reformat would be a
+  runtime-only, untestable addition, so it is recorded here rather than built.
+
 ## Activation, and where `.vue` stands in Visual Studio
 
 `ViuLanguageClient` is a MEF `[Export(typeof(ILanguageClient))]` filtered on the `viu` content type,

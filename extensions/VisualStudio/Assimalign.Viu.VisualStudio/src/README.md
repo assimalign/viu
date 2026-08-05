@@ -4,7 +4,8 @@ This project is the thin, **in-process** Visual Studio client for Viu single-fil
 classic VSSDK package targeting `net48`, because the editor surfaces it contributes exist only as MEF
 exports inside `devenv.exe`. It ships the `viu` content type, the `.pkgdef` claiming the `.viu` file
 extension, the Viu classification types and their format definitions, the lexical classifier that
-colors a buffer with no round trip, and `ViuLanguageClient`.
+colors a buffer with no round trip, the section-aware auto-closing of delimiters and elements, and
+`ViuLanguageClient`.
 
 Nothing semantic runs here. Semantic completion, diagnostics, navigation, and every future editor
 feature belong to the standalone language server the client starts, so the Viu parsers and Roslyn

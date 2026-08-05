@@ -102,6 +102,12 @@
          as the netstandard2.0 parser projects link it; its path is frozen. -->
     <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs"
              Link="Shims\IsExternalInit.cs" />
+    <!-- The WHATWG void-element table ViuAutoClosingLogic excludes from element auto-close, taken
+         from the repository's single authoritative DOM knowledge definition rather than retyped for
+         the editor. It is written to the lowest-common-denominator language surface precisely so
+         hosts like this one can link it; its path is frozen. -->
+    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs"
+             Link="Internal\DomKnowledgeData.cs" />
   </ItemGroup>
 
   <ItemGroup>

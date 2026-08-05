@@ -26,21 +26,10 @@ namespace Assimalign.Viu.VisualStudio;
 /// </remarks>
 internal static class ViuLexicalClassifier
 {
-    // The hybrid .viu container ([V01.01.06.10], Assimalign.Viu.Syntax.SingleFileComponent
-    // docs/FORMAT.md): <template> and <style> are top-level tags, @script keeps the @-block grammar,
-    // and the legacy @template/@style blocks keep highlighting during the migration window.
-    private static readonly Regex SectionHeaderExpression = new(
-        @"^\s*@(?<name>template|script|style)\b[^{]*(?<brace>\{)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex TagSectionOpenExpression = new(
-        @"^\s*<(?<name>template|style|script)\b",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex TemplateSectionTagExpression = new(
-        @"</?template\b",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
+    // The container grammar itself - which line opens a section, which line closes it, and what a
+    // container name means - lives in ViuSectionScanner, so this classifier and the auto-closing
+    // decisions share one definition of the hybrid .viu sections ([V01.01.06.10]) instead of each
+    // carrying a copy.
     private static readonly Regex TagHeaderAttributeExpression = new(
         @"(?<name>[A-Za-z_][A-Za-z0-9_.:-]*)(?:\s*=\s*(?<value>""[^""]*""|'[^']*'))?",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -149,7 +138,7 @@ internal static class ViuLexicalClassifier
                         if (ClassifyTagDelimitedRawLine(
                                 line,
                                 lineNumber,
-                                "</style>",
+                                ViuSectionScanner.StyleClosingTag,
                                 0,
                                 ref isInStyleComment,
                                 ClassifyStyleLine,
@@ -166,7 +155,7 @@ internal static class ViuLexicalClassifier
                         if (ClassifyTagDelimitedRawLine(
                                 line,
                                 lineNumber,
-                                "</script>",
+                                ViuSectionScanner.ScriptClosingTag,
                                 0,
                                 ref isInScriptComment,
                                 ClassifyScriptLine,
@@ -183,20 +172,13 @@ internal static class ViuLexicalClassifier
                 continue;
             }
 
-            Match sectionMatch = SectionHeaderExpression.Match(line);
+            Match sectionMatch = ViuSectionScanner.MatchSectionHeader(line);
 
             if (sectionMatch.Success)
             {
-                string sectionName = sectionMatch.Groups["name"].Value;
-                sectionKind = sectionName switch
-                {
-                    "template" => ViuSectionKind.Template,
-                    "script" => ViuSectionKind.Script,
-                    "style" => ViuSectionKind.Style,
-                    _ => ViuSectionKind.None,
-                };
-
                 Group nameGroup = sectionMatch.Groups["name"];
+                sectionKind = ViuSectionScanner.GetSectionKind(nameGroup.Value);
+
                 // The legacy @template/@style headers name the same containers their tag-delimited
                 // successors do, so they carry the framework-tag color. @script is the C# container's
                 // own header and keeps the keyword classification, which puts it in the same color as
@@ -222,7 +204,7 @@ internal static class ViuLexicalClassifier
             }
             else if (sectionKind == ViuSectionKind.None)
             {
-                Match tagMatch = TagSectionOpenExpression.Match(line);
+                Match tagMatch = ViuSectionScanner.MatchTagSectionOpen(line);
                 if (tagMatch.Success)
                 {
                     ClassifyTagSectionOpenLine(
@@ -317,9 +299,9 @@ internal static class ViuLexicalClassifier
             return;
         }
 
-        switch (nameGroup.Value)
+        switch (ViuSectionScanner.GetSectionKind(nameGroup.Value))
         {
-            case "template":
+            case ViuSectionKind.Template:
                 sectionKind = ViuSectionKind.Template;
                 isTagDelimitedSection = true;
                 templateTagDepth = 0;
@@ -337,13 +319,13 @@ internal static class ViuLexicalClassifier
 
                 break;
 
-            case "style":
+            case ViuSectionKind.Style:
                 sectionKind = ViuSectionKind.Style;
                 isTagDelimitedSection = true;
                 if (ClassifyTagDelimitedRawLine(
                         line,
                         lineNumber,
-                        "</style>",
+                        ViuSectionScanner.StyleClosingTag,
                         headerEnd,
                         ref isInStyleComment,
                         ClassifyStyleLine,
@@ -356,7 +338,7 @@ internal static class ViuLexicalClassifier
 
                 break;
 
-            case "script":
+            case ViuSectionKind.Script:
                 // The container parser rejects a top-level <script> tag (VIU1017); the lexer still
                 // colors it as a script section so the misplaced code stays readable while the
                 // diagnostic points at the fix.
@@ -365,7 +347,7 @@ internal static class ViuLexicalClassifier
                 if (ClassifyTagDelimitedRawLine(
                         line,
                         lineNumber,
-                        "</script>",
+                        ViuSectionScanner.ScriptClosingTag,
                         headerEnd,
                         ref isInScriptComment,
                         ClassifyScriptLine,
@@ -391,7 +373,7 @@ internal static class ViuLexicalClassifier
         bool[] occupiedCharacters,
         List<ViuLexicalSpan> spans)
     {
-        int closerEnd = ScanTemplateTagDepth(line, ref templateTagDepth);
+        int closerEnd = ViuSectionScanner.ScanTemplateTagDepth(line, ref templateTagDepth);
         if (closerEnd >= 0 && closerEnd < line.Length)
         {
             // Occupy everything past the true closer without emitting spans; whatever follows the
@@ -439,33 +421,6 @@ internal static class ViuLexicalClassifier
         ref bool isInComment,
         bool[] occupiedCharacters,
         List<ViuLexicalSpan> spans);
-
-    // Walks the <template>/</template> boundaries on a line, updating the nesting depth. Returns the
-    // exclusive end offset of the closer that brings the depth back to zero, or -1 when the section
-    // stays open past this line. Self-closing <template /> tags do not change the depth.
-    private static int ScanTemplateTagDepth(string line, ref int depth)
-    {
-        foreach (Match match in TemplateSectionTagExpression.Matches(line))
-        {
-            bool isClosing = line[match.Index + 1] == '/';
-            int tagClose = line.IndexOf('>', match.Index + match.Length);
-
-            if (isClosing)
-            {
-                depth--;
-                if (depth <= 0)
-                {
-                    return tagClose < 0 ? line.Length : tagClose + 1;
-                }
-            }
-            else if (tagClose < 0 || line[tagClose - 1] != '/')
-            {
-                depth++;
-            }
-        }
-
-        return -1;
-    }
 
     // Classifies a top-level container tag header: the tag punctuation as delimiters, the tag name as
     // the framework tag it always is at this position, and attributes (valueless ones such as

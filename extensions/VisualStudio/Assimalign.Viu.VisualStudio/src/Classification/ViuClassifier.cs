@@ -121,14 +121,8 @@ internal sealed class ViuClassifier : IClassifier
 
     private IReadOnlyList<ClassificationSpan> ClassifySnapshot(ITextSnapshot snapshot)
     {
-        int lineCount = snapshot.LineCount;
-        List<string> lines = new(lineCount);
-        for (int lineNumber = 0; lineNumber < lineCount; lineNumber++)
-        {
-            lines.Add(snapshot.GetLineFromLineNumber(lineNumber).GetText());
-        }
-
-        IReadOnlyList<ViuLexicalSpan> lexicalSpans = ViuLexicalClassifier.Classify(lines);
+        IReadOnlyList<ViuLexicalSpan> lexicalSpans =
+            ViuLexicalClassifier.Classify(ViuSnapshotLines.Read(snapshot));
         List<ClassificationSpan> snapshotSpans = new(lexicalSpans.Count);
 
         foreach (ViuLexicalSpan lexicalSpan in lexicalSpans)
