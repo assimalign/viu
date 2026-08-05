@@ -3,6 +3,11 @@
 # The packaged-consumer showcase lives in assimalign/viu-examples. Consumer lanes check both
 # repositories out as siblings so its nuget.config resolves only the packages built into
 # viu/_out/packages, exactly like the supported local development loop.
+#
+# Kept as its own thin root by [V01.01.12.02.02] rather than folded into a project matrix: every lane
+# here is a cross-repository measurement over the PUBLISHED app, not a per-project build, and the
+# nested checkout layout is why these lanes call setup-dotnet-wasm with repository-path instead of
+# the .github/actions/build recipe (that recipe assumes the Viu checkout is the workspace root).
 name: budget-gates
 
 on:
@@ -44,13 +49,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   gate-tests:
     name: budget gate tests
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
@@ -65,15 +77,19 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Viu
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: viu
+          persist-credentials: false
 
       - name: Checkout packaged-consumer showcase
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: assimalign/viu-examples
           path: viu-examples
+          persist-credentials: false
 
       # This conditional exists only to make the initial cross-repository migration mergeable:
       # Viu lands first, then viu-examples can consume it. Once the external showcase is on main,
@@ -135,7 +151,8 @@ jobs:
 
       - name: Upload measurement results
         if: always()
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: publish-budget-results
           path: viu/_out/budgets/head-results.json
@@ -151,15 +168,19 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Viu
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: viu
+          persist-credentials: false
 
       - name: Checkout packaged-consumer showcase
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: assimalign/viu-examples
           path: viu-examples
+          persist-credentials: false
 
       - name: Detect packaged-consumer showcase
         id: showcase
@@ -220,7 +241,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Startup gate placeholder
         shell: pwsh

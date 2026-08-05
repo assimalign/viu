@@ -1,5 +1,7 @@
-# Performance benchmark suite ([V01.01.11.04], #88). Three lanes with deliberately different cost
-# profiles, mirroring the budget-gates workflow:
+# Performance benchmark suite ([V01.01.11.04], #88). Kept as its own thin root by [V01.01.12.02.02]
+# rather than folded into a project matrix: its four lanes are not "build one project" jobs but
+# deliberately different cost profiles, and two of them are gates over a reviewed baseline rather
+# than over a project's tests.
 #   - harness-tests + interop-gate: fast, deterministic, run on every PR/push (path-filtered). The gate
 #     compares each scenario's interop-crossing count to the reviewed baseline
 #     (benchmarks/baselines/InteropCounts.json) and fails a regression. Counts are machine-independent, so
@@ -40,13 +42,23 @@ on:
       - '.github/actions/**'
       - '.github/workflows/benchmarks.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   harness-tests:
     name: benchmark harness tests
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       # Pure CoreCLR: the suite never touches the browser-wasm runtime, so no wasm-tools workload.
       - name: Set up .NET
@@ -63,7 +75,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
@@ -82,7 +97,8 @@ jobs:
 
       - name: Upload interop-count results
         if: always()
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: interop-count-results
           path: _out/benchmarks/interop-results.json
@@ -99,7 +115,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm
@@ -117,7 +136,8 @@ jobs:
 
       - name: Upload benchmark artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: benchmark-timings
           path: _out/benchmarks/artifacts/**
@@ -135,7 +155,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm

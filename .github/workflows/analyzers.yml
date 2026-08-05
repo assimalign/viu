@@ -1,0 +1,71 @@
+# Build+test lane for the Viu source generators ([V01.01.12.02.02]). The generators ship inside the
+# Assimalign.Viu.App targeting pack rather than as standalone NuGet packages, so this root never
+# publishes and the job keeps contents:read only.
+#
+# The matrix entries are FOLDER names, not assembly ids: analyzers/Assimalign.Viu.Generators.Reactive
+# holds Assimalign.Viu.Generators.Reactivity. The shared build action discovers the project inside
+# the folder instead of composing a path, so the two can differ without a special case here.
+name: Analyzers
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "analyzers/**"
+            # The reactivity generator compiles against the Reactivity runtime library; the syntax
+            # generator is the composition root of the Syntax cluster and of the shared projection
+            # core under tooling/.
+            - "libraries/**"
+            - "tooling/**"
+            - "build/**"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/actions/**"
+            - ".github/workflows/analyzers.yml"
+    pull_request:
+        branches: [main]
+        paths:
+            - "analyzers/**"
+            - "libraries/**"
+            - "tooling/**"
+            - "build/**"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/actions/**"
+            - ".github/workflows/analyzers.yml"
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+    build:
+        name: analyzers (${{ matrix.projects }})
+        runs-on: ubuntu-24.04
+        strategy:
+            fail-fast: false
+            matrix:
+                projects:
+                    [
+                        "Assimalign.Viu.Generators.Reactive",
+                        "Assimalign.Viu.Generators.Syntax"
+                    ]
+        steps:
+            - name: "Checkout: ${{ matrix.projects }}"
+              # actions/checkout v4
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  persist-credentials: false
+
+            - name: "Build: ${{ matrix.projects }}"
+              uses: ./.github/actions/build
+              with:
+                  area: "analyzers"
+                  project: ${{ matrix.projects }}

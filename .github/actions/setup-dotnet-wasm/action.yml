@@ -44,7 +44,7 @@ runs:
         restore-keys: |
           nuget-${{ runner.os }}-
 
-    - name: Install wasm-tools workload
+    - name: Install wasm-tools Workload
       if: inputs.install-wasm-tools == 'true'
       shell: bash
       run: dotnet workload install wasm-tools --skip-manifest-update

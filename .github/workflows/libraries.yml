@@ -1,0 +1,85 @@
+# Build+test lane for the runtime framework libraries ([V01.01.12.02.02]). One matrix entry per
+# project folder under libraries/ — the single list to maintain for this code root — each delegating
+# to the shared .github/actions/build recipe. A per-project job keeps a failure scoped to the project
+# that caused it instead of taking a whole area down, and adding a library is a one-line edit here.
+name: Libraries
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "libraries/**"
+            # The syntax generator and the reactivity generator are compiled into the library test
+            # projects, so a generator change must re-verify this root.
+            - "analyzers/**"
+            - "build/**"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/actions/**" # The shared build recipe and the .NET setup
+            - ".github/workflows/libraries.yml" # When Pipeline File Changes
+    pull_request:
+        branches: [main]
+        paths:
+            - "libraries/**"
+            - "analyzers/**"
+            - "build/**"
+            - "Directory.Build.props"
+            - "Directory.Build.targets"
+            - "global.json"
+            - "nuget.config"
+            - ".github/actions/**"
+            - ".github/workflows/libraries.yml"
+
+# packages:write is needed because every project in this root is packable and a main push publishes
+# it. A superseded pull-request run is cancelled; a main run is never cancelled mid-publish.
+permissions:
+    contents: read
+    packages: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+    build:
+        name: libraries (${{ matrix.projects }})
+        runs-on: ubuntu-24.04
+        strategy:
+            # One broken project should not hide the state of the other fifteen.
+            fail-fast: false
+            matrix:
+                projects:
+                    [
+                        "Assimalign.Viu.Browser",
+                        "Assimalign.Viu.Components",
+                        "Assimalign.Viu.Core",
+                        "Assimalign.Viu.Reactivity",
+                        "Assimalign.Viu.Router",
+                        "Assimalign.Viu.Router.Browser",
+                        "Assimalign.Viu.ServerRenderer",
+                        "Assimalign.Viu.Shared",
+                        "Assimalign.Viu.State",
+                        "Assimalign.Viu.Syntax",
+                        "Assimalign.Viu.Syntax.Css",
+                        "Assimalign.Viu.Syntax.Html",
+                        "Assimalign.Viu.Syntax.JavaScript",
+                        "Assimalign.Viu.Syntax.SingleFileComponent",
+                        "Assimalign.Viu.Syntax.Templates",
+                        "Assimalign.Viu.Testing"
+                    ]
+        steps:
+            - name: "Checkout: ${{ matrix.projects }}"
+              # actions/checkout v4
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+              with:
+                  persist-credentials: false
+
+            - name: "Build: ${{ matrix.projects }}"
+              uses: ./.github/actions/build
+              with:
+                  area: "libraries"
+                  project: ${{ matrix.projects }}
+                  publish-packages: "true"
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
