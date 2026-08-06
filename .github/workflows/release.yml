@@ -76,6 +76,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
+      package-count: ${{ steps.package-count.outputs.count }}
     steps:
       - name: Checkout
         # actions/checkout v4
@@ -159,6 +160,27 @@ jobs:
           VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/Pack-Release.ps1 -Version $env:VIU_PACKAGE_VERSION
 
+      # The publish jobs assert the artifact they download still carries every
+      # package this job produced. They cannot compute that themselves - they
+      # only download the artifact and never check out the repository - so the
+      # producer publishes the number. Deriving it here is what keeps it from
+      # drifting: Pack-Release.ps1 writes package-order.txt from the same
+      # authoritative id list it validates the pack against, so adding a package
+      # updates this automatically.
+      - name: Record package count
+        id: package-count
+        shell: pwsh
+        run: |
+          $packageOrderPath = '_out/release/packages/package-order.txt'
+          $packageCount = @(Get-Content -LiteralPath $packageOrderPath).Count
+          if ($packageCount -lt 1) {
+            throw "Pack-Release.ps1 produced no packages in $packageOrderPath."
+          }
+
+          "count=$packageCount" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release package count: $packageCount"
+
       - name: Verify utility release artifacts
         shell: pwsh
         env:
@@ -223,11 +245,13 @@ jobs:
         env:
           GITHUB_PACKAGES_TOKEN: ${{ github.token }}
           VIU_PACKAGE_VERSION: ${{ needs.pack-packages.outputs.version }}
+          VIU_PACKAGE_COUNT: ${{ needs.pack-packages.outputs.package-count }}
         run: |
           $packageDirectory = '_release/packages'
           $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
-          if ($packageFiles.Count -ne 21) {
-            throw "Expected 21 release packages, found $($packageFiles.Count)."
+          $expectedPackageCount = [int]$env:VIU_PACKAGE_COUNT
+          if ($packageFiles.Count -ne $expectedPackageCount) {
+            throw "Expected $expectedPackageCount release packages, found $($packageFiles.Count)."
           }
 
           foreach ($packageFile in $packageFiles) {
@@ -248,7 +272,7 @@ jobs:
           @"
           ## Published beta packages
 
-          Published all 21 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to the
+          Published all $($packageFiles.Count) Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to the
           Assimalign GitHub Packages feed.
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -292,11 +316,13 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
           VIU_PACKAGE_VERSION: ${{ needs.pack-packages.outputs.version }}
+          VIU_PACKAGE_COUNT: ${{ needs.pack-packages.outputs.package-count }}
         run: |
           $packageDirectory = '_release/packages'
           $packageFiles = @(Get-Content -LiteralPath "$packageDirectory/package-order.txt")
-          if ($packageFiles.Count -ne 21) {
-            throw "Expected 21 release packages, found $($packageFiles.Count)."
+          $expectedPackageCount = [int]$env:VIU_PACKAGE_COUNT
+          if ($packageFiles.Count -ne $expectedPackageCount) {
+            throw "Expected $expectedPackageCount release packages, found $($packageFiles.Count)."
           }
 
           foreach ($packageFile in $packageFiles) {
@@ -317,7 +343,7 @@ jobs:
           @"
           ## Published stable packages
 
-          Published all 21 Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to
+          Published all $($packageFiles.Count) Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to
           [nuget.org](https://www.nuget.org/profiles/Assimalign).
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

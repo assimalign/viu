@@ -358,8 +358,12 @@ spec-discoverable choice is the wrong one for component code. Resolution is a re
 
 Recorded here because they are unrelated to API surface but were confirmed:
 
-- `.github/workflows/release.yml:230,299` and `docs/RELEASING.md:10-11` assert 21 packages while
-  `scripts/Pack-Release.ps1:158-162` produces 22 — **the publish lane throws today.**
+- ~~`.github/workflows/release.yml:230,299` and `docs/RELEASING.md:10-11` assert 21 packages while
+  `scripts/Pack-Release.ps1:158-162` produces 22 — **the publish lane throws today.**~~
+  **FIXED** — confirmed live on the `[V01.01.14.01]` merge (`Expected 21 release packages, found 22.`),
+  which was the sixth consecutive `release.yml` failure. The count is now published by the
+  `pack-packages` job and consumed by both publish jobs, so it derives from the same authoritative
+  id list `Pack-Release.ps1` validates against and cannot drift again.
 - `HelperNames.ResolveFilter` names `_resolveFilter`, which exists on no runtime surface.
 - `SingleFileComponentSourceEmitter`'s `DomRenderHelperNames` array substring-scans the emitted body
   to decide whether to write the DOM `using static`; adding an 11th DOM helper without updating it
