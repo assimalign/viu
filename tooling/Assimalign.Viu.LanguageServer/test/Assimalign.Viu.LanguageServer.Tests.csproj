@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLanguageServers)</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.LanguageServer" />
+    <ViuProjectReference Include="Assimalign.Viu.UtilityCss" />
+  </ItemGroup>
+</Project>

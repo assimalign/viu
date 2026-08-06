@@ -34,7 +34,7 @@ What is deliberately deferred:
 | Language configuration | `language-configuration.json` |
 | Activation | `onLanguage:viu` |
 | Client | `src/extension.ts` → `out/extension.js`, `vscode-languageclient` 8.x over stdio |
-| Server payload | `server/<runtime identifier>/Assimalign.Viu.Tooling.LanguageServer[.exe]` |
+| Server payload | `server/<runtime identifier>/Assimalign.Viu.LanguageServer[.exe]` |
 
 Settings: `viu.languageServer.enabled`, `viu.languageServer.path` (point at a server you built
 yourself), and `viu.trace.server`.
@@ -135,7 +135,7 @@ apiece a five-runtime VSIX would exceed the Marketplace size gate. Each host pub
 build if a payload the host did not ask for is sitting in its publish directory.
 
 Only Windows runtimes carry an `.exe` suffix; a Linux or macOS payload is
-`Assimalign.Viu.Tooling.LanguageServer` with no extension. The targets, `Build.ps1`, and
+`Assimalign.Viu.LanguageServer` with no extension. The targets, `Build.ps1`, and
 `src/extension.ts` all resolve the name from the runtime identifier for that reason.
 
 ### Packaging

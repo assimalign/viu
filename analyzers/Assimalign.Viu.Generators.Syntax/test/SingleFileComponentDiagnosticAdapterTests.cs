@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-using Assimalign.Viu.Tooling.SingleFileComponent;
+using Assimalign.Viu.Compiler.SingleFileComponent;
 
 using Shouldly;
 using Xunit;

@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
-         per the syntax-cluster architectural steer: like its sibling parsers, the HTML parser runs INSIDE
+    <!-- Like its sibling parsers, the HTML parser runs INSIDE
          Roslyn generator hosts and build tooling (host-page/document processing), which are netstandard2.0
          analyzer hosts. It therefore targets the analyzer TFM alias — the same central property the other
          Assimalign.Viu.Syntax.* projects use — never a hardcoded string. Its net10.0 test project

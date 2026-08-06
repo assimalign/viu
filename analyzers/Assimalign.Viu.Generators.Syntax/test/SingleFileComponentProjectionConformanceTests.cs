@@ -4,8 +4,8 @@ using System.Threading;
 
 using Microsoft.CodeAnalysis;
 
-using Assimalign.Viu.Tooling.Css;
-using Assimalign.Viu.Tooling.SingleFileComponent;
+using Assimalign.Viu.Compiler.Css;
+using Assimalign.Viu.Compiler.SingleFileComponent;
 
 using Shouldly;
 using Xunit;

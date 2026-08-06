@@ -1,7 +1,7 @@
 {
   "relativeExecutablePaths": {
-    "x64": "LanguageServer/win-x64/Assimalign.Viu.Tooling.LanguageServer.exe",
-    "arm64": "LanguageServer/win-arm64/Assimalign.Viu.Tooling.LanguageServer.exe"
+    "x64": "LanguageServer/win-x64/Assimalign.Viu.LanguageServer.exe",
+    "arm64": "LanguageServer/win-arm64/Assimalign.Viu.LanguageServer.exe"
   },
   "arguments": []
 }

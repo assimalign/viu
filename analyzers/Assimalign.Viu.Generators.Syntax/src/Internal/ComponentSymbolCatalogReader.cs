@@ -4,7 +4,7 @@ using System.Threading;
 
 using Microsoft.CodeAnalysis;
 
-using Assimalign.Viu.Tooling.SingleFileComponent;
+using Assimalign.Viu.Compiler.SingleFileComponent;
 
 namespace Assimalign.Viu.Generators.Syntax;
 

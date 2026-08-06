@@ -43,7 +43,7 @@ $repositoryDirectory = [System.IO.Path]::GetFullPath(
 # The language-server project is named once, here, only so the shared target can be invoked on a
 # project that imports it. Every publish argument still comes from the target.
 $languageServerProject = Join-Path $repositoryDirectory `
-    'tooling\Assimalign.Viu.Tooling.LanguageServer\src\Assimalign.Viu.Tooling.LanguageServer.csproj'
+    'tooling\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj'
 
 $publishRoot = Join-Path $repositoryDirectory `
     "_out\extensions\VisualStudioCode\$Configuration"
@@ -116,10 +116,10 @@ foreach ($runtimeIdentifierName in $requestedRuntimeIdentifiers) {
     # Only Windows runtimes carry the .exe suffix: `dotnet publish` names the apphost after the
     # target platform, and the TypeScript client resolves the same two spellings.
     $executableName = if ($runtimeIdentifierName.StartsWith('win-')) {
-        'Assimalign.Viu.Tooling.LanguageServer.exe'
+        'Assimalign.Viu.LanguageServer.exe'
     }
     else {
-        'Assimalign.Viu.Tooling.LanguageServer'
+        'Assimalign.Viu.LanguageServer'
     }
 
     $sourceExecutable = Join-Path $sourceDirectory $executableName

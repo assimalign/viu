@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
-         per the reviewer's architectural steer: the .viu block parser runs INSIDE the Roslyn SFC
+    <!-- The .viu block parser runs INSIDE the Roslyn SFC
          generator ([V01.01.06.02]), which is a netstandard2.0 analyzer host. It therefore targets the
          analyzer TFM alias — the same central property the template compiler and generators projects use
          — never a hardcoded string. Its net10.0 test project references it normally. -->

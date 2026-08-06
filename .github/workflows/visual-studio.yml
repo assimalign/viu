@@ -99,10 +99,10 @@ jobs:
       # Visual Studio's MSBuild. The language service and language server are also built and tested
       # on Linux by tooling.yml; this run re-verifies them against the Windows payload.
       - name: Test language service
-        run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageService/test/Assimalign.Viu.Tooling.LanguageService.Tests.csproj --configuration Release
+        run: dotnet test tooling/Assimalign.Viu.LanguageService/test/Assimalign.Viu.LanguageService.Tests.csproj --configuration Release
 
       - name: Test language server
-        run: dotnet test tooling/Assimalign.Viu.Tooling.LanguageServer/test/Assimalign.Viu.Tooling.LanguageServer.Tests.csproj --configuration Release
+        run: dotnet test tooling/Assimalign.Viu.LanguageServer/test/Assimalign.Viu.LanguageServer.Tests.csproj --configuration Release
 
       - name: Test Visual Studio extension
         run: dotnet test extensions/VisualStudio/Assimalign.Viu.VisualStudio/test/Assimalign.Viu.VisualStudio.Tests.csproj --configuration Release

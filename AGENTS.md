@@ -18,6 +18,10 @@ the same category as Viu Utilities' Tailwind CSS v4.3.3 target, specified in `SP
 - `libraries/` — framework libraries, inverted layout: `libraries/Assimalign.Viu.<Name>/{src|test}`
   (the folder name is the assembly/package id; `src/` holds the shipping project, `test/` its tests —
   no area wrapper folders)
+- `tooling/` — compiler and editor libraries in the same inverted layout: the
+  `Assimalign.Viu.Syntax*` parser cluster, `Assimalign.Viu.Compiler.*` composition roots,
+  `Assimalign.Viu.UtilityCss`, and the language service/server. The root carries the tooling role;
+  assembly ids and namespaces do not add a blanket role prefix.
 - `../viu-examples/` — external packaged-consumer WASM showcase (separate repository)
 - `docs/` — repo-level planning docs (`PLAN.md` is the delivery plan)
 - `.Codex/rules/` — the canonical working conventions for this repo (auto-load by path):
@@ -66,6 +70,10 @@ HTML serialization, the Language Server Protocol — name and link that target. 
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
   folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
   `assimalign/viu`).
+- Compiler and editor libraries use the same layout under
+  `tooling/Assimalign.Viu.<Name>/{src|test}`. The location carries the developer-tooling role;
+  namespaces remain equal to their descriptive assembly ids (`Syntax.*`, `Compiler.*`, `UtilityCss`,
+  `LanguageService`, or `LanguageServer`).
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
   shared-framework pack producers live in `frameworks/` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
@@ -90,7 +98,13 @@ HTML serialization, the Language Server Protocol — name and link that target. 
 - **Delegates** (public delegate declarations) → `src/Delegates/`.
 - **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
 - Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
-- Linked shared-source files (`PatchFlags.cs`, `SlotFlags.cs`, `Internal/DomKnowledgeData.cs` from `Assimalign.Viu.Shared`; `Shims/IsExternalInit.cs`, `Shims/RequiredMemberShims.cs` from `Assimalign.Viu.Syntax`) are `<Compile Include>` targets from netstandard2.0 projects — **their paths are frozen**; moving them requires updating every linking csproj in the same change.
+- Linked shared-source paths are frozen. Syntax siblings and the compiler/UtilityCss projects link
+  Syntax shims through `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`;
+  `Assimalign.Viu.Syntax.Templates` links Shared sources through
+  `..\..\..\libraries\Assimalign.Viu.Shared\src\<File>`; and the Visual Studio project uses
+  `$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs` plus the
+  Shared `DomKnowledgeData.cs` path under `$(ViuRepositoryDirectory)libraries\`. Moving an owner or
+  consumer requires updating every linking csproj in the same change.
 
 ### Files and types
 
@@ -172,7 +186,8 @@ Never write a raw `<ProjectReference Include="..\..\...csproj" />` or `<PackageR
 test, or example csproj. Use the by-name item groups the build system resolves:
 
 - **`<ViuProjectReference Include="Assimalign.Viu.Shared" />`** — public project reference (flows as a
-  `.nupkg` dependency). Resolved by assembly name against `libraries/**/*.csproj`.
+  `.nupkg` dependency). Resolved by assembly name across the indexed repository roots, including
+  `libraries/` and `tooling/`.
 - **`<ViuPrivateProjectReference Include="..." />`** — private reference (`PrivateAssets=all`; does not
   flow to consumers).
 - **`<ViuPackageReference Include="xunit" />`** — package reference with **no `Version` attribute**;
@@ -184,7 +199,8 @@ test, or example csproj. Use the by-name item groups the build system resolves:
 ### Target framework and language
 
 - Opt a project into its TFM via the central alias, never a hardcoded string:
-  `<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>` (net10.0). Analyzers use
+  `<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>` (net10.0). Analyzers and
+  compiler/build-time tooling hosted by Roslyn or MSBuild use
   `$(TargetFrameworkForAnalyzers)` (netstandard2.0).
 - `Nullable`, `LangVersion=preview`, `EnablePreviewFeatures=true`, and `EnforceCodeStyleInBuild` flow
   centrally from `build/Targets/` — do **not** set them per-csproj.
@@ -238,7 +254,9 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 
 ### Adding a new library
 
-1. `libraries/Assimalign.Viu.<Name>/{src,test}` with the two csproj shapes above.
+1. Use `libraries/Assimalign.Viu.<Name>/{src,test}` for runtime libraries or
+   `tooling/Assimalign.Viu.<Name>/{src,test}` for compiler/build/editor libraries. The tooling root,
+   not a blanket assembly-name segment, carries that role.
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
@@ -358,8 +376,9 @@ paths:
 - **xUnit v2 + Shouldly** are the sanctioned frameworks. Shouldly is the single assertion library — do not
   add FluentAssertions or lean on raw `Assert`. Package versions come centrally
   ([`.claude/rules/build-system.md`](.claude/rules/build-system.md)); the test csproj declares them by name via `ViuPackageReference`.
-- Each library has a sibling test project at `libraries/Assimalign.Viu.<Name>/test/`
-  (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`, referencing its `src` via `ViuProjectReference`.
+- Each library has a sibling test project under its `libraries/Assimalign.Viu.<Name>/test/` or
+  `tooling/Assimalign.Viu.<Name>/test/` folder (`Assimalign.Viu.<Name>.Tests`), `IsPackable=false`,
+  referencing its `src` via `ViuProjectReference`.
 - Class `{Feature}Tests`; method names describe `Method_Scenario_ExpectedBehavior` (or an equally explicit
   phrase). Arrange / Act / Assert.
 
@@ -436,9 +455,10 @@ paths:
   as a reason a Viu behavior is what it is. An adopted technique is documented in Viu's terms and
   pinned by a Viu benchmark; origin acknowledgement, if wanted, goes in `docs/SPECIFICATION.md`
   § "Prior art and influences", once, centrally.
-- Per-library design docs mature into `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) and
-  `docs/DESIGN.md` (why it is shaped this way, WASM/AOT constraints, non-goals). Keep them current in the
-  same change as the code — a `DESIGN.md` that lags the code actively misleads.
+- Per-library design docs mature into `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` or
+  `tooling/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) beside `docs/DESIGN.md` (why it is
+  shaped this way, WASM/AOT constraints, non-goals). Keep them current in the same change as the code —
+  a `DESIGN.md` that lags the code actively misleads.
 - Repo-level planning lives in `docs/` — `docs/SPECIFICATION.md` is the authoritative statement of
   Viu's semantics; `docs/PLAN.md` is the authoritative delivery narrative (architecture map, founding
   decisions, waves); the GitHub Project **#15** board is the authoritative backlog.
@@ -473,8 +493,8 @@ paths:
 - Issue bodies must carry enough architectural boundary guidance for a future session to implement
   without this conversation's context: the target `Assimalign.Viu.<Area>` project, allowed
   dependency direction, and any interop/AOT/source-generator boundaries.
-- Library layout is inverted: `libraries/Assimalign.Viu.<Name>/{src|test}` — folder name = assembly
-  id, no area wrapper folders.
+- Library layout is inverted under both `libraries/Assimalign.Viu.<Name>/{src|test}` and
+  `tooling/Assimalign.Viu.<Name>/{src|test}` — folder name = assembly id, no area wrapper folders.
 - Preserve later-wave requirements in planning notes even when implementing only current-wave scope.
   If a ticket needs prerequisite work from another ticket, call that out rather than silently
   reordering.

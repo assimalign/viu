@@ -47,7 +47,7 @@ jobs:
         name: libraries (${{ matrix.projects }})
         runs-on: ubuntu-24.04
         strategy:
-            # One broken project should not hide the state of the other fourteen.
+            # One broken project should not hide the state of the other nine.
             fail-fast: false
             matrix:
                 projects:
@@ -61,11 +61,6 @@ jobs:
                         "Assimalign.Viu.ServerRenderer",
                         "Assimalign.Viu.Shared",
                         "Assimalign.Viu.State",
-                        "Assimalign.Viu.Syntax",
-                        "Assimalign.Viu.Syntax.Css",
-                        "Assimalign.Viu.Syntax.Html",
-                        "Assimalign.Viu.Syntax.SingleFileComponent",
-                        "Assimalign.Viu.Syntax.Templates",
                         "Assimalign.Viu.Testing"
                     ]
         steps:

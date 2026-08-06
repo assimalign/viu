@@ -6,7 +6,7 @@
     Optional Assimalign.Viu.Sdk NuGet package to inspect.
 
 .PARAMETER UtilityCssPackage
-    Optional Assimalign.Viu.Tooling.UtilityCss NuGet package to inspect.
+    Optional Assimalign.Viu.UtilityCss NuGet package to inspect.
 
 .PARAMETER VisualStudioExtension
     Optional Assimalign.Viu.VisualStudio VSIX package to inspect.
@@ -141,8 +141,8 @@ if (-not [string]::IsNullOrWhiteSpace($SdkPackage)) {
             'Targets/Assimalign.Viu.Sdk.UtilityCss.targets',
             'Targets/Assimalign.Viu.Sdk.Css.HotReload.targets',
             'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
-            'Tasks/Assimalign.Viu.Tooling.UtilityCss.dll',
-            'Tasks/Assimalign.Viu.Tooling.UtilityCss.THIRD-PARTY-NOTICES.md',
+            'Tasks/Assimalign.Viu.UtilityCss.dll',
+            'Tasks/Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md',
             'Watch/Assimalign.Viu.Sdk.CssHotReload.deps.json',
             'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
             'Watch/Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json'
@@ -153,7 +153,7 @@ if (-not [string]::IsNullOrWhiteSpace($SdkPackage)) {
             -ArtifactName $artifactName
         Assert-ThirdPartyNotice `
             -Archive $archive `
-            -EntryName 'Tasks/Assimalign.Viu.Tooling.UtilityCss.THIRD-PARTY-NOTICES.md' `
+            -EntryName 'Tasks/Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md' `
             -ArtifactName $artifactName
         Assert-NoForbiddenNuGetDependencies `
             -Archive $archive `
@@ -198,8 +198,8 @@ if (-not [string]::IsNullOrWhiteSpace($UtilityCssPackage)) {
         Assert-ArchiveEntries `
             -Archive $archive `
             -EntryNames @(
-                'Assimalign.Viu.Tooling.UtilityCss.nuspec',
-                'lib/netstandard2.0/Assimalign.Viu.Tooling.UtilityCss.dll',
+                'Assimalign.Viu.UtilityCss.nuspec',
+                'lib/netstandard2.0/Assimalign.Viu.UtilityCss.dll',
                 'THIRD-PARTY-NOTICES.md'
             ) `
             -ArtifactName $artifactName
@@ -209,7 +209,7 @@ if (-not [string]::IsNullOrWhiteSpace($UtilityCssPackage)) {
             -ArtifactName $artifactName
         Assert-NoForbiddenNuGetDependencies `
             -Archive $archive `
-            -EntryName 'Assimalign.Viu.Tooling.UtilityCss.nuspec' `
+            -EntryName 'Assimalign.Viu.UtilityCss.nuspec' `
             -ArtifactName $artifactName
     }
     finally {
@@ -228,8 +228,8 @@ if (-not [string]::IsNullOrWhiteSpace($VisualStudioExtension)) {
         )
         foreach ($runtimeIdentifier in $runtimeIdentifiers) {
             $requiredEntries += @(
-                "LanguageServer/$runtimeIdentifier/Assimalign.Viu.Tooling.LanguageServer.exe",
-                "LanguageServer/$runtimeIdentifier/Assimalign.Viu.Tooling.UtilityCss.THIRD-PARTY-NOTICES.md"
+                "LanguageServer/$runtimeIdentifier/Assimalign.Viu.LanguageServer.exe",
+                "LanguageServer/$runtimeIdentifier/Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md"
             )
         }
 
@@ -241,7 +241,7 @@ if (-not [string]::IsNullOrWhiteSpace($VisualStudioExtension)) {
         foreach ($runtimeIdentifier in $runtimeIdentifiers) {
             Assert-ThirdPartyNotice `
                 -Archive $archive `
-                -EntryName "LanguageServer/$runtimeIdentifier/Assimalign.Viu.Tooling.UtilityCss.THIRD-PARTY-NOTICES.md" `
+                -EntryName "LanguageServer/$runtimeIdentifier/Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md" `
                 -ArtifactName $artifactName
         }
     }

@@ -1,7 +1,7 @@
 using System;
 
-using Assimalign.Viu.Tooling.Css;
-using Assimalign.Viu.Tooling.SingleFileComponent;
+using Assimalign.Viu.Compiler.Css;
+using Assimalign.Viu.Compiler.SingleFileComponent;
 
 namespace Assimalign.Viu.Generators.Syntax;
 

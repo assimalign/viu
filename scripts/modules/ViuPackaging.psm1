@@ -24,7 +24,7 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Components',
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',
-    'Assimalign.Viu.Tooling.UtilityCss',
+    'Assimalign.Viu.UtilityCss',
     'Assimalign.Viu.Core',
     'Assimalign.Viu.Browser',
     'Assimalign.Viu.ServerRenderer',

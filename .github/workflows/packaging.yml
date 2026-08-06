@@ -97,7 +97,7 @@ jobs:
           }
 
           $utilityPackages = @(
-            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.Tooling.UtilityCss.*.nupkg'
+            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.UtilityCss.*.nupkg'
           )
           if ($utilityPackages.Count -ne 1) {
             throw "Expected exactly one utility engine package, found $($utilityPackages.Count)."
@@ -195,8 +195,8 @@ jobs:
                 Where-Object { $_.FullName.StartsWith('analyzers/dotnet/cs/', [System.StringComparison]::Ordinal) } |
                 ForEach-Object { $_.FullName.Substring('analyzers/dotnet/cs/'.Length) }
             )
-            if ($analyzerEntries -notcontains 'Assimalign.Viu.Tooling.SingleFileComponent.dll') {
-              throw "$($referencePackage[0].Name) analyzer payload is missing the shared projection core Assimalign.Viu.Tooling.SingleFileComponent.dll"
+            if ($analyzerEntries -notcontains 'Assimalign.Viu.Compiler.SingleFileComponent.dll') {
+              throw "$($referencePackage[0].Name) analyzer payload is missing the shared projection core Assimalign.Viu.Compiler.SingleFileComponent.dll"
             }
             $roslynEntries = @($analyzerEntries | Where-Object { $_ -like 'Microsoft.CodeAnalysis*.dll' })
             if ($roslynEntries.Count -ne 0) {
@@ -216,8 +216,8 @@ jobs:
               'Tasks/Assimalign.Viu.Syntax.Css.dll',
               'Tasks/Assimalign.Viu.Syntax.SingleFileComponent.dll',
               'Tasks/Assimalign.Viu.Syntax.Templates.dll',
-              'Tasks/Assimalign.Viu.Tooling.Css.dll',
-              'Tasks/Assimalign.Viu.Tooling.UtilityCss.dll',
+              'Tasks/Assimalign.Viu.Compiler.Css.dll',
+              'Tasks/Assimalign.Viu.UtilityCss.dll',
               'Targets/Assimalign.Viu.Generators.Syntax.props',
               'Targets/Assimalign.Viu.Generators.Syntax.targets',
               'Targets/Assimalign.Viu.Sdk.Css.Bundling.targets',
@@ -230,16 +230,15 @@ jobs:
             }
 
             $forbiddenSdkEntries = @(
-              'Tasks/Assimalign.Viu.Tooling.Tasks.dll',
               'Tasks/Microsoft.Build.dll',
               'Tasks/Microsoft.Build.Framework.dll',
               'Tasks/Microsoft.Build.Utilities.Core.dll',
               'Tasks/Microsoft.NET.StringTools.dll',
               # The shared .viu -> C# projection core ([V01.01.06.11]) belongs to the generator +
               # language-service graph only. If it ever appears here, a reference leaked into the
-              # Sdk.Tasks/Tooling.Css graph, whose whole OutDir sweeps into the SDK package's
+              # Sdk.Tasks/Compiler.Css graph, whose whole OutDir sweeps into the SDK package's
               # Tasks/ payload.
-              'Tasks/Assimalign.Viu.Tooling.SingleFileComponent.dll',
+              'Tasks/Assimalign.Viu.Compiler.SingleFileComponent.dll',
               'Targets/Assimalign.Viu.Syntax.Generators.props',
               'Targets/Assimalign.Viu.Syntax.Generators.targets'
             )
@@ -249,7 +248,7 @@ jobs:
               }
             }
 
-            # Roslyn IS legitimately in the task host's reference graph — Sdk.Tasks -> Tooling.Css ->
+            # Roslyn IS legitimately in the task host's reference graph — Sdk.Tasks -> Compiler.Css ->
             # Syntax.Templates parses template expressions with the real C# parser — but it is
             # compile-time-only there ([V01.01.12.19.04]): the ViuBundleCss task composes the style-only parsers and
             # never dispatches template content (Roslyn-backed expression compilation runs only in

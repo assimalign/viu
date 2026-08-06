@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Deviates from the repo build-system rule (libraries use $(TargetFrameworkForLibraries) = net10.0)
-         per the reviewer's architectural steer: the template compiler front end runs INSIDE the Roslyn
+    <!-- The template compiler front end runs INSIDE the Roslyn
          codegen generator ([V01.01.05.05]), which is a netstandard2.0 analyzer host. It therefore targets
          the analyzer TFM alias — the same central property the generators project uses — never a hardcoded
          string. Its net10.0 test project references it normally. -->

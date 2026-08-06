@@ -55,7 +55,7 @@ public class ViuLanguageServerConfigurationTests
 
         try
         {
-            const string ExecutableName = "Assimalign.Viu.Tooling.LanguageServer.exe";
+            const string ExecutableName = "Assimalign.Viu.LanguageServer.exe";
             File.WriteAllText(Path.Combine(x64Directory, ExecutableName), string.Empty);
             File.WriteAllText(Path.Combine(arm64Directory, ExecutableName), string.Empty);
 
@@ -196,13 +196,13 @@ public class ViuLanguageServerConfigurationTests
                 extensionDirectory,
                 "LanguageServer",
                 "win-x64",
-                "Assimalign.Viu.Tooling.LanguageServer.exe"));
+                "Assimalign.Viu.LanguageServer.exe"));
         arm64ExecutablePath.ShouldBe(
             Path.Combine(
                 extensionDirectory,
                 "LanguageServer",
                 "win-arm64",
-                "Assimalign.Viu.Tooling.LanguageServer.exe"));
+                "Assimalign.Viu.LanguageServer.exe"));
     }
 
     [Fact]

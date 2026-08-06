@@ -3,9 +3,9 @@
     <!-- Analyzer & Build Dependencies -->
     <ItemGroup>
         <_ViuPackage Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" />
-        <!-- Assimalign.Viu.Tooling.LanguageService consumes Microsoft.CodeAnalysis.CSharp at RUNTIME
+        <!-- Assimalign.Viu.LanguageService consumes Microsoft.CodeAnalysis.CSharp at RUNTIME
              ([V01.01.12.07.04], #261): its assets must stay unrestricted so they flow into the
-             self-contained Assimalign.Viu.Tooling.LanguageServer publish. Do not add PrivateAssets here. -->
+             self-contained Assimalign.Viu.LanguageServer publish. Do not add PrivateAssets here. -->
         <_ViuPackage Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
         <!-- The transitive netstandard2.0 closure of Microsoft.CodeAnalysis.CSharp 5.3.0, pinned at
              exactly the versions NuGet resolves for that line so the resolution is explicit rather

@@ -29,9 +29,9 @@ Assimalign.Viu.VisualStudio/
   language-server.json
   LanguageServer/
     win-x64/
-      Assimalign.Viu.Tooling.LanguageServer.exe
+      Assimalign.Viu.LanguageServer.exe
     win-arm64/
-      Assimalign.Viu.Tooling.LanguageServer.exe
+      Assimalign.Viu.LanguageServer.exe
 ```
 
 The extension directory is derived from this assembly's own location, because an in-process MEF part

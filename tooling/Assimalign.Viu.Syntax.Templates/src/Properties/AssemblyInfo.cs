@@ -6,4 +6,4 @@ using System.Runtime.CompilerServices;
 // component-usage validation ([SFC-USE-2]) asks the same DOM knowledge table the compiler itself uses to
 // decide whether an undeclared attribute on a component is a plausible fallthrough attribute. Sharing
 // the table is what keeps the two answers from drifting.
-[assembly: InternalsVisibleTo("Assimalign.Viu.Tooling.SingleFileComponent")]
+[assembly: InternalsVisibleTo("Assimalign.Viu.Compiler.SingleFileComponent")]
