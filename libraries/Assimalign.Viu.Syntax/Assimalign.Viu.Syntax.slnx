@@ -9,6 +9,4 @@
 	<Project Path="../Assimalign.Viu.Syntax.Css/test/Assimalign.Viu.Syntax.Css.Tests.csproj" />
 	<Project Path="../Assimalign.Viu.Syntax.Html/src/Assimalign.Viu.Syntax.Html.csproj" />
 	<Project Path="../Assimalign.Viu.Syntax.Html/test/Assimalign.Viu.Syntax.Html.Tests.csproj" />
-	<Project Path="../Assimalign.Viu.Syntax.JavaScript/src/Assimalign.Viu.Syntax.JavaScript.csproj" />
-	<Project Path="../Assimalign.Viu.Syntax.JavaScript/test/Assimalign.Viu.Syntax.JavaScript.Tests.csproj" />
 </Solution>

@@ -28,7 +28,6 @@ every language library roots on. It ships no language of its own.
 | `Assimalign.Viu.Syntax.SingleFileComponent` | The `.viu` container, plus the `.vue` compatibility parser ([V01.01.06.09]) |
 | `Assimalign.Viu.Syntax.Css` | CSS (scaffold — raw stylesheet root today) |
 | `Assimalign.Viu.Syntax.Html` | Plain HTML documents, e.g. the WASM host page (scaffold) |
-| `Assimalign.Viu.Syntax.JavaScript` | JavaScript around the JS-interop boundary (scaffold) |
 
 All of these run at build time inside netstandard2.0 Roslyn generator hosts
 ([V01.01.05.05]/[V01.01.06.02]); see [DESIGN.md](DESIGN.md) for the constraints that follow.

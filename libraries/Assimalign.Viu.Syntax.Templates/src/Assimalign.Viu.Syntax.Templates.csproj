@@ -6,8 +6,9 @@
          the analyzer TFM alias — the same central property the generators project uses — never a hardcoded
          string. Its net10.0 test project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
-    <!-- Deviates from the checklist rule "shipping libraries set IsAotCompatible=true": the AOT analyzers
-         require net7.0+, so the switch is inert on netstandard2.0. The central libraries targets
+    <IsPackable>false</IsPackable>
+    <!-- IsAotCompatible is intentionally not set: the AOT analyzers require net7.0+, so the switch is
+         inert on netstandard2.0. The central libraries targets
          (libraries/Directory.Build.targets) clear the inherited IsAotCompatible=true once this
          netstandard2.0 TFM is known. This library is consumed at build time by the generator, not shipped
          into the WASM app, so AOT-compat analysis does not apply; the runtime AOT boundary is enforced on
@@ -52,8 +53,11 @@
          referenced from this netstandard2.0 analyzer-host project, so — exactly as with DomKnowledgeData above —
          the two enum source files are <Compile Include>'d here. Both are netstandard2.0-clean (a [Flags] enum and
          a plain enum, System-only), keeping one authoritative definition instead of a drifting mirror. The
-         compiler assembly is consumed only at build time by the generator ([V01.01.05.05]), never shipped into the
-         same runtime as Shared, so the duplicated public type is inert. -->
+         compiler assembly is consumed only at build time by the generator ([V01.01.05.05]) and is never loaded
+         beside Shared at runtime. The duplicate public identities still cause CS0433 when code names either type
+         while both assemblies are referenced; the separate Testing and Browser generator-driving test projects
+         keep that compile-time closure isolated, and not producing a standalone package does not remove that
+         requirement. -->
     <Compile Include="..\..\Assimalign.Viu.Shared\src\PatchFlags.cs" Link="Shared\PatchFlags.cs" />
     <Compile Include="..\..\Assimalign.Viu.Shared\src\SlotFlags.cs" Link="Shared\SlotFlags.cs" />
   </ItemGroup>

@@ -254,13 +254,6 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Html/test/">
 		<Project Path="libraries/Assimalign.Viu.Syntax.Html/test/Assimalign.Viu.Syntax.Html.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.JavaScript/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.JavaScript/src/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.JavaScript/src/Assimalign.Viu.Syntax.JavaScript.csproj" />
-	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.JavaScript/test/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.JavaScript/test/Assimalign.Viu.Syntax.JavaScript.Tests.csproj" />
-	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Templates/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Templates/src/">
 		<Project Path="libraries/Assimalign.Viu.Syntax.Templates/src/Assimalign.Viu.Syntax.Templates.csproj" />

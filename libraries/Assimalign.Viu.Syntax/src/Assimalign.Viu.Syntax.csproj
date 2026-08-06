@@ -8,6 +8,7 @@
          derived parsers and the generators projects use — never a hardcoded string. Its net10.0 test
          project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+    <IsPackable>false</IsPackable>
     <!-- IsAotCompatible is intentionally not set here: the AOT analyzers require net7.0+, so the switch is
          inert on netstandard2.0. The central libraries targets (libraries/Directory.Build.targets) clear
          the inherited IsAotCompatible=true once the netstandard2.0 TFM is known, so no per-project value

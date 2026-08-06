@@ -39,8 +39,8 @@ inputs:
     description: >-
       Whether this code root publishes NuGet packages. Even when true, the pack and push only run
       for a push to main, from a Linux runner, and for a project that is actually packable
-      (a project declaring IsPackable=false — the language service and the language server — is
-      skipped, matching the inventory guard in scripts/modules/ViuPackaging.psm1).
+      (a project declaring IsPackable=false is skipped, matching the inventory guard in
+      scripts/modules/ViuPackaging.psm1).
     required: false
     default: 'false'
   package-feed:
