@@ -59,6 +59,10 @@ Viu.
 - **Delegates** (public delegate declarations) → `src/Delegates/`.
 - **Extension-method containers** → `src/Extensions/`.
 - **Exception types** → `src/Exception/`.
+- **Precedence when two of these apply.** The *semantic* classification wins over the *accessibility*
+  one: an `internal` exception type goes in `Exception/`, not `Internal/`, and an `internal` extension
+  container goes in `Extensions/`. Settled while placing
+  `LanguageServerProtocolRequestException` ([V01.01.14.10]) — it is `internal` and matched both bullets.
 - **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
 - Folders are **physical only** — including `Abstraction/`, `Internal/`, `Extensions/`, and
   `Exception/`; they never appear in a namespace. Create a folder only when it will contain files.

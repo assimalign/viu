@@ -1591,7 +1591,7 @@ it move together.
 | `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
 | `scripts/Measure-PublishBudget.ps1` + `scripts/budgets/PublishBudgets.json` | WASM publish size and startup budgets |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
-| `.github/workflows/area-*.yml`, `budget-gates.yml`, `benchmarks.yml` | Per-area CI |
+| `.github/workflows/area-*.yml`, `benchmarks.yml` | Per-area CI (`budget-gates.yml` is parked under `.github/workflows-disabled/`) |
 
 `[CONF-3]` Unit tests are **DOM-free by default**. The runtime is exercised through
 `Assimalign.Viu.Testing`'s in-memory host; real-browser coverage is a separate end-to-end harness.

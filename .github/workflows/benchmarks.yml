@@ -148,7 +148,7 @@ jobs:
     # WIRED-BUT-SKIPPED. The real-browser axes (wall-clock incl. interop init, live command-buffer
     # boundary-crossing counts, per-assembly published payload size) depend on the Playwright e2e harness
     # ([V01.01.11.03], #87). No measurement is faked; the lane turns on once that harness lands by setting
-    # the repository variable ENABLE_BROWSER_BENCHMARKS=true (the startup-gate pattern from budget-gates.yml).
+    # the repository variable ENABLE_BROWSER_BENCHMARKS=true (the startup-gate pattern from the parked budget-gates.yml).
     # TODO([V01.01.11.03], #87): publish the benchmark app trimmed, serve wwwroot, drive it headless in
     # Chromium/Firefox/WebKit measuring per-scenario time + command-buffer crossings + payload size.
     if: ${{ vars.ENABLE_BROWSER_BENCHMARKS == 'true' }}

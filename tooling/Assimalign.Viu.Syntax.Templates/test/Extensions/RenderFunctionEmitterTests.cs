@@ -466,9 +466,12 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
 /// </summary>
 internal static class RenderCodeAssertions
 {
-    /// <summary>Asserts <paramref name="actual"/> equals <paramref name="expected"/> after LF-normalizing the expectation.</summary>
     /// <param name="actual">The emitted render code (LF by contract).</param>
-    /// <param name="expected">The snapshot expectation, in the checkout's line endings.</param>
-    public static void ShouldBeCode(this string actual, string expected)
-        => actual.ShouldBe(expected.Replace("\r\n", "\n"));
+    extension(string actual)
+    {
+        /// <summary>Asserts <paramref name="actual"/> equals <paramref name="expected"/> after LF-normalizing the expectation.</summary>
+        /// <param name="expected">The snapshot expectation, in the checkout's line endings.</param>
+        public void ShouldBeCode(string expected)
+            => actual.ShouldBe(expected.Replace("\r\n", "\n"));
+    }
 }
