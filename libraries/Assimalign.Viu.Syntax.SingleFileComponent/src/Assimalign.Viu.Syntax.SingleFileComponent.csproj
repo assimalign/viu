@@ -6,8 +6,9 @@
          analyzer TFM alias — the same central property the template compiler and generators projects use
          — never a hardcoded string. Its net10.0 test project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
-    <!-- Deviates from the checklist rule "shipping libraries set IsAotCompatible=true": the AOT analyzers
-         require net7.0+, so the switch is inert on netstandard2.0. The central libraries targets
+    <IsPackable>false</IsPackable>
+    <!-- IsAotCompatible is intentionally not set: the AOT analyzers require net7.0+, so the switch is
+         inert on netstandard2.0. The central libraries targets
          (libraries/Directory.Build.targets) clear the inherited IsAotCompatible=true once this
          netstandard2.0 TFM is known. This library is consumed at build time by the generator, not shipped
          into the WASM app, so AOT-compat analysis does not apply; the runtime AOT boundary is enforced on

@@ -175,8 +175,8 @@
          SDK (dotnet pack -p:PackViuProjects=true on the Tasks csproj).
 
          The fan-out reaches projects OUTSIDE this csproj's ProjectReference closure
-         (Assimalign.Viu.Syntax.Html and .JavaScript are the only two netstandard2.0
-         libraries nothing in the SDK task graph references), so the outer `dotnet pack`
+         (Assimalign.Viu.Syntax.Html is the only netstandard2.0 library nothing in the SDK
+         task graph references), so the outer `dotnet pack`
          implicit restore never covers them: on a clean CI checkout they reach the fan-out
          with an empty obj/.
 

@@ -21,17 +21,9 @@ Set-StrictMode -Version Latest
 $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Reactivity',
     'Assimalign.Viu.Shared',
-    'Assimalign.Viu.Syntax',
     'Assimalign.Viu.Components',
-    'Assimalign.Viu.Syntax.Css',
-    'Assimalign.Viu.Syntax.Html',
-    'Assimalign.Viu.Syntax.JavaScript',
-    'Assimalign.Viu.Syntax.SingleFileComponent',
-    'Assimalign.Viu.Syntax.Templates',
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',
-    'Assimalign.Viu.Tooling.Css',
-    'Assimalign.Viu.Tooling.SingleFileComponent',
     'Assimalign.Viu.Tooling.UtilityCss',
     'Assimalign.Viu.Core',
     'Assimalign.Viu.Browser',
@@ -52,8 +44,8 @@ function Test-ViuProjectPackable {
         Whether a project produces a NuGet package, read from its declared IsPackable.
 
     .DESCRIPTION
-        Non-packable projects (the language service and the language server) live beside the
-        packable tooling libraries and must never enter the published inventory, so discovery
+        Non-packable projects live beside the packable tooling libraries and must never enter
+        the published inventory, so discovery
         filters on the same property the build honors. Reading the csproj directly keeps the
         guard free of an MSBuild evaluation; every Viu project that opts out declares
         IsPackable literally.
@@ -93,8 +85,8 @@ function Get-ViuLibraryProject {
     .DESCRIPTION
         An inventory id is resolved against every code root in $script:ViuCodeRoot, so moving a
         library between libraries/ and tooling/ needs no inventory edit. The drift guard scans
-        the same roots and compares packable projects only: the non-packable language service
-        and language server sit under tooling/ and are deliberately outside the published set.
+        the same roots and compares packable projects only: non-packable source projects are
+        deliberately outside the published set.
 
     .PARAMETER RepositoryDirectory
         The repository root.

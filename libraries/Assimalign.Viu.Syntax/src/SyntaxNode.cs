@@ -5,7 +5,7 @@ namespace Assimalign.Viu.Syntax;
 /// value-comparable record carrying the node's <see cref="SourceLocation"/>. Each language library
 /// derives its own abstract root from it — the template parser's <c>TemplateSyntaxNode</c>, the
 /// single-file-component parser's <c>SingleFileComponentBlock</c>, and the browser-language scaffolds (<c>CssSyntaxNode</c>,
-/// <c>HtmlSyntaxNode</c>, <c>JavaScriptSyntaxNode</c>) — so every parser shares one located,
+/// <c>HtmlSyntaxNode</c>) — so every parser shares one located,
 /// structurally-equatable node contract that <see cref="SyntaxParser"/> and the code-generation layer
 /// can consume without knowing the language.
 /// </summary>
