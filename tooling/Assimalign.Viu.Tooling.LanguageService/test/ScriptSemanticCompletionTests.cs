@@ -97,6 +97,47 @@ public class ScriptSemanticCompletionTests
     }
 
     [Fact]
+    public void GetCompletions_EditorBrowsableNeverRenderHelperMembers_OmitsCompilerSeam()
+    {
+        const string source =
+            "<template>\n  <div>x</div>\n</template>\n" +
+            "@script {\n" +
+            "public int Count { get; set; }\n" +
+            "    \n" +
+            "}\n";
+        var renderHelpers = new LanguageProjectSourceDocument(
+            "C:\\workspace\\App\\RenderHelpers.cs",
+            "namespace Assimalign.Viu;\n" +
+            "\n" +
+            "public static class RenderHelpers\n" +
+            "{\n" +
+            "    [System.ComponentModel.EditorBrowsable(" +
+            "System.ComponentModel.EditorBrowsableState.Never)]\n" +
+            "    public static readonly object _Fragment = new();\n" +
+            "\n" +
+            "    [System.ComponentModel.EditorBrowsable(" +
+            "System.ComponentModel.EditorBrowsableState.Never)]\n" +
+            "    public static object _createVNode() => new();\n" +
+            "\n" +
+            "    public static object CompletionControl => new();\n" +
+            "}\n",
+            IsComponent: false);
+        var service = CreateService(
+            source,
+            ScriptSemanticFixture.CreateContext(renderHelpers));
+
+        var completions = service.GetCompletions(
+            DocumentUri,
+            PositionAfter(source, "set; }\n    "));
+
+        // [V01.01.14.02] RenderHelpers is statically imported into the generated unit containing
+        // @script, so filtering must honor EditorBrowsable on each imported member.
+        completions.ShouldContain(completion => completion.Label == "CompletionControl");
+        completions.ShouldNotContain(
+            completion => completion.Label.StartsWith("_", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void GetCompletions_WithoutProjectContext_IsByteIdenticalToSyntaxOnlyPath()
     {
         var position = PositionAfter(ComponentSource, "set; }\n    ");

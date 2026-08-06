@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Components;
@@ -8,6 +9,7 @@ using Assimalign.Viu.Reactivity;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
+/// Compiler-generated code only; not part of the supported Viu API.
 /// Applies generated single-file-component <c>v-bind()</c> values as CSS custom properties.
 /// </summary>
 /// <remarks>
@@ -18,9 +20,11 @@ namespace Assimalign.Viu.Browser;
 /// reads an ambient component instance, because there is none to read in an AOT build. Specified by
 /// <c>[STY-6]</c> through <c>[STY-8]</c>.
 /// </remarks>
+[System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
 public static class CssVariables
 {
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Registers a component's generated CSS-variable getter against its current outermost browser
     /// elements.
     /// </summary>
@@ -35,6 +39,7 @@ public static class CssVariables
     /// <param name="getter">
     /// Produces hashed custom-property names without the leading <c>--</c> and their current values.
     /// </param>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static void UseCssVariables(
         IComponentContext context,
         Func<IReadOnlyDictionary<string, string>> getter)

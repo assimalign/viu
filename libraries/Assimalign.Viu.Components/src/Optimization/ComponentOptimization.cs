@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 using Assimalign.Viu.Shared;
 
@@ -29,7 +30,10 @@ public sealed class ComponentOptimization
     /// <summary>Gets the metadata used by hand-authored, unoptimized tree values.</summary>
     public static ComponentOptimization None { get; } = new();
 
-    /// <summary>Creates optimization metadata.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates optimization metadata.
+    /// </summary>
     /// <param name="patchFlags">The compiler-produced patch flags.</param>
     /// <param name="dynamicProperties">
     /// The property names that may change when <paramref name="patchFlags"/> contains
@@ -41,6 +45,7 @@ public sealed class ComponentOptimization
     /// <param name="hasOnce">
     /// Whether suspended block tracking such as <c>v-once</c> occurred inside the block.
     /// </param>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public ComponentOptimization(
         PatchFlags patchFlags = default,
         IReadOnlyList<string>? dynamicProperties = null,

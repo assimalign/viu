@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -377,7 +378,9 @@ internal sealed class ScriptSemanticEngine
     {
         if (target is null)
         {
-            return semanticModel.LookupSymbols(position);
+            return FilterEditorBrowsableSymbols(
+                semanticModel.LookupSymbols(position),
+                semanticModel.Compilation);
         }
 
         var symbolInfo = semanticModel.GetSymbolInfo(target, cancellationToken);
@@ -405,18 +408,20 @@ internal sealed class ScriptSemanticEngine
 
         if (targetSymbol is INamespaceSymbol namespaceSymbol)
         {
-            return semanticModel.LookupSymbols(position, namespaceSymbol)
-                .Where(symbol => symbol.Kind is SymbolKind.NamedType or SymbolKind.Namespace)
-                .ToArray();
+            return FilterEditorBrowsableSymbols(
+                semanticModel.LookupSymbols(position, namespaceSymbol)
+                    .Where(symbol => symbol.Kind is SymbolKind.NamedType or SymbolKind.Namespace),
+                semanticModel.Compilation);
         }
 
         if (targetSymbol is ITypeSymbol typeReference)
         {
             // The target names a type (Reactive., String.): static members and nested types.
-            return semanticModel.LookupStaticMembers(position, typeReference)
-                .Where(symbol => symbol.Kind is SymbolKind.Field or SymbolKind.Property
-                    or SymbolKind.Method or SymbolKind.Event or SymbolKind.NamedType)
-                .ToArray();
+            return FilterEditorBrowsableSymbols(
+                semanticModel.LookupStaticMembers(position, typeReference)
+                    .Where(symbol => symbol.Kind is SymbolKind.Field or SymbolKind.Property
+                        or SymbolKind.Method or SymbolKind.Event or SymbolKind.NamedType),
+                semanticModel.Compilation);
         }
 
         var expressionType = semanticModel.GetTypeInfo(target, cancellationToken).Type;
@@ -439,13 +444,54 @@ internal sealed class ScriptSemanticEngine
             return null;
         }
 
-        return semanticModel
-            .LookupSymbols(position, expressionType, includeReducedExtensionMethods: true)
-            .Where(symbol => symbol.Kind is SymbolKind.Field or SymbolKind.Property
-                or SymbolKind.Method or SymbolKind.Event)
-            .Where(symbol => !symbol.IsStatic ||
-                symbol is IMethodSymbol { MethodKind: MethodKind.ReducedExtension })
+        return FilterEditorBrowsableSymbols(
+            semanticModel
+                .LookupSymbols(position, expressionType, includeReducedExtensionMethods: true)
+                .Where(symbol => symbol.Kind is SymbolKind.Field or SymbolKind.Property
+                    or SymbolKind.Method or SymbolKind.Event)
+                .Where(symbol => !symbol.IsStatic ||
+                    symbol is IMethodSymbol { MethodKind: MethodKind.ReducedExtension }),
+            semanticModel.Compilation);
+    }
+
+    // The referenced Microsoft.CodeAnalysis.CSharp 5.3.0 surface exposes no public
+    // ISymbol.IsEditorBrowsable API. LookupSymbols therefore needs this metadata-level filter so
+    // the compiler-only seam stays out of .viu completion ([V01.01.14.02]).
+    private static IReadOnlyList<ISymbol> FilterEditorBrowsableSymbols(
+        IEnumerable<ISymbol> symbols,
+        Compilation compilation)
+    {
+        var editorBrowsableAttribute = compilation.GetTypeByMetadataName(
+            "System.ComponentModel.EditorBrowsableAttribute");
+        if (editorBrowsableAttribute is null)
+        {
+            return symbols.ToArray();
+        }
+
+        return symbols
+            .Where(symbol => !IsEditorBrowsableNever(symbol, editorBrowsableAttribute))
             .ToArray();
+    }
+
+    private static bool IsEditorBrowsableNever(
+        ISymbol symbol,
+        INamedTypeSymbol editorBrowsableAttribute)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (!SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    editorBrowsableAttribute) ||
+                attribute.ConstructorArguments.Length != 1)
+            {
+                continue;
+            }
+
+            return attribute.ConstructorArguments[0].Value is int state &&
+                state == (int)EditorBrowsableState.Never;
+        }
+
+        return false;
     }
 
     private List<LanguageCompletionItem> CreateCompletionItems(

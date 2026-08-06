@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using EditorBrowsableState = System.ComponentModel.EditorBrowsableState;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
@@ -12,6 +13,7 @@ using Assimalign.Viu.Shared;
 namespace Assimalign.Viu;
 
 /// <summary>
+/// Compiler-generated code only; not part of the supported Viu API.
 /// Implements the by-name runtime-helper contract emitted by the Viu template compiler and creates
 /// values in the unified <see cref="IComponent"/> tree.
 /// </summary>
@@ -22,44 +24,71 @@ namespace Assimalign.Viu;
 /// literally. This type is not thread-safe; Viu's runtime executes on the single-threaded host event
 /// loop.
 /// </remarks>
+[System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
 public static class RenderHelpers
 {
     private static readonly List<BlockFrame> BlockFrames = new();
     private static ConditionalWeakTable<IComponent, MemoMetadata> _memoMetadata = new();
     private static int _blockTrackingDepth = 1;
 
-    /// <summary>Gets the compiler marker for a fragment tree value.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Gets the compiler marker for a fragment tree value.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static readonly object _Fragment = new BuiltInComponentType("Fragment");
 
-    /// <summary>Gets the compiler marker for a teleport tree value.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Gets the compiler marker for a teleport tree value.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static readonly object _Teleport = new BuiltInComponentType("Teleport");
 
-    /// <summary>Gets the registered template type for the host-neutral Suspense built-in.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Gets the registered template type for the host-neutral Suspense built-in.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static readonly object _Suspense = typeof(Suspense);
 
-    /// <summary>Gets the registered template type for the host-neutral KeepAlive built-in.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Gets the registered template type for the host-neutral KeepAlive built-in.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static readonly object _KeepAlive = typeof(KeepAlive);
 
-    /// <summary>Gets the registered template type for the host-neutral BaseTransition built-in.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Gets the registered template type for the host-neutral BaseTransition built-in.
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static readonly object _BaseTransition = typeof(BaseTransition);
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Opens an optimization block and returns the token used to preserve generated evaluation order.
     /// </summary>
     /// <param name="disableTracking">
     /// Whether descendants should be excluded from the block's dynamic-child collection.
     /// </param>
     /// <returns>An opaque block token.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static BlockToken _openBlock(bool disableTracking = false)
     {
         BlockFrames.Add(new BlockFrame(disableTracking));
         return new BlockToken(0);
     }
 
-    /// <summary>Suspends or resumes block-tree collection.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Suspends or resumes block-tree collection.
+    /// </summary>
     /// <param name="value">A negative value suspends tracking; a positive value resumes it.</param>
     /// <param name="inVOnce">Whether the suspension begins a <c>v-once</c> subtree.</param>
     /// <returns>A token used by <see cref="_setCache"/> to apply the inverse change.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static BlockToken _setBlockTracking(int value, bool inVOnce = false)
     {
         _blockTrackingDepth += value;
@@ -71,7 +100,10 @@ public static class RenderHelpers
         return new BlockToken(value);
     }
 
-    /// <summary>Creates an element or fragment block.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates an element or fragment block.
+    /// </summary>
     /// <param name="block">The token returned by <see cref="_openBlock"/>.</param>
     /// <param name="tag">An element tag or <see cref="_Fragment"/>.</param>
     /// <param name="properties">The generated property bag.</param>
@@ -79,6 +111,7 @@ public static class RenderHelpers
     /// <param name="patchFlag">The compiler patch flags.</param>
     /// <param name="dynamicProperties">The selectively patchable property names.</param>
     /// <returns>The block root.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _createElementBlock(
         BlockToken block,
         object? tag,
@@ -97,7 +130,10 @@ public static class RenderHelpers
             asBlock: true);
     }
 
-    /// <summary>Creates a template, dynamic, or built-in block.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a template, dynamic, or built-in block.
+    /// </summary>
     /// <param name="block">The token returned by <see cref="_openBlock"/>.</param>
     /// <param name="tag">A template type, resolved name, element tag, or built-in marker.</param>
     /// <param name="properties">The generated property bag.</param>
@@ -105,6 +141,7 @@ public static class RenderHelpers
     /// <param name="patchFlag">The compiler patch flags.</param>
     /// <param name="dynamicProperties">The selectively patchable property names.</param>
     /// <returns>The block root.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _createBlock(
         BlockToken block,
         object? tag,
@@ -123,13 +160,17 @@ public static class RenderHelpers
             asBlock: true);
     }
 
-    /// <summary>Creates a non-block element or fragment.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a non-block element or fragment.
+    /// </summary>
     /// <param name="tag">An element tag or <see cref="_Fragment"/>.</param>
     /// <param name="properties">The generated property bag.</param>
     /// <param name="children">The generated child value or values.</param>
     /// <param name="patchFlag">The compiler patch flags.</param>
     /// <param name="dynamicProperties">The selectively patchable property names.</param>
     /// <returns>The tree value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _createElementVNode(
         object? tag,
         object? properties = null,
@@ -146,13 +187,17 @@ public static class RenderHelpers
             asBlock: false);
     }
 
-    /// <summary>Creates a non-block template, dynamic, or element value.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a non-block template, dynamic, or element value.
+    /// </summary>
     /// <param name="tag">A template type, resolved name, element tag, or built-in marker.</param>
     /// <param name="properties">The generated property bag.</param>
     /// <param name="children">Children or component slots.</param>
     /// <param name="patchFlag">The compiler patch flags.</param>
     /// <param name="dynamicProperties">The selectively patchable property names.</param>
     /// <returns>The tree value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _createVNode(
         object? tag,
         object? properties = null,
@@ -169,10 +214,14 @@ public static class RenderHelpers
             asBlock: false);
     }
 
-    /// <summary>Creates a text tree value.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a text tree value.
+    /// </summary>
     /// <param name="text">The text or value to display.</param>
     /// <param name="patchFlag">The compiler patch flags.</param>
     /// <returns>The text value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static ITextComponent _createTextVNode(object? text = null, int patchFlag = 0)
     {
         ITextComponent component = ComponentTree.Text(
@@ -182,10 +231,14 @@ public static class RenderHelpers
         return component;
     }
 
-    /// <summary>Creates a comment or empty-render placeholder.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a comment or empty-render placeholder.
+    /// </summary>
     /// <param name="text">The comment text.</param>
     /// <param name="asBlock">Whether to create a block-form comment.</param>
     /// <returns>The comment value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static ICommentComponent _createCommentVNode(string? text = "", bool asBlock = false)
     {
         if (!asBlock)
@@ -200,30 +253,42 @@ public static class RenderHelpers
             null);
     }
 
-    /// <summary>Creates a platform-specific static-content tree value.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a platform-specific static-content tree value.
+    /// </summary>
     /// <param name="content">The raw static content.</param>
     /// <param name="count">The compiler's top-level-node count hint.</param>
     /// <returns>The static tree value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IStaticComponent _createStaticVNode(string content, int count)
     {
         _ = count;
         return ComponentTree.Static(content);
     }
 
-    /// <summary>Formats an interpolation value for display.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Formats an interpolation value for display.
+    /// </summary>
     /// <param name="value">The value to format.</param>
     /// <returns>The display string.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _toDisplayString(object? value)
     {
         return DisplayStringFormatter.ToDisplayString(value);
     }
 
-    /// <summary>Renders each item in an enumerable.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Renders each item in an enumerable.
+    /// </summary>
     /// <typeparam name="T">The item type.</typeparam>
     /// <typeparam name="TResult">The generated result type.</typeparam>
     /// <param name="source">The source values.</param>
     /// <param name="render">The per-item renderer.</param>
     /// <returns>The rendered values.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static TResult[] _renderList<T, TResult>(
         IEnumerable<T>? source,
         Func<T, TResult> render)
@@ -244,12 +309,16 @@ public static class RenderHelpers
         return result.ToArray();
     }
 
-    /// <summary>Renders each item and its zero-based index.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Renders each item and its zero-based index.
+    /// </summary>
     /// <typeparam name="T">The item type.</typeparam>
     /// <typeparam name="TResult">The generated result type.</typeparam>
     /// <param name="source">The source values.</param>
     /// <param name="render">The per-item renderer.</param>
     /// <returns>The rendered values.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static TResult[] _renderList<T, TResult>(
         IEnumerable<T>? source,
         Func<T, int, TResult> render)
@@ -272,11 +341,15 @@ public static class RenderHelpers
         return result.ToArray();
     }
 
-    /// <summary>Renders a one-based numeric range.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Renders a one-based numeric range.
+    /// </summary>
     /// <typeparam name="TResult">The generated result type.</typeparam>
     /// <param name="count">The inclusive upper bound.</param>
     /// <param name="render">The per-number renderer.</param>
     /// <returns>The rendered values.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static TResult[] _renderList<TResult>(int count, Func<int, TResult> render)
     {
         ArgumentNullException.ThrowIfNull(render);
@@ -289,11 +362,15 @@ public static class RenderHelpers
         return result;
     }
 
-    /// <summary>Renders a one-based numeric range with a zero-based index.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Renders a one-based numeric range with a zero-based index.
+    /// </summary>
     /// <typeparam name="TResult">The generated result type.</typeparam>
     /// <param name="count">The inclusive upper bound.</param>
     /// <param name="render">The per-number renderer.</param>
     /// <returns>The rendered values.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static TResult[] _renderList<TResult>(
         int count,
         Func<int, int, TResult> render)
@@ -308,13 +385,17 @@ public static class RenderHelpers
         return result;
     }
 
-    /// <summary>Renders key/value entries with their zero-based index.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Renders key/value entries with their zero-based index.
+    /// </summary>
     /// <typeparam name="TKey">The entry key type.</typeparam>
     /// <typeparam name="TValue">The entry value type.</typeparam>
     /// <typeparam name="TResult">The generated result type.</typeparam>
     /// <param name="source">The entry source.</param>
     /// <param name="render">The per-entry renderer.</param>
     /// <returns>The rendered values.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static TResult[] _renderList<TKey, TValue, TResult>(
         IEnumerable<KeyValuePair<TKey, TValue>>? source,
         Func<TValue, TKey, int, TResult> render)
@@ -339,30 +420,42 @@ public static class RenderHelpers
         return result.ToArray();
     }
 
-    /// <summary>Wraps an unscoped generated slot function.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Wraps an unscoped generated slot function.
+    /// </summary>
     /// <param name="render">The generated slot renderer.</param>
     /// <returns>The component-slot delegate.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static ComponentSlot _withCtx(Func<object?[]?> render)
     {
         ArgumentNullException.ThrowIfNull(render);
         return _ => NormalizeSlotResult(render());
     }
 
-    /// <summary>Wraps a scoped generated slot function.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Wraps a scoped generated slot function.
+    /// </summary>
     /// <param name="render">The generated slot renderer.</param>
     /// <returns>The component-slot delegate.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static ComponentSlot _withCtx(Func<object?, object?[]?> render)
     {
         ArgumentNullException.ThrowIfNull(render);
         return arguments => NormalizeSlotResult(render(arguments));
     }
 
-    /// <summary>Renders a named slot or its fallback content.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Renders a named slot or its fallback content.
+    /// </summary>
     /// <param name="slots">The current component's slots.</param>
     /// <param name="name">The slot name.</param>
     /// <param name="properties">The scoped-slot arguments.</param>
     /// <param name="fallback">The optional fallback renderer.</param>
     /// <returns>The rendered slot subtree.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _renderSlot(
         IReadOnlyDictionary<string, ComponentSlot>? slots,
         string name,
@@ -384,10 +477,14 @@ public static class RenderHelpers
             : NormalizeSlotResult(fallback()) ?? ComponentTree.Comment();
     }
 
-    /// <summary>Merges static and compiler-produced dynamic slots.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Merges static and compiler-produced dynamic slots.
+    /// </summary>
     /// <param name="slots">The statically named slot property bag.</param>
     /// <param name="dynamicSlots">Dynamic slot descriptors and rendered descriptor arrays.</param>
     /// <returns>A merged slot property bag.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IReadOnlyDictionary<string, object?> _createSlots(
         object? slots,
         object?[] dynamicSlots)
@@ -403,19 +500,25 @@ public static class RenderHelpers
     }
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Creates a deferred named-template reference without resolving or activating a template.
     /// </summary>
     /// <param name="name">The registered template name.</param>
     /// <returns>An opaque name reference consumed by the tree factories.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object _resolveComponent(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         return new NamedTemplateType(name);
     }
 
-    /// <summary>Creates a deferred directive-name reference.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates a deferred directive-name reference.
+    /// </summary>
     /// <param name="name">The registered directive name.</param>
     /// <returns>An opaque directive reference.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object _resolveDirective(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
@@ -423,6 +526,7 @@ public static class RenderHelpers
     }
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Preserves a dynamic component selector until the tree request is created.
     /// </summary>
     /// <param name="value">
@@ -431,15 +535,20 @@ public static class RenderHelpers
     /// the application component factory intentionally has no probing API.
     /// </param>
     /// <returns>The unchanged selector.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _resolveDynamicComponent(object? value)
     {
         return DynamicComponents.ResolveDynamicComponent(value);
     }
 
-    /// <summary>Attaches generated directive metadata to an element or template request.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Attaches generated directive metadata to an element or template request.
+    /// </summary>
     /// <param name="component">The component tree value.</param>
     /// <param name="directives">The generated directive tuples.</param>
     /// <returns>A copy carrying the directive bindings.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _withDirectives(IComponent component, object?[] directives)
     {
         ArgumentNullException.ThrowIfNull(component);
@@ -503,12 +612,14 @@ public static class RenderHelpers
     }
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Merges generated property sources: <c>class</c> and <c>style</c> values from every source are
     /// normalized and combined rather than overwritten, event handlers for the same name accumulate
     /// into a list, and any other repeated name takes the last source's value.
     /// </summary>
     /// <param name="sources">The property sources.</param>
     /// <returns>The merged property bag.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IReadOnlyDictionary<string, object?> _mergeProps(params object?[] sources)
     {
         ArgumentNullException.ThrowIfNull(sources);
@@ -550,25 +661,37 @@ public static class RenderHelpers
         return new ReadOnlyDictionary<string, object?>(merged);
     }
 
-    /// <summary>Normalizes a dynamic class binding.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Normalizes a dynamic class binding.
+    /// </summary>
     /// <param name="value">The class binding.</param>
     /// <returns>The normalized class string.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _normalizeClass(object? value)
     {
         return StyleAndClassNormalization.NormalizeClass(value);
     }
 
-    /// <summary>Normalizes a dynamic style binding.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Normalizes a dynamic style binding.
+    /// </summary>
     /// <param name="value">The style binding.</param>
     /// <returns>The normalized style representation.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _normalizeStyle(object? value)
     {
         return StyleAndClassNormalization.NormalizeStyle(value);
     }
 
-    /// <summary>Normalizes the class and style entries in a generated property bag.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Normalizes the class and style entries in a generated property bag.
+    /// </summary>
     /// <param name="properties">The property source.</param>
     /// <returns>A normalized snapshot of the source, or the original non-property value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _normalizeProps(object? properties)
     {
         if (!CanReadProperties(properties))
@@ -590,17 +713,25 @@ public static class RenderHelpers
         return new ReadOnlyDictionary<string, object?>(normalized);
     }
 
-    /// <summary>Returns a property source unchanged because Viu does not use identity-swapping proxies.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Returns a property source unchanged because Viu does not use identity-swapping proxies.
+    /// </summary>
     /// <param name="properties">The property source.</param>
     /// <returns><paramref name="properties"/>.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _guardReactiveProps(object? properties)
     {
         return properties;
     }
 
-    /// <summary>Prefixes a generated event map's keys with <c>on</c>.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Prefixes a generated event map's keys with <c>on</c>.
+    /// </summary>
     /// <param name="value">The unprefixed event property source.</param>
     /// <returns>The prefixed event property bag.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IReadOnlyDictionary<string, object?> _toHandlers(object? value)
     {
         Dictionary<string, object?> handlers = new(StringComparer.Ordinal);
@@ -612,9 +743,13 @@ public static class RenderHelpers
         return new ReadOnlyDictionary<string, object?>(handlers);
     }
 
-    /// <summary>Converts a hyphenated name to camel case.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Converts a hyphenated name to camel case.
+    /// </summary>
     /// <param name="value">The input name.</param>
     /// <returns>The camel-cased name.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _camelize(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -644,9 +779,13 @@ public static class RenderHelpers
         return new string(buffer, 0, length);
     }
 
-    /// <summary>Capitalizes the first character of a string.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Capitalizes the first character of a string.
+    /// </summary>
     /// <param name="value">The input string.</param>
     /// <returns>The capitalized string.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _capitalize(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -655,34 +794,50 @@ public static class RenderHelpers
             : char.ToUpperInvariant(value[0]) + value[1..];
     }
 
-    /// <summary>Builds an <c>onEvent</c> property name.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Builds an <c>onEvent</c> property name.
+    /// </summary>
     /// <param name="value">The event name.</param>
     /// <returns>The handler property name.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _toHandlerKey(object? value)
     {
         string name = value as string ?? DisplayStringFormatter.ToDisplayString(value);
         return name.Length == 0 ? string.Empty : "on" + _capitalize(_camelize(name));
     }
 
-    /// <summary>Unwraps a reactive reference or returns a non-reference unchanged.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Unwraps a reactive reference or returns a non-reference unchanged.
+    /// </summary>
     /// <param name="value">The value to inspect.</param>
     /// <returns>The current reference value or the original value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _unref(object? value)
     {
         return value is IReactiveReference reference ? reference.Value : value;
     }
 
-    /// <summary>Determines whether a value is a reactive reference.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Determines whether a value is a reactive reference.
+    /// </summary>
     /// <param name="value">The value to inspect.</param>
     /// <returns>True when the value is a reactive reference.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static bool _isRef(object? value)
     {
         return Reactive.IsRef(value);
     }
 
-    /// <summary>Creates the generated property-bag representation.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Creates the generated property-bag representation.
+    /// </summary>
     /// <param name="entries">The ordered name/value entries.</param>
     /// <returns>An immutable property snapshot.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IReadOnlyDictionary<string, object?> _createProps(
         params (string Name, object? Value)[] entries)
     {
@@ -699,6 +854,7 @@ public static class RenderHelpers
     }
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Creates the generated directive-modifier bag — the fourth slot of a
     /// <see cref="_withDirectives(IComponent, object?[])"/> tuple.
     /// </summary>
@@ -712,6 +868,7 @@ public static class RenderHelpers
     /// </remarks>
     /// <param name="entries">The ordered modifier name/state entries.</param>
     /// <returns>An immutable modifier snapshot.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IReadOnlyDictionary<string, bool> _createModifiers(
         params (string Name, bool Value)[] entries)
     {
@@ -727,54 +884,78 @@ public static class RenderHelpers
         return new ReadOnlyDictionary<string, bool>(modifiers);
     }
 
-    /// <summary>Target-types a value-returning event handler with a payload.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a value-returning event handler with a payload.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Func<object?, object?> _withHandler(Func<object?, object?> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return handler;
     }
 
-    /// <summary>Target-types a synchronous event handler with a payload.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a synchronous event handler with a payload.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Action<object?> _withHandler(Action<object?> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return handler;
     }
 
-    /// <summary>Target-types a parameterless synchronous event handler.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a parameterless synchronous event handler.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Action _withHandler(Action handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return handler;
     }
 
-    /// <summary>Target-types a parameterless value-returning event handler.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a parameterless value-returning event handler.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Func<object?> _withHandler(Func<object?> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return handler;
     }
 
-    /// <summary>Target-types a parameterless task-returning event handler.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a parameterless task-returning event handler.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged task-returning handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Func<Task> _withHandler(Func<Task> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return handler;
     }
 
-    /// <summary>Target-types a task-returning event handler with an object payload.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a task-returning event handler with an object payload.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged task-returning handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Func<object?, Task> _withHandler(Func<object?, Task> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -782,11 +963,13 @@ public static class RenderHelpers
     }
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Adapts a task-returning handler with a strongly typed payload to the component event contract.
     /// </summary>
     /// <typeparam name="TEvent">The payload type.</typeparam>
     /// <param name="handler">The strongly typed handler.</param>
     /// <returns>An object-payload task-returning handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Func<object?, Task> _withHandler<TEvent>(Func<TEvent, Task> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -794,31 +977,41 @@ public static class RenderHelpers
     }
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Adapts a synchronous handler with a strongly typed payload to the component event contract.
     /// </summary>
     /// <typeparam name="TEvent">The payload type.</typeparam>
     /// <param name="handler">The strongly typed handler.</param>
     /// <returns>An object-payload synchronous handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Action<object?> _withHandler<TEvent>(Action<TEvent> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return value => handler((TEvent)value!);
     }
 
-    /// <summary>Target-types a delegate shape not covered by a more specific overload.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Target-types a delegate shape not covered by a more specific overload.
+    /// </summary>
     /// <param name="handler">The handler.</param>
     /// <returns>The unchanged handler.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static Delegate _withHandler(Delegate handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
         return handler;
     }
 
-    /// <summary>Resumes block tracking after writing a generated cache slot.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Resumes block tracking after writing a generated cache slot.
+    /// </summary>
     /// <param name="index">The cache slot index.</param>
     /// <param name="tracking">The suspension token.</param>
     /// <param name="value">The cached value.</param>
     /// <returns><paramref name="value"/>.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _setCache(int index, BlockToken tracking, object? value)
     {
         _ = index;
@@ -826,20 +1019,28 @@ public static class RenderHelpers
         return value;
     }
 
-    /// <summary>Clones a cached array before it is reused as generated children.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Clones a cached array before it is reused as generated children.
+    /// </summary>
     /// <param name="value">The cached value.</param>
     /// <returns>A shallow array clone, or the original non-array value.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static object? _spreadCache(object? value)
     {
         return value is Array array ? array.Clone() : value;
     }
 
-    /// <summary>Memoizes a generated subtree against a dependency array.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Memoizes a generated subtree against a dependency array.
+    /// </summary>
     /// <param name="dependencies">The current memo dependencies.</param>
     /// <param name="render">The subtree factory.</param>
     /// <param name="cache">The component instance's render cache.</param>
     /// <param name="index">The cache slot index.</param>
     /// <returns>The cached or newly rendered subtree.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent _withMemo(
         object?[] dependencies,
         Func<object?> render,
@@ -867,10 +1068,14 @@ public static class RenderHelpers
         return component;
     }
 
-    /// <summary>Compares a cached tree value's memo dependencies with the current dependencies.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Compares a cached tree value's memo dependencies with the current dependencies.
+    /// </summary>
     /// <param name="cached">The cached value.</param>
     /// <param name="dependencies">The current dependencies.</param>
     /// <returns>True when every dependency is unchanged.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static bool _isMemoSame(object? cached, object?[] dependencies)
     {
         ArgumentNullException.ThrowIfNull(dependencies);
@@ -893,9 +1098,13 @@ public static class RenderHelpers
         return true;
     }
 
-    /// <summary>Normalizes a generated render result into one component-tree root.</summary>
+    /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
+    /// Normalizes a generated render result into one component-tree root.
+    /// </summary>
     /// <param name="renderResult">The generated render result.</param>
     /// <returns>The normalized tree root.</returns>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static IComponent NormalizeRoot(object? renderResult)
     {
         return NormalizeChild(renderResult);
