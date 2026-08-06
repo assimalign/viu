@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
 
 /// <summary>
+/// Compiler-generated code only; not part of the supported Viu API.
 /// Applies compiler-generated component metadata updates to mounted development-time components.
 /// </summary>
 /// <remarks>
@@ -24,12 +26,14 @@ namespace Assimalign.Viu;
 /// This is the runtime half of [V01.01.06.05]:
 /// https://github.com/assimalign/viu/issues/61.
 /// </remarks>
+[System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
 public static class ComponentHotReload
 {
     private static readonly Dictionary<Type, List<ComponentHotReloadRegistration>>
         _registrations = [];
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Occurs once per updated component type immediately before Core resets its mounted instances
     /// for a script-block change.
     /// </summary>
@@ -38,15 +42,18 @@ public static class ComponentHotReload
     /// existing state, which would retain effects and lifecycle resources created by the previous
     /// script. A browser host may handle this event to perform a full application reload instead.
     /// </remarks>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static event ComponentScriptUpdateResetHandler? ScriptUpdateRequiresReset;
 
     /// <summary>
+    /// Compiler-generated code only; not part of the supported Viu API.
     /// Applies updated component method bodies to the corresponding mounted component instances.
     /// </summary>
     /// <param name="updatedTypes">
     /// The types supplied by <c>MetadataUpdateHandler.UpdateApplication</c>, or null when the
     /// runtime does not identify the changed types and every registered component must be checked.
     /// </param>
+    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static void ApplyUpdates(Type[]? updatedTypes)
     {
         if (_registrations.Count == 0)
