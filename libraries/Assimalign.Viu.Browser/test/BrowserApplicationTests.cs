@@ -28,11 +28,13 @@ public sealed class BrowserApplicationTests
                     "ScopedTemplate"),
             ]);
         IServiceProvider services = new EmptyServiceProvider();
-        BrowserApplicationBuilder builder =
-            BrowserApplication.CreateBuilder(root);
-
-        builder.AddComponentFactory(components);
-        builder.AddServiceProvider(services);
+        BrowserApplicationBuilder builder = new();
+        builder.ConfigureApplication(options =>
+        {
+            options.RootComponent = root;
+            options.Components = components;
+            options.Services = services;
+        });
 
         BrowserApplication application = builder.Build();
 
@@ -68,12 +70,15 @@ public sealed class BrowserApplicationTests
         IDirectiveResolver directives =
             new DirectiveRegistry(
                 Array.Empty<KeyValuePair<string, IDirective>>());
-        BrowserApplicationBuilder builder =
-            BrowserApplication.CreateBuilder(root);
-        builder.AddComponentFactory(
-            new ComponentFactory(Array.Empty<ComponentRegistration>()));
-        builder.AddServiceProvider(new EmptyServiceProvider());
-        builder.AddDirectiveResolver(directives);
+        BrowserApplicationBuilder builder = new();
+        builder.ConfigureApplication(options =>
+        {
+            options.RootComponent = root;
+            options.Components =
+                new ComponentFactory(Array.Empty<ComponentRegistration>());
+            options.Services = new EmptyServiceProvider();
+            options.Directives = directives;
+        });
 
         BrowserApplication application = builder.Build();
 
@@ -81,15 +86,16 @@ public sealed class BrowserApplicationTests
     }
 
     [Fact]
-    public void ApplicationFacade_DefaultResolversBuildPrimitiveApplicationAndPreserveBuilderType()
+    public void Constructor_DefaultResolversBuildPrimitiveApplicationAndPreserveBuilderType()
     {
         IComponent root = ComponentTree.Element("main");
 
-        BrowserApplicationBuilder builder = Application
-            .CreateBuilder()
-            .AddRootComponent(root)
+        BrowserApplicationBuilder builder = new BrowserApplicationBuilder()
             .ConfigureApplication(options =>
-                options.WarnHandler = static _ => { });
+            {
+                options.RootComponent = root;
+                options.WarnHandler = static _ => { };
+            });
         BrowserApplication application = builder.Build();
 
         application.Context.RootComponent.ShouldBeSameAs(root);
@@ -158,7 +164,7 @@ public sealed class BrowserApplicationTests
             await application.MountAsync(7);
 
         rootContext.ShouldBeNull();
-        application.IsRunning.ShouldBeTrue();
+        application.Context.IsRunning.ShouldBeTrue();
         order.ShouldBe(
         [
             "initialize",
@@ -171,7 +177,7 @@ public sealed class BrowserApplicationTests
 
         await application.StopAsync();
 
-        application.IsRunning.ShouldBeFalse();
+        application.Context.IsRunning.ShouldBeFalse();
         host.Removed.ShouldBe([1]);
     }
 
@@ -247,7 +253,7 @@ public sealed class BrowserApplicationTests
             Should.Throw<InvalidOperationException>(() => application.Mount(7));
 
         exception.Message.ShouldContain("MountAsync");
-        application.IsRunning.ShouldBeFalse();
+        application.Context.IsRunning.ShouldBeFalse();
         initialization.SetResult();
     }
 

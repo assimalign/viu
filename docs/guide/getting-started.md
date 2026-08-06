@@ -174,11 +174,13 @@ trimming-safe ([ADR-0004](../adr/0004-composition-only-component-model.md): a co
 function returning a render function, and there is no second, declarative authoring style).
 
 **`Program.cs`** — a Viu WASM app's whole bootstrap: compose the app, decorate its live lifetime, and
-await that lifetime. `Application.CreateBuilder()` selects the browser host and its default `#app`
-mount target. `RunAsync` initializes the browser bridge, mounts the tree, and remains pending until
-the application stops, so no artificial infinite delay is required:
+await that lifetime. Direct construction of `BrowserApplicationBuilder` selects the browser host and
+its default `#app` mount target. The `RunAsync` extension starts the application, waits for shutdown,
+and stops it; it remains pending across the mounted lifetime, so no artificial infinite delay is
+required:
 
 ```csharp
+using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 
@@ -191,20 +193,23 @@ ComponentFactory components = new(
         static () => new Counter()),
 ]);
 
-await Application
-    .CreateBuilder()
-    .AddRootComponent(ComponentTree.Template<Counter>())
-    .AddComponentFactory(components)
+await new BrowserApplicationBuilder()
+    .ConfigureApplication(options =>
+    {
+        options.RootComponent = ComponentTree.Template<Counter>();
+        options.Components = components;
+    })
     .Build()
     .RunAsync();
 ```
 
-Compose the app on the builder before `Build()` with `AddRootComponent`, `AddComponentFactory`,
-`AddServiceProvider`, `AddStateRegistry`, and `AddDirectiveResolver`. Configure diagnostics with
-`ConfigureApplication(options => ...)`; the built context is immutable. After `Build()`, `Use`
-registers asynchronous middleware around the complete live application lifetime. It does not mutate
-the component, directive, service, or state composition, and calling it after execution starts
-throws ([APP-2]–[APP-4]).
+Compose the app exclusively through `ConfigureApplication(options => ...)`: `RootComponent`,
+`Components`, `Services`, `State`, `Directives`, and diagnostics all live on
+`ApplicationOptions`. `Build()` freezes that composition into a read-only `IApplicationContext`;
+later option changes cannot recompose it. The context also exposes the live `IsRunning` state and
+`Stopping` token. After `Build()`, `Use` registers asynchronous middleware around the complete live
+application lifetime. It does not mutate the component, directive, service, or state composition,
+and calling it after execution starts throws ([APP-2]–[APP-4]).
 
 ### Dependency injection (`System.IServiceProvider`)
 
@@ -216,17 +221,20 @@ component's `Setup`:
 ```csharp
 using System;
 
+using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 
 IComponentFactory components = BuildComponentFactory();
 IServiceProvider services = BuildApplicationServices();
 
-await Application
-    .CreateBuilder()
-    .AddRootComponent(ComponentTree.Template<App>())
-    .AddComponentFactory(components)
-    .AddServiceProvider(services)
+await new BrowserApplicationBuilder()
+    .ConfigureApplication(options =>
+    {
+        options.RootComponent = ComponentTree.Template<App>();
+        options.Components = components;
+        options.Services = services;
+    })
     .Build()
     .RunAsync();
 ```
@@ -238,10 +246,10 @@ var api = (ApiClient?)context.Services.GetService(typeof(ApiClient))
 ```
 
 `IServiceProvider` is lookup-only, so Viu cannot offer container-agnostic registration methods or
-invent lifetime semantics over it. Register services through your chosen container before calling
-`AddServiceProvider`. Viu borrows the resulting provider and never disposes it; the external
-composition root retains ownership [APP-6]. A primitive tree needs neither a component factory nor
-a provider because the builder supplies empty resolvers for both by default.
+invent lifetime semantics over it. Register services through your chosen container, then assign the
+resulting provider to `ApplicationOptions.Services`. Viu borrows it and never disposes it; the
+external composition root retains ownership [APP-6]. A primitive tree needs neither a component
+factory nor a provider because the builder supplies empty resolvers for both by default.
 
 This is **app-level** DI, and it is the *only* ambient channel: Viu deliberately has **no hierarchical
 component-tree dependency API** — no ambient provide/inject walking up the parent chain
@@ -436,8 +444,8 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > **mountable component**: the generator emits the render function, merges the script into the partial
 > class, **and** implements `IComponentTemplate` with a `Setup` that returns the render delegate.
 > Register that generated type in the application `IComponentFactory`, request it with
-> `ComponentTree.Template<Greeting>()`, and pass the factory through `AddComponentFactory` before
-> `Build().RunAsync()`. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive
+> `ComponentTree.Template<Greeting>()`, and assign the factory to `ApplicationOptions.Components`
+> before building and invoking the `RunAsync` extension. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive
 > re-render, and a
 > template event handler (`@click="Increment"`) calls the like-named `@script` method:
 >

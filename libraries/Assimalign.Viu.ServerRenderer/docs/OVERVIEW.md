@@ -12,8 +12,9 @@ DOM, Browser, WebView2, or JavaScript-interop dependency.
 - `ServerRenderApplication` carries an `IApplicationContext` without binding it to a host node type. Its
   `IComponentFactory`, `IServiceProvider`, and optional state registry are independently supplied and
   borrowed; their composition root retains ownership.
-- `ServerApplicationBuilder` uses Core's host-neutral composition builder without making server
-  rendering a persistent `IApplication` lifetime.
+- `ServerApplicationBuilder` is a standalone server-composition builder. Its only composition method
+  is `ConfigureApplication(Action<ApplicationOptions>)`; `Build()` freezes those options into the
+  context without making server rendering a persistent `IApplication` lifetime.
 - `SsrContext` carries per-render teleport output and a free-form state handoff bag.
 - `SsrRenderState` is the push surface shared by the runtime walker and future compiler-produced server
   render functions.
@@ -56,17 +57,24 @@ IComponentFactory components = new ComponentFactory(
 
 IServiceProvider services = applicationServices;
 
-ServerRenderApplication application = ServerRenderApplication
-    .CreateBuilder(
-        ComponentTree.Template<RootTemplate>(),
-        components,
-        services)
+ServerRenderApplication application = new ServerApplicationBuilder()
+    .ConfigureApplication(options =>
+    {
+        options.RootComponent = ComponentTree.Template<RootTemplate>();
+        options.Components = components;
+        options.Services = services;
+    })
     .Build();
 
 SsrContext context = new();
 string html = await ServerRenderer.RenderToStringAsync(application, context);
 await ServerRenderer.RenderToStreamAsync(application, Console.Out, context);
 ```
+
+`ApplicationOptions` is the builder's single composition surface. Root component, component factory,
+service provider, optional state registry and directive resolver, and diagnostic handlers are copied
+into the built context. Reconfiguring the builder afterward does not mutate an application that was
+already built.
 
 `IComponentFactory` is only the application-selected template resolver. It does not implement
 `IServiceProvider`. Templates access the independently supplied provider through
@@ -101,6 +109,9 @@ the target element before client hydration. The target buffer already includes t
 - A server-render application is a plain composition object. It never mounts a persistent host tree,
   does not implement `IApplication`, and does not participate in top-level application lifetime
   middleware.
+- `ServerApplicationBuilder` deliberately does not implement `IApplicationBuilder`: its `Build()`
+  result is a `ServerRenderApplication`, not a runnable host. It shares `ApplicationOptions` with host
+  builders so composition has one vocabulary without conflating per-render and persistent lifetimes.
 - Every render has its own cancellation boundary. A future per-render interception contract would be
   separate from application middleware; none is provided today.
 - A host should create one application per request when services or state are request scoped.

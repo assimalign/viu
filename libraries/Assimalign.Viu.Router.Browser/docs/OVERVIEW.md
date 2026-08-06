@@ -21,18 +21,25 @@ in either package it bridges. Specified by
 ## Using it
 
 ```csharp
-await Application
-    .CreateBuilder()
-    .AddRootComponent(ComponentTree.Template<AppRoot>())
-    .AddComponentFactory(components)
-    .AddServiceProvider(services)
+using Assimalign.Viu;
+using Assimalign.Viu.Browser;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Router.Browser;
+
+await new BrowserApplicationBuilder()
+    .ConfigureApplication(options =>
+    {
+        options.RootComponent = ComponentTree.Template<AppRoot>();
+        options.Components = components;
+        options.Services = services;
+    })
     .Build()
     .UseRouter(router)
     .RunAsync();
 ```
 
 `RouterHistory.CreateWeb()` and `CreateWebHash()` are lazy. `UseRouter` reaches
-`Router.ReadyAsync(execution.Stopping)`, which initializes the history bridge before initial
+`Router.ReadyAsync(context.Stopping)`, which initializes the history bridge before initial
 navigation; ordinary bootstrap no longer calls `RouterHistory.InitializeAsync()` first [RTR-3].
 
 Only browser apps that use the Router need this package — it is not part of the base

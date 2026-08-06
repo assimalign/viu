@@ -9,20 +9,14 @@ namespace Assimalign.Viu;
 /// </summary>
 /// <remarks>
 /// Runtime middleware surrounds the complete mounted lifetime, while composition remains frozen in
-/// <see cref="Context"/>. Mount targets remain on <see cref="IApplication{TNode}"/> so this contract
-/// does not acquire a Browser or future WebView dependency. Not thread-safe. Specified by
-/// <c>[APP-1]</c> through <c>[APP-7]</c> and delivered by <c>[V01.01.14.07]</c>.
+/// <see cref="Context"/>. Host-specific mount operations belong to their platform assemblies so this
+/// contract does not acquire a Browser or future WebView dependency. Not thread-safe. Specified by
+/// <c>[APP-1]</c> through <c>[APP-7]</c> and delivered by <c>[V01.01.14.08]</c>.
 /// </remarks>
 public interface IApplication : IAsyncDisposable
 {
-    /// <summary>Gets the immutable application composition context.</summary>
+    /// <summary>Gets the immutable composition and observable runtime state for this application.</summary>
     IApplicationContext Context { get; }
-
-    /// <summary>
-    /// Gets whether the single application execution is in its Running state, before graceful
-    /// stopping has begun.
-    /// </summary>
-    bool IsRunning { get; }
 
     /// <summary>Appends middleware around the complete application execution.</summary>
     /// <param name="middleware">The runtime middleware.</param>
@@ -32,11 +26,14 @@ public interface IApplication : IAsyncDisposable
     /// </exception>
     IApplication Use(ApplicationMiddleware middleware);
 
-    /// <summary>Runs the application once and completes after its mounted lifetime ends.</summary>
-    /// <param name="cancellationToken">Requests graceful application shutdown.</param>
-    /// <returns>A task that spans startup, the mounted lifetime, and cleanup.</returns>
-    /// <exception cref="InvalidOperationException">The application has already executed.</exception>
-    ValueTask RunAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Starts the application middleware pipeline once and returns after the host terminal has
+    /// mounted and entered its Running state.
+    /// </summary>
+    /// <param name="cancellationToken">Requests graceful shutdown during or after startup.</param>
+    /// <returns>A task that completes when startup succeeds or the pipeline ends before mounting.</returns>
+    /// <exception cref="InvalidOperationException">The application has already started.</exception>
+    ValueTask StartAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Requests graceful shutdown and waits for application cleanup.</summary>
     /// <param name="cancellationToken">

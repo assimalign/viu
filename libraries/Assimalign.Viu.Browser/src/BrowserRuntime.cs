@@ -15,8 +15,8 @@ namespace Assimalign.Viu.Browser;
 /// whose node-ops drive the DOM over int-handle interop. Single-threaded by design (browser main
 /// thread only); not thread-safe.
 /// <para>
-/// Normal app bootstrap does <b>not</b> call this type: build a <c>BrowserApplication</c> with
-/// <see cref="Application.CreateBuilder"/> and run it with <c>RunAsync</c>, whose terminal owns bridge
+/// Normal app bootstrap does <b>not</b> call this type: build an application with
+/// <see cref="BrowserApplicationBuilder"/> and run it with the <c>RunAsync</c> extension, whose terminal owns bridge
 /// initialization (the reshape eliminated the external initialization pre-call,
 /// <c>V01.01.03.23</c>). The members here are the
 /// low-level primitives for advanced scenarios — a bare renderer, selector resolution, or the
@@ -32,8 +32,8 @@ public static class BrowserRuntime
     /// Loads the package's <c>viu-dom.js</c> bridge module and wires event dispatch. Idempotent —
     /// later calls await the same initialization.
     /// <para>
-    /// <b>Advanced/low-level.</b> A normal app does not call this: <c>BrowserApplication.RunAsync</c>
-    /// runs the same initialization internally through its lifetime terminal. Use this only for the bare-
+    /// <b>Advanced/low-level.</b> A normal app does not call this: the application lifetime terminal
+    /// runs the same initialization internally. Use this only for the bare-
     /// primitive scenarios (<see cref="CreateRenderer"/>, <see cref="QuerySelector"/>, the leak
     /// diagnostics) that need the bridge without an application.
     /// </para>
@@ -45,7 +45,7 @@ public static class BrowserRuntime
     /// <summary>
     /// Ensures the <c>viu-dom.js</c> bridge module is loaded and event dispatch is wired, caching the
     /// initialization so it runs at most once per process no matter how many applications mount. This
-    /// is the seam <see cref="BrowserApplication.OnInitializeAsync"/> awaits inside its mount path.
+    /// is the seam the Browser application lifetime awaits inside its mount path.
     /// </summary>
     /// <param name="cancellationToken">Cancels the module download.</param>
     internal static Task EnsureBridgeAsync(CancellationToken cancellationToken = default)
@@ -113,7 +113,7 @@ public static class BrowserRuntime
         if (!IsBridgeInitialized)
         {
             throw new InvalidOperationException(
-                "The Viu browser bridge is not initialized. Run a BrowserApplication with RunAsync "
+                "The Viu browser bridge is not initialized. Run a BrowserApplication with the RunAsync extension "
                 + "(which initializes the bridge in its lifetime terminal), or await BrowserRuntime.InitializeAsync() "
                 + "before using the bare-renderer/selector primitives.");
         }

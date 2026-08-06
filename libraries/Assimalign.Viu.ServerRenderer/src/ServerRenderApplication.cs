@@ -48,6 +48,11 @@ public sealed class ServerRenderApplication
     /// <param name="components">The application-selected component resolver.</param>
     /// <param name="services">The independently supplied service resolver.</param>
     /// <returns>The initialized builder.</returns>
+    /// <remarks>
+    /// The supplied values are applied through <see cref="ApplicationOptions"/> so subsequent
+    /// configuration and <see cref="ServerApplicationBuilder.Build"/> use the same composition
+    /// surface.
+    /// </remarks>
     public static ServerApplicationBuilder CreateBuilder(
         IComponent rootComponent,
         IComponentFactory components,
@@ -57,11 +62,13 @@ public sealed class ServerRenderApplication
         ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(services);
 
-        ServerApplicationBuilder builder = new();
-        builder.AddRootComponent(rootComponent);
-        builder.AddComponentFactory(components);
-        builder.AddServiceProvider(services);
-        return builder;
+        return new ServerApplicationBuilder()
+            .ConfigureApplication(options =>
+            {
+                options.RootComponent = rootComponent;
+                options.Components = components;
+                options.Services = services;
+            });
     }
 
     /// <summary>

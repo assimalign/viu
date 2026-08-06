@@ -9,6 +9,7 @@ using Xunit;
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
+using Assimalign.Viu.State;
 using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Router.Browser.Tests;
@@ -148,15 +149,13 @@ public class RouterLinkDomBridgeTests
             await using TestApplication application = new(order);
             application.UseRouter(router);
 
-            Task execution = application.RunAsync().AsTask();
-            await application.Mounted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await application.StartAsync();
 
-            execution.IsCompleted.ShouldBeFalse();
+            application.Context.IsRunning.ShouldBeTrue();
             order.ShouldBe(["ready", "initialize", "resolve", "mount"]);
             BrowserObjectEvents.Invoker.ShouldNotBeNull();
 
             await application.StopAsync();
-            await execution;
 
             order.ShouldBe(["ready", "initialize", "resolve", "mount", "unmount"]);
             BrowserObjectEvents.Invoker.ShouldBeNull();
@@ -187,7 +186,7 @@ public class RouterLinkDomBridgeTests
 
             InvalidOperationException exception =
                 await Should.ThrowAsync<InvalidOperationException>(
-                    () => application.RunAsync().AsTask());
+                    () => application.StartAsync().AsTask());
 
             exception.Message.ShouldBe("downstream failure");
             BrowserObjectEvents.Invoker.ShouldBeNull();
@@ -308,50 +307,193 @@ public class RouterLinkDomBridgeTests
         }
     }
 
-    private sealed class TestApplication : Application<int>
+    private sealed class TestApplication : IApplication
     {
+        private readonly TestApplicationContext _context;
+        private readonly List<ApplicationMiddleware> _middleware = [];
         private readonly List<string> _order;
+        private readonly TaskCompletionSource _startup =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly CancellationTokenSource _stoppingSource = new();
+        private Task? _execution;
+        private bool _hasStarted;
+        private bool _isDisposed;
 
         internal TestApplication(List<string> order)
-            : base(new ApplicationContext(
-                ComponentTree.Element("main"),
-                new ComponentFactory(Array.Empty<ComponentRegistration>()),
-                new EmptyServiceProvider()))
         {
             _order = order;
+            _context = new TestApplicationContext(
+                ComponentTree.Element("main"),
+                new ComponentFactory(Array.Empty<ComponentRegistration>()),
+                new EmptyServiceProvider(),
+                _stoppingSource.Token);
         }
+
+        public IApplicationContext Context => _context;
 
         internal TaskCompletionSource Mounted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        protected override ValueTask OnInitializeAsync(
-            CancellationToken cancellationToken)
+        public IApplication Use(ApplicationMiddleware middleware)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            ArgumentNullException.ThrowIfNull(middleware);
+            if (_hasStarted)
+            {
+                throw new InvalidOperationException(
+                    "Application middleware must be registered before execution begins.");
+            }
+
+            _middleware.Add(middleware);
+            return this;
+        }
+
+        public ValueTask StartAsync(CancellationToken cancellationToken = default)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            if (_hasStarted)
+            {
+                throw new InvalidOperationException(
+                    "An application instance can execute only once.");
+            }
+
+            _hasStarted = true;
+            _execution = ExecuteAsync(cancellationToken);
+            return new ValueTask(_startup.Task);
+        }
+
+        public ValueTask StopAsync(CancellationToken cancellationToken = default)
+        {
+            if (!_hasStarted)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _context.IsRunning = false;
+            _stoppingSource.Cancel();
+            Task execution = _execution ?? Task.CompletedTask;
+            return cancellationToken.CanBeCanceled
+                ? new ValueTask(execution.WaitAsync(cancellationToken))
+                : new ValueTask(execution);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            try
+            {
+                await StopAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // The test that injects a downstream failure observes it through StartAsync.
+            }
+            finally
+            {
+                _stoppingSource.Dispose();
+            }
+        }
+
+        private async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            using CancellationTokenRegistration registration =
+                cancellationToken.CanBeCanceled
+                    ? cancellationToken.Register(_stoppingSource.Cancel)
+                    : default;
+            ApplicationDelegate pipeline = ExecuteTerminalAsync;
+            for (int index = _middleware.Count - 1; index >= 0; index--)
+            {
+                ApplicationMiddleware middleware = _middleware[index];
+                ApplicationDelegate next = pipeline;
+                pipeline = context => middleware(context, next);
+            }
+
+            try
+            {
+                await pipeline(_context).ConfigureAwait(false);
+                _startup.TrySetResult();
+            }
+            catch (OperationCanceledException exception)
+                when (_stoppingSource.IsCancellationRequested &&
+                    exception.CancellationToken == _stoppingSource.Token)
+            {
+                _startup.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                _context.IsRunning = false;
+                _stoppingSource.Cancel();
+                _startup.TrySetException(exception);
+                throw;
+            }
+        }
+
+        private async ValueTask ExecuteTerminalAsync(IApplicationContext context)
+        {
+            context.Stopping.ThrowIfCancellationRequested();
             _order.Add("initialize");
-            return ValueTask.CompletedTask;
-        }
-
-        protected override ValueTask<int> ResolveMountTargetAsync(
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+            context.Stopping.ThrowIfCancellationRequested();
             _order.Add("resolve");
-            return ValueTask.FromResult(1);
-        }
-
-        protected override IComponentContext? MountCore(int container)
-        {
-            container.ShouldBe(1);
+            context.Stopping.ThrowIfCancellationRequested();
             _order.Add("mount");
             Mounted.TrySetResult();
-            return null;
+            _context.IsRunning = true;
+            _startup.TrySetResult();
+
+            try
+            {
+                await Task.Delay(Timeout.Infinite, context.Stopping)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception)
+                when (exception.CancellationToken == context.Stopping)
+            {
+            }
+            finally
+            {
+                _context.IsRunning = false;
+                _order.Add("unmount");
+            }
+        }
+    }
+
+    private sealed class TestApplicationContext : IApplicationContext
+    {
+        internal TestApplicationContext(
+            IComponent rootComponent,
+            IComponentFactory components,
+            IServiceProvider services,
+            CancellationToken stopping)
+        {
+            RootComponent = rootComponent;
+            Components = components;
+            Services = services;
+            Stopping = stopping;
         }
 
-        protected override void UnmountCore()
-        {
-            _order.Add("unmount");
-        }
+        public IComponent RootComponent { get; }
+
+        public IComponentFactory Components { get; }
+
+        public IServiceProvider Services { get; }
+
+        public IStateStoreRegistry? State => null;
+
+        public IDirectiveResolver? Directives => null;
+
+        public Action<Exception, IComponentContext?, string>? ErrorHandler => null;
+
+        public Action<string>? WarnHandler => null;
+
+        public bool IsRunning { get; internal set; }
+
+        public CancellationToken Stopping { get; }
     }
 
     private sealed class EmptyServiceProvider : IServiceProvider

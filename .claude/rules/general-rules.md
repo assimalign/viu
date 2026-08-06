@@ -57,8 +57,11 @@ Viu.
 - **Public interfaces** → `src/Abstraction/` (flat).
 - **Internal types** (classes, structs, enums, records, **and internal interfaces**) → `src/Internal/` (flat).
 - **Delegates** (public delegate declarations) → `src/Delegates/`.
+- **Extension-method containers** → `src/Extensions/`.
+- **Exception types** → `src/Exception/`.
 - **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
-- Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
+- Folders are **physical only** — including `Abstraction/`, `Internal/`, `Extensions/`, and
+  `Exception/`; they never appear in a namespace. Create a folder only when it will contain files.
 - Several projects link shared-source files through `<Compile Include>`, so their paths are frozen
   for this layout:
   - Syntax siblings, `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`,
@@ -77,6 +80,19 @@ Viu.
 ## Files and types
 
 - **One public type per file**; the filename is the type name.
+- **Extension methods use the C# `extension(...)` member syntax, never a `this` parameter.** This
+  repo's preview language version supports the syntax for both `net10.0` and `netstandard2.0`
+  projects:
+
+  ```csharp
+  public static class ApplicationExtensions
+  {
+      extension(IApplication application)
+      {
+          public ValueTask RunAsync(CancellationToken cancellationToken = default) { … }
+      }
+  }
+  ```
 - Generic types use `{T}` in the filename: `Store<TState>` → `Store{TState}.cs`. Do **not** use `OfT`
   or similar suffixes in type names or filenames. (A root+generic split family may instead use the
   dotted `.T.cs` form, e.g. `ReactiveValue.cs` + `ReactiveValue.T.cs`, matching its siblings.)

@@ -200,8 +200,8 @@ var router = new Router(RouterHistory.CreateMemory(),
 ]);
 NavigationFailure? failure = await router.Push("/users/42");   // awaitable; null on success
 
-// Register Router in the IServiceProvider selected by the application, then pass that provider to
-// the host builder with AddServiceProvider(...). Router does not create or modify a container.
+// Register Router in the IServiceProvider selected by the application, then assign that provider to
+// ApplicationOptions.Services. Router does not create or modify a container.
 // <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
 // and a plain left-click on it calls router.Push instead of triggering a page load.
 ```

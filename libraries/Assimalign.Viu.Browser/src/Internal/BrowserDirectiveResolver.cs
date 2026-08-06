@@ -9,7 +9,7 @@ namespace Assimalign.Viu.Browser;
 /// </summary>
 /// <remarks>
 /// The browser builder installs this resolver by default. Applications remain free to replace it
-/// through <see cref="ApplicationBuilder.AddDirectiveResolver(IDirectiveResolver)"/>.
+/// through <see cref="ApplicationOptions.Directives"/>.
 /// </remarks>
 internal sealed class BrowserDirectiveResolver : IDirectiveResolver
 {

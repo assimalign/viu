@@ -90,9 +90,13 @@ generic renderer operations. Suspense hydration intentionally fails fast until p
 branches can be coordinated with server output; ordinary templates, including awaited
 server-prefetched asynchronous components, hydrate through the normal path.
 
-`Application<TNode>` and `IApplication<TNode>` keep the mount target generic. Browser is one host
-adapter over that contract, not a dependency of Core, so a later WebView2 host can provide its own
-node handles, renderer operations, initialization, and teardown.
+Core's `IApplication` contract contains no host node type or mount method. It defines the
+single-use `StartAsync`/`StopAsync` lifetime and middleware; `RunAsync` is the extension that starts,
+waits for shutdown, and stops. The immutable composition snapshot and read-only runtime state live
+on `IApplicationContext`, including `IsRunning` and `Stopping`. Browser is one direct implementation,
+not a dependency of Core, and owns its integer-handle mount operations. A later WebView2 host can
+implement the same lifetime while providing its own node handles, renderer operations,
+initialization, and teardown.
 
 ## Dynamic, asynchronous, and cached trees
 

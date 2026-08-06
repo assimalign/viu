@@ -1,15 +1,10 @@
 #nullable enable
 Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.Build() -> Assimalign.Viu.ServerRenderer.ServerRenderApplication!
+Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
 Assimalign.Viu.ServerRenderer.ServerRenderApplication
 Assimalign.Viu.ServerRenderer.ServerRenderApplication.Context.get -> Assimalign.Viu.IApplicationContext!
 Assimalign.Viu.ServerRenderer.ServerRenderApplication.ServerRenderApplication(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null) -> void
 Assimalign.Viu.ServerRenderer.ServerRenderApplication.ServerRenderApplication(Assimalign.Viu.IApplicationContext! context) -> void
-override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.AddComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.AddDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.AddRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.AddServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.AddStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
 static Assimalign.Viu.ServerRenderer.ServerRenderApplication.CreateBuilder() -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
 static Assimalign.Viu.ServerRenderer.ServerRenderApplication.CreateBuilder(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
 static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStreamAsync(Assimalign.Viu.ServerRenderer.ServerRenderApplication! application, System.IO.TextWriter! writer, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!

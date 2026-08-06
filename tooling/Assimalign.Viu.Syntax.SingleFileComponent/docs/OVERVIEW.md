@@ -17,7 +17,8 @@ map, while JavaScript and the JavaScript compiler macros the `.vue` format permi
 executed (`[VUE-4]`). Applications register
 the generated type with their `IComponentFactory` and request it through
 `ComponentTree.Template<TComponent>()`, either as the root supplied to
-`BrowserApplication.CreateBuilder` or as a child. A style-only component stays a CSS-bundle unit.
+`BrowserApplicationBuilder.ConfigureApplication` through `ApplicationOptions.RootComponent` or as a
+child. A style-only component stays a CSS-bundle unit.
 This library owns none of that; it only produces the descriptor those consumers read.
 
 The canonical container syntax (the `<template>`/`<style>` tag grammar, the `@script`/custom

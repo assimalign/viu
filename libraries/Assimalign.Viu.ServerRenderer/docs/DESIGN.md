@@ -51,6 +51,14 @@ renderers.
 mounted host lifetime. It does not own a `Renderer<TNode>` or host container, does not implement
 `IApplication`, and carries the same immutable `IApplicationContext` that component execution reads.
 
+`ServerApplicationBuilder` is therefore standalone rather than an `IApplicationBuilder`: that
+interface builds a runnable host, while this builder produces `ServerRenderApplication`. The builder
+has one composition operation, `ConfigureApplication(Action<ApplicationOptions>)`. `Build()` validates
+the required root and snapshots the current root, resolvers, optional state and directives, and
+diagnostics into a new `ApplicationContext`; later option mutations cannot change that context. The
+low-level `ServerRenderApplication(IApplicationContext)` constructor remains available when a host has
+already assembled an immutable context.
+
 The application receives three independent, borrowed composition services:
 
 - `IComponentFactory` activates templates;
