@@ -5,3 +5,12 @@
 # Windows) would otherwise yield a different fingerprint than a LF checkout (Linux/CI) for
 # identical source — breaking the bundler's byte-stable-across-machines contract. Pin LF.
 *.viu text eol=lf
+
+# The Viu Utilities emitters normalize their output to LF unconditionally
+# (UtilityDirectiveEmitter and UtilityCssLayerEmitter both collapse CRLF and lone CR to LF;
+# the layer emitter documents "LF line endings" as its contract). Its tests assert that
+# canonical output against C# raw string literals, so the literal's line endings are part of
+# the expected value — a CRLF checkout (autocrlf on Windows) makes the expected value CRLF
+# while the emitter still produces LF, failing 7 tests that pass on a LF checkout (Linux/CI).
+# Pin LF so a fresh clone or worktree is green on every platform ([V01.01.12.24]).
+tooling/Assimalign.Viu.Tooling.UtilityCss/test/**/*.cs text eol=lf
