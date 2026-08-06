@@ -1,7 +1,7 @@
 namespace Assimalign.Viu.Syntax.SingleFileComponent;
 
 /// <summary>
-/// The <see cref="SingleFileComponentSyntaxParser"/> result: the parity
+/// The <see cref="SingleFileComponentSyntaxParser"/> result: the
 /// <see cref="SingleFileComponentDescriptor"/> (exactly what
 /// <see cref="SingleFileComponentParser.Parse(string)"/> produces), the same blocks flattened into the
 /// base node list in source order, the errors surfaced as the uniform

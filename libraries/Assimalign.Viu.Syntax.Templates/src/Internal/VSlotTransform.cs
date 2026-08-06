@@ -18,7 +18,8 @@ internal static class VSlotTransform
 
     /// <summary>
     /// A node transform that tracks <c>v-slot</c> depth so a slot inside another slot or a <c>v-for</c> is
-    /// forced dynamic. The C# port of <c>trackSlotScopes</c>.
+    /// forced dynamic: once a slot's content can vary per enclosing scope, its slot flags can no longer
+    /// be treated as stable across renders.
     /// </summary>
     public static Action? TrackSlotScopes(TemplateSyntaxNode node, TransformContext context)
     {

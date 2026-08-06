@@ -1,5 +1,35 @@
 <Project>
     <!--
+        Every packable project emits its XML documentation file so the prose
+        .claude/rules/documentation.md already mandates on every public member
+        actually reaches a consumer's IntelliSense ([V01.01.14.01]). Without
+        this the packages ship a bare DLL and the doc rule has no mechanical
+        enforcement either, because CS1591 (missing XML comment) only fires
+        when a documentation file is being produced.
+
+        The gate MUST stay in the targets phase: IsPackable is set in each
+        csproj body, so a props-phase gate evaluates against an unset property
+        and sweeps in every test project - see the same latent condition at
+        Build.Version.props:36. Directory.Build.targets imports run after the
+        csproj body, so the condition below sees the final value.
+
+        DocumentationFile is set explicitly alongside the switch, and it points
+        at $(OutputPath) rather than the usual $(IntermediateOutputPath).
+        Microsoft.NET.Sdk.targets derives DocumentationFile from the switch,
+        and Common.targets materializes the @(DocFileItem) that copies obj ->
+        bin, both earlier in the import chain than Directory.Build.targets
+        runs. Setting only the switch here is a silent no-op; setting an obj/
+        path here compiles the file but never copies it, and pack then fails
+        NU5026 looking for it under bin/. Csc reads DocumentationFile at
+        execution time, so writing straight to the output path lands it where
+        pack already expects it and needs no copy step.
+    -->
+    <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DocumentationFile Condition="'$(DocumentationFile)' == ''">$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+    </PropertyGroup>
+
+    <!--
         NuGet recommends a package README. Individual package families can set
         PackageReadmeFile and pack their own file before this targets-phase
         fallback runs; the SDK does so with sdks/README.md.
