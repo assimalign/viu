@@ -1,5 +1,0 @@
-#nullable enable
-Assimalign.Viu.Router.Browser.ApplicationRouterExtensions
-Assimalign.Viu.Router.Browser.ApplicationRouterExtensions.extension(Assimalign.Viu.IApplication!)
-Assimalign.Viu.Router.Browser.ApplicationRouterExtensions.extension(Assimalign.Viu.IApplication!).UseRouter(Assimalign.Viu.Router.Router! router) -> Assimalign.Viu.IApplication!
-static Assimalign.Viu.Router.Browser.ApplicationRouterExtensions.UseRouter(this Assimalign.Viu.IApplication! application, Assimalign.Viu.Router.Router! router) -> Assimalign.Viu.IApplication!

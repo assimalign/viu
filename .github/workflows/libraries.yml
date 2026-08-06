@@ -53,11 +53,11 @@ jobs:
                 projects:
                     [
                         "Assimalign.Viu.Browser",
+                        "Assimalign.Viu.Browser.Router",
                         "Assimalign.Viu.Components",
                         "Assimalign.Viu.Core",
                         "Assimalign.Viu.Reactivity",
                         "Assimalign.Viu.Router",
-                        "Assimalign.Viu.Router.Browser",
                         "Assimalign.Viu.ServerRenderer",
                         "Assimalign.Viu.Shared",
                         "Assimalign.Viu.State",

@@ -2,9 +2,9 @@ using System;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
+using Assimalign.Viu.Browser.Router;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Router;
-using Assimalign.Viu.Router.Browser;
 
 ComponentFactory components = new(
 [

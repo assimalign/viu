@@ -142,7 +142,8 @@ until reviewed.
 - **WBS / branch**: `V01.01.12.22` (Tooling) / `feature/V01.01.12.22-browser-rename`, stacked on R2.
 - **Scope**: rename library folder/assembly/namespace to `Assimalign.Viu.Browser`; **consequence
   the user did not name but consistency demands (flag in PR): `Assimalign.Viu.Router.RuntimeDom`
-  → `Assimalign.Viu.Router.Browser`**. Cascade identical in kind to R2: references, IVT, framework
+  → `Assimalign.Viu.Browser.Router` (current name after [V01.01.14.09])**. Cascade identical in
+  kind to R2: references, IVT, framework
   pack manifests, slnx files, `area-runtimedom.yml` → `area-browser.yml` +
   `area-router-runtimedom.yml` → `area-router-browser.yml`, `viu-dom.js` asset path/`_content/`
   segment (SDK `assets/` flow + module import paths in `BrowserRuntime`/`RouterHistory` — the

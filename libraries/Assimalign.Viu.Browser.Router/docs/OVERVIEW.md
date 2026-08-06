@@ -1,4 +1,4 @@
-# Assimalign.Viu.Router.Browser — overview
+# Assimalign.Viu.Browser.Router — overview
 
 The browser integration layer between `Assimalign.Viu.Router` and `Assimalign.Viu.Browser`: the
 one small adapter that lets `RouterLink` intercept a real DOM click and navigate client-side.
@@ -24,7 +24,7 @@ in either package it bridges. Specified by
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Router.Browser;
+using Assimalign.Viu.Browser.Router;
 
 await new BrowserApplicationBuilder()
     .ConfigureApplication(options =>

@@ -32,7 +32,7 @@ assemblies that every Viu app references with zero opt-in: `Assimalign.Viu.App`,
 `.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`.
 
 **Not** in the app reference set: the `Syntax.*` parsers and compiler/editor tooling assemblies,
-`ServerRenderer`, `Router`/`Router.Browser` (opt-in packages), and `Testing` (dev-time). The source
+`ServerRenderer`, `Router`/`Browser.Router` (opt-in packages), and `Testing` (dev-time). The source
 generator's parser/compiler closure reaches builds inside `analyzers/dotnet/cs/` of the Ref pack;
 `Syntax.Html` remains a tooling-only host-page parser; `UtilityCss` ships through its standalone
 package and SDK/editor hosts; and `LanguageService`/`LanguageServer` ship in editor payloads.
@@ -47,7 +47,7 @@ Shared ── Components ── Core ── Browser          <- browser host
    |          |           +---- ServerRenderer   <- server host
    |          +-- Reactivity
    |          +-- State
-   +--------- Router                             <- host-agnostic (Router.Browser is its bridge)
+   +--------- Router                             <- host-agnostic (Browser.Router is its bridge)
 ```
 
 `Shared`, `Reactivity`, `State`, `Components`, `Core` are all **host-agnostic**. This is why the
@@ -65,6 +65,7 @@ taking `Browser` and its `browser-wasm` runtime pin.
 | D4 | **Work tracking: area epic + this plan doc; feature items created just before each wave starts.** | 2026-08-05 | Avoids writing five detailed specs up front that later drift. The GitHub issue body stays the authoritative requirement source for the wave in flight. |
 | D5 | **Redesign the application lifetime: delete `IApplicationPlugin`, separate build-time composition from runtime behavior, and make `Use(...)` a real middleware pipeline around the persistent host lifetime.** Direction set by Chase from an independent architecture review of `fc8a90ba`. Full design in the section below, as amended by D5a. | 2026-08-05 | `IApplicationPlugin` is a deferred initializer with no `next`, no short-circuiting, and no cleanup phase. Verified: it has **zero shipping implementations** — every implementor in the tree is a test double or the showcase's recorder. Deleting it before the polish waves avoids hardening, documenting, and renaming types that are about to be removed. **Requires a `docs/SPECIFICATION.md` amendment replacing `[CMP-25]` (line 333)**, filed per `.claude/rules/deviations.md`; this row is the recorded confirmation. |
 | D5a | **Maintainer amendment for PR #305:** `IApplication` exposes `StartAsync`/`StopAsync`; `RunAsync` is an extension; runtime state and the stopping token live on `IApplicationContext`; middleware receives that context directly; a lean `IApplicationBuilder` configures all composition through `ApplicationOptions`; Browser implements the lifetime and mount APIs directly; the generic Core application abstraction, abstract builders, execution wrapper, and static Browser facade are deleted. | 2026-08-06 | This is the accepted review shape for [V01.01.14.08]. It adopts the familiar split between starting a host and running it until shutdown, keeps host-specific mounting out of Core, and removes inheritance that exposed platform mechanics as Core API. The amendment below replaces the original D5 target shape while retaining D5's middleware, cleanup, borrowed-ownership, and server-separation decisions. |
+| D6 | **Segment the SDK and the shared framework by platform.** `Assimalign.Viu.Sdk` and `Assimalign.Viu.App` become platform-agnostic; `Assimalign.Viu.Sdk.Browser` and `Assimalign.Viu.App.Browser` carry everything browser-specific. Direction set by Chase. Full design in the section below. | 2026-08-06 | Today there is exactly one SDK and one framework, and both are browser-only by construction: `sdks/Assimalign.Viu.Sdk/Sdk/Sdk.props:8` opens with `<Import Sdk="Microsoft.NET.Sdk.WebAssembly" …>` under the comment *"A Viu app is a WASM browser app, so the chain starts at Microsoft.NET.Sdk.WebAssembly"*, and the single `Assimalign.Viu.App` framework bundles `Browser` with the host-agnostic libraries. So authoring a platform-agnostic Viu component library means taking the WebAssembly SDK and a `browser-wasm` runtime pin for code that renders nothing. The split gives that author a first-class path, and gives every future host (SSR, WebView) a shape to slot into rather than a fork. |
 
 ## State
 
@@ -100,6 +101,8 @@ in as each item is created.
 | T12 | Close open inheritance hierarchies | 5 | — | — | Not started |
 | T14 | Dead and speculative surface | 5 | — | — | Not started |
 | T17 | Debugger presentation + untracked `Peek()` | 5 | — | — | Not started |
+| D6-A | Segment the SDK: agnostic `Assimalign.Viu.Sdk` + `Assimalign.Viu.Sdk.Browser` | 3 | — | — | Not started — see D6 |
+| D6-B | Segment the framework: `Assimalign.Viu.App` + `Assimalign.Viu.App.Browser` | 3 | — | — | Not started — see D6 |
 | G1 | `PackageOverrides.txt` (see D2) | 1 or 2 | — | — | Not started |
 | G2 | `IApplication` disposal contract | — | — | — | **Absorbed by D5-A / D5-C** |
 
@@ -116,6 +119,81 @@ types that are about to be deleted:
 | T12 — the former abstract builder's configuration methods returned `IApplicationBuilder`, collapsing the concrete Browser builder | D5-B | The abstract base is deleted. The lean interface remains for platform-neutral construction, while concrete builders self-return and implement its two members explicitly where return covariance requires it. |
 | T14 — `Performance` has no production reader; `BrowserApplication.CreateServerRendererBuilder` has zero callers | D5-B, D5-D | Both are deleted rather than renamed or documented. |
 | T11 — `Router.ReadyAsync` takes no `CancellationToken` | D5-E | Cancellation is required for the middleware pipeline to be cancellable at all. |
+
+## D6 — platform segmentation of the SDK and framework
+
+### What is browser-specific today
+
+The dependency layering ([verified above](#verified-dependency-layering)) already separates cleanly —
+`Shared`, `Reactivity`, `State`, `Components` and `Core` are host-agnostic; `Browser` and
+`ServerRenderer` are hosts. The SDK and framework are the only places that fail to reflect it.
+
+| Piece | Agnostic | Browser-specific |
+|---|---|---|
+| `Assimalign.Viu.Generators.Syntax.props`/`.targets` (the `.viu` generator wiring) | ✅ | |
+| CSS composition and utility CSS | ✅ (component styles) | `ViuInjectCssBundleLink` writes into `index.html` |
+| `Assimalign.Viu.Sdk.Common.props` | mostly ✅ | |
+| `Sdk.props` chaining `Microsoft.NET.Sdk.WebAssembly` | | ✅ |
+| `Assimalign.Viu.Sdk.WebAssembly.targets` | | ✅ |
+| `Assimalign.Viu.Sdk.StaticWebAssets.targets` (`wwwroot`, `viu-dom.js`) | | ✅ |
+| `Assimalign.Viu.Sdk.FrameworkReference.props` (`browser-wasm` runtime pack) | | ✅ |
+| CSS hot reload, publish-size budget | | ✅ |
+
+### Target shape
+
+**SDK.** `Assimalign.Viu.Sdk` chains `Microsoft.NET.Sdk`, carries the `.viu` generator wiring, component
+compilation, and CSS composition, and references the agnostic framework. It builds a Viu **component
+library** that names no platform. `Assimalign.Viu.Sdk.Browser` imports it, chains
+`Microsoft.NET.Sdk.WebAssembly`, and adds the static-web-asset, `viu-dom.js`, HTML-injection, hot-reload
+and publish-budget machinery — the same relationship `Microsoft.NET.Sdk.Web` has to `Microsoft.NET.Sdk`.
+
+**Framework.** `Assimalign.Viu.App` carries `Shared`, `Components`, `Reactivity`, `State`, `Core` and the
+umbrella. `Assimalign.Viu.App.Browser` adds `Browser` and owns the `browser-wasm` runtime pack.
+
+`frameworks/Assimalign.Viu.App.props` **already anticipates this**: its `ItemGroup`s are conditioned on
+`$(ViuFrameworkName)` precisely so *"additional framework families (e.g. a future
+Assimalign.Viu.App.Server for SSR) can share this manifest file."* The manifest needs new entries, not a
+new mechanism.
+
+### Naming — the platform segment is a suffix here, and that is deliberate
+
+This looks inconsistent with [V01.01.14.09], which moved the platform segment to the **front**
+(`Assimalign.Viu.Router.Browser` → `Assimalign.Viu.Browser.Router`). It is not: the two are different
+axes, and both follow .NET precedent.
+
+- `Assimalign.Viu.Browser.Router` — `Router` is a **feature owned by a platform**. The owner leads, as
+  with `Browser`'s DOM bridge and event registry.
+- `Assimalign.Viu.Sdk.Browser` / `Assimalign.Viu.App.Browser` — `Sdk` and `App` are **pack families with
+  platform variants**. The family leads and the variant is suffixed, exactly as with
+  `Microsoft.NET.Sdk` → `Microsoft.NET.Sdk.Web`/`.Razor`/`.WebAssembly`, and
+  `Microsoft.NETCore.App` → `Microsoft.NETCore.App.Runtime.browser-wasm`.
+
+Recorded so a future session does not "correct" one to match the other.
+
+### What this changes about D2
+
+D2 chose to publish the six framework libraries standalone plus `PackageOverrides.txt` **specifically**
+so a component-library author could reference the host-agnostic set from a stock `Microsoft.NET.Sdk`
+project without taking `Browser`. D6 serves that author better: they use
+`<Project Sdk="Assimalign.Viu.Sdk">` and get the agnostic framework.
+
+D2 is **not** withdrawn — standalone packages remain the escape hatch for consumers who cannot adopt a
+custom SDK — but it stops being the primary answer, and `PackageOverrides.txt` becomes *more* load
+bearing, since it must now cover the agnostic framework's assemblies to keep them inert on the SDK path.
+
+### Open questions to settle when this is scheduled
+
+1. **Does the agnostic framework ship a runtime pack?** A component library needs only the targeting
+   pack. A RID-less runtime pack may be unnecessary — but `ResolveTargetingPackAssets` and the
+   `KnownFrameworkReference` registration need to work without one, which wants proving.
+2. **Does `ServerRenderer` become `Assimalign.Viu.App.Server` / `Assimalign.Viu.Sdk.Server`?** The
+   manifest comment already names it. If the pattern is right, SSR is its validation; if SSR does not
+   fit, that is a signal the split is drawn wrong.
+3. **Where does CSS bundling divide?** Component style compilation is agnostic; injecting the bundle
+   link into `index.html` is not. The seam runs through `ViuBundleCss`/`ViuInjectCssBundleLink` and needs
+   drawing precisely.
+4. **Does `Assimalign.Viu.Sdk.Browser` chain `Assimalign.Viu.Sdk`, or duplicate its imports?** Chaining
+   is correct but MSBuild SDK chaining across two packaged SDKs needs verifying against the resolver.
 
 ## D5 — application lifetime redesign
 
@@ -271,7 +349,7 @@ The packaged showcase performs the whole sequence by hand today
 ([`../viu-examples/.../Program.cs:19`](https://github.com/assimalign/viu-examples/blob/main/examples/Assimalign.Viu.Showcase/Program.cs)):
 initialize browser router history, construct the router, await initial navigation, install
 `RouterLinkDomBridge`, mount, wait forever, then uninstall the bridge and dispose routing resources.
-That is a textbook around-lifetime concern. `UseRouter(router)` in `Assimalign.Viu.Router.Browser`
+That is a textbook around-lifetime concern. `UseRouter(router)` in `Assimalign.Viu.Browser.Router`
 collapses it:
 
 ```csharp

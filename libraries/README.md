@@ -10,7 +10,7 @@ The primary runtime packages are:
 - `Assimalign.Viu.State`
 - `Assimalign.Viu.Core`
 
-Browser, ServerRenderer, Testing, Router, Router.Browser, Shared, Syntax, template compilation,
+Browser, ServerRenderer, Testing, Router, Browser.Router, Shared, Syntax, template compilation,
 single-file component generation, and CSS tooling are wired to the same redesign graph.
 
 The application lifetime boundary is host-neutral. Core exposes `IApplication`, the immutable and

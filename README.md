@@ -67,7 +67,7 @@ editor code that compiles and understands one.
 | [`Assimalign.Viu.Browser`](libraries/Assimalign.Viu.Browser) | The browser host adapter: the batched JS-interop DOM bridge, attribute/property patching, event wiring, the `v-model`/`v-show` directives, and CSS transitions | [OVERVIEW](libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Browser/docs/DESIGN.md) · [ADR-0001](libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md) |
 | [`Assimalign.Viu.ServerRenderer`](libraries/Assimalign.Viu.ServerRenderer) | The DOM-free string/stream HTML renderer (WHATWG-exact escaping, attributes, class/style, slots, teleport buffering, `serverPrefetch`) and the hydration marker protocol; the compiler's server code generation and the server adaptor follow ([V01.01.07]) | [OVERVIEW](libraries/Assimalign.Viu.ServerRenderer/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.ServerRenderer/docs/DESIGN.md) |
 | [`Assimalign.Viu.Router`](libraries/Assimalign.Viu.Router) | The DOM-free route table and matcher, history integration (memory/web/hash), the `RouterView`/`RouterLink` components, and the asynchronous navigation-guard pipeline; lazy routes and scroll behavior follow ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Router/docs/DESIGN.md) |
-| [`Assimalign.Viu.Router.Browser`](libraries/Assimalign.Viu.Router.Browser) | The browser bridge wiring the Browser host's click dispatch into `RouterLink` navigation, so the router core stays DOM-free; installed at bootstrap by router apps ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Router.Browser/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Router.Browser/docs/DESIGN.md) |
+| [`Assimalign.Viu.Browser.Router`](libraries/Assimalign.Viu.Browser.Router) | The browser bridge wiring the Browser host's click dispatch into `RouterLink` navigation, so the router core stays DOM-free; installed at bootstrap by router apps ([V01.01.08]) | [OVERVIEW](libraries/Assimalign.Viu.Browser.Router/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Browser.Router/docs/DESIGN.md) |
 | [`Assimalign.Viu.Testing`](libraries/Assimalign.Viu.Testing) | The in-memory host (`TNode = TestNode`) and the component test wrappers, so the runtime is exercised without a browser | [OVERVIEW](libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md) · [DESIGN](libraries/Assimalign.Viu.Testing/docs/DESIGN.md) |
 
 ### Developer tooling (`tooling/`)
@@ -139,9 +139,11 @@ the language-server process. See
 ### Packaged SDK showcase
 
 [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) contains the complete
-browser showcase. It consumes `Assimalign.Viu.Sdk`, `Assimalign.Viu.Router`, and
-`Assimalign.Viu.Router.Browser` from a local NuGet feed, so it exercises the same package boundary
-as an external application rather than relying on project references into this repository.
+browser showcase. It consumes `Assimalign.Viu.Sdk` and `Assimalign.Viu.Router` from a local NuGet
+feed. Its browser-router package reference must be migrated separately to
+`Assimalign.Viu.Browser.Router` for [V01.01.14.09]; after that follow-up, it will exercise the renamed
+package boundary as an external application rather than relying on project references into this
+repository.
 
 ### Packaging (`sdks/`, `frameworks/`)
 

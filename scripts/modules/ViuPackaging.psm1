@@ -29,7 +29,7 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Browser',
     'Assimalign.Viu.ServerRenderer',
     'Assimalign.Viu.Testing',
-    'Assimalign.Viu.Router.Browser'
+    'Assimalign.Viu.Browser.Router'
 )
 
 # The repository's code roots that hold independently published libraries, each using the

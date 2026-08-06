@@ -48,7 +48,7 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
 | SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` (+ `Assimalign.Viu.Compiler.SingleFileComponent`, the shared build/editor projection core extracted with [V01.01.06.11]) | `@vue/compiler-sfc` — `.viu` single-file components (hybrid container syntax since `V01.01.06.10`: `<template>`/`<style>` tags + the `@script` block; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
-| Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Router.Browser`, formerly `Assimalign.Viu.Router.RuntimeDom` — renamed [V01.01.12.22] — the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
+| Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Browser.Router`, formerly `Assimalign.Viu.Router.RuntimeDom` — renamed through [V01.01.12.22] and [V01.01.14.09] — the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
 | DevTools (`V01.01.10`) | `Assimalign.Viu.DevTools` | `vue-devtools` protocol + UI |
 | Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
@@ -257,7 +257,8 @@ Work is tracked exactly like the sibling Cohesion repo:
 ### [V01.01.04] Framework - RuntimeDom (W01, P001)
 
 > Renamed to `Assimalign.Viu.Browser` by the .NET reshape (R3, [V01.01.12.22], `docs/NET-RESHAPE-PLAN.md`);
-> the consequence bridge `Assimalign.Viu.Router.RuntimeDom` became `Assimalign.Viu.Router.Browser`. The epic
+> the consequence bridge `Assimalign.Viu.Router.RuntimeDom` is now `Assimalign.Viu.Browser.Router`
+> after [V01.01.14.09]. The epic
 > and its feature history stay; the shipping code now lives in the browser library.
 
 | Code | Feature | Wave | Priority |
