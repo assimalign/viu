@@ -203,6 +203,20 @@
         <!-- ============ REF PACK ============ -->
         <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref'">
             <_ViuExpectedAssembly Include="@(ViuFrameworkAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll')" />
+
+            <!--
+                XML documentation travels beside the ref assemblies. The SDK
+                path resolves compile references from this pack and never from
+                the libraries' own lib/ folders, so omitting these leaves the
+                supported consumption path with no IntelliSense even though
+                every library package carries its own .xml ([V01.01.14.01]).
+
+                Filtered on existence rather than asserted like the DLLs above:
+                a framework member whose public surface is empty produces no
+                doc file, and that must not fail the pack.
+            -->
+            <_ViuDocumentationCandidate Include="@(ViuFrameworkAssembly->'$(_ViuFrameworkSourceDir)%(Identity).xml')" />
+            <_ViuExpectedDocumentation Include="@(_ViuDocumentationCandidate)" Condition="Exists('%(Identity)')" />
         </ItemGroup>
 
         <Error Condition="'$(ViuFrameworkKind)' == 'Ref' and !Exists('%(_ViuExpectedAssembly.Identity)')"
@@ -249,6 +263,9 @@
 
         <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref'">
             <TfmSpecificPackageFile Include="@(_ViuExpectedAssembly)">
+                <PackagePath>ref/$(TargetFrameworkLatest)/%(Filename)%(Extension)</PackagePath>
+            </TfmSpecificPackageFile>
+            <TfmSpecificPackageFile Include="@(_ViuExpectedDocumentation)">
                 <PackagePath>ref/$(TargetFrameworkLatest)/%(Filename)%(Extension)</PackagePath>
             </TfmSpecificPackageFile>
             <TfmSpecificPackageFile Include="$(_ViuFrameworkListPath)">

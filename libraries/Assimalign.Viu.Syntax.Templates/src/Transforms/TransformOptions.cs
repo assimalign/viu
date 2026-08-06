@@ -87,7 +87,14 @@ public sealed class TransformOptions
     /// <summary>Whether component slots inherit the parent's scope id. Defaults to <see langword="true"/>.</summary>
     public bool Slotted { get; set; } = true;
 
-    /// <summary>The scoped-styles id, or <see langword="null"/>. Out of scope here; carried for parity.</summary>
+    /// <summary>
+    /// The scoped-styles id (<c>data-v-&lt;hash&gt;</c>), or <see langword="null"/> when the component
+    /// declares no <c>scoped</c> style block. Flows onto <see cref="TransformContext.ScopeId"/>, where
+    /// two transforms consume it: static stringification stamps it onto the markup it precomputes, and
+    /// a slot outlet uses it together with <see cref="Slotted"/> to decide whether the outlet inherits
+    /// the parent's scope. Set by the single-file-component pipeline, which derives the hash from the
+    /// project-relative path ([V01.01.06.04]).
+    /// </summary>
     public string? ScopeId { get; set; }
 
     /// <summary>

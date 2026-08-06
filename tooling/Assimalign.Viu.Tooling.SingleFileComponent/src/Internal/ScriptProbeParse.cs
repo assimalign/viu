@@ -4,7 +4,7 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 
 /// <summary>
 /// A parsed <c>@script</c> block: the block's class-body member region, parsed inside the synthetic
-/// partial-class probe by <see cref="ScriptBlockAnalyzer.ParseProbe"/>, together with the arithmetic
+/// partial-class probe by <see cref="ScriptBlockAnalyzer.ParseProbe(string)"/>, together with the arithmetic
 /// that maps a probe-tree offset back onto the block content. Consumers walk <see cref="Probe"/> and
 /// translate every offset they keep through <see cref="TryGetContentOffset"/>, so the probe wrapper
 /// and the leading-using split stay a private detail of the shared analyzer

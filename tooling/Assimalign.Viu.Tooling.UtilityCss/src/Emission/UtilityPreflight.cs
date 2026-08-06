@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Tooling.UtilityCss;
 /// Tailwind CSS v4.3.3 Preflight behavior.
 /// </summary>
 /// <remarks>
-/// The emitted CSS has no runtime dependency. Compatibility provenance and the upstream MIT
+/// The emitted CSS has no runtime dependency. Compatibility provenance and the Tailwind CSS MIT
 /// license are recorded in <c>docs/THIRD-PARTY-NOTICES.md</c>.
 /// </remarks>
 public static class UtilityPreflight

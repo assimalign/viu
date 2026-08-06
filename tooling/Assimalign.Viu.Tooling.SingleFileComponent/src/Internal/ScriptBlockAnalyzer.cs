@@ -45,7 +45,7 @@ namespace Assimalign.Viu.Tooling.SingleFileComponent;
 /// </item>
 /// </list>
 /// The editor shares this exact core through <see cref="DescribeMembers"/> ([V01.01.06.11]) and
-/// <see cref="ParseProbe"/> ([V01.01.12.07.10]): the probe wrapper, the leading-using split, and member
+/// <see cref="ParseProbe(string)"/> ([V01.01.12.07.10]): the probe wrapper, the leading-using split, and member
 /// discovery exist <em>once</em>, killing the drift the language service's hand-mirrored reader used to
 /// carry.
 /// See <c>docs/FORMAT.md</c> for the <c>@script</c> content contract. Work items [V01.01.06.03] and
