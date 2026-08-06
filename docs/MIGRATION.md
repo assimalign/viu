@@ -30,13 +30,19 @@ All redesign project references resolve inside the staging graph. It includes th
 packages plus Browser, ServerRenderer, Testing, Router, Router.Browser, Shared, Syntax, template
 compilation, single-file component generation, and CSS tooling.
 
-The staging application model is host-generic:
+The staging application model separates a host-neutral lifetime from host-owned mounting:
 
-- `IApplication` carries platform-neutral configuration and lifecycle;
-- `IApplication<TNode>` carries the host-specific mount target;
-- `Application<TNode>` provides shared mounting and plugin behavior;
-- `BrowserApplication : Application<int>` is the current DOM host; and
-- a WebView2 application can select its own node-handle type without changing Core abstractions.
+- `IApplication` carries the platform-neutral single-use `StartAsync`/`StopAsync` lifetime and
+  middleware;
+- `RunAsync` is an extension that starts, waits for shutdown, and stops;
+- `IApplicationContext` carries the immutable composition snapshot plus read-only `IsRunning` and
+  `Stopping` runtime state;
+- the lean `IApplicationBuilder` configures one `ApplicationOptions` composition surface and builds
+  an `IApplication`;
+- `BrowserApplication` implements `IApplication` directly and owns its integer-handle `Mount` and
+  `MountAsync` operations; and
+- a WebView2 application can implement the same lifetime while selecting its own host-node and
+  mount surface without changing Core abstractions.
 
 ## Promotion sequence after approval
 
@@ -62,7 +68,8 @@ The promotion must preserve these decisions:
 - no relationship required between `IComponentFactory` and `IServiceProvider`;
 - no reflection activation or dynamic code generation;
 - application ownership of factories, service providers, and state registries; and
-- host-specific mounting only through `IApplication<TNode>` / `Application<TNode>`.
+- host-specific mounting only through the owning platform application, never through Core's
+  `IApplication` contract.
 
 ## Known migration constraint
 

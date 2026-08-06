@@ -114,8 +114,11 @@ internal sealed class TransitionTestHarness : IDisposable
                 TransitionGroup.Registration,
                 BaseTransition.Registration,
             ]),
-            new EmptyServiceProvider());
-        application.WarnHandler = Warnings.Add;
+            new EmptyServiceProvider(),
+            options: new ApplicationOptions
+            {
+                WarnHandler = Warnings.Add,
+            });
         _application = application;
     }
 

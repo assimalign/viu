@@ -13,9 +13,9 @@ namespace Assimalign.Viu.Router.Tests;
 // Pins the initial-navigation semantics ([V01.01.08.07], issue #219): CurrentRoute starts at the
 // RouteLocation.Start sentinel, the first navigation runs the full guard pipeline with `from` set to
 // that sentinel, the confirm step replaces rather than pushes the current history entry, and
-// ReadyAsync always settles. Run counts are pinned so the initial pass fires each guard exactly once
-// with no double resolution. All DOM-free through memory history (the RouterView case adds the
-// in-memory Testing renderer).
+// ReadyAsync always settles, and caller cancellation reaches the initial guard pipeline. Run counts
+// are pinned so the initial pass fires each guard exactly once with no double resolution. All
+// DOM-free through memory history (the RouterView case adds the in-memory Testing renderer).
 public class InitialNavigationTests
 {
     private static IReadOnlyList<RouteRecord> Routes() =>
@@ -154,6 +154,37 @@ public class InitialNavigationTests
         first.ShouldBeSameAs(second);
         beforeEachRuns.ShouldBe(1);
         router.CurrentRoute.Value.Name.ShouldBe("home");
+    }
+
+    [Fact]
+    public async Task ReadyAsync_CancelledByCaller_CancelsTheInitialGuardPipeline()
+    {
+        TaskCompletionSource guardStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken observedToken = default;
+        using CancellationTokenSource cancellation = new();
+        using Router router = new(
+            RouterHistory.CreateMemory(),
+            Routes());
+        router.BeforeEach(
+            async (_, _, token) =>
+            {
+                observedToken = token;
+                guardStarted.SetResult();
+                await Task.Delay(Timeout.Infinite, token);
+                return NavigationGuardResult.Allow;
+            });
+
+        Task<NavigationFailure?> readiness =
+            router.ReadyAsync(cancellation.Token);
+        await guardStarted.Task;
+        cancellation.Cancel();
+        NavigationFailure? failure = await readiness;
+
+        failure.ShouldNotBeNull();
+        failure.Type.ShouldBe(NavigationFailureType.Cancelled);
+        observedToken.IsCancellationRequested.ShouldBeTrue();
+        router.CurrentRoute.Value.ShouldBeSameAs(RouteLocation.Start);
     }
 
     [Fact]

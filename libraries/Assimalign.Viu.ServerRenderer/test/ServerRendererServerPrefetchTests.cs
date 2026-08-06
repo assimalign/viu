@@ -79,8 +79,14 @@ public class ServerRendererServerPrefetchTests
                 () => throw new InvalidOperationException("boom"));
             return () => TestTree.Element("div", "recovered");
         });
-        ServerApplication application = Ssr.Application(component.Request());
-        application.Context.ErrorHandler = (exception, _, _) => captured = exception;
+        ServerRenderApplication application = ServerRenderApplication
+            .CreateBuilder(
+                component.Request(),
+                InlineComponentFactory.Instance,
+                TestServiceProvider.Empty)
+            .ConfigureApplication(
+                options => options.ErrorHandler = (exception, _, _) => captured = exception)
+            .Build();
 
         string html = await ServerRenderer.RenderToStringAsync(application);
 

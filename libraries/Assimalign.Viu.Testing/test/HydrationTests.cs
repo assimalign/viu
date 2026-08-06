@@ -375,16 +375,17 @@ public sealed class HydrationTests
         List<string>? warnings,
         params ComponentRegistration[] registrations)
     {
-        ApplicationContext application = new(
+        ApplicationOptions? options = warnings is null
+            ? null
+            : new ApplicationOptions
+            {
+                WarnHandler = warnings.Add,
+            };
+        return new ApplicationContext(
             root,
             new ComponentFactory(registrations),
-            new EmptyServiceResolver());
-        if (warnings is not null)
-        {
-            application.WarnHandler = warnings.Add;
-        }
-
-        return application;
+            new EmptyServiceResolver(),
+            options: options);
     }
 
     private static ComponentAttributes Attributes(

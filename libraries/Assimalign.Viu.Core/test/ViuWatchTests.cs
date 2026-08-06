@@ -271,7 +271,7 @@ public sealed class ViuWatchTests : IDisposable
 
     private static MountedComponent CreateMounted(
         Action setup,
-        Action<IApplicationContext>? configure = null)
+        Action<ApplicationOptions>? configure = null)
     {
         DelegateTemplate template = new(setup);
         ComponentFactory factory = new(
@@ -281,11 +281,13 @@ public sealed class ViuWatchTests : IDisposable
                 () => template),
         ]);
         ITemplateComponent request = ComponentTree.Template<DelegateTemplate>();
+        ApplicationOptions options = new();
+        configure?.Invoke(options);
         IApplicationContext application = new ApplicationContext(
             request,
             factory,
-            new EmptyServiceProvider());
-        configure?.Invoke(application);
+            new EmptyServiceProvider(),
+            options: options);
         return MountedComponent.Create(application, request);
     }
 

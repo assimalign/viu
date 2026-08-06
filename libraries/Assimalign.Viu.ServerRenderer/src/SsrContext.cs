@@ -6,7 +6,7 @@ namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
 /// The per-render server context. One instance is threaded through a single
-/// <see cref="ServerRenderer.RenderToStringAsync(ServerApplication, SsrContext?, System.Threading.CancellationToken)"/>
+/// <see cref="ServerRenderer.RenderToStringAsync(ServerRenderApplication, SsrContext?, System.Threading.CancellationToken)"/>
 /// (or streaming) call and carries the two things the surrounding document assembly needs after the
 /// component tree serializes: the <see cref="Teleports"/> map (content that was rendered out of tree
 /// position) and a free-form <see cref="State"/> bag for application handoff (e.g. serialized store

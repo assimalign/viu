@@ -17,15 +17,27 @@ The integer renderer node is an opaque browser handle. Core never resolves CSS s
 JavaScript module, or understands DOM attributes. Conversely, Browser does not activate templates
 or own the application component factory, service provider, or state registry.
 
-This keeps `Application<TNode>` reusable for a future WebView2 application. WebView2 may choose a
-different node handle and transport while reusing the same Core and Components APIs.
+This keeps host nodes out of Core's application abstraction. A future WebView2 application can
+implement `IApplication` directly, choose a different node handle and transport, and reuse the same
+Core and Components APIs without inheriting a node-generic application base.
 
 ## Application lifecycle
 
-`BrowserApplication` derives from `Application<int>` and receives an immutable
-`IApplicationContext`. `MountAsync(string)` initializes the JavaScript bridge, resolves the selector,
-then enters the generic application mount path. `MountCore` clears a client-mount container and calls
-`Renderer<int>.Render(root, container, context)`. `UnmountCore` renders null into the same container.
+`BrowserApplication` implements `IApplication` directly and receives the context whose immutable
+composition snapshot and read-only runtime state are shared with middleware. `StartAsync` claims the
+single-use lifetime, launches the middleware pipeline independently, and waits until the Browser
+terminal has initialized the JavaScript bridge, resolved the configured selector (`#app` by
+default), and mounted or hydrated. It then returns while that pipeline stays active. `StopAsync`
+signals `IApplicationContext.Stopping`, awaits the pipeline, and unmounts before reverse middleware
+cleanup runs [APP-4] [APP-5]. Core's `RunAsync` extension composes start, the shutdown wait, and stop
+for the ordinary long-running entry point. A post-start pipeline failure changes
+`IApplicationContext.IsRunning` to false, reaches the configured error handler, and surfaces from
+`StopAsync` or `RunAsync`.
+
+The Browser mount path clears a client-mount container and calls
+`Renderer<int>.Render(root, container, context)`; unmount renders null into the same container. The
+public `Mount` and `MountAsync` overloads are Browser-owned lower-level embedding and test seams and
+explicitly bypass the top-level middleware pipeline [APP-7].
 
 The application composition root retains ownership of all supplied resolvers. Browser wraps the
 application's `IComponentFactory` only to resolve `Transition`, `TransitionGroup`, and Core
@@ -49,10 +61,12 @@ activation, dynamic code generation, or retained `JSObject` per node/event.
 
 ## Hydration
 
-`CreateServerRendererBuilder` selects Core's `Renderer<int>.Hydrate` path and deliberately does not
-clear the mount container. Direct and buffered options create a `BrowserHydrationReader` from one
-`snapshotHydration` bridge call per root or teleport target. All structural, kind, text, and
-attribute reads then stay in managed memory.
+The browser host's hydration mode selects Core's `Renderer<int>.Hydrate` path and deliberately does
+not clear the mount container. Direct and buffered options create a `BrowserHydrationReader` from
+one `snapshotHydration` bridge call per root or teleport target. All structural, kind, text, and
+attribute reads then stay in managed memory. D5 removed the unused
+`BrowserApplication.CreateServerRendererBuilder` entry point; it did not change the renderer's
+hydration protocol or the lower-level hydration coverage [HYD-2].
 
 Buffered hydration advances its managed handle allocator beyond the maximum handle in each
 snapshot. A localized mismatch can therefore create replacement nodes without colliding with any
@@ -95,8 +109,8 @@ application contract.
 ## Browser directives
 
 The Browser builder installs its built-in directive resolver by default. Developers may replace it
-through the host-neutral `UseDirectiveResolver` builder method. The default resolver currently
-maps compiler-emitted names for:
+by assigning `ApplicationOptions.Directives` in `ConfigureApplication`. The default resolver
+currently maps compiler-emitted names for:
 
 - `show` to `VShow`;
 - `modelText` to `VModelText`;

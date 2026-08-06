@@ -41,8 +41,11 @@ public sealed class ComponentMountOptions
     /// <summary>Gets or sets the optional application directive resolver.</summary>
     public IDirectiveResolver? Directives { get; set; }
 
-    /// <summary>Gets or sets an optional application-context configuration callback.</summary>
-    public Action<IApplicationContext>? ConfigureApplication { get; set; }
+    /// <summary>
+    /// Gets or sets an optional callback that configures diagnostics before the immutable
+    /// application context is created.
+    /// </summary>
+    public Action<ApplicationOptions>? ConfigureApplication { get; set; }
 
     /// <summary>
     /// Replaces child requests for <typeparamref name="TComponent"/> with an optional explicit stub

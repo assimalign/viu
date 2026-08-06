@@ -19,13 +19,13 @@ namespace Assimalign.Viu.ServerRenderer;
 /// </remarks>
 public static class ServerRenderer
 {
-    /// <summary>Renders a configured server application to an HTML string.</summary>
-    /// <param name="application">The application to render.</param>
+    /// <summary>Renders a configured server-render application to an HTML string.</summary>
+    /// <param name="application">The server-render composition to render.</param>
     /// <param name="context">The per-render context, or null for a new context.</param>
-    /// <param name="cancellationToken">Cancels plugin initialization, prefetch, or writing.</param>
+    /// <param name="cancellationToken">Cancels prefetch or writing for this render.</param>
     /// <returns>The serialized HTML.</returns>
     public static async Task<string> RenderToStringAsync(
-        ServerApplication application,
+        ServerRenderApplication application,
         SsrContext? context = null,
         CancellationToken cancellationToken = default)
     {
@@ -48,7 +48,7 @@ public static class ServerRenderer
     /// <param name="cancellationToken">Cancels rendering.</param>
     /// <returns>The serialized HTML.</returns>
     /// <remarks>
-    /// If the tree contains a template request, render a <see cref="ServerApplication"/> configured
+    /// If the tree contains a template request, render a <see cref="ServerRenderApplication"/> configured
     /// with an <see cref="IComponentFactory"/> and service provider instead.
     /// </remarks>
     public static Task<string> RenderToStringAsync(
@@ -60,14 +60,14 @@ public static class ServerRenderer
         return RenderToStringAsync(CreatePrimitiveApplication(rootComponent), context, cancellationToken);
     }
 
-    /// <summary>Streams a configured server application to a text writer.</summary>
-    /// <param name="application">The application to render.</param>
+    /// <summary>Streams a configured server-render application to a text writer.</summary>
+    /// <param name="application">The server-render composition to render.</param>
     /// <param name="writer">The destination writer.</param>
     /// <param name="context">The per-render context, or null for a new context.</param>
-    /// <param name="cancellationToken">Cancels plugin initialization, prefetch, or writing.</param>
+    /// <param name="cancellationToken">Cancels prefetch or writing for this render.</param>
     /// <returns>A task that completes after all content is flushed.</returns>
     public static Task RenderToStreamAsync(
-        ServerApplication application,
+        ServerRenderApplication application,
         TextWriter writer,
         SsrContext? context = null,
         CancellationToken cancellationToken = default)
@@ -103,23 +103,21 @@ public static class ServerRenderer
             cancellationToken);
     }
 
-    private static ServerApplication CreatePrimitiveApplication(IComponent rootComponent)
+    private static ServerRenderApplication CreatePrimitiveApplication(IComponent rootComponent)
     {
-        return new ServerApplication(
+        return new ServerRenderApplication(
             rootComponent,
             EmptyComponentFactory.Instance,
             EmptyServiceProvider.Instance);
     }
 
     private static async Task RenderCoreAsync(
-        ServerApplication application,
+        ServerRenderApplication application,
         SsrWriter writer,
         SsrContext context,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await application.PrepareAsync(cancellationToken).ConfigureAwait(false);
-
         SsrRenderState state = new(
             writer,
             context,

@@ -14,7 +14,7 @@ and Browser packages.
 | Component activation | `IComponentFactory` | Application-owned |
 | Reactive values and subscriptions | `Reactive`, `IReactiveReference<T>`, `IReactiveEffectScope` | Explicit or component-owned |
 | Shared state | `StateStoreDefinition<TStore>`, `IStateStoreRegistry` | One registry |
-| Host lifecycle and mounting | `IApplication<TNode>`, `Application<TNode>` | One host application |
+| Top-level host lifetime | `IApplication`, `IApplicationContext` | One single-use host application |
 
 `IComponent` is the one public render-tree vocabulary. Core still keeps internal mounted-node
 bookkeeping because an immutable render description and a live host node have different lifetimes.
@@ -543,32 +543,35 @@ using StateStoreRegistry state = StateStores.CreateRegistry(
     services,
     new ReactiveEffectScopeFactory());
 
-BrowserApplicationBuilder builder =
-    BrowserApplication.CreateBuilder(ComponentTree.Template<App>());
-builder.UseComponentFactory(components);
-builder.UseServiceProvider(services);
-builder.UseStateRegistry(state);
+BrowserApplicationBuilder builder = new();
 builder.ConfigureApplication(
-    context =>
+    options =>
     {
-        context.ErrorHandler =
+        options.RootComponent = ComponentTree.Template<App>();
+        options.Components = components;
+        options.Services = services;
+        options.State = state;
+        options.ErrorHandler =
             (exception, component, information) =>
                 Console.Error.WriteLine($"{information}: {exception}");
-        context.WarnHandler = Console.Error.WriteLine;
+        options.WarnHandler = Console.Error.WriteLine;
     });
 
-await using BrowserApplication application = builder.Build();
-await application.MountAsync("#app");
+await using IApplication application = builder.Build();
+await application.RunAsync();
 ```
 
 The application borrows `components`, `services`, and `state`. Disposing the browser application
 unmounts its tree; the composition root still disposes the registry and provider it created.
 
-`BrowserApplication` derives from `Application<int>` because Browser represents DOM nodes as opaque
-integer handles. The host-facing mount contract is `IApplication<TNode>`. The non-generic
-`IApplication` base contains only platform-neutral configuration, plugin, state, and unmount
-capabilities. A WebView2 host can derive from `Application<WebViewNodeHandle>` and supply its own
-renderer operations without changing component, reactivity, or state APIs.
+`BrowserApplication` implements `IApplication` directly and keeps its opaque integer DOM handles out
+of Core. The interface owns the single-use `StartAsync`/`StopAsync` contract, middleware, and
+asynchronous disposal; `RunAsync` is the extension that starts, waits for shutdown, and stops. The
+read-only `IApplicationContext.IsRunning` and `Stopping` members expose runtime state to callers and
+middleware. Browser's lower-level `Mount` and `MountAsync` methods remain available for embedding
+and tests and explicitly bypass top-level middleware [APP-7]. A WebView2 host can implement
+`IApplication` directly and supply its own mount surface and renderer operations without changing
+component, reactivity, or state APIs.
 
 ## 5. Reactivity
 
@@ -801,9 +804,9 @@ For Pinia-shaped member APIs, State also provides `StateStore<TState>` with type
   services. Neither contract implies the other.
 - Core never performs reflection-based activation and never owns the supplied application
   provider.
-- Application plugins initialize an already-composed application. The built-in component and
-  directive resolvers are configured before `Build()`; plugin-driven mutation requires a custom
-  resolver that deliberately exposes that capability.
+- `ConfigureApplication` composes components, directives, services, state, and diagnostics through
+  `ApplicationOptions` before `Build()`. `Use` registers top-level lifetime middleware after
+  `Build()`; middleware cannot alter composition, and registration freezes when `StartAsync` begins.
 - State replaces the previous Store package. One definition produces one store instance per
   registry.
 - Effect scopes stop subscriptions; they do not make descendants subscribe automatically.

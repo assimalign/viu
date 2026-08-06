@@ -104,10 +104,11 @@ public sealed class ComponentRuntimeTests
         IApplicationContext application = new ApplicationContext(
             ComponentTree.Template<CapturingTemplate>(),
             factory,
-            new EmptyServiceProvider())
-        {
-            ErrorHandler = (_, _, _) => applicationErrors++,
-        };
+            new EmptyServiceProvider(),
+            options: new ApplicationOptions
+            {
+                ErrorHandler = (_, _, _) => applicationErrors++,
+            });
         MountedComponent parent = MountedComponent.Create(
             application,
             ComponentTree.Template<CapturingTemplate>());
@@ -206,8 +207,8 @@ public sealed class ComponentRuntimeTests
         EventTemplate template = new();
         MountedComponent mounted = CreateMounted(
             template,
-            configure: context =>
-                ((ApplicationContext)context).EventObserver =
+            configure: options =>
+                options.EventObserver =
                     (_, name, arguments) => observed.Add((name, arguments)));
 
         mounted.Context.Emit("save", 42, "complete");
@@ -366,7 +367,7 @@ public sealed class ComponentRuntimeTests
         ITemplateComponent? request = null,
         ComponentContext? parent = null,
         IApplicationContext? application = null,
-        Action<IApplicationContext>? configure = null,
+        Action<ApplicationOptions>? configure = null,
         IStateStoreRegistry? state = null)
     {
         Type templateType = template.GetType();
@@ -374,13 +375,15 @@ public sealed class ComponentRuntimeTests
         [
             new ComponentRegistration(templateType, () => template),
         ]);
+        ApplicationOptions options = new();
+        configure?.Invoke(options);
         IApplicationContext context = application
             ?? new ApplicationContext(
                 request ?? ComponentTree.Template(templateType),
                 factory,
                 new EmptyServiceProvider(),
-                state);
-        configure?.Invoke(context);
+                state,
+                options: options);
         return MountedComponent.Create(
             context,
             request ?? ComponentTree.Template(templateType),

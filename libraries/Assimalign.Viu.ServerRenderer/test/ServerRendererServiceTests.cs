@@ -16,6 +16,38 @@ namespace Assimalign.Viu.ServerRenderer.Tests;
 public class ServerRendererServiceTests
 {
     [Fact]
+    public void Builder_ConfigureApplication_FreezesCompositionAndDiagnosticsAtBuild()
+    {
+        InlineComponent component = new(_ => () => TestTree.Element("div", "x"));
+        IComponent rootComponent = component.Request();
+        TestServiceProvider services = TestServiceProvider.Empty;
+        Action<string> warnHandler = static _ => { };
+        ApplicationOptions? configuredOptions = null;
+        ServerApplicationBuilder builder = new();
+
+        ServerApplicationBuilder configured = builder.ConfigureApplication(options =>
+        {
+            configuredOptions = options;
+            options.RootComponent = rootComponent;
+            options.Components = InlineComponentFactory.Instance;
+            options.Services = services;
+            options.WarnHandler = warnHandler;
+        });
+        ServerRenderApplication application = configured.Build();
+        configuredOptions!.RootComponent = ComponentTree.Comment("changed");
+        configuredOptions.Services = new TestServiceProvider(
+            new Dictionary<Type, object>());
+        configuredOptions.WarnHandler = null;
+
+        // [APP-2] Build freezes the option values while the supplied dependencies stay borrowed.
+        configured.ShouldBeSameAs(builder);
+        application.Context.RootComponent.ShouldBeSameAs(rootComponent);
+        application.Context.Components.ShouldBeSameAs(InlineComponentFactory.Instance);
+        application.Context.Services.ShouldBeSameAs(services);
+        application.Context.WarnHandler.ShouldBeSameAs(warnHandler);
+    }
+
+    [Fact]
     public async Task Builder_AttachesServices_ReachableFromSetupDuringRender()
     {
         Greeting greeting = new("hello");
@@ -27,7 +59,7 @@ public class ServerRendererServiceTests
                 ?? throw new InvalidOperationException("Greeting was not supplied.");
             return () => TestTree.Element("div", resolved.Text);
         });
-        ServerApplication application = ServerApplication
+        ServerRenderApplication application = ServerRenderApplication
             .CreateBuilder(component.Request(), InlineComponentFactory.Instance, services)
             .Build();
 
@@ -38,18 +70,16 @@ public class ServerRendererServiceTests
     }
 
     [Fact]
-    public async Task ServerApplication_DoesNotDisposeBorrowedServiceProvider()
+    public async Task ServerRenderApplication_DoesNotDisposeBorrowedServiceProvider()
     {
         TrackingServiceProvider services = new();
         InlineComponent component = new(_ => () => TestTree.Element("div", "x"));
-        ServerApplication application = new(
+        ServerRenderApplication application = new(
             component.Request(),
             InlineComponentFactory.Instance,
             services);
 
         await ServerRenderer.RenderToStringAsync(application);
-        application.Unmount();
-        await application.UnmountAsync();
 
         services.IsDisposed.ShouldBeFalse();
     }

@@ -71,9 +71,10 @@ runtime code generation. Roslyn source generators are the sanctioned metaprogram
 `<IsAotCompatible>true</IsAotCompatible>`; activation is explicit delegate dispatch; nothing is
 discovered by reflection at runtime.
 
-`[DEF-5]` Viu is **host-generic**. `Renderer<TNode>` and `Application<TNode>` are parameterized on
-the host node type. The browser (`TNode = int`) and the in-memory test host (`TNode = TestNode`) are
-adapters over the same contracts; neither is a dependency of the core.
+`[DEF-5]` Viu is **host-generic**. `Renderer<TNode>` is parameterized on the host node type, while
+Core's `IApplication` lifetime contains no host node type. Platform assemblies implement that
+lifetime directly and own their mount operations; Browser uses opaque integer DOM handles without
+making Browser a dependency of Core.
 
 The principal runtime, compiler, and editor assemblies and their responsibilities:
 
@@ -332,9 +333,67 @@ This is a decision, not a deferral (see [§17](#17-non-goals-and-current-limits)
 consequences elsewhere: `RouterView` takes its nesting depth as an explicit argument
 ([§12](#12-routing)) precisely because no ambient hierarchical channel exists.
 
-`[CMP-25]` Application plugins (`IApplicationPlugin`) are **awaited pre-mount initialization hooks**
-over an already-composed application. They do not imply a mutable component or directive registry; a
-developer who wants plugin-driven registration supplies a mutable custom resolver.
+#### Application composition and lifetime
+
+`[APP-1]` A runnable `IApplication` has the internal single-use state machine **Created → Starting →
+Running → Stopping → Stopped**, with failure edges from Starting, Running, and Stopping. `StartAsync`
+synchronously claims the application by moving it from Created to Starting exactly once, begins the
+middleware pipeline as an independently observed asynchronous task, and waits until the host terminal
+has mounted and signalled Running. Every later `StartAsync` call throws, including after stopping or
+failure. `IApplicationContext.IsRunning` is true only between that mounted signal and the beginning of
+stopping. An already-cancelled token is observed only after the claim and therefore follows the
+ordinary **Starting → Stopping → Stopped** path without mounting.
+
+`[APP-2]` Application composition and runtime behavior are separate phases. The lean
+`IApplicationBuilder` exposes only `ConfigureApplication(Action<ApplicationOptions>)` and `Build()`.
+`ApplicationOptions` is the single builder composition surface for the root component, component
+factory, service provider, state registry, directive resolver, and diagnostics. `Build()` snapshots
+those borrowed values into a read-only `IApplicationContext`; later option mutation cannot alter the
+built context. `Use(ApplicationMiddleware)` decorates the already-built application's live execution
+and cannot add or replace composition.
+
+`[APP-3]` Middleware registration freezes when execution begins: `Use` after `StartAsync` or a
+lower-level Browser mount operation has started throws. Registrations are ordered entries, not a set;
+registering the same middleware instance twice executes it twice.
+
+`[APP-4]` For two middleware registrations, execution is nested in registration order and cleanup is
+nested in reverse order:
+
+```text
+first before
+  second before
+    initialize host → resolve mount target → mount or hydrate
+    signal Running; wait for IApplicationContext.Stopping
+    unmount
+  second cleanup
+first cleanup
+```
+
+The terminal delegate MUST remain pending after mount until `IApplicationContext.Stopping` is
+signalled; `StartAsync` returns at the mounted signal without completing that pipeline task. Returning
+the terminal immediately after mount would run middleware `finally` blocks while the application was
+still live. The `RunAsync` extension spans the full lifetime as **StartAsync → wait for Stopping →
+StopAsync**.
+
+`[APP-5]` Cancellation of the `RunAsync` token, or a call to `StopAsync`, signals
+`IApplicationContext.Stopping`, begins stopping, unmounts the live tree, and then unwinds middleware
+cleanup in reverse registration order. `StopAsync` awaits the pipeline task; its own token cancels only
+that caller's wait, never the cleanup. Cleanup surrounding a failing inner delegate still runs through
+ordinary asynchronous `try`/`finally` semantics. A pipeline failure after startup moves the
+application to Failed, is reported once through `IApplicationContext.ErrorHandler`, and remains on the
+pipeline task so `StopAsync` and `RunAsync` surface it. Startup and host failures follow the same
+reporting path; cancellation requested through Stopping is normal shutdown [APP-1].
+
+`[APP-6]` The component factory, service provider, state registry, directive resolver, and other
+composition dependencies are **borrowed**. Viu never disposes them when an application stops, fails,
+or is asynchronously disposed; their external composition root retains ownership [CMP-9].
+
+`[APP-7]` Top-level startup is asynchronous only. `IApplication` exposes `StartAsync` and `StopAsync`;
+`RunAsync` is an extension composing those operations, and Viu exposes no synchronous start or run
+because blocking asynchronous host initialization is unsafe on single-threaded WebAssembly.
+Lower-level mount APIs live in `Assimalign.Viu.Browser` for embedding and tests and explicitly bypass
+top-level lifetime middleware. Core carries no generic mount abstraction. Server rendering is a
+separate per-render composition and also does not participate in this pipeline [SSR-2].
 
 ### 4.9 Attribute-declared parameters and events
 
@@ -416,7 +475,11 @@ without them.
 (`Metadata/{ParameterAttribute,EventAttribute}.cs` for [CMP-26]-[CMP-31];
 `ComponentTemplateBase.cs` for [CMP-32]);
 `libraries/Assimalign.Viu.Core/src/Internal/{ComponentContext,ComponentLifecycle,MountedComponent}.cs`;
-`libraries/Assimalign.Viu.Core/src/Abstraction/IApplicationContext.cs`;
+`libraries/Assimalign.Viu.Core/src/Abstraction/{IApplication,IApplicationBuilder,IApplicationContext}.cs`;
+`libraries/Assimalign.Viu.Core/src/Delegates/{ApplicationDelegate,ApplicationMiddleware}.cs`;
+`libraries/Assimalign.Viu.Core/src/Application/{ApplicationContext,ApplicationOptions}.cs`;
+`libraries/Assimalign.Viu.Core/src/Extensions/ApplicationExtensions.cs`;
+`libraries/Assimalign.Viu.Browser/src/{BrowserApplication,BrowserApplicationBuilder}.cs`;
 `libraries/Assimalign.Viu.Components/docs/OVERVIEW.md`; `docs/ARCHITECTURE.md`;
 `libraries/Assimalign.Viu.Core/docs/OVERVIEW.md`.*
 
@@ -1254,12 +1317,13 @@ boundary:
 
 ### 11.1 Server rendering
 
-`[SSR-1]` `ServerRenderer.RenderToStringAsync` renders a configured `ServerApplication` to a string;
+`[SSR-1]` `ServerRenderer.RenderToStringAsync` renders a configured `ServerRenderApplication` to a string;
 `RenderToStreamAsync` writes **completed template subtrees** to a `TextWriter` and awaits the
 writer's `FlushAsync`, so the destination controls backpressure.
 
-`[SSR-2]` `ServerApplication` carries an `IApplicationContext` **without a host node type**. Because
-it never mounts a live host tree, `IsMounted` is `false` and `RootContext` is `null`.
+`[SSR-2]` `ServerRenderApplication` is a plain per-render composition object carrying an immutable
+`IApplicationContext` **without a host node type**. It does not implement `IApplication`, owns no
+persistent mounted lifetime, and does not participate in top-level application middleware [APP-7].
 
 `[SSR-3]` ServerRenderer consumes the **same `IComponent` tree** client renderers patch; it does not
 maintain a second node model. `ComponentTreeSerializer` dispatches the seven `ComponentKind` values
@@ -1339,9 +1403,9 @@ already carries the trailing `<!--teleport anchor-->` the walker requires.
 adapter over a host-agnostic contract. ServerRenderer references Shared, Components, and Core, and
 has no DOM, Browser, WebView2, or JavaScript-interop dependency.
 
-`[SSR-9]` A server host SHOULD create **one application per request** when services or state are
-request-scoped. The supplied factory, service provider, and state registry are borrowed and are
-never disposed by ServerRenderer [CMP-9].
+`[SSR-9]` A server host SHOULD create **one server-render application per request** when services or
+state are request-scoped. The supplied factory, service provider, and state registry are borrowed
+and are never disposed by ServerRenderer [CMP-9], [APP-6].
 
 *Authority: `libraries/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
@@ -1362,9 +1426,12 @@ cheaply. `RouteParameters` accessors are **boxing-free and reflection-free**
 `With`/`WithMany` builders.
 
 `[RTR-3]` Three histories ship behind the `RouterHistory` factory: **memory** (pure; no
-initialization), **web** (HTML5 History API), and **hash**. Web and hash drive the History API over
-interop and require `InitializeAsync` first. History state marshals as a **flat, primitives-only**
-payload.
+initialization), **web** (HTML5 History API), and **hash**. Web and hash lazily initialize their
+browser-history bridge when `Router.ReadyAsync` first needs it; `RouterHistory.InitializeAsync`
+remains an optional prewarming call. `UseRouter` awaits readiness with
+`IApplicationContext.Stopping` before the host terminal mounts and removes the DOM bridge during
+reverse-order application cleanup [APP-4], [APP-5]. History state marshals as a **flat,
+primitives-only** payload.
 
 `[RTR-4]` `RouterView` and `RouterLink` resolve `Router` from `IComponentContext.Services`.
 **`RouterView` takes its nesting depth as an explicit argument** (default `0`), and a nested layout

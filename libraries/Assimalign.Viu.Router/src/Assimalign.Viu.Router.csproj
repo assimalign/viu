@@ -17,7 +17,7 @@
   <!--
     The non-Blazor WebAssembly host serves the consuming app's source wwwroot. Package the
     browser-history module with a buildTransitive target that flows it to the standard
-    /_content/Assimalign.Viu.Router/ URL consumed by RouterHistory.InitializeAsync().
+    /_content/Assimalign.Viu.Router/ URL consumed by the RouterHistory lazy bridge initialization.
   -->
   <ItemGroup>
     <None Update="wwwroot\viu-history.js"

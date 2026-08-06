@@ -47,9 +47,17 @@ renderers.
 
 ## Application composition
 
-`ServerApplication` is host-neutral because it does not own a `Renderer<TNode>` or host container.
-It implements the non-generic `IApplication` configuration face and carries the same
-`IApplicationContext` used by Browser and future WebView2 applications.
+`ServerRenderApplication` is a plain composition object because server rendering has no persistent
+mounted host lifetime. It does not own a `Renderer<TNode>` or host container, does not implement
+`IApplication`, and carries the same immutable `IApplicationContext` that component execution reads.
+
+`ServerApplicationBuilder` is therefore standalone rather than an `IApplicationBuilder`: that
+interface builds a runnable host, while this builder produces `ServerRenderApplication`. The builder
+has one composition operation, `ConfigureApplication(Action<ApplicationOptions>)`. `Build()` validates
+the required root and snapshots the current root, resolvers, optional state and directives, and
+diagnostics into a new `ApplicationContext`; later option mutations cannot change that context. The
+low-level `ServerRenderApplication(IApplicationContext)` constructor remains available when a host has
+already assembled an immutable context.
 
 The application receives three independent, borrowed composition services:
 
@@ -61,8 +69,11 @@ ServerRenderer does not own or dispose any of them. It does not implement compon
 provide/inject. Applications that need hierarchical dependency behavior can choose an appropriate
 service provider or component factory at their own composition boundary.
 
-Plugins are deduplicated by reference and awaited before rendering. Because an app may carry
-request-scoped services or state, server hosts should create one app per request.
+Top-level application middleware surrounds one live hosted application, so server rendering
+deliberately bypasses it. A future interception surface, if required, would be a per-render contract
+carrying the `SsrContext`, output, and cancellation token; D5 explicitly defers that separate design.
+Because a server-render application may carry request-scoped services or state, server hosts should
+create one composition object per request.
 
 ## Async and streaming model
 

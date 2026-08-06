@@ -228,22 +228,28 @@ public sealed class Router : IDisposable
     /// <c>from</c> = <see cref="RouteLocation.Start"/>, so a global <see cref="BeforeEach"/> redirect
     /// (the classic <c>/</c> → <c>/x</c>) fires even for a page loaded directly at that URL; the
     /// confirm step replaces the current history entry rather than pushing a new one. Idempotent —
-    /// every call returns the same task, so the initial navigation runs exactly once.
+    /// every call returns the same task, so the initial navigation runs exactly once. The first
+    /// call's cancellation token owns bridge initialization and that navigation; tokens supplied by
+    /// later callers cannot replace it.
     /// </summary>
     /// <remarks>
     /// A Viu bootstrap awaits this before mounting so the first render already reflects the resolved
-    /// (or redirected) route. The returned task resolves with the initial navigation's
-    /// <see cref="NavigationFailure"/> (or <see langword="null"/> on success) and faults only on an
-    /// unexpected guard exception. Viu has no router-install hook, so triggering the first navigation
-    /// and awaiting it are one method rather than two, and it always settles — an aborted initial
-    /// navigation completes with its failure instead of hanging.
+    /// (or redirected) route. After history initialization, the returned task resolves with the
+    /// initial navigation's <see cref="NavigationFailure"/> (or <see langword="null"/> on success);
+    /// caller cancellation during a guard produces a cancelled failure, while cancellation or failure
+    /// during history initialization propagates from this task. An unexpected guard exception also
+    /// faults it. Viu has no separate router-install hook, so triggering the first navigation and
+    /// awaiting it are one method rather than two, and an aborted initial navigation completes with
+    /// its failure instead of hanging.
     /// </remarks>
+    /// <param name="cancellationToken">Cancels history initialization and the initial navigation.</param>
     /// <returns>The initial navigation outcome, settling when it completes.</returns>
     /// <exception cref="ObjectDisposedException">The router has been disposed.</exception>
-    public Task<NavigationFailure?> ReadyAsync()
+    public Task<NavigationFailure?> ReadyAsync(
+        CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        return _initialNavigation ??= Navigate(_history.Location, replace: false);
+        return _initialNavigation ??= ReadyCoreAsync(cancellationToken);
     }
 
     /// <summary>
@@ -314,14 +320,38 @@ public sealed class Router : IDisposable
         };
     }
 
-    private async Task<NavigationFailure?> Navigate(string location, bool replace)
+    private async Task<NavigationFailure?> ReadyCoreAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_history is IInitializableRouterHistory initializableHistory)
+        {
+            await initializableHistory
+                .InitializeAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return await Navigate(
+            _history.Location,
+            replace: false,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<NavigationFailure?> Navigate(
+        string location,
+        bool replace,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(location);
         ThrowIfDisposed();
         var to = _matcher.Resolve(location);
         try
         {
-            return await PushWithRedirect(to, replace, redirectedFrom: null, redirectCount: 0);
+            return await PushWithRedirect(
+                to,
+                replace,
+                redirectedFrom: null,
+                redirectCount: 0,
+                cancellationToken: cancellationToken);
         }
         catch (Exception exception)
         {
@@ -338,9 +368,10 @@ public sealed class Router : IDisposable
         RouteLocation to,
         bool replace,
         RouteLocation? redirectedFrom,
-        int redirectCount)
+        int redirectCount,
+        CancellationToken cancellationToken)
     {
-        var token = BeginNavigation();
+        var token = BeginNavigation(cancellationToken);
         var from = _currentRoute.Value;
         NavigationFailure? failure;
         // Dedup only when `from` already has a matched chain:
@@ -354,7 +385,21 @@ public sealed class Router : IDisposable
         }
         else
         {
-            var outcome = await RunNavigationPipeline(to, from, token);
+            NavigationOutcome outcome;
+            try
+            {
+                outcome = await RunNavigationPipeline(to, from, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                failure = new NavigationFailure(
+                    NavigationFailureType.Cancelled,
+                    to,
+                    from);
+                TriggerAfterEach(to, from, failure);
+                return failure;
+            }
+
             switch (outcome.Kind)
             {
                 case NavigationOutcomeKind.Redirect:
@@ -365,7 +410,12 @@ public sealed class Router : IDisposable
                     var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
                     // afterEach fires for the final navigation only — the redirect recurses before
                     // the after-hooks run — so return the recursion's result directly.
-                    return await PushWithRedirect(redirectTarget, replace, redirectedFrom ?? to, redirectCount + 1);
+                    return await PushWithRedirect(
+                        redirectTarget,
+                        replace,
+                        redirectedFrom ?? to,
+                        redirectCount + 1,
+                        cancellationToken);
                 case NavigationOutcomeKind.Abort:
                     failure = new NavigationFailure(NavigationFailureType.Aborted, to, from);
                     break;
@@ -595,12 +645,16 @@ public sealed class Router : IDisposable
     }
 
     // Supersede any in-flight navigation and start a fresh cancellation scope for this one. A
-    // superseded token reads cancelled at its next checkpoint; the source is left for GC (it holds no
-    // unmanaged resource) and only the current one is disposed on Dispose().
-    private CancellationToken BeginNavigation()
+    // caller token is linked rather than substituted so later navigations can still supersede it.
+    // The current source is disposed by Dispose; a superseded source remains alive while its guard
+    // still holds the token and becomes collectible when that navigation settles.
+    private CancellationToken BeginNavigation(
+        CancellationToken cancellationToken = default)
     {
         _pendingNavigation?.Cancel();
-        _pendingNavigation = new CancellationTokenSource();
+        _pendingNavigation = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : new CancellationTokenSource();
         return _pendingNavigation.Token;
     }
 
@@ -643,7 +697,12 @@ public sealed class Router : IDisposable
                         RestorePopLocation(information);
                         urlRestored = true;
                         var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
-                        await PushWithRedirect(redirectTarget, replace: false, redirectedFrom: to, redirectCount: 0);
+                        await PushWithRedirect(
+                            redirectTarget,
+                            replace: false,
+                            redirectedFrom: to,
+                            redirectCount: 0,
+                            cancellationToken: default);
                         return;
                     case NavigationOutcomeKind.Abort:
                         failure = new NavigationFailure(NavigationFailureType.Aborted, to, from);

@@ -14,6 +14,12 @@ namespace Assimalign.Viu.Router;
 /// <c>/</c> path plus any query and fragment. The configured <see cref="Base"/> is prepended when
 /// writing to the environment and stripped when reading back, so consumers never see it. Not
 /// thread-safe: the router targets the single-threaded JS event loop.
+/// <para>
+/// Web and hash histories initialize their browser bridge through <see cref="Router.ReadyAsync"/>.
+/// <see cref="Listen"/> and <see cref="Destroy"/> are valid before readiness so a router can attach
+/// and detach safely; every other synchronous member throws <see cref="InvalidOperationException"/>
+/// until readiness completes.
+/// </para>
 /// </remarks>
 public interface IRouterHistory
 {

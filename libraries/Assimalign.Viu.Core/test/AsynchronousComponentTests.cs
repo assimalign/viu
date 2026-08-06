@@ -300,8 +300,13 @@ public sealed class AsynchronousComponentTests : IDisposable
         FakeHost host = new();
         Renderer<FakeHostNode> renderer =
             RendererFactory.CreateRenderer(host.Options);
-        ApplicationContext application = Application(request, definition);
-        application.ErrorHandler = (_, _, _) => handledErrors++;
+        ApplicationContext application = Application(
+            request,
+            definition,
+            new ApplicationOptions
+            {
+                ErrorHandler = (_, _, _) => handledErrors++,
+            });
 
         renderer.Render(request, host.Root, application);
         _time.Advance(100);
@@ -360,8 +365,13 @@ public sealed class AsynchronousComponentTests : IDisposable
         FakeHost host = new();
         Renderer<FakeHostNode> renderer =
             RendererFactory.CreateRenderer(host.Options);
-        ApplicationContext application = Application(request, definition);
-        application.ErrorHandler = (error, _, _) => handled = error;
+        ApplicationContext application = Application(
+            request,
+            definition,
+            new ApplicationOptions
+            {
+                ErrorHandler = (error, _, _) => handled = error,
+            });
 
         renderer.Render(request, host.Root, application);
         _pump.RunUntilIdle();
@@ -627,6 +637,19 @@ public sealed class AsynchronousComponentTests : IDisposable
         AsynchronousComponentDefinition definition,
         params ComponentRegistration[] registrations)
     {
+        return Application(
+            root,
+            definition,
+            options: null,
+            registrations);
+    }
+
+    private static ApplicationContext Application(
+        IComponent root,
+        AsynchronousComponentDefinition definition,
+        ApplicationOptions? options,
+        params ComponentRegistration[] registrations)
+    {
         List<ComponentRegistration> all =
         [
             definition.Registration,
@@ -635,7 +658,8 @@ public sealed class AsynchronousComponentTests : IDisposable
         return new ApplicationContext(
             root,
             new ComponentFactory(all),
-            new EmptyServiceProvider());
+            new EmptyServiceProvider(),
+            options: options);
     }
 
     private static ComponentArguments Arguments(

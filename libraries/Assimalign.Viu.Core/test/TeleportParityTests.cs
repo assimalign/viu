@@ -384,8 +384,11 @@ public sealed class TeleportParityTests : IDisposable
         ApplicationContext application = new(
             root,
             new ComponentFactory(Array.Empty<ComponentRegistration>()),
-            new EmptyServiceProvider());
-        application.WarnHandler = warnings.Add;
+            new EmptyServiceProvider(),
+            options: new ApplicationOptions
+            {
+                WarnHandler = warnings.Add,
+            });
         return application;
     }
 

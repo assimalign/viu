@@ -1,0 +1,16 @@
+#nullable enable
+Assimalign.Viu.Browser.BrowserApplication.Context.get -> Assimalign.Viu.IApplicationContext!
+Assimalign.Viu.Browser.BrowserApplication.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.Browser.BrowserApplication.Mount(int container) -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.Browser.BrowserApplication.MountAsync(int container, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.Components.IComponentContext?>
+Assimalign.Viu.Browser.BrowserApplication.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.Browser.BrowserApplication.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.Browser.BrowserApplication.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.Browser.BrowserApplication.Use(Assimalign.Viu.ApplicationMiddleware! middleware) -> Assimalign.Viu.IApplication!
+Assimalign.Viu.Browser.BrowserApplicationBuilder.BrowserApplicationBuilder(bool useCommandBuffer = false) -> void
+Assimalign.Viu.Browser.BrowserApplicationBuilder.Build() -> Assimalign.Viu.Browser.BrowserApplication!
+Assimalign.Viu.Browser.BrowserApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+*REMOVED*override Assimalign.Viu.Browser.BrowserApplicationBuilder.Build() -> Assimalign.Viu.Browser.BrowserApplication!
+*REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateBuilder(Assimalign.Viu.Components.IComponent! rootComponent, bool useCommandBuffer = false) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+*REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateBuilder(bool useCommandBuffer = false) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+*REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateServerRendererBuilder(Assimalign.Viu.Components.IComponent! rootComponent) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!

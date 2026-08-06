@@ -55,7 +55,8 @@ and — as of [V01.01.06.07] — generates the `IComponentTemplate` bridge (meta
 allocates the render cache, wires slots, applies any `v-bind()` CSS custom properties, and returns the
 render delegate). A template-bearing `.viu` is registered with the application-selected
 `IComponentFactory` and requested through `ComponentTree.Template<TComponent>()`, including when
-that request is the root supplied to `BrowserApplication.CreateBuilder(...)`; reactive `@script`
+that request is assigned to `ApplicationOptions.RootComponent` through
+`BrowserApplicationBuilder.ConfigureApplication`; reactive `@script`
 members then drive re-rendering with no hand-written component bridge. A `.viu` with **no**
 template block (a `<style>`-only CSS-bundle unit, or a `@script`-only partial) stays a plain partial
 class — no component bridge — so it keeps compiling exactly as before. This library still only

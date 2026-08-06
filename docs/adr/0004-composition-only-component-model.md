@@ -9,16 +9,24 @@
 > **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
 > framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
 > [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority — the composition-only
-> component model is carried forward there as clauses `[CMP-1]`–`[CMP-25]` and §17.1. **The core
+> component model is carried forward in §4's component clauses and §17.1. **The core
 > decision recorded here is unaffected**: Viu ships a composition-only component model with no
 > options-style authoring, no mixins, and no global-properties bag.
 >
 > **The stated replacement mechanism, however, no longer exists.** The Decision below routes
 > cross-cutting values through "typed provide/inject (`InjectionKey<T>`, app-level `Provide<T>`)" and
 > plugins (`IPlugin`), and describes an `ApplicationConfiguration` carrying the error handler, warn
-> handler, and performance flag. As of this working tree: `InjectionKey` and `ApplicationConfiguration`
-> do not exist anywhere in the source, `IPlugin` is now `IApplicationPlugin`, and application state
-> moved onto `IApplicationContext`. **Component-tree provide/inject was not ported at all** — it is a
+> handler, and performance flag. As of this working tree: `InjectionKey`, `ApplicationConfiguration`,
+> `IPlugin`, and its interim `IApplicationPlugin` successor do not exist. Composition uses builder
+> `ConfigureApplication(ApplicationOptions)` through the lean `IApplicationBuilder`;
+> `ApplicationMiddleware` receives `IApplicationContext` and surrounds the live application
+> lifetime; all composition and diagnostics are frozen from those options into the context.
+> `IApplicationContext` also exposes read-only `IsRunning` and `Stopping` runtime state, while
+> `IApplication` exposes `StartAsync` and `StopAsync` and gains long-running `RunAsync` through an
+> extension. Browser implements that contract directly and owns the lower-level mount methods; the
+> interim generic and abstract application types and Browser's static facade were removed by
+> [V01.01.14.08]. **Component-tree provide/inject was
+> not ported at all** — it is a
 > recorded decision, not a deferral (`docs/ARCHITECTURE.md` approved decision 8), and the specification
 > states it as `[CMP-24]`: component dependencies are explicit through parameters and slots,
 > `IComponentContext.Services`, State definitions, and `IComponentContext.Components`. Reversing the
@@ -51,10 +59,9 @@ runtime machinery — a poor fit for an AOT/trimming target and for C#'s type sy
   state (refs, computeds) and handlers.
 - No `app.config.globalProperties`: cross-cutting values are supplied through **typed
   provide/inject** (`InjectionKey<T>`, app-level `Provide<T>`) and plugins (`IPlugin`).
-- `Application<TNode>` (the C# port of `createAppAPI(render)`) and `ApplicationConfiguration`
-  deliberately exclude a global-properties bag; `ApplicationConfiguration` carries the error
-  handler, warn handler, and performance flag only. This exclusion is called out in
-  `Application<TNode>`'s own XML docs, which reference this ADR.
+- The application lifetime and its configuration deliberately exclude a global-properties bag;
+  configuration carries only typed composition and diagnostics. The current options/context API
+  preserves that exclusion without a host-generic application base.
 
 ## Consequences
 
@@ -78,7 +85,7 @@ runtime machinery — a poor fit for an AOT/trimming target and for C#'s type sy
 
 - [`docs/PLAN.md`](../PLAN.md) — founding decision 5.
 - [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md)
-  (formerly `Assimalign.Viu.RuntimeCore`, renamed in [V01.01.12.21]) and `Application<TNode>` /
-  `ApplicationConfiguration`.
+  (formerly `Assimalign.Viu.RuntimeCore`, renamed in [V01.01.12.21]) and the current application
+  options/context surface.
 - Vue 3: [Composition API FAQ](https://vuejs.org/guide/extras/composition-api-faq.html),
   [provide/inject](https://vuejs.org/guide/components/provide-inject.html).

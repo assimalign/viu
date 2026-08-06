@@ -164,67 +164,92 @@ await runMain()
 
 ## Your first component
 
-A Viu component is a plain C# object implementing `IComponent`. Its `Setup` method runs **once** per
-instance, declares the component's reactive state as ordinary locals, and returns a **render
-function** that re-runs whenever the state it read changes. The closure *is* the component's state:
+A Viu authored component is a plain C# object implementing `IComponentTemplate`. Its `Setup` method
+runs **once** per mounted instance, declares reactive state as ordinary locals, and returns a
+**render function** producing an immutable `IComponent` tree. The function re-runs whenever the
+reactive state it read changes. The closure *is* the component's state:
 there is no separate state object to declare, no name-based lookup between state and template, and
 no instance to reflect over at run time — which is exactly what makes the model AOT- and
 trimming-safe ([ADR-0004](../adr/0004-composition-only-component-model.md): a component is a setup
 function returning a render function, and there is no second, declarative authoring style).
 
-**`Program.cs`** — a Viu WASM app's whole bootstrap: build the app from a root component and mount it
-by selector, then keep the WASM main loop alive (rendering is reactive from there on). The builder is
-the .NET-idiomatic shape (compare `WebApplication.CreateBuilder`), and `MountAsync` loads the browser
-bridge inside the mount path — there is no separate initialization call:
-
-```csharp
-using System.Threading;
-using System.Threading.Tasks;
-
-using Assimalign.Viu.Browser;
-
-using HelloViu;
-
-await BrowserApplication.CreateBuilder(new Counter()).Build().MountAsync("#app");
-
-await Task.Delay(Timeout.Infinite);
-```
-
-Configure the app on the builder before `Build()` — `UseRootComponent`, `UseComponentFactory`,
-`UseServiceProvider`, `UseStateRegistry`, `UseDirectiveResolver`, and plugins with
-`Use(IApplicationPlugin)`. Configuration is complete by the time `Build()` returns; a plugin is an
-awaited pre-mount initialization hook over an already-composed application, not a mutable registry
-you can extend afterwards.
-
-### Dependency injection (`System.IServiceProvider`)
-
-For app-level singletons — a data client, a router, a store registry — Viu integrates
-**bring-your-own dependency injection over `System.IServiceProvider`**. Register services on the
-builder (the shape a .NET developer expects, compare `WebApplicationBuilder.Services`), then resolve
-them from a component's `Setup`:
+**`Program.cs`** — a Viu WASM app's whole bootstrap: compose the app, decorate its live lifetime, and
+await that lifetime. Direct construction of `BrowserApplicationBuilder` selects the browser host and
+its default `#app` mount target. The `RunAsync` extension starts the application, waits for shutdown,
+and stops it; it remains pending across the mounted lifetime, so no artificial infinite delay is
+required:
 
 ```csharp
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
+using Assimalign.Viu.Components;
 
-var builder = BrowserApplication.CreateBuilder(new App());
-builder.Services.AddSingleton(new ApiClient(baseAddress));         // an app-level singleton
-builder.Services.AddTransient<RequestId>(_ => new RequestId());    // a fresh instance per resolution
-await builder.Build().MountAsync("#app");
+using HelloViu;
+
+ComponentFactory components = new(
+[
+    new ComponentRegistration(
+        typeof(Counter),
+        static () => new Counter()),
+]);
+
+await new BrowserApplicationBuilder()
+    .ConfigureApplication(options =>
+    {
+        options.RootComponent = ComponentTree.Template<Counter>();
+        options.Components = components;
+    })
+    .Build()
+    .RunAsync();
+```
+
+Compose the app exclusively through `ConfigureApplication(options => ...)`: `RootComponent`,
+`Components`, `Services`, `State`, `Directives`, and diagnostics all live on
+`ApplicationOptions`. `Build()` freezes that composition into a read-only `IApplicationContext`;
+later option changes cannot recompose it. The context also exposes the live `IsRunning` state and
+`Stopping` token. After `Build()`, `Use` registers asynchronous middleware around the complete live
+application lifetime. It does not mutate the component, directive, service, or state composition,
+and calling it after execution starts throws ([APP-2]–[APP-4]).
+
+### Dependency injection (`System.IServiceProvider`)
+
+For app-level singletons — a data client, a router, a store registry — Viu integrates
+**bring-your-own dependency injection over `System.IServiceProvider`**. Build and own the provider
+with the container of your choice, attach its lookup-only interface to Viu, then resolve from a
+component's `Setup`:
+
+```csharp
+using System;
+
+using Assimalign.Viu;
+using Assimalign.Viu.Browser;
+using Assimalign.Viu.Components;
+
+IComponentFactory components = BuildComponentFactory();
+IServiceProvider services = BuildApplicationServices();
+
+await new BrowserApplicationBuilder()
+    .ConfigureApplication(options =>
+    {
+        options.RootComponent = ComponentTree.Template<App>();
+        options.Components = components;
+        options.Services = services;
+    })
+    .Build()
+    .RunAsync();
 ```
 
 ```csharp
 // inside a component's Setup:
-var api = DependencyInjection.GetRequiredService<ApiClient>();      // resolves from the app service provider
+var api = (ApiClient?)context.Services.GetService(typeof(ApiClient))
+    ?? throw new InvalidOperationException("ApiClient is not registered.");
 ```
 
-The default provider is **AOT-safe**: every service is created by a factory delegate — there is no
-reflection, no constructor discovery, and no `Microsoft.Extensions.DependencyInjection` dependency. It
-supports `Singleton`, `Scoped` (per application — the app is the root scope), and `Transient`
-lifetimes; two applications get isolated providers, and disposing an application disposes its owned
-singleton/scoped services. To use a full container (`Microsoft.Extensions.DependencyInjection`,
-Autofac, …), implement the small `IServiceContainer` over it and pass it to
-`builder.UseServiceContainer(...)`.
+`IServiceProvider` is lookup-only, so Viu cannot offer container-agnostic registration methods or
+invent lifetime semantics over it. Register services through your chosen container, then assign the
+resulting provider to `ApplicationOptions.Services`. Viu borrows it and never disposes it; the
+external composition root retains ownership [APP-6]. A primitive tree needs neither a component
+factory nor a provider because the builder supplies empty resolvers for both by default.
 
 This is **app-level** DI, and it is the *only* ambient channel: Viu deliberately has **no hierarchical
 component-tree dependency API** — no ambient provide/inject walking up the parent chain
@@ -247,51 +272,62 @@ argument precisely because no ambient channel exists to carry it.
 ```csharp
 using System;
 
-using Assimalign.Viu;
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace HelloViu;
 
-internal sealed class Counter : IComponent
+internal sealed class Counter : IComponentTemplate
 {
-    public string? Name => "Counter";
-
-    public ComponentSetup Setup(ComponentProperties properties, ComponentSetupContext context)
+    public ComponentRenderer Setup(IComponentContext context)
     {
-        // ref() -> Reactive.Reference: a reactive box read and written through .Value.
-        var count = Reactive.Reference(0);
+        ArgumentNullException.ThrowIfNull(context);
 
-        // computed(): a cached, lazily recomputed derived value.
-        var label = Reactive.Computed(() => count.Value == 1 ? "1 click" : $"{count.Value} clicks");
+        Reference<int> count = Reactive.Reference(0);
+        Computed<string> label = Reactive.Computed(
+            () => count.Value == 1 ? "1 click" : $"{count.Value} clicks");
 
         void Increment() => count.Value++;
 
-        return () => VirtualNodeFactory.Element(
+        return () => ComponentTree.Element(
             "section",
-            VirtualNodeFactory.Properties(("class", "counter")),
-            VirtualNodeFactory.Element("h1", "Hello from Viu"),
-            VirtualNodeFactory.Element(
-                "p",
-                VirtualNodeFactory.Properties(("class", "count")),
-                VirtualNodeFactory.Text(label.Value)),
-            VirtualNodeFactory.Element(
-                "button",
-                VirtualNodeFactory.Properties(
-                    ("class", "primary"),
-                    ("type", "button"),
-                    ("onClick", (Action)Increment)),
-                VirtualNodeFactory.Text("Increment")));
+            new ComponentAttributes(
+            [
+                new ComponentAttribute("class", "counter"),
+            ]),
+            [
+                ComponentTree.Element(
+                    "h1",
+                    children: [ComponentTree.Text("Hello from Viu")]),
+                ComponentTree.Element(
+                    "p",
+                    new ComponentAttributes(
+                    [
+                        new ComponentAttribute("class", "count"),
+                    ]),
+                    [ComponentTree.Text(label.Value)]),
+                ComponentTree.Element(
+                    "button",
+                    new ComponentAttributes(
+                    [
+                        new ComponentAttribute("class", "primary"),
+                        new ComponentAttribute("type", "button"),
+                        new ComponentAttribute("onClick", (Action)Increment),
+                    ]),
+                    [ComponentTree.Text("Increment")]),
+            ]);
     }
 }
 ```
 
-The render function builds a **virtual node** tree with `VirtualNodeFactory`; the runtime diffs it and
+The render function builds an immutable component tree with `ComponentTree`; the runtime diffs it and
 applies only the changed nodes to the real DOM. This matters more on WASM than in JavaScript: **every
 DOM mutation crosses the JS-interop boundary**, so idiomatic Viu leans on the compiled render function
 and the renderer's batched updates rather than imperative DOM access
-([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNodeFactory`, `IComponent`,
-`ComponentProperties`, and `ComponentSetupContext` all live in
-[`Assimalign.Viu.Core`](../../libraries/Assimalign.Viu.Core/docs/OVERVIEW.md); the
-browser entry point `BrowserApplication` lives in
+([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `ComponentTree`, `IComponent`,
+`IComponentTemplate`, and `IComponentContext` live in
+[`Assimalign.Viu.Components`](../../libraries/Assimalign.Viu.Components/docs/OVERVIEW.md); the
+browser `Application` facade and `BrowserApplication` host live in
 [`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a complete
 application with props, emitted events, lifecycle hooks, routing, forms, state, and built-ins, read
 the external [`viu-examples` showcase](https://github.com/assimalign/viu-examples).
@@ -406,10 +442,11 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > **`.viu` `<template>`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
 > A `.viu` with a `<template>` (Viu template syntax) and an `@script` (C#) block now compiles to a
 > **mountable component**: the generator emits the render function, merges the script into the partial
-> class, **and** generates the `IComponent` bridge (a `Setup` that returns the render delegate),
-> so you mount it exactly like a hand-written component — `BrowserApplication.CreateBuilder(new Greeting()).Build().MountAsync("#app")`
-> or `VirtualNodeFactory.Component(new Greeting(), props)` — with no manual wiring beyond the package
-> reference. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive re-render, and a
+> class, **and** implements `IComponentTemplate` with a `Setup` that returns the render delegate.
+> Register that generated type in the application `IComponentFactory`, request it with
+> `ComponentTree.Template<Greeting>()`, and assign the factory to `ApplicationOptions.Components`
+> before building and invoking the `RunAsync` extension. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive
+> re-render, and a
 > template event handler (`@click="Increment"`) calls the like-named `@script` method:
 >
 > ```
@@ -417,7 +454,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 >     <button class="counter" @click="Increment">{{ Count }}</button>
 > </template>
 > @script {
->     using Assimalign.Viu;
+>     using Assimalign.Viu.Reactivity;
 >     public readonly Reference<int> Count = Reactive.Reference(0);
 >     public void Increment() => Count.Value++;
 > }

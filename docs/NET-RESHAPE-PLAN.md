@@ -151,23 +151,34 @@ until reviewed.
   JS, still accurate) or rename to `viu-browser.js` — default: keep filename, change only the
   `_content` package segment.
 
-### R4 — Application model: `IApplication` + abstract base + `IApplicationBuilder` (user item 5)
+### R4 — Application model (superseded; user item 5)
+
+> **Superseded outcome (2026-08-06, [V01.01.14.08]).** This section records the R4 design that
+> shipped at that point in the reshape arc; it is not the current application contract. The API
+> hardening review later deleted the generic node-typed interface, the abstract application and
+> builder bases, and Browser's static builder facades.
+> `IApplication` now exposes single-use `StartAsync` and `StopAsync`; `RunAsync` is an extension;
+> `IApplicationContext` carries `IsRunning` and `Stopping`; middleware receives that context
+> directly; and Browser implements the lifetime and owns mount operations. A lean
+> `IApplicationBuilder` remains, with `ConfigureApplication(ApplicationOptions)` and `Build()` only.
+> The R5 and R8 builder, plugin, service-container, and runtime-state descriptions below remain as
+> historical execution records and are superseded by the same final surface.
 
 - **WBS / branch**: `V01.01.03.23` (RuntimeCore→Core epic #16) /
   `feature/V01.01.03.23-application-model`, stacked on R3.
 - **Scope** (design work, not mechanical — the issue body finalizes the contract):
-  - `IApplication` (+ generic surface as needed) in Core `Abstraction/`; abstract
-    `Application` base with virtual lifecycle seams (creation, plugin install, mount, dispose)
-    replacing today's sealed-shape `Application<TNode>`.
+  - `IApplication` (+ a generic surface as then contemplated) in Core `Abstraction/`; an abstract
+    application base with virtual lifecycle seams (creation, plugin install, mount, dispose)
+    replacing the then-sealed implementation.
   - **Kill the external `BrowserRuntime.InitializeAsync()` step**: `BrowserApplication` (Browser
     library) implements/extends the base and owns its own initialization internally (module
     imports awaited inside its mount path or builder `Build`), so consumer bootstrap is
     builder → build → mount with no runtime pre-call. `ServerApplication` (ServerRenderer) and the
     Testing renderer's mount align to the same contract.
-  - `IApplicationBuilder` + default `ApplicationBuilder` in Core: configuration surface for root
+  - `IApplicationBuilder` plus a default Core builder: configuration surface for root
     component/props, plugins (`Use`), provides, and (R5) services; platform packages supply
-    entry points. **As implemented (#233):** the entry points are `BrowserApplication.CreateBuilder`/
-    `CreateSsrBuilder` and `ServerApplication.CreateBuilder`; `IPlugin<TNode>` became non-generic
+    entry points. **As implemented (#233):** static Browser and server builder factories were the
+    entry points; `IPlugin<TNode>` became non-generic
     `IPlugin`; `CreateApp`/`CreateSsrApp` were **removed** (a sync `Mount` cannot run the killed init)
     and all call sites migrated; `BrowserRuntime` was retained as a low-level primitive holder
     (`InitializeAsync` repositioned as advanced, module-import owned internally by the mount path); the
@@ -277,6 +288,12 @@ Branch stacked on R6.
 - Full-green bar as R6.
 
 ## R8 — application context, async plugins, service container (`V01.01.03.27` intended)
+
+> **Superseded outcome (2026-08-06, [V01.01.14.08]).** `IApplicationPlugin`, the Add-style
+> application composition surface, and runtime state on `IApplication` were subsequently removed.
+> Composition is now configured on `ApplicationOptions` and frozen at `Build()`; runtime
+> `IsRunning` and `Stopping` are read-only members of `IApplicationContext`; and asynchronous
+> behavior composes through `ApplicationMiddleware(IApplicationContext, ApplicationDelegate)`.
 
 Branch stacked on R7.
 

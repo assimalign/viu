@@ -15,9 +15,10 @@ namespace Assimalign.Viu.Router.Browser;
 /// of every non-router application's framework closure ([V01.01.08.03.01], issue #191).
 /// Specified by <c>[RTR-7]</c>.
 /// <para>
-/// Install once at app bootstrap, before mounting (the Viu DOM bridge itself is loaded inside the
-/// app's <c>MountAsync</c> path). Not thread-safe (browser main thread only); the installed bridge is
-/// ambient process-global state on <see cref="BrowserObjectEvents"/>.
+/// <see cref="ApplicationRouterExtensions.UseRouter"/> installs this bridge around the whole
+/// application lifetime. The direct methods remain available for lower-level embedding. Not
+/// thread-safe (browser main thread only); the installed bridge is ambient process-global state on
+/// <see cref="BrowserObjectEvents"/>.
 /// </para>
 /// </summary>
 public static class RouterLinkDomBridge
@@ -28,7 +29,8 @@ public static class RouterLinkDomBridge
     /// <summary>
     /// Installs the bridge so the DOM event system dispatches <see cref="RouterLink"/>'s (and any
     /// other renderer-agnostic component's) click handlers — sets
-    /// <see cref="BrowserObjectEvents.Invoker"/>. Call once at bootstrap.
+    /// <see cref="BrowserObjectEvents.Invoker"/>. Ordinary applications use
+    /// <see cref="ApplicationRouterExtensions.UseRouter"/> instead of calling this directly.
     /// </summary>
     public static void Install() => BrowserObjectEvents.Invoker = Invoker;
 

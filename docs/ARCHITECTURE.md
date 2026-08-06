@@ -100,11 +100,12 @@ Component-tree `provide`/`inject` is intentionally absent. Component dependencie
 - State definitions and explicit registries for shared state; and
 - `IComponentContext.Components` for deliberate component resolution.
 
-Application plugins are awaited pre-mount initialization hooks over an already-composed
-application. They do not imply a mutable component/directive registry: a developer can supply a
-mutable custom resolver when plugin-driven registration is wanted, while the built-in resolvers
-are composed before `Build()`. This keeps `IComponentFactory` open to arbitrary resolver designs
-instead of adding registration methods to the activation contract.
+Application composition and live execution are separate. `ConfigureApplication` assigns the root,
+component factory, directive resolver, service provider, state registry, and diagnostics through
+`ApplicationOptions` before `Build()`. Afterward, `Use(ApplicationMiddleware)` decorates the
+single-use asynchronous application lifetime; it cannot mutate those composition dependencies, and
+registration freezes when `StartAsync` claims execution. This keeps `IComponentFactory` open to
+arbitrary resolver designs instead of adding registration methods to the activation contract.
 
 ## Lifecycle and asynchronous work
 
@@ -192,22 +193,32 @@ roots use the normal diff.
 Null and empty dynamic-child collections remain distinct: null means “not a block,” while a
 non-null empty collection means “an optimized block with no dynamic descendants.”
 
-## Host-generic application model
+## Persistent application model
 
-`IApplication` contains the platform-neutral configuration, plugin, mounted-state, and unmount
-surface. Mounting remains generic through `IApplication<TNode>`, and shared implementation lives in
-`Application<TNode>`.
+`IApplication` is the platform-neutral lifetime contract: its immutable `IApplicationContext`,
+runtime middleware, single-use `StartAsync`, `StopAsync`, and asynchronous disposal. The context is
+also the read-only runtime-state carrier through `IsRunning` and `Stopping`. Core's `RunAsync`
+extension performs the long-running host sequence: start, wait for shutdown, then stop. Core carries
+no host node type and exposes no mount operation [APP-1]–[APP-7].
 
-`BrowserApplication : Application<int>` uses opaque integer DOM handles and adds selector-based
-asynchronous mounting. Browser owns DOM operations, command buffering, browser events, DOM
-directives, transitions, and transition groups; it does not own application services or state.
+`BrowserApplication` implements `IApplication` directly and uses opaque integer DOM handles. A
+directly constructed `BrowserApplicationBuilder` freezes `ApplicationOptions` into the context and
+targets `#app` by default. `StartAsync` launches the middleware pipeline independently and returns
+after the Browser terminal has initialized the host and mounted the tree. `StopAsync` signals
+`IApplicationContext.Stopping`, awaits that pipeline, and unmounts before reverse middleware
+cleanup. `RunAsync` remains pending across the mounted lifetime by composing those operations.
+Browser owns DOM operations, command buffering, browser events, DOM directives, transitions, and
+transition groups; it does not own application services or state.
 
-A planned WebView2 host can derive from `Application<WebViewNodeHandle>`, provide a renderer over its
-own node/session handle, and reuse Components, Reactivity, State, Core lifecycle, plugins, and
-scheduling without depending on Browser.
+The public `Mount` and `MountAsync` operations belong to `BrowserApplication`. They are lower-level
+embedding and testing paths that bypass top-level middleware [APP-7]. A future WebView2 host can
+implement `IApplication` directly, own its node/session handles and mount surface, and reuse
+Components, Reactivity, State, Core rendering, middleware, and scheduling without depending on
+Browser.
 
-ServerRenderer implements the same non-generic application configuration face because its primary
-operation produces serialized output rather than mounting into a persistent node.
+`ServerRenderApplication` is instead a plain composition object. Server rendering produces output
+per request rather than owning a persistent mounted lifetime, so it does not implement
+`IApplication` or participate in application middleware [SSR-2].
 
 ## Runtime capabilities
 
@@ -251,7 +262,8 @@ Dynamic registered names are supported. A plain dynamic string means an element 
 2. `IComponent` is the public render-tree value; `IComponentTemplate` is authored behavior.
 3. Type and registered-name template requests delay activation until mount.
 4. `IComponentFactory` and `IServiceProvider` remain independent application decisions.
-5. Mount APIs remain host-generic through `IApplication<TNode>` and `Application<TNode>`.
+5. Core's application lifetime is host-neutral; each platform implementation owns its mount APIs
+   and host-node types.
 6. Reactivity uses the standalone `Assimalign.Viu.Reactivity` namespace and `IReactive*`
    interfaces while retaining the `ReactiveValue` engine base.
 7. Core keeps internal mounted-node storage for rendering hot paths.

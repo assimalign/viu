@@ -42,14 +42,16 @@ public static class ViuTest
         TestComponentFactory components = new(
             options?.Components,
             options?.Stubs ?? emptyStubs);
+        ApplicationOptions applicationOptions = new();
+        options?.ConfigureApplication?.Invoke(applicationOptions);
+        applicationOptions.EventObserver = emitted.Record;
         ApplicationContext application = new(
             component,
             components,
             options?.Services ?? EmptyServiceProvider.Instance,
             options?.State,
-            options?.Directives);
-        options?.ConfigureApplication?.Invoke(application);
-        application.EventObserver = emitted.Record;
+            options?.Directives,
+            applicationOptions);
 
         Scheduler.Reset();
         ScheduledFlush flush = new(TestSchedulerPump.Install());
@@ -104,14 +106,16 @@ public static class ViuTest
             template,
             options.Components,
             options.Stubs);
+        ApplicationOptions applicationOptions = new();
+        options.ConfigureApplication?.Invoke(applicationOptions);
+        applicationOptions.EventObserver = emitted.Record;
         ApplicationContext application = new(
             root,
             components,
             options.Services ?? EmptyServiceProvider.Instance,
             options.State,
-            options.Directives);
-        options.ConfigureApplication?.Invoke(application);
-        application.EventObserver = emitted.Record;
+            options.Directives,
+            applicationOptions);
 
         Scheduler.Reset();
         ScheduledFlush flush = new(TestSchedulerPump.Install());

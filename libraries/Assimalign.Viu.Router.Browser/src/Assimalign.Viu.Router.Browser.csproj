@@ -8,6 +8,7 @@
        (Router is an opt-in package, not a framework member) and Router never references Browser
        (pinned by RouterAssembly_DoesNotReferenceTheBrowserDomAdapter), so the mapping lives here. -->
   <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
     <ViuProjectReference Include="Assimalign.Viu.Browser" />
   </ItemGroup>

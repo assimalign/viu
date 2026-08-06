@@ -13,10 +13,11 @@ The primary runtime packages are:
 Browser, ServerRenderer, Testing, Router, Router.Browser, Shared, Syntax, template compilation,
 single-file component generation, and CSS tooling are wired to the same redesign graph.
 
-The application boundary is host-generic. Core exposes `IApplication<TNode>` and
-`Application<TNode>` for host-specific node handles; `BrowserApplication : Application<int>` is the
-current host, while a WebView2 host can provide a different handle and renderer without changing
-component, reactivity, or state APIs.
+The application lifetime boundary is host-neutral. Core exposes `IApplication`, the immutable and
+runtime-state-carrying `IApplicationContext`, the lean `IApplicationBuilder`, lifetime middleware,
+and the `RunAsync` extension. `BrowserApplication` implements that contract directly and owns its
+integer-handle mount APIs. A WebView2 host can implement the same lifetime while providing a
+different handle, mount surface, and renderer without changing component, reactivity, or state APIs.
 
 `IComponentFactory` and `IServiceProvider` are separate application-owned resolvers. Viu supplies
 no custom dependency-injection container and no component-tree `provide`/`inject`.

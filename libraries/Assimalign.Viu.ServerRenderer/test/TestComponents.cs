@@ -26,18 +26,18 @@ internal static class Ssr
         IServiceProvider? services = null)
     {
         ArgumentNullException.ThrowIfNull(component);
-        ServerApplication application = new(
+        ServerRenderApplication application = new(
             component.Request(arguments),
             InlineComponentFactory.Instance,
             services ?? TestServiceProvider.Empty);
         return ServerRenderer.RenderToStringAsync(application, context);
     }
 
-    internal static ServerApplication Application(
+    internal static ServerRenderApplication Application(
         IComponent root,
         IServiceProvider? services = null)
     {
-        return new ServerApplication(
+        return new ServerRenderApplication(
             root,
             InlineComponentFactory.Instance,
             services ?? TestServiceProvider.Empty);

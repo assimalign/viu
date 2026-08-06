@@ -1,6 +1,7 @@
 # API surface hardening plan — [V01.01.14]
 
-**Status: ARC OPEN. Wave 1 in progress on `feature/V01.01.14-api-surface-hardening`.**
+**Status: ARC OPEN. Wave 2A in progress on
+`feature/V01.01.14.08-application-lifetime`.**
 
 This document is the session-independent source of truth for the API-hardening arc. Any session
 (human or agent) resuming this work reads this file first, checks the *State* table, and continues
@@ -62,7 +63,8 @@ taking `Browser` and its `browser-wasm` runtime pin.
 | D3 | **Delete `Assimalign.Viu.Syntax.JavaScript`; keep `Assimalign.Viu.Syntax.Html`.** | 2026-08-05 | Both are scaffolds today, but Html is the base for an in-flight POC supporting raw HTML rendering at runtime, external to the build process. Html's packaging is therefore left alone rather than blanket-unshipped — it may need to ship as a runtime library. |
 | D3a | **Amends D3: `Assimalign.Viu.Syntax.Html` is retained but *not published*.** The project stays; the package stops. | 2026-08-05 | D3 kept Html packable on the assumption it might ship as a runtime library. Implementing [V01.01.14.04] showed that cannot work yet, on two counts. Its only dependency, `Assimalign.Viu.Syntax`, is itself now unpublished, so a standalone `Assimalign.Viu.Syntax.Html` package is not restorable by anyone. And the project is a build-time analyzer-host assembly on netstandard2.0 whose own csproj states it is "consumed at build time by generators, never shipped into the WASM app" — the wrong shape for a runtime consumer regardless of the dependency. Publishing resumes when the runtime work settles the TFM and the dependency story together. D3's substance is intact: the project is not deleted and the POC is unblocked. Nothing has shipped publicly (D1), so unshipping now costs nothing. |
 | D4 | **Work tracking: area epic + this plan doc; feature items created just before each wave starts.** | 2026-08-05 | Avoids writing five detailed specs up front that later drift. The GitHub issue body stays the authoritative requirement source for the wave in flight. |
-| D5 | **Redesign the application lifetime: delete `IApplicationPlugin`, separate build-time composition from runtime behavior, and make `Use(...)` a real middleware pipeline around `RunAsync()`.** Direction set by Chase from an independent architecture review of `fc8a90ba`. Full design in the section below. | 2026-08-05 | `IApplicationPlugin` is a deferred initializer with no `next`, no short-circuiting, and no cleanup phase. Verified: it has **zero shipping implementations** — every implementor in the tree is a test double or the showcase's recorder. Deleting it before the polish waves avoids hardening, documenting, and renaming types that are about to be removed. **Requires a `docs/SPECIFICATION.md` amendment replacing `[CMP-25]` (line 333)**, filed per `.claude/rules/deviations.md`; this row is the recorded confirmation. |
+| D5 | **Redesign the application lifetime: delete `IApplicationPlugin`, separate build-time composition from runtime behavior, and make `Use(...)` a real middleware pipeline around the persistent host lifetime.** Direction set by Chase from an independent architecture review of `fc8a90ba`. Full design in the section below, as amended by D5a. | 2026-08-05 | `IApplicationPlugin` is a deferred initializer with no `next`, no short-circuiting, and no cleanup phase. Verified: it has **zero shipping implementations** — every implementor in the tree is a test double or the showcase's recorder. Deleting it before the polish waves avoids hardening, documenting, and renaming types that are about to be removed. **Requires a `docs/SPECIFICATION.md` amendment replacing `[CMP-25]` (line 333)**, filed per `.claude/rules/deviations.md`; this row is the recorded confirmation. |
+| D5a | **Maintainer amendment for PR #305:** `IApplication` exposes `StartAsync`/`StopAsync`; `RunAsync` is an extension; runtime state and the stopping token live on `IApplicationContext`; middleware receives that context directly; a lean `IApplicationBuilder` configures all composition through `ApplicationOptions`; Browser implements the lifetime and mount APIs directly; the generic Core application abstraction, abstract builders, execution wrapper, and static Browser facade are deleted. | 2026-08-06 | This is the accepted review shape for [V01.01.14.08]. It adopts the familiar split between starting a host and running it until shutdown, keeps host-specific mounting out of Core, and removes inheritance that exposed platform mechanics as Core API. The amendment below replaces the original D5 target shape while retaining D5's middleware, cleanup, borrowed-ownership, and server-separation decisions. |
 
 ## State
 
@@ -78,12 +80,12 @@ in as each item is created.
 | T16 | Drop the viral `RequiresPreviewFeatures` stamp | 1 | `.03` | #292 | **IN REVIEW** — supersedes #280 |
 | T03 | Unship build-time packages; delete `Syntax.JavaScript` (keep `Syntax.Html`, see D3) | 1 | `.04` | #294 | **IMPLEMENTED** — pending integration |
 | T02 | Public-API baseline and hardening-attribute conventions | 1 | `.06` | #299 | **IMPLEMENTED** — pending integration |
-| D5-A | Application lifetime: middleware pipeline, delete `IApplicationPlugin` | 2A | — | — | Not started |
-| D5-B | Composition surface: drop public `IApplicationBuilder`, self-returning builders, frozen options | 2A | — | — | Not started |
-| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | — | — | Not started |
-| D5-D | Host facade: `Application.CreateBuilder()` in Browser/SDK | 2A | — | — | Not started |
-| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | — | — | Not started |
-| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | — | — | Not started |
+| D5-A | Application lifetime: middleware pipeline, `StartAsync`/`StopAsync`, `RunAsync` extension, delete `IApplicationPlugin` | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
+| D5-B | Composition surface: lean `IApplicationBuilder`, options-only composition, frozen context | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
+| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
+| D5-D | Browser entry point: direct `new BrowserApplicationBuilder()`; no static facade | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
+| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
+| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
 | T05 | Internalize friend-only publics (~120 types) | 2 | — | — | Not started |
 | T13 | Single source of truth for the helper-name contract | 2 | — | — | Not started |
 | T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | — | — | Not started — decide after T04 lands |
@@ -109,13 +111,19 @@ types that are about to be deleted:
 | Absorbed | Into | Why |
 |---|---|---|
 | G2 `IApplication` declares no disposal; `ServerApplication` implements neither | D5-A, D5-C | The new `IApplication : IAsyncDisposable` closes the contract, and `ServerApplication` leaves the interface entirely rather than growing a teardown path it has no use for. |
-| G6 `Application<TNode>` non-virtual `Dispose` with a private flag | D5-A | The state machine replaces the single `IsMounted` Boolean, and disposal is defined by it. |
+| G6 Core's generic application base had non-virtual `Dispose` with a private flag | D5-A | The Browser-owned state machine replaces the single `IsMounted` Boolean, and disposal is defined by it. |
 | T09 — `IApplicationContext.ErrorHandler`/`WarnHandler`/`Performance` are `{ get; set; }` on the interface while three docs call the context immutable | D5-B | Diagnostics move into builder options and freeze at `Build()`, which makes the documentation true instead of restating the mutation. |
-| T12 — `ApplicationBuilder`'s configuration methods return `IApplicationBuilder`, collapsing the covariant `Build()` on `BrowserApplicationBuilder` | D5-B | Concrete builders return themselves; the erasing interface is removed. |
+| T12 — the former abstract builder's configuration methods returned `IApplicationBuilder`, collapsing the concrete Browser builder | D5-B | The abstract base is deleted. The lean interface remains for platform-neutral construction, while concrete builders self-return and implement its two members explicitly where return covariance requires it. |
 | T14 — `Performance` has no production reader; `BrowserApplication.CreateServerRendererBuilder` has zero callers | D5-B, D5-D | Both are deleted rather than renamed or documented. |
 | T11 — `Router.ReadyAsync` takes no `CancellationToken` | D5-E | Cancellation is required for the middleware pipeline to be cancellable at all. |
 
 ## D5 — application lifetime redesign
+
+> **Maintainer amendment (D5a, 2026-08-06, PR #305).** The first implementation proved the middleware
+> boundary but exposed host mechanics through Core inheritance and made one method both start and
+> span the host lifetime. The accepted review shape below replaces that target: `StartAsync` starts
+> the background pipeline and returns at mounted/Running, while the `RunAsync` extension owns the
+> full start → wait → stop sequence. All other D5 goals remain in force.
 
 ### What is wrong today
 
@@ -127,14 +135,13 @@ showcase's `ShowcasePlugin`, which only records that it ran.
 
 The surrounding abstractions have concrete defects:
 
-- Builder methods return `IApplicationBuilder`, erasing `BrowserApplicationBuilder`; `Build()` then
-  returns `IApplication`; `Use()` erases the application type again.
-- `CreateBuilder(root).Build()` cannot work without manually supplying a component factory and a
-  service provider, despite documented examples saying otherwise
-  ([`ApplicationBuilder.cs:87`](../libraries/Assimalign.Viu.Core/src/Application/ApplicationBuilder.cs)).
+- Builder methods returned an interface that erased the concrete Browser builder and its host-specific
+  result.
+- The old builder could not build a primitive root without dummy component and service resolvers,
+  despite documented examples saying otherwise.
 - `MountAsync` has reentrancy, cancellation, partial-mount cleanup, and disposal-during-startup
   problems because one `IsMounted` Boolean stands in for the whole lifecycle
-  ([`Application{TNode}.cs:94`](../libraries/Assimalign.Viu.Core/src/Application/Application{TNode}.cs)).
+  in the former Core implementation.
 - Selector mounting initializes Browser *before* plugins, while direct node mounting installs plugins
   *before* Browser initialization ([`BrowserApplication.cs:128`](../libraries/Assimalign.Viu.Browser/src/BrowserApplication.cs)).
 - `ServerApplication` implements `IApplication` although it is never mounted, its root context is
@@ -143,42 +150,76 @@ The surrounding abstractions have concrete defects:
 ### Target abstraction
 
 ```csharp
-public delegate ValueTask ApplicationDelegate(ApplicationExecutionContext context);
+public delegate ValueTask ApplicationDelegate(IApplicationContext context);
 
 public delegate ValueTask ApplicationMiddleware(
-    ApplicationExecutionContext context,
+    IApplicationContext context,
     ApplicationDelegate next);
-
-public sealed class ApplicationExecutionContext
-{
-    public IApplication Application { get; }
-    public CancellationToken Stopping { get; }
-}
 
 public interface IApplication : IAsyncDisposable
 {
     IApplicationContext Context { get; }
-    bool IsRunning { get; }
     IApplication Use(ApplicationMiddleware middleware);
-    ValueTask RunAsync(CancellationToken cancellationToken = default);
+    ValueTask StartAsync(CancellationToken cancellationToken = default);
     ValueTask StopAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IApplicationContext
+{
+    bool IsRunning { get; }
+    CancellationToken Stopping { get; }
+    IComponent RootComponent { get; }
+    IComponentFactory Components { get; }
+    IServiceProvider Services { get; }
+    IStateStoreRegistry? State { get; }
+    IDirectiveResolver? Directives { get; }
+    Action<Exception, IComponentContext?, string>? ErrorHandler { get; }
+    Action<string>? WarnHandler { get; }
+}
+
+public interface IApplicationBuilder
+{
+    IApplicationBuilder ConfigureApplication(Action<ApplicationOptions> configure);
+    IApplication Build();
 }
 ```
 
-Internal state machine: `Created → Running → Stopping → Stopped`, with `Created → Failed` and
-`Running → Failed` edges.
+`ApplicationOptions` is the one mutable composition surface before `Build()`: `RootComponent`,
+`Components`, `Services`, `State`, `Directives`, `ErrorHandler`, and `WarnHandler`. `Build()` snapshots
+those values into the read-only context. The context's composition never changes; only its observable
+runtime members (`IsRunning` and the one attached `Stopping` token) carry lifetime state.
+
+Internal state machine:
+
+```
+Created → Starting → Running → Stopping → Stopped
+              ↘        ↘          ↘ Failed
+```
+
+`StartAsync` claims execution **synchronously** by moving Created to Starting, freezes `Use`, and starts
+the pipeline as an independently observed asynchronous task without scheduling work onto a worker
+thread. It waits for the host terminal to finish initialization, resolve the mount target, mount, set
+`IApplicationContext.IsRunning`, and signal startup. The pipeline itself stays pending. A stop request
+moves Starting or Running to Stopping, clears `IsRunning`, signals `IApplicationContext.Stopping`, and
+awaits the same pipeline task through unmount and reverse-order cleanup. Startup, live-execution, or
+cleanup failure moves to Failed. A failure after startup is reported once through `ErrorHandler` and
+remains on the pipeline task so `StopAsync` and `RunAsync` surface it.
 
 ### Rules
 
-- `Add*` composes dependencies **before** `Build()`; `Use` decorates runtime execution **after** it.
+- `ConfigureApplication` composes dependencies through `ApplicationOptions` **before** `Build()`;
+  `Use` decorates runtime execution **after** it.
 - `Use` never adds components, directives, services, or state.
 - `Use` after execution begins throws.
 - Registering the same middleware twice executes it twice — no plugin-style deduplication.
-- `RunAsync` is single-use and spans the entire mounted lifetime.
-- Cancellation or `StopAsync` unmounts and runs middleware cleanup in reverse order.
+- `StartAsync` is single-use, begins the pipeline in the background, and returns only after the
+  terminal signals mounted/Running (or the pipeline ends before mounting).
+- The `RunAsync` extension is exactly Start → wait for `Context.Stopping` → Stop.
+- Cancellation or `StopAsync` signals `Context.Stopping`, unmounts, awaits the pipeline, and runs
+  middleware cleanup in reverse order.
 - Composition dependencies stay borrowed; Viu does not dispose them.
-- Startup stays asynchronous. A synchronous `Run()` would be unsafe on single-threaded WebAssembly,
-  so the honest endpoint is `await RunAsync()`.
+- Startup stays asynchronous. A synchronous start or run would be unsafe on single-threaded
+  WebAssembly.
 
 For two registrations the execution order is:
 
@@ -198,34 +239,31 @@ That lifetime boundary is the whole point: if the terminal returned immediately 
 ### Intended developer experience
 
 ```csharp
-await Application
-    .CreateBuilder()
-    .AddRootComponent(ComponentTree.Template<App>())
-    .AddComponentFactory(components)
-    .AddServiceProvider(services)
-    .AddStateRegistry(state)
+await new BrowserApplicationBuilder()
     .ConfigureApplication(options =>
     {
-        options.WarnHandler = RecordWarning;
+        options.RootComponent = ComponentTree.Template<App>();
+        options.Components = components;
+        options.Services = services;
+        options.State = state;
         options.ErrorHandler = RecordError;
     })
     .Build()
     .UseRouter(router)
-    .Use(async (execution, next) =>
+    .Use(async (context, next) =>
     {
-        await RestoreSessionAsync(execution.Stopping);
-        await next(execution);
+        await RestoreSessionAsync(context.Stopping);
+        await next(context);
     })
     .RunAsync();
 ```
 
-`Application.CreateBuilder()` cannot live in Core while implicitly selecting Browser — Core is
-deliberately host-neutral — so the facade belongs in `Assimalign.Viu.Browser` or an SDK-level
-composition assembly.
+The Browser host is selected explicitly by constructing `BrowserApplicationBuilder`. There is no
+static application facade in Core, Browser, or the SDK.
 
 Because `IServiceProvider` is lookup-only, Viu cannot offer container-agnostic service registration.
-`AddServiceProvider(provider)` attaches the developer's provider; feature packages must not pretend
-they can mutate it.
+Assigning `ApplicationOptions.Services` attaches the developer's provider; feature packages must not
+pretend they can mutate it.
 
 ### Why a SPA needs this
 
@@ -237,13 +275,13 @@ That is a textbook around-lifetime concern. `UseRouter(router)` in `Assimalign.V
 collapses it:
 
 ```csharp
-return application.Use(async (execution, next) =>
+return application.Use(async (context, next) =>
 {
     RouterLinkDomBridge.Install();
     try
     {
-        await router.ReadyAsync(execution.Stopping);
-        await next(execution);
+        await router.ReadyAsync(context.Stopping);
+        await next(context);
     }
     finally
     {
@@ -271,11 +309,12 @@ cancellation. A once-per-SPA lifetime and a once-per-request render are differen
 
 ### Also required
 
-- Keep the lower-level mount APIs for embedding and testing, documented as bypassing top-level
-  lifetime middleware.
+- Keep lower-level mount APIs in `Assimalign.Viu.Browser` for embedding and testing, documented as
+  bypassing top-level lifetime middleware. Core carries no host node type.
 - Provide empty default component and service resolvers, so a primitive application needs no dummy
   dependencies.
-- Add middleware ordering, failure, and cancellation tests, plus an in-memory application runner.
+- Pin middleware ordering, startup signaling, terminal pending behavior, background failure reporting,
+  cancellation, borrowed ownership, and mount bypass against the production Browser lifetime.
 - Compile the documented fluent example as a package-consumer test so the guide cannot drift again —
   the getting-started guide currently documents several removed dependency APIs.
 
@@ -288,13 +327,13 @@ hideable, diffable, and stop shipping what should never have shipped.
 (~120 types), almost entirely mechanical via `InternalsVisibleTo`, which the repo already uses in 16
 places. Must precede baseline generation so the baseline never records surface that is about to go.
 
-**Wave 2A — application lifetime redesign (D5).** Units `.22`–`.27`. Sequenced here, not later,
+**Wave 2A — application lifetime redesign (D5/D5a).** Delivered as [V01.01.14.08]. Sequenced here, not later,
 because it *deletes* types the polish waves would otherwise spend effort hardening, documenting, and
 renaming. It is a hard break, which D1 makes free.
 
 > **Sequencing constraint:** Wave 2A and Wave 2's `.05` internalization both edit
 > `Assimalign.Viu.Core` heavily and must be run **sequentially, not in parallel**. Prefer 2A first —
-> internalizing types that `.22` deletes is wasted work, and the post-redesign surface is the one the
+> internalizing types that D5 deletes is wasted work, and the post-redesign surface is the one the
 > `.04` public-API baseline should record.
 
 **Wave 3 — namespace segmentation and naming.** Namespace moves precede renames so the surface
