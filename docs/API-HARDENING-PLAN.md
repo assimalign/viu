@@ -151,13 +151,8 @@ them, and only one group is genuinely hard.
 | **Consumed by a sibling shipping library** (3 grants, all from `Core`) | The real work — see below. |
 
 **The `Core` cases.** `Core` grants internals to `Browser`, `ServerRenderer` and `Testing`. Of its 39
-internal types, only **six** are reached across the boundary: `ComponentContext`, `EmptyServiceProvider`,
-`MountedTemplateNode`, `EmptyComponentFactory`, `ApplicationState`, `MountedComponent`.
-
-Each needs a deliberate answer — promote to public API, move to its sole consumer, or express through an
-interface with the concrete type staying internal. Two probably *want* to be public regardless:
-`ApplicationState` is the D5 lifecycle enum a host legitimately observes, and the empty resolvers are
-D5's "a primitive application should not need dummy dependencies" defaults.
+internal types, only **six** are reached across the boundary. Each has now been measured and given a
+deliberate answer — see the section below. **None is promoted whole**; the surface added is nine members.
 
 **The `tooling/` cases, measured.** Three of the five grants share exactly **one** type each —
 `SingleFileComponentPathComparison` (twice) and `CompilerDomKnowledge` — each a promote-or-move decision
@@ -178,6 +173,140 @@ is a real design call rather than an accessibility edit.
 **Expect the headline number to fall.** The original "~120 types internalized" assumed grants were
 available. Under D8 a meaningful share stays public — correctly, because the assembly boundary is real.
 The gain is honesty about that boundary rather than a smaller type count.
+
+### D8 applied to `Core` — the six cross-boundary types
+
+`Core` grants internals to `Browser`, `ServerRenderer` and `Testing`. Of its 39 internal types, six are
+reached across that boundary. Each was measured for what the consumer *actually* uses, not what the type
+exposes. **No type is promoted whole**; the surface added is nine members.
+
+#### 1. `EmptyComponentFactory` and `EmptyServiceProvider` — deleted, not promoted
+
+Both are internal null-objects duplicated in **three** assemblies each (`Core`, `ServerRenderer`,
+`Testing`). Neither needs to exist:
+
+- `EmptyComponentFactory` throws "not registered" on every `Create`. `Assimalign.Viu.Components`'s
+  **already-public** `ComponentFactory` does the same thing when constructed with no registrations, so
+  `ApplicationOptions.Components` defaults to an empty `ComponentFactory` and the six duplicate types go.
+- `EmptyServiceProvider` returns `null` for every service — the "always non-null, sometimes useless"
+  pattern. It exists only to keep `Services` non-nullable, so making dependency injection genuinely
+  optional removes the reason for it.
+
+`ComponentFactory` becomes **derivable** (unsealed, `protected` registration, `virtual Create`) so
+applications can build on the default rather than reimplement it. The repo's sealing rule targets hot
+paths; component creation runs once per mount, so this is a deliberate, documented exception.
+
+**Dependency injection becomes opt-in:**
+
+| Member | Was | Becomes |
+|---|---|---|
+| `ApplicationOptions.Services` | `IServiceProvider` = `EmptyServiceProvider.Instance` | `IServiceProvider?` = `null` |
+| `IApplicationContext.Services` | `IServiceProvider` | `IServiceProvider?` |
+| `IComponentContext.Services` | `IServiceProvider` | `IServiceProvider?` |
+
+`BrowserApplicationBuilder`'s "Services cannot be null" guard goes with them — it exists only to defend
+the non-null fiction. Verified safe for code generation: the single-file-component emitter never touches
+`Context.Services`.
+
+No first-class DI hook is added. `IComponentFactory`'s own docs already state the contract *"intentionally
+does not prescribe how components are activated"*; an application that wants container-resolved components
+writes a factory that does that.
+
+#### 2. `ApplicationState` — promoted
+
+The `[APP-1]` lifecycle enum. A host legitimately observes which state an application is in, and
+`IApplicationContext.IsRunning` already exposes a coarser view of the same fact.
+
+#### 3. `ComponentContext` — **not** promoted; two members added to `IComponentContext`
+
+545 lines, but consumers reach past `IComponentContext` for exactly two things:
+
+- `ScopeIdentifier` — `ComponentTreeSerializer.cs:97`, stamping the scoped-CSS attribute
+- `Parent` — `ComponentWrapper.cs:296`, walking ancestors to resolve a query
+
+```csharp
+public interface IComponentContext
+{
+    // … existing members …
+    string? ScopeIdentifier { get; }
+    IComponentContext? Parent { get; }
+}
+```
+
+Neither leaks anything new: `ScopeIdentifier` is already public on `IComponentTemplate`, and a context
+having a parent is an ordinary thing to model. `ComponentContext` stays `internal`; the consumers'
+signatures change to `IComponentContext?`.
+
+#### 4. `MountedComponent` — **not** promoted; a render scope replaces it
+
+Used only by `ServerComponentRenderer`, which today drives the whole mount lifecycle by hand:
+
+```csharp
+instance = MountedComponent.Create(state.Application, request, parent, state.NextComponentIdentifier());
+await instance.InvokeServerPrefetchAsync().WaitAsync(state.CancellationToken);
+IComponent subtree = instance.Render();
+await ComponentTreeSerializer.RenderAsync(state, subtree, instance.Context);
+// finally: instance?.AbortMount();
+```
+
+The mount must stay alive while the caller serializes the subtree, so a fire-and-forget
+`RenderOnceAsync` does not fit. A disposable scope does:
+
+```csharp
+public interface IComponentRenderScope : IAsyncDisposable
+{
+    IComponent Tree { get; }
+    IComponentContext Context { get; }
+}
+
+public static class ComponentHost   // existing public static class
+{
+    public static ValueTask<IComponentRenderScope> RenderAsync(
+        IApplicationContext application,
+        ITemplateComponent request,
+        IComponentContext? parent,
+        int componentIdentifier,
+        CancellationToken cancellationToken = default);
+}
+```
+
+The caller becomes `await using` instead of `try`/`finally`, and the ordering invariants — prefetch before
+render, abort on failure — move **into** Core rather than being re-derived by every host. Three public
+members instead of a 369-line lifecycle class.
+
+#### 5. `MountedTemplateNode<TNode>` — **not** promoted; a view interface replaces it
+
+Used only by `Testing`, which needs precisely three facts per mounted template: the context to match on
+(`ViuTest.FindMountedTemplate` compares by reference), and the first and last host node of the subtree
+(`TestQuery.HostNodes`). Everything after that is Testing's own node walking.
+
+```csharp
+public interface IMountedTemplateView<TNode>
+{
+    IComponentContext Context { get; }
+    TNode FirstHostNode { get; }
+    TNode LastHostNode { get; }
+}
+
+// on the existing public Renderer<TNode>
+public IReadOnlyList<IMountedTemplateView<TNode>> GetMountedTemplates(TNode container);
+```
+
+`MountedTemplateNode<TNode>` and `MountedRenderNode<TNode>` stay internal, so the render-tree shape is
+not published to reveal a first/last node pair.
+
+#### Why this is the point of D8
+
+`ServerRenderer` and `Testing` were both re-implementing engine operations by driving `Core`'s internals,
+because a grant made that free and so the seam was never designed. The outcome is not merely "fewer
+`internal` types made `public`" — `Core` now exposes the two **operations** these hosts need, *render a
+component once* and *inspect the mounted tree*, instead of the machinery they previously assembled by
+hand. That is a smaller public surface **and** stronger encapsulation than exists today.
+
+**No `IComponentFactoryBuilder`.** `ComponentFactory(IEnumerable<ComponentRegistration>)` already
+composes — merging generated and hand-written registrations is list concatenation. A builder would earn
+its place only if registration became incremental or order-dependent, and neither is true. Adding one now
+is the speculative surface T14 targets elsewhere in this arc.
 
 ## D6 — platform segmentation of the SDK and framework
 
