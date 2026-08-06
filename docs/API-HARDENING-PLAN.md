@@ -1,7 +1,6 @@
 # API surface hardening plan — [V01.01.14]
 
-**Status: ARC OPEN. Wave 2A in progress on
-`feature/V01.01.14.08-application-lifetime`.**
+**Status: ARC OPEN. Waves 1 and 2A complete and merged; Wave 2 next (T05).**
 
 This document is the session-independent source of truth for the API-hardening arc. Any session
 (human or agent) resuming this work reads this file first, checks the *State* table, and continues
@@ -77,19 +76,21 @@ in as each item is created.
 | Theme | Description | Wave | WBS | Issue | Status |
 |---|---|---|---|---|---|
 | T01 + T15 | Ship XML documentation; sweep derivative doc phrasing | 1 | `.01` | #285 | **MERGED** (PR #288) |
-| T04 | Compiler-seam hardening (`[EditorBrowsable]` + language-service filter) | 1 | `.02` | #287 | **IN REVIEW** (PR #289) |
-| T16 | Drop the viral `RequiresPreviewFeatures` stamp | 1 | `.03` | #292 | **IN REVIEW** — supersedes #280 |
-| T03 | Unship build-time packages; delete `Syntax.JavaScript` (keep `Syntax.Html`, see D3) | 1 | `.04` | #294 | **IMPLEMENTED** — pending integration |
-| T02 | Public-API baseline and hardening-attribute conventions | 1 | `.06` | #299 | **IMPLEMENTED** — pending integration |
-| D5-A | Application lifetime: middleware pipeline, `StartAsync`/`StopAsync`, `RunAsync` extension, delete `IApplicationPlugin` | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
-| D5-B | Composition surface: lean `IApplicationBuilder`, options-only composition, frozen context | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
-| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
-| D5-D | Browser entry point: direct `new BrowserApplicationBuilder()`; no static facade | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
-| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
-| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | `.08` | #304 | **IMPLEMENTED — pending integration** |
-| T05 | Internalize friend-only publics (~120 types) | 2 | — | — | Not started |
-| T13 | Single source of truth for the helper-name contract | 2 | — | — | Not started |
-| T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | — | — | Not started — decide after T04 lands |
+| T04 | Compiler-seam hardening (`[EditorBrowsable]` + language-service filter) | 1 | `.02` | #287 | **MERGED** (PR #289) |
+| T16 | Drop the viral `RequiresPreviewFeatures` stamp | 1 | `.03` | #292 | **MERGED** (PR #293) — superseded #280 |
+| T03 | Unship build-time packages; delete `Syntax.JavaScript` (retain `Syntax.Html`, unpublished — see D3a) | 1 | `.04` | #294 | **MERGED** (PR #295) |
+| T02 | Public-API baseline and hardening-attribute conventions | 1 | `.06` | #299 | **MERGED** (PR #300) |
+| D5-A | Application lifetime: middleware pipeline, `StartAsync`/`StopAsync`, `RunAsync` extension, delete `IApplicationPlugin` | 2A | `.08` | #304 | **MERGED** (PR #305) |
+| D5-B | Composition surface: lean `IApplicationBuilder`, options-only composition, frozen context | 2A | `.08` | #304 | **MERGED** (PR #305) |
+| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | `.08` | #304 | **MERGED** (PR #305) |
+| D5-D | Browser entry point: direct `new BrowserApplicationBuilder()`; no static facade | 2A | `.08` | #304 | **MERGED** (PR #305) |
+| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | `.08` | #304 | **MERGED** (PR #305) |
+| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | `.08` | #304 | **MERGED** (PR #305) |
+| — | Rename `Router.Browser` → `Browser.Router` | 2A | `.09` | #307 | **MERGED** (PR #308) |
+| — | Extension-member syntax; `Extensions/` and `Exception/` folders | 2 | `.10` | #309 | **MERGED** (PR #310) |
+| T05 | Internalize friend-only publics (~120 types) | 2 | — | — | **NEXT** — largest remaining surface reduction |
+| T13 | Single source of truth for the helper-name contract | 2 | `.07` | #301 | **MERGED** (PR #306) |
+| T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | — | — | Not started — reassess: D5 already moved mounting to Browser |
 | T07 | Product-prefix stutter and duplicate facades | 3 | — | — | Not started |
 | T08 | Naming-rule compliance | 3 | — | — | Not started |
 | G3 | `SlotFlags` is named `*Flags` but is not a bitmask | 3 | — | — | Not started |
