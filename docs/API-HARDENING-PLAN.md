@@ -32,7 +32,7 @@ assemblies that every Viu app references with zero opt-in: `Assimalign.Viu.App`,
 `.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`.
 
 **Not** in the app reference set: the `Syntax.*` parsers and compiler/editor tooling assemblies,
-`ServerRenderer`, `Router`/`Router.Browser` (opt-in packages), and `Testing` (dev-time). The source
+`ServerRenderer`, `Router`/`Browser.Router` (opt-in packages), and `Testing` (dev-time). The source
 generator's parser/compiler closure reaches builds inside `analyzers/dotnet/cs/` of the Ref pack;
 `Syntax.Html` remains a tooling-only host-page parser; `UtilityCss` ships through its standalone
 package and SDK/editor hosts; and `LanguageService`/`LanguageServer` ship in editor payloads.
@@ -47,7 +47,7 @@ Shared ── Components ── Core ── Browser          <- browser host
    |          |           +---- ServerRenderer   <- server host
    |          +-- Reactivity
    |          +-- State
-   +--------- Router                             <- host-agnostic (Router.Browser is its bridge)
+   +--------- Router                             <- host-agnostic (Browser.Router is its bridge)
 ```
 
 `Shared`, `Reactivity`, `State`, `Components`, `Core` are all **host-agnostic**. This is why the
@@ -271,7 +271,7 @@ The packaged showcase performs the whole sequence by hand today
 ([`../viu-examples/.../Program.cs:19`](https://github.com/assimalign/viu-examples/blob/main/examples/Assimalign.Viu.Showcase/Program.cs)):
 initialize browser router history, construct the router, await initial navigation, install
 `RouterLinkDomBridge`, mount, wait forever, then uninstall the bridge and dispose routing resources.
-That is a textbook around-lifetime concern. `UseRouter(router)` in `Assimalign.Viu.Router.Browser`
+That is a textbook around-lifetime concern. `UseRouter(router)` in `Assimalign.Viu.Browser.Router`
 collapses it:
 
 ```csharp

@@ -9,10 +9,11 @@ using Xunit;
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Router;
 using Assimalign.Viu.State;
 using Assimalign.Viu.Testing;
 
-namespace Assimalign.Viu.Router.Browser.Tests;
+namespace Assimalign.Viu.Browser.Router.Tests;
 
 // Pins the Router<->DOM click bridge ([V01.01.08.03.01], issue #191): the browser adapter's
 // BrowserEvent is mapped onto RouterLinkClickEvent (mouse button, the four system modifiers, and the
@@ -133,7 +134,7 @@ public class RouterLinkDomBridgeTests
         try
         {
             BrowserObjectEvents.Invoker = null;
-            using Router router = new(
+            using global::Assimalign.Viu.Router.Router router = new(
                 RouterHistory.CreateMemory(),
                 [new RouteRecord("/"), new RouteRecord("/next")]);
             router.BeforeEach((_, _, _) =>
@@ -176,7 +177,7 @@ public class RouterLinkDomBridgeTests
         try
         {
             BrowserObjectEvents.Invoker = null;
-            using Router router = new(
+            using global::Assimalign.Viu.Router.Router router = new(
                 RouterHistory.CreateMemory(),
                 [new RouteRecord("/")]);
             await using TestApplication application = new([]);
@@ -264,7 +265,7 @@ public class RouterLinkDomBridgeTests
     private static Action<object?> ClickListener(ComponentWrapper wrapper)
         => (Action<object?>)wrapper.Get("a").Element.EventListeners["click"];
 
-    private static Router LinkRouter()
+    private static global::Assimalign.Viu.Router.Router LinkRouter()
         => new(
             RouterHistory.CreateMemory(),
             [
@@ -275,7 +276,7 @@ public class RouterLinkDomBridgeTests
                 ]),
             ]);
 
-    private static ComponentWrapper MountLink(Router router, string to)
+    private static ComponentWrapper MountLink(global::Assimalign.Viu.Router.Router router, string to)
     {
         var options = new ComponentMountOptions
         {
@@ -294,16 +295,16 @@ public class RouterLinkDomBridgeTests
 
     private sealed class RouterServiceProvider : IServiceProvider
     {
-        private readonly Router _router;
+        private readonly global::Assimalign.Viu.Router.Router _router;
 
-        internal RouterServiceProvider(Router router)
+        internal RouterServiceProvider(global::Assimalign.Viu.Router.Router router)
         {
             _router = router;
         }
 
         public object? GetService(Type serviceType)
         {
-            return serviceType == typeof(Router) ? _router : null;
+            return serviceType == typeof(global::Assimalign.Viu.Router.Router) ? _router : null;
         }
     }
 

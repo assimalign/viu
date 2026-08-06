@@ -87,7 +87,7 @@ The principal runtime, compiler, and editor assemblies and their responsibilitie
 | `Assimalign.Viu.Core` | Host-neutral application, renderer, scheduler, hydration, built-in components |
 | `Assimalign.Viu.Browser` | The browser host adapter: interop bridge, DOM directives, transitions |
 | `Assimalign.Viu.ServerRenderer` | HTML serialization and the hydration marker protocol |
-| `Assimalign.Viu.Router` / `.Router.Browser` | The DOM-free router core and its browser click/history bridge |
+| `Assimalign.Viu.Router` / `Assimalign.Viu.Browser.Router` | The DOM-free router core and its browser click/history bridge |
 | `Assimalign.Viu.Testing` | The in-memory host and component test wrappers |
 | `Assimalign.Viu.Syntax*` | The build-time parser cluster: templates, `.viu`/`.vue` containers, CSS, HTML, JavaScript |
 | `Assimalign.Viu.Compiler.*` | Build-time composition roots for CSS and single-file-component projection |
@@ -1447,14 +1447,14 @@ and lets the pipeline guarantee a guard decides exactly once.
 hook. A guard-redirect chain that exceeds the safety cap throws `NavigationRedirectException`.
 
 `[RTR-7]` **Boundary.** `Assimalign.Viu.Router` references Components and Reactivity but **not Core
-and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Router.Browser` is the
+and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` is the
 click-dispatch bridge, and the browser history edge is gated by `[SupportedOSPlatform("browser")]`.
 
 `[RTR-8]` **Limit.** Lazy route components and scroll behavior are not implemented
 ([V01.01.08.05]); every route component resolves eagerly. See [§17](#17-non-goals-and-current-limits).
 
 *Authority: `libraries/Assimalign.Viu.Router/docs/{OVERVIEW,DESIGN}.md`;
-`libraries/Assimalign.Viu.Router.Browser/docs/{OVERVIEW,DESIGN}.md`.*
+`libraries/Assimalign.Viu.Browser.Router/docs/{OVERVIEW,DESIGN}.md`.*
 
 ---
 

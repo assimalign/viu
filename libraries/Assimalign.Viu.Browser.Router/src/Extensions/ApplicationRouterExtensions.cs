@@ -2,7 +2,7 @@ using System;
 
 using Assimalign.Viu;
 
-namespace Assimalign.Viu.Router.Browser;
+namespace Assimalign.Viu.Browser.Router;
 
 /// <summary>Composes browser-router behavior around a persistent Viu application lifetime.</summary>
 public static class ApplicationRouterExtensions
@@ -24,7 +24,7 @@ public static class ApplicationRouterExtensions
         /// <see cref="IApplication.StopAsync(System.Threading.CancellationToken)"/>. Specified by
         /// <c>[APP-4]</c>, <c>[APP-5]</c>, and <c>[RTR-3]</c>.
         /// </remarks>
-        public IApplication UseRouter(Router router)
+        public IApplication UseRouter(global::Assimalign.Viu.Router.Router router)
         {
             ArgumentNullException.ThrowIfNull(application);
             ArgumentNullException.ThrowIfNull(router);

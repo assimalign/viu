@@ -7,6 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
-    <PackageReference Include="Assimalign.Viu.Router.Browser" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Browser.Router" Version="$(ViuConsumerVersion)" />
   </ItemGroup>
 </Project>

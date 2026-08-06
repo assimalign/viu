@@ -1,8 +1,9 @@
 using System;
 
 using Assimalign.Viu.Browser;
+using Assimalign.Viu.Router;
 
-namespace Assimalign.Viu.Router.Browser;
+namespace Assimalign.Viu.Browser.Router;
 
 /// <summary>
 /// The browser integration layer that lets <see cref="RouterLink"/> navigate on a real click — it

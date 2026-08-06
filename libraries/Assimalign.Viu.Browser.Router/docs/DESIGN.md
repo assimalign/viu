@@ -1,9 +1,13 @@
-# Assimalign.Viu.Router.Browser — design
+# Assimalign.Viu.Browser.Router — design
 
 Why this is a separate package and how the click bridge works. What it is: see
 [OVERVIEW.md](OVERVIEW.md). Work item:
 [V01.01.08.03.01] (issue #191), discovered while implementing the DOM-free RouterLink components
 ([V01.01.08.03], #72).
+
+The platform-first package name is specified by [V01.01.14.09] (issue #307): `Browser` owns its host
+bridges, while `Router` identifies the optional integration. The name therefore does not present the
+assembly as a browser variant owned by the host-agnostic Router.
 
 ## Why a third package, not a reference either way
 

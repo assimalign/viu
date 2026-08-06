@@ -10,7 +10,7 @@
     <ViuPackageReference Include="Shouldly" />
   </ItemGroup>
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.Router.Browser" />
+    <ViuProjectReference Include="Assimalign.Viu.Browser.Router" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
     <!-- Directly used to synthesize BrowserEvents (internal ctor via InternalsVisibleTo). -->
     <ViuProjectReference Include="Assimalign.Viu.Browser" />

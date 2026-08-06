@@ -25,7 +25,7 @@ flowchart BT
 component and application dependencies. `Core` integrates all three into host-neutral application,
 rendering, scheduling, hydration, and built-in behavior.
 
-The staging solution also contains Browser, ServerRenderer, Testing, Router, Router.Browser,
+The staging solution also contains Browser, ServerRenderer, Testing, Router, Browser.Router,
 Shared, Syntax, template compilation, single-file component generation, and CSS tooling projects
 that consume the new boundaries.
 

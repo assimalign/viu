@@ -287,16 +287,16 @@
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/test/">
 		<Project Path="libraries/Assimalign.Viu.Router/test/Assimalign.Viu.Router.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/docs/">
-		<File Path="libraries/Assimalign.Viu.Router.Browser/docs/DESIGN.md" />
-		<File Path="libraries/Assimalign.Viu.Router.Browser/docs/OVERVIEW.md" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser.Router/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser.Router/docs/">
+		<File Path="libraries/Assimalign.Viu.Browser.Router/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Browser.Router/docs/OVERVIEW.md" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/src/">
-		<Project Path="libraries/Assimalign.Viu.Router.Browser/src/Assimalign.Viu.Router.Browser.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser.Router/src/">
+		<Project Path="libraries/Assimalign.Viu.Browser.Router/src/Assimalign.Viu.Browser.Router.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Router.Browser/test/">
-		<Project Path="libraries/Assimalign.Viu.Router.Browser/test/Assimalign.Viu.Router.Browser.Tests.csproj" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Browser.Router/test/">
+		<Project Path="libraries/Assimalign.Viu.Browser.Router/test/Assimalign.Viu.Browser.Router.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/src/">

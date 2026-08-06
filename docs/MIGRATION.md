@@ -27,7 +27,7 @@ package boundary while retaining the newer engine behavior and tests.
 ## Staging graph
 
 All redesign project references resolve inside the staging graph. It includes the four primary
-packages plus Browser, ServerRenderer, Testing, Router, Router.Browser, Shared, Syntax, template
+packages plus Browser, ServerRenderer, Testing, Router, Browser.Router, Shared, Syntax, template
 compilation, single-file component generation, and CSS tooling.
 
 The staging application model separates a host-neutral lifetime from host-owned mounting:
