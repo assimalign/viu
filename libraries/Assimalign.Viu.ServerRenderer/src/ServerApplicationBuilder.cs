@@ -1,3 +1,8 @@
+using System;
+
+using Assimalign.Viu.Components;
+using Assimalign.Viu.State;
+
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
@@ -6,12 +11,53 @@ namespace Assimalign.Viu.ServerRenderer;
 /// </summary>
 public sealed class ServerApplicationBuilder : ApplicationBuilder
 {
-    /// <summary>Builds the configured server application.</summary>
-    /// <returns>The configured application.</returns>
-    public override ServerApplication Build()
+    /// <inheritdoc/>
+    public override ServerApplicationBuilder AddRootComponent(IComponent component)
     {
-        ServerApplication application = new(CreateContext());
-        ApplyConfiguration(application);
-        return application;
+        base.AddRootComponent(component);
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public override ServerApplicationBuilder AddComponentFactory(IComponentFactory components)
+    {
+        base.AddComponentFactory(components);
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public override ServerApplicationBuilder AddServiceProvider(IServiceProvider services)
+    {
+        base.AddServiceProvider(services);
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public override ServerApplicationBuilder AddStateRegistry(IStateStoreRegistry state)
+    {
+        base.AddStateRegistry(state);
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public override ServerApplicationBuilder AddDirectiveResolver(IDirectiveResolver directives)
+    {
+        base.AddDirectiveResolver(directives);
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public override ServerApplicationBuilder ConfigureApplication(
+        Action<ApplicationOptions> configure)
+    {
+        base.ConfigureApplication(configure);
+        return this;
+    }
+
+    /// <summary>Builds the configured server-render composition object.</summary>
+    /// <returns>The configured server-render application.</returns>
+    public ServerRenderApplication Build()
+    {
+        return new ServerRenderApplication(CreateContext());
     }
 }

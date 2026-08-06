@@ -109,10 +109,16 @@ without a browser:
   `wwwroot/viu-history.js` — and does nothing but flatten the policy's URLs and states into
   primitive interop calls. The JS module is a dumb applier: the only decision it makes is reading the
   live `window.scrollX/Y` for the leaving entry (the one piece of state the DOM owns).
+- **`DeferredBrowserRouterHistory` is the asynchronous composition seam.** `CreateWeb` and
+  `CreateWebHash` return it without importing JavaScript. It accepts `Listen` before readiness so the
+  `Router` constructor stays synchronous, then `Router.ReadyAsync` loads the bridge and constructs
+  the ordinary `BrowserRouterHistory` policy. Until that completes, every other synchronous history
+  member throws one actionable readiness exception; `Destroy` remains safe for startup teardown.
 
-Hash mode is not a second implementation: `RouterHistory.CreateWebHash` only computes a `#`-carrying
-base and hands it to the same web policy (`RouterHistory.ResolveHashBase` → `BrowserRouterHistory`),
-so there is one state machine to reason about.
+Hash mode is not a second implementation: after lazy bridge initialization,
+`RouterHistory.CreateWebHash` computes a `#`-carrying base and hands it to the same web policy
+(`RouterHistory.ResolveHashBase` → `BrowserRouterHistory`), so there is one state machine to reason
+about.
 
 ## History state: one position counter, computed in C#
 
@@ -264,13 +270,15 @@ URL (the classic `{ path: '/', redirect: '/x' }`) never fired for a page loaded 
   matched route, so same-location pushes still short-circuit to `Duplicated`. The sentinel is
   value-equal to an *unmatched* `/` resolution, so this count gate — not value equality — is what
   keeps them apart.
-- **`ReadyAsync` triggers and awaits the first navigation.** Viu has no router-install hook, so one
-  idempotent method both starts the initial navigation and awaits it. The first call navigates to the
-  current history location through the full pipeline with `from` = the sentinel (so the leave phase is
-  trivially empty and every enter/global guard fires once), memoizes the resulting task, and returns
-  it to every later caller. A bootstrap awaits it before mounting so the first render already reflects
-  the resolved (or redirected) route. It always settles: an aborted initial navigation completes with
-  its failure rather than hanging.
+- **`ReadyAsync` initializes, triggers, and awaits the first navigation.** Viu has no router-install
+  hook, so one idempotent method loads a deferred browser-history bridge when needed, starts the
+  initial navigation, and awaits it. The first call's cancellation token covers both initialization
+  and every guard; that call memoizes the resulting task, so later calls return the same task and
+  cannot replace its token. The navigation uses the current history location and the full pipeline
+  with `from` = the sentinel (so the leave phase is trivially empty and every enter/global guard fires
+  once). A bootstrap awaits it before mounting so the first render already reflects the resolved (or
+  redirected) route. It always settles after initialization: an aborted or cancelled initial
+  navigation completes with its typed failure rather than hanging.
 - **The first confirm replaces, never pushes.** `finalizeNavigation` forces a replace when `from` is
   the start sentinel (by `ReferenceEquals`), so the application's entry URL is not left as a stale
   back-target; through an initial redirect the reference stays the sentinel across the whole chain

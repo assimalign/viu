@@ -155,8 +155,13 @@ public sealed class TemplateReferenceTests : IDisposable
         InvalidGeneratedReferenceTemplate template = new();
         ITemplateComponent root =
             ComponentTree.Template<InvalidGeneratedReferenceTemplate>();
-        IApplicationContext application = CreateApplication(root, template);
-        application.WarnHandler = warnings.Add;
+        IApplicationContext application = CreateApplication(
+            root,
+            new ApplicationOptions
+            {
+                WarnHandler = warnings.Add,
+            },
+            template);
         FakeHost host = new();
         Renderer<FakeHostNode> renderer =
             RendererFactory.CreateRenderer(host.Options);
@@ -196,6 +201,14 @@ public sealed class TemplateReferenceTests : IDisposable
         ITemplateComponent root,
         params IComponentTemplate[] templates)
     {
+        return CreateApplication(root, options: null, templates);
+    }
+
+    private static IApplicationContext CreateApplication(
+        ITemplateComponent root,
+        ApplicationOptions? options,
+        params IComponentTemplate[] templates)
+    {
         ComponentRegistration[] registrations =
             new ComponentRegistration[templates.Length];
         for (int index = 0; index < templates.Length; index++)
@@ -209,7 +222,8 @@ public sealed class TemplateReferenceTests : IDisposable
         return new ApplicationContext(
             root,
             new ComponentFactory(registrations),
-            new EmptyServiceProvider());
+            new EmptyServiceProvider(),
+            options: options);
     }
 
     private sealed class ExposingTemplate : IComponentTemplate

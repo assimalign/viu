@@ -2,7 +2,8 @@
 
 `Assimalign.Viu.Browser` is the browser host for the redesigned Viu runtime. It supplies
 `RendererOptions<int>` over opaque DOM handles and layers selector-based mounting and JavaScript
-module initialization on Core's platform-neutral `Application<int>`.
+module initialization on Core's platform-neutral `Application<int>`. Top-level applications run
+through Core's lifetime middleware and target `#app` by default.
 
 ## Application composition
 
@@ -13,16 +14,24 @@ component tree, component factory, service provider, and optional state registry
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 
-BrowserApplicationBuilder builder =
-    BrowserApplication.CreateBuilder(
-        ComponentTree.Template<ApplicationRoot>());
-
-builder.UseComponentFactory(components);
-builder.UseServiceProvider(services);
-builder.UseStateRegistry(state);
-
-BrowserApplication application = builder.Build();
-await application.MountAsync("#app");
+await Application
+    .CreateBuilder()
+    .AddRootComponent(ComponentTree.Template<ApplicationRoot>())
+    .AddComponentFactory(components)
+    .AddServiceProvider(services)
+    .AddStateRegistry(state)
+    .ConfigureApplication(options =>
+    {
+        options.WarnHandler = RecordWarning;
+        options.ErrorHandler = RecordError;
+    })
+    .Build()
+    .Use(async (execution, next) =>
+    {
+        await RestoreSessionAsync(execution.Stopping);
+        await next(execution);
+    })
+    .RunAsync();
 ```
 
 The application borrows the supplied factory, provider, and state registry. Browser wraps the
@@ -30,6 +39,10 @@ component factory with AOT-safe `Transition`, `TransitionGroup`, and Core `BaseT
 resolution, then delegates every application component request to the supplied factory. The wrapper is not an
 `IServiceProvider`; Browser neither creates nor disposes an application dependency-injection
 container. Component-tree provide/inject APIs are not part of the redesign.
+
+`RunAsync` initializes the browser bridge, resolves `#app`, mounts, waits for cancellation or
+`StopAsync`, and unmounts before middleware cleanup unwinds. `Mount` and `MountAsync` remain
+lower-level embedding and testing APIs; they bypass top-level lifetime middleware [APP-7].
 
 `IApplication` and `IApplicationContext` stay free of browser types. A future WebView2 host can
 derive its own application from `Application<TNode>` and supply another `RendererOptions<TNode>`

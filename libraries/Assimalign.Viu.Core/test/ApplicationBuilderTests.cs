@@ -7,137 +7,146 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu.Components;
+using Assimalign.Viu.State;
 
 namespace Assimalign.Viu.Tests;
 
 public sealed class ApplicationBuilderTests
 {
     [Fact]
-    public void Build_SuppliedResolvers_RemainIndependentBorrowedApplicationDecisions()
+    public void Build_AddMethodsFreezeBorrowedCompositionBeforeRuntimeUse()
     {
         EmptyServiceProvider services = new();
         ComponentFactory components = new(Array.Empty<ComponentRegistration>());
         IComponent root = ComponentTree.Element("main");
+        StubStateStoreRegistry state = new();
+        DirectiveRegistry directives = new(
+            Array.Empty<KeyValuePair<string, IDirective>>());
         TestApplicationBuilder builder = new();
 
-        IApplication application = builder
-            .UseRootComponent(root)
-            .UseComponentFactory(components)
-            .UseServiceProvider(services)
-            .Build();
+        TestApplicationBuilder configured = builder
+            .AddRootComponent(root)
+            .AddComponentFactory(components)
+            .AddServiceProvider(services)
+            .AddStateRegistry(state)
+            .AddDirectiveResolver(directives);
+        TestApplication application = configured.Build();
 
-        application.ShouldBeAssignableTo<IApplication<int>>();
+        // [APP-2] Add* composes before Build; runtime Use has no composition role.
+        configured.ShouldBeSameAs(builder);
         application.Context.RootComponent.ShouldBeSameAs(root);
         application.Context.Components.ShouldBeSameAs(components);
         application.Context.Services.ShouldBeSameAs(services);
-        application.Context.Services.ShouldNotBeSameAs(components);
-        application.Context.State.ShouldBeNull();
+        application.Context.State.ShouldBeSameAs(state);
+        application.Context.Directives.ShouldBeSameAs(directives);
     }
 
     [Fact]
-    public async Task MountAsync_InstallsPluginsBeforeHostInitializationAndRender()
+    public void Build_PrimitiveRootUsesEmptyDefaultResolvers()
     {
-        List<string> order = [];
-        RecordingPlugin plugin = new(order);
-        TestApplication application = (TestApplication)new TestApplicationBuilder(order)
-            .UseRootComponent(ComponentTree.Element("main"))
-            .UseComponentFactory(new ComponentFactory(Array.Empty<ComponentRegistration>()))
-            .UseServiceProvider(new EmptyServiceProvider())
-            .Use(plugin)
+        TestApplication application = new TestApplicationBuilder()
+            .AddRootComponent(ComponentTree.Element("main"))
             .Build();
 
-        await application.MountAsync(42);
-
-        order.ShouldBe(["plugin", "initialize", "mount:42"]);
-        application.IsMounted.ShouldBeTrue();
-        plugin.Installations.ShouldBe(1);
-
-        await application.MountAsync(42);
-        plugin.Installations.ShouldBe(1);
+        application.Context.Services.GetService(typeof(object)).ShouldBeNull();
+        Should.Throw<InvalidOperationException>(
+            () => application.Context.Components.Create(typeof(UnknownTemplate)));
     }
 
     [Fact]
-    public async Task UnmountAsync_UsesTheGenericHostLifecycle()
+    public void Build_ApplicationOptionsAreFrozenIntoEachContext()
     {
-        TestApplication application = (TestApplication)new TestApplicationBuilder()
-            .UseRootComponent(ComponentTree.Element("main"))
-            .UseComponentFactory(new ComponentFactory(Array.Empty<ComponentRegistration>()))
-            .UseServiceProvider(new EmptyServiceProvider())
-            .Build();
-        await application.MountAsync(7);
+        List<string> warnings = [];
+        Action<string> warnHandler = warnings.Add;
+        Action<Exception, IComponentContext?, string> errorHandler =
+            static (_, _, _) => { };
+        ApplicationOptions? configuredOptions = null;
+        TestApplicationBuilder builder = new TestApplicationBuilder()
+            .AddRootComponent(ComponentTree.Element("main"))
+            .ConfigureApplication(options =>
+            {
+                configuredOptions = options;
+                options.WarnHandler = warnHandler;
+                options.ErrorHandler = errorHandler;
+            });
 
-        await application.UnmountAsync();
+        TestApplication application = builder.Build();
+        configuredOptions!.WarnHandler = static _ => { };
+        configuredOptions.ErrorHandler = null;
 
-        application.IsMounted.ShouldBeFalse();
-        application.RootContext.ShouldBeNull();
-        application.UnmountCount.ShouldBe(1);
+        application.Context.WarnHandler.ShouldBeSameAs(warnHandler);
+        application.Context.ErrorHandler.ShouldBeSameAs(errorHandler);
     }
 
     private sealed class TestApplicationBuilder : ApplicationBuilder
     {
-        private readonly List<string> _order;
-
-        internal TestApplicationBuilder(List<string>? order = null)
+        public override TestApplicationBuilder AddRootComponent(IComponent component)
         {
-            _order = order ?? [];
+            base.AddRootComponent(component);
+            return this;
         }
 
-        public override IApplication Build()
+        public override TestApplicationBuilder AddComponentFactory(
+            IComponentFactory components)
         {
-            TestApplication application = new(CreateContext(), _order);
-            ApplyConfiguration(application);
-            return application;
+            base.AddComponentFactory(components);
+            return this;
+        }
+
+        public override TestApplicationBuilder AddServiceProvider(
+            IServiceProvider services)
+        {
+            base.AddServiceProvider(services);
+            return this;
+        }
+
+        public override TestApplicationBuilder AddStateRegistry(
+            IStateStoreRegistry state)
+        {
+            base.AddStateRegistry(state);
+            return this;
+        }
+
+        public override TestApplicationBuilder AddDirectiveResolver(
+            IDirectiveResolver directives)
+        {
+            base.AddDirectiveResolver(directives);
+            return this;
+        }
+
+        public override TestApplicationBuilder ConfigureApplication(
+            Action<ApplicationOptions> configure)
+        {
+            base.ConfigureApplication(configure);
+            return this;
+        }
+
+        internal TestApplication Build()
+        {
+            return new TestApplication(CreateContext());
         }
     }
 
     private sealed class TestApplication : Application<int>
     {
-        private readonly List<string> _order;
-
-        internal TestApplication(IApplicationContext context, List<string> order)
+        internal TestApplication(IApplicationContext context)
             : base(context)
         {
-            _order = order;
         }
 
-        internal int UnmountCount { get; private set; }
-
-        protected override ValueTask OnInitializeAsync(CancellationToken cancellationToken)
+        protected override ValueTask<int> ResolveMountTargetAsync(
+            CancellationToken cancellationToken)
         {
-            _order.Add("initialize");
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult(1);
         }
 
         protected override IComponentContext? MountCore(int container)
         {
-            _order.Add($"mount:{container}");
             return null;
         }
 
         protected override void UnmountCore()
         {
-            UnmountCount++;
-        }
-    }
-
-    private sealed class RecordingPlugin : IApplicationPlugin
-    {
-        private readonly List<string> _order;
-
-        internal RecordingPlugin(List<string> order)
-        {
-            _order = order;
-        }
-
-        internal int Installations { get; private set; }
-
-        public ValueTask InstallAsync(
-            IApplication application,
-            CancellationToken cancellationToken = default)
-        {
-            Installations++;
-            _order.Add("plugin");
-            return ValueTask.CompletedTask;
         }
     }
 
@@ -146,6 +155,40 @@ public sealed class ApplicationBuilderTests
         public object? GetService(Type serviceType)
         {
             return null;
+        }
+    }
+
+    private sealed class StubStateStoreRegistry : IStateStoreRegistry
+    {
+        public int Count => 0;
+
+        public bool IsDisposed { get; private set; }
+
+        public TStore GetOrCreate<TStore>(
+            StateStoreDefinition<TStore> definition,
+            IComponentContext? owner = null)
+            where TStore : class
+        {
+            throw new InvalidOperationException("No stores are configured for this test.");
+        }
+
+        public bool Remove<TStore>(StateStoreDefinition<TStore> definition)
+            where TStore : class
+        {
+            return false;
+        }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    private sealed class UnknownTemplate : IComponentTemplate
+    {
+        public ComponentRenderer Setup(IComponentContext context)
+        {
+            return static () => ComponentTree.Comment();
         }
     }
 }

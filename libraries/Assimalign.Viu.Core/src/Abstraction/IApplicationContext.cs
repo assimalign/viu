@@ -27,14 +27,11 @@ public interface IApplicationContext
     IDirectiveResolver? Directives { get; }
 
     /// <summary>
-    /// Gets or sets the terminal handler for render, lifecycle, watcher, and event errors that no
+    /// Gets the terminal handler for render, lifecycle, watcher, and event errors that no
     /// component error-capture hook stopped.
     /// </summary>
-    Action<Exception, IComponentContext?, string>? ErrorHandler { get; set; }
+    Action<Exception, IComponentContext?, string>? ErrorHandler { get; }
 
-    /// <summary>Gets or sets the application warning handler.</summary>
-    Action<string>? WarnHandler { get; set; }
-
-    /// <summary>Gets or sets whether host-neutral performance instrumentation is enabled.</summary>
-    bool Performance { get; set; }
+    /// <summary>Gets the application warning handler.</summary>
+    Action<string>? WarnHandler { get; }
 }

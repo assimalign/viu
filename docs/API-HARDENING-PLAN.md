@@ -1,6 +1,7 @@
 # API surface hardening plan — [V01.01.14]
 
-**Status: ARC OPEN. Wave 1 in progress on `feature/V01.01.14-api-surface-hardening`.**
+**Status: ARC OPEN. Wave 2A in progress on
+`feature/V01.01.14.07-application-lifetime`.**
 
 This document is the session-independent source of truth for the API-hardening arc. Any session
 (human or agent) resuming this work reads this file first, checks the *State* table, and continues
@@ -78,12 +79,12 @@ in as each item is created.
 | T16 | Drop the viral `RequiresPreviewFeatures` stamp | 1 | `.03` | #292 | **IN REVIEW** — supersedes #280 |
 | T03 | Unship build-time packages; delete `Syntax.JavaScript` (keep `Syntax.Html`, see D3) | 1 | `.04` | #294 | **IMPLEMENTED** — pending integration |
 | T02 | Public-API baseline and hardening-attribute conventions | 1 | `.06` | #299 | **IMPLEMENTED** — pending integration |
-| D5-A | Application lifetime: middleware pipeline, delete `IApplicationPlugin` | 2A | — | — | Not started |
-| D5-B | Composition surface: drop public `IApplicationBuilder`, self-returning builders, frozen options | 2A | — | — | Not started |
-| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | — | — | Not started |
-| D5-D | Host facade: `Application.CreateBuilder()` in Browser/SDK | 2A | — | — | Not started |
-| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | — | — | Not started |
-| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | — | — | Not started |
+| D5-A | Application lifetime: middleware pipeline, delete `IApplicationPlugin` | 2A | `.07` | — | **IMPLEMENTED — pending integration** |
+| D5-B | Composition surface: drop public `IApplicationBuilder`, self-returning builders, frozen options | 2A | `.07` | — | **IMPLEMENTED — pending integration** |
+| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | `.07` | — | **IMPLEMENTED — pending integration** |
+| D5-D | Host facade: `Application.CreateBuilder()` in Browser/SDK | 2A | `.07` | — | **IMPLEMENTED — pending integration** |
+| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | `.07` | — | **IMPLEMENTED — pending integration** |
+| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | `.07` | — | **IMPLEMENTED — pending integration** |
 | T05 | Internalize friend-only publics (~120 types) | 2 | — | — | Not started |
 | T13 | Single source of truth for the helper-name contract | 2 | — | — | Not started |
 | T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | — | — | Not started — decide after T04 lands |
@@ -165,8 +166,23 @@ public interface IApplication : IAsyncDisposable
 }
 ```
 
-Internal state machine: `Created → Running → Stopping → Stopped`, with `Created → Failed` and
-`Running → Failed` edges.
+Internal state machine:
+
+```
+Created → Running → Stopping → Stopped
+                  ↘ Failed
+```
+
+`Running` spans startup and cleanup: `RunAsync` claims execution **synchronously** on entry, which is
+what makes it single-use and what freezes `Use`. Everything after that claim — middleware, host
+initialization, mount, the wait, unmount, and reverse-order cleanup — happens in `Running`/`Stopping`,
+so every failure path is `Running → Failed` or `Stopping → Failed`.
+
+> **Correction (2026-08-06).** An earlier revision of this line read "with `Created → Failed` and
+> `Running → Failed` edges". That was a transcription error, not the recorded design: `Created → Failed`
+> is unreachable, because nothing can fail between construction and the synchronous claim. Introducing
+> it would have required an extra "claimed but not yet running" state serving no caller. The diagram
+> above is the design as decided.
 
 ### Rules
 

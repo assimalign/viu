@@ -41,7 +41,7 @@ public class ServerRendererStreamingTests
             _ => () => ComponentTree.Element(
                 "div",
                 children: [childA.Request(), childB.Request()]));
-        ServerApplication application = Ssr.Application(parent.Request());
+        ServerRenderApplication application = Ssr.Application(parent.Request());
         RecordingTextWriter writer = new();
 
         await ServerRenderer.RenderToStreamAsync(application, writer);

@@ -21,7 +21,7 @@ internal sealed class EmptyComponentFactory : IComponentFactory
         ArgumentNullException.ThrowIfNull(componentType);
         throw new InvalidOperationException(
             $"Component type \"{componentType}\" cannot be activated while rendering a raw component "
-            + "tree. Render a ServerApplication configured with an IComponentFactory.");
+            + "tree. Render a ServerRenderApplication configured with an IComponentFactory.");
     }
 
     public IComponentTemplate Create(string name)
@@ -29,6 +29,6 @@ internal sealed class EmptyComponentFactory : IComponentFactory
         ArgumentException.ThrowIfNullOrEmpty(name);
         throw new InvalidOperationException(
             $"Component name \"{name}\" cannot be activated while rendering a raw component tree. "
-            + "Render a ServerApplication configured with an IComponentFactory.");
+            + "Render a ServerRenderApplication configured with an IComponentFactory.");
     }
 }

@@ -69,7 +69,7 @@ public sealed class ServerRendererHydrationRoundTripTests
                         "article",
                         children: [ComponentTree.Text(message.Value)]));
         ITemplateComponent request = component.Request();
-        ServerApplication application = Ssr.Application(request);
+        ServerRenderApplication application = Ssr.Application(request);
         string html =
             await ServerRenderer.RenderToStringAsync(application);
         TestElement container = TestServerMarkup.Parse(html);

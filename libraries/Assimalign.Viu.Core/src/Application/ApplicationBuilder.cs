@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.State;
@@ -7,107 +6,103 @@ using Assimalign.Viu.State;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// The host-neutral application builder base. It accepts an already-composed component factory and
-/// never constructs or owns a dependency-injection container.
+/// The shared application-composition builder base. It accepts an already-composed component
+/// factory and never constructs or owns a dependency-injection container.
 /// </summary>
-public abstract class ApplicationBuilder : IApplicationBuilder
+/// <remarks>
+/// Concrete persistent-host and server-render builders override the fluent methods with covariant
+/// return types so composition never erases the derived builder. Specified by <c>[APP-2]</c>.
+/// </remarks>
+public abstract class ApplicationBuilder
 {
-    private readonly List<Action<IApplication>> _configuration = [];
+    private readonly ApplicationOptions _options = new();
     private IComponent? _rootComponent;
-    private IComponentFactory? _components;
-    private IServiceProvider? _services;
+    private IComponentFactory _components = EmptyComponentFactory.Instance;
+    private IServiceProvider _services = EmptyServiceProvider.Instance;
     private IStateStoreRegistry? _state;
     private IDirectiveResolver? _directives;
 
-    /// <inheritdoc/>
-    public IApplicationBuilder UseRootComponent(IComponent component)
+    /// <summary>Sets the root value in the component tree.</summary>
+    /// <param name="component">The root component.</param>
+    /// <returns>This builder.</returns>
+    public virtual ApplicationBuilder AddRootComponent(IComponent component)
     {
         ArgumentNullException.ThrowIfNull(component);
         _rootComponent = component;
         return this;
     }
 
-    /// <inheritdoc/>
-    public IApplicationBuilder UseComponentFactory(IComponentFactory components)
+    /// <summary>Sets the application-selected component resolver.</summary>
+    /// <param name="components">The application component factory.</param>
+    /// <returns>This builder.</returns>
+    public virtual ApplicationBuilder AddComponentFactory(IComponentFactory components)
     {
         ArgumentNullException.ThrowIfNull(components);
         _components = components;
         return this;
     }
 
-    /// <inheritdoc/>
-    public IApplicationBuilder UseServiceProvider(IServiceProvider services)
+    /// <summary>Attaches an independently supplied application service resolver.</summary>
+    /// <param name="services">The application service provider.</param>
+    /// <returns>This builder.</returns>
+    public virtual ApplicationBuilder AddServiceProvider(IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(services);
         _services = services;
         return this;
     }
 
-    /// <inheritdoc/>
-    public IApplicationBuilder UseStateRegistry(IStateStoreRegistry state)
+    /// <summary>Sets the optional application state registry.</summary>
+    /// <param name="state">The application state registry.</param>
+    /// <returns>This builder.</returns>
+    public virtual ApplicationBuilder AddStateRegistry(IStateStoreRegistry state)
     {
         ArgumentNullException.ThrowIfNull(state);
         _state = state;
         return this;
     }
 
-    /// <inheritdoc/>
-    public IApplicationBuilder UseDirectiveResolver(IDirectiveResolver directives)
+    /// <summary>Sets the optional application directive resolver.</summary>
+    /// <param name="directives">The application directive resolver.</param>
+    /// <returns>This builder.</returns>
+    public virtual ApplicationBuilder AddDirectiveResolver(IDirectiveResolver directives)
     {
         ArgumentNullException.ThrowIfNull(directives);
         _directives = directives;
         return this;
     }
 
-    /// <inheritdoc/>
-    public IApplicationBuilder Use(IApplicationPlugin plugin)
-    {
-        ArgumentNullException.ThrowIfNull(plugin);
-        _configuration.Add(application => application.Use(plugin));
-        return this;
-    }
-
-    /// <inheritdoc/>
-    public IApplicationBuilder ConfigureApplication(Action<IApplicationContext> configure)
+    /// <summary>Configures diagnostics that are frozen when an application is built.</summary>
+    /// <param name="configure">The application-options action.</param>
+    /// <returns>This builder.</returns>
+    public virtual ApplicationBuilder ConfigureApplication(Action<ApplicationOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        _configuration.Add(application => configure(application.Context));
+        configure(_options);
         return this;
     }
 
-    /// <summary>
-    /// Builds the host-specific application without taking ownership of the supplied factory,
-    /// provider, or state registry.
-    /// </summary>
-    /// <returns>The configured application.</returns>
-    public abstract IApplication Build();
-
-    /// <summary>Creates the validated immutable context for a host-specific application.</summary>
+    /// <summary>Creates the validated immutable context for the derived composition object.</summary>
+    /// <param name="decorateComponents">
+    /// An optional derived-builder decorator for the application-selected component factory.
+    /// </param>
     /// <returns>The application context.</returns>
-    protected IApplicationContext CreateContext()
+    protected IApplicationContext CreateContext(
+        Func<IComponentFactory, IComponentFactory>? decorateComponents = null)
     {
         IComponent rootComponent = _rootComponent
             ?? throw new InvalidOperationException("Configure a root component before building the application.");
-        IComponentFactory components = _components
-            ?? throw new InvalidOperationException("Configure a component factory before building the application.");
-        IServiceProvider services = _services
-            ?? throw new InvalidOperationException("Configure a service provider before building the application.");
+        IComponentFactory components = decorateComponents is null
+            ? _components
+            : decorateComponents(_components)
+                ?? throw new InvalidOperationException(
+                    "The component-factory decorator returned null.");
         return new ApplicationContext(
             rootComponent,
             components,
-            services,
+            _services,
             _state,
-            _directives);
-    }
-
-    /// <summary>Applies recorded plugins and context configuration in call order.</summary>
-    /// <param name="application">The newly created host application.</param>
-    protected void ApplyConfiguration(IApplication application)
-    {
-        ArgumentNullException.ThrowIfNull(application);
-        foreach (Action<IApplication> configure in _configuration)
-        {
-            configure(application);
-        }
+            _directives,
+            _options);
     }
 }

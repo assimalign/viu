@@ -15,12 +15,14 @@ public sealed class ApplicationContext : IApplicationContext
     /// <param name="services">The independently supplied application service resolver.</param>
     /// <param name="state">The optional application state registry.</param>
     /// <param name="directives">The optional application directive resolver.</param>
+    /// <param name="options">The optional diagnostics to snapshot into the context.</param>
     public ApplicationContext(
         IComponent rootComponent,
         IComponentFactory components,
         IServiceProvider services,
         IStateStoreRegistry? state = null,
-        IDirectiveResolver? directives = null)
+        IDirectiveResolver? directives = null,
+        ApplicationOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
         ArgumentNullException.ThrowIfNull(components);
@@ -30,6 +32,9 @@ public sealed class ApplicationContext : IApplicationContext
         Services = services;
         State = state;
         Directives = directives;
+        ErrorHandler = options?.ErrorHandler;
+        WarnHandler = options?.WarnHandler;
+        EventObserver = options?.EventObserver;
     }
 
     /// <inheritdoc/>
@@ -48,13 +53,10 @@ public sealed class ApplicationContext : IApplicationContext
     public IDirectiveResolver? Directives { get; }
 
     /// <inheritdoc/>
-    public Action<Exception, IComponentContext?, string>? ErrorHandler { get; set; }
+    public Action<Exception, IComponentContext?, string>? ErrorHandler { get; }
 
     /// <inheritdoc/>
-    public Action<string>? WarnHandler { get; set; }
+    public Action<string>? WarnHandler { get; }
 
-    /// <inheritdoc/>
-    public bool Performance { get; set; }
-
-    internal Action<IComponentContext, string, IReadOnlyList<object?>>? EventObserver { get; set; }
+    internal Action<IComponentContext, string, IReadOnlyList<object?>>? EventObserver { get; }
 }

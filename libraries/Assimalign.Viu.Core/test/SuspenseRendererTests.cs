@@ -220,9 +220,14 @@ public sealed class SuspenseRendererTests : IDisposable
             _ => ComponentTree.Text("waiting"));
         (Renderer<FakeHostNode> renderer, FakeHost host) =
             CreateRenderer(root, definition);
-        ApplicationContext application = CreateApplication(root, definition);
         Exception? handled = null;
-        application.ErrorHandler = (exception, _, _) => handled = exception;
+        ApplicationContext application = CreateApplication(
+            root,
+            new ApplicationOptions
+            {
+                ErrorHandler = (exception, _, _) => handled = exception,
+            },
+            definition);
 
         renderer.Render(root, host.Root, application);
         _pump.RunUntilIdle();
@@ -309,6 +314,14 @@ public sealed class SuspenseRendererTests : IDisposable
         IComponent root,
         params AsynchronousComponentDefinition[] definitions)
     {
+        return CreateApplication(root, options: null, definitions);
+    }
+
+    private static ApplicationContext CreateApplication(
+        IComponent root,
+        ApplicationOptions? options,
+        params AsynchronousComponentDefinition[] definitions)
+    {
         List<ComponentRegistration> registrations =
         [
             Suspense.Registration,
@@ -324,7 +337,8 @@ public sealed class SuspenseRendererTests : IDisposable
         return new ApplicationContext(
             root,
             new ComponentFactory(registrations),
-            new EmptyServiceProvider());
+            new EmptyServiceProvider(),
+            options: options);
     }
 
     private static ComponentArguments Arguments(

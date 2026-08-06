@@ -8,22 +8,24 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Provides the host-generic application lifecycle used by Browser and future platform packages.
+/// Provides the host-generic application lifetime used by Browser and future platform packages.
 /// </summary>
 /// <typeparam name="TNode">The host renderer's node handle type.</typeparam>
 /// <remarks>
-/// The application borrows the component factory, service provider, and state registry contained
-/// in <see cref="Context"/>. Their composition root retains ownership. Not thread-safe.
+/// Each instance executes at most once. Runtime middleware surrounds initialization, target
+/// resolution, mounting, the live wait, and unmounting. The application borrows every composition
+/// dependency in <see cref="Context"/> and never disposes one. Not thread-safe. Specified by
+/// <c>[APP-1]</c> through <c>[APP-7]</c>.
 /// </remarks>
-public abstract class Application<TNode> :
-    IApplication<TNode>,
-    IDisposable,
-    IAsyncDisposable
+public abstract class Application<TNode> : IApplication<TNode>
     where TNode : notnull
 {
-    private readonly HashSet<IApplicationPlugin> _installedPlugins =
-        new(ReferenceEqualityComparer.Instance);
-    private readonly List<IApplicationPlugin> _pendingPlugins = [];
+    private readonly List<ApplicationMiddleware> _middleware = [];
+    private readonly CancellationTokenSource _stoppingSource = new();
+    private Task? _execution;
+    private Task? _stopExecution;
+    private ApplicationState _state;
+    private bool _isDirectMount;
     private bool _isDisposed;
 
     /// <summary>Initializes an application over an independently composed context.</summary>
@@ -38,120 +40,114 @@ public abstract class Application<TNode> :
     public IApplicationContext Context { get; }
 
     /// <inheritdoc/>
-    public bool IsMounted { get; private set; }
+    public bool IsRunning => _state == ApplicationState.Running;
 
     /// <inheritdoc/>
     public IComponentContext? RootContext { get; private set; }
 
+    internal ApplicationState State => _state;
+
     /// <inheritdoc/>
-    public IApplication Use(IApplicationPlugin plugin)
+    public IApplication Use(ApplicationMiddleware middleware)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        ArgumentNullException.ThrowIfNull(plugin);
+        ArgumentNullException.ThrowIfNull(middleware);
 
-        if (!_installedPlugins.Add(plugin))
+        if (_state != ApplicationState.Created)
         {
-            Warn("Plugin has already been applied to the target application.");
-            return this;
+            throw new InvalidOperationException(
+                "Application middleware must be registered before execution begins.");
         }
 
-        if (IsMounted)
-        {
-            Warn("Plugins registered after mount cannot affect the existing root tree.");
-        }
-
-        _pendingPlugins.Add(plugin);
+        _middleware.Add(middleware);
         return this;
+    }
+
+    /// <inheritdoc/>
+    public ValueTask RunAsync(CancellationToken cancellationToken = default)
+    {
+        BeginExecution(isDirectMount: false);
+        Task execution = ExecuteAsync(cancellationToken);
+        _execution = execution;
+        return new ValueTask(execution);
     }
 
     /// <inheritdoc/>
     public IComponentContext? Mount(TNode container)
     {
-        ObjectDisposedException.ThrowIf(_isDisposed, this);
         ArgumentNullException.ThrowIfNull(container);
+        BeginExecution(isDirectMount: true);
 
-        if (IsMounted)
+        bool mountAttempted = false;
+        try
         {
-            Warn("Application is already mounted.");
+            ValueTask initialization = OnInitializeAsync(CancellationToken.None);
+            if (!initialization.IsCompleted)
+            {
+                throw new InvalidOperationException(
+                    "This host requires asynchronous initialization. Use MountAsync instead.");
+            }
+
+            initialization.GetAwaiter().GetResult();
+            mountAttempted = true;
+            RootContext = MountCore(container);
+            _execution = Task.CompletedTask;
             return RootContext;
         }
-
-        InstallPendingPluginsSynchronously();
-        ValueTask initialization = OnInitializeAsync(CancellationToken.None);
-        if (!initialization.IsCompletedSuccessfully)
+        catch
         {
-            throw new InvalidOperationException(
-                "This host requires asynchronous initialization. Use MountAsync instead.");
-        }
+            try
+            {
+                if (mountAttempted)
+                {
+                    UnmountCore();
+                }
+            }
+            finally
+            {
+                RootContext = null;
+                _state = ApplicationState.Failed;
+            }
 
-        initialization.GetAwaiter().GetResult();
-        RootContext = MountCore(container);
-        IsMounted = true;
-        return RootContext;
+            throw;
+        }
     }
 
     /// <inheritdoc/>
-    public async ValueTask<IComponentContext?> MountAsync(
+    public ValueTask<IComponentContext?> MountAsync(
         TNode container,
         CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_isDisposed, this);
         ArgumentNullException.ThrowIfNull(container);
+        return MountResolvedAsync(
+            _ => ValueTask.FromResult(container),
+            cancellationToken);
+    }
 
-        if (IsMounted)
-        {
-            Warn("Application is already mounted.");
-            return RootContext;
-        }
+    internal ValueTask<IComponentContext?> MountResolvedAsync(
+        Func<CancellationToken, ValueTask<TNode>> resolveMountTarget,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(resolveMountTarget);
+        BeginExecution(isDirectMount: true);
 
-        await InstallPendingPluginsAsync(cancellationToken).ConfigureAwait(false);
-        await OnInitializeAsync(cancellationToken).ConfigureAwait(false);
-        RootContext = await MountCoreAsync(container, cancellationToken).ConfigureAwait(false);
-        IsMounted = true;
-        return RootContext;
+        Task<IComponentContext?> execution =
+            MountDirectAsync(resolveMountTarget, cancellationToken);
+        _execution = execution;
+        return new ValueTask<IComponentContext?>(execution);
     }
 
     /// <inheritdoc/>
-    public void Unmount()
+    public ValueTask StopAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsMounted)
-        {
-            return;
-        }
-
-        UnmountCore();
-        RootContext = null;
-        IsMounted = false;
+        Task stopExecution = GetOrCreateStopExecution();
+        return cancellationToken.CanBeCanceled
+            ? new ValueTask(stopExecution.WaitAsync(cancellationToken))
+            : new ValueTask(stopExecution);
     }
 
-    /// <inheritdoc/>
-    public async ValueTask UnmountAsync(CancellationToken cancellationToken = default)
-    {
-        if (!IsMounted)
-        {
-            return;
-        }
-
-        await UnmountCoreAsync(cancellationToken).ConfigureAwait(false);
-        RootContext = null;
-        IsMounted = false;
-    }
-
-    /// <summary>Releases application-owned mounted runtime state.</summary>
-    public void Dispose()
-    {
-        if (_isDisposed)
-        {
-            return;
-        }
-
-        Unmount();
-        _isDisposed = true;
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>Asynchronously releases application-owned mounted runtime state.</summary>
-    /// <returns>A task that completes after host teardown.</returns>
+    /// <summary>Asynchronously releases the running application without disposing borrowed dependencies.</summary>
+    /// <returns>A task that completes after application cleanup.</returns>
     public async ValueTask DisposeAsync()
     {
         if (_isDisposed)
@@ -159,15 +155,30 @@ public abstract class Application<TNode> :
             return;
         }
 
-        await UnmountAsync().ConfigureAwait(false);
         _isDisposed = true;
-        GC.SuppressFinalize(this);
+        try
+        {
+            await GetOrCreateStopExecution().ConfigureAwait(false);
+        }
+        finally
+        {
+            _stoppingSource.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 
-    /// <summary>
-    /// Performs host initialization after plugins install and before the first render.
-    /// </summary>
-    /// <param name="cancellationToken">Cancels host initialization.</param>
+    /// <summary>Resolves the host mount target used by top-level application execution.</summary>
+    /// <param name="cancellationToken">Signals graceful shutdown during target resolution.</param>
+    /// <returns>The host mount target.</returns>
+    /// <remarks>
+    /// Lower-level <see cref="Mount(TNode)"/> calls supply a target directly and do not invoke this
+    /// method. Specified by <c>[APP-4]</c> and <c>[APP-7]</c>.
+    /// </remarks>
+    protected abstract ValueTask<TNode> ResolveMountTargetAsync(
+        CancellationToken cancellationToken);
+
+    /// <summary>Performs host initialization before target resolution and the first render.</summary>
+    /// <param name="cancellationToken">Signals graceful shutdown during host initialization.</param>
     /// <returns>A task that completes when the host is ready.</returns>
     protected virtual ValueTask OnInitializeAsync(CancellationToken cancellationToken)
     {
@@ -181,7 +192,7 @@ public abstract class Application<TNode> :
 
     /// <summary>Asynchronously mounts the root tree into the supplied host container.</summary>
     /// <param name="container">The host container.</param>
-    /// <param name="cancellationToken">Cancels asynchronous host work.</param>
+    /// <param name="cancellationToken">Signals graceful shutdown during host work.</param>
     /// <returns>The root component context, when one exists.</returns>
     protected virtual ValueTask<IComponentContext?> MountCoreAsync(
         TNode container,
@@ -194,43 +205,270 @@ public abstract class Application<TNode> :
     protected abstract void UnmountCore();
 
     /// <summary>Asynchronously removes the mounted tree from the host.</summary>
-    /// <param name="cancellationToken">Cancels asynchronous host teardown.</param>
+    /// <param name="cancellationToken">Cancels host-specific asynchronous teardown.</param>
     /// <returns>A task that completes after host teardown.</returns>
+    /// <remarks>
+    /// Top-level shutdown passes a non-cancelled token so a stop request cannot skip cleanup.
+    /// </remarks>
     protected virtual ValueTask UnmountCoreAsync(CancellationToken cancellationToken)
     {
         UnmountCore();
         return ValueTask.CompletedTask;
     }
 
-    private void InstallPendingPluginsSynchronously()
+    private async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        while (_pendingPlugins.Count > 0)
+        await Task.Yield();
+        using CancellationTokenRegistration cancellationRegistration =
+            RegisterStopping(cancellationToken);
+        ApplicationExecutionContext context =
+            new(this, _stoppingSource.Token);
+        ApplicationDelegate pipeline = ExecuteTerminalAsync;
+        for (int index = _middleware.Count - 1; index >= 0; index--)
         {
-            IApplicationPlugin plugin = _pendingPlugins[0];
-            ValueTask installation = plugin.InstallAsync(this, CancellationToken.None);
-            if (!installation.IsCompletedSuccessfully)
+            ApplicationMiddleware middleware = _middleware[index];
+            ApplicationDelegate next = pipeline;
+            pipeline = execution => middleware(execution, next);
+        }
+
+        try
+        {
+            await pipeline(context).ConfigureAwait(false);
+            CompleteStopping();
+        }
+        catch (OperationCanceledException exception)
+            when (IsStoppingCancellation(exception))
+        {
+            CompleteStopping();
+        }
+        catch
+        {
+            _state = ApplicationState.Failed;
+            throw;
+        }
+    }
+
+    private async ValueTask ExecuteTerminalAsync(
+        ApplicationExecutionContext context)
+    {
+        bool mountAttempted = false;
+        try
+        {
+            context.Stopping.ThrowIfCancellationRequested();
+            await OnInitializeAsync(context.Stopping).ConfigureAwait(false);
+            context.Stopping.ThrowIfCancellationRequested();
+            TNode container = await ResolveMountTargetAsync(context.Stopping)
+                .ConfigureAwait(false);
+            context.Stopping.ThrowIfCancellationRequested();
+            mountAttempted = true;
+            RootContext = await MountCoreAsync(container, context.Stopping)
+                .ConfigureAwait(false);
+            await WaitForStoppingAsync(context.Stopping).ConfigureAwait(false);
+        }
+        finally
+        {
+            try
             {
-                throw new InvalidOperationException(
-                    "A plugin requires asynchronous installation. Use MountAsync instead.");
+                if (mountAttempted)
+                {
+                    await UnmountCoreAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                RootContext = null;
+            }
+        }
+    }
+
+    private async Task<IComponentContext?> MountDirectAsync(
+        Func<CancellationToken, ValueTask<TNode>> resolveMountTarget,
+        CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        using CancellationTokenRegistration cancellationRegistration =
+            RegisterStopping(cancellationToken);
+        bool mountAttempted = false;
+        try
+        {
+            _stoppingSource.Token.ThrowIfCancellationRequested();
+            await OnInitializeAsync(_stoppingSource.Token).ConfigureAwait(false);
+            _stoppingSource.Token.ThrowIfCancellationRequested();
+            TNode container = await resolveMountTarget(_stoppingSource.Token)
+                .ConfigureAwait(false);
+            _stoppingSource.Token.ThrowIfCancellationRequested();
+            mountAttempted = true;
+            RootContext = await MountCoreAsync(container, _stoppingSource.Token)
+                .ConfigureAwait(false);
+            return RootContext;
+        }
+        catch (OperationCanceledException exception)
+            when (IsStoppingCancellation(exception))
+        {
+            try
+            {
+                await CleanupFailedMountAsync(mountAttempted).ConfigureAwait(false);
+            }
+            catch
+            {
+                _state = ApplicationState.Failed;
+                throw;
             }
 
-            installation.GetAwaiter().GetResult();
-            _pendingPlugins.RemoveAt(0);
+            CompleteStopping();
+            throw;
         }
-    }
-
-    private async ValueTask InstallPendingPluginsAsync(CancellationToken cancellationToken)
-    {
-        while (_pendingPlugins.Count > 0)
+        catch
         {
-            IApplicationPlugin plugin = _pendingPlugins[0];
-            await plugin.InstallAsync(this, cancellationToken).ConfigureAwait(false);
-            _pendingPlugins.RemoveAt(0);
+            try
+            {
+                await CleanupFailedMountAsync(mountAttempted).ConfigureAwait(false);
+            }
+            finally
+            {
+                _state = ApplicationState.Failed;
+            }
+
+            throw;
         }
     }
 
-    private void Warn(string message)
+    private async Task CleanupFailedMountAsync(bool mountAttempted)
     {
-        Context.WarnHandler?.Invoke(message);
+        try
+        {
+            if (mountAttempted)
+            {
+                await UnmountCoreAsync(CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            RootContext = null;
+        }
+    }
+
+    private Task GetOrCreateStopExecution()
+    {
+        if (_stopExecution is not null)
+        {
+            return _stopExecution;
+        }
+
+        if (_state == ApplicationState.Running)
+        {
+            RequestStopping();
+        }
+
+        if (_state != ApplicationState.Stopping)
+        {
+            return Task.CompletedTask;
+        }
+
+        _stopExecution = _isDirectMount
+            ? StopDirectMountAsync()
+            : _execution ?? Task.CompletedTask;
+        return _stopExecution;
+    }
+
+    private async Task StopDirectMountAsync()
+    {
+        if (_execution is not null)
+        {
+            try
+            {
+                await _execution.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception)
+                when (IsStoppingCancellation(exception))
+            {
+            }
+        }
+
+        if (_state != ApplicationState.Stopping)
+        {
+            return;
+        }
+
+        try
+        {
+            await UnmountCoreAsync(CancellationToken.None).ConfigureAwait(false);
+            RootContext = null;
+            CompleteStopping();
+        }
+        catch
+        {
+            RootContext = null;
+            _state = ApplicationState.Failed;
+            throw;
+        }
+    }
+
+    private static async Task WaitForStoppingAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private CancellationTokenRegistration RegisterStopping(
+        CancellationToken cancellationToken)
+    {
+        return cancellationToken.CanBeCanceled
+            ? cancellationToken.Register(
+                static state => ((Application<TNode>)state!).RequestStopping(),
+                this)
+            : default;
+    }
+
+    private bool IsStoppingCancellation(OperationCanceledException exception)
+    {
+        return _stoppingSource.IsCancellationRequested &&
+            exception.CancellationToken == _stoppingSource.Token;
+    }
+
+    private void RequestStopping()
+    {
+        if (_state == ApplicationState.Running)
+        {
+            _state = ApplicationState.Stopping;
+        }
+
+        _stoppingSource.Cancel();
+    }
+
+    private void BeginExecution(bool isDirectMount)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        if (_state != ApplicationState.Created)
+        {
+            throw new InvalidOperationException(
+                "An application instance can execute only once.");
+        }
+
+        _isDirectMount = isDirectMount;
+        _state = ApplicationState.Running;
+    }
+
+    private void CompleteStopping()
+    {
+        if (_state == ApplicationState.Running)
+        {
+            _state = ApplicationState.Stopping;
+        }
+
+        if (_state == ApplicationState.Stopping)
+        {
+            _state = ApplicationState.Stopped;
+        }
     }
 }

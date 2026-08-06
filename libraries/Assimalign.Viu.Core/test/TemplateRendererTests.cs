@@ -208,15 +208,18 @@ public sealed class TemplateRendererTests
         ThrowingChildTemplate child = new();
         ITemplateComponent root = ComponentTree.Template<CapturingParentTemplate>();
         int applicationErrors = 0;
-        IApplicationContext application = CreateApplication(
+        IApplicationContext application = CreateApplicationWithOptions(
             root,
+            new ApplicationOptions
+            {
+                ErrorHandler = (_, _, _) => applicationErrors++,
+            },
             new ComponentRegistration(
                 typeof(CapturingParentTemplate),
                 () => parent),
             new ComponentRegistration(
                 typeof(ThrowingChildTemplate),
                 () => child));
-        application.ErrorHandler = (_, _, _) => applicationErrors++;
         FakeHost host = new();
         Renderer<FakeHostNode> renderer =
             RendererFactory.CreateRenderer(host.Options);
@@ -383,13 +386,16 @@ public sealed class TemplateRendererTests
         try
         {
             ITemplateComponent root = ComponentTree.Template<ThrowingBlockTemplate>();
-            IApplicationContext application = CreateApplication(
+            int handled = 0;
+            IApplicationContext application = CreateApplicationWithOptions(
                 root,
+                new ApplicationOptions
+                {
+                    ErrorHandler = (_, _, _) => handled++,
+                },
                 new ComponentRegistration(
                     typeof(ThrowingBlockTemplate),
                     static () => new ThrowingBlockTemplate()));
-            int handled = 0;
-            application.ErrorHandler = (_, _, _) => handled++;
             FakeHost host = new();
             Renderer<FakeHostNode> renderer =
                 RendererFactory.CreateRenderer(host.Options);
@@ -428,6 +434,18 @@ public sealed class TemplateRendererTests
             root,
             new ComponentFactory(registrations),
             new EmptyServiceProvider());
+    }
+
+    private static IApplicationContext CreateApplicationWithOptions(
+        IComponent root,
+        ApplicationOptions options,
+        params ComponentRegistration[] registrations)
+    {
+        return new ApplicationContext(
+            root,
+            new ComponentFactory(registrations),
+            new EmptyServiceProvider(),
+            options: options);
     }
 
     private static ITemplateComponent RequestWithTitle(string title)

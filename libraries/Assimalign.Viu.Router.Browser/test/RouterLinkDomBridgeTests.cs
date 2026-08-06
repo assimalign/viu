@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
@@ -120,6 +123,83 @@ public class RouterLinkDomBridgeTests
         }
     }
 
+    [Fact]
+    public async Task UseRouter_InstallsBeforeReadinessAndUninstallsAfterApplicationStops()
+    {
+        BrowserObjectEventInvoker? previous = BrowserObjectEvents.Invoker;
+        List<string> order = [];
+        int navigationCount = 0;
+        try
+        {
+            BrowserObjectEvents.Invoker = null;
+            using Router router = new(
+                RouterHistory.CreateMemory(),
+                [new RouteRecord("/"), new RouteRecord("/next")]);
+            router.BeforeEach((_, _, _) =>
+            {
+                navigationCount++;
+                if (navigationCount == 1)
+                {
+                    BrowserObjectEvents.Invoker.ShouldNotBeNull();
+                    order.Add("ready");
+                }
+                return Task.FromResult(NavigationGuardResult.Allow);
+            });
+            await using TestApplication application = new(order);
+            application.UseRouter(router);
+
+            Task execution = application.RunAsync().AsTask();
+            await application.Mounted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            execution.IsCompleted.ShouldBeFalse();
+            order.ShouldBe(["ready", "initialize", "resolve", "mount"]);
+            BrowserObjectEvents.Invoker.ShouldNotBeNull();
+
+            await application.StopAsync();
+            await execution;
+
+            order.ShouldBe(["ready", "initialize", "resolve", "mount", "unmount"]);
+            BrowserObjectEvents.Invoker.ShouldBeNull();
+            (await router.Push("/next")).ShouldBeNull();
+            navigationCount.ShouldBe(2);
+        }
+        finally
+        {
+            RouterLinkDomBridge.Uninstall();
+            BrowserObjectEvents.Invoker = previous;
+        }
+    }
+
+    [Fact]
+    public async Task UseRouter_DownstreamFailureAlwaysUninstallsBridge()
+    {
+        BrowserObjectEventInvoker? previous = BrowserObjectEvents.Invoker;
+        try
+        {
+            BrowserObjectEvents.Invoker = null;
+            using Router router = new(
+                RouterHistory.CreateMemory(),
+                [new RouteRecord("/")]);
+            await using TestApplication application = new([]);
+            application.UseRouter(router);
+            application.Use(static (_, _) =>
+                throw new InvalidOperationException("downstream failure"));
+
+            InvalidOperationException exception =
+                await Should.ThrowAsync<InvalidOperationException>(
+                    () => application.RunAsync().AsTask());
+
+            exception.Message.ShouldBe("downstream failure");
+            BrowserObjectEvents.Invoker.ShouldBeNull();
+            application.Mounted.Task.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            RouterLinkDomBridge.Uninstall();
+            BrowserObjectEvents.Invoker = previous;
+        }
+    }
+
     // --- end-to-end through the real RouterLink --------------------------------------------------
 
     [Fact]
@@ -225,6 +305,61 @@ public class RouterLinkDomBridgeTests
         public object? GetService(Type serviceType)
         {
             return serviceType == typeof(Router) ? _router : null;
+        }
+    }
+
+    private sealed class TestApplication : Application<int>
+    {
+        private readonly List<string> _order;
+
+        internal TestApplication(List<string> order)
+            : base(new ApplicationContext(
+                ComponentTree.Element("main"),
+                new ComponentFactory(Array.Empty<ComponentRegistration>()),
+                new EmptyServiceProvider()))
+        {
+            _order = order;
+        }
+
+        internal TaskCompletionSource Mounted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override ValueTask OnInitializeAsync(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _order.Add("initialize");
+            return ValueTask.CompletedTask;
+        }
+
+        protected override ValueTask<int> ResolveMountTargetAsync(
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _order.Add("resolve");
+            return ValueTask.FromResult(1);
+        }
+
+        protected override IComponentContext? MountCore(int container)
+        {
+            container.ShouldBe(1);
+            _order.Add("mount");
+            Mounted.TrySetResult();
+            return null;
+        }
+
+        protected override void UnmountCore()
+        {
+            _order.Add("unmount");
+        }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            ArgumentNullException.ThrowIfNull(serviceType);
+            return null;
         }
     }
 }

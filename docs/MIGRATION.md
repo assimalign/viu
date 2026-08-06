@@ -32,9 +32,9 @@ compilation, single-file component generation, and CSS tooling.
 
 The staging application model is host-generic:
 
-- `IApplication` carries platform-neutral configuration and lifecycle;
-- `IApplication<TNode>` carries the host-specific mount target;
-- `Application<TNode>` provides shared mounting and plugin behavior;
+- `IApplication` carries the platform-neutral single-use asynchronous lifetime and middleware;
+- `IApplication<TNode>` retains lower-level host-specific mounting for embedding and tests;
+- `Application<TNode>` provides shared mounting, stopping, and middleware behavior;
 - `BrowserApplication : Application<int>` is the current DOM host; and
 - a WebView2 application can select its own node-handle type without changing Core abstractions.
 

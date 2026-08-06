@@ -36,7 +36,7 @@ public sealed class ServerRendererSuspenseTests
                 typeof(ResolvedTemplate),
                 static () => new ResolvedTemplate()),
         ]);
-        ServerApplication application = new(
+        ServerRenderApplication application = new(
             root,
             components,
             TestServiceProvider.Empty);

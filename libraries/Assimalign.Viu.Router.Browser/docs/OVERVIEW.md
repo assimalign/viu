@@ -9,6 +9,9 @@ in either package it bridges. Specified by
 
 ## What it provides
 
+- **`UseRouter(router)`** — application middleware that installs the DOM bridge, awaits the router's
+  cancellable initial navigation, enters the application terminal, and removes the bridge after
+  unmount or failure. The caller retains ownership of the router.
 - **`RouterLinkDomBridge`** — `Install()`/`Uninstall()` wire the bridge into the DOM event system
   (`BrowserObjectEvents.Invoker`). `Invoke` converts the dispatched `BrowserEvent`'s click metadata
   (mouse button, the Control/Shift/Alt/Meta modifiers, and the arrival-time `defaultPrevented`) into
@@ -18,9 +21,19 @@ in either package it bridges. Specified by
 ## Using it
 
 ```csharp
-RouterLinkDomBridge.Install();            // enable RouterLink navigation in the browser
-await BrowserApplication.CreateBuilder(new AppRoot()).Build().MountAsync("#app");
+await Application
+    .CreateBuilder()
+    .AddRootComponent(ComponentTree.Template<AppRoot>())
+    .AddComponentFactory(components)
+    .AddServiceProvider(services)
+    .Build()
+    .UseRouter(router)
+    .RunAsync();
 ```
+
+`RouterHistory.CreateWeb()` and `CreateWebHash()` are lazy. `UseRouter` reaches
+`Router.ReadyAsync(execution.Stopping)`, which initializes the history bridge before initial
+navigation; ordinary bootstrap no longer calls `RouterHistory.InitializeAsync()` first [RTR-3].
 
 Only browser apps that use the Router need this package — it is not part of the base
 `Assimalign.Viu.App` framework, so a non-router app never pays for it.

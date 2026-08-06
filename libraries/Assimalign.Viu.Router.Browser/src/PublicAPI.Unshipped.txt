@@ -1,0 +1,3 @@
+#nullable enable
+Assimalign.Viu.Router.Browser.ApplicationRouterExtensions
+static Assimalign.Viu.Router.Browser.ApplicationRouterExtensions.UseRouter(this Assimalign.Viu.IApplication! application, Assimalign.Viu.Router.Router! router) -> Assimalign.Viu.IApplication!

@@ -100,11 +100,12 @@ Component-tree `provide`/`inject` is intentionally absent. Component dependencie
 - State definitions and explicit registries for shared state; and
 - `IComponentContext.Components` for deliberate component resolution.
 
-Application plugins are awaited pre-mount initialization hooks over an already-composed
-application. They do not imply a mutable component/directive registry: a developer can supply a
-mutable custom resolver when plugin-driven registration is wanted, while the built-in resolvers
-are composed before `Build()`. This keeps `IComponentFactory` open to arbitrary resolver designs
-instead of adding registration methods to the activation contract.
+Application composition and live execution are separate. `Add*` builder methods select the root,
+component factory, directive resolver, service provider, and state registry before `Build()`.
+Afterward, `Use(ApplicationMiddleware)` decorates the single-use asynchronous application lifetime;
+it cannot mutate those composition dependencies, and registration freezes when `RunAsync` claims
+execution. This keeps `IComponentFactory` open to arbitrary resolver designs instead of adding
+registration methods to the activation contract.
 
 ## Lifecycle and asynchronous work
 
@@ -194,20 +195,24 @@ non-null empty collection means “an optimized block with no dynamic descendant
 
 ## Host-generic application model
 
-`IApplication` contains the platform-neutral configuration, plugin, mounted-state, and unmount
-surface. Mounting remains generic through `IApplication<TNode>`, and shared implementation lives in
-`Application<TNode>`.
+`IApplication` contains the platform-neutral context, lifetime middleware, running state,
+`RunAsync`, and `StopAsync`. Mounting remains generic through `IApplication<TNode>`, and shared
+single-use state-machine implementation lives in `Application<TNode>`. Lower-level host mount APIs
+remain available for embedding and tests, but bypass the top-level middleware pipeline [APP-7].
 
-`BrowserApplication : Application<int>` uses opaque integer DOM handles and adds selector-based
-asynchronous mounting. Browser owns DOM operations, command buffering, browser events, DOM
-directives, transitions, and transition groups; it does not own application services or state.
+`BrowserApplication : Application<int>` uses opaque integer DOM handles. `Application.CreateBuilder()`
+selects Browser with a default `#app` mount target; `RunAsync` initializes the host, mounts, waits for
+cancellation or `StopAsync`, and unmounts before middleware cleanup. Browser owns DOM operations,
+command buffering, browser events, DOM directives, transitions, and transition groups; it does not
+own application services or state.
 
 A planned WebView2 host can derive from `Application<WebViewNodeHandle>`, provide a renderer over its
-own node/session handle, and reuse Components, Reactivity, State, Core lifecycle, plugins, and
+own node/session handle, and reuse Components, Reactivity, State, Core lifecycle, middleware, and
 scheduling without depending on Browser.
 
-ServerRenderer implements the same non-generic application configuration face because its primary
-operation produces serialized output rather than mounting into a persistent node.
+`ServerRenderApplication` is instead a plain composition object. Server rendering produces output
+per request rather than owning a persistent mounted lifetime, so it does not implement
+`IApplication` or participate in application middleware [SSR-2].
 
 ## Runtime capabilities
 

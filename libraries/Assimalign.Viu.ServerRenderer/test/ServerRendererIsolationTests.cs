@@ -23,10 +23,10 @@ public class ServerRendererIsolationTests
                 ?? throw new InvalidOperationException("Tenant was not supplied.");
             return () => TestTree.Element("div", tenant.Name);
         });
-        ServerApplication applicationA = Ssr.Application(
+        ServerRenderApplication applicationA = Ssr.Application(
             component.Request(),
             Services(new Tenant("tenant-a")));
-        ServerApplication applicationB = Ssr.Application(
+        ServerRenderApplication applicationB = Ssr.Application(
             component.Request(),
             Services(new Tenant("tenant-b")));
 
@@ -70,7 +70,7 @@ public class ServerRendererIsolationTests
             count.Value++;
             return () => TestTree.Element("div", count.Value.ToString());
         });
-        ServerApplication application = Ssr.Application(component.Request());
+        ServerRenderApplication application = Ssr.Application(component.Request());
 
         string first = await ServerRenderer.RenderToStringAsync(application);
         string second = await ServerRenderer.RenderToStringAsync(application);

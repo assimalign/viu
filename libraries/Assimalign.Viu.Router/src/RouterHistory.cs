@@ -9,8 +9,8 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// The factory facade for the router's three history modes. Each returns an
 /// <see cref="IRouterHistory"/>; the memory mode is pure and needs no browser, while the web and hash
-/// modes drive the History API over interop and require <see cref="InitializeAsync"/> to have
-/// completed first. Specified by <c>[RTR-3]</c>.
+/// modes defer their History API bridge initialization until <see cref="Router.ReadyAsync"/>.
+/// Specified by <c>[RTR-3]</c>.
 /// </summary>
 public static class RouterHistory
 {
@@ -18,10 +18,15 @@ public static class RouterHistory
 
     /// <summary>
     /// Loads this package's <c>viu-history.js</c> bridge module and binds the <c>popstate</c>
-    /// dispatch. Idempotent — later calls await the same initialization. Must complete before
-    /// <see cref="CreateWeb"/> or <see cref="CreateWebHash"/>. The memory mode does not need it.
+    /// dispatch. Idempotent — later calls await the same initialization. Web and hash histories call
+    /// this lazily from <see cref="Router.ReadyAsync"/>; applications may call it earlier only to
+    /// prewarm the bridge. The memory mode does not need it.
     /// </summary>
     /// <param name="cancellationToken">Cancels the module download.</param>
+    /// <returns>
+    /// The cached bridge-initialization task. The first call's cancellation token owns that task;
+    /// later calls cannot replace it.
+    /// </returns>
     [SupportedOSPlatform("browser")]
     public static Task InitializeAsync(CancellationToken cancellationToken = default)
         => initialization ??= InitializeCoreAsync(cancellationToken);
@@ -41,13 +46,18 @@ public static class RouterHistory
     /// or <c>"/"</c> is used.
     /// </summary>
     /// <param name="basePath">The base path (e.g. <c>"/app/"</c>), or <see langword="null"/> to auto-detect.</param>
-    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
+    /// <returns>
+    /// A deferred browser history. A router may attach its listener immediately; awaiting
+    /// <see cref="Router.ReadyAsync"/> initializes every other synchronous member.
+    /// </returns>
     [SupportedOSPlatform("browser")]
     public static IRouterHistory CreateWeb(string? basePath = null)
     {
-        EnsureInitialized();
-        var interop = new JavaScriptBrowserHistoryInterop();
-        return new BrowserRouterHistory(interop, ResolveWebBase(interop, basePath));
+        return new DeferredBrowserRouterHistory(
+            isHash: false,
+            basePath,
+            InitializeAsync,
+            static () => new JavaScriptBrowserHistoryInterop());
     }
 
     /// <summary>
@@ -56,13 +66,18 @@ public static class RouterHistory
     /// the current <c>location.pathname</c>/<c>search</c>, with a <c>#</c> ensured.
     /// </summary>
     /// <param name="basePath">The base (e.g. <c>"/folder/#/app/"</c>), or <see langword="null"/> to auto-detect.</param>
-    /// <exception cref="InvalidOperationException"><see cref="InitializeAsync"/> has not completed.</exception>
+    /// <returns>
+    /// A deferred browser history. A router may attach its listener immediately; awaiting
+    /// <see cref="Router.ReadyAsync"/> initializes every other synchronous member.
+    /// </returns>
     [SupportedOSPlatform("browser")]
     public static IRouterHistory CreateWebHash(string? basePath = null)
     {
-        EnsureInitialized();
-        var interop = new JavaScriptBrowserHistoryInterop();
-        return new BrowserRouterHistory(interop, ResolveHashBase(interop, basePath));
+        return new DeferredBrowserRouterHistory(
+            isHash: true,
+            basePath,
+            InitializeAsync,
+            static () => new JavaScriptBrowserHistoryInterop());
     }
 
     // Web base: a configured base wins; otherwise the <base> href (origin stripped) or "/".
@@ -102,15 +117,5 @@ public static class RouterHistory
             "/_content/Assimalign.Viu.Router/viu-history.js",
             cancellationToken);
         await JavaScriptBrowserHistoryInterop.InitializeModuleAsync();
-    }
-
-    [SupportedOSPlatform("browser")]
-    private static void EnsureInitialized()
-    {
-        if (initialization is not { IsCompletedSuccessfully: true })
-        {
-            throw new InvalidOperationException(
-                "RouterHistory.InitializeAsync() must complete before creating a web or hash history.");
-        }
     }
 }

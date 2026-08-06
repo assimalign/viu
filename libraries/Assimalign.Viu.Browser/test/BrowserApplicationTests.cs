@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Versioning;
-using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -32,8 +31,8 @@ public sealed class BrowserApplicationTests
         BrowserApplicationBuilder builder =
             BrowserApplication.CreateBuilder(root);
 
-        builder.UseComponentFactory(components);
-        builder.UseServiceProvider(services);
+        builder.AddComponentFactory(components);
+        builder.AddServiceProvider(services);
 
         BrowserApplication application = builder.Build();
 
@@ -71,10 +70,10 @@ public sealed class BrowserApplicationTests
                 Array.Empty<KeyValuePair<string, IDirective>>());
         BrowserApplicationBuilder builder =
             BrowserApplication.CreateBuilder(root);
-        builder.UseComponentFactory(
+        builder.AddComponentFactory(
             new ComponentFactory(Array.Empty<ComponentRegistration>()));
-        builder.UseServiceProvider(new EmptyServiceProvider());
-        builder.UseDirectiveResolver(directives);
+        builder.AddServiceProvider(new EmptyServiceProvider());
+        builder.AddDirectiveResolver(directives);
 
         BrowserApplication application = builder.Build();
 
@@ -82,7 +81,63 @@ public sealed class BrowserApplicationTests
     }
 
     [Fact]
-    public async Task MountAsync_InstallsPluginThenInitializesClearsAndRenders()
+    public void ApplicationFacade_DefaultResolversBuildPrimitiveApplicationAndPreserveBuilderType()
+    {
+        IComponent root = ComponentTree.Element("main");
+
+        BrowserApplicationBuilder builder = Application
+            .CreateBuilder()
+            .AddRootComponent(root)
+            .ConfigureApplication(options =>
+                options.WarnHandler = static _ => { });
+        BrowserApplication application = builder.Build();
+
+        application.Context.RootComponent.ShouldBeSameAs(root);
+        application.Context.Components.ShouldNotBeNull();
+        application.Context.Services.ShouldNotBeNull();
+        application.Context.WarnHandler.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task RunAsync_DefaultMountTargetResolvesAppAfterBrowserInitialization()
+    {
+        List<string> order = [];
+        TaskCompletionSource mounted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingHost host = new(order);
+        BrowserApplication application = new(
+            RendererFactory.CreateRenderer(host.CreateOptions()),
+            CreateContext(ComponentTree.Element("main")),
+            initialize: _ =>
+            {
+                order.Add("initialize");
+                return Task.CompletedTask;
+            },
+            clearContainer: _ =>
+            {
+                order.Add("clear");
+                mounted.TrySetResult();
+            },
+            resolveContainer: selector =>
+            {
+                order.Add($"resolve:{selector}");
+                return 9;
+            });
+
+        Task execution = application.RunAsync().AsTask();
+
+        await mounted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        execution.IsCompleted.ShouldBeFalse();
+        order[0].ShouldBe("initialize");
+        order[1].ShouldBe("resolve:#app");
+        order[2].ShouldBe("clear");
+
+        await application.StopAsync();
+        await execution;
+    }
+
+    [Fact]
+    public async Task MountAsync_LowerLevelPathInitializesClearsRendersAndStops()
     {
         List<string> order = [];
         RecordingHost host = new(order);
@@ -99,18 +154,13 @@ public sealed class BrowserApplicationTests
                 return Task.CompletedTask;
             },
             clearContainer: _ => order.Add("clear"));
-        CountingPlugin plugin = new(order);
-        application.Use(plugin);
-
         IComponentContext? rootContext =
             await application.MountAsync(7);
 
         rootContext.ShouldBeNull();
-        application.IsMounted.ShouldBeTrue();
-        plugin.SeenApplication.ShouldBeSameAs(application);
+        application.IsRunning.ShouldBeTrue();
         order.ShouldBe(
         [
-            "plugin",
             "initialize",
             "clear",
             "create:main",
@@ -119,21 +169,19 @@ public sealed class BrowserApplicationTests
             "insert:1:7:0",
         ]);
 
-        application.Unmount();
+        await application.StopAsync();
 
-        application.IsMounted.ShouldBeFalse();
+        application.IsRunning.ShouldBeFalse();
         host.Removed.ShouldBe([1]);
     }
 
     [Fact]
-    public async Task MountAsync_SecondMountWarnsAndDoesNotInitializeAgain()
+    public async Task MountAsync_SecondMountThrowsAndDoesNotInitializeAgain()
     {
         int initializationCount = 0;
-        List<string> warnings = [];
         RecordingHost host = new([]);
         ApplicationContext context =
             CreateContext(ComponentTree.Element("main"));
-        context.WarnHandler = warnings.Add;
         BrowserApplication application = new(
             RendererFactory.CreateRenderer(host.CreateOptions()),
             context,
@@ -145,11 +193,11 @@ public sealed class BrowserApplicationTests
             clearContainer: static _ => { });
 
         await application.MountAsync(7);
-        await application.MountAsync(8);
+        await Should.ThrowAsync<InvalidOperationException>(
+            async () => await application.MountAsync(8));
 
         initializationCount.ShouldBe(1);
-        warnings.ShouldContain(
-            warning => warning.Contains("already mounted", StringComparison.Ordinal));
+        await application.StopAsync();
     }
 
     [Fact]
@@ -180,6 +228,7 @@ public sealed class BrowserApplicationTests
         rootContext.ShouldNotBeNull();
         rootContext!.Components.ShouldBeSameAs(components);
         order.ShouldContain("scope:1:data-v-browser-test");
+        await application.StopAsync();
     }
 
     [Fact]
@@ -198,7 +247,8 @@ public sealed class BrowserApplicationTests
             Should.Throw<InvalidOperationException>(() => application.Mount(7));
 
         exception.Message.ShouldContain("MountAsync");
-        application.IsMounted.ShouldBeFalse();
+        application.IsRunning.ShouldBeFalse();
+        initialization.SetResult();
     }
 
     [Fact]
@@ -226,6 +276,81 @@ public sealed class BrowserApplicationTests
         order[0].ShouldBe("initialize");
         order[1].ShouldBe("resolve:#application");
         order[2].ShouldBe("clear");
+        await application.StopAsync();
+    }
+
+    [Fact]
+    public async Task SelectorMount_ClaimsExecutionBeforeInitializationCompletes()
+    {
+        TaskCompletionSource initializationStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource initializationRelease =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int resolutionCount = 0;
+        RecordingHost host = new([]);
+        BrowserApplication application = new(
+            RendererFactory.CreateRenderer(host.CreateOptions()),
+            CreateContext(ComponentTree.Element("main")),
+            initialize: async _ =>
+            {
+                initializationStarted.TrySetResult();
+                await initializationRelease.Task.ConfigureAwait(false);
+            },
+            clearContainer: static _ => { },
+            resolveContainer: _ =>
+            {
+                resolutionCount++;
+                return 9;
+            });
+
+        ValueTask<IComponentContext?> mounting =
+            application.MountAsync("#application");
+
+        Should.Throw<InvalidOperationException>(() =>
+            application.Use(static (executionContext, next) =>
+                next(executionContext)));
+        await initializationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        resolutionCount.ShouldBe(0);
+
+        initializationRelease.TrySetResult();
+        await mounting;
+        resolutionCount.ShouldBe(1);
+        await application.StopAsync();
+    }
+
+    [Fact]
+    public async Task SelectorMount_InitializationFailureConsumesExecutionClaim()
+    {
+        int initializationCount = 0;
+        int resolutionCount = 0;
+        RecordingHost host = new([]);
+        BrowserApplication application = new(
+            RendererFactory.CreateRenderer(host.CreateOptions()),
+            CreateContext(ComponentTree.Element("main")),
+            initialize: _ =>
+            {
+                initializationCount++;
+                return Task.FromException(
+                    new InvalidOperationException("initialization failed"));
+            },
+            clearContainer: static _ => { },
+            resolveContainer: _ =>
+            {
+                resolutionCount++;
+                return 9;
+            });
+
+        InvalidOperationException exception =
+            await Should.ThrowAsync<InvalidOperationException>(
+                async () => await application.MountAsync("#application"));
+
+        exception.Message.ShouldBe("initialization failed");
+        Should.Throw<InvalidOperationException>(() =>
+        {
+            _ = application.MountAsync("#other");
+        });
+        initializationCount.ShouldBe(1);
+        resolutionCount.ShouldBe(0);
     }
 
     [Fact]
@@ -253,7 +378,7 @@ public sealed class BrowserApplicationTests
         host.Removed.ShouldBeEmpty();
         host.Order.ShouldNotContain("create:main");
 
-        application.Unmount();
+        await application.StopAsync();
 
         host.Removed.ShouldBe([42]);
     }
@@ -272,21 +397,6 @@ public sealed class BrowserApplicationTests
         {
             ArgumentNullException.ThrowIfNull(serviceType);
             return null;
-        }
-    }
-
-    private sealed class CountingPlugin(List<string> order) : IApplicationPlugin
-    {
-        public IApplication? SeenApplication { get; private set; }
-
-        public ValueTask InstallAsync(
-            IApplication application,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            SeenApplication = application;
-            order.Add("plugin");
-            return ValueTask.CompletedTask;
         }
     }
 

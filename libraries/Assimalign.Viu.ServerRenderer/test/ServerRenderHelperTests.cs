@@ -20,7 +20,7 @@ public class ServerRenderHelperTests
     private static (SsrRenderState State, SsrWriter Writer) NewState()
     {
         var writer = new SsrWriter();
-        ServerApplication application = Ssr.Application(ComponentTree.Comment());
+        ServerRenderApplication application = Ssr.Application(ComponentTree.Comment());
         return (
             new SsrRenderState(
                 writer,

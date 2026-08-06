@@ -27,7 +27,7 @@ public class ServerRendererServiceTests
                 ?? throw new InvalidOperationException("Greeting was not supplied.");
             return () => TestTree.Element("div", resolved.Text);
         });
-        ServerApplication application = ServerApplication
+        ServerRenderApplication application = ServerRenderApplication
             .CreateBuilder(component.Request(), InlineComponentFactory.Instance, services)
             .Build();
 
@@ -38,18 +38,16 @@ public class ServerRendererServiceTests
     }
 
     [Fact]
-    public async Task ServerApplication_DoesNotDisposeBorrowedServiceProvider()
+    public async Task ServerRenderApplication_DoesNotDisposeBorrowedServiceProvider()
     {
         TrackingServiceProvider services = new();
         InlineComponent component = new(_ => () => TestTree.Element("div", "x"));
-        ServerApplication application = new(
+        ServerRenderApplication application = new(
             component.Request(),
             InlineComponentFactory.Instance,
             services);
 
         await ServerRenderer.RenderToStringAsync(application);
-        application.Unmount();
-        await application.UnmountAsync();
 
         services.IsDisposed.ShouldBeFalse();
     }

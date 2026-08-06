@@ -1,0 +1,12 @@
+#nullable enable
+*REMOVED*override Assimalign.Viu.Browser.BrowserApplicationBuilder.Build() -> Assimalign.Viu.Browser.BrowserApplication!
+*REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateServerRendererBuilder(Assimalign.Viu.Components.IComponent! rootComponent) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+Assimalign.Viu.Browser.Application
+Assimalign.Viu.Browser.BrowserApplicationBuilder.Build() -> Assimalign.Viu.Browser.BrowserApplication!
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.AddComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.AddDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.AddRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.AddServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.AddStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+static Assimalign.Viu.Browser.Application.CreateBuilder() -> Assimalign.Viu.Browser.BrowserApplicationBuilder!

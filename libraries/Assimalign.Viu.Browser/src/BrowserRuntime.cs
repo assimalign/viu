@@ -16,9 +16,9 @@ namespace Assimalign.Viu.Browser;
 /// thread only); not thread-safe.
 /// <para>
 /// Normal app bootstrap does <b>not</b> call this type: build a <c>BrowserApplication</c> with
-/// <see cref="BrowserApplication.CreateBuilder(IComponent, bool)"/>
-/// and mount it with <c>MountAsync</c>, which owns the bridge initialization internally (the reshape
-/// eliminated the external initialization pre-call, <c>V01.01.03.23</c>). The members here are the
+/// <see cref="Application.CreateBuilder"/> and run it with <c>RunAsync</c>, whose terminal owns bridge
+/// initialization (the reshape eliminated the external initialization pre-call,
+/// <c>V01.01.03.23</c>). The members here are the
 /// low-level primitives for advanced scenarios — a bare renderer, selector resolution, or the
 /// handle-leak diagnostics — that operate without an application.
 /// </para>
@@ -32,8 +32,8 @@ public static class BrowserRuntime
     /// Loads the package's <c>viu-dom.js</c> bridge module and wires event dispatch. Idempotent —
     /// later calls await the same initialization.
     /// <para>
-    /// <b>Advanced/low-level.</b> A normal app does not call this: <c>BrowserApplication.MountAsync</c>
-    /// runs the same initialization internally through its mount path. Use this only for the bare-
+    /// <b>Advanced/low-level.</b> A normal app does not call this: <c>BrowserApplication.RunAsync</c>
+    /// runs the same initialization internally through its lifetime terminal. Use this only for the bare-
     /// primitive scenarios (<see cref="CreateRenderer"/>, <see cref="QuerySelector"/>, the leak
     /// diagnostics) that need the bridge without an application.
     /// </para>
@@ -113,8 +113,8 @@ public static class BrowserRuntime
         if (!IsBridgeInitialized)
         {
             throw new InvalidOperationException(
-                "The Viu browser bridge is not initialized. Mount a BrowserApplication with MountAsync "
-                + "(which initializes the bridge in its mount path), or await BrowserRuntime.InitializeAsync() "
+                "The Viu browser bridge is not initialized. Run a BrowserApplication with RunAsync "
+                + "(which initializes the bridge in its lifetime terminal), or await BrowserRuntime.InitializeAsync() "
                 + "before using the bare-renderer/selector primitives.");
         }
     }

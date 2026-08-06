@@ -1,0 +1,72 @@
+#nullable enable
+abstract Assimalign.Viu.Application<TNode>.ResolveMountTargetAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<TNode>
+Assimalign.Viu.Application<TNode>.IsRunning.get -> bool
+Assimalign.Viu.Application<TNode>.RunAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.Application<TNode>.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.Application<TNode>.Use(Assimalign.Viu.ApplicationMiddleware! middleware) -> Assimalign.Viu.IApplication!
+Assimalign.Viu.ApplicationBuilder.CreateContext(System.Func<Assimalign.Viu.Components.IComponentFactory!, Assimalign.Viu.Components.IComponentFactory!>? decorateComponents = null) -> Assimalign.Viu.IApplicationContext!
+Assimalign.Viu.ApplicationContext.ApplicationContext(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null, Assimalign.Viu.IDirectiveResolver? directives = null, Assimalign.Viu.ApplicationOptions? options = null) -> void
+Assimalign.Viu.ApplicationDelegate
+Assimalign.Viu.ApplicationExecutionContext
+Assimalign.Viu.ApplicationExecutionContext.Application.get -> Assimalign.Viu.IApplication!
+Assimalign.Viu.ApplicationExecutionContext.Stopping.get -> System.Threading.CancellationToken
+Assimalign.Viu.ApplicationMiddleware
+Assimalign.Viu.ApplicationOptions
+Assimalign.Viu.ApplicationOptions.ApplicationOptions() -> void
+Assimalign.Viu.ApplicationOptions.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.IComponentContext?, string!>?
+Assimalign.Viu.ApplicationOptions.ErrorHandler.set -> void
+Assimalign.Viu.ApplicationOptions.WarnHandler.get -> System.Action<string!>?
+Assimalign.Viu.ApplicationOptions.WarnHandler.set -> void
+Assimalign.Viu.IApplication.IsRunning.get -> bool
+Assimalign.Viu.IApplication.RunAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.IApplication.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.IApplication.Use(Assimalign.Viu.ApplicationMiddleware! middleware) -> Assimalign.Viu.IApplication!
+Assimalign.Viu.IApplication<TNode>.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
+virtual Assimalign.Viu.ApplicationDelegate.Invoke(Assimalign.Viu.ApplicationExecutionContext! context) -> System.Threading.Tasks.ValueTask
+virtual Assimalign.Viu.ApplicationMiddleware.Invoke(Assimalign.Viu.ApplicationExecutionContext! context, Assimalign.Viu.ApplicationDelegate! next) -> System.Threading.Tasks.ValueTask
+virtual Assimalign.Viu.ApplicationBuilder.AddComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.ApplicationBuilder!
+virtual Assimalign.Viu.ApplicationBuilder.AddDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.ApplicationBuilder!
+virtual Assimalign.Viu.ApplicationBuilder.AddRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.ApplicationBuilder!
+virtual Assimalign.Viu.ApplicationBuilder.AddServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.ApplicationBuilder!
+virtual Assimalign.Viu.ApplicationBuilder.AddStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.ApplicationBuilder!
+virtual Assimalign.Viu.ApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.ApplicationBuilder!
+*REMOVED*abstract Assimalign.Viu.ApplicationBuilder.Build() -> Assimalign.Viu.IApplication!
+*REMOVED*Assimalign.Viu.Application<TNode>.Dispose() -> void
+*REMOVED*Assimalign.Viu.Application<TNode>.IsMounted.get -> bool
+*REMOVED*Assimalign.Viu.Application<TNode>.Unmount() -> void
+*REMOVED*Assimalign.Viu.Application<TNode>.UnmountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+*REMOVED*Assimalign.Viu.Application<TNode>.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplication!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.ApplyConfiguration(Assimalign.Viu.IApplication! application) -> void
+*REMOVED*Assimalign.Viu.ApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.IApplicationContext!>! configure) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.CreateContext() -> Assimalign.Viu.IApplicationContext!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.UseComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.UseDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.UseRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.UseServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationBuilder.UseStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.ApplicationContext.ApplicationContext(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null, Assimalign.Viu.IDirectiveResolver? directives = null) -> void
+*REMOVED*Assimalign.Viu.ApplicationContext.ErrorHandler.set -> void
+*REMOVED*Assimalign.Viu.ApplicationContext.Performance.get -> bool
+*REMOVED*Assimalign.Viu.ApplicationContext.Performance.set -> void
+*REMOVED*Assimalign.Viu.ApplicationContext.WarnHandler.set -> void
+*REMOVED*Assimalign.Viu.IApplication.IsMounted.get -> bool
+*REMOVED*Assimalign.Viu.IApplication.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
+*REMOVED*Assimalign.Viu.IApplication.Unmount() -> void
+*REMOVED*Assimalign.Viu.IApplication.UnmountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+*REMOVED*Assimalign.Viu.IApplication.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplication!
+*REMOVED*Assimalign.Viu.IApplicationBuilder
+*REMOVED*Assimalign.Viu.IApplicationBuilder.Build() -> Assimalign.Viu.IApplication!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.IApplicationContext!>! configure) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.UseComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.UseDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.UseRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.UseServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationBuilder.UseStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.IApplicationBuilder!
+*REMOVED*Assimalign.Viu.IApplicationContext.ErrorHandler.set -> void
+*REMOVED*Assimalign.Viu.IApplicationContext.Performance.get -> bool
+*REMOVED*Assimalign.Viu.IApplicationContext.Performance.set -> void
+*REMOVED*Assimalign.Viu.IApplicationContext.WarnHandler.set -> void
+*REMOVED*Assimalign.Viu.IApplicationPlugin
+*REMOVED*Assimalign.Viu.IApplicationPlugin.InstallAsync(Assimalign.Viu.IApplication! application, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask

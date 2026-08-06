@@ -171,10 +171,11 @@ public sealed class HydrationRendererTests
         return new ApplicationContext(
             root,
             new ComponentFactory(Array.Empty<ComponentRegistration>()),
-            new EmptyServiceProvider())
-        {
-            WarnHandler = warnings.Add,
-        };
+            new EmptyServiceProvider(),
+            options: new ApplicationOptions
+            {
+                WarnHandler = warnings.Add,
+            });
     }
 
     private sealed class EmptyServiceProvider : IServiceProvider

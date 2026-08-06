@@ -67,8 +67,8 @@ The history layer (all under namespace `Assimalign.Viu.Router`):
   `Push`/`Replace`/`Go`, `Listen`, `CreateHref`, `Destroy`. Locations are the base-stripped path
   the matcher resolves; the configured base is prepended on write and stripped on read.
 - **`RouterHistory`** (static facade): `CreateMemory`, `CreateWeb`, `CreateWebHash`, and the
-  browser-only `InitializeAsync`. Memory is pure and needs no initialization; web and hash drive the
-  History API over interop and require `InitializeAsync` first.
+  browser-only `InitializeAsync`. Memory is pure and needs no initialization; web and hash defer
+  their History API bridge until `Router.ReadyAsync`, while `InitializeAsync` is an optional prewarm.
 - **`RouterHistoryState`**: the flat, primitives-only state carried on each entry — the adjacency
   links (`Back`/`Current`/`Forward`), the `Replaced` flag, the monotonic `Position` counter, and an
   optional `Scroll` anchor.
@@ -173,11 +173,18 @@ IRouterHistory history = RouterHistory.CreateMemory();
 history.Push("/users/42");
 // history.Location == "/users/42", history.State.Position == 1
 
-// Web history — clean URLs over the History API (browser only).
-await RouterHistory.InitializeAsync();
-IRouterHistory web = RouterHistory.CreateWeb("/app/");   // base prepended on write, stripped on read
+// Web history — clean URLs over the History API (browser only). Bridge loading is lazy.
+IRouterHistory web = RouterHistory.CreateWeb("/app/");   // no initialization pre-call
+var webRouter = new Router(web, routes);
+await webRouter.ReadyAsync(cancellationToken);            // imports the bridge, then navigates
 web.Listen((to, from, information) => { /* resolve `to` through the matcher */ });
 ```
+
+`RouterHistory.InitializeAsync(cancellationToken)` remains available as an optional prewarm when an
+application deliberately wants to overlap the module download with other startup work. It is never
+required before `CreateWeb` or `CreateWebHash`. Until `Router.ReadyAsync` completes, `Listen` and
+`Destroy` are the only valid synchronous members on a web/hash history; every other member throws the
+same actionable `InvalidOperationException`.
 
 ```csharp
 using Assimalign.Viu.Components;
@@ -194,7 +201,7 @@ var router = new Router(RouterHistory.CreateMemory(),
 NavigationFailure? failure = await router.Push("/users/42");   // awaitable; null on success
 
 // Register Router in the IServiceProvider selected by the application, then pass that provider to
-// the host builder with UseServiceProvider(...). Router does not create or modify a container.
+// the host builder with AddServiceProvider(...). Router does not create or modify a container.
 // <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
 // and a plain left-click on it calls router.Push instead of triggering a page load.
 ```

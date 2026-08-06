@@ -6,13 +6,14 @@ DOM, Browser, WebView2, or JavaScript-interop dependency.
 
 ## Public surface
 
-- `ServerRenderer.RenderToStringAsync` renders a configured `ServerApplication` to a string.
+- `ServerRenderer.RenderToStringAsync` renders a configured `ServerRenderApplication` to a string.
 - `ServerRenderer.RenderToStreamAsync` writes completed template subtrees to a `TextWriter` and awaits
   the writer's backpressure.
-- `ServerApplication` carries an `IApplicationContext` without binding it to a host node type. Its
+- `ServerRenderApplication` carries an `IApplicationContext` without binding it to a host node type. Its
   `IComponentFactory`, `IServiceProvider`, and optional state registry are independently supplied and
   borrowed; their composition root retains ownership.
-- `ServerApplicationBuilder` uses Core's host-neutral `ApplicationBuilder` contract.
+- `ServerApplicationBuilder` uses Core's host-neutral composition builder without making server
+  rendering a persistent `IApplication` lifetime.
 - `SsrContext` carries per-render teleport output and a free-form state handoff bag.
 - `SsrRenderState` is the push surface shared by the runtime walker and future compiler-produced server
   render functions.
@@ -55,7 +56,7 @@ IComponentFactory components = new ComponentFactory(
 
 IServiceProvider services = applicationServices;
 
-ServerApplication application = ServerApplication
+ServerRenderApplication application = ServerRenderApplication
     .CreateBuilder(
         ComponentTree.Template<RootTemplate>(),
         components,
@@ -97,8 +98,11 @@ the target element before client hydration. The target buffer already includes t
   Components supplies the public tree and template contracts.
 - Activation uses explicit `IComponentFactory` delegates. There is no reflection-based activation,
   runtime code generation, or linker-unfriendly service discovery.
-- A server application never mounts a live host tree, so `IsMounted` is false and `RootContext` is null.
-- Plugins install asynchronously before the first render that observes them.
+- A server-render application is a plain composition object. It never mounts a persistent host tree,
+  does not implement `IApplication`, and does not participate in top-level application lifetime
+  middleware.
+- Every render has its own cancellation boundary. A future per-render interception contract would be
+  separate from application middleware; none is provided today.
 - A host should create one application per request when services or state are request scoped.
 - The supplied factory, service provider, and state registry are borrowed and are never disposed by
   ServerRenderer.

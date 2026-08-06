@@ -9,16 +9,18 @@
 > **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
 > framework, not a port of Vue.js**; Vue is no longer a normative authority for Viu's semantics, and
 > [`docs/SPECIFICATION.md`](../SPECIFICATION.md) is now the authority — the composition-only
-> component model is carried forward there as clauses `[CMP-1]`–`[CMP-25]` and §17.1. **The core
+> component model is carried forward in §4's component clauses and §17.1. **The core
 > decision recorded here is unaffected**: Viu ships a composition-only component model with no
 > options-style authoring, no mixins, and no global-properties bag.
 >
 > **The stated replacement mechanism, however, no longer exists.** The Decision below routes
 > cross-cutting values through "typed provide/inject (`InjectionKey<T>`, app-level `Provide<T>`)" and
 > plugins (`IPlugin`), and describes an `ApplicationConfiguration` carrying the error handler, warn
-> handler, and performance flag. As of this working tree: `InjectionKey` and `ApplicationConfiguration`
-> do not exist anywhere in the source, `IPlugin` is now `IApplicationPlugin`, and application state
-> moved onto `IApplicationContext`. **Component-tree provide/inject was not ported at all** — it is a
+> handler, and performance flag. As of this working tree: `InjectionKey`, `ApplicationConfiguration`,
+> `IPlugin`, and its interim `IApplicationPlugin` successor do not exist. Composition uses builder
+> `Add*` methods; `ApplicationMiddleware` surrounds the live application lifetime; diagnostics are
+> frozen from `ApplicationOptions` into `IApplicationContext`. **Component-tree provide/inject was
+> not ported at all** — it is a
 > recorded decision, not a deferral (`docs/ARCHITECTURE.md` approved decision 8), and the specification
 > states it as `[CMP-24]`: component dependencies are explicit through parameters and slots,
 > `IComponentContext.Services`, State definitions, and `IComponentContext.Components`. Reversing the

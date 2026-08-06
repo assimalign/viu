@@ -91,12 +91,17 @@ public sealed class DirectiveRendererTests
         IElementComponent root = DirectedElement(1);
         Exception? observed = null;
         string? diagnostic = null;
-        IApplicationContext application = CreateApplication(root, directive);
-        application.ErrorHandler = (exception, _, information) =>
-        {
-            observed = exception;
-            diagnostic = information;
-        };
+        IApplicationContext application = CreateApplication(
+            root,
+            directive,
+            new ApplicationOptions
+            {
+                ErrorHandler = (exception, _, information) =>
+                {
+                    observed = exception;
+                    diagnostic = information;
+                },
+            });
         FakeHost host = new();
         Renderer<FakeHostNode> renderer =
             RendererFactory.CreateRenderer(host.Options);
@@ -221,13 +226,15 @@ public sealed class DirectiveRendererTests
 
     private static IApplicationContext CreateApplication(
         IComponent root,
-        IDirective directive)
+        IDirective directive,
+        ApplicationOptions? options = null)
     {
         return new ApplicationContext(
             root,
             new ComponentFactory(Array.Empty<ComponentRegistration>()),
             new EmptyServiceProvider(),
-            directives: Registry(directive));
+            directives: Registry(directive),
+            options: options);
     }
 
     private static DirectiveRegistry Registry(IDirective directive)

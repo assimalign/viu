@@ -23,9 +23,13 @@ different node handle and transport while reusing the same Core and Components A
 ## Application lifecycle
 
 `BrowserApplication` derives from `Application<int>` and receives an immutable
-`IApplicationContext`. `MountAsync(string)` initializes the JavaScript bridge, resolves the selector,
-then enters the generic application mount path. `MountCore` clears a client-mount container and calls
-`Renderer<int>.Render(root, container, context)`. `UnmountCore` renders null into the same container.
+`IApplicationContext`. The top-level `RunAsync` terminal initializes the JavaScript bridge, resolves
+the configured selector (`#app` by default), mounts or hydrates, waits for cancellation or
+`StopAsync`, then unmounts before middleware cleanup runs [APP-4] [APP-5]. `MountCore` clears a
+client-mount container and calls `Renderer<int>.Render(root, container, context)`.
+`UnmountCore` renders null into the same container. The public `Mount` and `MountAsync` overloads
+remain lower-level embedding and test seams and explicitly bypass the top-level middleware pipeline
+[APP-7].
 
 The application composition root retains ownership of all supplied resolvers. Browser wraps the
 application's `IComponentFactory` only to resolve `Transition`, `TransitionGroup`, and Core
@@ -49,10 +53,12 @@ activation, dynamic code generation, or retained `JSObject` per node/event.
 
 ## Hydration
 
-`CreateServerRendererBuilder` selects Core's `Renderer<int>.Hydrate` path and deliberately does not
-clear the mount container. Direct and buffered options create a `BrowserHydrationReader` from one
-`snapshotHydration` bridge call per root or teleport target. All structural, kind, text, and
-attribute reads then stay in managed memory.
+The browser host's hydration mode selects Core's `Renderer<int>.Hydrate` path and deliberately does
+not clear the mount container. Direct and buffered options create a `BrowserHydrationReader` from
+one `snapshotHydration` bridge call per root or teleport target. All structural, kind, text, and
+attribute reads then stay in managed memory. D5 removed the unused
+`BrowserApplication.CreateServerRendererBuilder` entry point; it did not change the renderer's
+hydration protocol or the lower-level hydration coverage [HYD-2].
 
 Buffered hydration advances its managed handle allocator beyond the maximum handle in each
 snapshot. A localized mismatch can therefore create replacement nodes without colliding with any
@@ -95,7 +101,7 @@ application contract.
 ## Browser directives
 
 The Browser builder installs its built-in directive resolver by default. Developers may replace it
-through the host-neutral `UseDirectiveResolver` builder method. The default resolver currently
+through the host-neutral `AddDirectiveResolver` builder method. The default resolver currently
 maps compiler-emitted names for:
 
 - `show` to `VShow`;
