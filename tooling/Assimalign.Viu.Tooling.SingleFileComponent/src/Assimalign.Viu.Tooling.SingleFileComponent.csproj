@@ -8,10 +8,6 @@
          Assimalign.Viu.Tooling.Css core use, never a hardcoded string. Its net10.0 test project
          references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
-    <!-- Build-time-hosted code must target the stable analyzer surface: opt out of the repo-wide
-         preview-features switch (see build/Targets/Build.TargetFramework.props) so no
-         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the sibling parsers. -->
-    <EnablePreviewFeatures>false</EnablePreviewFeatures>
     <!-- The projection core was extracted from the generator project, whose
          EnforceExtendedAnalyzerRules=true kept the RS1035 no-I/O guard on this code (the name resolver's
          string-only design relies on it). Keep the guard here so the extraction cannot silently start

@@ -7,10 +7,6 @@
          alias — the same central property the other Assimalign.Viu.Syntax.* projects use — never a
          hardcoded string. Its net10.0 test project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
-    <!-- Source-generator-hosted code must target the stable analyzer surface: opt out of the repo-wide
-         preview-features switch (see build/Targets/Build.TargetFramework.props) so no
-         [RequiresPreviewFeatures] leaks into the netstandard2.0 assembly. Mirrors the sibling parsers. -->
-    <EnablePreviewFeatures>false</EnablePreviewFeatures>
     <!-- IsAotCompatible is intentionally not set here: the AOT analyzers require net8.0+, so the central
          libraries targets clear the inherited IsAotCompatible=true for this netstandard2.0 TFM. The
          assembly is consumed at build time by generators, never shipped into the WASM app. -->

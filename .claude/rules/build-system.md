@@ -55,8 +55,14 @@ test, or example csproj. Use the by-name item groups the build system resolves:
 - Opt a project into its TFM via the central alias, never a hardcoded string:
   `<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>` (net10.0). Analyzers use
   `$(TargetFrameworkForAnalyzers)` (netstandard2.0).
-- `Nullable`, `LangVersion=preview`, `EnablePreviewFeatures=true`, and `EnforceCodeStyleInBuild` flow
+- `Nullable`, `LangVersion=preview`, `EnablePreviewFeatures=false`, and `EnforceCodeStyleInBuild` flow
   centrally from `build/Targets/` — do **not** set them per-csproj.
+- **C# preview *language* features are on; runtime preview *APIs* are off.** `LangVersion=Preview` and
+  `EnablePreviewFeatures` are independent switches. Shipped assemblies must not emit
+  `[assembly: RequiresPreviewFeatures]` — it is viral, forcing every consumer to opt in
+  ([V01.01.14.07]). A project needing a runtime preview API (`static abstract` interface members,
+  `INumber<T>`, `IParsable<T>`) has to justify making that requirement viral for consumers; it is not
+  a per-csproj convenience.
 
 ## csproj shapes
 

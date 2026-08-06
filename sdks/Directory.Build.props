@@ -14,8 +14,6 @@
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<IsPackable>true</IsPackable>
 		<AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
-		<!-- Build-task code targets the stable surface (see Build.TargetFramework.props). -->
-		<EnablePreviewFeatures>false</EnablePreviewFeatures>
 	</PropertyGroup>
 	<!-- Package metadata -->
 	<PropertyGroup>
