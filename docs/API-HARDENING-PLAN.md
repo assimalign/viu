@@ -65,6 +65,8 @@ taking `Browser` and its `browser-wasm` runtime pin.
 | D5 | **Redesign the application lifetime: delete `IApplicationPlugin`, separate build-time composition from runtime behavior, and make `Use(...)` a real middleware pipeline around the persistent host lifetime.** Direction set by Chase from an independent architecture review of `fc8a90ba`. Full design in the section below, as amended by D5a. | 2026-08-05 | `IApplicationPlugin` is a deferred initializer with no `next`, no short-circuiting, and no cleanup phase. Verified: it has **zero shipping implementations** — every implementor in the tree is a test double or the showcase's recorder. Deleting it before the polish waves avoids hardening, documenting, and renaming types that are about to be removed. **Requires a `docs/SPECIFICATION.md` amendment replacing `[CMP-25]` (line 333)**, filed per `.claude/rules/deviations.md`; this row is the recorded confirmation. |
 | D5a | **Maintainer amendment for PR #305:** `IApplication` exposes `StartAsync`/`StopAsync`; `RunAsync` is an extension; runtime state and the stopping token live on `IApplicationContext`; middleware receives that context directly; a lean `IApplicationBuilder` configures all composition through `ApplicationOptions`; Browser implements the lifetime and mount APIs directly; the generic Core application abstraction, abstract builders, execution wrapper, and static Browser facade are deleted. | 2026-08-06 | This is the accepted review shape for [V01.01.14.08]. It adopts the familiar split between starting a host and running it until shutdown, keeps host-specific mounting out of Core, and removes inheritance that exposed platform mechanics as Core API. The amendment below replaces the original D5 target shape while retaining D5's middleware, cleanup, borrowed-ownership, and server-separation decisions. |
 | D6 | **Segment the SDK and the shared framework by platform.** `Assimalign.Viu.Sdk` and `Assimalign.Viu.App` become platform-agnostic; `Assimalign.Viu.Sdk.Browser` and `Assimalign.Viu.App.Browser` carry everything browser-specific. Direction set by Chase. Full design in the section below. | 2026-08-06 | Today there is exactly one SDK and one framework, and both are browser-only by construction: `sdks/Assimalign.Viu.Sdk/Sdk/Sdk.props:8` opens with `<Import Sdk="Microsoft.NET.Sdk.WebAssembly" …>` under the comment *"A Viu app is a WASM browser app, so the chain starts at Microsoft.NET.Sdk.WebAssembly"*, and the single `Assimalign.Viu.App` framework bundles `Browser` with the host-agnostic libraries. So authoring a platform-agnostic Viu component library means taking the WebAssembly SDK and a `browser-wasm` runtime pin for code that renders nothing. The split gives that author a first-class path, and gives every future host (SSR, WebView) a shape to slot into rather than a fork. |
+| D7 | **`Assimalign.Viu.Hosting` (T06) is not implemented in this repository.** The host-authoring/app-authoring namespace split moves to the Cohesion project. | 2026-08-06 | Direction set by Chase. The finding stands and is worth keeping recorded — the `Assimalign.Viu` front door mixes app-authoring API with host-adapter plumbing — but the segmentation is being solved in Cohesion rather than duplicated here. D5 also already removed much of what T06 targeted: mounting moved into Browser and the generic Core application abstraction was deleted. T06 stays in the state table as **Will not do (see D7)** so a future session does not re-derive it as an open opportunity. |
+| D8 | **`InternalsVisibleTo` is for unit tests only.** It is not a mechanism for sharing internals between shipping libraries. | 2026-08-06 | Direction set by Chase. A cross-library grant makes the assembly boundary a fiction: two assemblies that need each other's internals are either one assembly, or have an API that was never designed. This reverses the premise of T05 as originally scoped, which planned to internalize ~120 types and add grants — see the T05 note below for what it becomes. Eight cross-library grants exist today and are in scope to remove. |
 
 ## State
 
@@ -88,9 +90,9 @@ in as each item is created.
 | D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | `.08` | #304 | **MERGED** (PR #305) |
 | — | Rename `Router.Browser` → `Browser.Router` | 2A | `.09` | #307 | **MERGED** (PR #308) |
 | — | Extension-member syntax; `Extensions/` and `Exception/` folders | 2 | `.10` | #309 | **MERGED** (PR #310) |
-| T05 | Internalize friend-only publics (~120 types) | 2 | — | — | **NEXT** — largest remaining surface reduction |
+| T05 | Reduce friend-only publics — **re-scoped by D8**, see note below | 2 | — | — | **NEXT** |
 | T13 | Single source of truth for the helper-name contract | 2 | `.07` | #301 | **MERGED** (PR #306) |
-| T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | — | — | Not started — reassess: D5 already moved mounting to Browser |
+| T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | — | — | — | **Will not do — see D7** (moving to Cohesion) |
 | T07 | Product-prefix stutter and duplicate facades | 3 | — | — | Not started |
 | T08 | Naming-rule compliance | 3 | — | — | Not started |
 | G3 | `SlotFlags` is named `*Flags` but is not a bitmask | 3 | — | — | Not started |
@@ -120,6 +122,32 @@ types that are about to be deleted:
 | T12 — the former abstract builder's configuration methods returned `IApplicationBuilder`, collapsing the concrete Browser builder | D5-B | The abstract base is deleted. The lean interface remains for platform-neutral construction, while concrete builders self-return and implement its two members explicitly where return covariance requires it. |
 | T14 — `Performance` has no production reader; `BrowserApplication.CreateServerRendererBuilder` has zero callers | D5-B, D5-D | Both are deleted rather than renamed or documented. |
 | T11 — `Router.ReadyAsync` takes no `CancellationToken` | D5-E | Cancellation is required for the middleware pipeline to be cancellable at all. |
+
+### T05 after D8 — what changed and what it costs
+
+T05 was scoped as *"internalize ~120 types and add `InternalsVisibleTo` grants."* **D8 removes the
+mechanism**, so the unit is re-scoped rather than merely constrained. The types divide by who consumes
+them, and only one group is genuinely hard.
+
+| Group | Treatment under D8 |
+|---|---|
+| **Zero consumers** — e.g. `PatchFlagNames`, `ShapeFlagsExtensions`, `Scheduler.IsFlushing`/`IsFlushPending` | Make `internal` outright. No grant needed; D8 is not engaged. |
+| **Consumed only by the assembly's own tests** — e.g. the generators' `*TrackingName` constants | `internal` + a **test** grant. Exactly what D8 sanctions. |
+| **Consumed by a sibling `tooling/` assembly** (5 of the 8 existing cross-library grants) | Make the member **public** and delete the grant. These assemblies do not ship ([V01.01.14.04]), so `public` costs nothing developer-facing — the surface is invisible to app developers either way. |
+| **Consumed by a sibling shipping library** (3 grants, all from `Core`) | The real work — see below. |
+
+**The `Core` cases.** `Core` grants internals to `Browser`, `ServerRenderer` and `Testing`. Of its 39
+internal types, only **six** are reached across the boundary: `ComponentContext`, `EmptyServiceProvider`,
+`MountedTemplateNode`, `EmptyComponentFactory`, `ApplicationState`, `MountedComponent`.
+
+Each needs a deliberate answer — promote to public API, move to its sole consumer, or express through an
+interface with the concrete type staying internal. Two probably *want* to be public regardless:
+`ApplicationState` is the D5 lifecycle enum a host legitimately observes, and the empty resolvers are
+D5's "a primitive application should not need dummy dependencies" defaults.
+
+**Expect the headline number to fall.** The original "~120 types internalized" assumed grants were
+available. Under D8 a meaningful share stays public — correctly, because the assembly boundary is real.
+The gain is honesty about that boundary rather than a smaller type count.
 
 ## D6 — platform segmentation of the SDK and framework
 
