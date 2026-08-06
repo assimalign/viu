@@ -28,9 +28,6 @@
 
   <PropertyGroup>
     <TargetFramework>$(TargetFrameworkForVisualStudioClassicExtensions)</TargetFramework>
-    <!-- The repository default emits [assembly: RequiresPreviewFeatures], whose attribute does not
-         exist on the .NET Framework surface every classic VSIX compiles against. -->
-    <EnablePreviewFeatures>false</EnablePreviewFeatures>
     <IsPackable>false</IsPackable>
     <NeutralLanguage>en-US</NeutralLanguage>
 

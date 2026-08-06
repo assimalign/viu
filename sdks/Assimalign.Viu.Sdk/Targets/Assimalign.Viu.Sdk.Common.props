@@ -39,14 +39,6 @@
         -->
         <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>
 
-        <!--
-            The Assimalign.Viu.App framework libraries opt into runtime preview
-            APIs ([assembly: RequiresPreviewFeatures] - see the repo's
-            build/Targets/Build.TargetFramework.props). The attribute is viral,
-            so consumers referencing the framework must opt in too; default it
-            here (overridable in the consumer csproj body).
-        -->
-        <EnablePreviewFeatures Condition="'$(EnablePreviewFeatures)' == ''">true</EnablePreviewFeatures>
         <LangVersion Condition="'$(LangVersion)' == ''">preview</LangVersion>
         <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     </PropertyGroup>
