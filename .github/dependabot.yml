@@ -1,0 +1,33 @@
+# Keeps SHA-pinned GitHub Actions current.
+#
+# Every `uses:` in this repository is pinned to a commit SHA with a trailing
+# `# owner/action vN` comment, because a git tag is mutable: the action's owner
+# — or anyone who compromises that account — can repoint `@v4` at new code that
+# then runs with write access to this repository and its secrets. A commit SHA
+# cannot be repointed. See GitHub's "Security hardening for GitHub Actions" and
+# the OpenSSF Scorecard `Pinned-Dependencies` check.
+#
+# The cost of pinning is staleness: a pin never moves, including past security
+# fixes to the action itself. Dependabot closes that gap. It understands SHA
+# pinning specifically — it bumps the SHA *and* rewrites the version comment —
+# so updates arrive as reviewable pull requests without giving up immutability.
+#
+# Without this file the pinning is only half a practice: immutable, and
+# indefinitely out of date.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+    groups:
+      # Action bumps are near-always routine; one grouped PR per week keeps the
+      # review surface proportional to the risk.
+      github-actions:
+        patterns:
+          - '*'

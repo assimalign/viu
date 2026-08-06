@@ -13,7 +13,7 @@
     "",
     "startupBudgetMilliseconds: the time-to-first-render ceiling for the headless-browser startup lane.",
     "This value is PROVISIONAL and NOT YET ENFORCED -- it is not a measured number. The startup lane is",
-    "wired-but-skipped in .github/workflows/budget-gates.yml pending the Playwright e2e harness",
+    "wired-but-skipped in .github/workflows-disabled/budget-gates.yml pending the Playwright e2e harness",
     "([V01.01.11.03], #87), which owns real-browser measurement. Calibrate this from repeated headless",
     "runs when that lane activates.",
     "",

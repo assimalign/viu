@@ -57,7 +57,7 @@
 	<Folder Name="/viu/.github/workflows/">
 		<File Path=".github/workflows/analyzers.yml" />
 		<File Path=".github/workflows/benchmarks.yml" />
-		<File Path=".github/workflows/budget-gates.yml" />
+		<File Path=".github/workflows-disabled/budget-gates.yml" />
 		<File Path=".github/workflows/libraries.yml" />
 		<File Path=".github/workflows/packaging.yml" />
 		<File Path=".github/workflows/release.yml" />
