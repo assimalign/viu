@@ -1,0 +1,12 @@
+<Project Sdk="Assimalign.Viu.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ViuBundleSingleFileComponentCss>false</ViuBundleSingleFileComponentCss>
+    <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
+    <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Router.Browser" Version="$(ViuConsumerVersion)" />
+  </ItemGroup>
+</Project>

@@ -77,6 +77,10 @@ jobs:
         shell: pwsh
         run: ./scripts/Install-Local.ps1
 
+      - name: Compile application-lifetime package consumer
+        shell: pwsh
+        run: ./scripts/Test-ApplicationLifetimeConsumer.ps1
+
       - name: Verify standalone utility dependency boundary
         shell: pwsh
         run: >-
