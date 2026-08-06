@@ -227,53 +227,53 @@
 		<File Path="libraries/Directory.Build.props" />
 		<File Path="libraries/Directory.Build.targets" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax/">
-		<File Path="libraries/Assimalign.Viu.Syntax/Assimalign.Viu.Syntax.slnx" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax/">
+		<File Path="tooling/Assimalign.Viu.Syntax/Assimalign.Viu.Syntax.slnx" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax/docs/">
-		<File Path="libraries/Assimalign.Viu.Syntax/docs/DESIGN.md" />
-		<File Path="libraries/Assimalign.Viu.Syntax/docs/OVERVIEW.md" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax/docs/">
+		<File Path="tooling/Assimalign.Viu.Syntax/docs/DESIGN.md" />
+		<File Path="tooling/Assimalign.Viu.Syntax/docs/OVERVIEW.md" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax/src/">
-		<Project Path="libraries/Assimalign.Viu.Syntax/src/Assimalign.Viu.Syntax.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax/src/">
+		<Project Path="tooling/Assimalign.Viu.Syntax/src/Assimalign.Viu.Syntax.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax/test/">
-		<Project Path="libraries/Assimalign.Viu.Syntax/test/Assimalign.Viu.Syntax.Tests.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax/test/">
+		<Project Path="tooling/Assimalign.Viu.Syntax/test/Assimalign.Viu.Syntax.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Css/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Css/src/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.Css/src/Assimalign.Viu.Syntax.Css.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Css/" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Css/src/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Css/src/Assimalign.Viu.Syntax.Css.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Css/test/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.Css/test/Assimalign.Viu.Syntax.Css.Tests.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Css/test/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Css/test/Assimalign.Viu.Syntax.Css.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Html/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Html/src/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.Html/src/Assimalign.Viu.Syntax.Html.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Html/" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Html/src/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Html/src/Assimalign.Viu.Syntax.Html.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Html/test/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.Html/test/Assimalign.Viu.Syntax.Html.Tests.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Html/test/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Html/test/Assimalign.Viu.Syntax.Html.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Templates/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Templates/src/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.Templates/src/Assimalign.Viu.Syntax.Templates.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Templates/" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Templates/src/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Templates/src/Assimalign.Viu.Syntax.Templates.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Templates/test/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.Templates/test/Assimalign.Viu.Syntax.Templates.Tests.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Templates/test/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Templates/test/Assimalign.Viu.Syntax.Templates.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.Templates/tools/">
-		<File Path="libraries/Assimalign.Viu.Syntax.Templates/tools/Generate-HtmlEntities.ps1" />
-		<File Path="libraries/Assimalign.Viu.Syntax.Templates/tools/README.md" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Templates/tools/">
+		<File Path="tooling/Assimalign.Viu.Syntax.Templates/tools/Generate-HtmlEntities.ps1" />
+		<File Path="tooling/Assimalign.Viu.Syntax.Templates/tools/README.md" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.SingleFileComponent/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/">
-		<File Path="libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.SingleFileComponent/" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/">
+		<File Path="tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.SingleFileComponent/src/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.SingleFileComponent/src/Assimalign.Viu.Syntax.SingleFileComponent.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.SingleFileComponent/src/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.SingleFileComponent/src/Assimalign.Viu.Syntax.SingleFileComponent.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Syntax.SingleFileComponent/test/">
-		<Project Path="libraries/Assimalign.Viu.Syntax.SingleFileComponent/test/Assimalign.Viu.Syntax.SingleFileComponent.Tests.csproj" />
+	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.SingleFileComponent/test/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.SingleFileComponent/test/Assimalign.Viu.Syntax.SingleFileComponent.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Router/docs/">

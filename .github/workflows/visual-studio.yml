@@ -17,7 +17,7 @@ on:
       # ship inside the language-server payload, so any tooling change must re-verify the
       # extension build and the packaged VSIX.
       - 'tooling/**'
-      - 'libraries/Assimalign.Viu.Syntax*/**'
+      - 'tooling/Assimalign.Viu.Syntax*/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'
@@ -39,7 +39,7 @@ on:
     paths:
       - 'extensions/VisualStudio/**'
       - 'tooling/**'
-      - 'libraries/Assimalign.Viu.Syntax*/**'
+      - 'tooling/Assimalign.Viu.Syntax*/**'
       - 'build/**'
       - 'scripts/Test-UtilityCssArtifactShape.ps1'
       - 'scripts/Test-UtilityCssIndependence.ps1'

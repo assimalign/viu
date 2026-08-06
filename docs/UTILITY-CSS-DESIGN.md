@@ -50,9 +50,9 @@ The implementation and conformance vectors must cite the narrowest applicable of
 
 Repository architecture reused by this feature:
 
-- [`Assimalign.Viu.Syntax.Css` design](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
+- [`Assimalign.Viu.Syntax.Css` design](../tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
 - [`Assimalign.Viu.Tooling.Css` design](../tooling/Assimalign.Viu.Tooling.Css/docs/DESIGN.md)
-- [Viu `.viu` format](../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
+- [Viu `.viu` format](../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
 - [Visual Studio language tooling design](../extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md)
 
 ## 1. Product contract

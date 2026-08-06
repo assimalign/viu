@@ -70,5 +70,5 @@ scheduling cost and no parallelism worth having; `AnalyzerTimeout` bounds the pa
   items land — the scaffolds exist to pin the pipeline seam, project shape, and caching contract, not
   to promise parsing. The Css scaffold's raw root was replaced by real rule-level parsing and the
   scoped-selector rewrite with scoped CSS [V01.01.06.04] (see
-  `libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`); it is the flagship consumer of the
+  `tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`); it is the flagship consumer of the
   registration seam — the generator composition root registers `CssSyntaxParser` for `@style` blocks.

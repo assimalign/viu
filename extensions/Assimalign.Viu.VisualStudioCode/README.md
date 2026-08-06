@@ -21,7 +21,7 @@ What is deliberately deferred:
   inside `@script` and `/* */` inside `<style>` needs a language-service contribution.
 - A multi-line `<template …>` or `<style …>` opening tag. A TextMate `begin` pattern is matched
   against one line, so an opening tag split across lines is not recognized as a block opener. The
-  container parser accepts it ([FORMAT.md §4](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)).
+  container parser accepts it ([FORMAT.md §4](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)).
 - Extension bundling. The client is compiled with `tsc` and ships its `node_modules` production
   dependency; there is no esbuild/webpack step yet.
 
@@ -82,7 +82,7 @@ Two consequences:
    `punctuation.section.embedded.*.viu`.
 
 The block-slicing rules come from
-[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md), not from a
+[`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md), not from a
 generic HTML grammar. In particular `@script` ends at the **first later line whose first column is
 `}`** (§3.2) — the grammar anchors on `^\}` rather than balancing braces, because that is the
 container's actual termination rule. A top-level `<script>` tag is scoped `invalid.illegal`, matching

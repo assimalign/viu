@@ -130,7 +130,7 @@ These are deliberate, recorded divergences from upstream — everything else tra
    `@style` @-block syntax canonical for every block — the earlier decision happened and is
    superseded, not erased: the legacy `@template`/`@style` containers still parse during a
    migration window with a Warning-severity diagnostic (the decision record and rules live in
-   `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
+   `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
    explicitly scoped tag-based `.vue` compatibility input. Template markup remains standard Vue
    template syntax in both containers.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer

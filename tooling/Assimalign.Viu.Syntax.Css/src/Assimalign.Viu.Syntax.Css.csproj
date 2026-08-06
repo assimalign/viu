@@ -8,9 +8,9 @@
          hardcoded string. Its net10.0 test project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
     <IsPackable>false</IsPackable>
-    <!-- IsAotCompatible is intentionally not set here: the AOT analyzers require net8.0+, so the central
-         libraries targets clear the inherited IsAotCompatible=true for this netstandard2.0 TFM. The
-         assembly is consumed at build time by generators, never shipped into the WASM app. -->
+    <!-- IsAotCompatible is intentionally not set here: tooling projects do not inherit the runtime-library
+         default, and the AOT analyzers require net8.0+. The assembly is consumed at build time by
+         generators, never shipped into the WASM app. -->
   </PropertyGroup>
   <ItemGroup>
     <!-- The shared base ([V01.01.05.09]): Position, SourceLocation, SyntaxList, SyntaxNode, the parser

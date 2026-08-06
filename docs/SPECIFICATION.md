@@ -100,7 +100,7 @@ The shipping libraries and their responsibilities:
 | Document | Role | Relationship to this specification |
 | --- | --- | --- |
 | `docs/SPECIFICATION.md` | **Normative.** What Viu is and what it guarantees. | Highest authority for semantics. |
-| `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` | **Normative for the `.viu` container grammar.** | [§8](#8-the-viu-container-and-the-compilation-pipeline) delegates to it rather than restating it. |
+| `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` | **Normative for the `.viu` container grammar.** | [§8](#8-the-viu-container-and-the-compilation-pipeline) delegates to it rather than restating it. |
 | `docs/UTILITY-CSS-DESIGN.md` | **Normative for Viu Utilities' frozen Tailwind CSS v4.3.3 compatibility contract.** | [§10.4](#104-viu-utilities) delegates to it. |
 | `docs/adr/*.md` | Decision records — why a choice was made. Append-only. | Normative for *rationale and constraint*, not for current API shape. A conflict means the ADR needs superseding. |
 | `libraries/**/docs/OVERVIEW.md` | What each library is; its public surface. | Non-normative elaboration. MUST NOT contradict this document. |
@@ -903,7 +903,7 @@ real `.viu` line **and column** [SFC-8].
 the component's C# in an `@script { }` block, and custom blocks in `@`-form.
 
 `[SFC-4]` The full grammar is **normative in
-[`FORMAT.md`](../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)** and is not
+[`FORMAT.md`](../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)** and is not
 restated here. This specification pins only the structural invariants a consumer must know:
 
 - **Column 0 is structural for opening a block.** A top-level line beginning with `@` opens an
@@ -1105,8 +1105,8 @@ usage carrying an argument-less `v-bind="…"` spread or a dynamic `:[name]` arg
 expression that is not a C# literal; and a hyphenated attribute name. A false positive is worse than a
 false negative here, so every undecidable input produces silence rather than a guess.
 
-*Authority: `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
-`libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
+*Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
+`tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
 `tooling/Assimalign.Viu.Tooling.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
 `analyzers/Assimalign.Viu.Generators.Syntax/src/{SingleFileComponentGenerator,Internal/ComponentSymbolCatalogReader}.cs`;
 `docs/adr/0005-no-runtime-template-compilation.md`.*
@@ -1167,9 +1167,9 @@ utility-candidate detection, and hot-reload metadata.
 
 `[VUE-10]` The implementation adds **no Vue JavaScript runtime and no dependency on Vue**.
 
-*Authority: `libraries/Assimalign.Viu.Syntax.SingleFileComponent/src/VueSingleFileComponent*.cs`;
+*Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/src/VueSingleFileComponent*.cs`;
 `.../src/Internal/{VueSingleFileComponentParseEngine,SingleFileComponentTagScanner}.cs`;
-`libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md` §§"Tag-based `.vue`
+`tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md` §§"Tag-based `.vue`
 compatibility", "Generator compatibility contract"; `docs/UTILITY-CSS-DESIGN.md` §8.2;
 `sdks/README.md`; `build/Targets/Build.UtilityCss.targets`.*
 
@@ -1242,8 +1242,8 @@ boundary:
 *Authority: `docs/UTILITY-CSS-DESIGN.md` (**normative** for §10.4);
 `tooling/Assimalign.Viu.Tooling.Css/docs/{OVERVIEW,DESIGN}.md`;
 `tooling/Assimalign.Viu.Tooling.UtilityCss/docs/{OVERVIEW,DESIGN}.md`;
-`libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`;
-`libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md` §"CSS Modules accessors";
+`tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`;
+`tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md` §"CSS Modules accessors";
 `libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §"Component CSS variables".*
 
 ---

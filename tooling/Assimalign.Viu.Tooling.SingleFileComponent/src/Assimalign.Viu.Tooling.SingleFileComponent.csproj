@@ -38,7 +38,7 @@
          are authored once in Assimalign.Viu.Syntax and <Compile Include>'d here (still internal) because an
          internal shim in a referenced assembly is not visible to this compilation — each netstandard2.0
          assembly needs its own copy to light up `init`/`record`/`required`. -->
-    <Compile Include="..\..\..\libraries\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
-    <Compile Include="..\..\..\libraries\Assimalign.Viu.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
+    <Compile Include="..\..\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs" Link="Shims\IsExternalInit.cs" />
+    <Compile Include="..\..\Assimalign.Viu.Syntax\src\Shims\RequiredMemberShims.cs" Link="Shims\RequiredMemberShims.cs" />
   </ItemGroup>
 </Project>

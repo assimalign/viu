@@ -3,7 +3,7 @@
 `Assimalign.Viu.Syntax.SingleFileComponent` defines and parses the `.viu` single-file component (SFC) format — the Viu
 counterpart to Vue's `.vue` files. This document is the authoritative specification for the container
 syntax and the block parser (`SingleFileComponentParser.Parse`). It matches the parser's behavior exactly; the test
-suite (`libraries/Assimalign.Viu.Syntax.SingleFileComponent/test/`) pins every rule stated here.
+suite (`tooling/Assimalign.Viu.Syntax.SingleFileComponent/test/`) pins every rule stated here.
 
 Work items: **[V01.01.06.01]** (original @-block format), **[V01.01.06.10]** (hybrid-container pivot,
 #257). Block semantics mirror the Vue SFC specification (<https://vuejs.org/api/sfc-spec.html>);

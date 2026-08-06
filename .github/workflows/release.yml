@@ -54,7 +54,7 @@ jobs:
                   'extensions/VisualStudio/',
                   [System.StringComparison]::Ordinal) -or
                 $_.StartsWith(
-                  'libraries/Assimalign.Viu.Syntax',
+                  'tooling/Assimalign.Viu.Syntax',
                   [System.StringComparison]::Ordinal) -or
                 $_.StartsWith(
                   'tooling/',

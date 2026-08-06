@@ -7,10 +7,9 @@
          string. Its net10.0 test project references it normally. -->
     <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
     <IsPackable>false</IsPackable>
-    <!-- IsAotCompatible is intentionally not set: the AOT analyzers require net7.0+, so the switch is
-         inert on netstandard2.0. The central libraries targets
-         (libraries/Directory.Build.targets) clear the inherited IsAotCompatible=true once this
-         netstandard2.0 TFM is known. This library is consumed at build time by the generator, not shipped
+    <!-- IsAotCompatible is intentionally not set: tooling projects do not inherit the runtime-library
+         default, and the AOT analyzers require net7.0+. This library is consumed at build time by the
+         generator, not shipped
          into the WASM app, so AOT-compat analysis does not apply; the runtime AOT boundary is enforced on
          the generator's OUTPUT, which is ordinary net10.0 code. -->
   </PropertyGroup>
@@ -47,7 +46,7 @@
          template compiler can <Compile Include> it here without a net10.0 project reference (Shared is
          net10.0 and cannot be referenced from netstandard2.0). See the file header and the
          Assimalign.Viu.Shared.GeneratorFixture precedent. -->
-    <Compile Include="..\..\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs" Link="Internal\DomKnowledgeData.cs" />
+    <Compile Include="..\..\..\libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs" Link="Internal\DomKnowledgeData.cs" />
     <!-- Linked shared-source seam ([V01.01.01.03], per the #50 boundary note): PatchFlags and SlotFlags are the
          compiler <-> runtime contract authored in Assimalign.Viu.Shared. Shared is net10.0 and cannot be
          referenced from this netstandard2.0 analyzer-host project, so — exactly as with DomKnowledgeData above —
@@ -58,7 +57,7 @@
          while both assemblies are referenced; the separate Testing and Browser generator-driving test projects
          keep that compile-time closure isolated, and not producing a standalone package does not remove that
          requirement. -->
-    <Compile Include="..\..\Assimalign.Viu.Shared\src\PatchFlags.cs" Link="Shared\PatchFlags.cs" />
-    <Compile Include="..\..\Assimalign.Viu.Shared\src\SlotFlags.cs" Link="Shared\SlotFlags.cs" />
+    <Compile Include="..\..\..\libraries\Assimalign.Viu.Shared\src\PatchFlags.cs" Link="Shared\PatchFlags.cs" />
+    <Compile Include="..\..\..\libraries\Assimalign.Viu.Shared\src\SlotFlags.cs" Link="Shared\SlotFlags.cs" />
   </ItemGroup>
 </Project>

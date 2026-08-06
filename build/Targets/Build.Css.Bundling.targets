@@ -2,7 +2,7 @@
   <!--
     Static-web-asset CSS bundling for canonical .viu and compatible .vue single-file components
     ([V01.01.12.12]/[V01.01.06.09]) — the MSBuild half that completes the RS1035 deferral recorded in
-    libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
+    tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
     this task does the I/O a generator cannot).
 
     Imported LATE (via build/Build.targets -> Directory.Build.targets), after the consuming csproj has set

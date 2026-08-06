@@ -53,7 +53,7 @@ version-counter and doubly-linked-list dependency graph — all of which port to
   refs, a template that reads a ref must emit `.Value`, and — because `Ref<T>.Value` is a settable
   property — compound assignment and increment (`count++`, `count += 1`) rewrite cleanly to
   `count.Value …`. This is the expression-binding contract pinned in
-  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md);
+  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md);
   a change to `Ref<T>.Value` requires a matching change there.
 - No implicit deep reactivity: authors reach for `[Reactive]` classes or reactive collections
   explicitly, which is more predictable but less magical than a deep `Proxy`.
