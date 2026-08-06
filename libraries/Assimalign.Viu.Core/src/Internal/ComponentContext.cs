@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Text;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
@@ -67,7 +66,7 @@ internal sealed class ComponentContext :
                 AddAlias(_parameterAliases, parameter.Name, parameter, "parameter");
                 AddAlias(
                     _parameterAliases,
-                    Camelize(parameter.Name),
+                    NameNormalization.Camelize(parameter.Name),
                     parameter,
                     "parameter");
                 AddAlias(
@@ -88,7 +87,7 @@ internal sealed class ComponentContext :
                 AddAlias(_eventAliases, componentEvent.Name, componentEvent, "event");
                 AddAlias(
                     _eventAliases,
-                    Camelize(componentEvent.Name),
+                    NameNormalization.Camelize(componentEvent.Name),
                     componentEvent,
                     "event");
             }
@@ -303,7 +302,7 @@ internal sealed class ComponentContext :
             return declaration;
         }
 
-        _eventAliases.TryGetValue(Camelize(eventName), out declaration);
+        _eventAliases.TryGetValue(NameNormalization.Camelize(eventName), out declaration);
         return declaration;
     }
 
@@ -338,7 +337,7 @@ internal sealed class ComponentContext :
             return true;
         }
 
-        string camelizedName = Camelize(eventName) + suffix;
+        string camelizedName = NameNormalization.Camelize(eventName) + suffix;
         if (!string.Equals(camelizedName, exactName, StringComparison.Ordinal)
             && _listeners.TryGetValue(camelizedName, out listener!))
         {
@@ -458,34 +457,6 @@ internal sealed class ComponentContext :
     {
         string name = listenerName[2..];
         return char.ToLowerInvariant(name[0]) + name[1..];
-    }
-
-    private static string Camelize(string name)
-    {
-        int firstHyphen = name.IndexOf('-', StringComparison.Ordinal);
-        if (firstHyphen < 0)
-        {
-            return name;
-        }
-
-        StringBuilder result = new(name.Length);
-        bool uppercaseNext = false;
-        foreach (char character in name)
-        {
-            if (character == '-')
-            {
-                uppercaseNext = true;
-                continue;
-            }
-
-            result.Append(
-                uppercaseNext
-                    ? char.ToUpperInvariant(character)
-                    : character);
-            uppercaseNext = false;
-        }
-
-        return result.ToString();
     }
 
     private static void AddAlias<T>(

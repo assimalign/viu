@@ -22,26 +22,26 @@ internal sealed class RenderCodeWriter
     // ---- Contract helper names bound by name on the runtime helper surface (see docs/DESIGN.md). ----
 
     // An untyped object literal has no C# equivalent, so props/slots objects emit through this helper.
-    private const string CreatePropsHelper = "_createProps";
+    private static readonly string CreatePropsHelper = "_" + HelperNames.CreateProps.Name;
 
     // A directive-modifier bag is name -> bool, not the name -> object? of a property bag, and the
     // directive binding that receives it is typed that way. It therefore has its own helper: the
     // props helper in the modifier slot type-checks yet reads back as no modifiers at all
     // ([SFC-CG-6]).
-    private const string CreateModifiersHelper = "_createModifiers";
+    private static readonly string CreateModifiersHelper = "_" + HelperNames.CreateModifiers.Name;
 
     // C# lambdas and method groups have no natural type in an object-typed position, so event-handler
     // property values emit through this delegate-typed helper.
-    private const string WithHandlerHelper = "_withHandler";
+    private static readonly string WithHandlerHelper = "_" + HelperNames.WithHandler.Name;
 
     // Pausing block tracking, creating the value, stamping its cache index, resuming, and yielding the
     // slot must happen in that order. C# has no comma operator, so the sequence collapses into this
     // helper and rides on guaranteed left-to-right argument evaluation.
-    private const string SetCacheHelper = "_setCache";
+    private static readonly string SetCacheHelper = "_" + HelperNames.SetCache.Name;
 
     // A cached array must be copied before use, so a consumer cannot mutate the cached instance;
     // C# has no spread in this position, so a cloning helper call takes its place.
-    private const string SpreadCacheHelper = "_spreadCache";
+    private static readonly string SpreadCacheHelper = "_" + HelperNames.SpreadCache.Name;
 
     private readonly TransformResult result;
     private readonly StringBuilder builder = new();
