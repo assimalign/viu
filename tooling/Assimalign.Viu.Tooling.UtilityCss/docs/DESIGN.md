@@ -163,3 +163,18 @@ The remaining boundaries are explicit:
 
 `UtilityDirectiveEmitter` remains the canonical directive-only projection for cache keys. It does
 not duplicate the project compiler or pretend that a projection is transformed application CSS.
+
+## Line endings are part of the emitted contract
+
+Every emitter normalizes its output to LF regardless of the source stylesheet's line endings —
+`UtilityDirectiveEmitter` and `UtilityCssLayerEmitter` both collapse CRLF and lone CR to LF before
+returning. That is deliberate: emitted CSS feeds cache keys and content fingerprints, so identical
+input must produce byte-identical output on every platform, not merely equivalent text.
+
+The tests pin that contract by asserting emitter output against C# raw string literals, which makes
+each literal's line endings part of the expected value. So the test sources themselves must check
+out LF — `.gitattributes` pins `tooling/Assimalign.Viu.Tooling.UtilityCss/test/**/*.cs` to
+`eol=lf` ([V01.01.12.24]); without it a Windows checkout under `core.autocrlf=true` turns the
+expected values into CRLF and the assertions fail against correct LF output. Keep new expected-CSS
+assertions in that directory, and do not relax them to be line-ending agnostic — the canonical LF
+output *is* the specified behavior.

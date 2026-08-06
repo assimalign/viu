@@ -63,35 +63,40 @@ taking `Browser` and its `browser-wasm` runtime pin.
 
 ## State
 
-| Unit | Theme | Wave | Status |
-|---|---|---|---|
-| `V01.01.14.01` | T01 ship XML documentation + T15 derivative doc phrasing | 1 | **IN PROGRESS** |
-| `V01.01.14.02` | T04 compiler-seam hardening (`[EditorBrowsable]` + language-service filter) | 1 | Not started |
-| `V01.01.14.03` | T03 unship build-time packages | 1 | Not started |
-| `V01.01.14.04` | T02 public-API baseline and hardening-attribute conventions | 1 | Not started |
-| `V01.01.14.22` | **Application lifetime: middleware pipeline, delete `IApplicationPlugin`** | 2A | Not started |
-| `V01.01.14.23` | **Composition surface: drop public `IApplicationBuilder`, self-returning builders, frozen options** | 2A | Not started |
-| `V01.01.14.24` | **Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication`** | 2A | Not started |
-| `V01.01.14.25` | **Host facade: `Application.CreateBuilder()` in Browser/SDK** | 2A | Not started |
-| `V01.01.14.26` | **Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init** | 2A | Not started |
-| `V01.01.14.27` | **Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite** | 2A | Not started |
-| `V01.01.14.05` | T05 internalize friend-only publics (~120 types) | 2 | Not started |
-| `V01.01.14.06` | T13 single source of truth for the helper-name contract | 2 | Not started |
-| `V01.01.14.07` | T16 drop the viral `RequiresPreviewFeatures` stamp | 2 | Not started |
-| `V01.01.14.08` | T06 namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | Not started — decide after `.02` lands |
-| `V01.01.14.09` | T07 product-prefix and duplicate facades | 3 | Not started |
-| `V01.01.14.10` | T08 naming-rule compliance | 3 | Not started |
-| `V01.01.14.11` | T09 mutable state and encapsulation | 4 | Not started |
-| `V01.01.14.12` | T10 compiler-seam typing | 4 | Not started |
-| `V01.01.14.13` | T11 async conventions | 4 | Not started |
-| `V01.01.14.14` | T12 close open hierarchies | 5 | Not started |
-| `V01.01.14.15` | T14 dead and speculative surface | 5 | Not started |
-| `V01.01.14.16` | T17 debugger presentation + untracked `Peek()` | 5 | Not started |
-| `V01.01.14.17` | G1 `PackageOverrides.txt` (see D2) | 1 or 2 | Not started |
-| `V01.01.14.18` | G2 `IApplication` disposal contract | — | **Absorbed by `.22`/`.24`** |
-| `V01.01.14.19` | G3 `SlotFlags` is not a bitmask | 3 | Not started |
-| `V01.01.14.20` | G4 equality operators on app-visible `IEquatable<T>` | 4 | Not started |
-| `V01.01.14.21` | G5 covariant read-only reactive reference | 4 | Not started |
+**Theme id is the stable key, not the WBS code.** Do not pre-assign WBS codes here. The
+`viu-work-items` script derives the next free child of `V01.01.14` at creation time, so a code
+reserved in advance will not match the one the item actually receives. Fill the WBS and Issue columns
+in as each item is created.
+
+| Theme | Description | Wave | WBS | Issue | Status |
+|---|---|---|---|---|---|
+| T01 + T15 | Ship XML documentation; sweep derivative doc phrasing | 1 | `.01` | #285 | **MERGED** (PR #288) |
+| T04 | Compiler-seam hardening (`[EditorBrowsable]` + language-service filter) | 1 | `.02` | #287 | **IN REVIEW** (PR #289) |
+| T16 | Drop the viral `RequiresPreviewFeatures` stamp | 1 | `.03` | #292 | **IN REVIEW** — supersedes #280 |
+| T03 | Unship build-time packages; delete `Syntax.JavaScript` (keep `Syntax.Html`, see D3) | 1 | — | — | Not started — must follow T16 (both edit the Syntax csprojs) |
+| T02 | Public-API baseline and hardening-attribute conventions | 1 | — | — | Not started — must be **last** in Wave 1 |
+| D5-A | Application lifetime: middleware pipeline, delete `IApplicationPlugin` | 2A | — | — | Not started |
+| D5-B | Composition surface: drop public `IApplicationBuilder`, self-returning builders, frozen options | 2A | — | — | Not started |
+| D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | — | — | Not started |
+| D5-D | Host facade: `Application.CreateBuilder()` in Browser/SDK | 2A | — | — | Not started |
+| D5-E | Router bootstrap: `UseRouter`, `ReadyAsync` cancellation, lazy history init | 2A | — | — | Not started |
+| D5-F | Specification: replace `[CMP-25]` with application lifecycle clauses; lifetime test suite | 2A | — | — | Not started |
+| T05 | Internalize friend-only publics (~120 types) | 2 | — | — | Not started |
+| T13 | Single source of truth for the helper-name contract | 2 | — | — | Not started |
+| T06 | Namespace segmentation (`Assimalign.Viu.Hosting`) | 3 | — | — | Not started — decide after T04 lands |
+| T07 | Product-prefix stutter and duplicate facades | 3 | — | — | Not started |
+| T08 | Naming-rule compliance | 3 | — | — | Not started |
+| G3 | `SlotFlags` is named `*Flags` but is not a bitmask | 3 | — | — | Not started |
+| T09 | Mutable state and encapsulation | 4 | — | — | Not started |
+| T10 | Compiler-seam typing | 4 | — | — | Not started |
+| T11 | Async conventions | 4 | — | — | Not started |
+| G4 | Equality operators on app-visible `IEquatable<T>` | 4 | — | — | Not started |
+| G5 | Covariant read-only reactive reference | 4 | — | — | Not started |
+| T12 | Close open inheritance hierarchies | 5 | — | — | Not started |
+| T14 | Dead and speculative surface | 5 | — | — | Not started |
+| T17 | Debugger presentation + untracked `Peek()` | 5 | — | — | Not started |
+| G1 | `PackageOverrides.txt` (see D2) | 1 or 2 | — | — | Not started |
+| G2 | `IApplication` disposal contract | — | — | — | **Absorbed by D5-A / D5-C** |
 
 ### Units the D5 redesign absorbs
 
@@ -100,12 +105,12 @@ types that are about to be deleted:
 
 | Absorbed | Into | Why |
 |---|---|---|
-| G2 `IApplication` declares no disposal; `ServerApplication` implements neither | `.22`, `.24` | The new `IApplication : IAsyncDisposable` closes the contract, and `ServerApplication` leaves the interface entirely rather than growing a teardown path it has no use for. |
-| G6 `Application<TNode>` non-virtual `Dispose` with a private flag | `.22` | The state machine replaces the single `IsMounted` Boolean, and disposal is defined by it. |
-| T09 — `IApplicationContext.ErrorHandler`/`WarnHandler`/`Performance` are `{ get; set; }` on the interface while three docs call the context immutable | `.23` | Diagnostics move into builder options and freeze at `Build()`, which makes the documentation true instead of restating the mutation. |
-| T12 — `ApplicationBuilder`'s configuration methods return `IApplicationBuilder`, collapsing the covariant `Build()` on `BrowserApplicationBuilder` | `.23` | Concrete builders return themselves; the erasing interface is removed. |
-| T14 — `Performance` has no production reader; `BrowserApplication.CreateServerRendererBuilder` has zero callers | `.23`, `.25` | Both are deleted rather than renamed or documented. |
-| T11 — `Router.ReadyAsync` takes no `CancellationToken` | `.26` | Cancellation is required for the middleware pipeline to be cancellable at all. |
+| G2 `IApplication` declares no disposal; `ServerApplication` implements neither | D5-A, D5-C | The new `IApplication : IAsyncDisposable` closes the contract, and `ServerApplication` leaves the interface entirely rather than growing a teardown path it has no use for. |
+| G6 `Application<TNode>` non-virtual `Dispose` with a private flag | D5-A | The state machine replaces the single `IsMounted` Boolean, and disposal is defined by it. |
+| T09 — `IApplicationContext.ErrorHandler`/`WarnHandler`/`Performance` are `{ get; set; }` on the interface while three docs call the context immutable | D5-B | Diagnostics move into builder options and freeze at `Build()`, which makes the documentation true instead of restating the mutation. |
+| T12 — `ApplicationBuilder`'s configuration methods return `IApplicationBuilder`, collapsing the covariant `Build()` on `BrowserApplicationBuilder` | D5-B | Concrete builders return themselves; the erasing interface is removed. |
+| T14 — `Performance` has no production reader; `BrowserApplication.CreateServerRendererBuilder` has zero callers | D5-B, D5-D | Both are deleted rather than renamed or documented. |
+| T11 — `Router.ReadyAsync` takes no `CancellationToken` | D5-E | Cancellation is required for the middleware pipeline to be cancellable at all. |
 
 ## D5 — application lifetime redesign
 
@@ -358,8 +363,12 @@ spec-discoverable choice is the wrong one for component code. Resolution is a re
 
 Recorded here because they are unrelated to API surface but were confirmed:
 
-- `.github/workflows/release.yml:230,299` and `docs/RELEASING.md:10-11` assert 21 packages while
-  `scripts/Pack-Release.ps1:158-162` produces 22 — **the publish lane throws today.**
+- ~~`.github/workflows/release.yml:230,299` and `docs/RELEASING.md:10-11` assert 21 packages while
+  `scripts/Pack-Release.ps1:158-162` produces 22 — **the publish lane throws today.**~~
+  **FIXED** — confirmed live on the `[V01.01.14.01]` merge (`Expected 21 release packages, found 22.`),
+  which was the sixth consecutive `release.yml` failure. The count is now published by the
+  `pack-packages` job and consumed by both publish jobs, so it derives from the same authoritative
+  id list `Pack-Release.ps1` validates against and cannot drift again.
 - `HelperNames.ResolveFilter` names `_resolveFilter`, which exists on no runtime surface.
 - `SingleFileComponentSourceEmitter`'s `DomRenderHelperNames` array substring-scans the emitted body
   to decide whether to write the DOM `using static`; adding an 11th DOM helper without updating it
