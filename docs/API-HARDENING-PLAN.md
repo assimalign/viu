@@ -129,11 +129,25 @@ T05 was scoped as *"internalize ~120 types and add `InternalsVisibleTo` grants."
 mechanism**, so the unit is re-scoped rather than merely constrained. The types divide by who consumes
 them, and only one group is genuinely hard.
 
+> **"Public" means two different things here — keep them apart.**
+>
+> **Accessibility** (`public` vs `internal`) is what D8 governs. **Packaging** (`IsPackable`) is not,
+> and is unchanged.
+>
+> A `tooling/` type becoming `public` is a *correct and expected* outcome of D8, not a concession: it
+> makes a real dependency into a designed contract. It does **not** put that type on nuget.org. Those
+> assemblies stopped publishing in [V01.01.14.04] and stay unpublished — they reach builds only inside
+> `analyzers/dotnet/cs/` of the Ref pack. So an app developer's IntelliSense is unaffected either way.
+>
+> D8 exists to keep the boundaries between libraries honest, not to minimise public surface in
+> assemblies no app references. Do not read a `public` in `tooling/` as a regression of the unshipping
+> work, and do not "fix" it by re-adding a grant.
+
 | Group | Treatment under D8 |
 |---|---|
 | **Zero consumers** — e.g. `PatchFlagNames`, `ShapeFlagsExtensions`, `Scheduler.IsFlushing`/`IsFlushPending` | Make `internal` outright. No grant needed; D8 is not engaged. |
 | **Consumed only by the assembly's own tests** — e.g. the generators' `*TrackingName` constants | `internal` + a **test** grant. Exactly what D8 sanctions. |
-| **Consumed by a sibling `tooling/` assembly** (5 of the 8 grants) | Same treatment as a shipping library. D8 applies everywhere: not shipping is not a reason to skip designing the seam, because the boundary exists for maintainers even when no app developer can see it. |
+| **Consumed by a sibling `tooling/` assembly** (5 of the 8 grants) | Same decision procedure as a shipping library, and for most of these the answer is simply **make it `public`** — the dependency is real, so it is a contract. Costs nothing developer-facing, since these assemblies do not publish. |
 | **Consumed by a sibling shipping library** (3 grants, all from `Core`) | The real work — see below. |
 
 **The `Core` cases.** `Core` grants internals to `Browser`, `ServerRenderer` and `Testing`. Of its 39
