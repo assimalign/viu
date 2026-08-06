@@ -3,6 +3,12 @@
     <!-- Analyzer & Build Dependencies -->
     <ItemGroup>
         <_ViuPackage Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" />
+        <!-- Keep the public-API analyzer on the same stable 5.3.0 band as the Roslyn packages
+             below. The 3.11.0 train is prerelease-only, while 5.3.0 ships analyzer/code-fix
+             assets with no package dependency closure. -->
+        <_ViuPackage Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.3.0">
+            <PrivateAssets>all</PrivateAssets>
+        </_ViuPackage>
         <!-- Assimalign.Viu.LanguageService consumes Microsoft.CodeAnalysis.CSharp at RUNTIME
              ([V01.01.12.07.04], #261): its assets must stay unrestricted so they flow into the
              self-contained Assimalign.Viu.LanguageServer publish. Do not add PrivateAssets here. -->

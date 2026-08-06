@@ -1,0 +1,128 @@
+#nullable enable
+Assimalign.Viu.Browser.BrowserApplication
+Assimalign.Viu.Browser.BrowserApplication.IsHydrating.get -> bool
+Assimalign.Viu.Browser.BrowserApplication.MountAsync(string! selector, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.Components.IComponentContext?>
+Assimalign.Viu.Browser.BrowserApplicationBuilder
+Assimalign.Viu.Browser.BrowserDomException
+Assimalign.Viu.Browser.BrowserDomException.BrowserDomException(string! operationName, int nodeHandle, string! message, System.Exception? innerException = null) -> void
+Assimalign.Viu.Browser.BrowserDomException.NodeHandle.get -> int
+Assimalign.Viu.Browser.BrowserDomException.OperationName.get -> string!
+Assimalign.Viu.Browser.BrowserEvent
+Assimalign.Viu.Browser.BrowserEvent.Button.get -> int
+Assimalign.Viu.Browser.BrowserEvent.Buttons.get -> int
+Assimalign.Viu.Browser.BrowserEvent.ClientX.get -> double
+Assimalign.Viu.Browser.BrowserEvent.ClientY.get -> double
+Assimalign.Viu.Browser.BrowserEvent.Code.get -> string!
+Assimalign.Viu.Browser.BrowserEvent.DefaultPrevented.get -> bool
+Assimalign.Viu.Browser.BrowserEvent.Detail.get -> int
+Assimalign.Viu.Browser.BrowserEvent.EventName.get -> string!
+Assimalign.Viu.Browser.BrowserEvent.IsSelfTarget.get -> bool
+Assimalign.Viu.Browser.BrowserEvent.Key.get -> string!
+Assimalign.Viu.Browser.BrowserEvent.Modifiers.get -> Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEvent.PreventDefault() -> void
+Assimalign.Viu.Browser.BrowserEvent.PropagationStopped.get -> bool
+Assimalign.Viu.Browser.BrowserEvent.SelectedValues.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Assimalign.Viu.Browser.BrowserEvent.StopPropagation() -> void
+Assimalign.Viu.Browser.BrowserEvent.TargetChecked.get -> bool
+Assimalign.Viu.Browser.BrowserEvent.TargetValue.get -> string?
+Assimalign.Viu.Browser.BrowserEvent.TimeStamp.get -> double
+Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEventModifiers.Alt = 4 -> Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEventModifiers.Control = 1 -> Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEventModifiers.Meta = 8 -> Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEventModifiers.None = 0 -> Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEventModifiers.Shift = 2 -> Assimalign.Viu.Browser.BrowserEventModifiers
+Assimalign.Viu.Browser.BrowserEvents
+Assimalign.Viu.Browser.BrowserObjectEventInvoker
+Assimalign.Viu.Browser.BrowserObjectEvents
+Assimalign.Viu.Browser.BrowserRuntime
+Assimalign.Viu.Browser.CssVariables
+Assimalign.Viu.Browser.DomRenderHelpers
+Assimalign.Viu.Browser.Transition
+Assimalign.Viu.Browser.Transition.Flags.get -> Assimalign.Viu.Components.ComponentFlags
+Assimalign.Viu.Browser.Transition.Name.get -> string?
+Assimalign.Viu.Browser.Transition.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
+Assimalign.Viu.Browser.Transition.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
+Assimalign.Viu.Browser.TransitionGroup
+Assimalign.Viu.Browser.TransitionGroup.Name.get -> string?
+Assimalign.Viu.Browser.TransitionGroup.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
+Assimalign.Viu.Browser.TransitionGroup.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
+Assimalign.Viu.Browser.ViuModelBinding
+Assimalign.Viu.Browser.ViuModelBinding.Setter.get -> System.Action<object?>!
+Assimalign.Viu.Browser.ViuModelBinding.Value.get -> object?
+Assimalign.Viu.Browser.ViuModelBinding.ViuModelBinding(object? value, System.Action<object?>! setter) -> void
+Assimalign.Viu.Browser.VModelCheckbox
+Assimalign.Viu.Browser.VModelCheckbox.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelCheckbox.BeforeUpdate.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelCheckbox.Created.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelCheckbox.Mounted.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelDynamic
+Assimalign.Viu.Browser.VModelDynamic.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelDynamic.BeforeUpdate.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelDynamic.Created.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelDynamic.Mounted.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelDynamic.Updated.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelRadio
+Assimalign.Viu.Browser.VModelRadio.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelRadio.BeforeUpdate.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelRadio.Created.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelSelect
+Assimalign.Viu.Browser.VModelSelect.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelSelect.BeforeUpdate.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelSelect.Created.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelSelect.Mounted.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelSelect.Updated.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelText
+Assimalign.Viu.Browser.VModelText.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelText.BeforeUpdate.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelText.Created.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VModelText.Mounted.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VShow
+Assimalign.Viu.Browser.VShow.BeforeMount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VShow.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VShow.Mounted.get -> Assimalign.Viu.DirectiveHook?
+Assimalign.Viu.Browser.VShow.Updated.get -> Assimalign.Viu.DirectiveHook?
+override Assimalign.Viu.Browser.BrowserApplicationBuilder.Build() -> Assimalign.Viu.Browser.BrowserApplication!
+static Assimalign.Viu.Browser.BrowserApplication.CreateBuilder(Assimalign.Viu.Components.IComponent! rootComponent, bool useCommandBuffer = false) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+static Assimalign.Viu.Browser.BrowserApplication.CreateBuilder(bool useCommandBuffer = false) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+static Assimalign.Viu.Browser.BrowserApplication.CreateServerRendererBuilder(Assimalign.Viu.Components.IComponent! rootComponent) -> Assimalign.Viu.Browser.BrowserApplicationBuilder!
+static Assimalign.Viu.Browser.BrowserEvents.WithKeys(System.Action<Assimalign.Viu.Browser.BrowserEvent!>! handler, params string![]! keys) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.BrowserEvents.WithKeys(System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>! handler, params string![]! keys) -> System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>!
+static Assimalign.Viu.Browser.BrowserEvents.WithModifiers(System.Action<Assimalign.Viu.Browser.BrowserEvent!>! handler, params string![]! modifiers) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.BrowserEvents.WithModifiers(System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>! handler, params string![]! modifiers) -> System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>!
+static Assimalign.Viu.Browser.BrowserObjectEvents.Invoker.get -> Assimalign.Viu.Browser.BrowserObjectEventInvoker?
+static Assimalign.Viu.Browser.BrowserObjectEvents.Invoker.set -> void
+static Assimalign.Viu.Browser.BrowserRuntime.CreateRenderer() -> Assimalign.Viu.Renderer<int>!
+static Assimalign.Viu.Browser.BrowserRuntime.GetRegistryDiagnostics() -> (int JsNodes, int JsListenerMaps, int DotnetListeners)
+static Assimalign.Viu.Browser.BrowserRuntime.InitializeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.Browser.BrowserRuntime.QuerySelector(string! selector) -> int
+static Assimalign.Viu.Browser.CssVariables.UseCssVariables(Assimalign.Viu.Components.IComponentContext! context, System.Func<System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>! getter) -> void
+static Assimalign.Viu.Browser.DomRenderHelpers._withKeys(System.Action! handler, params string![]! keys) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withKeys(System.Action<Assimalign.Viu.Browser.BrowserEvent!>! handler, params string![]! keys) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withKeys(System.Func<Assimalign.Viu.Browser.BrowserEvent!, object?>! handler, params string![]! keys) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withKeys(System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>! handler, params string![]! keys) -> System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withKeys(System.Func<object?>! handler, params string![]! keys) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withKeys(System.Func<System.Threading.Tasks.Task!>! handler, params string![]! keys) -> System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withModifiers(System.Action! handler, params string![]! modifiers) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withModifiers(System.Action<Assimalign.Viu.Browser.BrowserEvent!>! handler, params string![]! modifiers) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withModifiers(System.Func<Assimalign.Viu.Browser.BrowserEvent!, object?>! handler, params string![]! modifiers) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withModifiers(System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>! handler, params string![]! modifiers) -> System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withModifiers(System.Func<object?>! handler, params string![]! modifiers) -> System.Action<Assimalign.Viu.Browser.BrowserEvent!>!
+static Assimalign.Viu.Browser.DomRenderHelpers._withModifiers(System.Func<System.Threading.Tasks.Task!>! handler, params string![]! modifiers) -> System.Func<Assimalign.Viu.Browser.BrowserEvent!, System.Threading.Tasks.Task!>!
+static Assimalign.Viu.Browser.Transition.Registration.get -> Assimalign.Viu.Components.ComponentRegistration
+static Assimalign.Viu.Browser.TransitionGroup.Registration.get -> Assimalign.Viu.Components.ComponentRegistration
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._Transition -> object!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._TransitionGroup -> object!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._vModelCheckbox -> Assimalign.Viu.Components.IComponentDirectiveBinding!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._vModelDynamic -> Assimalign.Viu.Components.IComponentDirectiveBinding!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._vModelRadio -> Assimalign.Viu.Components.IComponentDirectiveBinding!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._vModelSelect -> Assimalign.Viu.Components.IComponentDirectiveBinding!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._vModelText -> Assimalign.Viu.Components.IComponentDirectiveBinding!
+static readonly Assimalign.Viu.Browser.DomRenderHelpers._vShow -> Assimalign.Viu.Components.IComponentDirectiveBinding!
+static readonly Assimalign.Viu.Browser.VModelCheckbox.Instance -> Assimalign.Viu.Browser.VModelCheckbox!
+static readonly Assimalign.Viu.Browser.VModelDynamic.Instance -> Assimalign.Viu.Browser.VModelDynamic!
+static readonly Assimalign.Viu.Browser.VModelRadio.Instance -> Assimalign.Viu.Browser.VModelRadio!
+static readonly Assimalign.Viu.Browser.VModelSelect.Instance -> Assimalign.Viu.Browser.VModelSelect!
+static readonly Assimalign.Viu.Browser.VModelText.Instance -> Assimalign.Viu.Browser.VModelText!
+static readonly Assimalign.Viu.Browser.VShow.Instance -> Assimalign.Viu.Browser.VShow!
+virtual Assimalign.Viu.Browser.BrowserObjectEventInvoker.Invoke(System.Action<object?>! handler, Assimalign.Viu.Browser.BrowserEvent! browserEvent) -> void

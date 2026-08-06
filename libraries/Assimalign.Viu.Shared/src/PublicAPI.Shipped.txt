@@ -1,0 +1,98 @@
+#nullable enable
+Assimalign.Viu.Shared.DisplayStringFormatter
+Assimalign.Viu.Shared.DomKnowledge
+Assimalign.Viu.Shared.LooseEquality
+Assimalign.Viu.Shared.NumberCoercion
+Assimalign.Viu.Shared.PatchFlagNames
+Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.Bail = -2 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.Cached = -1 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.Class = 2 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.DevRootFragment = 2048 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.DynamicSlots = 1024 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.FullProps = 16 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.KeyedFragment = 128 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.NeedHydration = 32 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.NeedPatch = 512 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.Props = 8 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.StableFragment = 64 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.Style = 4 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.Text = 1 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlags.UnkeyedFragment = 256 -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Shared.PatchFlagsExtensions
+Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.ArrayChildren = 16 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.Component = Assimalign.Viu.Shared.ShapeFlags.FunctionalComponent | Assimalign.Viu.Shared.ShapeFlags.StatefulComponent -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.ComponentKeptAlive = 512 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.ComponentShouldKeepAlive = 256 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.Element = 1 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.FunctionalComponent = 2 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.SlotsChildren = 32 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.StatefulComponent = 4 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.Suspense = 128 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.Teleport = 64 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlags.TextChildren = 8 -> Assimalign.Viu.Shared.ShapeFlags
+Assimalign.Viu.Shared.ShapeFlagsExtensions
+Assimalign.Viu.Shared.SlotFlags
+Assimalign.Viu.Shared.SlotFlags.Dynamic = 2 -> Assimalign.Viu.Shared.SlotFlags
+Assimalign.Viu.Shared.SlotFlags.Forwarded = 3 -> Assimalign.Viu.Shared.SlotFlags
+Assimalign.Viu.Shared.SlotFlags.Stable = 1 -> Assimalign.Viu.Shared.SlotFlags
+Assimalign.Viu.Shared.StyleAndClassNormalization
+static Assimalign.Viu.Shared.DisplayStringFormatter.FormatScalar(object! value) -> string!
+static Assimalign.Viu.Shared.DisplayStringFormatter.ToDisplayString(object? value) -> string!
+static Assimalign.Viu.Shared.DomKnowledge.GetAttributeName(string! propertyName) -> string!
+static Assimalign.Viu.Shared.DomKnowledge.IsBooleanAttribute(string! attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsBooleanAttribute(System.ReadOnlySpan<char> attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsHtmlTag(string! tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsHtmlTag(System.ReadOnlySpan<char> tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsKnownHtmlAttribute(string! attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsKnownHtmlAttribute(System.ReadOnlySpan<char> attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsKnownSvgAttribute(string! attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsKnownSvgAttribute(System.ReadOnlySpan<char> attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsMathMLTag(string! tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsMathMLTag(System.ReadOnlySpan<char> tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsSsrSafeAttributeName(string! attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsSsrSafeAttributeName(System.ReadOnlySpan<char> attributeName) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsSvgTag(string! tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsSvgTag(System.ReadOnlySpan<char> tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsVoidTag(string! tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.IsVoidTag(System.ReadOnlySpan<char> tag) -> bool
+static Assimalign.Viu.Shared.DomKnowledge.TryGetAttributeName(System.ReadOnlySpan<char> propertyName, out string! attributeName) -> bool
+static Assimalign.Viu.Shared.LooseEquality.LooseEqual(object? left, object? right) -> bool
+static Assimalign.Viu.Shared.LooseEquality.LooseIndexOf(System.Collections.IEnumerable! values, object? value) -> int
+static Assimalign.Viu.Shared.NumberCoercion.LooseToNumber(object? value) -> object?
+static Assimalign.Viu.Shared.NumberCoercion.ToNumber(object? value) -> object?
+static Assimalign.Viu.Shared.PatchFlagNames.Format(Assimalign.Viu.Shared.PatchFlags flags) -> string!
+static Assimalign.Viu.Shared.PatchFlagsExtensions.Has(this Assimalign.Viu.Shared.PatchFlags flags, Assimalign.Viu.Shared.PatchFlags flag) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.HasDynamicClass(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.HasDynamicProps(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.HasDynamicSlots(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.HasDynamicStyle(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.HasFullProps(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.HasText(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.IsBail(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.IsCached(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.IsDevRootFragment(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.IsKeyedFragment(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.IsStableFragment(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.IsUnkeyedFragment(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.NeedsHydration(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.PatchFlagsExtensions.NeedsPatch(this Assimalign.Viu.Shared.PatchFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.Has(this Assimalign.Viu.Shared.ShapeFlags flags, Assimalign.Viu.Shared.ShapeFlags flag) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.HasArrayChildren(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.HasSlotsChildren(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.HasTextChildren(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsComponent(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsElement(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsFunctionalComponent(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsKeptAlive(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsStatefulComponent(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsSuspense(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.IsTeleport(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.ShapeFlagsExtensions.ShouldKeepAlive(this Assimalign.Viu.Shared.ShapeFlags flags) -> bool
+static Assimalign.Viu.Shared.StyleAndClassNormalization.Hyphenate(string! name) -> string!
+static Assimalign.Viu.Shared.StyleAndClassNormalization.IsTruthy(object? value) -> bool
+static Assimalign.Viu.Shared.StyleAndClassNormalization.NormalizeClass(object? value) -> string!
+static Assimalign.Viu.Shared.StyleAndClassNormalization.NormalizeStyle(object? value) -> object?
+static Assimalign.Viu.Shared.StyleAndClassNormalization.ParseStringStyle(string! cssText) -> System.Collections.Generic.Dictionary<string!, object?>!
+static Assimalign.Viu.Shared.StyleAndClassNormalization.StringifyStyle(object? style) -> string!

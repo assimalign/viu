@@ -353,7 +353,8 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.pull_request.merged == true &&
-      needs.detect-visual-studio-changes.outputs.changed == 'true'
+      needs.detect-visual-studio-changes.outputs.changed == 'true' &&
+      vars.VIU_PUBLISH_MARKETPLACE == 'true'
     needs: detect-visual-studio-changes
     runs-on: windows-latest
     environment:

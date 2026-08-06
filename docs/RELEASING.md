@@ -7,7 +7,7 @@ Area workflows only build and test their part of the repository; they never publ
 
 | Event | NuGet packages | Visual Studio extension |
 | --- | --- | --- |
-| Merged pull request into `main` | Every package listed in `package-order.txt` publishes to the Assimalign GitHub Packages feed as `X.Y.Z-beta.<run-number>` | Publishes the next numeric VSIX version when the extension or an embedded language-engine dependency changed |
+| Merged pull request into `main` | Every package listed in `package-order.txt` publishes to the Assimalign GitHub Packages feed as `X.Y.Z-beta.<run-number>` | Publishes the next numeric VSIX version when the extension or an embedded language-engine dependency changed and `VIU_PUBLISH_MARKETPLACE` is `true`; otherwise the job skips |
 | Published stable GitHub Release | Every package listed in `package-order.txt` publishes to nuget.org as the stable release version | No publication |
 | Draft or prerelease GitHub Release | No publication | No publication |
 
@@ -50,6 +50,11 @@ internal visibility rather than simply the organization's package feed, change e
 The NuGet push protocol cannot select package visibility.
 
 ### Visual Studio Marketplace
+
+Create the repository Actions variable `VIU_PUBLISH_MARKETPLACE` and set it to the exact lowercase
+value `true` only when Marketplace publishing is enabled. When the variable is unset or has any
+other value, the Marketplace job skips before requesting its environment or credential. Setting it
+to `true` restores the existing publication path without a workflow change.
 
 Create the `visual-studio-marketplace` GitHub environment and protect it with required reviewers.
 The organization secret `VS_MARKETPLACE_TOKEN` must contain an Assimalign Marketplace token with

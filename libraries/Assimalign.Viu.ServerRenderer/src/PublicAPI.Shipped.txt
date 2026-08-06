@@ -1,0 +1,46 @@
+#nullable enable
+Assimalign.Viu.ServerRenderer.ServerApplication
+Assimalign.Viu.ServerRenderer.ServerApplication.Context.get -> Assimalign.Viu.IApplicationContext!
+Assimalign.Viu.ServerRenderer.ServerApplication.IsMounted.get -> bool
+Assimalign.Viu.ServerRenderer.ServerApplication.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.ServerRenderer.ServerApplication.ServerApplication(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null) -> void
+Assimalign.Viu.ServerRenderer.ServerApplication.ServerApplication(Assimalign.Viu.IApplicationContext! context) -> void
+Assimalign.Viu.ServerRenderer.ServerApplication.Unmount() -> void
+Assimalign.Viu.ServerRenderer.ServerApplication.UnmountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.ServerRenderer.ServerApplication.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.ServerRenderer.ServerApplication!
+Assimalign.Viu.ServerRenderer.ServerApplicationBuilder
+Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.ServerApplicationBuilder() -> void
+Assimalign.Viu.ServerRenderer.ServerRender
+Assimalign.Viu.ServerRenderer.ServerRenderer
+Assimalign.Viu.ServerRenderer.SsrContext
+Assimalign.Viu.ServerRenderer.SsrContext.SsrContext() -> void
+Assimalign.Viu.ServerRenderer.SsrContext.State.get -> System.Collections.Generic.IDictionary<string!, object?>!
+Assimalign.Viu.ServerRenderer.SsrContext.Teleports.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+Assimalign.Viu.ServerRenderer.SsrRenderState
+Assimalign.Viu.ServerRenderer.SsrRenderState.Application.get -> Assimalign.Viu.IApplicationContext!
+Assimalign.Viu.ServerRenderer.SsrRenderState.CancellationToken.get -> System.Threading.CancellationToken
+Assimalign.Viu.ServerRenderer.SsrRenderState.Context.get -> Assimalign.Viu.ServerRenderer.SsrContext!
+Assimalign.Viu.ServerRenderer.SsrRenderState.FlushAsync() -> System.Threading.Tasks.Task!
+Assimalign.Viu.ServerRenderer.SsrRenderState.Push(string! chunk) -> void
+override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.Build() -> Assimalign.Viu.ServerRenderer.ServerApplication!
+static Assimalign.Viu.ServerRenderer.ServerApplication.CreateBuilder() -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
+static Assimalign.Viu.ServerRenderer.ServerApplication.CreateBuilder(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
+static Assimalign.Viu.ServerRenderer.ServerRender.EscapeHtml(object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.EscapeHtml(string? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.EscapeHtmlComment(string? source) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrInterpolate(object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttr(string! key, object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttrs(Assimalign.Viu.Components.IComponentAttributeCollection? attributes, string? tag = null) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderClass(object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderComment(string? content) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderComponentAsync(Assimalign.Viu.ServerRenderer.SsrRenderState! state, Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Components.IComponentContext? parent = null) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderDynamicAttr(string! key, object? value, string? tag = null) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderListAsync(object? source, System.Func<object?, object?, System.Threading.Tasks.Task!>! renderItem) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderSlotAsync(Assimalign.Viu.ServerRenderer.SsrRenderState! state, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots, string! name, Assimalign.Viu.Components.IComponentArguments? slotArguments = null, Assimalign.Viu.Components.IComponentContext? parent = null, System.Func<Assimalign.Viu.Components.IComponent?>? fallback = null) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderStyle(object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderSuspenseAsync(Assimalign.Viu.ServerRenderer.SsrRenderState! state, System.Func<Assimalign.Viu.ServerRenderer.SsrRenderState!, System.Threading.Tasks.Task!>! defaultBranch) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderTeleportAsync(Assimalign.Viu.ServerRenderer.SsrRenderState! state, System.Func<Assimalign.Viu.ServerRenderer.SsrRenderState!, System.Threading.Tasks.Task!>! contentRenderer, string? target, bool disabled) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStreamAsync(Assimalign.Viu.Components.IComponent! rootComponent, System.IO.TextWriter! writer, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStreamAsync(Assimalign.Viu.ServerRenderer.ServerApplication! application, System.IO.TextWriter! writer, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStringAsync(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStringAsync(Assimalign.Viu.ServerRenderer.ServerApplication! application, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!

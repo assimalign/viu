@@ -30,6 +30,51 @@
     </PropertyGroup>
 
     <!--
+        Public-surface enforcement shares the documentation gate's evaluation-order requirement:
+        IsPackable is final only after the csproj body has evaluated, so this reference and its
+        baselines must remain in the targets phase. The existence guards let a project without
+        baseline files evaluate safely, while the packability condition excludes non-publishing
+        projects from the contract.
+
+        Build.targets imports this file before Build.References.Packages.targets so the central
+        by-name package resolver sees the ViuPackageReference contributed here.
+    -->
+    <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+        <!--
+            RS0026 ("do not add multiple public overloads with optional parameters") and RS0027
+            ("an optional-parameter overload should have the most parameters") are API-design
+            opinions, not baseline-integrity rules. They are deliberately off, for two reasons.
+
+            They contradict the shipped surface. Assimalign.Viu.Reactivity.Reactive.Watch has five
+            public overloads, every one ending in `WatchOptions? options = null` - exactly the shape
+            RS0026 forbids. That surface is grandfathered by the baseline, so the rules would enforce
+            on new API a standard the framework's most prominent facade does not meet.
+
+            They also fire on pure renames. The analyzer models a rename as a removal plus an
+            addition and applies new-API rules to the addition, so renaming a parameter's type -
+            with the signature shape otherwise unchanged - trips RS0026. Working around that means
+            churning an unrelated overload family to satisfy a lint rule rather than a caller.
+
+            The rules this gate exists for are RS0016 (symbol missing from the baseline), RS0017
+            (baseline entry with no matching symbol) and RS0037 (nullability unrecorded). Those stay
+            on and remain errors under -warnaserror.
+        -->
+        <NoWarn>$(NoWarn);RS0026;RS0027</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(IsPackable)' != 'false'">
+        <ViuPackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" />
+        <!-- The package's build-transitive target adds these relative identities automatically;
+             replace them with the explicit, existence-guarded repository wiring below so each
+             physical baseline reaches the analyzer exactly once. -->
+        <AdditionalFiles Remove="PublicAPI.Shipped.txt;PublicAPI.Unshipped.txt" />
+        <AdditionalFiles Include="$(MSBuildProjectDirectory)\PublicAPI.Shipped.txt"
+                         Condition="Exists('$(MSBuildProjectDirectory)\PublicAPI.Shipped.txt')" />
+        <AdditionalFiles Include="$(MSBuildProjectDirectory)\PublicAPI.Unshipped.txt"
+                         Condition="Exists('$(MSBuildProjectDirectory)\PublicAPI.Unshipped.txt')" />
+    </ItemGroup>
+
+    <!--
         NuGet recommends a package README. Individual package families can set
         PackageReadmeFile and pack their own file before this targets-phase
         fallback runs; the SDK does so with sdks/README.md.

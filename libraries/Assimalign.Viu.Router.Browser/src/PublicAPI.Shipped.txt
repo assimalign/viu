@@ -1,0 +1,5 @@
+#nullable enable
+Assimalign.Viu.Router.Browser.RouterLinkDomBridge
+static Assimalign.Viu.Router.Browser.RouterLinkDomBridge.Install() -> void
+static Assimalign.Viu.Router.Browser.RouterLinkDomBridge.Invoke(System.Action<object?>! handler, Assimalign.Viu.Browser.BrowserEvent! browserEvent) -> void
+static Assimalign.Viu.Router.Browser.RouterLinkDomBridge.Uninstall() -> void

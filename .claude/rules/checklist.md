@@ -33,5 +33,6 @@ is ❌, fix it before reporting completion, not after. Mark genuinely inapplicab
       cleaned up.
 - [ ] Public APIs have XML docs stating what the member does and what it guarantees; behavior specified in
       `docs/SPECIFICATION.md` cites its clause id.
+- [ ] Public API changes are reflected in PublicAPI.Unshipped.txt; an unexplained addition is a design review, not a rubber stamp.
 - [ ] The work item ([V01.01.NN…]) is referenced; scope creep captured via the `viu-work-items` skill.
 - [ ] No dangling solution/project references after any rename or move.

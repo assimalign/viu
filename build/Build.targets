@@ -1,5 +1,8 @@
 <Project>
 	<!--Metadata Reference: https://learn.microsoft.com/en-us/visualstudio/msbuild/msbuild-well-known-item-metadata?view=vs-2022-->
+	<!-- Build.Packaging contributes packability-gated ViuPackageReference items after the csproj
+	     body has assigned IsPackable; import it before the central by-name package resolver. -->
+	<Import Project="Targets\Build.Packaging.targets" />
 	<Import Project="Targets\Build.References.Packages.targets" />
 	<Import Project="Targets\Build.References.Projects.targets" />
 	<Import Project="Targets\Build.References.Analyzers.targets" />
@@ -8,5 +11,4 @@
 	<Import Project="Targets\Build.Css.Bundling.targets" />
 	<Import Project="Targets\Build.UtilityCss.targets" />
 	<Import Project="Targets\Build.Css.HotReload.targets" />
-	<Import Project="Targets\Build.Packaging.targets" />
 </Project>
