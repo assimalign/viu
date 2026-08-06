@@ -29,7 +29,7 @@ public static class ApplicationExtensions
                     await application.StartAsync(cancellationToken).ConfigureAwait(false);
                     await taskCompletionSource.Task;   // <-- the "forever" await
                 }
-                catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+                catch (OperationCanceledException) when (application.Context.Stopping.IsCancellationRequested)
                 {
                     
                 }
