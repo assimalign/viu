@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
+using Assimalign.Viu.Syntax.Templates;
+
 namespace Assimalign.Viu.Compiler.SingleFileComponent;
 
 /// <summary>
@@ -48,20 +50,6 @@ internal static class SingleFileComponentSourceEmitter
     /// binds these types by name and therefore does not reference the runtime assembly itself.
     /// </summary>
     private const string ComponentsNamespace = "global::Assimalign.Viu.Components";
-
-    private static readonly string[] DomRenderHelperNames =
-    {
-        "_vModelRadio",
-        "_vModelCheckbox",
-        "_vModelText",
-        "_vModelSelect",
-        "_vModelDynamic",
-        "_withModifiers",
-        "_withKeys",
-        "_vShow",
-        "_Transition",
-        "_TransitionGroup",
-    };
 
     /// <summary>Emits the full generated source for <paramref name="model"/>.</summary>
     /// <param name="model">The scaffold to render.</param>
@@ -504,6 +492,9 @@ internal static class SingleFileComponentSourceEmitter
         }
 
         var cacheExpression = model.HotReloadMetadata is null ? "_cache" : "_hotReloadRenderCache";
+        // NormalizeRoot remains a qualified PascalCase call rather than a HelperNames entry. Both helper
+        // prefixing sites represent names only as "_" + helper.Name, so they cannot express this deliberately
+        // unprefixed runtime member without changing the helper-name model.
         if (model.Declarations.Parameters.Count == 0)
         {
             AppendIndent(builder, indent + 1);
@@ -1114,8 +1105,9 @@ internal static class SingleFileComponentSourceEmitter
 
     private static bool UsesDomRenderHelpers(string renderBody)
     {
-        foreach (var helperName in DomRenderHelperNames)
+        foreach (var helper in HelperNames.DomHelpers)
         {
+            var helperName = "_" + helper.Name;
             if (renderBody.IndexOf(helperName, StringComparison.Ordinal) >= 0)
             {
                 return true;

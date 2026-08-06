@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using Assimalign.Viu.Shared;
+
 namespace Assimalign.Viu;
 
 /// <summary>
@@ -47,14 +49,14 @@ public sealed class DirectiveRegistry : IDirectiveResolver
             return directive;
         }
 
-        string camelizedName = Camelize(name);
+        string camelizedName = NameNormalization.Camelize(name);
         if (!string.Equals(camelizedName, name, StringComparison.Ordinal)
             && _directives.TryGetValue(camelizedName, out directive))
         {
             return directive;
         }
 
-        string pascalizedName = Capitalize(camelizedName);
+        string pascalizedName = NameNormalization.Capitalize(camelizedName);
         return !string.Equals(
                    pascalizedName,
                    camelizedName,
@@ -62,40 +64,5 @@ public sealed class DirectiveRegistry : IDirectiveResolver
                && _directives.TryGetValue(pascalizedName, out directive)
             ? directive
             : null;
-    }
-
-    private static string Camelize(string name)
-    {
-        if (name.IndexOf('-', StringComparison.Ordinal) < 0)
-        {
-            return name;
-        }
-
-        char[] buffer = new char[name.Length];
-        int length = 0;
-        bool capitalizeNext = false;
-        foreach (char character in name)
-        {
-            if (character == '-')
-            {
-                capitalizeNext = true;
-                continue;
-            }
-
-            buffer[length] = capitalizeNext
-                ? char.ToUpperInvariant(character)
-                : character;
-            length++;
-            capitalizeNext = false;
-        }
-
-        return new string(buffer, 0, length);
-    }
-
-    private static string Capitalize(string name)
-    {
-        return name.Length == 0
-            ? name
-            : char.ToUpperInvariant(name[0]) + name[1..];
     }
 }
