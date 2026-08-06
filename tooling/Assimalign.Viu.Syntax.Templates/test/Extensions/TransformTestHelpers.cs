@@ -31,35 +31,47 @@ internal static class TransformTestHelpers
         return result;
     }
 
-    /// <summary>The single top-level transformed child.</summary>
-    public static TemplateChildNode SingleChild(this TransformResult result)
-        => result.Children.ShouldHaveSingleItem();
-
-    /// <summary>Whether a helper with the given runtime name was registered.</summary>
-    public static bool UsesHelper(this TransformResult result, string name)
-        => result.Helpers.Any(helper => helper.Name == name);
-
-    /// <summary>Asserts a helper with the given runtime name was registered.</summary>
-    public static void ShouldUseHelper(this TransformResult result, string name)
-        => result.UsesHelper(name).ShouldBeTrue($"expected helper '{name}' to be registered");
-
-    /// <summary>The code-generation node of the single top-level child.</summary>
-    public static TemplateSyntaxNode RootCodegen(this TransformResult result)
-        => result.CodegenNode.ShouldNotBeNull();
-
-    /// <summary>Asserts the property list contains a property whose static key equals <paramref name="key"/> and returns it.</summary>
-    public static Property Property(this ObjectExpression obj, string key)
-        => obj.Properties.FirstOrDefault(p => p.Key is SimpleExpressionNode { IsStatic: true } k && k.Content == key)
-            .ShouldNotBeNull($"expected property '{key}'");
-
-    /// <summary>The content of a static simple-expression node.</summary>
-    public static string StaticContent(this TemplateSyntaxNode node)
-        => node.ShouldBeOfType<SimpleExpressionNode>().Content;
-
-    /// <summary>Asserts a patch flag is present on a vnode call.</summary>
-    public static void ShouldHavePatchFlag(this VNodeCall call, PatchFlags flag)
+    extension(TransformResult result)
     {
-        call.PatchFlag.ShouldNotBeNull();
-        (call.PatchFlag!.Value & flag).ShouldBe(flag);
+        /// <summary>The single top-level transformed child.</summary>
+        public TemplateChildNode SingleChild()
+            => result.Children.ShouldHaveSingleItem();
+
+        /// <summary>Whether a helper with the given runtime name was registered.</summary>
+        public bool UsesHelper(string name)
+            => result.Helpers.Any(helper => helper.Name == name);
+
+        /// <summary>Asserts a helper with the given runtime name was registered.</summary>
+        public void ShouldUseHelper(string name)
+            => result.UsesHelper(name).ShouldBeTrue($"expected helper '{name}' to be registered");
+
+        /// <summary>The code-generation node of the single top-level child.</summary>
+        public TemplateSyntaxNode RootCodegen()
+            => result.CodegenNode.ShouldNotBeNull();
+    }
+
+    extension(ObjectExpression obj)
+    {
+        /// <summary>Asserts the property list contains a property whose static key equals <paramref name="key"/> and returns it.</summary>
+        public Property Property(string key)
+            => obj.Properties.FirstOrDefault(p => p.Key is SimpleExpressionNode { IsStatic: true } k && k.Content == key)
+                .ShouldNotBeNull($"expected property '{key}'");
+    }
+
+    extension(TemplateSyntaxNode node)
+    {
+        /// <summary>The content of a static simple-expression node.</summary>
+        public string StaticContent()
+            => node.ShouldBeOfType<SimpleExpressionNode>().Content;
+    }
+
+    extension(VNodeCall call)
+    {
+        /// <summary>Asserts a patch flag is present on a vnode call.</summary>
+        public void ShouldHavePatchFlag(PatchFlags flag)
+        {
+            call.PatchFlag.ShouldNotBeNull();
+            (call.PatchFlag!.Value & flag).ShouldBe(flag);
+        }
     }
 }
