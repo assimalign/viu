@@ -259,6 +259,7 @@
 		<Project Path="tooling/Assimalign.Viu.Syntax.Templates/src/Assimalign.Viu.Syntax.Templates.csproj" />
 	</Folder>
 	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Templates/test/">
+		<Project Path="tooling/Assimalign.Viu.Syntax.Templates/test/Assimalign.Viu.Syntax.Templates.HelperContractTests/Assimalign.Viu.Syntax.Templates.HelperContractTests.csproj" />
 		<Project Path="tooling/Assimalign.Viu.Syntax.Templates/test/Assimalign.Viu.Syntax.Templates.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/tooling/Assimalign.Viu.Syntax.Templates/tools/">

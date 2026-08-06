@@ -70,3 +70,4 @@ virtual Assimalign.Viu.ApplicationBuilder.ConfigureApplication(System.Action<Ass
 *REMOVED*Assimalign.Viu.IApplicationContext.WarnHandler.set -> void
 *REMOVED*Assimalign.Viu.IApplicationPlugin
 *REMOVED*Assimalign.Viu.IApplicationPlugin.InstallAsync(Assimalign.Viu.IApplication! application, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+*REMOVED*static Assimalign.Viu.RenderHelpers._isRef(object? value) -> bool

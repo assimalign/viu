@@ -1,15 +1,20 @@
+using System.Collections.Generic;
+using System.Linq;
+
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The canonical table of runtime helper references the transform pipeline can emit. Each field is a
-/// <see cref="RuntimeHelper"/> whose <see cref="RuntimeHelper.Name"/> equals the member name generated
-/// code binds against on <c>Assimalign.Viu.RenderHelpers</c> (and <c>DomRenderHelpers</c> for the DOM
-/// helpers below). The binding is <b>by name</b>: no <c>Assimalign.Viu.Syntax.*</c> assembly references
-/// any runtime assembly, so the name in this table is a one-way contract that a rename on either side
-/// breaks (<c>[SFC-CG-2]</c>).
+/// The canonical table of runtime helper references emitted by the transform pipeline or its render-code
+/// writer. Each field is a <see cref="RuntimeHelper"/> whose <see cref="RuntimeHelper.Name"/> equals the
+/// member name generated code binds against on <c>Assimalign.Viu.RenderHelpers</c> (and
+/// <c>DomRenderHelpers</c> for the DOM helpers below). The binding is <b>by name</b>: no
+/// <c>Assimalign.Viu.Syntax.*</c> assembly references any runtime assembly, so the name in this table is
+/// a one-way contract that a rename on either side breaks (<c>[SFC-CG-2]</c>).
 /// </summary>
 public static class HelperNames
 {
+    private static readonly List<RuntimeHelper> domHelpers = new();
+
     /// <summary>The <c>Fragment</c> block type.</summary>
     public static readonly RuntimeHelper Fragment = new("Fragment");
 
@@ -58,9 +63,6 @@ public static class HelperNames
     /// <summary>Resolves a directive by name.</summary>
     public static readonly RuntimeHelper ResolveDirective = new("resolveDirective");
 
-    /// <summary>Resolves a filter by name.</summary>
-    public static readonly RuntimeHelper ResolveFilter = new("resolveFilter");
-
     /// <summary>Applies runtime directives to a vnode.</summary>
     public static readonly RuntimeHelper WithDirectives = new("withDirectives");
 
@@ -97,9 +99,6 @@ public static class HelperNames
     /// <summary>Camel-cases a dynamic argument.</summary>
     public static readonly RuntimeHelper Camelize = new("camelize");
 
-    /// <summary>Capitalizes a string.</summary>
-    public static readonly RuntimeHelper Capitalize = new("capitalize");
-
     /// <summary>Builds an <c>onXxx</c> handler key.</summary>
     public static readonly RuntimeHelper ToHandlerKey = new("toHandlerKey");
 
@@ -112,44 +111,67 @@ public static class HelperNames
     /// <summary>Unwraps a ref.</summary>
     public static readonly RuntimeHelper Unref = new("unref");
 
-    /// <summary>Tests whether a value is a ref.</summary>
-    public static readonly RuntimeHelper IsRef = new("isRef");
-
     /// <summary>Memoizes a subtree for <c>v-memo</c>.</summary>
     public static readonly RuntimeHelper WithMemo = new("withMemo");
 
     /// <summary>Compares two memo dependency arrays.</summary>
     public static readonly RuntimeHelper IsMemoSame = new("isMemoSame");
 
+    // ---- Writer-only helpers: bound against Assimalign.Viu.RenderHelpers. ----
+    // These names are serialized directly by RenderCodeWriter after transformation. Do not route them
+    // through TransformContext.Helper or HelperString: doing so would add them to TransformResult.Helpers
+    // and change that observable transform contract.
+
+    internal static readonly RuntimeHelper CreateProps = new("createProps");
+
+    internal static readonly RuntimeHelper CreateModifiers = new("createModifiers");
+
+    internal static readonly RuntimeHelper WithHandler = new("withHandler");
+
+    internal static readonly RuntimeHelper SetCache = new("setCache");
+
+    internal static readonly RuntimeHelper SpreadCache = new("spreadCache");
+
     // ---- DOM helpers: bound against Assimalign.Viu.Browser.DomRenderHelpers ----
+    // Register every DOM helper through RegisterDomHelper. DomHelpers is derived from these declarations,
+    // so the source emitter's conditional using-static import cannot drift from the canonical names.
 
     /// <summary>The <c>v-model</c> directive for radio inputs.</summary>
-    public static readonly RuntimeHelper VModelRadio = new("vModelRadio");
+    public static readonly RuntimeHelper VModelRadio = RegisterDomHelper("vModelRadio");
 
     /// <summary>The <c>v-model</c> directive for checkbox inputs.</summary>
-    public static readonly RuntimeHelper VModelCheckbox = new("vModelCheckbox");
+    public static readonly RuntimeHelper VModelCheckbox = RegisterDomHelper("vModelCheckbox");
 
     /// <summary>The <c>v-model</c> directive for text inputs.</summary>
-    public static readonly RuntimeHelper VModelText = new("vModelText");
+    public static readonly RuntimeHelper VModelText = RegisterDomHelper("vModelText");
 
     /// <summary>The <c>v-model</c> directive for select elements.</summary>
-    public static readonly RuntimeHelper VModelSelect = new("vModelSelect");
+    public static readonly RuntimeHelper VModelSelect = RegisterDomHelper("vModelSelect");
 
     /// <summary>The <c>v-model</c> directive for dynamic input types.</summary>
-    public static readonly RuntimeHelper VModelDynamic = new("vModelDynamic");
+    public static readonly RuntimeHelper VModelDynamic = RegisterDomHelper("vModelDynamic");
 
     /// <summary>The <c>v-on</c> modifier guard wrapper.</summary>
-    public static readonly RuntimeHelper WithModifiers = new("withModifiers");
+    public static readonly RuntimeHelper WithModifiers = RegisterDomHelper("withModifiers");
 
     /// <summary>The <c>v-on</c> key guard wrapper.</summary>
-    public static readonly RuntimeHelper WithKeys = new("withKeys");
+    public static readonly RuntimeHelper WithKeys = RegisterDomHelper("withKeys");
 
     /// <summary>The <c>v-show</c> directive.</summary>
-    public static readonly RuntimeHelper VShow = new("vShow");
+    public static readonly RuntimeHelper VShow = RegisterDomHelper("vShow");
 
     /// <summary>The <c>Transition</c> DOM built-in.</summary>
-    public static readonly RuntimeHelper Transition = new("Transition");
+    public static readonly RuntimeHelper Transition = RegisterDomHelper("Transition");
 
     /// <summary>The <c>TransitionGroup</c> DOM built-in.</summary>
-    public static readonly RuntimeHelper TransitionGroup = new("TransitionGroup");
+    public static readonly RuntimeHelper TransitionGroup = RegisterDomHelper("TransitionGroup");
+
+    internal static readonly RuntimeHelper[] DomHelpers = domHelpers.ToArray();
+
+    private static RuntimeHelper RegisterDomHelper(string name)
+    {
+        var helper = new RuntimeHelper(name);
+        domHelpers.Add(helper);
+        return helper;
+    }
 }

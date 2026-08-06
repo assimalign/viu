@@ -215,7 +215,10 @@ The emitted code compiles against `global::Assimalign.Viu.RenderHelpers` (import
 `using static` by the generator) — a static surface the runtime area provides ([V01.01.03.22], issue
 #136). Members carry the underscore-prefixed alias names on purpose — a deliberate, generated-code-only
 deviation from the repository C# naming rule, because these names ARE the by-name binding contract
-(`[SFC-CG-2]`). What code generation requires of each member:
+(`[SFC-CG-2]`). `HelperNames` is the single name table: transforms register its ordinary entries,
+`RenderCodeWriter` reads its fenced writer-only entries without adding them to `TransformResult.Helpers`,
+and its derived `DomHelpers` array drives the generator's conditional DOM import. What code generation
+requires of each member:
 
 - `_openBlock(bool disableTracking = false) : BlockToken` — opens a block, returns an opaque
   `BlockToken`; every `_createBlock`/`_createElementBlock` takes it as the first argument
@@ -247,8 +250,7 @@ deviation from the repository C# naming rule, because these names ARE the by-nam
 - Built-in tags as values (runtime-core): `_Fragment`, `_Teleport`, `_Suspense`, `_KeepAlive`,
   `_BaseTransition`. `_Fragment` is fully realized; the component-like built-ins are surface markers
   whose renderer support lands with their own work items.
-- `_unref(object?) : object?` / `_isRef(object?) : bool` — bridge to `Assimalign.Viu.Core`
-  references.
+- `_unref(object?) : object?` — unwraps a reactive reference and leaves a non-reference unchanged.
 - Emitter-contract helpers, per the serialization table above: `_createProps(params (string, object?)[] entries)`,
   `_createModifiers(params (string, bool)[] entries)`, `_withHandler(handler)` (delegate-typed overloads),
   `_setCache(int index, BlockToken tracking, object? value)`, `_spreadCache(object?)`.
@@ -263,13 +265,15 @@ platform-agnostic runtime-core layer must not reference (keeping runtime-core DO
 directive from ever mis-binding onto a runtime-core marker). They ship instead as
 `global::Assimalign.Viu.Browser.DomRenderHelpers`, and the composition-root generator ([V01.01.06.02])
 emits a **second** file-level `using static global::Assimalign.Viu.Browser.DomRenderHelpers;` alongside the
-runtime-core one whenever a render body is present. A browser `.viu` always has Browser available (it is the
-DOM renderer), so both imports are unconditional — DOM-directive templates (`v-show`, `v-model`,
-`@click.prevent`, `@keyup.enter`) are now end-to-end compilable. `DomRenderHelpers` references only Browser's
-own machinery and Core's `IDirective`, never any `Assimalign.Viu.Syntax.*` assembly; the by-name contract
-still flows one way. Pinned by `Assimalign.Viu.Browser.CompiledRenderTests` (a `.viu` using every spelling
-below compiles against both facades) and `Assimalign.Viu.Browser.Tests.DomRenderHelpersTests` (facade
-mapping + v-show / `.prevent` execution through the in-memory adapter).
+runtime-core one whenever the render body contains an entry from `HelperNames.DomHelpers`. The array is
+derived as each DOM helper is declared in the canonical table, so a new DOM helper cannot leave this import
+decision behind. DOM-directive templates (`v-show`, `v-model`, `@click.prevent`, `@keyup.enter`) are therefore
+end-to-end compilable without making an ordinary component depend on the Browser host. `DomRenderHelpers`
+references only Browser's own machinery and Core's `IDirective`, never any
+`Assimalign.Viu.Syntax.*` assembly; the by-name contract still flows one way. Pinned by the helper-contract
+conformance tests, `Assimalign.Viu.Browser.CompiledRenderTests` (a `.viu` using every spelling below compiles
+against both facades), and `Assimalign.Viu.Browser.Tests.DomRenderHelpersTests` (facade mapping + v-show /
+`.prevent` execution through the in-memory adapter).
 
 What code generation requires of each DOM member, mapped to the runtime machinery it forwards to:
 

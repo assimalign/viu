@@ -1,0 +1,4 @@
+#nullable enable
+Assimalign.Viu.Shared.NameNormalization
+static Assimalign.Viu.Shared.NameNormalization.Camelize(string! value) -> string!
+static Assimalign.Viu.Shared.NameNormalization.Capitalize(string! value) -> string!

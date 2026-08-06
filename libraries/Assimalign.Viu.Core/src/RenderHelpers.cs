@@ -752,31 +752,7 @@ public static class RenderHelpers
     [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _camelize(string value)
     {
-        ArgumentNullException.ThrowIfNull(value);
-        if (value.IndexOf('-', StringComparison.Ordinal) < 0)
-        {
-            return value;
-        }
-
-        char[] buffer = new char[value.Length];
-        int length = 0;
-        bool capitalizeNext = false;
-        foreach (char character in value)
-        {
-            if (character == '-')
-            {
-                capitalizeNext = true;
-                continue;
-            }
-
-            buffer[length] = capitalizeNext
-                ? char.ToUpperInvariant(character)
-                : character;
-            length++;
-            capitalizeNext = false;
-        }
-
-        return new string(buffer, 0, length);
+        return NameNormalization.Camelize(value);
     }
 
     /// <summary>
@@ -788,10 +764,7 @@ public static class RenderHelpers
     [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
     public static string _capitalize(string value)
     {
-        ArgumentNullException.ThrowIfNull(value);
-        return value.Length == 0
-            ? value
-            : char.ToUpperInvariant(value[0]) + value[1..];
+        return NameNormalization.Capitalize(value);
     }
 
     /// <summary>
@@ -817,18 +790,6 @@ public static class RenderHelpers
     public static object? _unref(object? value)
     {
         return value is IReactiveReference reference ? reference.Value : value;
-    }
-
-    /// <summary>
-    /// Compiler-generated code only; not part of the supported Viu API.
-    /// Determines whether a value is a reactive reference.
-    /// </summary>
-    /// <param name="value">The value to inspect.</param>
-    /// <returns>True when the value is a reactive reference.</returns>
-    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
-    public static bool _isRef(object? value)
-    {
-        return Reactive.IsRef(value);
     }
 
     /// <summary>
