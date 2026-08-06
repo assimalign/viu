@@ -146,6 +146,34 @@ Viu.
 - **Single-threaded model**: the runtime targets the JS event loop. Ambient `static` state is acceptable,
   but any non-thread-safe type must say so in its XML docs.
 
+## Assembly boundaries — `InternalsVisibleTo` is for tests only
+
+- **`InternalsVisibleTo` grants access to a project's own test assembly. Nothing else.** It is not a
+  mechanism for sharing internals between libraries, including between two build-time-only libraries.
+- **Why.** The reason a project is a separate project is to draw a boundary. A cross-library grant makes
+  that boundary a fiction: the assemblies compile as one unit while presenting themselves as two, so the
+  seam is never designed, never documented, and never reviewed. Two assemblies that need each other's
+  internals are either one assembly, or they have an API nobody wrote.
+- **When a sibling library needs something**, choose deliberately — do not reach for a grant:
+  1. **Design the contract.** If the sibling genuinely depends on it, it is API. Make it `public` on
+     purpose, document it, and let the public-API baseline record it.
+  2. **Move the type** to the consumer, when there is exactly one and it belongs there.
+  3. **Express it through an interface** under `Abstraction/`, keeping the concrete type `internal` —
+     the interface-first rule above.
+  4. **Merge the projects**, if the boundary turns out not to be real.
+  Being non-shipping is *not* a reason to skip this. A build-time assembly's surface is invisible to app
+  developers, but the boundary still exists for the people maintaining it.
+- **Placement.** Grants live in `src/Properties/AssemblyInfo.cs` — one file per project, nowhere else.
+  Not in a csproj `<InternalsVisibleTo>` item, and not scattered across source files.
+
+  ```csharp
+  using System.Runtime.CompilerServices;
+
+  [assembly: InternalsVisibleTo("Assimalign.Viu.<Name>.Tests")]
+  ```
+
+Recorded as **D8** in [`docs/API-HARDENING-PLAN.md`](../../docs/API-HARDENING-PLAN.md).
+
 ## AOT / trimming (hard constraints)
 
 - Trimming- and WASM/NativeAOT-safe: **no reflection-based serialization, no dynamic code generation, no

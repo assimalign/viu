@@ -66,7 +66,7 @@ taking `Browser` and its `browser-wasm` runtime pin.
 | D5a | **Maintainer amendment for PR #305:** `IApplication` exposes `StartAsync`/`StopAsync`; `RunAsync` is an extension; runtime state and the stopping token live on `IApplicationContext`; middleware receives that context directly; a lean `IApplicationBuilder` configures all composition through `ApplicationOptions`; Browser implements the lifetime and mount APIs directly; the generic Core application abstraction, abstract builders, execution wrapper, and static Browser facade are deleted. | 2026-08-06 | This is the accepted review shape for [V01.01.14.08]. It adopts the familiar split between starting a host and running it until shutdown, keeps host-specific mounting out of Core, and removes inheritance that exposed platform mechanics as Core API. The amendment below replaces the original D5 target shape while retaining D5's middleware, cleanup, borrowed-ownership, and server-separation decisions. |
 | D6 | **Segment the SDK and the shared framework by platform.** `Assimalign.Viu.Sdk` and `Assimalign.Viu.App` become platform-agnostic; `Assimalign.Viu.Sdk.Browser` and `Assimalign.Viu.App.Browser` carry everything browser-specific. Direction set by Chase. Full design in the section below. | 2026-08-06 | Today there is exactly one SDK and one framework, and both are browser-only by construction: `sdks/Assimalign.Viu.Sdk/Sdk/Sdk.props:8` opens with `<Import Sdk="Microsoft.NET.Sdk.WebAssembly" …>` under the comment *"A Viu app is a WASM browser app, so the chain starts at Microsoft.NET.Sdk.WebAssembly"*, and the single `Assimalign.Viu.App` framework bundles `Browser` with the host-agnostic libraries. So authoring a platform-agnostic Viu component library means taking the WebAssembly SDK and a `browser-wasm` runtime pin for code that renders nothing. The split gives that author a first-class path, and gives every future host (SSR, WebView) a shape to slot into rather than a fork. |
 | D7 | **`Assimalign.Viu.Hosting` (T06) is not implemented in this repository.** The host-authoring/app-authoring namespace split moves to the Cohesion project. | 2026-08-06 | Direction set by Chase. The finding stands and is worth keeping recorded — the `Assimalign.Viu` front door mixes app-authoring API with host-adapter plumbing — but the segmentation is being solved in Cohesion rather than duplicated here. D5 also already removed much of what T06 targeted: mounting moved into Browser and the generic Core application abstraction was deleted. T06 stays in the state table as **Will not do (see D7)** so a future session does not re-derive it as an open opportunity. |
-| D8 | **`InternalsVisibleTo` is for unit tests only.** It is not a mechanism for sharing internals between shipping libraries. | 2026-08-06 | Direction set by Chase. A cross-library grant makes the assembly boundary a fiction: two assemblies that need each other's internals are either one assembly, or have an API that was never designed. This reverses the premise of T05 as originally scoped, which planned to internalize ~120 types and add grants — see the T05 note below for what it becomes. Eight cross-library grants exist today and are in scope to remove. |
+| D8 | **`InternalsVisibleTo` is for unit tests only, everywhere.** It is not a mechanism for sharing internals between libraries — including between two build-time-only libraries. Grants live in `src/Properties/AssemblyInfo.cs`. Recorded as a standing rule in `.claude/rules/general-rules.md`. | 2026-08-06 | Direction set by Chase. A cross-library grant makes the assembly boundary a fiction: two assemblies that need each other's internals are either one assembly, or have an API that was never designed. This reverses the premise of T05 as originally scoped, which planned to internalize ~120 types and add grants — see the T05 note below for what it becomes. Being non-shipping is not an exemption: a build-time assembly's surface is invisible to app developers, but the boundary still exists for maintainers. Eight cross-library grants exist today and are in scope to remove. |
 
 ## State
 
@@ -133,7 +133,7 @@ them, and only one group is genuinely hard.
 |---|---|
 | **Zero consumers** — e.g. `PatchFlagNames`, `ShapeFlagsExtensions`, `Scheduler.IsFlushing`/`IsFlushPending` | Make `internal` outright. No grant needed; D8 is not engaged. |
 | **Consumed only by the assembly's own tests** — e.g. the generators' `*TrackingName` constants | `internal` + a **test** grant. Exactly what D8 sanctions. |
-| **Consumed by a sibling `tooling/` assembly** (5 of the 8 existing cross-library grants) | Make the member **public** and delete the grant. These assemblies do not ship ([V01.01.14.04]), so `public` costs nothing developer-facing — the surface is invisible to app developers either way. |
+| **Consumed by a sibling `tooling/` assembly** (5 of the 8 grants) | Same treatment as a shipping library. D8 applies everywhere: not shipping is not a reason to skip designing the seam, because the boundary exists for maintainers even when no app developer can see it. |
 | **Consumed by a sibling shipping library** (3 grants, all from `Core`) | The real work — see below. |
 
 **The `Core` cases.** `Core` grants internals to `Browser`, `ServerRenderer` and `Testing`. Of its 39
@@ -144,6 +144,22 @@ Each needs a deliberate answer — promote to public API, move to its sole consu
 interface with the concrete type staying internal. Two probably *want* to be public regardless:
 `ApplicationState` is the D5 lifecycle enum a host legitimately observes, and the empty resolvers are
 D5's "a primitive application should not need dummy dependencies" defaults.
+
+**The `tooling/` cases, measured.** Three of the five grants share exactly **one** type each —
+`SingleFileComponentPathComparison` (twice) and `CompilerDomKnowledge` — each a promote-or-move decision
+and nothing more. The two substantial ones are both `Assimalign.Viu.Compiler.SingleFileComponent`:
+**12** types reach `Generators.Syntax` and **9** reach `LanguageService`, overlapping heavily
+(`SingleFileComponentProjection`, `SingleFileComponentSourceEmitter`, `SingleFileComponentDiagnostics`,
+`SingleFileComponentFormat`, `SingleFileComponentNameResolver`), for **16** distinct types.
+
+That is not accidental leakage. The projection core's own `docs/OVERVIEW.md` says it exists so that
+*"the two hosts that need that projection"* share one implementation — so those types **are** its
+contract, and are `internal` only because a grant made that easy. Under D8 they become a designed public
+API, which is what the assembly was always for. Watch for `EquatableArray` in that list: near-identical
+copies exist in other projects, so it is a duplication question rather than a promotion one.
+
+**Total deliberate decisions: ~23 types** — 6 in `Core`, ~17 across `tooling/`. Tractable, and each one
+is a real design call rather than an accessibility edit.
 
 **Expect the headline number to fall.** The original "~120 types internalized" assumed grants were
 available. Under D8 a meaningful share stays public — correctly, because the assembly boundary is real.
