@@ -1,0 +1,2 @@
+#nullable enable
+*REMOVED*static Assimalign.Viu.RenderHelpers._isRef(object? value) -> bool
