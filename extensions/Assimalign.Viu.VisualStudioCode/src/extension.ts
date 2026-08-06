@@ -14,7 +14,7 @@ import {
  * The published file name of the standalone Viu language server. `dotnet publish` appends the
  * platform's executable suffix, so only Windows runtimes carry `.exe`.
  */
-const languageServerExecutableBaseName = 'Assimalign.Viu.Tooling.LanguageServer';
+const languageServerExecutableBaseName = 'Assimalign.Viu.LanguageServer';
 
 /**
  * Node's `process.platform` values mapped to the platform segment of a .NET runtime identifier.

@@ -75,7 +75,7 @@ discovered by reflection at runtime.
 the host node type. The browser (`TNode = int`) and the in-memory test host (`TNode = TestNode`) are
 adapters over the same contracts; neither is a dependency of the core.
 
-The shipping libraries and their responsibilities:
+The principal runtime, compiler, and editor assemblies and their responsibilities:
 
 | Library | Responsibility |
 | --- | --- |
@@ -88,10 +88,12 @@ The shipping libraries and their responsibilities:
 | `Assimalign.Viu.ServerRenderer` | HTML serialization and the hydration marker protocol |
 | `Assimalign.Viu.Router` / `.Router.Browser` | The DOM-free router core and its browser click/history bridge |
 | `Assimalign.Viu.Testing` | The in-memory host and component test wrappers |
-| `Assimalign.Viu.Syntax*` | The parser cluster: templates, `.viu`/`.vue` containers, CSS, HTML, JavaScript |
-| `Assimalign.Viu.Tooling.*` | Build/editor composition roots: CSS, single-file-component projection, utility CSS |
+| `Assimalign.Viu.Syntax*` | The build-time parser cluster: templates, `.viu`/`.vue` containers, CSS, HTML, JavaScript |
+| `Assimalign.Viu.Compiler.*` | Build-time composition roots for CSS and single-file-component projection |
+| `Assimalign.Viu.UtilityCss` | The independently published utility CSS compiler and compatibility engine |
+| `Assimalign.Viu.LanguageService` / `.LanguageServer` | Editor semantics and their Language Server Protocol process boundary |
 
-*Authority: `Assimalign.Viu.slnx`; `libraries/*/docs/OVERVIEW.md`; `global.json`.*
+*Authority: `Assimalign.Viu.slnx`; `{libraries,tooling}/*/docs/OVERVIEW.md`; `global.json`.*
 
 ---
 
@@ -100,11 +102,11 @@ The shipping libraries and their responsibilities:
 | Document | Role | Relationship to this specification |
 | --- | --- | --- |
 | `docs/SPECIFICATION.md` | **Normative.** What Viu is and what it guarantees. | Highest authority for semantics. |
-| `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` | **Normative for the `.viu` container grammar.** | [§8](#8-the-viu-container-and-the-compilation-pipeline) delegates to it rather than restating it. |
+| `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` | **Normative for the `.viu` container grammar.** | [§8](#8-the-viu-container-and-the-compilation-pipeline) delegates to it rather than restating it. |
 | `docs/UTILITY-CSS-DESIGN.md` | **Normative for Viu Utilities' frozen Tailwind CSS v4.3.3 compatibility contract.** | [§10.4](#104-viu-utilities) delegates to it. |
 | `docs/adr/*.md` | Decision records — why a choice was made. Append-only. | Normative for *rationale and constraint*, not for current API shape. A conflict means the ADR needs superseding. |
-| `libraries/**/docs/OVERVIEW.md` | What each library is; its public surface. | Non-normative elaboration. MUST NOT contradict this document. |
-| `libraries/**/docs/DESIGN.md` | Why each library is shaped that way; local deltas. | Non-normative rationale. |
+| `{libraries,tooling}/**/docs/OVERVIEW.md` | What each library is; its public surface. | Non-normative elaboration. MUST NOT contradict this document. |
+| `{libraries,tooling}/**/docs/DESIGN.md` | Why each library is shaped that way; local deltas. | Non-normative rationale. |
 | `docs/PLAN.md` | Delivery narrative — waves, WBS map, sequencing. | Non-normative. Describes *when*, not *what*. Its "Founding design decisions" section is superseded by this document for anything semantic. |
 | `docs/PERFORMANCE-RESEARCH.md` | The external performance-research ledger. | **Explicitly non-normative by construction** ([§18](#18-performance-research-policy)). |
 
@@ -903,7 +905,7 @@ real `.viu` line **and column** [SFC-8].
 the component's C# in an `@script { }` block, and custom blocks in `@`-form.
 
 `[SFC-4]` The full grammar is **normative in
-[`FORMAT.md`](../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)** and is not
+[`FORMAT.md`](../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)** and is not
 restated here. This specification pins only the structural invariants a consumer must know:
 
 - **Column 0 is structural for opening a block.** A top-level line beginning with `@` opens an
@@ -929,7 +931,7 @@ blocks are immutable records with structural equality — the prerequisite for [
 `[SFC-PIPE-1]` The pipeline is: **container parse → template compile → `@script` analysis →
 projection → generated scaffold.**
 
-`[SFC-PIPE-2]` `Assimalign.Viu.Tooling.SingleFileComponent` is the **one** projection that both the
+`[SFC-PIPE-2]` `Assimalign.Viu.Compiler.SingleFileComponent` is the **one** projection that both the
 source generator and the editor language service run. Equality between the two hosts is a **pinned
 contract**, not a convention: `SingleFileComponentProjectionConformanceTests` drives every fixture
 through both and asserts ordinal-identical generated source, hint names, and diagnostic sets.
@@ -1105,9 +1107,9 @@ usage carrying an argument-less `v-bind="…"` spread or a dynamic `:[name]` arg
 expression that is not a C# literal; and a hyphenated attribute name. A false positive is worse than a
 false negative here, so every undecidable input produces silence rather than a guess.
 
-*Authority: `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
-`libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
-`tooling/Assimalign.Viu.Tooling.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
+*Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md` (**normative**);
+`tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`;
+`tooling/Assimalign.Viu.Compiler.SingleFileComponent/{docs/DESIGN.md,src/Internal/{SingleFileComponentProjection,SingleFileComponentSourceEmitter,RenderBodySourceMapper}.cs}`;
 `analyzers/Assimalign.Viu.Generators.Syntax/src/{SingleFileComponentGenerator,Internal/ComponentSymbolCatalogReader}.cs`;
 `docs/adr/0005-no-runtime-template-compilation.md`.*
 
@@ -1167,9 +1169,9 @@ utility-candidate detection, and hot-reload metadata.
 
 `[VUE-10]` The implementation adds **no Vue JavaScript runtime and no dependency on Vue**.
 
-*Authority: `libraries/Assimalign.Viu.Syntax.SingleFileComponent/src/VueSingleFileComponent*.cs`;
+*Authority: `tooling/Assimalign.Viu.Syntax.SingleFileComponent/src/VueSingleFileComponent*.cs`;
 `.../src/Internal/{VueSingleFileComponentParseEngine,SingleFileComponentTagScanner}.cs`;
-`libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md` §§"Tag-based `.vue`
+`tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/DESIGN.md` §§"Tag-based `.vue`
 compatibility", "Generator compatibility contract"; `docs/UTILITY-CSS-DESIGN.md` §8.2;
 `sdks/README.md`; `build/Targets/Build.UtilityCss.targets`.*
 
@@ -1240,10 +1242,10 @@ boundary:
   behavior. It is not affiliated with or endorsed by Tailwind Labs.**
 
 *Authority: `docs/UTILITY-CSS-DESIGN.md` (**normative** for §10.4);
-`tooling/Assimalign.Viu.Tooling.Css/docs/{OVERVIEW,DESIGN}.md`;
-`tooling/Assimalign.Viu.Tooling.UtilityCss/docs/{OVERVIEW,DESIGN}.md`;
-`libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`;
-`libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md` §"CSS Modules accessors";
+`tooling/Assimalign.Viu.Compiler.Css/docs/{OVERVIEW,DESIGN}.md`;
+`tooling/Assimalign.Viu.UtilityCss/docs/{OVERVIEW,DESIGN}.md`;
+`tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md`;
+`tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md` §"CSS Modules accessors";
 `libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §"Component CSS variables".*
 
 ---
@@ -1441,8 +1443,9 @@ process**. The client is in process in Visual Studio, because the editor surface
 — content types, classification types, and format definitions — exist only as MEF exports inside the
 IDE. Nothing semantic follows it in: the parsers and Roslyn stay behind the protocol boundary, in a
 process the IDE does not host. The chain is
-`Assimalign.Viu.VisualStudio → Assimalign.Viu.Tooling.LanguageServer → Assimalign.Viu.Tooling.LanguageService →
-{Syntax.SingleFileComponent, Tooling.SingleFileComponent, Tooling.UtilityCss}`.
+`Assimalign.Viu.VisualStudio → Assimalign.Viu.LanguageServer → Assimalign.Viu.LanguageService →
+{Assimalign.Viu.Syntax.SingleFileComponent, Assimalign.Viu.Compiler.SingleFileComponent,
+Assimalign.Viu.UtilityCss}`.
 
 `[TOOL-2]` **The build/editor equality guarantee.** One projection, conformance-pinned, producing
 ordinal-identical generated source, hint names, and diagnostics for both hosts [SFC-PIPE-2]. The
@@ -1469,7 +1472,7 @@ first directory containing a project so an unrelated nested project is not claim
 for document changes, diagnostics, completion, and hover.
 
 *Authority: `extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md`;
-`tooling/Assimalign.Viu.Tooling.SingleFileComponent/docs/DESIGN.md`.*
+`tooling/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md`.*
 
 ---
 
@@ -1518,7 +1521,7 @@ it move together.
 | Generator snapshot tests | Emitted source, hint names, diagnostics |
 | `SingleFileComponentProjectionConformanceTests` | Build/editor projection equality [SFC-PIPE-2] |
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
-| `tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
+| `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
 | `scripts/Measure-PublishBudget.ps1` + `scripts/budgets/PublishBudgets.json` | WASM publish size and startup budgets |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
 | `.github/workflows/area-*.yml`, `budget-gates.yml`, `benchmarks.yml` | Per-area CI |
@@ -1615,7 +1618,7 @@ and does not carry provenance ([`.claude/rules/documentation.md`](../.claude/rul
 `[ART-2]` If any externally authored data table were ever transcribed rather than independently
 derived, the attribution is a licensing matter and belongs in a `THIRD-PARTY-NOTICES` file, not in
 doc comments. Viu Utilities already follows this pattern
-(`tooling/Assimalign.Viu.Tooling.UtilityCss/docs/THIRD-PARTY-NOTICES.md`).
+(`tooling/Assimalign.Viu.UtilityCss/docs/THIRD-PARTY-NOTICES.md`).
 
 ---
 

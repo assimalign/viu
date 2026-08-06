@@ -24,10 +24,10 @@
          @style compilation the generator runs, over the same .viu inputs, so the physical bundle is
          byte-identical to the generated ExtractedStyles constant. Its transitive parser closure
          (Syntax / SingleFileComponent / Templates / Css) copies to the task output for MSBuild to load. -->
-		<ViuPrivateProjectReference Include="Assimalign.Viu.Tooling.Css" />
+		<ViuPrivateProjectReference Include="Assimalign.Viu.Compiler.Css" />
 		<!-- The standalone utility candidate scanner/compiler ([V01.01.12.16], #159). Its output remains
 		     separate from component @style CSS and it brings no Tailwind, Node, or runtime dependency. -->
-		<ViuPrivateProjectReference Include="Assimalign.Viu.Tooling.UtilityCss" />
+		<ViuPrivateProjectReference Include="Assimalign.Viu.UtilityCss" />
 	</ItemGroup>
 	<ItemGroup>
 		<!-- Build-order-only edge: the development worker is packaged beside the netstandard2.0
@@ -46,7 +46,7 @@
     <ViuPackageReference Include="Microsoft.Build.Framework" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The Roslyn closure that rides the parser graph (Tooling.Css -> Syntax.Templates, whose
+    <!-- The Roslyn closure that rides the parser graph (Compiler.Css -> Syntax.Templates, whose
          template expressions are parsed with the real C# parser) is compile-time-only for THIS host:
          the bundling task composes the style-only parsers
          (SingleFileComponentParserFactory.CreateForStyleExtraction), which never dispatch template

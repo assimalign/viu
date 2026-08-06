@@ -171,13 +171,12 @@
         </ItemGroup>
     </Target>
 
-    <!-- Optional: pack every shipping library into the local feed alongside the
-         SDK (dotnet pack -p:PackViuProjects=true on the Tasks csproj).
+    <!-- Optional: pack every project under libraries/ into the local feed alongside the
+         SDK (dotnet pack -p:PackViuProjects=true on the Tasks csproj). Release packaging uses
+         scripts/modules/ViuPackaging.psm1 instead and includes packable tooling projects.
 
-         The fan-out reaches projects OUTSIDE this csproj's ProjectReference closure
-         (Assimalign.Viu.Syntax.Html is the only netstandard2.0 library nothing in the SDK
-         task graph references), so the outer `dotnet pack`
-         implicit restore never covers them: on a clean CI checkout they reach the fan-out
+         The fan-out reaches projects OUTSIDE this csproj's ProjectReference closure, so the outer
+         `dotnet pack` implicit restore never covers them: on a clean CI checkout they reach the fan-out
          with an empty obj/.
 
          That makes the restore/build split load-bearing, and it must be spelled the way

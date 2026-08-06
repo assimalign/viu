@@ -2,7 +2,7 @@
   <!--
     Static-web-asset CSS bundling for canonical .viu and compatible .vue single-file components
     ([V01.01.12.12]/[V01.01.06.09]) — the MSBuild half that completes the RS1035 deferral recorded in
-    libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
+    tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md (a source generator emits C#, not content files;
     this task does the I/O a generator cannot).
 
     Imported LATE (via build/Build.targets -> Directory.Build.targets), after the consuming csproj has set
@@ -79,7 +79,7 @@
     <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == ''">false</ViuInjectSingleFileComponentCssLink>
   </PropertyGroup>
 
-  <!-- The task lives in sdks/Assimalign.Viu.Sdk/Tasks; it re-runs the shared Tooling.Css core
+  <!-- The task lives in sdks/Assimalign.Viu.Sdk/Tasks; it re-runs the shared Compiler.Css core
        OUTSIDE the analyzer sandbox so it may write files. Declared whenever bundling is on — NOT gated on
        Exists($(ViuBundleCssTaskAssembly)). A UsingTask condition is evaluated at static import time, which
        for the in-repo dogfood path can precede the Sdk.Tasks build (the assembly is loaded through
@@ -316,7 +316,7 @@
     manifest (a manifest-aware host: `dotnet run`, ASP.NET Core, a configured CDN). A statically hosted
     published WASM app has no such middleware, so a hashed href would 404. The plain route works everywhere
     and still revalidates via the endpoint's ETag/integrity; the fingerprinted endpoint remains registered for
-    hosted scenarios. See tooling/Assimalign.Viu.Tooling.Css/docs/DESIGN.md. Override the href with
+    hosted scenarios. See tooling/Assimalign.Viu.Compiler.Css/docs/DESIGN.md. Override the href with
     $(ViuSingleFileComponentCssBundleLinkHref) for a manifest-aware deployment that wants the immutable URL.
   -->
 

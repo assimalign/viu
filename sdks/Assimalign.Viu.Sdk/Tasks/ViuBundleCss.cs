@@ -7,7 +7,7 @@ using System.Threading;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
-using Assimalign.Viu.Tooling.Css;
+using Assimalign.Viu.Compiler.Css;
 
 namespace Assimalign.Viu.Sdk.Tasks;
 

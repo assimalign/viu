@@ -26,8 +26,9 @@
   without this conversation's context: the target `Assimalign.Viu.<Area>` project, allowed
   dependency direction, and any interop/AOT/source-generator boundaries.
 - Library layout is inverted: `libraries/Assimalign.Viu.<Name>/{src|test}` — folder name = assembly
-  id, no area wrapper folders. Developer tooling uses the same layout under
-  `tooling/Assimalign.Viu.Tooling.<Name>/{src|test}`.
+  id, no area wrapper folders. Compiler and editor tooling uses the same layout under
+  `tooling/Assimalign.Viu.<Name>/{src|test}`; the location carries the role without adding a blanket
+  `Tooling.` segment to the assembly id or namespace.
 - Preserve later-wave requirements in planning notes even when implementing only current-wave scope.
   If a ticket needs prerequisite work from another ticket, call that out rather than silently
   reordering.

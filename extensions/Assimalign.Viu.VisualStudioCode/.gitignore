@@ -5,7 +5,7 @@ node_modules/
 out/
 
 # Language-server payloads staged by Build.ps1. These are ~18 MB per runtime identifier and are
-# reproduced from tooling/Assimalign.Viu.Tooling.LanguageServer; they are never committed.
+# reproduced from tooling/Assimalign.Viu.LanguageServer; they are never committed.
 server/
 
 # vsce package output

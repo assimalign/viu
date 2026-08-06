@@ -21,7 +21,7 @@ What is deliberately deferred:
   inside `@script` and `/* */` inside `<style>` needs a language-service contribution.
 - A multi-line `<template …>` or `<style …>` opening tag. A TextMate `begin` pattern is matched
   against one line, so an opening tag split across lines is not recognized as a block opener. The
-  container parser accepts it ([FORMAT.md §4](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)).
+  container parser accepts it ([FORMAT.md §4](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)).
 - Extension bundling. The client is compiled with `tsc` and ships its `node_modules` production
   dependency; there is no esbuild/webpack step yet.
 
@@ -34,7 +34,7 @@ What is deliberately deferred:
 | Language configuration | `language-configuration.json` |
 | Activation | `onLanguage:viu` |
 | Client | `src/extension.ts` → `out/extension.js`, `vscode-languageclient` 8.x over stdio |
-| Server payload | `server/<runtime identifier>/Assimalign.Viu.Tooling.LanguageServer[.exe]` |
+| Server payload | `server/<runtime identifier>/Assimalign.Viu.LanguageServer[.exe]` |
 
 Settings: `viu.languageServer.enabled`, `viu.languageServer.path` (point at a server you built
 yourself), and `viu.trace.server`.
@@ -82,7 +82,7 @@ Two consequences:
    `punctuation.section.embedded.*.viu`.
 
 The block-slicing rules come from
-[`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md), not from a
+[`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md), not from a
 generic HTML grammar. In particular `@script` ends at the **first later line whose first column is
 `}`** (§3.2) — the grammar anchors on `^\}` rather than balancing braces, because that is the
 container's actual termination rule. A top-level `<script>` tag is scoped `invalid.illegal`, matching
@@ -135,7 +135,7 @@ apiece a five-runtime VSIX would exceed the Marketplace size gate. Each host pub
 build if a payload the host did not ask for is sitting in its publish directory.
 
 Only Windows runtimes carry an `.exe` suffix; a Linux or macOS payload is
-`Assimalign.Viu.Tooling.LanguageServer` with no extension. The targets, `Build.ps1`, and
+`Assimalign.Viu.LanguageServer` with no extension. The targets, `Build.ps1`, and
 `src/extension.ts` all resolve the name from the runtime identifier for that reason.
 
 ### Packaging

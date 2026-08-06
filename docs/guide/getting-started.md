@@ -347,7 +347,7 @@ schedules a re-render — no reflection, fully trimming- and AOT-safe.
 
 Viu's canonical single-file component is the `.viu` file, using the hybrid container
 ([V01.01.06.10], #257): `<template>`/`<style>` tags plus the C# `@script { }` block (the exact grammar
-is in [`FORMAT.md`](../../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
+is in [`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
 `@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
 `<template>`/`@script` compiles to a **mountable component** (see the note below,
 [#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **scoped, bundled CSS**

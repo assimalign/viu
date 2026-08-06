@@ -50,9 +50,9 @@ The implementation and conformance vectors must cite the narrowest applicable of
 
 Repository architecture reused by this feature:
 
-- [`Assimalign.Viu.Syntax.Css` design](../libraries/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
-- [`Assimalign.Viu.Tooling.Css` design](../tooling/Assimalign.Viu.Tooling.Css/docs/DESIGN.md)
-- [Viu `.viu` format](../libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
+- [`Assimalign.Viu.Syntax.Css` design](../tooling/Assimalign.Viu.Syntax.Css/docs/DESIGN.md)
+- [`Assimalign.Viu.Compiler.Css` design](../tooling/Assimalign.Viu.Compiler.Css/docs/DESIGN.md)
+- [Viu `.viu` format](../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md)
 - [Visual Studio language tooling design](../extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md)
 
 ## 1. Product contract
@@ -73,7 +73,7 @@ IntelliSense, or editor suggestions that do not generate CSS, is incomplete.
 
 The feature is standalone in two senses:
 
-- its engine is a dedicated `Assimalign.Viu.Tooling.UtilityCss` assembly rather than utility logic
+- its engine is a dedicated `Assimalign.Viu.UtilityCss` assembly rather than utility logic
   hidden inside the single-file-component generator or Visual Studio extension; and
 - its output is a separate utility stylesheet. Disabling component `@style` bundling does not disable
   utilities, and disabling utilities does not change scoped CSS or CSS Modules.
@@ -89,9 +89,9 @@ AOT release WebAssembly payload.
 Create the inverted-layout library:
 
 ```text
-tooling/Assimalign.Viu.Tooling.UtilityCss/
-  src/Assimalign.Viu.Tooling.UtilityCss.csproj
-  test/Assimalign.Viu.Tooling.UtilityCss.Tests.csproj
+tooling/Assimalign.Viu.UtilityCss/
+  src/Assimalign.Viu.UtilityCss.csproj
+  test/Assimalign.Viu.UtilityCss.Tests.csproj
   conformance/
 ```
 
@@ -99,7 +99,7 @@ The shipping project targets `$(TargetFrameworkForAnalyzers)` because the same b
 Roslyn analyzer host. It is build-time tooling, not a member of `Assimalign.Viu.App`, and is not a
 runtime framework reference.
 
-`Assimalign.Viu.Tooling.UtilityCss` owns:
+`Assimalign.Viu.UtilityCss` owns:
 
 - immutable candidate, variant, theme, source, diagnostic, and generated-rule models;
 - the balanced candidate parser and plain-text detector;
@@ -145,7 +145,7 @@ valid if the same registry can resolve it.
                                       |
                          content + normalized source identity
                                       v
-                  Assimalign.Viu.Tooling.UtilityCss
+                  Assimalign.Viu.UtilityCss
         detector -> parser -> theme/directives -> shared registry -> compiler
                 |                         |                    |
                 |                         |                    +-> deterministic CSS
@@ -153,7 +153,7 @@ valid if the same registry can resolve it.
                 +-> per-source candidates and spans
                      /                                  \
                     /                                    \
- Assimalign.Viu.Generators.Syntax             Assimalign.Viu.Tooling.LanguageService
+ Assimalign.Viu.Generators.Syntax             Assimalign.Viu.LanguageService
  diagnostics + incremental model              completion + hover + diagnostics
                     \                                    /
                      \                                  /
@@ -183,7 +183,7 @@ The following architecture is already implemented and remains valid:
 - **[V01.01.12.12.03]** ([#169](https://github.com/assimalign/viu/issues/169)) established
   content-based fingerprinting through `DefineStaticWebAssets`.
 
-The existing `ViuBundleCss` task and `Assimalign.Viu.Tooling.Css` compile `.viu` component styles.
+The existing `ViuBundleCss` task and `Assimalign.Viu.Compiler.Css` compile `.viu` component styles.
 They are not retroactively redefined as the utility engine. Viu Utilities adds a separate pure core,
 a separate task entry point in the existing SDK task assembly, and a separate asset while reusing
 the landed discovery, no-op write, fingerprint, link-injection, and compression ordering patterns.
@@ -390,9 +390,9 @@ The repository-owned manifest under the utility library's `conformance/` folder 
 - golden vectors and the authoritative official reference for each behavior.
 
 The frozen contract is
-[`compatibility-v4.3.3.json`](../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json);
+[`compatibility-v4.3.3.json`](../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json);
 its independently authored executable expectations are
-[`golden-vectors-v4.3.3.json`](../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../tooling/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 These files are copied only to the test output and are not embedded in or loaded by the shipping
 tooling assembly.
 
@@ -477,7 +477,7 @@ diagnostics and recover where possible. Cancellation is the only expected contro
 
 The SDK adds a `ViuBundleUtilityCss` task entry point to the existing
 `Assimalign.Viu.Sdk.Tasks` package payload. It calls the same
-`Assimalign.Viu.Tooling.UtilityCss` compiler as the analyzer and writes:
+`Assimalign.Viu.UtilityCss` compiler as the analyzer and writes:
 
 ```text
 obj/<configuration>/<tfm>/viu/<PackageId>.utilities.css
@@ -572,9 +572,9 @@ architecture:
 
 ```text
 Assimalign.Viu.VisualStudio
-  -> Assimalign.Viu.Tooling.LanguageServer
-       -> Assimalign.Viu.Tooling.LanguageService
-            -> Assimalign.Viu.Tooling.UtilityCss
+  -> Assimalign.Viu.LanguageServer
+       -> Assimalign.Viu.LanguageService
+            -> Assimalign.Viu.UtilityCss
 ```
 
 The thin VSIX still owns only Visual Studio registration, process lifetime, and presentation. The
@@ -600,7 +600,7 @@ project snapshot is available it may offer the built-in registry/default theme, 
 project-defined entries. Incremental document changes invalidate only affected candidates, theme, or
 registry projections.
 
-The VSIX packages the language server with the `Assimalign.Viu.Tooling.UtilityCss` dependency closure.
+The VSIX packages the language server with the `Assimalign.Viu.UtilityCss` dependency closure.
 It does not bundle or coordinate with the Tailwind CSS IntelliSense extension.
 
 ## 11. Incrementality, determinism, and quality gates

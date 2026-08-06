@@ -53,8 +53,9 @@ test, or example csproj. Use the by-name item groups the build system resolves:
 ## Target framework and language
 
 - Opt a project into its TFM via the central alias, never a hardcoded string:
-  `<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>` (net10.0). Analyzers use
-  `$(TargetFrameworkForAnalyzers)` (netstandard2.0).
+  `<TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>` (net10.0). Analyzers and
+  compiler/build-time tooling that must load inside Roslyn or MSBuild hosts use
+  `$(TargetFrameworkForAnalyzers)` (netstandard2.0); their test projects still use the library alias.
 - `Nullable`, `LangVersion=preview`, `EnablePreviewFeatures=false`, and `EnforceCodeStyleInBuild` flow
   centrally from `build/Targets/` — do **not** set them per-csproj.
 - **C# preview *language* features are on; runtime preview *APIs* are off.** `LangVersion=Preview` and
@@ -114,8 +115,10 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 ## Adding a new library
 
 1. `libraries/Assimalign.Viu.<Name>/{src,test}` with the two csproj shapes above — or
-   `tooling/Assimalign.Viu.Tooling.<Name>/{src,test}` when the library is developer tooling
-   (build-time or editor code that never ships into a Viu app's runtime).
+   `tooling/Assimalign.Viu.<Name>/{src,test}` for compiler, build-time, or editor code. The `tooling/`
+   location carries that role; do not add a blanket `Tooling.` segment to the assembly id or namespace.
+   Use the specific product role instead (`Syntax.*`, `Compiler.*`, `UtilityCss`, `LanguageService`,
+   or `LanguageServer`).
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.

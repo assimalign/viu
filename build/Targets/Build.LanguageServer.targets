@@ -30,18 +30,18 @@
     <ViuSkipLanguageServerPublish Condition="'$(ViuSkipLanguageServerPublish)' == ''">false</ViuSkipLanguageServerPublish>
     <ViuSkipLanguageServerStalenessCheck Condition="'$(ViuSkipLanguageServerStalenessCheck)' == ''">false</ViuSkipLanguageServerStalenessCheck>
 
-    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Tooling.LanguageServer\src\Assimalign.Viu.Tooling.LanguageServer.csproj</ViuLanguageServerProjectPath>
+    <ViuLanguageServerProjectPath Condition="'$(ViuLanguageServerProjectPath)' == ''">$(ViuRepositoryDirectory)tooling\Assimalign.Viu.LanguageServer\src\Assimalign.Viu.LanguageServer.csproj</ViuLanguageServerProjectPath>
     <ViuLanguageServerPublishRoot Condition="'$(ViuLanguageServerPublishRoot)' == ''">$(ViuOutputPathForExtensions)\VisualStudio\$(Configuration)</ViuLanguageServerPublishRoot>
     <ViuLanguageServerPublishPath Condition="'$(ViuLanguageServerPublishPath)' == ''">$(ViuLanguageServerPublishRoot)\LanguageServer</ViuLanguageServerPublishPath>
 
     <!-- The published file name is RID-shaped: only Windows runtimes get the .exe suffix, so a
-         non-Windows payload is 'Assimalign.Viu.Tooling.LanguageServer' with no extension. Every
+         non-Windows payload is 'Assimalign.Viu.LanguageServer' with no extension. Every
          payload path is therefore derived from the BASE name through
          _ViuComputeLanguageServerPayloadPaths, which batches over the runtime identifiers and picks
          the suffix per RID. ViuLanguageServerExecutableName remains the Windows name because the
          two properties below feed Visual Studio's up-to-date check, which is Windows-only by
          construction. -->
-    <ViuLanguageServerExecutableBaseName Condition="'$(ViuLanguageServerExecutableBaseName)' == ''">Assimalign.Viu.Tooling.LanguageServer</ViuLanguageServerExecutableBaseName>
+    <ViuLanguageServerExecutableBaseName Condition="'$(ViuLanguageServerExecutableBaseName)' == ''">Assimalign.Viu.LanguageServer</ViuLanguageServerExecutableBaseName>
     <ViuLanguageServerExecutableName Condition="'$(ViuLanguageServerExecutableName)' == ''">$(ViuLanguageServerExecutableBaseName).exe</ViuLanguageServerExecutableName>
     <ViuLanguageServerX64ExecutablePath>$(ViuLanguageServerPublishPath)\win-x64\$(ViuLanguageServerExecutableName)</ViuLanguageServerX64ExecutablePath>
     <ViuLanguageServerArm64ExecutablePath>$(ViuLanguageServerPublishPath)\win-arm64\$(ViuLanguageServerExecutableName)</ViuLanguageServerArm64ExecutablePath>

@@ -24,7 +24,7 @@ the release workflow). So are the agent-configuration trees `.claude/` and `.age
 
 | Document | Location | What it holds |
 | --- | --- | --- |
-| Root `README.md` | repository root | The project mission, the repository map (every project under `libraries/`, `analyzers/`, `sdks/`, `frameworks/`), the external showcase link, and clone/build instructions. |
+| Root `README.md` | repository root | The project mission, the repository map (every project under `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `frameworks/`), the external showcase link, and clone/build instructions. |
 | `docs/README.md` | [`docs/README.md`](README.md) | The index of repository-level documentation and the placement policy above. |
 | `SPECIFICATION.md` | [`docs/SPECIFICATION.md`](SPECIFICATION.md) | **Normative.** What Viu is and what it guarantees, in numbered clauses with stable ids. Highest authority for semantics; every other document below is subordinate to it and must not contradict it. |
 | `ARCHITECTURE.md` | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | The cross-library architecture: the package split, the unified component tree, the host-generic application model, and the AOT and ownership rules. Spans every library, so it is repo-level rather than per-library. |
@@ -91,8 +91,9 @@ The rationale and the trade-offs — why the shape, not the shape itself.
 
 ## Where new things go
 
-- **A new library** — `libraries/Assimalign.Viu.<Name>/{src,test,docs}` (folder name = assembly id,
-  no area wrapper folders). Seed `docs/OVERVIEW.md` and `docs/DESIGN.md` with the code. Wire the
+- **A new library** — `libraries/Assimalign.Viu.<Name>/{src,test,docs}` for runtime code or
+  `tooling/Assimalign.Viu.<Name>/{src,test,docs}` for compiler/build/editor code (folder name =
+  assembly id, no area wrapper folders). Seed `docs/OVERVIEW.md` and `docs/DESIGN.md` with the code. Wire the
   csprojs per [`.claude/rules/build-system.md`](../.claude/rules/build-system.md) ("Adding a new
   library") and add a row to the root `README.md` repository map.
 - **A new sample** — add it to

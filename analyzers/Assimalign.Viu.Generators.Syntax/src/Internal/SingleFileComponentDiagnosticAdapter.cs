@@ -3,7 +3,7 @@ using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-using Assimalign.Viu.Tooling.SingleFileComponent;
+using Assimalign.Viu.Compiler.SingleFileComponent;
 
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;

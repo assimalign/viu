@@ -207,8 +207,8 @@ $requiredEntries = @(
     'Assimalign.Viu.VisualStudio.dll',
     'Assimalign.Viu.VisualStudio.pkgdef',
     'language-server.json',
-    'LanguageServer/win-x64/Assimalign.Viu.Tooling.LanguageServer.exe',
-    'LanguageServer/win-arm64/Assimalign.Viu.Tooling.LanguageServer.exe'
+    'LanguageServer/win-x64/Assimalign.Viu.LanguageServer.exe',
+    'LanguageServer/win-arm64/Assimalign.Viu.LanguageServer.exe'
 )
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem

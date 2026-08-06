@@ -51,7 +51,7 @@ $rid = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitectu
     default { throw "Unsupported host architecture '$_' for the packaged language server." }
 }
 $serverExecutable = Join-Path $repoRoot `
-    "_out\extensions\VisualStudio\$Configuration\LanguageServer\$rid\Assimalign.Viu.Tooling.LanguageServer.exe"
+    "_out\extensions\VisualStudio\$Configuration\LanguageServer\$rid\Assimalign.Viu.LanguageServer.exe"
 if (-not (Test-Path $serverExecutable)) {
     throw "The published language server was not found at $serverExecutable; run extensions\VisualStudio\Build.ps1 -Configuration $Configuration first."
 }
@@ -69,7 +69,7 @@ $fixturePath = Join-Path $fixtureDirectory 'fixture.json'
 
 $env:VIU_PACKED_CONSUMER_FIXTURE = $fixturePath
 try {
-    dotnet test (Join-Path $repoRoot 'tooling\Assimalign.Viu.Tooling.LanguageServer\test') `
+    dotnet test (Join-Path $repoRoot 'tooling\Assimalign.Viu.LanguageServer\test') `
         --filter 'FullyQualifiedName~LanguageServerPackedConsumerTests' `
         --logger 'console;verbosity=detailed'
     if ($LASTEXITCODE -ne 0) {

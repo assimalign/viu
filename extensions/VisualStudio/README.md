@@ -6,14 +6,14 @@ This area contains the end-to-end Visual Studio editing experience for Viu singl
   contributes the `viu` content type, the `.pkgdef` that claims the `.viu` file extension, the Viu
   color theme (its own classification types and their format definitions), and the language client
   that starts and connects the language server.
-- `Assimalign.Viu.Tooling.LanguageServer` is an editor-neutral Language Server Protocol executable
+- `Assimalign.Viu.LanguageServer` is an editor-neutral Language Server Protocol executable
   that runs in its **own process**.
-- `Assimalign.Viu.Tooling.LanguageService` owns document state and Viu language features without
+- `Assimalign.Viu.LanguageService` owns document state and Viu language features without
   depending on Visual Studio.
 
 Only the extension lives under `extensions/VisualStudio/`. The language server and the language
 service are editor-neutral developer tooling and live at
-`tooling/Assimalign.Viu.Tooling.LanguageServer` and `tooling/Assimalign.Viu.Tooling.LanguageService`;
+`tooling/Assimalign.Viu.LanguageServer` and `tooling/Assimalign.Viu.LanguageService`;
 `Assimalign.Viu.VisualStudio.slnx` and `Build.ps1` drive all three together.
 
 The process boundary that matters is the server's, and it is intentional: Viu's parsers and Roslyn
@@ -145,10 +145,10 @@ The complete repository and Marketplace setup is documented in
 
 ## Viu Utilities IntelliSense
 
-The extension and SDK use the same `Assimalign.Viu.Tooling.UtilityCss` parser, frozen
+The extension and SDK use the same `Assimalign.Viu.UtilityCss` parser, frozen
 Tailwind CSS v4.3.3-compatible registry, theme model, and project stylesheet compiler. The
 machine-readable compatibility contract is
-[`compatibility-v4.3.3.json`](../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json):
+[`compatibility-v4.3.3.json`](../../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json):
 382 utility roots, 88 variants, 21 theme namespaces, supported value/modifier modes, and the
 CSS-first directive/function surface. Completion detail and hover are compiler output, not a
 separate editor approximation.

@@ -59,7 +59,7 @@ crossings as possible and keep each one cheap.**
   satisfy and proxies would not.
 - The compiler carries static hoisting and stringification passes (`cacheStatic` / `stringifyStatic`)
   whose payoff is counted in avoided interop calls — see
-  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../libraries/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md).
+  [`Assimalign.Viu.Syntax.Templates/docs/DESIGN.md`](../../tooling/Assimalign.Viu.Syntax.Templates/docs/DESIGN.md).
 - WASM size and startup budgets gate CI from W03; a benchmark suite ([V01.01.11.04]) re-measures
   interop cost under AOT.
 

@@ -64,17 +64,17 @@ Visual Studio (devenv.exe)
        -> ViuClassifier       MEF; the Viu palette over ViuLexicalClassifier
        -> ViuLanguageClient   MEF ILanguageClient; starts the server, hands Visual Studio its streams
             -> stdio Language Server Protocol connection
-                 -> Assimalign.Viu.Tooling.LanguageServer  (separate process)
-                      -> Assimalign.Viu.Tooling.LanguageService
+                 -> Assimalign.Viu.LanguageServer  (separate process)
+                      -> Assimalign.Viu.LanguageService
                            -> Assimalign.Viu.Syntax.SingleFileComponent
-                           -> Assimalign.Viu.Tooling.SingleFileComponent (the shared build/editor projection, [V01.01.06.11])
-                           -> Assimalign.Viu.Tooling.UtilityCss
+                           -> Assimalign.Viu.Compiler.SingleFileComponent (the shared build/editor projection, [V01.01.06.11])
+                           -> Assimalign.Viu.UtilityCss
 ```
 
 `extensions/VisualStudio/` holds exactly one project, `Assimalign.Viu.VisualStudio`, and one build
 entry point, `Build.ps1`. Everything below the stdio boundary is editor-neutral developer tooling
-and lives under the repository's `tooling/` root (`tooling/Assimalign.Viu.Tooling.LanguageServer`,
-`tooling/Assimalign.Viu.Tooling.LanguageService`, and the build-time cores they consume).
+and lives under the repository's `tooling/` root (`tooling/Assimalign.Viu.LanguageServer`,
+`tooling/Assimalign.Viu.LanguageService`, and the build-time cores they consume).
 
 `Assimalign.Viu.VisualStudio` performs fast lexical classification with no server round trip. It
 lexes both container syntaxes of the hybrid `.viu` format ([V01.01.06.10]): tag-delimited top-level
@@ -82,11 +82,11 @@ lexes both container syntaxes of the hybrid `.viu` format ([V01.01.06.10]): tag-
 a section) plus the `@script` @-block, and the legacy `@template`/`@style` @-blocks keep highlighting
 during the migration window.
 
-`Assimalign.Viu.Tooling.LanguageServer` owns protocol framing and translates protocol values into
+`Assimalign.Viu.LanguageServer` owns protocol framing and translates protocol values into
 editor-neutral contracts. It writes protocol messages only to standard output; standard error is
 reserved for diagnostics.
 
-`Assimalign.Viu.Tooling.LanguageService` caches the current text and the format-appropriate immutable
+`Assimalign.Viu.LanguageService` caches the current text and the format-appropriate immutable
 container parse for each open `.viu` or accepted `.vue` document. It exposes block diagnostics,
 completion catalogs, declaration-aware `@script` member completion ([V01.01.12.07.04] #261 — a
 syntax-only Roslyn parse of the script block, cached on the block text; no compilation, no
@@ -627,11 +627,11 @@ separate halves.**
 
 ## Viu Utilities project context
 
-`Assimalign.Viu.Tooling.UtilityCss` is the single compiler/editor authority. Its contract is frozen
+`Assimalign.Viu.UtilityCss` is the single compiler/editor authority. Its contract is frozen
 to Tailwind CSS v4.3.3 by
-[`compatibility-v4.3.3.json`](../../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/compatibility-v4.3.3.json)
+[`compatibility-v4.3.3.json`](../../../../tooling/Assimalign.Viu.UtilityCss/conformance/compatibility-v4.3.3.json)
 and independently authored
-[`golden-vectors-v4.3.3.json`](../../../../tooling/Assimalign.Viu.Tooling.UtilityCss/conformance/golden-vectors-v4.3.3.json).
+[`golden-vectors-v4.3.3.json`](../../../../tooling/Assimalign.Viu.UtilityCss/conformance/golden-vectors-v4.3.3.json).
 The manifest enumerates 382 utility roots, 88 variants, 21 theme namespaces, value and modifier
 modes, source forms, directives, functions, and canonical ordering. The language service consumes
 that registry directly; completion detail and hover display executable compiler output.
@@ -700,8 +700,8 @@ Project-aware IntelliSense requires one authoritative `.viu`/`.vue` to C# projec
 
 1. **Delivered ([V01.01.06.11], #258).** The generator's component-name, script-region,
    generated-context, and source-mapping logic is extracted into the shared
-   `Assimalign.Viu.Tooling.SingleFileComponent` library
-   (`tooling/Assimalign.Viu.Tooling.SingleFileComponent`, see its `docs/DESIGN.md`); the source
+   `Assimalign.Viu.Compiler.SingleFileComponent` library
+   (`tooling/Assimalign.Viu.Compiler.SingleFileComponent`, see its `docs/DESIGN.md`); the source
    generator and this language service both consume it, and the two-host conformance test
    (`analyzers/Assimalign.Viu.Generators.Syntax/test/SingleFileComponentProjectionConformanceTests.cs`)
    pins ordinal-identical generated source, hint names, and diagnostics.
@@ -863,9 +863,9 @@ Assimalign.Viu.VisualStudio/
   language-server.json
   LanguageServer/
     win-x64/
-      Assimalign.Viu.Tooling.LanguageServer.exe
+      Assimalign.Viu.LanguageServer.exe
     win-arm64/
-      Assimalign.Viu.Tooling.LanguageServer.exe
+      Assimalign.Viu.LanguageServer.exe
 ```
 
 The server path is resolved relative to the installed extension — derived from the client assembly's

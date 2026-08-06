@@ -11,9 +11,9 @@ namespace Assimalign.Viu.VisualStudio;
 internal sealed class ViuLanguageServerConfiguration
 {
     private const string DefaultX64ExecutablePath =
-        @"LanguageServer\win-x64\Assimalign.Viu.Tooling.LanguageServer.exe";
+        @"LanguageServer\win-x64\Assimalign.Viu.LanguageServer.exe";
     private const string DefaultArm64ExecutablePath =
-        @"LanguageServer\win-arm64\Assimalign.Viu.Tooling.LanguageServer.exe";
+        @"LanguageServer\win-arm64\Assimalign.Viu.LanguageServer.exe";
 
     // The set CommandLineToArgvW treats as significant. An argument free of all of them round-trips
     // unquoted; anything else is quoted and its backslash runs doubled.

@@ -31,8 +31,9 @@ then renamed to `Assimalign.Viu.*` with the product rename — see the architect
 ## Architecture: Vue 3 package → Viu library
 
 Package boundaries map 1:1 to .NET class libraries using the inverted layout
-`libraries/Assimalign.Viu.<Name>/{src|test}` — the folder name is the assembly/package id, with no
-area wrapper folders (project decision, 2026-07-16). The product name is **Viu** and the package
+`{libraries,tooling}/Assimalign.Viu.<Name>/{src|test}` — runtime projects live in `libraries/`,
+compiler/editor projects live in `tooling/`, and the folder name is the assembly/package id with no
+area wrapper folders (project decisions, 2026-07-16 and [V01.01.14.05]). The product name is **Viu** and the package
 root is **`Assimalign.Viu.*`** (renamed from Vue/Vuecs 2026-07-19, `V01.01.12.18`/#173, aligning
 the brand with the `.viu` SFC extension; the GitHub repo slug is now `assimalign/viu` (renamed
 from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vuejs.org links, the
@@ -45,7 +46,7 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` → renamed `Assimalign.Viu.Core`, root namespace `Assimalign.Viu` ([V01.01.12.21]) | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` → renamed `Assimalign.Viu.Browser` ([V01.01.12.22]) | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
 | Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
-| SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` (+ `Assimalign.Viu.Tooling.SingleFileComponent`, the shared build/editor projection core extracted with [V01.01.06.11]) | `@vue/compiler-sfc` — `.viu` single-file components (hybrid container syntax since `V01.01.06.10`: `<template>`/`<style>` tags + the `@script` block; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
+| SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` (+ `Assimalign.Viu.Compiler.SingleFileComponent`, the shared build/editor projection core extracted with [V01.01.06.11]) | `@vue/compiler-sfc` — `.viu` single-file components (hybrid container syntax since `V01.01.06.10`: `<template>`/`<style>` tags + the `@script` block; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
 | ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
 | Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Router.Browser`, formerly `Assimalign.Viu.Router.RuntimeDom` — renamed [V01.01.12.22] — the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
 | Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
@@ -61,9 +62,9 @@ option, or file type, the role Vite plugins play in a Vue build), and one librar
 on it: `Assimalign.Viu.Syntax.Templates` (the Vue template language), `.SingleFileComponent` (the
 `.viu` container), and the browser-language scaffolds `.Css`, `.Html`, and `.JavaScript` (raw-root
 parsers today; rule/element/statement-level parsing lands with their work items, starting with scoped
-CSS [V01.01.06.04]). Composition roots sit beside the cluster as `Tooling` libraries:
-`Assimalign.Viu.Tooling.Css` ([V01.01.12.12]) is the shared style compilation/bundling both
-build-time hosts run, and `Assimalign.Viu.Tooling.SingleFileComponent` ([V01.01.06.11]) is the ONE
+CSS [V01.01.06.04]). Composition roots sit beside the cluster as compiler libraries:
+`Assimalign.Viu.Compiler.Css` ([V01.01.12.12]) is the shared style compilation/bundling both
+build-time hosts run, and `Assimalign.Viu.Compiler.SingleFileComponent` ([V01.01.06.11]) is the ONE
 `.viu`/`.vue` → C# projection pipeline the `Assimalign.Viu.Generators.Syntax` source generator and
 the Visual Studio language service both consume, so build output and editor understanding cannot
 drift (the `@vue/compiler-sfc`-consumed-by-Vite-and-Volar shape).
@@ -130,7 +131,7 @@ These are deliberate, recorded divergences from upstream — everything else tra
    `@style` @-block syntax canonical for every block — the earlier decision happened and is
    superseded, not erased: the legacy `@template`/`@style` containers still parse during a
    migration window with a Warning-severity diagnostic (the decision record and rules live in
-   `libraries/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
+   `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
    explicitly scoped tag-based `.vue` compatibility input. Template markup remains standard Vue
    template syntax in both containers.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer

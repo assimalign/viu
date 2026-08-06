@@ -7,7 +7,7 @@
   has no equivalent: it can only borrow the editor's built-in categories, so a Viu palette was
   impossible there, and its remote tag bridge rejected names as ordinary as Roslyn's `method`.
   Nothing semantic moved in process with this change: the language server remains a separate stdio
-  executable (tooling\Assimalign.Viu.Tooling.LanguageServer), so Roslyn and the Viu parsers still
+  executable (tooling\Assimalign.Viu.LanguageServer), so Roslyn and the Viu parsers still
   never load into devenv.exe. See docs\DESIGN.md.
 
   The Sdk attribute is spelled out as explicit Sdk.props/Sdk.targets imports because
@@ -97,7 +97,7 @@
     <!-- ViuLexicalSpan is a record struct, and the .NET Framework does not ship IsExternalInit. This
          is the repository's single authoritative copy of the shim, linked (still internal) exactly
          as the netstandard2.0 parser projects link it; its path is frozen. -->
-    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs"
+    <Compile Include="$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs"
              Link="Shims\IsExternalInit.cs" />
     <!-- The WHATWG void-element table ViuAutoClosingLogic excludes from element auto-close, taken
          from the repository's single authoritative DOM knowledge definition rather than retyped for

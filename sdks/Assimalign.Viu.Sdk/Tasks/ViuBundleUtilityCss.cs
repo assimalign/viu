@@ -10,7 +10,7 @@ using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
 using Assimalign.Viu.Syntax.SingleFileComponent;
-using Assimalign.Viu.Tooling.UtilityCss;
+using Assimalign.Viu.UtilityCss;
 
 namespace Assimalign.Viu.Sdk.Tasks;
 

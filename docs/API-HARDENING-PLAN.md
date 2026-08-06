@@ -30,9 +30,11 @@ Every theme below exists downstream of that.
 assemblies that every Viu app references with zero opt-in: `Assimalign.Viu.App`, `.Shared`,
 `.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`.
 
-**Not** in the app reference set: the `Syntax.*` parsers and `Tooling.*` (they reach consumers only
-inside `analyzers/dotnet/cs/` of the Ref pack), `ServerRenderer`, `Router`/`Router.Browser` (opt-in
-packages), and `Testing` (dev-time).
+**Not** in the app reference set: the `Syntax.*` parsers and compiler/editor tooling assemblies,
+`ServerRenderer`, `Router`/`Router.Browser` (opt-in packages), and `Testing` (dev-time). The source
+generator's parser/compiler closure reaches builds inside `analyzers/dotnet/cs/` of the Ref pack;
+`Syntax.Html` remains a tooling-only host-page parser; `UtilityCss` ships through its standalone
+package and SDK/editor hosts; and `LanguageService`/`LanguageServer` ship in editor payloads.
 
 Raw public-type counts badly misrank the work: `Syntax.Templates`' 59 public types are build-time
 only, while `Shared`'s 11 are in every app's IntelliSense. Prioritize the seven.

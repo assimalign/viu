@@ -46,7 +46,7 @@ paths:
   wanted, goes in `docs/SPECIFICATION.md` § "Prior art and influences", once, centrally.
 - Per-library design docs mature into `libraries/Assimalign.Viu.<Name>/docs/OVERVIEW.md` (what it is) and
   `docs/DESIGN.md` (why it is shaped this way, WASM/AOT constraints, non-goals) — the same pair under
-  `tooling/Assimalign.Viu.Tooling.<Name>/docs/` for developer-tooling libraries. Keep them current in the
+  `tooling/Assimalign.Viu.<Name>/docs/` for compiler and editor libraries. Keep them current in the
   same change as the code — a `DESIGN.md` that lags the code actively misleads.
 - Repo-level planning lives in `docs/` — `docs/SPECIFICATION.md` is the authoritative statement of
   Viu's semantics; `docs/PLAN.md` is the authoritative delivery narrative (architecture map, founding

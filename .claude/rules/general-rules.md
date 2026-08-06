@@ -24,12 +24,13 @@ Viu.
   assembly / package id. `src/` holds the shipping project, `test/` its test project. No area wrapper
   folders. Package root is `Assimalign.Viu.*` (product name "Viu"; the GitHub repo slug is
   `assimalign/viu`).
-- Developer-tooling libraries live under `tooling/Assimalign.Viu.Tooling.<Name>/{src|test}` — the same
-  inverted layout and the same folder-name-is-the-assembly-id rule. That root holds the build-time
-  cores (`Assimalign.Viu.Tooling.Css`, `Assimalign.Viu.Tooling.SingleFileComponent`,
-  `Assimalign.Viu.Tooling.UtilityCss`) and the editor tooling
-  (`Assimalign.Viu.Tooling.LanguageService`, `Assimalign.Viu.Tooling.LanguageServer`); none of them
-  ship into a Viu app's runtime.
+- Compiler and editor libraries live under `tooling/Assimalign.Viu.<Name>/{src|test}` — the same
+  inverted layout and the same folder-name-is-the-assembly-id rule. The root, not a blanket
+  `Tooling.` assembly/namespace segment, carries the developer-tooling classification. It contains
+  the `Assimalign.Viu.Syntax*` parser cluster, the `Assimalign.Viu.Compiler.*` build-time composition
+  roots, `Assimalign.Viu.UtilityCss`, `Assimalign.Viu.LanguageService`, and
+  `Assimalign.Viu.LanguageServer`. None enters a Viu app's runtime; UtilityCss is the one independently
+  published tooling package.
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
   `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
   shared-framework pack producers live in `frameworks/` (see [build-system.md](build-system.md)).
@@ -58,7 +59,20 @@ Viu.
 - **Delegates** (public delegate declarations) → `src/Delegates/`.
 - **Public non-interface types** group into **feature folders** (`Rendering/`, `Components/`, `Watch/`, `Blocks/`, …): one folder per coherent feature set. Types used across the whole library (the "currency" types — e.g. `VirtualNode`, the flag enums, a library's facade) stay at the `src/` root.
 - Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
-- Linked shared-source files (`PatchFlags.cs`, `SlotFlags.cs`, `Internal/DomKnowledgeData.cs` from `Assimalign.Viu.Shared`; `Shims/IsExternalInit.cs`, `Shims/RequiredMemberShims.cs` from `Assimalign.Viu.Syntax`) are `<Compile Include>` targets from netstandard2.0 projects — **their paths are frozen**; moving them requires updating every linking csproj in the same change.
+- Several projects link shared-source files through `<Compile Include>`, so their paths are frozen
+  for this layout:
+  - Syntax siblings, `Assimalign.Viu.Compiler.Css`, `Assimalign.Viu.Compiler.SingleFileComponent`,
+    and `Assimalign.Viu.UtilityCss` link `Shims/IsExternalInit.cs` and
+    `Shims/RequiredMemberShims.cs` through
+    `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`.
+  - `Assimalign.Viu.Syntax.Templates` links `Internal/DomKnowledgeData.cs`, `PatchFlags.cs`, and
+    `SlotFlags.cs` from Shared through
+    `..\..\..\libraries\Assimalign.Viu.Shared\src\<File>`.
+  - The Visual Studio project links the external-init shim through
+    `$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs`; its source
+    and test projects link `Internal/DomKnowledgeData.cs` through
+    `$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs`.
+  Moving any owner or consumer requires updating every linking csproj in the same change.
 
 ## Files and types
 
