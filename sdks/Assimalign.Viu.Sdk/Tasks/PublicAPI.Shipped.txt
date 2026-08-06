@@ -1,0 +1,94 @@
+#nullable enable
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundleExists.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundleExists.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundleOutputPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundleOutputPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundlePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundlePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundleWritten.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.BundleWritten.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.Cancel() -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.EmptyBundleMarkerPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.EmptyBundleMarkerPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.PreserveEmptyBundleOnRemoval.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.PreserveEmptyBundleOnRemoval.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.ProjectDirectory.get -> string?
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.ProjectDirectory.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.SingleFileComponents.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.SingleFileComponents.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleCss.ViuBundleCss() -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundleExists.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundleExists.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundleOutputPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundleOutputPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundlePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundlePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundleWritten.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.BundleWritten.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.Cancel() -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.EmptyBundleMarkerPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.EmptyBundleMarkerPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.HotReloadDependencyManifestPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.HotReloadDependencyManifestPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.PreserveEmptyBundleOnRemoval.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.PreserveEmptyBundleOnRemoval.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.ProjectDirectory.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.ProjectDirectory.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.SourceFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.SourceFiles.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.UtilityStylesheets.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.UtilityStylesheets.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.ViuBundleUtilityCss() -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.BundleFileName.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.BundleFileName.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.Cancel() -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.HostPagePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.HostPagePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.InjectedHostPagePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.InjectedHostPagePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.LinkHref.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.LinkHref.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.LinkInjected.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.LinkInjected.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.OutputPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.OutputPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.ViuInjectCssBundleLink() -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.Configuration.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.Configuration.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.DebounceMilliseconds.get -> int
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.DebounceMilliseconds.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.DependencyManifestPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.DependencyManifestPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.DotNetHostPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.DotNetHostPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.EventLogPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.EventLogPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ExcludedDirectories.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ExcludedDirectories.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ProjectDirectory.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ProjectDirectory.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ProjectPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ProjectPath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.RuntimeIdentifier.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.RuntimeIdentifier.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.StateFilePath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.StateFilePath.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.TargetFramework.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.TargetFramework.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.ViuStartCssHotReloadWorker() -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WatchComponents.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WatchComponents.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WatchFiles.get -> Microsoft.Build.Framework.ITaskItem![]!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WatchFiles.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WatchUtilityMarkup.get -> bool
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WatchUtilityMarkup.set -> void
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WorkerAssemblyPath.get -> string!
+Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.WorkerAssemblyPath.set -> void
+override Assimalign.Viu.Sdk.Tasks.ViuBundleCss.Execute() -> bool
+override Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss.Execute() -> bool
+override Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink.Execute() -> bool
+override Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker.Execute() -> bool

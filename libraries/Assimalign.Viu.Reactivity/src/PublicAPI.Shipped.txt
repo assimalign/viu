@@ -1,0 +1,247 @@
+#nullable enable
+abstract Assimalign.Viu.Reactivity.ReactiveValue.BoxedValue.get -> object?
+abstract Assimalign.Viu.Reactivity.ReactiveValue<T>.Value.get -> T
+abstract Assimalign.Viu.Reactivity.ReactiveValue<T>.Value.set -> void
+Assimalign.Viu.Reactivity.Computed<T>
+Assimalign.Viu.Reactivity.Computed<T>.Computed(System.Func<T>! getter, System.Action<T>? setter = null) -> void
+Assimalign.Viu.Reactivity.Computed<T>.IsWritable.get -> bool
+Assimalign.Viu.Reactivity.CustomReference<T>
+Assimalign.Viu.Reactivity.CustomReference<T>.CustomReference(Assimalign.Viu.Reactivity.CustomReferenceFactory<T>! factory) -> void
+Assimalign.Viu.Reactivity.CustomReferenceFactory<T>
+Assimalign.Viu.Reactivity.Dependency
+Assimalign.Viu.Reactivity.Dependency.Dependency() -> void
+Assimalign.Viu.Reactivity.Dependency.Track() -> void
+Assimalign.Viu.Reactivity.Dependency.Trigger() -> void
+Assimalign.Viu.Reactivity.EffectScope
+Assimalign.Viu.Reactivity.EffectScope.Dispose() -> void
+Assimalign.Viu.Reactivity.EffectScope.EffectScope(bool detached = false) -> void
+Assimalign.Viu.Reactivity.EffectScope.IsActive.get -> bool
+Assimalign.Viu.Reactivity.EffectScope.Pause() -> void
+Assimalign.Viu.Reactivity.EffectScope.Resume() -> void
+Assimalign.Viu.Reactivity.EffectScope.Run(System.Action! action) -> void
+Assimalign.Viu.Reactivity.EffectScope.Run<TResult>(System.Func<TResult>! function) -> TResult
+Assimalign.Viu.Reactivity.EffectScope.Stop() -> void
+Assimalign.Viu.Reactivity.IReactiveEffectScope
+Assimalign.Viu.Reactivity.IReactiveEffectScope.IsActive.get -> bool
+Assimalign.Viu.Reactivity.IReactiveEffectScope.Run(System.Action! action) -> void
+Assimalign.Viu.Reactivity.IReactiveEffectScope.Run<TResult>(System.Func<TResult>! function) -> TResult
+Assimalign.Viu.Reactivity.IReactiveEffectScope.Stop() -> void
+Assimalign.Viu.Reactivity.IReactiveEffectScopeFactory
+Assimalign.Viu.Reactivity.IReactiveEffectScopeFactory.Create(bool isDetached = false) -> Assimalign.Viu.Reactivity.IReactiveEffectScope!
+Assimalign.Viu.Reactivity.IReactiveObject
+Assimalign.Viu.Reactivity.IReactiveObject.GetDependency(string! propertyName) -> Assimalign.Viu.Reactivity.Dependency?
+Assimalign.Viu.Reactivity.IReactiveObject.IsReadOnly.get -> bool
+Assimalign.Viu.Reactivity.IReactiveObject.ToRaw() -> object!
+Assimalign.Viu.Reactivity.IReactiveReadOnly
+Assimalign.Viu.Reactivity.IReactiveReadOnly.IsReadOnly.get -> bool
+Assimalign.Viu.Reactivity.IReactiveReference
+Assimalign.Viu.Reactivity.IReactiveReference.Value.get -> object?
+Assimalign.Viu.Reactivity.IReactiveReference<T>
+Assimalign.Viu.Reactivity.IReactiveReference<T>.Value.get -> T
+Assimalign.Viu.Reactivity.IReactiveReference<T>.Value.set -> void
+Assimalign.Viu.Reactivity.IReactiveTrackedReference
+Assimalign.Viu.Reactivity.IReactiveTrackedReference.Dependency.get -> Assimalign.Viu.Reactivity.Dependency!
+Assimalign.Viu.Reactivity.IReactiveTraversable
+Assimalign.Viu.Reactivity.IReactiveTraversable.Traverse(Assimalign.Viu.Reactivity.ReactiveTraversal! traversal) -> void
+Assimalign.Viu.Reactivity.IReactiveWatchScheduler
+Assimalign.Viu.Reactivity.IReactiveWatchScheduler.Schedule(Assimalign.Viu.Reactivity.WatchJob! job) -> void
+Assimalign.Viu.Reactivity.OnCleanup
+Assimalign.Viu.Reactivity.Reactive
+Assimalign.Viu.Reactivity.ReactiveAttribute
+Assimalign.Viu.Reactivity.ReactiveAttribute.ReactiveAttribute() -> void
+Assimalign.Viu.Reactivity.ReactiveAttribute.Readonly.get -> bool
+Assimalign.Viu.Reactivity.ReactiveAttribute.Readonly.set -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Add(TKey key, TValue value) -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Clear() -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.ContainsKey(TKey key) -> bool
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Count.get -> int
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Enumerator
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Enumerator.Current.get -> System.Collections.Generic.KeyValuePair<TKey, TValue>
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Enumerator.Dispose() -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Enumerator.Enumerator() -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Enumerator.MoveNext() -> bool
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.GetEnumerator() -> Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Enumerator
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.IsReadOnly.get -> bool
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Keys.get -> System.Collections.Generic.ICollection<TKey>!
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.ReactiveDictionary() -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.ReactiveDictionary(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>! items) -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.ReactiveDictionary(System.Collections.Generic.IEqualityComparer<TKey>? comparer) -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Remove(TKey key) -> bool
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.this[TKey key].get -> TValue
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.this[TKey key].set -> void
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.TryGetValue(TKey key, out TValue value) -> bool
+Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>.Values.get -> System.Collections.Generic.ICollection<TValue>!
+Assimalign.Viu.Reactivity.ReactiveEffect
+Assimalign.Viu.Reactivity.ReactiveEffect.AllowRecurse.get -> bool
+Assimalign.Viu.Reactivity.ReactiveEffect.AllowRecurse.set -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.IsActive.get -> bool
+Assimalign.Viu.Reactivity.ReactiveEffect.OnStop.get -> System.Action?
+Assimalign.Viu.Reactivity.ReactiveEffect.OnStop.set -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.Pause() -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.ReactiveEffect(System.Action! function) -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.Resume() -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.Run() -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.RunIfDirty() -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.Scheduler.get -> System.Action?
+Assimalign.Viu.Reactivity.ReactiveEffect.Scheduler.set -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.Stop() -> void
+Assimalign.Viu.Reactivity.ReactiveEffectScopeFactory
+Assimalign.Viu.Reactivity.ReactiveEffectScopeFactory.Create(bool isDetached = false) -> Assimalign.Viu.Reactivity.IReactiveEffectScope!
+Assimalign.Viu.Reactivity.ReactiveEffectScopeFactory.ReactiveEffectScopeFactory() -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>
+Assimalign.Viu.Reactivity.ReactiveList<T>.Add(T item) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.AddRange(System.Collections.Generic.IEnumerable<T>! items) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.Clear() -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.Contains(T item) -> bool
+Assimalign.Viu.Reactivity.ReactiveList<T>.CopyTo(T[]! array, int arrayIndex) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.Count.get -> int
+Assimalign.Viu.Reactivity.ReactiveList<T>.Enumerator
+Assimalign.Viu.Reactivity.ReactiveList<T>.Enumerator.Current.get -> T
+Assimalign.Viu.Reactivity.ReactiveList<T>.Enumerator.Dispose() -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.Enumerator.Enumerator() -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.Enumerator.MoveNext() -> bool
+Assimalign.Viu.Reactivity.ReactiveList<T>.GetEnumerator() -> Assimalign.Viu.Reactivity.ReactiveList<T>.Enumerator
+Assimalign.Viu.Reactivity.ReactiveList<T>.IndexOf(T item) -> int
+Assimalign.Viu.Reactivity.ReactiveList<T>.Insert(int index, T item) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.IsReadOnly.get -> bool
+Assimalign.Viu.Reactivity.ReactiveList<T>.ReactiveList() -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.ReactiveList(int capacity) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.ReactiveList(System.Collections.Generic.IEnumerable<T>! items) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.Remove(T item) -> bool
+Assimalign.Viu.Reactivity.ReactiveList<T>.RemoveAt(int index) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.RemoveRange(int index, int count) -> void
+Assimalign.Viu.Reactivity.ReactiveList<T>.this[int index].get -> T
+Assimalign.Viu.Reactivity.ReactiveList<T>.this[int index].set -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Add(T item) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Clear() -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Contains(T item) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.CopyTo(T[]! array, int arrayIndex) -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Count.get -> int
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Enumerator
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Enumerator.Current.get -> T
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Enumerator.Dispose() -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Enumerator.Enumerator() -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Enumerator.MoveNext() -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.ExceptWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.GetEnumerator() -> Assimalign.Viu.Reactivity.ReactiveSet<T>.Enumerator
+Assimalign.Viu.Reactivity.ReactiveSet<T>.IntersectWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.IsProperSubsetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.IsProperSupersetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.IsReadOnly.get -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.IsSupersetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Overlaps(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.ReactiveSet() -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.ReactiveSet(System.Collections.Generic.IEnumerable<T>! items) -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.ReactiveSet(System.Collections.Generic.IEqualityComparer<T>? comparer) -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.Remove(T item) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.SetEquals(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Assimalign.Viu.Reactivity.ReactiveSet<T>.SymmetricExceptWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Assimalign.Viu.Reactivity.ReactiveSet<T>.UnionWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Assimalign.Viu.Reactivity.ReactiveTraversal
+Assimalign.Viu.Reactivity.ReactiveTraversal.Depth.get -> int
+Assimalign.Viu.Reactivity.ReactiveTraversal.ReactiveTraversal(int depth) -> void
+Assimalign.Viu.Reactivity.ReactiveTraversal.Visit(object? value) -> void
+Assimalign.Viu.Reactivity.ReactiveValue
+Assimalign.Viu.Reactivity.ReactiveValue.Dependency.get -> Assimalign.Viu.Reactivity.Dependency!
+Assimalign.Viu.Reactivity.ReactiveValue<T>
+Assimalign.Viu.Reactivity.Reference<T>
+Assimalign.Viu.Reactivity.Reference<T>.Reference(T value) -> void
+Assimalign.Viu.Reactivity.ShallowReactiveAttribute
+Assimalign.Viu.Reactivity.ShallowReactiveAttribute.Readonly.get -> bool
+Assimalign.Viu.Reactivity.ShallowReactiveAttribute.Readonly.set -> void
+Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ShallowReactiveAttribute() -> void
+Assimalign.Viu.Reactivity.ShallowReference<T>
+Assimalign.Viu.Reactivity.ShallowReference<T>.ShallowReference(T value) -> void
+Assimalign.Viu.Reactivity.Subscriber
+Assimalign.Viu.Reactivity.Subscriber.FirstDependency.get -> Assimalign.Viu.Reactivity.SubscriberLink?
+Assimalign.Viu.Reactivity.SubscriberLink
+Assimalign.Viu.Reactivity.SubscriberLink.Dependency.get -> Assimalign.Viu.Reactivity.Dependency!
+Assimalign.Viu.Reactivity.SubscriberLink.NextDependency.get -> Assimalign.Viu.Reactivity.SubscriberLink?
+Assimalign.Viu.Reactivity.SubscriberLink.NextSubscriber.get -> Assimalign.Viu.Reactivity.SubscriberLink?
+Assimalign.Viu.Reactivity.SubscriberLink.PreviousDependency.get -> Assimalign.Viu.Reactivity.SubscriberLink?
+Assimalign.Viu.Reactivity.SubscriberLink.PreviousSubscriber.get -> Assimalign.Viu.Reactivity.SubscriberLink?
+Assimalign.Viu.Reactivity.SubscriberLink.Subscriber.get -> Assimalign.Viu.Reactivity.Subscriber!
+Assimalign.Viu.Reactivity.SubscriberLink.Version.get -> int
+Assimalign.Viu.Reactivity.WatchCallback<T>
+Assimalign.Viu.Reactivity.WatchFlushMode
+Assimalign.Viu.Reactivity.WatchFlushMode.Post = 2 -> Assimalign.Viu.Reactivity.WatchFlushMode
+Assimalign.Viu.Reactivity.WatchFlushMode.Pre = 1 -> Assimalign.Viu.Reactivity.WatchFlushMode
+Assimalign.Viu.Reactivity.WatchFlushMode.Sync = 0 -> Assimalign.Viu.Reactivity.WatchFlushMode
+Assimalign.Viu.Reactivity.WatchHandle
+Assimalign.Viu.Reactivity.WatchHandle.Dispose() -> void
+Assimalign.Viu.Reactivity.WatchHandle.IsActive.get -> bool
+Assimalign.Viu.Reactivity.WatchHandle.Pause() -> void
+Assimalign.Viu.Reactivity.WatchHandle.Resume() -> void
+Assimalign.Viu.Reactivity.WatchHandle.Stop() -> void
+Assimalign.Viu.Reactivity.WatchJob
+Assimalign.Viu.Reactivity.WatchJob.Flush.get -> Assimalign.Viu.Reactivity.WatchFlushMode
+Assimalign.Viu.Reactivity.WatchJob.Invoke() -> void
+Assimalign.Viu.Reactivity.WatchJob.IsActive.get -> bool
+Assimalign.Viu.Reactivity.WatchOptions
+Assimalign.Viu.Reactivity.WatchOptions.Deep.get -> bool
+Assimalign.Viu.Reactivity.WatchOptions.Deep.set -> void
+Assimalign.Viu.Reactivity.WatchOptions.DeepDepth.get -> int?
+Assimalign.Viu.Reactivity.WatchOptions.DeepDepth.set -> void
+Assimalign.Viu.Reactivity.WatchOptions.Flush.get -> Assimalign.Viu.Reactivity.WatchFlushMode
+Assimalign.Viu.Reactivity.WatchOptions.Flush.set -> void
+Assimalign.Viu.Reactivity.WatchOptions.Immediate.get -> bool
+Assimalign.Viu.Reactivity.WatchOptions.Immediate.set -> void
+Assimalign.Viu.Reactivity.WatchOptions.Once.get -> bool
+Assimalign.Viu.Reactivity.WatchOptions.Once.set -> void
+Assimalign.Viu.Reactivity.WatchOptions.Scheduler.get -> Assimalign.Viu.Reactivity.IReactiveWatchScheduler?
+Assimalign.Viu.Reactivity.WatchOptions.Scheduler.set -> void
+Assimalign.Viu.Reactivity.WatchOptions.WatchOptions() -> void
+override Assimalign.Viu.Reactivity.Computed<T>.IsReadOnly.get -> bool
+override Assimalign.Viu.Reactivity.Computed<T>.Value.get -> T
+override Assimalign.Viu.Reactivity.Computed<T>.Value.set -> void
+override Assimalign.Viu.Reactivity.CustomReference<T>.Value.get -> T
+override Assimalign.Viu.Reactivity.CustomReference<T>.Value.set -> void
+override Assimalign.Viu.Reactivity.Reference<T>.Value.get -> T
+override Assimalign.Viu.Reactivity.Reference<T>.Value.set -> void
+override Assimalign.Viu.Reactivity.ShallowReference<T>.Value.get -> T
+override Assimalign.Viu.Reactivity.ShallowReference<T>.Value.set -> void
+override sealed Assimalign.Viu.Reactivity.ReactiveValue<T>.BoxedValue.get -> object?
+static Assimalign.Viu.Reactivity.EffectScope.Current.get -> Assimalign.Viu.Reactivity.EffectScope?
+static Assimalign.Viu.Reactivity.Reactive.Computed<T>(System.Func<T>! getter, System.Action<T>? setter = null) -> Assimalign.Viu.Reactivity.Computed<T>!
+static Assimalign.Viu.Reactivity.Reactive.CurrentScope.get -> Assimalign.Viu.Reactivity.EffectScope?
+static Assimalign.Viu.Reactivity.Reactive.CustomReference<T>(Assimalign.Viu.Reactivity.CustomReferenceFactory<T>! factory) -> Assimalign.Viu.Reactivity.CustomReference<T>!
+static Assimalign.Viu.Reactivity.Reactive.Effect(System.Action! action, System.Action? scheduler = null) -> Assimalign.Viu.Reactivity.ReactiveEffect!
+static Assimalign.Viu.Reactivity.Reactive.EffectScope(bool detached = false) -> Assimalign.Viu.Reactivity.EffectScope!
+static Assimalign.Viu.Reactivity.Reactive.EndBatch() -> void
+static Assimalign.Viu.Reactivity.Reactive.IsReactive(object? value) -> bool
+static Assimalign.Viu.Reactivity.Reactive.IsReadonly(object? value) -> bool
+static Assimalign.Viu.Reactivity.Reactive.IsRef(object? value) -> bool
+static Assimalign.Viu.Reactivity.Reactive.MarkRaw<T>(T! value) -> T!
+static Assimalign.Viu.Reactivity.Reactive.OnScopeDispose(System.Action! callback, bool failSilently = false) -> void
+static Assimalign.Viu.Reactivity.Reactive.PauseTracking() -> void
+static Assimalign.Viu.Reactivity.Reactive.Reference<T>(T value) -> Assimalign.Viu.Reactivity.Reference<T>!
+static Assimalign.Viu.Reactivity.Reactive.ResetTracking() -> void
+static Assimalign.Viu.Reactivity.Reactive.ShallowReference<T>(T value) -> Assimalign.Viu.Reactivity.ShallowReference<T>!
+static Assimalign.Viu.Reactivity.Reactive.StartBatch() -> void
+static Assimalign.Viu.Reactivity.Reactive.ToRaw<T>(Assimalign.Viu.Reactivity.ReactiveList<T>! list) -> System.Collections.Generic.List<T>!
+static Assimalign.Viu.Reactivity.Reactive.ToRaw<T>(Assimalign.Viu.Reactivity.ReactiveSet<T>! set) -> System.Collections.Generic.HashSet<T>!
+static Assimalign.Viu.Reactivity.Reactive.ToRaw<T>(T value) -> T
+static Assimalign.Viu.Reactivity.Reactive.ToRaw<TKey, TValue>(Assimalign.Viu.Reactivity.ReactiveDictionary<TKey, TValue>! dictionary) -> System.Collections.Generic.Dictionary<TKey, TValue>!
+static Assimalign.Viu.Reactivity.Reactive.ToRef<T>(System.Func<T>! getter, System.Action<T>? setter = null) -> Assimalign.Viu.Reactivity.ReactiveValue<T>!
+static Assimalign.Viu.Reactivity.Reactive.TriggerReference(Assimalign.Viu.Reactivity.IReactiveTrackedReference! reference) -> void
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(Assimalign.Viu.Reactivity.Computed<T>! reference) -> T
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(Assimalign.Viu.Reactivity.CustomReference<T>! reference) -> T
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(Assimalign.Viu.Reactivity.IReactiveReference<T>! reference) -> T
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(Assimalign.Viu.Reactivity.ReactiveValue<T>! reference) -> T
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(Assimalign.Viu.Reactivity.Reference<T>! reference) -> T
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(Assimalign.Viu.Reactivity.ShallowReference<T>! reference) -> T
+static Assimalign.Viu.Reactivity.Reactive.Unref<T>(T value) -> T
+static Assimalign.Viu.Reactivity.Reactive.Watch(Assimalign.Viu.Reactivity.IReactiveReference![]! sources, Assimalign.Viu.Reactivity.WatchCallback<object?[]!>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+static Assimalign.Viu.Reactivity.Reactive.Watch(System.Func<object?>![]! sources, Assimalign.Viu.Reactivity.WatchCallback<object?[]!>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+static Assimalign.Viu.Reactivity.Reactive.Watch<T>(Assimalign.Viu.Reactivity.IReactiveReference<T>! source, Assimalign.Viu.Reactivity.WatchCallback<T>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+static Assimalign.Viu.Reactivity.Reactive.Watch<T>(System.Func<T>! source, Assimalign.Viu.Reactivity.WatchCallback<T>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+static Assimalign.Viu.Reactivity.Reactive.Watch<TReactive>(TReactive! source, Assimalign.Viu.Reactivity.WatchCallback<TReactive!>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+static Assimalign.Viu.Reactivity.Reactive.WatchEffect(System.Action! effect, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+static Assimalign.Viu.Reactivity.Reactive.WatchEffect(System.Action<Assimalign.Viu.Reactivity.OnCleanup!>! effect, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
+virtual Assimalign.Viu.Reactivity.CustomReferenceFactory<T>.Invoke(System.Action! track, System.Action! trigger) -> (System.Func<T>! Get, System.Action<T>! Set)
+virtual Assimalign.Viu.Reactivity.OnCleanup.Invoke(System.Action! cleanup) -> void
+virtual Assimalign.Viu.Reactivity.ReactiveValue.IsReadOnly.get -> bool
+virtual Assimalign.Viu.Reactivity.WatchCallback<T>.Invoke(T value, T oldValue, Assimalign.Viu.Reactivity.OnCleanup! onCleanup) -> void

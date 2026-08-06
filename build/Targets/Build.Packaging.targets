@@ -30,6 +30,28 @@
     </PropertyGroup>
 
     <!--
+        Public-surface enforcement shares the documentation gate's evaluation-order requirement:
+        IsPackable is final only after the csproj body has evaluated, so this reference and its
+        baselines must remain in the targets phase. The existence guards let a project without
+        baseline files evaluate safely, while the packability condition excludes non-publishing
+        projects from the contract.
+
+        Build.targets imports this file before Build.References.Packages.targets so the central
+        by-name package resolver sees the ViuPackageReference contributed here.
+    -->
+    <ItemGroup Condition="'$(IsPackable)' != 'false'">
+        <ViuPackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" />
+        <!-- The package's build-transitive target adds these relative identities automatically;
+             replace them with the explicit, existence-guarded repository wiring below so each
+             physical baseline reaches the analyzer exactly once. -->
+        <AdditionalFiles Remove="PublicAPI.Shipped.txt;PublicAPI.Unshipped.txt" />
+        <AdditionalFiles Include="$(MSBuildProjectDirectory)\PublicAPI.Shipped.txt"
+                         Condition="Exists('$(MSBuildProjectDirectory)\PublicAPI.Shipped.txt')" />
+        <AdditionalFiles Include="$(MSBuildProjectDirectory)\PublicAPI.Unshipped.txt"
+                         Condition="Exists('$(MSBuildProjectDirectory)\PublicAPI.Unshipped.txt')" />
+    </ItemGroup>
+
+    <!--
         NuGet recommends a package README. Individual package families can set
         PackageReadmeFile and pack their own file before this targets-phase
         fallback runs; the SDK does so with sdks/README.md.

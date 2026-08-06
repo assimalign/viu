@@ -105,6 +105,16 @@ Viu.
 
 - **Interface-first**: the public contract is an interface under `Abstraction/`; prefer `internal`
   concrete implementations (surfaced through the interface or a public facade like `Reactive`).
+- **Generated-code binding**: put `[EditorBrowsable(EditorBrowsableState.Never)]` on every public
+  member that exists only so a source generator can bind it by name. `RenderHelpers`,
+  `DomRenderHelpers`, and `ComponentHotReload` are the precedents established by [V01.01.14.02].
+- **Renames before and after release**: before Viu's first public release, renames are direct because
+  nothing has shipped publicly and GitHub Packages is the only registry (decision D1 in
+  `docs/API-HARDENING-PLAN.md`). After the first public release, retain the old name for one preview
+  version with `[Obsolete("Renamed to X.", error: false)]` and
+  `[EditorBrowsable(EditorBrowsableState.Never)]`. Do not retain an obsolete alias for a member bound
+  through `using static` in generated code: that alias would warn inside every consuming application's
+  compilation.
 - **Dispatch on hot paths**: interfaces are for public contracts and cold paths. On the engine's hot
   paths (per-trigger notification, patching, diffing) prefer an **abstract base class** over an
   interface — .NET interface dispatch is measurably costlier than a vtable virtual call, and the gap

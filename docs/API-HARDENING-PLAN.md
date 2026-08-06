@@ -77,7 +77,7 @@ in as each item is created.
 | T04 | Compiler-seam hardening (`[EditorBrowsable]` + language-service filter) | 1 | `.02` | #287 | **IN REVIEW** (PR #289) |
 | T16 | Drop the viral `RequiresPreviewFeatures` stamp | 1 | `.03` | #292 | **IN REVIEW** — supersedes #280 |
 | T03 | Unship build-time packages; delete `Syntax.JavaScript` (keep `Syntax.Html`, see D3) | 1 | `.04` | #294 | **IMPLEMENTED** — pending integration |
-| T02 | Public-API baseline and hardening-attribute conventions | 1 | — | — | Not started — must be **last** in Wave 1 |
+| T02 | Public-API baseline and hardening-attribute conventions | 1 | `.06` | #299 | **IMPLEMENTED** — pending integration |
 | D5-A | Application lifetime: middleware pipeline, delete `IApplicationPlugin` | 2A | — | — | Not started |
 | D5-B | Composition surface: drop public `IApplicationBuilder`, self-returning builders, frozen options | 2A | — | — | Not started |
 | D5-C | Separate SSR: `ServerApplication` → `ServerRenderApplication`, off `IApplication` | 2A | — | — | Not started |
