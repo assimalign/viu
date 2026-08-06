@@ -21,26 +21,23 @@ public static class ApplicationExtensions
         {
             ArgumentNullException.ThrowIfNull(application);
 
-            try
+            var taskCompletionSource = new TaskCompletionSource();
+            using (cancellationToken.Register(() => taskCompletionSource.TrySetResult()))
             {
-                await application.StartAsync(cancellationToken).ConfigureAwait(false);
-                await WaitForStoppingAsync(application.Context.Stopping).ConfigureAwait(false);
+                try
+                {
+                    await application.StartAsync(cancellationToken).ConfigureAwait(false);
+                    await taskCompletionSource.Task;   // <-- the "forever" await
+                }
+                catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+                {
+                    
+                }
+                finally
+                {
+                    await application.StopAsync(CancellationToken.None).ConfigureAwait(false);
+                }
             }
-            finally
-            {
-                await application.StopAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-        }
-    }
-
-    private static async ValueTask WaitForStoppingAsync(CancellationToken stopping)
-    {
-        try
-        {
-            await Task.Delay(Timeout.Infinite, stopping).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
-        {
         }
     }
 }
