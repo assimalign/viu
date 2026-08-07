@@ -17,6 +17,7 @@ namespace Assimalign.Viu.Components;
 /// only ever invokes <see cref="IComponent.Setup"/> with its own implementation.
 /// Deliberately absent: a style-scope identifier — scoped CSS is deferred until after the
 /// component-model arc; reintroduction is an additive member.
+/// Specified by <c>[CMP-2]</c>, <c>[CMP-24]</c>, and <c>[CMP-33]</c>.
 /// </remarks>
 public abstract class ComponentContext
 {
@@ -58,15 +59,55 @@ public abstract class ComponentContext
 
     /// <summary>
     /// Watches a tracked getter within this instance's scope and scheduler; the watch stops
-    /// automatically on unmount. Implemented once here against <see cref="Scope"/> and
-    /// <see cref="WatchScheduler"/>; failures route through <see cref="OnWatchError"/>.
+    /// automatically on unmount. Delivery uses pre-flush timing; Reactivity falls back to
+    /// synchronous delivery when <see cref="WatchScheduler"/> is <see langword="null"/>.
+    /// Implemented once here against <see cref="Scope"/> and <see cref="WatchScheduler"/>;
+    /// callback and getter failures route through <see cref="OnWatchError"/>. A handled getter
+    /// failure contributes the default value and leaves the watch active. Specified by
+    /// <c>[CMP-2]</c>, <c>[CMP-23]</c>, and <c>[RCT-12]</c>.
     /// </summary>
     /// <typeparam name="TValue">The watched value type.</typeparam>
     /// <param name="getter">The tracked value getter.</param>
     /// <param name="callback">The callback receiving the current and previous values.</param>
     /// <returns>A handle that stops the watch.</returns>
     public WatchHandle Watch<TValue>(Func<TValue> getter, Action<TValue, TValue> callback)
-        => throw new NotSupportedException("The contract model does not execute watches.");
+    {
+        ArgumentNullException.ThrowIfNull(getter);
+        ArgumentNullException.ThrowIfNull(callback);
+
+        TValue GuardedGetter()
+        {
+            try
+            {
+                return getter();
+            }
+            catch (Exception exception)
+            {
+                OnWatchError(exception);
+                return default!;
+            }
+        }
+
+        return Scope.Run(
+            () => Reactive.Watch(
+                GuardedGetter,
+                (value, previousValue, _) =>
+                {
+                    try
+                    {
+                        callback(value, previousValue);
+                    }
+                    catch (Exception exception)
+                    {
+                        OnWatchError(exception);
+                    }
+                },
+                new WatchOptions
+                {
+                    Flush = WatchFlushMode.Pre,
+                    Scheduler = WatchScheduler,
+                }));
+    }
 
     /// <summary>Receives a watch callback failure for component error routing.</summary>
     /// <param name="exception">The callback failure.</param>

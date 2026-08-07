@@ -6,6 +6,7 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Describes a subtree rendered into a target resolved by the active host.
 /// </summary>
+/// <remarks>Specified by <c>[BLT-1]</c> through <c>[BLT-4]</c>.</remarks>
 public sealed class TeleportNode : CompositeVirtualNode
 {
     /// <summary>Initializes an immutable teleport node.</summary>

@@ -1,8 +1,7 @@
-using Assimalign.Viu.Reactivity;
-
 using Shouldly;
-
 using Xunit;
+
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Reactivity.Tests;
 

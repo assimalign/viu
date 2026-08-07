@@ -3,6 +3,7 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Identifies the closed structural variants understood by Viu's renderer.
 /// </summary>
+/// <remarks>The ten-value algebra is specified by <c>[CMP-3]</c>.</remarks>
 public enum VirtualNodeKind
 {
     /// <summary>An element with a qualified name, bindings, and child nodes.</summary>

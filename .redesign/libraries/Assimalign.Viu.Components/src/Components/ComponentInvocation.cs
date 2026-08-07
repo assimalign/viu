@@ -5,6 +5,11 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Carries raw immutable inputs supplied by a parent-created component node.
 /// </summary>
+/// <remarks>
+/// Arguments, slots, listeners, and directives are copied when the invocation is constructed and
+/// are never contract-resolved in place. Specified by <c>[CMP-2]</c>, <c>[CMP-7]</c>, and
+/// <c>[CMP-18]</c>.
+/// </remarks>
 public sealed class ComponentInvocation
 {
     private static readonly IReadOnlyDictionary<string, object?> EmptyArguments =
@@ -27,9 +32,11 @@ public sealed class ComponentInvocation
         IEnumerable<DirectiveInvocation>? directives = null)
     {
         Arguments = arguments is null ? EmptyArguments : CollectionSnapshot.CopyDictionary(arguments);
-        Slots = slots is null ? EmptySlots : CollectionSnapshot.CopyDictionary(slots);
-        Listeners = CollectionSnapshot.CopyDictionary(listeners);
-        Directives = CollectionSnapshot.Copy(directives);
+        Slots = slots is null
+            ? EmptySlots
+            : CollectionSnapshot.CopyNonNullDictionary(slots, nameof(slots));
+        Listeners = CollectionSnapshot.CopyNonNullDictionary(listeners, nameof(listeners));
+        Directives = CollectionSnapshot.CopyNonNull(directives, nameof(directives));
     }
 
     /// <summary>Gets raw named arguments before contract resolution.</summary>

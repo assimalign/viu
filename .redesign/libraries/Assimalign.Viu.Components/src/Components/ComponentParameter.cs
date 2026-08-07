@@ -2,7 +2,11 @@ using System;
 
 namespace Assimalign.Viu.Components;
 
-/// <summary>An immutable declared input parameter.</summary>
+/// <summary>
+/// An immutable declared input parameter. The runtime evaluates its default factory at most once
+/// per mounted instance and validation never discards a supplied value. Specified by
+/// <c>[CMP-12]</c> and <c>[CMP-13]</c>.
+/// </summary>
 public sealed class ComponentParameter
 {
     /// <summary>Initializes a parameter declaration.</summary>

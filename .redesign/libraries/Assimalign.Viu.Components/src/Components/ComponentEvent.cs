@@ -3,7 +3,10 @@ using System.Collections.Generic;
 
 namespace Assimalign.Viu.Components;
 
-/// <summary>An immutable declared output event.</summary>
+/// <summary>
+/// An immutable declared output event whose optional validator receives the complete ordered
+/// argument snapshot. Specified by <c>[CMP-14]</c> and <c>[CMP-15]</c>.
+/// </summary>
 public sealed class ComponentEvent
 {
     /// <summary>Initializes an event declaration.</summary>

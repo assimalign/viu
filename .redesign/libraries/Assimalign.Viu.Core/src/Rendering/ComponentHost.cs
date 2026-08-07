@@ -29,7 +29,10 @@ public sealed class ComponentHost
     /// that keeps the component's reactive lifetime alive while its tree is consumed. The render
     /// runs against a <see cref="ComponentRenderFrame"/> constructed once per mount and kept on
     /// the returned scope's lease, so repeated renders of the mount reuse the same frame — there
-    /// is no ambient render-helper state.
+    /// is no ambient render-helper state. Disposing or aborting the operation cancels the
+    /// component-lifetime token before stopping its effect scope, drains observed lifecycle
+    /// tasks, and never invokes client lifecycle phases. Specified by <c>[CMP-21]</c>,
+    /// <c>[CMP-22]</c>, and <c>[SSR-5]</c>.
     /// </summary>
     /// <param name="request">The immutable invocation and optional parent operation scope.</param>
     /// <param name="cancellationToken">Cancellation for setup-adjacent asynchronous work.</param>
@@ -58,7 +61,9 @@ public sealed class ComponentHost
             request.Component.Invocation.Listeners,
             scope,
             _options.WatchScheduler,
-            request.Parent?.Context);
+            request.Parent?.Context,
+            _options.ErrorHandler);
+        lifecycle.SetObservedTaskFaultHandler(context.RouteError);
 
         try
         {
@@ -73,11 +78,11 @@ public sealed class ComponentHost
             cancellationToken.ThrowIfCancellationRequested();
             var frame = new ComponentRenderFrame();
             var tree = renderer(frame);
-            return new ComponentRenderLease(instance, context, tree, scope, frame);
+            return new ComponentRenderLease(instance, context, tree, scope, frame, lifecycle);
         }
         catch
         {
-            await ComponentRenderLease.ReleaseAsync(instance, scope).ConfigureAwait(false);
+            await ComponentRenderLease.ReleaseAsync(instance, scope, lifecycle).ConfigureAwait(false);
             throw;
         }
     }

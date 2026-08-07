@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
@@ -9,6 +10,7 @@ namespace Assimalign.Viu;
 internal sealed class ComponentRenderLease : IComponentRenderScope
 {
     private readonly IComponent _instance;
+    private readonly ComponentLifecycle _lifecycle;
     private readonly EffectScope _scope;
 
     internal ComponentRenderLease(
@@ -16,9 +18,11 @@ internal sealed class ComponentRenderLease : IComponentRenderScope
         ComponentContext context,
         VirtualNode? tree,
         EffectScope scope,
-        ComponentRenderFrame frame)
+        ComponentRenderFrame frame,
+        ComponentLifecycle lifecycle)
     {
         _instance = instance;
+        _lifecycle = lifecycle;
         Context = context;
         Tree = tree;
         _scope = scope;
@@ -43,20 +47,68 @@ internal sealed class ComponentRenderLease : IComponentRenderScope
         }
 
         IsDisposed = true;
-        await ReleaseAsync(_instance, _scope).ConfigureAwait(false);
+        await ReleaseAsync(_instance, _scope, _lifecycle).ConfigureAwait(false);
     }
 
-    internal static async ValueTask ReleaseAsync(IComponent instance, EffectScope scope)
+    internal static async ValueTask ReleaseAsync(
+        IComponent instance,
+        EffectScope scope,
+        ComponentLifecycle lifecycle)
     {
-        scope.Dispose();
-        switch (instance)
+        ExceptionDispatchInfo? failure = null;
+        try
         {
-            case IAsyncDisposable asynchronousDisposable:
-                await asynchronousDisposable.DisposeAsync().ConfigureAwait(false);
-                break;
-            case IDisposable disposable:
-                disposable.Dispose();
-                break;
+            lifecycle.Cancel();
         }
+        catch (Exception exception)
+        {
+            failure = ExceptionDispatchInfo.Capture(exception);
+        }
+
+        try
+        {
+            scope.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failure ??= ExceptionDispatchInfo.Capture(exception);
+        }
+
+        try
+        {
+            switch (instance)
+            {
+                case IAsyncDisposable asynchronousDisposable:
+                    await asynchronousDisposable.DisposeAsync().ConfigureAwait(false);
+                    break;
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            failure ??= ExceptionDispatchInfo.Capture(exception);
+        }
+
+        try
+        {
+            await lifecycle.DrainAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failure ??= ExceptionDispatchInfo.Capture(exception);
+        }
+
+        try
+        {
+            lifecycle.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failure ??= ExceptionDispatchInfo.Capture(exception);
+        }
+
+        failure?.Throw();
     }
 }

@@ -4,6 +4,7 @@ namespace Assimalign.Viu.Components;
 /// Resolves component references to their explicit registrations. Registration is the only
 /// activation path — there is no runtime constructor discovery.
 /// </summary>
+/// <remarks>Specified by <c>[CMP-4]</c> and <c>[CMP-6]</c>.</remarks>
 public interface IComponentFactory
 {
     /// <summary>Resolves a reference to its registration, throwing when unregistered.</summary>

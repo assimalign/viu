@@ -3,60 +3,119 @@ using System;
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// Invariant name-shape conversions used by contract resolution and registered-name lookup.
-/// Moved from the dissolved shared library; the hyphenation form lives here because binding
-/// resolution's alias tables need it.
+/// Provides the ordinal, culture-invariant name conversions shared by component contract
+/// resolution and registered-name lookup. Specified by <c>[CMP-6]</c> and <c>[CMP-13]</c>.
 /// </summary>
 public static class NameNormalization
 {
-    /// <summary>Converts a hyphenated or pascal name to camel case.</summary>
-    /// <param name="name">The source name.</param>
-    /// <returns>The camel-case form.</returns>
-    public static string Camelize(string name)
+    /// <summary>
+    /// Converts a hyphenated name to camel case by removing each hyphen and
+    /// invariant-capitalizing the next non-hyphen character.
+    /// </summary>
+    /// <param name="value">The name to normalize.</param>
+    /// <returns>
+    /// The camel-case name. A value without a hyphen is returned unchanged and without an
+    /// allocation.
+    /// </returns>
+    public static string Camelize(string value)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        return char.IsUpper(name[0]) ? string.Create(name.Length, name, static (span, source) =>
+        ArgumentNullException.ThrowIfNull(value);
+        if (value.IndexOf('-', StringComparison.Ordinal) < 0)
         {
-            source.AsSpan().CopyTo(span);
-            span[0] = char.ToLowerInvariant(span[0]);
-        }) : name;
+            return value;
+        }
+
+        char[] buffer = new char[value.Length];
+        int length = 0;
+        bool capitalizeNext = false;
+        foreach (char character in value)
+        {
+            if (character == '-')
+            {
+                capitalizeNext = true;
+                continue;
+            }
+
+            buffer[length] = capitalizeNext
+                ? char.ToUpperInvariant(character)
+                : character;
+            length++;
+            capitalizeNext = false;
+        }
+
+        return new string(buffer, 0, length);
     }
 
-    /// <summary>Converts a camel or hyphenated name to pascal case.</summary>
-    /// <param name="name">The source name.</param>
-    /// <returns>The pascal-case form.</returns>
-    public static string Pascalize(string name)
+    /// <summary>Converts a hyphenated or camel-case name to Pascal case.</summary>
+    /// <param name="value">The name to normalize.</param>
+    /// <returns>The Pascal-case name, or the original empty string.</returns>
+    public static string Pascalize(string value)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        return char.IsLower(name[0]) ? string.Create(name.Length, name, static (span, source) =>
+        string camelized = Camelize(value);
+        if (camelized.Length == 0)
         {
-            source.AsSpan().CopyTo(span);
-            span[0] = char.ToUpperInvariant(span[0]);
-        }) : name;
+            return camelized;
+        }
+
+        char firstCharacter = char.ToUpperInvariant(camelized[0]);
+        if (firstCharacter == camelized[0])
+        {
+            return camelized;
+        }
+
+        return string.Create(
+            camelized.Length,
+            (Source: camelized, FirstCharacter: firstCharacter),
+            static (span, state) =>
+        {
+            state.Source.AsSpan().CopyTo(span);
+            span[0] = state.FirstCharacter;
+        });
     }
 
-    /// <summary>Converts a camel or pascal name to a lower hyphenated form.</summary>
-    /// <param name="name">The source name.</param>
-    /// <returns>The hyphenated form.</returns>
+    /// <summary>
+    /// Converts camel case to lower hyphenated form. A leading capital is lower-cased without a
+    /// leading hyphen, preserving vendor-prefixed names.
+    /// </summary>
+    /// <param name="name">The name to normalize.</param>
+    /// <returns>The lower hyphenated form.</returns>
     public static string Hyphenate(string name)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        System.Text.StringBuilder builder = new(name.Length + 4);
-        foreach (char character in name)
+        ArgumentNullException.ThrowIfNull(name);
+        int hyphenCount = 0;
+        for (int index = 1; index < name.Length; index++)
         {
-            if (char.IsUpper(character))
+            if (char.IsAsciiLetterUpper(name[index]))
             {
-                if (builder.Length > 0)
-                {
-                    builder.Append('-');
-                }
-                builder.Append(char.ToLowerInvariant(character));
-            }
-            else
-            {
-                builder.Append(character);
+                hyphenCount++;
             }
         }
-        return builder.ToString();
+
+        if (hyphenCount == 0 && (name.Length == 0 || !char.IsAsciiLetterUpper(name[0])))
+        {
+            return name;
+        }
+
+        return string.Create(name.Length + hyphenCount, name, static (span, source) =>
+        {
+            int position = 0;
+            for (int index = 0; index < source.Length; index++)
+            {
+                char character = source[index];
+                if (char.IsAsciiLetterUpper(character))
+                {
+                    if (index > 0)
+                    {
+                        span[position++] = '-';
+                    }
+
+                    span[position++] = char.ToLowerInvariant(character);
+                }
+                else
+                {
+                    span[position++] = character;
+                }
+            }
+        });
     }
 }

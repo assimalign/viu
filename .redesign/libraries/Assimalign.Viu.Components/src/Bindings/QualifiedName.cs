@@ -7,6 +7,7 @@ namespace Assimalign.Viu.Components;
 /// namespace name plus the local name; the prefix is a serialization alias carried for formats
 /// that preserve it and deliberately excluded from equality.
 /// </summary>
+/// <remarks>Used by the closed element vocabulary specified by <c>[CMP-3]</c>.</remarks>
 public readonly struct QualifiedName : IEquatable<QualifiedName>
 {
     /// <summary>Initializes a qualified name.</summary>
@@ -36,7 +37,7 @@ public readonly struct QualifiedName : IEquatable<QualifiedName>
             && string.Equals(NamespaceName, other.NamespaceName, StringComparison.Ordinal);
 
     /// <inheritdoc/>
-    public override bool Equals(object? obj) => obj is QualifiedName other && Equals(other);
+    public override bool Equals(object? value) => value is QualifiedName other && Equals(other);
 
     /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(LocalName, NamespaceName);

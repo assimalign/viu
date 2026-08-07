@@ -19,16 +19,21 @@ public sealed class ComponentRuntimeOptions
     /// <param name="components">The registration-backed component factory.</param>
     /// <param name="watchScheduler">The component watch scheduling policy.</param>
     /// <param name="services">The optional externally owned application service provider.</param>
+    /// <param name="errorHandler">
+    /// The optional terminal sink for component errors not stopped by an ancestor capture hook.
+    /// </param>
     public ComponentRuntimeOptions(
         IComponentFactory components,
         IReactiveWatchScheduler watchScheduler,
-        IServiceProvider? services = null)
+        IServiceProvider? services = null,
+        Action<Exception, ComponentContext?, string>? errorHandler = null)
     {
         ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(watchScheduler);
         Components = components;
         WatchScheduler = watchScheduler;
         Services = services;
+        ErrorHandler = errorHandler;
     }
 
     /// <summary>Gets the borrowed component factory.</summary>
@@ -39,4 +44,11 @@ public sealed class ComponentRuntimeOptions
 
     /// <summary>Gets the borrowed optional application service provider.</summary>
     public IServiceProvider? Services { get; }
+
+    /// <summary>
+    /// Gets the terminal sink for observed render, lifecycle, watcher, and event faults that no
+    /// ancestor <see cref="ComponentLifecycle.OnErrorCaptured"/> callback stopped. A missing sink
+    /// leaves such a fault unhandled and preserves its exception. Specified by <c>[CMP-23]</c>.
+    /// </summary>
+    public Action<Exception, ComponentContext?, string>? ErrorHandler { get; }
 }

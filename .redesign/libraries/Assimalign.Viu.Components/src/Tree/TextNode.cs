@@ -2,7 +2,7 @@ using System;
 
 namespace Assimalign.Viu.Components;
 
-/// <summary>Describes one immutable text node.</summary>
+/// <summary>Describes one immutable text node in the closed algebra specified by <c>[CMP-3]</c>.</summary>
 public sealed class TextNode : VirtualNode
 {
     /// <summary>Initializes a text node.</summary>

@@ -1,6 +1,9 @@
 namespace Assimalign.Viu.Components;
 
-/// <summary>Identifies the serialization contract of an opaque static markup payload.</summary>
+/// <summary>
+/// Identifies the serialization contract of an opaque static payload in the closed algebra
+/// specified by <c>[CMP-3]</c>.
+/// </summary>
 public enum MarkupFormat
 {
     /// <summary>An HTML serialization payload.</summary>

@@ -5,6 +5,10 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Describes one compile-time-known directive invocation without activating it.
 /// </summary>
+/// <remarks>
+/// The immutable invocation travels with its virtual node; host behavior resolves the type token
+/// through an explicit directive seam. Specified by <c>[CMP-7]</c>.
+/// </remarks>
 public sealed class DirectiveInvocation
 {
     /// <summary>Initializes an immutable directive invocation.</summary>

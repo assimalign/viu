@@ -7,11 +7,11 @@ Targets follow the adopted disposition in
 |---|---|---|---|
 | `IComponent` tree description | `VirtualNode` | Components | Reserves "component" for authored behavior and closes the render vocabulary. |
 | Per-kind component interfaces | Sealed `VirtualNode` variants | Components | Makes kind/shape mismatches unrepresentable. |
-| `ITemplateComponent` | `ComponentNode` | Components | Names the value as an immutable invocation in the tree. |
+| Retired template-node interface | `ComponentNode` | Components | Names the value as an immutable invocation in the tree. |
 | Template request arguments and slots | `ComponentInvocation` | Components | Explicitly identifies raw parent-created inputs. |
 | `IComponentTemplate` | `IComponent` | Components | The authored contract stays in the component model, one instance per mount. |
 | Template metadata properties | `ComponentContract` + `ComponentRegistration` | Components | Separates static declaration from the live instance; the runtime reads the contract before activation. |
-| `IComponentContext` | public abstract `ComponentContext` + internal `RuntimeComponentContext` | Components / Core | The authoring surface is model vocabulary; the single implementation is engine-internal. |
+| Retired component-context interface | public abstract `ComponentContext` + internal `RuntimeComponentContext` | Components / Core | The authoring surface is model vocabulary; the single implementation is engine-internal. |
 | Context arguments/slots/attributes | `ComponentBindings` + pure static `Resolve` | Components | Names resolved parameters, slots, and fallthrough; the transformation is unit-testable without a runtime. |
 | Component registry / definition resolver | `IComponentFactory` / `ComponentFactory` | Components | Registration-backed resolution is model vocabulary; no runtime constructor discovery. |
 | Public hot-reload metadata interface on generated types | `ComponentDevelopmentMetadata` registration ABI | Core | Makes the public seam an explicit generated-code ABI. |

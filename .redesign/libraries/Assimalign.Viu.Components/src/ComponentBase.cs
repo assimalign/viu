@@ -5,6 +5,7 @@ namespace Assimalign.Viu.Components;
 /// assigned during setup and deliberately does not implement <see cref="IComponent"/> — the
 /// authored or generated partial opts into the contract explicitly.
 /// </summary>
+/// <remarks>Specified by <c>[CMP-31]</c>.</remarks>
 public abstract class ComponentBase
 {
     /// <summary>Initializes the authoring base.</summary>

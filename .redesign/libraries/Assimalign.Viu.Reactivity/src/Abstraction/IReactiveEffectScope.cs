@@ -3,8 +3,9 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Owns reactive effects and cleanup callbacks as one disposable lifetime. Mirrors the shipping
-/// abstraction boundary over the effect scope.
+/// Owns reactive effects and cleanup callbacks as one disposable lifetime without broadcasting
+/// value changes. Implementations guarantee idempotent stop semantics. Specified by
+/// <c>[RCT-10]</c> and <c>[RCT-11]</c>.
 /// </summary>
 public interface IReactiveEffectScope : IDisposable
 {

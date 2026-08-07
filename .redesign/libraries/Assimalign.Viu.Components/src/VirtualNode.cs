@@ -6,6 +6,7 @@ namespace Assimalign.Viu.Components;
 /// <remarks>
 /// Only this assembly can derive from the type. Extensibility is provided through component
 /// invocations, directives, and host bindings rather than renderer-unknown node variants.
+/// Instances never carry mounted host state. Specified by <c>[CMP-2]</c> and <c>[CMP-3]</c>.
 /// </remarks>
 public abstract class VirtualNode
 {

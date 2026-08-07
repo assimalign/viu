@@ -1,10 +1,9 @@
 using System.Collections.Generic;
 
-using Assimalign.Viu.Components;
-
 using Shouldly;
-
 using Xunit;
+
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Components.Tests;
 

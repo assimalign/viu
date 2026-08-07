@@ -7,18 +7,18 @@ namespace Assimalign.Viu.State;
 internal sealed class StateContext : IStateContext
 {
     internal StateContext(
-        EffectScope scope,
+        IReactiveEffectScope scope,
         IServiceProvider? services,
-        IReactiveWatchScheduler watchScheduler)
+        IReactiveWatchScheduler? watchScheduler)
     {
         Scope = scope;
         Services = services;
         WatchScheduler = watchScheduler;
     }
 
-    public EffectScope Scope { get; }
+    public IReactiveEffectScope Scope { get; }
 
     public IServiceProvider? Services { get; }
 
-    public IReactiveWatchScheduler WatchScheduler { get; }
+    public IReactiveWatchScheduler? WatchScheduler { get; }
 }

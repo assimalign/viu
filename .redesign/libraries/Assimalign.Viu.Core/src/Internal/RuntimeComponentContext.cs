@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
@@ -9,6 +10,7 @@ namespace Assimalign.Viu;
 internal sealed class RuntimeComponentContext : ComponentContext
 {
     private readonly IReadOnlyDictionary<string, ComponentEventListener> _listeners;
+    private readonly Action<Exception, ComponentContext?, string>? _errorHandler;
     private object? _exposedValue;
 
     internal RuntimeComponentContext(
@@ -18,7 +20,8 @@ internal sealed class RuntimeComponentContext : ComponentContext
         IReadOnlyDictionary<string, ComponentEventListener> listeners,
         IReactiveEffectScope scope,
         IReactiveWatchScheduler? watchScheduler,
-        ComponentContext? parent)
+        ComponentContext? parent,
+        Action<Exception, ComponentContext?, string>? errorHandler)
     {
         Bindings = bindings;
         Services = services;
@@ -27,6 +30,7 @@ internal sealed class RuntimeComponentContext : ComponentContext
         Scope = scope;
         WatchScheduler = watchScheduler;
         Parent = parent;
+        _errorHandler = errorHandler;
     }
 
     public override ComponentBindings Bindings { get; }
@@ -49,7 +53,14 @@ internal sealed class RuntimeComponentContext : ComponentContext
         ArgumentNullException.ThrowIfNull(arguments);
         if (_listeners.TryGetValue(name, out var listener))
         {
-            listener(Array.AsReadOnly(arguments));
+            try
+            {
+                listener(Array.AsReadOnly(arguments));
+            }
+            catch (Exception exception)
+            {
+                RouteError(exception, "component event listener");
+            }
         }
     }
 
@@ -62,10 +73,42 @@ internal sealed class RuntimeComponentContext : ComponentContext
         _ = message;
     }
 
-    protected override void OnWatchError(Exception exception)
+    internal void RouteError(Exception exception, string diagnosticInformation)
     {
-        // The shipping runtime routes watch failures to OnErrorCaptured; the contract model
-        // only fixes the seam.
-        _ = exception;
+        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentException.ThrowIfNullOrEmpty(diagnosticInformation);
+
+        ComponentContext? source = this;
+        for (ComponentContext? ancestor = Parent;
+            ancestor is not null;
+            ancestor = ancestor.Parent)
+        {
+            try
+            {
+                if (!ancestor.Lifecycle.InvokeErrorCaptured(
+                    exception,
+                    source,
+                    diagnosticInformation))
+                {
+                    return;
+                }
+            }
+            catch (Exception captureException)
+            {
+                exception = captureException;
+                source = ancestor;
+            }
+        }
+
+        if (_errorHandler is not null)
+        {
+            _errorHandler(exception, source, diagnosticInformation);
+            return;
+        }
+
+        ExceptionDispatchInfo.Capture(exception).Throw();
     }
+
+    protected override void OnWatchError(Exception exception) =>
+        RouteError(exception, "component watch callback");
 }

@@ -1,3 +1,5 @@
+using System;
+
 namespace Assimalign.Viu.Components;
 
 /// <summary>
@@ -9,6 +11,7 @@ namespace Assimalign.Viu.Components;
 /// The decorated child arrives through the invocation's lazy default slot; the transition's full
 /// declared parameter set (name, mode, appear, and the per-phase class and hook inputs) rides
 /// the invocation arguments, resolved by the executor against the built-in's published contract.
+/// Specified by <c>[BLT-7]</c> through <c>[BLT-10]</c>.
 /// </remarks>
 public sealed class TransitionNode : VirtualNode
 {
@@ -18,7 +21,8 @@ public sealed class TransitionNode : VirtualNode
     public TransitionNode(ComponentInvocation invocation, object? key = null)
         : base(VirtualNodeKind.Transition, key, null, null)
     {
-        Invocation = invocation ?? ComponentInvocation.Empty;
+        ArgumentNullException.ThrowIfNull(invocation);
+        Invocation = invocation;
     }
 
     /// <summary>Gets the raw arguments and lazy slots supplied at the invocation site.</summary>

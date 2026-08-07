@@ -3,43 +3,44 @@ using System;
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// Reserved node-shape classification — a frozen value contract with no current runtime
-/// consumer, retained so previously compiled output never observes a layout change. Specified by
-/// <c>[RND-FLAGS-4]</c>; moved verbatim from the dissolved shared library.
+/// Bitmask describing a node's historical runtime shape and the form of its children. The closed
+/// <see cref="VirtualNode"/> algebra is authoritative for current dispatch, but these numeric
+/// values remain a frozen, additive-only contract for previously compiled output. Specified by
+/// <c>[RND-FLAGS-1]</c> and <c>[RND-FLAGS-4]</c>.
 /// </summary>
 [Flags]
 public enum ShapeFlags
 {
-    /// <summary>An element node.</summary>
+    /// <summary>The node is a plain host element.</summary>
     Element = 1,
 
-    /// <summary>A functional component.</summary>
+    /// <summary>The node represents stateless functional component behavior.</summary>
     FunctionalComponent = 1 << 1,
 
-    /// <summary>A stateful component.</summary>
+    /// <summary>The node represents an activated component instance with state and lifecycle.</summary>
     StatefulComponent = 1 << 2,
 
-    /// <summary>Children collapse to one text payload.</summary>
+    /// <summary>The node's children collapse to one text payload.</summary>
     TextChildren = 1 << 3,
 
-    /// <summary>Children are an ordered array.</summary>
+    /// <summary>The node's children are an ordered list.</summary>
     ArrayChildren = 1 << 4,
 
-    /// <summary>Children are named slots.</summary>
+    /// <summary>The node's children are a named slot collection.</summary>
     SlotsChildren = 1 << 5,
 
-    /// <summary>A teleport node.</summary>
+    /// <summary>The node is a teleport structural value.</summary>
     Teleport = 1 << 6,
 
-    /// <summary>A suspense node.</summary>
+    /// <summary>The node is a suspense structural value.</summary>
     Suspense = 1 << 7,
 
-    /// <summary>A component that should be cached by keep-alive.</summary>
+    /// <summary>The component is inside a keep-alive boundary and should be retained.</summary>
     ComponentShouldKeepAlive = 1 << 8,
 
-    /// <summary>A component currently retained by keep-alive.</summary>
+    /// <summary>The component is being reactivated from retained keep-alive state.</summary>
     ComponentKeptAlive = 1 << 9,
 
-    /// <summary>Any component shape.</summary>
+    /// <summary>Composite mask matching either functional or stateful component shape.</summary>
     Component = StatefulComponent | FunctionalComponent,
 }

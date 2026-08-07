@@ -5,6 +5,7 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Describes compiler-trusted static markup whose format must be supported by the active host.
 /// </summary>
+/// <remarks>Static nodes are immutable descriptions specified by <c>[CMP-2]</c> and <c>[CMP-3]</c>.</remarks>
 public sealed class StaticNode : VirtualNode
 {
     /// <summary>Initializes an immutable static markup node.</summary>
@@ -13,6 +14,11 @@ public sealed class StaticNode : VirtualNode
     public StaticNode(MarkupFormat format, string content)
         : base(VirtualNodeKind.Static, null, null, null)
     {
+        if (format is not MarkupFormat.Html and not MarkupFormat.ExtensibleMarkupLanguage)
+        {
+            throw new ArgumentOutOfRangeException(nameof(format));
+        }
+
         ArgumentNullException.ThrowIfNull(content);
         Format = format;
         Content = content;

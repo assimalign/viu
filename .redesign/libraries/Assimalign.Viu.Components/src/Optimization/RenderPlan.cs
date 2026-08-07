@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Assimalign.Viu.Components;
@@ -5,6 +6,11 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Carries compiler-produced block and binding information used for selective patching.
 /// </summary>
+/// <remarks>
+/// All collection inputs are copied. A <see langword="null"/> dynamic-child list means no block;
+/// an empty list means an optimized block with no dynamic descendants. Specified by
+/// <c>[RND-BLOCK-1]</c> through <c>[RND-BLOCK-3]</c>.
+/// </remarks>
 public sealed class RenderPlan
 {
     /// <summary>Gets the plan used when no compiler optimization metadata is present.</summary>
@@ -22,9 +28,29 @@ public sealed class RenderPlan
         IEnumerable<int>? dynamicBindingIndices = null,
         IEnumerable<VirtualNode>? dynamicChildren = null)
     {
+        if ((int)patchFlags < 0
+            && patchFlags != PatchFlags.Cached
+            && patchFlags != PatchFlags.Bail)
+        {
+            throw new ArgumentOutOfRangeException(nameof(patchFlags));
+        }
+
         PatchFlags = patchFlags;
         DynamicBindingIndices = CollectionSnapshot.CopyNullable(dynamicBindingIndices);
-        DynamicChildren = CollectionSnapshot.CopyNullable(dynamicChildren);
+        if (DynamicBindingIndices is not null)
+        {
+            foreach (int dynamicBindingIndex in DynamicBindingIndices)
+            {
+                if (dynamicBindingIndex < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(dynamicBindingIndices));
+                }
+            }
+        }
+
+        DynamicChildren = CollectionSnapshot.CopyNullableNonNull(
+            dynamicChildren,
+            nameof(dynamicChildren));
     }
 
     /// <summary>Gets the categories that may change.</summary>

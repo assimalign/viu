@@ -2,7 +2,7 @@ using System;
 
 namespace Assimalign.Viu.Components;
 
-/// <summary>Describes one immutable comment node.</summary>
+/// <summary>Describes one immutable comment node in the closed algebra specified by <c>[CMP-3]</c>.</summary>
 public sealed class CommentNode : VirtualNode
 {
     /// <summary>Initializes a comment node.</summary>

@@ -18,9 +18,22 @@ Emit, Expose, Warn, concrete Watch), `ComponentBase`, `ComponentBindings` and it
 conventions such as State attach only through `Services` and the ambient reactive scope and never
 earn a context member. Deliberately absent: any style-scope identity — scoped CSS is deferred.
 
+`ComponentBindings.Resolve` performs the full pure resolution step: exact, camelized, and
+hyphenated parameter aliases; declared-listener and node-lifecycle filtering; fallthrough splitting;
+and diagnostics for alias collisions, failed validators, and missing required inputs. It deliberately
+does not evaluate defaults or gate warning delivery. Those are mounted-instance responsibilities, so
+the runtime can cache a default once and warn at the correct lifecycle boundary ([CMP-12]).
+
+`ComponentLifecycle` carries the complete named hook surface ([CMP-20] through [CMP-22]). Ordinary
+asynchronous hooks are observed without delaying progression, server prefetch is awaited, and hidden
+runtime operations drive error routing, cancellation, observer draining, and disposal. The public
+surface never exposes an enum-keyed callback registry.
+
 A `ComponentRenderer` receives its mount's `ComponentRenderFrame` — the per-mount render cache
 and block assembly — so there is no ambient render-helper state and no public static helper
 class; compiled output binds through the frame parameter, never through statics imported by name.
+The frame supports nested/disabled block tracking, fixed cache slots, stable handler caching, and
+memo dependency snapshots; cached static subtrees retain identity for one mount ([SFC-OPT-1]).
 Code-first components are `ComponentRegistration.Define(name, contract, setup)` wrapping a
 `ComponentSetup` delegate (composition-only per
 [ADR-0004](../../../../docs/adr/0004-composition-only-component-model.md); no options-object

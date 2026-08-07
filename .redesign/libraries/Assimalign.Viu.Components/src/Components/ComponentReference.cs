@@ -5,6 +5,11 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Identifies a component definition by exactly one supported lookup form.
 /// </summary>
+/// <remarks>
+/// References are descriptions only and never activate an instance. Name identity is ordinal and
+/// resolved through explicit registrations. Specified by <c>[CMP-6]</c>, <c>[CMP-7]</c>, and
+/// <c>[BLT-15]</c>.
+/// </remarks>
 public sealed record ComponentReference
 {
     private ComponentReference(
@@ -32,6 +37,13 @@ public sealed record ComponentReference
     public static ComponentReference ForType(Type componentType)
     {
         ArgumentNullException.ThrowIfNull(componentType);
+        if (!typeof(IComponent).IsAssignableFrom(componentType))
+        {
+            throw new ArgumentException(
+                "A type-based component reference must identify an IComponent implementation.",
+                nameof(componentType));
+        }
+
         return new ComponentReference(ComponentReferenceKind.Type, componentType, null);
     }
 

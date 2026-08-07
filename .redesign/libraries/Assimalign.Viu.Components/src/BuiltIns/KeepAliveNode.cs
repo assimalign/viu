@@ -1,3 +1,5 @@
+using System;
+
 namespace Assimalign.Viu.Components;
 
 /// <summary>
@@ -8,6 +10,7 @@ namespace Assimalign.Viu.Components;
 /// The cached content arrives through the invocation's lazy default slot, and retention inputs
 /// (include, exclude, maximum) ride the invocation arguments, resolved by the executor against
 /// the built-in's published contract — slots are never evaluated at description time.
+/// Specified by <c>[BLT-5]</c> and <c>[BLT-6]</c>.
 /// </remarks>
 public sealed class KeepAliveNode : VirtualNode
 {
@@ -17,7 +20,8 @@ public sealed class KeepAliveNode : VirtualNode
     public KeepAliveNode(ComponentInvocation invocation, object? key = null)
         : base(VirtualNodeKind.KeepAlive, key, null, null)
     {
-        Invocation = invocation ?? ComponentInvocation.Empty;
+        ArgumentNullException.ThrowIfNull(invocation);
+        Invocation = invocation;
     }
 
     /// <summary>Gets the raw arguments and lazy slots supplied at the invocation site.</summary>

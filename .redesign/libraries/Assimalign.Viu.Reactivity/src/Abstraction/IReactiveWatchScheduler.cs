@@ -1,15 +1,16 @@
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Schedules a watch job according to a host's flush and ordering policy.
+/// Schedules pre-flush and post-flush watcher jobs without coupling Reactivity to a renderer.
+/// Standalone watchers fall back to synchronous delivery when no scheduler is supplied. Specified
+/// by <c>[RCT-12]</c>.
 /// </summary>
-/// <remarks>
-/// This is a genuine host port: standalone execution, Core's phased scheduler, and deterministic
-/// tests provide meaningfully different policies.
-/// </remarks>
 public interface IReactiveWatchScheduler
 {
-    /// <summary>Schedules a stable job for later or immediate execution.</summary>
-    /// <param name="job">The job identity and callback.</param>
+    /// <summary>
+    /// Queues <paramref name="job"/> in its requested flush phase. Implementations must deduplicate
+    /// an already queued job and skip inactive jobs.
+    /// </summary>
+    /// <param name="job">The watcher reaction to schedule.</param>
     void Schedule(WatchJob job);
 }

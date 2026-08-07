@@ -5,6 +5,7 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Describes a non-activating invocation of registered authored component behavior.
 /// </summary>
+/// <remarks>Specified by <c>[CMP-7]</c>.</remarks>
 public sealed class ComponentNode : VirtualNode
 {
     /// <summary>Initializes an immutable component invocation node.</summary>

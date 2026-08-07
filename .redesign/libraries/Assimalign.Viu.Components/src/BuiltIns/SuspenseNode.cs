@@ -1,3 +1,5 @@
+using System;
+
 namespace Assimalign.Viu.Components;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Assimalign.Viu.Components;
 /// <remarks>
 /// Content arrives through the invocation's lazy default slot and the fallback through the lazy
 /// fallback slot — both stay unevaluated at description time, preserving slot laziness and
-/// re-render granularity.
+/// re-render granularity. Specified by <c>[BLT-11]</c> through <c>[BLT-13]</c>.
 /// </remarks>
 public sealed class SuspenseNode : VirtualNode
 {
@@ -17,7 +19,8 @@ public sealed class SuspenseNode : VirtualNode
     public SuspenseNode(ComponentInvocation invocation, object? key = null)
         : base(VirtualNodeKind.Suspense, key, null, null)
     {
-        Invocation = invocation ?? ComponentInvocation.Empty;
+        ArgumentNullException.ThrowIfNull(invocation);
+        Invocation = invocation;
     }
 
     /// <summary>Gets the raw arguments and lazy slots supplied at the invocation site.</summary>

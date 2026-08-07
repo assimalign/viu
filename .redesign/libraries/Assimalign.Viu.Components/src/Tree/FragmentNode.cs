@@ -2,7 +2,10 @@ using System.Collections.Generic;
 
 namespace Assimalign.Viu.Components;
 
-/// <summary>Describes a transparent ordered child collection.</summary>
+/// <summary>
+/// Describes a transparent ordered child collection in the closed algebra specified by
+/// <c>[CMP-3]</c>.
+/// </summary>
 public sealed class FragmentNode : CompositeVirtualNode
 {
     /// <summary>Initializes an immutable fragment.</summary>

@@ -1,11 +1,10 @@
 using System;
 
+using Shouldly;
+using Xunit;
+
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
-
-using Shouldly;
-
-using Xunit;
 
 namespace Assimalign.Viu.Components.Tests;
 

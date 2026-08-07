@@ -5,6 +5,10 @@ namespace Assimalign.Viu.Components;
 /// <summary>
 /// Describes one immutable element binding with an explicit host application kind.
 /// </summary>
+/// <remarks>
+/// The explicit kind keeps host attributes, properties, and event subscriptions distinct without
+/// inspecting the value at runtime. Specified by <c>[CMP-3]</c> and <c>[CMP-17]</c>.
+/// </remarks>
 public sealed class ElementBinding
 {
     private ElementBinding(ElementBindingKind kind, QualifiedName name, object? value)
@@ -27,8 +31,15 @@ public sealed class ElementBinding
     /// <param name="name">The qualified attribute name.</param>
     /// <param name="value">The attribute value.</param>
     /// <returns>The immutable binding.</returns>
-    public static ElementBinding Attribute(QualifiedName name, object? value) =>
-        new(ElementBindingKind.Attribute, name, value);
+    public static ElementBinding Attribute(QualifiedName name, object? value)
+    {
+        if (string.IsNullOrEmpty(name.LocalName))
+        {
+            throw new ArgumentException("The attribute local name cannot be empty.", nameof(name));
+        }
+
+        return new ElementBinding(ElementBindingKind.Attribute, name, value);
+    }
 
     /// <summary>Creates a host-property binding.</summary>
     /// <param name="name">The non-empty host property name.</param>
