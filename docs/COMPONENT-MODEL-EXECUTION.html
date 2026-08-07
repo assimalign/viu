@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Viu component model — execution walkthrough</title>
+<style>
+  :root {
+    --bg: #F5F8F7;
+    --panel: #FFFFFF;
+    --ink: #20312F;
+    --muted: #5C6F6B;
+    --line: #C6D4D0;
+    --model: #0E7C6B;
+    --model-soft: #E2F0EC;
+    --engine: #B4540A;
+    --engine-soft: #F7E9DC;
+    --code-bg: #ECF2F0;
+    --dim: #9FB0AB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1715; --panel: #16211E; --ink: #DCE7E3; --muted: #8FA39D;
+      --line: #31423D; --model: #45C2A9; --model-soft: #10312B;
+      --engine: #DE8D52; --engine-soft: #382514; --code-bg: #1B2724; --dim: #4E605B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1715; --panel: #16211E; --ink: #DCE7E3; --muted: #8FA39D;
+    --line: #31423D; --model: #45C2A9; --model-soft: #10312B;
+    --engine: #DE8D52; --engine-soft: #382514; --code-bg: #1B2724; --dim: #4E605B;
+  }
+  :root[data-theme="light"] {
+    --bg: #F5F8F7; --panel: #FFFFFF; --ink: #20312F; --muted: #5C6F6B;
+    --line: #C6D4D0; --model: #0E7C6B; --model-soft: #E2F0EC;
+    --engine: #B4540A; --engine-soft: #F7E9DC; --code-bg: #ECF2F0; --dim: #9FB0AB;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, "Helvetica Neue", sans-serif;
+    font-size: 16px; line-height: 1.6; margin: 0;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 48px 24px 80px; }
+  .prose { max-width: 720px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--model); font-weight: 600; margin: 0 0 10px;
+  }
+  h1 {
+    font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+    font-size: clamp(28px, 4vw, 38px); font-weight: 650; line-height: 1.15;
+    letter-spacing: -0.015em; margin: 0 0 14px; text-wrap: balance;
+  }
+  h2 {
+    font-size: 21px; font-weight: 650; letter-spacing: -0.01em;
+    margin: 56px 0 6px; text-wrap: balance;
+  }
+  p { margin: 10px 0; }
+  .dek { color: var(--muted); font-size: 17px; }
+  a { color: var(--model); }
+  code, .mono {
+    font-family: "Cascadia Code", "Cascadia Mono", Consolas, "SF Mono", ui-monospace, monospace;
+    font-size: .88em;
+  }
+  p code, li code, .status code, figcaption code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+
+  .status {
+    max-width: 720px; margin: 26px 0 0; padding: 16px 18px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-left: 3px solid var(--engine); border-radius: 8px;
+    font-size: 14.5px; line-height: 1.55;
+  }
+  .status p { margin: 0 0 8px; }
+  .status p:last-child { margin-bottom: 0; }
+  .status .label {
+    display: block; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--engine); font-weight: 700; margin-bottom: 6px;
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 26px 0 8px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+  .swatch.model { background: var(--model-soft); border: 1.5px solid var(--model); }
+  .swatch.engine { background: var(--engine-soft); border: 1.5px solid var(--engine); }
+  .swatch.dashed { border: 1.5px dashed var(--muted); background: transparent; }
+
+  figure { margin: 22px 0 0; }
+  .frame {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 12px 10px; overflow-x: auto;
+  }
+  .frame svg { display: block; min-width: 920px; width: 100%; height: auto; }
+  figcaption { font-size: 14px; color: var(--muted); margin: 12px 2px 0; max-width: 780px; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  .fignum { color: var(--model); font-weight: 650; }
+  .clause { font-family: "Cascadia Code", Consolas, ui-monospace, monospace; font-size: .9em; color: var(--ink); }
+
+  /* SVG shared vocabulary */
+  svg text { font-family: "Segoe UI", sans-serif; font-size: 12.5px; fill: var(--ink); }
+  svg .tname { font-family: "Cascadia Code", Consolas, ui-monospace, monospace; font-size: 12px; }
+  svg .tsmall { font-size: 11px; fill: var(--muted); }
+  svg .thead { font-size: 12px; font-weight: 600; letter-spacing: .08em; }
+  svg .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; rx: 6; }
+  svg .model-box { fill: var(--model-soft); stroke: var(--model); stroke-width: 1.3; rx: 6; }
+  svg .engine-box { fill: var(--engine-soft); stroke: var(--engine); stroke-width: 1.3; rx: 6; }
+  svg .dim-box { fill: none; stroke: var(--dim); stroke-width: 1.2; stroke-dasharray: 4 3; rx: 6; }
+  svg .region { fill: none; stroke-width: 1.4; rx: 10; }
+  svg .flow { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+  svg .flow-model { stroke: var(--model); stroke-width: 1.6; fill: none; }
+  svg .flow-engine { stroke: var(--engine); stroke-width: 1.5; fill: none; }
+  svg .dashed { stroke-dasharray: 5 4; }
+  svg .mk-ink { fill: var(--muted); }
+  svg .mk-model { fill: var(--model); }
+  svg .mk-engine { fill: var(--engine); }
+  svg .stepnum circle { fill: var(--panel); stroke: var(--muted); stroke-width: 1.2; }
+  svg .stepnum text { font-size: 11.5px; font-weight: 600; fill: var(--muted); }
+
+  pre.codeblock {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; margin: 18px 0;
+  }
+  pre.codeblock code { background: none; padding: 0; font-size: inherit; }
+  .cm { color: var(--muted); }
+  .kw { color: var(--engine); }
+  .ty { color: var(--model); font-weight: 600; }
+
+  footer { margin-top: 64px; font-size: 13.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 18px; max-width: 720px; }
+  footer p { margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="prose">
+    <p class="eyebrow">Assimalign.Viu · component-model redesign</p>
+    <h1>How the pieces execute</h1>
+    <p class="dek">
+      Four figures, in execution order: who owns each type, what happens when the renderer meets a
+      component, how one raw invocation becomes resolved bindings, and why a reactive change
+      re-renders exactly one component.
+    </p>
+
+    <div class="status">
+      <span class="label">Status — adopted design, not yet implemented</span>
+      <p>
+        This page describes the <strong>end state</strong> of the component-model redesign, staged in
+        the isolated <code>.redesign/</code> tree. The shipping source under <code>libraries/</code>
+        still uses the <code>ComponentKind</code> plus <code>I*Component</code> interface tree that
+        this design replaces. Every framework type named below exists in the staging tree.
+      </p>
+      <p>
+        Rationale, the assembly-seam analysis, and the migration plan live in
+        <a href="../REDESIGN-REVIEW.md"><code>REDESIGN-REVIEW.md</code></a>. Normative semantics
+        remain <a href="SPECIFICATION.md"><code>SPECIFICATION.md</code></a>; clause ids are cited
+        below where this design preserves or extends a specified behavior.
+      </p>
+      <p>
+        <a href="ARCHITECTURE.md"><code>ARCHITECTURE.md</code></a> and
+        <a href="MIGRATION.md"><code>MIGRATION.md</code></a> describe the <em>previous</em> redesign —
+        the one that replaced the <code>VirtualNode</code> vocabulary with the <code>IComponent</code>
+        tree. They predate this work and are pending update; where they disagree with this page about
+        what <code>.redesign/</code> contains, they are stale.
+      </p>
+    </div>
+
+    <div class="legend">
+      <span class="chip"><span class="swatch model"></span><code>Assimalign.Viu.Components</code> — the model (vocabulary)</span>
+      <span class="chip"><span class="swatch engine"></span><code>Assimalign.Viu.Core</code> — the engine (drives; internals shaded)</span>
+      <span class="chip"><span class="swatch dashed"></span>data flowing back / never visited</span>
+    </div>
+  </header>
+
+  <h2>1 · Who owns what — one word, four lifetimes</h2>
+  <p class="prose">
+    <span class="clause">[CMP-1]</span> already separates three roles that one object would otherwise
+    conflate: render description, authored behavior, and runtime bookkeeping. This design makes the
+    fourth — the static identity and declaration — explicit too, and gives each an owner. Components
+    holds three of them; only mounted bookkeeping lives in Core.
+  </p>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 960 540" role="img" aria-label="Ownership map: the Components assembly holds static identity, immutable descriptions, and live-instance types; Core holds the internal engine that implements ComponentContext; Reactivity supplies the scope and scheduler.">
+        <defs>
+          <marker id="f1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" class="mk-engine"></polygon>
+          </marker>
+        </defs>
+
+        <rect x="16" y="34" width="622" height="470" class="region" style="stroke: var(--model)"></rect>
+        <text x="30" y="24" class="thead" style="fill: var(--model)">ASSIMALIGN.VIU.COMPONENTS</text>
+
+        <text x="34" y="66" class="thead">STATIC — once per app</text>
+        <rect x="34" y="80" width="180" height="30" class="box"></rect>
+        <text x="44" y="99" class="tname">ComponentReference</text>
+        <rect x="34" y="118" width="180" height="44" class="box"></rect>
+        <text x="44" y="136" class="tname">ComponentContract</text>
+        <text x="44" y="152" class="tsmall">Parameters · Events · Flags</text>
+        <rect x="34" y="170" width="180" height="44" class="box"></rect>
+        <text x="44" y="188" class="tname">ComponentRegistration</text>
+        <text x="44" y="204" class="tsmall">Reference + Contract + Activator</text>
+        <rect x="34" y="222" width="180" height="30" class="box"></rect>
+        <text x="44" y="241" class="tname">ComponentFactory</text>
+
+        <text x="238" y="66" class="thead">DESCRIPTION — per render</text>
+        <rect x="238" y="80" width="188" height="58" class="box"></rect>
+        <text x="248" y="98" class="tname">VirtualNode</text>
+        <text x="248" y="114" class="tsmall">closed: Element · Text · Comment</text>
+        <text x="248" y="128" class="tsmall">Static · Fragment · Teleport</text>
+        <rect x="238" y="146" width="188" height="44" class="box"></rect>
+        <text x="248" y="164" class="tname">ComponentNode</text>
+        <text x="248" y="180" class="tsmall">Component + Invocation</text>
+        <rect x="238" y="198" width="188" height="44" class="box"></rect>
+        <text x="248" y="216" class="tname">KeepAlive·Suspense·Transition</text>
+        <text x="248" y="232" class="tsmall">each carries a lazy Invocation</text>
+        <rect x="238" y="250" width="188" height="44" class="box"></rect>
+        <text x="248" y="268" class="tname">ComponentInvocation</text>
+        <text x="248" y="284" class="tsmall">Arguments · Slots · Listeners</text>
+        <rect x="238" y="298" width="188" height="44" class="box"></rect>
+        <text x="248" y="316" class="tname">RenderPlan</text>
+        <text x="248" y="332" class="tsmall">PatchFlags · DynamicChildren</text>
+
+        <text x="450" y="66" class="thead">LIVE — one per mount</text>
+        <rect x="450" y="80" width="172" height="30" class="model-box"></rect>
+        <text x="460" y="99" class="tname">IComponent</text>
+        <rect x="450" y="118" width="172" height="86" class="model-box"></rect>
+        <text x="460" y="136" class="tname">ComponentContext</text>
+        <text x="460" y="152" class="tsmall">Bindings · Lifecycle · Parent</text>
+        <text x="460" y="166" class="tsmall">Scope · WatchScheduler</text>
+        <text x="460" y="180" class="tsmall">Services</text>
+        <text x="460" y="194" class="tsmall">Emit · Expose · Warn · Watch</text>
+        <rect x="450" y="212" width="172" height="44" class="model-box"></rect>
+        <text x="460" y="230" class="tname">ComponentBindings</text>
+        <text x="460" y="246" class="tsmall">Parameters · Slots · Fallthrough</text>
+        <rect x="450" y="264" width="172" height="30" class="model-box"></rect>
+        <text x="460" y="283" class="tname">ComponentLifecycle</text>
+
+        <rect x="34" y="380" width="392" height="106" class="region" style="stroke: var(--line)"></rect>
+        <text x="48" y="372" class="thead" style="fill: var(--muted)">ASSIMALIGN.VIU.REACTIVITY (leaf)</text>
+        <rect x="48" y="396" width="176" height="30" class="box"></rect>
+        <text x="58" y="415" class="tname">IReactiveEffectScope</text>
+        <rect x="48" y="434" width="176" height="30" class="box"></rect>
+        <text x="58" y="453" class="tname">IReactiveWatchScheduler</text>
+        <text x="240" y="410" class="tsmall">change tracking is intrinsic to the</text>
+        <text x="240" y="425" class="tsmall">model: ComponentContext exposes</text>
+        <text x="240" y="440" class="tsmall">Scope + WatchScheduler first-class</text>
+
+        <rect x="672" y="34" width="272" height="330" class="region" style="stroke: var(--engine)"></rect>
+        <text x="686" y="24" class="thead" style="fill: var(--engine)">ASSIMALIGN.VIU.CORE</text>
+        <rect x="688" y="66" width="240" height="44" class="engine-box"></rect>
+        <text x="698" y="84" class="tname">RuntimeComponentContext</text>
+        <text x="698" y="100" class="tsmall">internal — the only implementation</text>
+        <rect x="688" y="122" width="240" height="44" class="engine-box"></rect>
+        <text x="698" y="140" class="tname">mounted bookkeeping</text>
+        <text x="698" y="156" class="tsmall">internal — never leaves the engine</text>
+        <rect x="688" y="178" width="240" height="44" class="engine-box"></rect>
+        <text x="698" y="196" class="tname">ComponentHost</text>
+        <text x="698" y="212" class="tsmall">RenderAsync → IComponentRenderScope</text>
+        <rect x="688" y="234" width="240" height="44" class="engine-box"></rect>
+        <text x="698" y="252" class="tname">MountedComponentView&lt;TNode&gt;</text>
+        <text x="698" y="268" class="tsmall">read-only inspection for Testing</text>
+        <text x="688" y="304" class="tsmall">conventions (State, Router) attach</text>
+        <text x="688" y="319" class="tsmall">via context.Services + ambient scope —</text>
+        <text x="688" y="334" class="tsmall">they never earn a context member</text>
+
+        <path d="M 688 88 C 660 88 650 100 622 118" class="flow-engine" marker-end="url(#f1a)"></path>
+        <text x="683" y="56" class="tsmall" style="fill: var(--engine)">implements</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">Figure 1.</span> <b>Ownership.</b> Components owns everything a component <i>is</i> — its identity, its immutable descriptions <span class="clause">[CMP-2]</span>, and its live authoring surface. Core owns only what a component is <i>doing at runtime</i>, and mounted state never travels back into the description model <span class="clause">[RND-3]</span>. The one edge crossing the boundary is Core's internal subclass of the abstract context.</figcaption>
+  </figure>
+
+  <h2>2 · First mount — the engine drives, the model is what it touches</h2>
+  <p class="prose">
+    Everything below happens synchronously inside one patch walk, with no reflection anywhere
+    <span class="clause">[EXE-4]</span>: every step is a dictionary lookup, a delegate call, or a
+    plain method. The renderer receives a per-mount <code>ComponentRenderFrame</code> — the render
+    cache and block assembly ride the parameter, so there is no ambient helper state and no public
+    static helper class.
+  </p>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 960 700" role="img" aria-label="Nine-step sequence of a first mount: the Core engine walks the tree, resolves the reference to a registration, reads the contract, resolves bindings, activates the instance, builds the context, runs Setup, invokes the renderer, and mounts the subtree recording render plans.">
+        <defs>
+          <marker id="f2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" class="mk-ink"></polygon>
+          </marker>
+        </defs>
+        <text x="56" y="26" class="thead" style="fill: var(--engine)">THE ENGINE (Core — drives)</text>
+        <text x="548" y="26" class="thead" style="fill: var(--model)">THE MODEL (Components — what it touches)</text>
+
+        <g class="stepnum"><circle cx="30" cy="72" r="12"></circle><text x="30" y="76" text-anchor="middle">1</text></g>
+        <rect x="56" y="48" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="68">Patch walk reaches a child component</text>
+        <text x="66" y="86" class="tsmall">exhaustive switch on sealed node types — no casts</text>
+        <path d="M 452 72 L 542 72" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="64" class="tsmall" text-anchor="middle">meets</text>
+        <rect x="548" y="48" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="68" class="tname">ComponentNode</text>
+        <text x="558" y="86" class="tsmall tname">{ Component, Invocation }</text>
+
+        <g class="stepnum"><circle cx="30" cy="142" r="12"></circle><text x="30" y="146" text-anchor="middle">2</text></g>
+        <rect x="56" y="118" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="138" class="tname">factory.Resolve(node.Component)</text>
+        <text x="66" y="156" class="tsmall">dictionary lookup — unregistered throws, no discovery</text>
+        <path d="M 452 142 L 542 142" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="134" class="tsmall" text-anchor="middle">yields</text>
+        <rect x="548" y="118" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="138" class="tname">ComponentRegistration</text>
+        <text x="558" y="156" class="tsmall tname">{ Reference, Contract, Activator }</text>
+
+        <g class="stepnum"><circle cx="30" cy="212" r="12"></circle><text x="30" y="216" text-anchor="middle">3</text></g>
+        <rect x="56" y="188" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="208">Read the declaration — before any activation</text>
+        <text x="66" y="226" class="tsmall">hot-reload remount and resolution depend on this order</text>
+        <path d="M 452 212 L 542 212" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="204" class="tsmall" text-anchor="middle">reads</text>
+        <rect x="548" y="188" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="208" class="tname">ComponentContract</text>
+        <text x="558" y="226" class="tsmall tname">{ Parameters, Events, Flags }</text>
+
+        <g class="stepnum"><circle cx="30" cy="282" r="12"></circle><text x="30" y="286" text-anchor="middle">4</text></g>
+        <rect x="56" y="258" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="278" class="tname">ComponentBindings.Resolve(contract, invocation)</text>
+        <text x="66" y="296" class="tsmall">pure function + diagnostics; engine gates the warnings</text>
+        <path d="M 452 282 L 542 282" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="274" class="tsmall" text-anchor="middle">produces</text>
+        <rect x="548" y="258" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="278" class="tname">ComponentBindings</text>
+        <text x="558" y="296" class="tsmall tname">{ Parameters, Slots, FallthroughBindings }</text>
+
+        <g class="stepnum"><circle cx="30" cy="352" r="12"></circle><text x="30" y="356" text-anchor="middle">5</text></g>
+        <rect x="56" y="328" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="348" class="tname">registration.Activator(services)</text>
+        <text x="66" y="366" class="tsmall">direct delegate call — the only activation path</text>
+        <path d="M 452 352 L 542 352" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="344" class="tsmall" text-anchor="middle">creates</text>
+        <rect x="548" y="328" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="348" class="tname">IComponent</text>
+        <text x="558" y="366" class="tsmall">one authored instance for this mount</text>
+
+        <g class="stepnum"><circle cx="30" cy="422" r="12"></circle><text x="30" y="426" text-anchor="middle">6</text></g>
+        <rect x="56" y="398" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="418" class="tname">new RuntimeComponentContext(…)  // internal</text>
+        <text x="66" y="436" class="tsmall">wraps bindings, lifecycle, a fresh effect scope, parent</text>
+        <path d="M 452 422 L 542 422" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="414" class="tsmall" text-anchor="middle">implements</text>
+        <rect x="548" y="398" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="418" class="tname">ComponentContext</text>
+        <text x="558" y="436" class="tsmall">the abstract surface authors program against</text>
+
+        <g class="stepnum"><circle cx="30" cy="492" r="12"></circle><text x="30" y="496" text-anchor="middle">7</text></g>
+        <rect x="56" y="468" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="488" class="tname">instance.Setup(context)</text>
+        <text x="66" y="506" class="tsmall">runs once, synchronously, inside the effect scope</text>
+        <path d="M 452 492 L 542 492" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="484" class="tsmall" text-anchor="middle">returns</text>
+        <rect x="548" y="468" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="488" class="tname">ComponentRenderer</text>
+        <text x="558" y="506" class="tsmall">the closure re-invoked on every reactive change</text>
+
+        <g class="stepnum"><circle cx="30" cy="562" r="12"></circle><text x="30" y="566" text-anchor="middle">8</text></g>
+        <rect x="56" y="538" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="558" class="tname">renderer(frame)  // inside context.Scope</text>
+        <text x="66" y="576" class="tsmall">every reactive read subscribes this component's effect</text>
+        <path d="M 452 562 L 542 562" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="554" class="tsmall" text-anchor="middle">produces</text>
+        <rect x="548" y="538" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="558" class="tname">VirtualNode subtree</text>
+        <text x="558" y="576" class="tsmall">fresh, immutable — never written back to</text>
+
+        <g class="stepnum"><circle cx="30" cy="632" r="12"></circle><text x="30" y="636" text-anchor="middle">9</text></g>
+        <rect x="56" y="608" width="392" height="48" class="engine-box"></rect>
+        <text x="66" y="628">Mount the subtree through the host</text>
+        <text x="66" y="646" class="tsmall">host contract only — no DOM knowledge in the engine</text>
+        <path d="M 452 632 L 542 632" class="flow" marker-end="url(#f2a)"></path>
+        <text x="497" y="624" class="tsmall" text-anchor="middle">records</text>
+        <rect x="548" y="608" width="392" height="48" class="model-box"></rect>
+        <text x="558" y="628" class="tname">RenderPlan</text>
+        <text x="558" y="646" class="tsmall tname">{ PatchFlags, DynamicChildren }</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">Figure 2.</span> <b>First mount.</b> The engine never needs a capability cast: everything it consumes is a public model type, and the one thing the model cannot define — the live implementation of <code>ComponentContext</code> — is exactly what Core adds (step&nbsp;6). Activation stays factory-only <span class="clause">[CMP-4]</span>, setup stays synchronous <span class="clause">[CMP-8]</span>, and the render produces a fresh immutable tree <span class="clause">[RND-1]</span>. Note step&nbsp;3: the contract is readable <i>before</i> activation because it rides the registration, not the instance. Step&nbsp;9 crosses the complete host contract <span class="clause">[RND-HOST-1]</span>.</figcaption>
+  </figure>
+
+  <p class="prose">The same nine steps, seen from the generated <code>.viu</code> component's side:</p>
+  <pre class="codeblock"><code><span class="kw">partial class</span> <span class="ty">Counter</span> : ComponentBase, <span class="ty">IComponent</span>
+{
+    <span class="cm">// ③ read before activation — the contract rides the registration</span>
+    <span class="kw">static readonly</span> <span class="ty">ComponentContract</span> __ViuContract = <span class="kw">new</span>(
+        <span class="cm">"Counter"</span>, ComponentFlags.InheritFallthroughBindings,
+        parameters: [<span class="kw">new</span> <span class="ty">ComponentParameter</span>(<span class="cm">"count"</span>, isRequired: <span class="kw">true</span>), <span class="kw">new</span> <span class="ty">ComponentParameter</span>(<span class="cm">"title"</span>)],
+        events:     [<span class="kw">new</span> <span class="ty">ComponentEvent</span>(<span class="cm">"increment"</span>)]);
+
+    <span class="ty">ComponentRenderer</span> IComponent.Setup(<span class="ty">ComponentContext</span> context)   <span class="cm">// ⑦</span>
+    {
+        Context = context;
+        <span class="kw">var</span> store = CounterStore.Definition.Use(context);            <span class="cm">// seam: Services + ambient — no cast</span>
+        context.Watch(() =&gt; store.Total, (current, previous) =&gt; …); <span class="cm">// scoped to this mount</span>
+        <span class="kw">return</span> frame =&gt; Render(<span class="kw">this</span>, frame);                          <span class="cm">// ⑧ → VirtualNode subtree</span>
+    }
+}</code></pre>
+
+  <h2>3 · One invocation, resolved — raw request vs. mounted view</h2>
+  <p class="prose">
+    The old duplication (<code>Arguments</code>/<code>Slots</code>/<code>Attributes</code> declared
+    twice with the same names) dissolves because the raw request and the resolved view are now
+    <em>different types with different names</em>, connected by one documented transform. Parameter
+    binding still re-runs per render <span class="clause">[CMP-29]</span>.
+  </p>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 960 490" role="img" aria-label="A parent's markup produces a raw ComponentInvocation; Resolve combines it with the ComponentContract to produce ComponentBindings, splitting declared parameters from fallthrough bindings; the declared event listener is consumed and later reached by Emit.">
+        <defs>
+          <marker id="f3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" class="mk-ink"></polygon>
+          </marker>
+          <marker id="f3b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" class="mk-engine"></polygon>
+          </marker>
+        </defs>
+
+        <rect x="24" y="40" width="404" height="54" class="box"></rect>
+        <text x="36" y="62" class="tname">&lt;Counter :count="count" title="Team A"</text>
+        <text x="36" y="80" class="tname">  class="wide" @increment="OnIncrement" /&gt;</text>
+        <text x="24" y="30" class="thead" style="fill: var(--muted)">PARENT TEMPLATE (compiled)</text>
+        <path d="M 226 94 L 226 118" class="flow" marker-end="url(#f3a)"></path>
+
+        <rect x="24" y="124" width="404" height="150" class="model-box"></rect>
+        <text x="36" y="146" class="tname">ComponentInvocation</text>
+        <text x="36" y="170" class="tname tsmall">Arguments  { count: 5, title: "Team A",</text>
+        <text x="36" y="186" class="tname tsmall">             class: "wide" }</text>
+        <text x="36" y="210" class="tname tsmall">Listeners  { increment → OnIncrement }</text>
+        <text x="36" y="234" class="tname tsmall">Slots      { default: (lazy) }</text>
+        <text x="36" y="258" class="tsmall">raw, immutable — exactly what the parent wrote</text>
+
+        <rect x="480" y="40" width="228" height="96" class="model-box"></rect>
+        <text x="492" y="62" class="tname">ComponentContract</text>
+        <text x="492" y="86" class="tname tsmall">Parameters: count (required),</text>
+        <text x="492" y="102" class="tname tsmall">            title</text>
+        <text x="492" y="122" class="tname tsmall">Events:     increment</text>
+        <text x="480" y="30" class="thead" style="fill: var(--muted)">CHILD'S DECLARATION</text>
+
+        <rect x="480" y="180" width="228" height="52" class="box"></rect>
+        <text x="594" y="202" class="tname" text-anchor="middle">ComponentBindings.Resolve</text>
+        <text x="594" y="220" class="tsmall" text-anchor="middle">(contract, invocation, diagnostics)</text>
+        <path d="M 594 136 L 594 174" class="flow" marker-end="url(#f3a)"></path>
+        <path d="M 428 199 L 474 203" class="flow" marker-end="url(#f3a)"></path>
+        <text x="452" y="188" class="tsmall" text-anchor="middle">+</text>
+
+        <rect x="742" y="124" width="200" height="196" class="model-box"></rect>
+        <text x="754" y="146" class="tname">ComponentBindings</text>
+        <text x="754" y="172" class="tname tsmall">Parameters</text>
+        <text x="754" y="188" class="tname tsmall">{ count: 5,</text>
+        <text x="754" y="204" class="tname tsmall">  title: "Team A" }</text>
+        <text x="754" y="230" class="tname tsmall">Slots { default }</text>
+        <text x="754" y="256" class="tname tsmall">FallthroughBindings</text>
+        <text x="754" y="272" class="tname tsmall">{ class: "wide" }</text>
+        <text x="754" y="296" class="tsmall">undeclared → merges onto</text>
+        <text x="754" y="311" class="tsmall">the rendered root</text>
+        <path d="M 708 206 L 736 206" class="flow" marker-end="url(#f3a)"></path>
+
+        <text x="480" y="256" class="tsmall">diagnostics: e.g. MissingRequiredParameter —</text>
+        <text x="480" y="271" class="tsmall">the engine warns once per mount, not per render</text>
+
+        <rect x="24" y="392" width="404" height="44" class="dim-box"></rect>
+        <text x="36" y="410" class="tname tsmall" style="fill: var(--engine)">child later calls context.Emit("increment", 6)</text>
+        <text x="36" y="427" class="tsmall">declared events are consumed as listeners — they never fall through</text>
+        <path d="M 226 392 L 226 278" class="flow-engine dashed" marker-end="url(#f3b)"></path>
+        <text x="238" y="330" class="tsmall" style="fill: var(--engine)">invokes the parent's OnIncrement</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">Figure 3.</span> <b>Resolution.</b> <code>count</code> and <code>title</code> are declared, so they become <code>Parameters</code>; <code>class</code> is not, so it becomes <code>FallthroughBindings</code>; <code>@increment</code> matches a declared event, so it is consumed as a listener reachable only through <code>Emit</code>. The transform is a pure, unit-testable function — per-mount concerns (default caching, warn-once gating) stay in the engine.</figcaption>
+  </figure>
+
+  <h2>4 · The update — component-local invalidation, block-local patching</h2>
+  <p class="prose">
+    This is Viu's founding rendering objective, preserved: a state change re-runs only the render
+    closures that read it, and the resulting diff visits only what the compiler marked dynamic. The
+    three-state block contract of <span class="clause">[RND-BLOCK-1]</span> and the frozen patch-flag
+    layout of <span class="clause">[RND-FLAGS-1]</span> carry over unchanged under the
+    <code>RenderPlan</code> name.
+  </p>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 960 400" role="img" aria-label="A reactive write notifies only the render effect that read the value; the fresh subtree is diffed using the RenderPlan, patching one text node while the sibling button is never visited.">
+        <defs>
+          <marker id="f4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" class="mk-ink"></polygon>
+          </marker>
+          <marker id="f4b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0,0 10,5 0,10" class="mk-model"></polygon>
+          </marker>
+        </defs>
+
+        <rect x="24" y="48" width="150" height="44" class="engine-box"></rect>
+        <text x="99" y="68" class="tname" text-anchor="middle">count.Value++</text>
+        <text x="99" y="84" class="tsmall" text-anchor="middle">anywhere in app code</text>
+
+        <path d="M 174 70 L 220 70" class="flow" marker-end="url(#f4a)"></path>
+        <rect x="226" y="48" width="212" height="44" class="box"></rect>
+        <text x="332" y="68" text-anchor="middle">Reactivity notifies subscribers</text>
+        <text x="332" y="84" class="tsmall" text-anchor="middle">dependency graph, not tree walk</text>
+
+        <path d="M 438 70 L 484 70" class="flow" marker-end="url(#f4a)"></path>
+        <rect x="490" y="48" width="238" height="44" class="box"></rect>
+        <text x="609" y="68" text-anchor="middle">Scheduler queues <tspan style="font-weight:600">one</tspan> render effect</text>
+        <text x="609" y="84" class="tsmall" text-anchor="middle">only the closure that read count</text>
+
+        <path d="M 728 70 L 774 70" class="flow" marker-end="url(#f4a)"></path>
+        <rect x="780" y="48" width="160" height="44" class="model-box"></rect>
+        <text x="860" y="68" class="tname" text-anchor="middle">renderer(frame)</text>
+        <text x="860" y="84" class="tsmall" text-anchor="middle">fresh VirtualNode subtree</text>
+
+        <path d="M 860 92 C 860 140 620 130 555 160" class="flow" marker-end="url(#f4a)"></path>
+
+        <rect x="270" y="164" width="420" height="52" class="model-box"></rect>
+        <text x="480" y="185" class="tname" text-anchor="middle">diff consults RenderPlan</text>
+        <text x="480" y="203" class="tname tsmall" text-anchor="middle">{ PatchFlags.Text, DynamicChildren: [ text ] }</text>
+
+        <path d="M 388 216 L 320 268" class="flow-model" marker-end="url(#f4b)"></path>
+        <text x="330" y="238" class="tsmall" style="fill: var(--model)">in DynamicChildren</text>
+        <path d="M 572 216 L 640 268" class="flow dashed"></path>
+        <text x="590" y="238" class="tsmall">not listed</text>
+
+        <rect x="180" y="274" width="250" height="56" class="model-box"></rect>
+        <text x="192" y="296" class="tname">TextNode  "5" → "6"</text>
+        <text x="192" y="316" class="tsmall">patched — exactly one host write</text>
+
+        <rect x="530" y="274" width="250" height="56" class="dim-box"></rect>
+        <text x="542" y="296" class="tname" style="fill: var(--muted)">ElementNode &lt;button&gt;</text>
+        <text x="542" y="316" class="tsmall">never visited — not even compared</text>
+
+        <text x="24" y="374" class="tsmall">Every skipped visit is a JS-interop round-trip that never happens — the host contract batches what remains into one commit.</text>
+      </svg>
+    </div>
+    <figcaption><span class="fignum">Figure 4.</span> <b>The update loop.</b> Invalidation is component-scoped (the dependency graph knows which render closures read <code>count</code>); patching is block-scoped (the <code>RenderPlan</code> lists the only children that can change). The button's subtree is not diffed cheaply — it is not diffed at all.</figcaption>
+  </figure>
+
+  <footer>
+    <p>
+      Types shown are the adopted end-state scaffold under
+      <code>.redesign/libraries/Assimalign.Viu.Components/src</code>; the staging solution builds with
+      0 warnings and 0 errors and carries 17 contract tests across its projects.
+    </p>
+    <p>
+      Application code in the samples (<code>count.Value</code>, <code>store.Total</code>) is
+      illustrative; every framework type named on this page exists in the staging tree. Scoped CSS is
+      deferred until the arc completes, so no style-scope state appears anywhere above.
+    </p>
+  </footer>
+</div>
+
+</body>
+</html>

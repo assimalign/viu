@@ -1,0 +1,45 @@
+<Project>
+  <ItemGroup>
+    <_ViuRedesignProject Include="$(ViuRedesignDirectory)libraries\**\*.csproj" />
+    <_ViuRedesignProject Include="$(ViuRedesignDirectory)tooling\**\*.csproj" />
+    <_ViuRedesignProject Update="@(_ViuRedesignProject)"
+                         ProjectIdentifier="%(_ViuRedesignProject.Filename)"
+                         ProjectPath="%(_ViuRedesignProject.FullPath)" />
+
+    <ViuProjectReference Update="@(_ViuRedesignProject->'%(ProjectIdentifier)')"
+                         ProjectPath="%(_ViuRedesignProject.ProjectPath)" />
+    <ViuPrivateProjectReference Update="@(_ViuRedesignProject->'%(ProjectIdentifier)')"
+                                ProjectPath="%(_ViuRedesignProject.ProjectPath)" />
+    <ViuAnalyzerReference Update="@(_ViuRedesignProject->'%(ProjectIdentifier)')"
+                          ProjectPath="%(_ViuRedesignProject.ProjectPath)" />
+
+    <ProjectReference Include="@(ViuProjectReference->'%(ProjectPath)')" />
+    <ProjectReference Include="@(ViuPrivateProjectReference->'%(ProjectPath)')"
+                      PrivateAssets="all" />
+    <ProjectReference Include="@(ViuAnalyzerReference->'%(ProjectPath)')"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+
+    <ViuProjectReference Remove="@(ViuProjectReference->HasMetadata('ProjectPath'))" />
+    <ViuPrivateProjectReference Remove="@(ViuPrivateProjectReference->HasMetadata('ProjectPath'))" />
+    <ViuAnalyzerReference Remove="@(ViuAnalyzerReference->HasMetadata('ProjectPath'))" />
+
+    <_ViuRedesignUnresolvedProjectReference Include="@(ViuProjectReference)" />
+    <_ViuRedesignUnresolvedPrivateProjectReference Include="@(ViuPrivateProjectReference)" />
+    <_ViuRedesignUnresolvedAnalyzerReference Include="@(ViuAnalyzerReference)" />
+
+    <ViuProjectReference Remove="@(ViuProjectReference)" />
+    <ViuPrivateProjectReference Remove="@(ViuPrivateProjectReference)" />
+    <ViuAnalyzerReference Remove="@(ViuAnalyzerReference)" />
+    <_ViuRedesignProject Remove="@(_ViuRedesignProject)" />
+  </ItemGroup>
+
+  <Target Name="ViuValidateRedesignProjectReferences" BeforeTargets="PrepareForBuild">
+    <Error Condition="'@(_ViuRedesignUnresolvedProjectReference)' != ''"
+           Text="The redesign project reference(s) '@(_ViuRedesignUnresolvedProjectReference)' do not resolve inside .redesign." />
+    <Error Condition="'@(_ViuRedesignUnresolvedPrivateProjectReference)' != ''"
+           Text="The redesign private project reference(s) '@(_ViuRedesignUnresolvedPrivateProjectReference)' do not resolve inside .redesign." />
+    <Error Condition="'@(_ViuRedesignUnresolvedAnalyzerReference)' != ''"
+           Text="The redesign analyzer reference(s) '@(_ViuRedesignUnresolvedAnalyzerReference)' do not resolve inside .redesign." />
+  </Target>
+</Project>
