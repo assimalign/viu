@@ -90,7 +90,7 @@ package version produced by `Install-Local.ps1` (it tracks the repo's
 ```
 
 **`nuget.config`** — add the local feed alongside nuget.org (point `value` at your clone's
-`_out/packages`; this mirrors the [`sdks/README.md`](../../sdks/README.md#local-development-loop)
+`_out/packages`; this matches the [`sdks/README.md`](../../sdks/README.md#local-development-loop)
 pattern):
 
 ```xml
@@ -164,14 +164,13 @@ await runMain()
 
 ## Your first component
 
-A Viu authored component is a plain C# object implementing `IComponentTemplate`. Its `Setup` method
-runs **once** per mounted instance, declares reactive state as ordinary locals, and returns a
-**render function** producing an immutable `IComponent` tree. The function re-runs whenever the
-reactive state it read changes. The closure *is* the component's state:
-there is no separate state object to declare, no name-based lookup between state and template, and
-no instance to reflect over at run time — which is exactly what makes the model AOT- and
-trimming-safe ([ADR-0004](../adr/0004-composition-only-component-model.md): a component is a setup
-function returning a render function, and there is no second, declarative authoring style).
+A Viu authored component is a plain C# object implementing `IComponent`. Its synchronous `Setup`
+method runs **once** per mounted invocation and returns a `ComponentRenderer`. That render function
+receives the mount's `ComponentRenderFrame`, produces a fresh immutable `VirtualNode` description,
+and re-runs whenever reactive state it read changes. Static identity and input/output declarations
+live on `ComponentRegistration`, where Core can read them before activation; live host bookkeeping
+stays internal. These four distinct lifetimes keep activation explicit, AOT-safe, and free of
+reflection ([ADR-0004](../adr/0004-composition-only-component-model.md)).
 
 **`Program.cs`** — a Viu WASM app's whole bootstrap: compose the app, decorate its live lifetime, and
 await that lifetime. Direct construction of `BrowserApplicationBuilder` selects the browser host and
@@ -186,17 +185,17 @@ using Assimalign.Viu.Components;
 
 using HelloViu;
 
-ComponentFactory components = new(
-[
+ComponentFactory components = new();
+components.Register(
     new ComponentRegistration(
-        typeof(Counter),
-        static () => new Counter()),
-]);
+        Counter.Reference,
+        Counter.Contract,
+        static _ => new Counter()));
 
 await new BrowserApplicationBuilder()
     .ConfigureApplication(options =>
     {
-        options.RootComponent = ComponentTree.Template<Counter>();
+        options.RootComponent = new ComponentNode(Counter.Reference);
         options.Components = components;
     })
     .Build()
@@ -231,7 +230,7 @@ IServiceProvider services = BuildApplicationServices();
 await new BrowserApplicationBuilder()
     .ConfigureApplication(options =>
     {
-        options.RootComponent = ComponentTree.Template<App>();
+        options.RootComponent = new ComponentNode(App.Reference);
         options.Components = components;
         options.Services = services;
     })
@@ -241,25 +240,26 @@ await new BrowserApplicationBuilder()
 
 ```csharp
 // inside a component's Setup:
-var api = (ApiClient?)context.Services.GetService(typeof(ApiClient))
+var api = (ApiClient?)context.Services?.GetService(typeof(ApiClient))
     ?? throw new InvalidOperationException("ApiClient is not registered.");
 ```
 
 `IServiceProvider` is lookup-only, so Viu cannot offer container-agnostic registration methods or
 invent lifetime semantics over it. Register services through your chosen container, then assign the
 resulting provider to `ApplicationOptions.Services`. Viu borrows it and never disposes it; the
-external composition root retains ownership [APP-6]. A primitive tree needs neither a component
-factory nor a provider because the builder supplies empty resolvers for both by default.
+external composition root retains ownership [APP-6]. Services are nullable and opt-in; a primitive
+root needs neither a component registration nor a provider.
 
-This is **app-level** DI, and it is the *only* ambient channel: Viu deliberately has **no hierarchical
-component-tree dependency API** — no ambient provide/inject walking up the parent chain
+This is **app-level** DI. Viu deliberately has **no hierarchical component-tree dependency API** —
+no ambient provide/inject walking up the parent chain
 ([`[CMP-24]`](../SPECIFICATION.md#48-no-component-tree-provideinject)). A component's dependencies are
-explicit, and there are exactly four ways to get one:
+explicit:
 
-- **parameters and slots** for parent-to-child data;
-- **`IComponentContext.Services`** for application services (what you registered on the builder above);
-- **a State definition** resolved through the application's store registry, for shared mutable state; and
-- **`IComponentContext.Components`** for deliberate component resolution by name or type.
+- `ComponentContext.Bindings` carries contract-resolved parameters, slots, and fallthrough values;
+- nullable `ComponentContext.Services` carries application services;
+- State and other conventions attach through services plus the ambient reactive scope; and
+- a parent requests a component explicitly with `ComponentNode` and `ComponentReference`, while
+  application composition owns registration resolution.
 
 This is a decision, not a deferral. An ambient hierarchical channel makes a component's contract
 invisible at its call site and its behavior dependent on where it happens to be mounted; it also
@@ -277,9 +277,15 @@ using Assimalign.Viu.Reactivity;
 
 namespace HelloViu;
 
-internal sealed class Counter : IComponentTemplate
+internal sealed class Counter : IComponent
 {
-    public ComponentRenderer Setup(IComponentContext context)
+    public static ComponentReference Reference { get; } =
+        ComponentReference.ForType(typeof(Counter));
+
+    public static ComponentContract Contract { get; } =
+        new(displayName: nameof(Counter));
+
+    public ComponentRenderer Setup(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -289,43 +295,44 @@ internal sealed class Counter : IComponentTemplate
 
         void Increment() => count.Value++;
 
-        return () => ComponentTree.Element(
-            "section",
-            new ComponentAttributes(
+        return frame => new ElementNode(
+            new QualifiedName("section"),
+            bindings:
             [
-                new ComponentAttribute("class", "counter"),
-            ]),
+                ElementBinding.Attribute(new QualifiedName("class"), "counter"),
+            ],
+            children:
             [
-                ComponentTree.Element(
-                    "h1",
-                    children: [ComponentTree.Text("Hello from Viu")]),
-                ComponentTree.Element(
-                    "p",
-                    new ComponentAttributes(
+                new ElementNode(
+                    new QualifiedName("h1"),
+                    children: [new TextNode("Hello from Viu")]),
+                new ElementNode(
+                    new QualifiedName("p"),
+                    bindings:
                     [
-                        new ComponentAttribute("class", "count"),
-                    ]),
-                    [ComponentTree.Text(label.Value)]),
-                ComponentTree.Element(
-                    "button",
-                    new ComponentAttributes(
+                        ElementBinding.Attribute(new QualifiedName("class"), "count"),
+                    ],
+                    children: [new TextNode(label.Value)]),
+                new ElementNode(
+                    new QualifiedName("button"),
+                    bindings:
                     [
-                        new ComponentAttribute("class", "primary"),
-                        new ComponentAttribute("type", "button"),
-                        new ComponentAttribute("onClick", (Action)Increment),
-                    ]),
-                    [ComponentTree.Text("Increment")]),
+                        ElementBinding.Attribute(new QualifiedName("class"), "primary"),
+                        ElementBinding.Attribute(new QualifiedName("type"), "button"),
+                        ElementBinding.Event("click", (Action)Increment),
+                    ],
+                    children: [new TextNode("Increment")]),
             ]);
     }
 }
 ```
 
-The render function builds an immutable component tree with `ComponentTree`; the runtime diffs it and
-applies only the changed nodes to the real DOM. This matters more on WASM than in JavaScript: **every
-DOM mutation crosses the JS-interop boundary**, so idiomatic Viu leans on the compiled render function
-and the renderer's batched updates rather than imperative DOM access
-([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `ComponentTree`, `IComponent`,
-`IComponentTemplate`, and `IComponentContext` live in
+The render function builds an immutable virtual-node tree; the runtime diffs it and applies only the
+changed nodes to the real DOM. Hand-built output carries `RenderPlan.None` and takes the correct full
+diff path. This matters more on WASM than in JavaScript: **every DOM mutation crosses the JS-interop
+boundary**, so idiomatic Viu leans on compiled render functions and batched renderer updates rather
+than imperative DOM access ([ADR-0003](../adr/0003-batched-interop-dom-operations.md)). `VirtualNode`,
+its ten sealed node kinds, `IComponent`, `ComponentContext`, and registration vocabulary live in
 [`Assimalign.Viu.Components`](../../libraries/Assimalign.Viu.Components/docs/OVERVIEW.md); the
 browser `Application` facade and `BrowserApplication` host live in
 [`Assimalign.Viu.Browser`](../../libraries/Assimalign.Viu.Browser/docs/OVERVIEW.md). For a complete
@@ -386,13 +393,14 @@ Viu's canonical single-file component is the `.viu` file, using the hybrid conta
 is in [`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md); legacy
 `@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
 `<template>`/`@script` compiles to a **mountable component** (see the note below,
-[#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **scoped, bundled CSS**
-unit.
+[#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **bundled CSS** unit.
+Per-component scope identifiers are deferred until the `[V01.01.15]` component-model arc completes;
+their later addition is additive to `ComponentContract` and does not change the file format.
 
 > **`.vue` files compile too.** Viu ships a `.vue` single-file-component compatibility parser as a
 > product feature ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)). The SDK globs
 > `**/*.viu` and `**/*.vue` into the same build graph, and everything downstream of the container
-> parse — template code generation, scoped styles, CSS Modules, source mapping, hot-reload metadata —
+> parse — template code generation, style extraction, CSS Modules, source mapping, hot-reload metadata —
 > is shared. A `.vue` script merges into the generated component only when it declares
 > `lang="csharp"`, because Viu executes no JavaScript. The rules are specified in
 > [§9 of the specification](../SPECIFICATION.md#9-vue-compatibility--a-shipping-feature).
@@ -442,9 +450,10 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > **`.viu` `<template>`/`@script` components are mountable ([#216](https://github.com/assimalign/viu/issues/216)).**
 > A `.viu` with a `<template>` (Viu template syntax) and an `@script` (C#) block now compiles to a
 > **mountable component**: the generator emits the render function, merges the script into the partial
-> class, **and** implements `IComponentTemplate` with a `Setup` that returns the render delegate.
-> Register that generated type in the application `IComponentFactory`, request it with
-> `ComponentTree.Template<Greeting>()`, and assign the factory to `ApplicationOptions.Components`
+> class, **and** implements `IComponent` with a synchronous `Setup(ComponentContext)` returning a
+> frame-based `ComponentRenderer`. Its generated registration carries a static `ComponentContract`
+> beside an explicit activator. Register that definition in the application `IComponentFactory`,
+> request it with `new ComponentNode(ComponentReference.ForType(typeof(Greeting)))`, and assign the factory to `ApplicationOptions.Components`
 > before building and invoking the `RunAsync` extension. Reactive `@script` members (a `Reference<T>`, a `[Reactive]` field) drive
 > re-render, and a
 > template event handler (`@click="Increment"`) calls the like-named `@script` method:
@@ -460,11 +469,10 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > }
 > ```
 >
-> Still in progress ([#227](https://github.com/assimalign/viu/issues/227)): parameters and events
-> declared inside `@script`, and `@script`-authored lifecycle hooks. Until those land,
-> undeclared attributes fall through to the component's root element, and a parent composes a child `.viu`
-> by explicit instantiation (`new Greeting()`). Hand-authored `IComponent` components (as above)
-> remain fully supported.
+> The `[V01.01.15]` migration changes the generated runtime bridge, not this authoring experience:
+> template events still call the named C# member, reactive reads still drive re-render, and parameters,
+> events, lifecycle declarations, and fallthrough behavior retain their specified source forms.
+> Hand-authored `IComponent` components use the same registration and rendering vocabulary.
 
 ## Run and publish
 
@@ -524,17 +532,17 @@ That folder is a static site — host it on any static web host.
 
 ## Not yet available
 
-This guide is intentionally scoped to what a consumer can build and publish today. Coming later:
+The component examples in this guide describe the adopted `[V01.01.15]` standard. The documentation
+lands before the atomic implementation swap on `feature/V01.01.15-component-model`; until that swap
+completes, packaged consumers still see the preceding public names. Other planned work includes:
 
 - **A `dotnet new` project template** — [V01.01.12.04] (W05); until then, create the project by hand as
   above.
-- **Parameters, events, and lifecycle hooks declared inside a `.viu` `@script`** — still in progress
-  ([#227](https://github.com/assimalign/viu/issues/227)). Mountable `.viu` `<template>`/`@script` components
-  themselves already work ([#216](https://github.com/assimalign/viu/issues/216), see the note above).
 - **A template-syntax reference and the API reference site** — the Documentation area
   [V01.01.13](https://github.com/assimalign/viu/issues/97).
 
 ---
 
-This guide follows the repo's [documentation conventions](../CONTRIBUTING.md); every code block is
-extracted verbatim from a Viu app that was built, run, and published against the packaged SDK.
+This guide follows the repo's [documentation conventions](../CONTRIBUTING.md). Component-model code
+blocks are specification examples until the `[V01.01.15]` swap completes; packaging and command
+examples continue to describe the existing SDK workflow.

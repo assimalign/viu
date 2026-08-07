@@ -1,6 +1,7 @@
 # End-state design
 
-Adopted disposition: [`../../REDESIGN-REVIEW.md`](../../REDESIGN-REVIEW.md) §2/§2a. This document
+Adopted disposition:
+[`../../docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §2/§2a. This document
 summarizes what the scaffold models.
 
 ## One word no longer carries four lifetimes

@@ -27,4 +27,5 @@ Code-first components are `ComponentRegistration.Define(name, contract, setup)` 
 form); hand-built subtrees carry `RenderPlan.None` and patch by full diff unless plans are
 supplied.
 
-Adopted disposition: [`../../../../REDESIGN-REVIEW.md`](../../../../REDESIGN-REVIEW.md) §2/§2a.
+Adopted disposition:
+[`../../../../docs/COMPONENT-MODEL-PLAN.md`](../../../../docs/COMPONENT-MODEL-PLAN.md) §2/§2a.

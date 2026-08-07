@@ -143,25 +143,18 @@
     </p>
 
     <div class="status">
-      <span class="label">Status — adopted design, not yet implemented</span>
+      <span class="label">Status — adopted component-model standard; migration swap pending</span>
       <p>
-        This page describes the <strong>end state</strong> of the component-model redesign, staged in
-        the isolated <code>.redesign/</code> tree. The shipping source under <code>libraries/</code>
-        still uses the <code>ComponentKind</code> plus <code>I*Component</code> interface tree that
-        this design replaces. Every framework type named below exists in the staging tree.
+        This page describes the <strong>adopted standard</strong> for the
+        <code>[V01.01.15]</code> component-model arc. Its implementation swap lands on
+        <code>feature/V01.01.15-component-model</code>; the <code>.redesign/</code> scaffold fixes the
+        exact type shapes used during that migration.
       </p>
       <p>
-        Rationale, the assembly-seam analysis, and the migration plan live in
-        <a href="../REDESIGN-REVIEW.md"><code>REDESIGN-REVIEW.md</code></a>. Normative semantics
-        remain <a href="SPECIFICATION.md"><code>SPECIFICATION.md</code></a>; clause ids are cited
-        below where this design preserves or extends a specified behavior.
-      </p>
-      <p>
-        <a href="ARCHITECTURE.md"><code>ARCHITECTURE.md</code></a> and
-        <a href="MIGRATION.md"><code>MIGRATION.md</code></a> describe the <em>previous</em> redesign —
-        the one that replaced the <code>VirtualNode</code> vocabulary with the <code>IComponent</code>
-        tree. They predate this work and are pending update; where they disagree with this page about
-        what <code>.redesign/</code> contains, they are stale.
+        Rationale, the assembly-seam analysis, and the migration trains live in the
+        <a href="COMPONENT-MODEL-PLAN.md"><code>COMPONENT-MODEL-PLAN.md</code></a> plan of record.
+        Normative semantics remain <a href="SPECIFICATION.md"><code>SPECIFICATION.md</code></a>;
+        clause ids are cited below where this design preserves or extends a specified behavior.
       </p>
     </div>
 
@@ -540,9 +533,10 @@
 
   <footer>
     <p>
-      Types shown are the adopted end-state scaffold under
-      <code>.redesign/libraries/Assimalign.Viu.Components/src</code>; the staging solution builds with
-      0 warnings and 0 errors and carries 17 contract tests across its projects.
+      Types shown follow the adopted scaffold under
+      <code>.redesign/libraries/Assimalign.Viu.Components/src</code>. The governing migration sequence
+      and its verification gates are in the
+      <a href="COMPONENT-MODEL-PLAN.md"><code>COMPONENT-MODEL-PLAN.md</code></a> plan of record.
     </p>
     <p>
       Application code in the samples (<code>count.Value</code>, <code>store.Total</code>) is

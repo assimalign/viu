@@ -1,6 +1,7 @@
 # Project graph
 
-Adopted charter: [`../../REDESIGN-REVIEW.md`](../../REDESIGN-REVIEW.md) §2. Vocabulary lives low,
+Adopted charter:
+[`../../docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §2. Vocabulary lives low,
 composition lives high, conventions attach through seams.
 
 ```mermaid

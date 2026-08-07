@@ -23,7 +23,7 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 | Document | What it holds |
 | --- | --- |
 | [`SPECIFICATION.md`](SPECIFICATION.md) | **Normative.** What Viu is and what it guarantees, in numbered clauses with stable ids (`[RND-BLOCK-2]`, `[SCH-4]`, …). The highest authority for Viu's semantics. |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The cross-library architecture: the Reactivity / Components / State / Core package split, the unified component tree, the host-generic application model, and the AOT and ownership rules. |
+| [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md) | The plan of record for the `[V01.01.15]` component-model arc: adopted layer charter, designed seams, type disposition, migration trains, and completion gates. |
 | [`COMPONENT-MODEL-EXECUTION.html`](COMPONENT-MODEL-EXECUTION.html) | A visual walkthrough of the component model in execution — type ownership, first mount, invocation resolution, and the reactive update loop, in four diagrams. Describes the **adopted but not yet implemented** redesign staged under `.redesign/`; open it in a browser. |
 | [`PLAN.md`](PLAN.md) | The delivery narrative — wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. |
 | [`adr/`](adr/) | The append-only log of repo-wide, cross-cutting architecture decisions (see [`adr/README.md`](adr/README.md)). |
@@ -32,8 +32,7 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 | [`DEVELOPER-EXAMPLES.md`](DEVELOPER-EXAMPLES.md) | Worked consumption examples for the Components, Reactivity, State, Core, and Browser packages, written from the application developer's point of view. |
 | [`UTILITY-CSS-DESIGN.md`](UTILITY-CSS-DESIGN.md) | The Viu Utilities design — the Tailwind CSS v4.3.3 compatibility target spanning the CSS parser, the build-time engine, the SDK pipeline, and editor IntelliSense. |
 | [`PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) | **Explicitly non-normative.** The ledger of optimization techniques observed in other rendering frameworks, measured against Viu's baselines before any are adopted. |
-| [`NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The historical record of the reshape from a faithful port to an idiomatic .NET framework, with the arcs that have merged and the parts since superseded. |
-| [`MIGRATION.md`](MIGRATION.md) | The redesign migration map — previous owner or vocabulary to its replacement — for the promotion of the redesigned boundaries into the shipping tree. |
+| [`NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) | The historical record of Viu's .NET-native API reshape, with the arcs that have merged and the parts since superseded. |
 | [`RELEASING.md`](RELEASING.md) | Release channels, NuGet trusted publishing, GitHub Packages, and the Visual Studio Marketplace preview. |
 
 Per-project documentation is indexed from the repository map in the root

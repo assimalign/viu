@@ -4,7 +4,8 @@ This directory is an isolated, compilable model of the adopted end-state boundar
 Components, Reactivity, State, and Core libraries. It is intentionally outside the shipping
 solution. Nothing under `libraries/`, `tooling/`, `frameworks/`, or `sdks/` consumes these projects.
 
-**The adopted disposition is [`../REDESIGN-REVIEW.md`](../REDESIGN-REVIEW.md)** (§2/§2a in
+**The adopted disposition is
+[`../docs/COMPONENT-MODEL-PLAN.md`](../docs/COMPONENT-MODEL-PLAN.md)** (§2/§2a in
 particular): Components owns the component model — the closed `VirtualNode` algebra *and* the
 authored contract (`IComponent`, abstract `ComponentContext`, contract/invocation/bindings,
 registration/factory) — referencing only Reactivity; Core is the Application Model, engine, and

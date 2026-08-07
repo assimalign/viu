@@ -1,45 +1,41 @@
-# Viu abstraction redesign
+# Viu runtime libraries
 
-This directory is the isolated implementation of the approved split of `Assimalign.Viu.Core`.
-Source under `libraries/` remains unchanged until a separate migration is approved.
+This directory contains Viu's shipping runtime libraries. Their documentation describes the
+adopted `[V01.01.15]` component model; the atomic implementation swap lands on
+`feature/V01.01.15-component-model`, using `.redesign/` only as the exact contract scaffold.
 
-The primary runtime packages are:
+The principal packages are:
 
-- `Assimalign.Viu.Components`
-- `Assimalign.Viu.Reactivity`
-- `Assimalign.Viu.State`
-- `Assimalign.Viu.Core`
+- `Assimalign.Viu.Reactivity` — change tracking and reactive lifetimes;
+- `Assimalign.Viu.Components` — the closed `VirtualNode` algebra, authored component contract,
+  registration, bindings, and render plans;
+- `Assimalign.Viu.State` — the state-store convention attached through designed component seams;
+- `Assimalign.Viu.Core` — application composition, lifetime, renderer engine, and host operations;
+- `Assimalign.Viu.Browser` — the browser host and DOM interop;
+- `Assimalign.Viu.ServerRenderer` and `Assimalign.Viu.Testing` — one-shot server rendering and
+  in-memory testing hosts; and
+- `Assimalign.Viu.Router` plus `Assimalign.Viu.Browser.Router` — host-neutral navigation and the
+  browser history/click bridge.
 
-Browser, ServerRenderer, Testing, Router, Browser.Router, Shared, Syntax, template compilation,
-single-file component generation, and CSS tooling are wired to the same redesign graph.
+The application lifetime boundary is host-neutral. Core owns `IApplication`, the read-only
+application context, middleware, `ApplicationLifetime`, and the promoted `ApplicationState`.
+Browser owns its integer DOM handles and mount operations. A future host supplies its own adapter
+without changing component, reactivity, or state APIs.
 
-The application lifetime boundary is host-neutral. Core exposes `IApplication`, the immutable and
-runtime-state-carrying `IApplicationContext`, the lean `IApplicationBuilder`, lifetime middleware,
-and the `RunAsync` extension. `BrowserApplication` implements that contract directly and owns its
-integer-handle mount APIs. A WebView2 host can implement the same lifetime while providing a
-different handle, mount surface, and renderer without changing component, reactivity, or state APIs.
+`IComponentFactory` and nullable `IServiceProvider` are separate, application-owned values. Viu
+supplies no dependency-injection container and no hierarchical component dependency channel.
+Conventions attach through `ComponentContext.Services` plus the ambient reactive scope; activation
+uses explicit `ComponentRegistration` delegates and never runtime constructor discovery.
 
-`IComponentFactory` and `IServiceProvider` are separate application-owned resolvers. Viu supplies
-no custom dependency-injection container and no component-tree `provide`/`inject`.
-
-Build and test the staging solution with:
+Build and test the repository from its root:
 
 ```powershell
-dotnet build .redesign/Assimalign.Viu.Redesign.slnx
-dotnet test .redesign/Assimalign.Viu.Redesign.slnx
-dotnet test analyzers/Assimalign.Viu.Generators.Reactive/test
-dotnet test analyzers/Assimalign.Viu.Generators.Syntax/test
+dotnet build Assimalign.Viu.slnx
+dotnet test <project>/test/
 ```
 
 The packaged-consumer showcase is maintained in
-[`assimalign/viu-examples`](https://github.com/assimalign/viu-examples). The Browser
-compiled-render test project remains the in-repository `.viu` plus renderer integration canary.
-
-Read [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) for the implemented boundaries,
-[`docs/DEVELOPER-EXAMPLES.md`](../docs/DEVELOPER-EXAMPLES.md) for consumption examples, and
-[`docs/MIGRATION.md`](../docs/MIGRATION.md) for the later promotion into `libraries/`.
-
-Known limitation: Suspense mount/update behavior is implemented, but Suspense hydration currently
-fails explicitly. Boundary timeout/events, fallback-to-reveal transition choreography, and
-hidden-branch post-effect delay are not implemented — see
-[§17 of the specification](../docs/SPECIFICATION.md#17-non-goals-and-current-limits).
+[`assimalign/viu-examples`](https://github.com/assimalign/viu-examples). Read the
+[`[V01.01.15]` component-model plan](../docs/COMPONENT-MODEL-PLAN.md) for the adopted boundaries and
+migration trains, [`docs/SPECIFICATION.md`](../docs/SPECIFICATION.md) for normative semantics, and
+[`docs/DEVELOPER-EXAMPLES.md`](../docs/DEVELOPER-EXAMPLES.md) for consumption examples.

@@ -1,11 +1,18 @@
-# Redesign review and counterproposal
+# Component model plan of record
 
-A review of the `.redesign/` end-state (the conversation in [REDESIGN.md](./REDESIGN.md)) and an
-alternative that keeps the closed virtual-node tree the user agreed with **without removing the
-Component abstraction from `Assimalign.Viu.Components`**. Produced from a multi-agent survey of the
-shipping code, three independently developed designs, and an adversarial critique of each; file/line
-citations below were verified against the working tree. The mobile/native portion of the prior
-conversation is out of scope by instruction.
+> **Arc:** `[V01.01.15]` — epic [#313](https://github.com/assimalign/viu/issues/313), features
+> [#314](https://github.com/assimalign/viu/issues/314) through
+> [#317](https://github.com/assimalign/viu/issues/317).
+> **Implementation branch:** `feature/V01.01.15-component-model`.
+> **Precedent:** this plan follows the graduation and execution model established by
+> [`NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md).
+
+This document records the adopted disposition for the `.redesign/` end state. It keeps the closed
+virtual-node tree while retaining the authored-component abstraction in
+`Assimalign.Viu.Components`. The disposition was produced from a repository-wide survey, three
+independently developed designs, and an adversarial critique of each; the file and line citations
+below were verified against the working tree. Mobile and native platform work remains outside this
+arc.
 
 ---
 

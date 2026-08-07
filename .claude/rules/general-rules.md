@@ -125,15 +125,19 @@ Viu.
 
 - **Interface-first**: the public contract is an interface under `Abstraction/`; prefer `internal`
   concrete implementations (surfaced through the interface or a public facade like `Reactive`).
-- **Generated-code binding**: put `[EditorBrowsable(EditorBrowsableState.Never)]` on every public
-  member that exists only so a source generator can bind it by name. `RenderHelpers`,
-  `DomRenderHelpers`, and `ComponentHotReload` are the precedents established by [V01.01.14.02].
+- **Generated-code binding**: follow the three-tier ABI in
+  [`docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §9. Public cross-assembly
+  identity/state types (`ComponentRenderFrame`, nodes, qualified Browser directive APIs) are
+  designed surface; residual stateless glue is generator-emitted `internal` code in the consumer;
+  `ComponentHotReload` is the sole hidden name-bound registration ABI and is marked
+  `[EditorBrowsable(EditorBrowsableState.Never)]`. Generated render code uses no file-level static
+  imports and reserves no underscore-prefixed author names.
 - **Renames before and after release**: before Viu's first public release, renames are direct because
   nothing has shipped publicly and GitHub Packages is the only registry (decision D1 in
   `docs/API-HARDENING-PLAN.md`). After the first public release, retain the old name for one preview
   version with `[Obsolete("Renamed to X.", error: false)]` and
   `[EditorBrowsable(EditorBrowsableState.Never)]`. Do not retain an obsolete alias for a member bound
-  through `using static` in generated code: that alias would warn inside every consuming application's
+  through the generated-code ABI: that alias would warn inside every consuming application's
   compilation.
 - **Dispatch on hot paths**: interfaces are for public contracts and cold paths. On the engine's hot
   paths (per-trigger notification, patching, diffing) prefer an **abstract base class** over an
@@ -163,6 +167,12 @@ Viu.
   4. **Merge the projects**, if the boundary turns out not to be real.
   Being non-shipping is *not* a reason to skip this. A build-time assembly's surface is invisible to app
   developers, but the boundary still exists for the people maintaining it.
+- **Component-model seams.** A library may attach to the component model only through a designed
+  seam: the host contract and public operations, `context.Services` plus the ambient reactive scope,
+  the generated-code ABI, or application composition. If an integration needs a cast, a friend
+  grant, or a bridge interface, the seam is missing; fix the seam, not the shim. The adopted charter
+  and seam inventory are in
+  [`docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §2a.
 - **Placement.** Grants live in `src/Properties/AssemblyInfo.cs` — one file per project, nowhere else.
   Not in a csproj `<InternalsVisibleTo>` item, and not scattered across source files.
 

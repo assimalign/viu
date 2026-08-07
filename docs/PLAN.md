@@ -1,7 +1,7 @@
 # Viu Delivery Plan
 
-Viu is a faithful re-implementation of Vue.js 3 in C#/.NET, running in the browser through the
-.NET WebAssembly build tools (`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). This
+Viu is a standalone C#/.NET user-interface framework running in the browser through the .NET
+WebAssembly build tools (`Microsoft.NET.Sdk.WebAssembly`, `JSImport`/`JSExport` interop). This
 document is the narrative companion to the executable backlog in the org GitHub Project
 [**#15 "Viu"**](https://github.com/orgs/assimalign/projects/15) — the board is the authoritative,
 living plan; this file records the architecture mapping, the founding design decisions, and the wave
@@ -20,26 +20,26 @@ The current code proves the rendering seam end to end and nothing more:
   behavior is exercised by the separate
   [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) showcase.
 
-What it validates: the adapter-injected renderer design (identical in spirit to Vue's
-`createRenderer(RendererOptions)`), and that C#-driven DOM patching through interop works. What it
+What it validates: the host-adapter renderer design and C#-driven DOM patching through interop. What it
 lacks: reactivity (the demo polls every 100 ms), a component model, a scheduler, keyed diffing with
 minimal moves, compiler-informed patching, and every ecosystem piece. The child reconciliation is
 index-based (no LIS), the diff/patch path is duplicated in two implementations, and naming was split
 between `Assimalign.Vue.*` and `Assimalign.Vuecs.*` (standardized on `Assimalign.Vue.*` 2026-07-16,
 then renamed to `Assimalign.Viu.*` with the product rename — see the architecture note below).
 
-## Architecture: Vue 3 package → Viu library
+## Architecture: Viu library map
 
 Package boundaries map 1:1 to .NET class libraries using the inverted layout
 `{libraries,tooling}/Assimalign.Viu.<Name>/{src|test}` — runtime projects live in `libraries/`,
 compiler/editor projects live in `tooling/`, and the folder name is the assembly/package id with no
 area wrapper folders (project decisions, 2026-07-16 and [V01.01.14.05]). The product name is **Viu** and the package
 root is **`Assimalign.Viu.*`** (renamed from Vue/Vuecs 2026-07-19, `V01.01.12.18`/#173, aligning
-the brand with the `.viu` SFC extension; the GitHub repo slug is now `assimalign/viu` (renamed
-from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vuejs.org links, the
-`vue:` template prefix — are deliberately untouched):
+the brand with the `.viu` single-file-component extension; the GitHub repo slug is now
+`assimalign/viu`, renamed from `assimalign/vuecs`). The live `vue:` template prefix and `.vue`
+compatibility input remain deliberate product syntax; external package names in the table below
+record only the July 2026 scoping history:
 
-| Area (WBS) | Viu library | Vue 3 counterpart |
+| Area (WBS) | Viu library | Initial July 2026 scope (historical) |
 | --- | --- | --- |
 | Shared (`V01.01.01`) | `Assimalign.Viu.Shared` | `@vue/shared` — PatchFlags/ShapeFlags/SlotFlags, normalization, DOM tables |
 | Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` → merged into `Assimalign.Viu.Core` ([V01.01.12.21]) | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
@@ -53,13 +53,13 @@ from `assimalign/vuecs`), and upstream Vue.js references — `@vue/*` names, vue
 | DevTools (`V01.01.10`) | `Assimalign.Viu.DevTools` | `vue-devtools` protocol + UI |
 | Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
 | Tooling (`V01.01.12`) | build/CI/templates/dev loop | Vite + `create-vue` + monorepo infra |
-| Documentation (`V01.01.13`) | docs + samples | vuejs.org + examples |
+| Documentation (`V01.01.13`) | docs + samples | documentation and examples |
 
 The parsing side of the map is the **`Assimalign.Viu.Syntax` cluster**: the shared base defines the
 node/diagnostic primitives and a registration-based parser pipeline (`SyntaxParser`,
 `AggregateSyntaxParser` — the seam build tooling uses to attach a parser to a block name, `lang`
-option, or file type, the role Vite plugins play in a Vue build), and one library per language roots
-on it: `Assimalign.Viu.Syntax.Templates` (the Vue template language), `.SingleFileComponent` (the
+  option, or file type), and one library per language roots on it:
+  `Assimalign.Viu.Syntax.Templates` (Viu's template language), `.SingleFileComponent` (the
 `.viu` container), and the browser-language scaffolds `.Css`, `.Html`, and `.JavaScript` (raw-root
 parsers today; rule/element/statement-level parsing lands with their work items, starting with scoped
 CSS [V01.01.06.04]). Composition roots sit beside the cluster as compiler libraries:
@@ -67,79 +67,47 @@ CSS [V01.01.06.04]). Composition roots sit beside the cluster as compiler librar
 build-time hosts run, and `Assimalign.Viu.Compiler.SingleFileComponent` ([V01.01.06.11]) is the ONE
 `.viu`/`.vue` → C# projection pipeline the `Assimalign.Viu.Generators.Syntax` source generator and
 the Visual Studio language service both consume, so build output and editor understanding cannot
-drift (the `@vue/compiler-sfc`-consumed-by-Vite-and-Volar shape).
+  drift.
 
 ## Founding design decisions (C#/WASM divergences)
 
-> **Superseded framing (2026-08-02) — the decisions stand, the framing does not.**
->
-> On 2026-08-02 the user directed that **Viu is a standalone framework, not a port of Vue.js**. Vue
-> is no longer a normative authority for Viu's semantics; the adopted idea was the **render
-> architecture** — hierarchical virtual-node-tree rendering with compiler-informed diffing — which
-> Viu now owns and specifies on its own terms.
-> [**`docs/SPECIFICATION.md`**](SPECIFICATION.md) is the authority for Viu's semantics, and behavior
-> is pinned by this repository's tests.
->
-> Three consequences for reading this section and the architecture map above it:
->
-> 1. **The framing sentence immediately below is superseded.** "Everything else tracks Vue 3
->    semantics (vuejs/core v3.5.x) as the reference implementation" is no longer the policy. There is
->    no reference implementation; there is a specification. The eight decisions themselves are
->    unaffected and remain accurate — each is carried forward as normative clauses in
->    `SPECIFICATION.md` (§3 constraints, §5 reactivity, §6 rendering, §8 compilation, §11 the
->    host-agnostic rule, §15 packaging) and, for the five recorded as ADRs, in
->    [`docs/adr/`](adr/README.md), where each carries its own dated framing note.
-> 2. **The 2026-07-19 packaging note above ("upstream Vue.js references — `@vue/*` names, vuejs.org
->    links, the `vue:` template prefix — are deliberately untouched") is the written form of the
->    policy this decision reverses**, and is superseded for `@vue/*` naming and vuejs.org links used
->    as behavioral authority. Two parts of that sentence remain **true and deliberate**: the `vue:`
->    template prefix is live shipping template syntax, and the "Vue 3 counterpart" column of the
->    architecture table above is preserved as the historical record of how the areas were originally
->    scoped — it is not a parity contract.
-> 3. **The `.vue` compatibility surface is unaffected and is a shipping product feature.**
->    [V01.01.06.09] (#250) targets the Vue single-file-component container specification because
->    compatibility with a documented external format *is* the requirement — the same category as Viu
->    Utilities' Tailwind CSS v4.3.3 target. It is specified as `SPECIFICATION.md` §9.
->
-> Continued evaluation of Vue's (and other frameworks') **performance** work is explicitly retained,
-> through [`docs/PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md) — a non-normative ledger in which
-> nothing becomes binding on Viu until it lands in the specification or an ADR.
->
-> This section is preserved, not rewritten: it records what was decided and when.
+> **Historical scope note (2026-08-02).** The area map records how the July 2026 backlog was
+> initially divided. Since 2026-08-02, [`SPECIFICATION.md`](SPECIFICATION.md) and repository tests
+> have been the authority for Viu semantics; the eight dated decisions below remain Viu-owned
+> architecture decisions. The shipping `.vue` input remains an external container-format
+> compatibility target under [V01.01.06.09], and performance research remains non-normative in
+> [`PERFORMANCE-RESEARCH.md`](PERFORMANCE-RESEARCH.md).
 
-These are deliberate, recorded divergences from upstream — everything else tracks Vue 3 semantics
-(vuejs/core v3.5.x) as the reference implementation:
+These eight dated decisions define Viu's C# and WebAssembly architecture:
 
 1. **Compiler-informed VDOM is the defining idea to keep.** The compiler and runtime share the
    PatchFlags/ShapeFlags/SlotFlags bitmask vocabulary; the runtime patches only what flags say can
    change, and the block tree flattens dynamic nodes. On WASM this matters *more* than in JS: every
    DOM mutation crosses the JS-interop boundary, so every skipped patch visit is a marshaling
    round-trip avoided.
-2. **No JS `Proxy` → Ref-first reactivity + source generators.** `Ref<T>`/`Computed<T>` (plain
-   getter/setter with track/trigger — Vue 3.5's own ref internals port directly) are the primary
-   primitives. `reactive(obj)` becomes `[Reactive]` partial classes whose property wrappers are
-   emitted by a Roslyn source generator; reactive collections are dedicated `ReactiveList<T>`-style
-   types, not proxied BCL types. The dependency engine ports Vue 3.5's version-counter +
-   doubly-linked-list design.
-3. **No runtime template compilation.** Vue's full build compiles templates with `new Function` —
-   impossible in WASM. Templates and SFCs compile at build time via Roslyn source generators; that
+2. **No JS `Proxy` → reference-first reactivity + source generators.** `Reference<T>` and
+   `Computed<T>` getter/setter cells are the primary primitives. `[Reactive]` partial classes receive
+   source-generated property wrappers; reactive collections use dedicated types instead of proxied
+   BCL collections. The dependency engine uses version counters and doubly linked dependency lists.
+3. **No runtime template compilation.** Templates and single-file components compile at build time
+   through Roslyn source generators; that
    is the only path, and it is also how the tooling story (diagnostics, IDE integration) gets
    Razor-grade. The canonical `.viu` container is the **hybrid** form decided 2026-08-02
-   (`V01.01.06.10`, #257): tag-based `<template>`/`<style>` blocks exactly as in Vue, with the
+   (`V01.01.06.10`, #257): tag-based `<template>`/`<style>` blocks, with the
    component's C# kept in an `@script { }` block and custom blocks staying @-syntax. That decision
    partially reverses the 2026-07-17 `V01.01.06.01` decision, which made `@template`/`@script`/
    `@style` @-block syntax canonical for every block — the earlier decision happened and is
    superseded, not erased: the legacy `@template`/`@style` containers still parse during a
    migration window with a Warning-severity diagnostic (the decision record and rules live in
    `tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs/FORMAT.md`). `V01.01.06.09` adds an
-   explicitly scoped tag-based `.vue` compatibility input. Template markup remains standard Vue
-   template syntax in both containers.
+   explicitly scoped tag-based `.vue` compatibility input. Both containers feed the same Viu
+   template compiler.
 4. **The interop boundary is the performance budget.** Patch operations batch into a command buffer
    applied by one JS call per flush; events use one delegated JS listener forwarding into .NET;
    static content is stringified aggressively into `innerHTML` inserts.
-5. **Composition-only component model.** No Options API, no mixins, no
-   `app.config.globalProperties` — typed provide/inject and composition functions instead. Recorded
-   as a founding ADR.
+5. **Composition-only component model.** No options-object authoring, mixins, or global-properties
+   bag. Components use setup closures; conventions attach through services and the ambient reactive
+   scope. Recorded as a founding ADR and refined by `[V01.01.15]`.
 6. **Trimming/AOT-safe everywhere.** No reflection-based serialization, no dynamic codegen, no
    linker-unfriendly activation. Every area publishes a representative WASM consumer with trimming
    validation; size and startup budgets gate CI from W03.
@@ -157,8 +125,8 @@ These are deliberate, recorded divergences from upstream — everything else tra
    framework delivered as the `Assimalign.Viu.App` shared framework: a `KnownFrameworkReference`
    registration resolving to the `Assimalign.Viu.App.Ref` targeting pack (compile references +
    `data/FrameworkList.xml`) and per-RID `Assimalign.Viu.App.Runtime.<rid>` runtime packs
-   (`browser-wasm` today) — the `Microsoft.AspNetCore.App.Ref`/`.Runtime.<rid>` shape, mirrored
-   from `assimalign/cohesion`'s `sdks/` + `frameworks/`. **Codegen placement decision:** the source
+   (`browser-wasm` today) — the shared-framework packaging layout established in
+   `assimalign/cohesion`'s `sdks/` + `frameworks/`. **Codegen placement decision:** the source
    generators stay Roslyn incremental generators (moving them into MSBuild tasks would forfeit IDE
    integration and incrementality) but are *delivered* through the Ref pack's `analyzers/dotnet/cs`
    with `<File Type="Analyzer">` manifest entries, so SDK consumers get `[Reactive]` and `.viu`
@@ -192,11 +160,24 @@ Work is tracked exactly like the sibling Cohesion repo:
 | Wave | Theme | Exit demo |
 | --- | --- | --- |
 | **W01** | Rendering foundation — shared contracts, reactivity core (deps/Ref/effect/computed/scope), VNode v2 + renderer + scheduler + render effects, hardened DOM bridge + patchProp + events, in-memory test renderer, solution restructure + CI | The stopwatch re-renders reactively (no polling) through the new pipeline, tested DOM-free |
-| **W02** | Component model — instance/setup, props, emits, slots, provide/inject, lifecycle, app API, directives, refs, dynamic components, watch, `[Reactive]` source-gen, reactive collections, LIS keyed diff, browser bootstrap, test utils | TodoMVC built from components with `h()` render functions |
+| **W02** | Component model — instance/setup, props, emits, slots, lifecycle, app API, directives, refs, dynamic components, watch, `[Reactive]` source-gen, reactive collections, LIS keyed diff, browser bootstrap, test utils | TodoMVC built from components with `h()` render functions |
 | **W03** | Compiler — template parser → transforms → C# codegen source generator, patch flags + block tree end-to-end, static hoisting, diagnostics, `.viu` SFC format + MSBuild, interop command buffer, v-model/v-show, size budgets | TodoMVC rewritten as `.viu` components; interop calls measurably collapse |
 | **W04** | Ecosystem — router, store, built-ins (Teleport/KeepAlive/Transition/async), scoped CSS + CSS modules, HackerNews sample, getting-started guide | HackerNews client: routed, stored, styled |
 | **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new viu-app` works from NuGet |
 | **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.viu` editor support | Docs site built by Viu itself |
+
+### Active component-model arc
+
+`[V01.01.15]` ([epic #313](https://github.com/assimalign/viu/issues/313);
+[plan of record](COMPONENT-MODEL-PLAN.md)) replaces the outgoing component representation with the
+adopted four-lifetime model: immutable `VirtualNode` descriptions, static registration identity and
+contract, activated authored `IComponent` instances, and Core-owned mounted bookkeeping. It also
+establishes frame-based render emission and the designed host, service/reactive, generated-code, and
+application-composition seams. The arc places `[V01.01.14]` API hardening at a **full stop** until
+the component-model swap lands, so hardening decisions and baselines do not record the outgoing
+surface. After the swap, [#316](https://github.com/assimalign/viu/issues/316) first re-evaluates the
+remaining `[V01.01.14]` work against the adopted surface; public-API baselines are then regenerated,
+and the arc resumes from the first approved incomplete unit in wave order.
 
 ## The planned backlog
 
@@ -241,7 +222,7 @@ Work is tracked exactly like the sibling Cohesion repo:
 | `V01.01.03.07` | Implement props declaration, validation, and attrs fallthrough | W02 | P001 |
 | `V01.01.03.08` | Implement emits and the component event contract | W02 | P001 |
 | `V01.01.03.09` | Implement slots with stability flags | W02 | P002 |
-| `V01.01.03.10` | Implement Provide and Inject | W02 | P002 |
+| `V01.01.03.10` | ~~Implement Provide and Inject~~ — superseded by the explicit dependency seams in `[CMP-24]` and `[CMP-33]` | W02 | P002 |
 | `V01.01.03.11` | Implement lifecycle hooks | W02 | P001 |
 | `V01.01.03.12` | Implement the App API with plugins and global error handling | W02 | P002 |
 | `V01.01.03.13` | Implement the runtime directive system | W02 | P002 |
@@ -389,6 +370,6 @@ Work is tracked exactly like the sibling Cohesion repo:
 - Work-item intake: [.claude/skills/viu-work-items/SKILL.md](../.claude/skills/viu-work-items/SKILL.md)
 - Project schema + manual recipes: [.claude/skills/viu-work-items/reference/project-schema.md](../.claude/skills/viu-work-items/reference/project-schema.md)
 - Working conventions: [.claude/rules/workflow.md](../.claude/rules/workflow.md)
-- Upstream reference: [vuejs/core](https://github.com/vuejs/core) (v3.5.x), [vuejs.org](https://vuejs.org)
+- Performance research policy: [PERFORMANCE-RESEARCH.md](PERFORMANCE-RESEARCH.md)
 
 

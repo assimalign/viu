@@ -1,7 +1,7 @@
 # Current-to-target type map
 
 Targets follow the adopted disposition in
-[`../../REDESIGN-REVIEW.md`](../../REDESIGN-REVIEW.md) §2/§2a.
+[`../../docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §2/§2a.
 
 | Current concept | Target concept | Owner | Reason |
 |---|---|---|---|

@@ -1,7 +1,8 @@
 # End-to-end walkthrough
 
 This example follows one authored component through every lifetime of the adopted model
-([`../../REDESIGN-REVIEW.md`](../../REDESIGN-REVIEW.md)). The source generator would normally emit
+([`../../docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md)). The source generator
+would normally emit
 the reference, contract, and registration; they are written explicitly here so the ownership
 boundaries remain visible.
 
