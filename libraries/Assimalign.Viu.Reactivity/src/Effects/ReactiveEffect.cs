@@ -10,9 +10,9 @@ namespace Assimalign.Viu.Reactivity;
 /// read in the latest run are unlinked). When a tracked dependency triggers, the effect either
 /// invokes its <see cref="Scheduler"/> (exactly once per batch) or re-runs synchronously.
 /// Not thread-safe: designed for the single-threaded JS event-loop model. Specified by
-/// <c>[RCT-2]</c>, <c>[RCT-9]</c>, and <c>[RCT-10]</c>.
+/// <c>[RCT-2]</c>, <c>[RCT-5]</c>, <c>[RCT-9]</c>, and <c>[RCT-10]</c>.
 /// </summary>
-public sealed class ReactiveEffect : Subscriber
+public sealed class ReactiveEffect : Subscriber, IDisposable
 {
     private readonly Action _function;
     private bool _pendingWhilePaused;
@@ -116,6 +116,13 @@ public sealed class ReactiveEffect : Subscriber
         Flags &= ~SubscriberFlags.Active;
         OnStop?.Invoke();
     }
+
+    /// <summary>
+    /// Stops this effect and releases every dependency subscription. Disposal is idempotent and is
+    /// exactly equivalent to <see cref="Stop"/>, so an effect can participate in ordinary owned
+    /// lifetime scopes without a second teardown protocol.
+    /// </summary>
+    public void Dispose() => Stop();
 
     /// <summary>Defers invalidations: while paused, triggers are remembered but not delivered.</summary>
     public void Pause() => Flags |= SubscriberFlags.Paused;

@@ -38,7 +38,7 @@ internal static class PatchFlagNames
         if (flags > 0)
         {
             StringBuilder? builder = null;
-            for (var bit = 1; bit <= (int)PatchFlags.DevRootFragment; bit <<= 1)
+            for (var bit = 1; bit <= (int)PatchFlags.DevelopmentRootFragment; bit <<= 1)
             {
                 var flag = (PatchFlags)bit;
                 if ((flags & flag) == 0)
@@ -70,15 +70,15 @@ internal static class PatchFlagNames
         PatchFlags.Text => "TEXT",
         PatchFlags.Class => "CLASS",
         PatchFlags.Style => "STYLE",
-        PatchFlags.Props => "PROPS",
-        PatchFlags.FullProps => "FULL_PROPS",
-        PatchFlags.NeedHydration => "NEED_HYDRATION",
+        PatchFlags.Properties => "PROPS",
+        PatchFlags.FullProperties => "FULL_PROPS",
+        PatchFlags.NeedsHydration => "NEED_HYDRATION",
         PatchFlags.StableFragment => "STABLE_FRAGMENT",
         PatchFlags.KeyedFragment => "KEYED_FRAGMENT",
         PatchFlags.UnkeyedFragment => "UNKEYED_FRAGMENT",
         PatchFlags.NeedPatch => "NEED_PATCH",
         PatchFlags.DynamicSlots => "DYNAMIC_SLOTS",
-        PatchFlags.DevRootFragment => "DEV_ROOT_FRAGMENT",
+        PatchFlags.DevelopmentRootFragment => "DEV_ROOT_FRAGMENT",
         PatchFlags.Cached => "CACHED",
         PatchFlags.Bail => "BAIL",
         _ => null,

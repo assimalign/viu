@@ -195,12 +195,13 @@ public static class TestServerMarkup
             {
                 position++;
                 SkipWhitespace(attributes, ref position);
-                element.Properties[name] = WebUtility.HtmlDecode(
-                    ParseAttributeValue(attributes, ref position));
+                element.SetProperty(
+                    name,
+                    WebUtility.HtmlDecode(ParseAttributeValue(attributes, ref position)));
             }
             else
             {
-                element.Properties[name] = string.Empty;
+                element.SetProperty(name, string.Empty);
             }
         }
     }
@@ -297,7 +298,7 @@ public static class TestServerMarkup
     private static void Append(TestElement parent, TestNode child)
     {
         child.Parent = parent;
-        parent.Children.Add(child);
+        parent.AddChild(child);
     }
 
     private static int IndexOfWhitespace(string value)

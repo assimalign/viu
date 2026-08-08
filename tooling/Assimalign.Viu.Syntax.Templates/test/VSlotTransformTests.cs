@@ -9,12 +9,12 @@ using Xunit;
 namespace Assimalign.Viu.Syntax.Templates;
 
 // These cases ARE the contract for buildSlots, the
-// SlotFlags fingerprint (STABLE/DYNAMIC/FORWARDED), and the slot-misuse diagnostics.
+// SlotStability fingerprint (STABLE/DYNAMIC/FORWARDED), and the slot-misuse diagnostics.
 public class VSlotTransformTests
 {
     private static ObjectExpression Slots(TransformResult result)
     {
-        var children = result.CodegenNode.ShouldBeOfType<VNodeCall>().Children;
+        var children = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Children;
         return children is CallExpression createSlots
             ? createSlots.Arguments[0].ShouldBeOfType<ObjectExpression>()
             : children.ShouldBeOfType<ObjectExpression>();
@@ -29,18 +29,18 @@ public class VSlotTransformTests
         var result = TransformTestHelpers.Transform("<Comp><template #header>title</template></Comp>");
 
         var slots = Slots(result);
-        slots.Property("header").Value.ShouldBeOfType<FunctionExpression>();
-        SlotFlag(slots).ShouldBe(((int)SlotFlags.Stable).ToString());
+        slots.ObjectProperty("header").Value.ShouldBeOfType<FunctionExpression>();
+        SlotFlag(slots).ShouldBe(((int)SlotStability.Stable).ToString());
         result.ShouldUseHelper("withCtx");
     }
 
     [Fact]
-    public void OnComponentSlot_ProducesDefaultSlotWithProps()
+    public void OnComponentSlot_ProducesDefaultSlotWithProperties()
     {
         var result = TransformTestHelpers.Transform("<Comp v-slot=\"{ item }\">{{ item }}</Comp>");
 
         var slots = Slots(result);
-        var defaultSlot = slots.Property("default").Value.ShouldBeOfType<FunctionExpression>();
+        var defaultSlot = slots.ObjectProperty("default").Value.ShouldBeOfType<FunctionExpression>();
         defaultSlot.Parameters.Count.ShouldBe(1);
         defaultSlot.Parameters[0].ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("{ item }");
     }
@@ -50,11 +50,11 @@ public class VSlotTransformTests
     {
         var result = TransformTestHelpers.Transform("<Comp><template #a v-if=\"ok\">x</template></Comp>");
 
-        var codegenChildren = result.CodegenNode.ShouldBeOfType<VNodeCall>().Children;
+        var codegenChildren = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Children;
         var createSlots = codegenChildren.ShouldBeOfType<CallExpression>();
         createSlots.Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("createSlots");
-        SlotFlag(createSlots.Arguments[0].ShouldBeOfType<ObjectExpression>()).ShouldBe(((int)SlotFlags.Dynamic).ToString());
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().ShouldHavePatchFlag(PatchFlags.DynamicSlots);
+        SlotFlag(createSlots.Arguments[0].ShouldBeOfType<ObjectExpression>()).ShouldBe(((int)SlotStability.Dynamic).ToString());
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().ShouldHavePatchFlag(PatchFlags.DynamicSlots);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class VSlotTransformTests
     {
         var result = TransformTestHelpers.Transform("<Comp><slot></slot></Comp>");
 
-        SlotFlag(Slots(result)).ShouldBe(((int)SlotFlags.Forwarded).ToString());
+        SlotFlag(Slots(result)).ShouldBe(((int)SlotStability.Forwarded).ToString());
     }
 
     [Fact]

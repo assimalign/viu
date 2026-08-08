@@ -23,7 +23,7 @@ internal static class VShowTransform
 
         return new DirectiveTransformResult
         {
-            Properties = Array.Empty<Property>(),
+            Properties = Array.Empty<ObjectProperty>(),
             NeedRuntime = context.Helper(HelperNames.VShow),
         };
     }

@@ -19,6 +19,10 @@
 .PARAMETER ScratchRoot
     A repository-local directory under _out used for an isolated copy and publish
     outputs. The script creates and removes only a uniquely named child directory.
+
+.PARAMETER OfflinePackageDirectory
+    An optional local source for non-Viu packages. When supplied, the isolated
+    restore maps all non-Viu packages to this source instead of nuget.org.
 #>
 [CmdletBinding()]
 param(
@@ -26,7 +30,8 @@ param(
         (Join-Path (Split-Path $PSScriptRoot -Parent) '_out/packages'),
     [string] $Version,
     [string] $ScratchRoot =
-        (Join-Path (Split-Path $PSScriptRoot -Parent) '_out/scratch/application-lifetime-consumer')
+        (Join-Path (Split-Path $PSScriptRoot -Parent) '_out/scratch/application-lifetime-consumer'),
+    [string] $OfflinePackageDirectory
 )
 
 Set-StrictMode -Version Latest
@@ -38,6 +43,19 @@ $fixtureDirectory = Join-Path $PSScriptRoot 'fixtures/ApplicationLifetimeConsume
 $packageDirectoryPath = [System.IO.Path]::GetFullPath($PackageDirectory)
 if (-not [System.IO.Directory]::Exists($packageDirectoryPath)) {
     throw "The package directory does not exist: $packageDirectoryPath"
+}
+
+$externalPackageSourceKey = 'nuget.org'
+$externalPackageSourceValue = 'https://api.nuget.org/v3/index.json'
+if (-not [string]::IsNullOrWhiteSpace($OfflinePackageDirectory)) {
+    $offlinePackageDirectoryPath = [System.IO.Path]::GetFullPath(
+        $OfflinePackageDirectory)
+    if (-not [System.IO.Directory]::Exists($offlinePackageDirectoryPath)) {
+        throw "The offline package directory does not exist: $offlinePackageDirectoryPath"
+    }
+
+    $externalPackageSourceKey = 'offline'
+    $externalPackageSourceValue = $offlinePackageDirectoryPath
 }
 
 $repositoryOutputPath = [System.IO.Path]::GetFullPath(
@@ -134,19 +152,21 @@ try {
 
     $escapedPackageDirectory =
         [System.Security.SecurityElement]::Escape($packageDirectoryPath)
+    $escapedExternalPackageSourceValue =
+        [System.Security.SecurityElement]::Escape($externalPackageSourceValue)
     $nugetConfiguration = @"
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear />
     <add key="viu-local" value="$escapedPackageDirectory" />
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <add key="$externalPackageSourceKey" value="$escapedExternalPackageSourceValue" />
   </packageSources>
   <packageSourceMapping>
     <packageSource key="viu-local">
       <package pattern="Assimalign.Viu.*" />
     </packageSource>
-    <packageSource key="nuget.org">
+    <packageSource key="$externalPackageSourceKey">
       <package pattern="*" />
     </packageSource>
   </packageSourceMapping>
@@ -174,6 +194,52 @@ try {
         "-p:ViuConsumerVersion=$Version"
     if ($LASTEXITCODE -ne 0) {
         throw "Building the application-lifetime package consumer failed with exit code $LASTEXITCODE."
+    }
+
+    # [PKG-2] — the fixture deliberately references every standalone package
+    # that overlaps Assimalign.Viu.App. Verify that the targeting-pack manifest
+    # was consumed and that no matching lib/ asset survived conflict resolution.
+    $expectedFrameworkPackageOverrides = @(
+        'Assimalign.Viu.Components',
+        'Assimalign.Viu.Reactivity',
+        'Assimalign.Viu.State',
+        'Assimalign.Viu.Core',
+        'Assimalign.Viu.Browser'
+    )
+    $packageConflictOverridesPath = Join-Path `
+        $temporaryRootPath `
+        'obj/viu-package-conflict-overrides.txt'
+    if (-not [System.IO.File]::Exists($packageConflictOverridesPath)) {
+        throw "The package consumer did not emit conflict-override evidence: $packageConflictOverridesPath"
+    }
+
+    $packageConflictOverrides = [System.IO.File]::ReadAllText(
+        $packageConflictOverridesPath)
+    foreach ($packageId in $expectedFrameworkPackageOverrides) {
+        $expectedOverride = "$packageId|$Version"
+        if ($packageConflictOverrides.IndexOf(
+                $expectedOverride,
+                [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "The App.Ref targeting pack did not register package override $expectedOverride."
+        }
+    }
+
+    $resolvedPackageReferencesPath = Join-Path `
+        $temporaryRootPath `
+        'obj/viu-resolved-package-references.txt'
+    if (-not [System.IO.File]::Exists($resolvedPackageReferencesPath)) {
+        throw "The package consumer did not emit resolved-reference evidence: $resolvedPackageReferencesPath"
+    }
+
+    $resolvedPackageReferences = [System.IO.File]::ReadAllText(
+        $resolvedPackageReferencesPath).Replace(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar).ToLowerInvariant()
+    foreach ($packageId in $expectedFrameworkPackageOverrides) {
+        $standaloneLibraryAsset = "/$($packageId.ToLowerInvariant())/$($Version.ToLowerInvariant())/lib/"
+        if ($resolvedPackageReferences.Contains($standaloneLibraryAsset)) {
+            throw "Standalone package asset survived App framework conflict resolution: $standaloneLibraryAsset"
+        }
     }
 
     $trimmedOutput = Join-Path $temporaryRootPath 'publish-trimmed'

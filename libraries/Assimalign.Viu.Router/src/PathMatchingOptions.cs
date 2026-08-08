@@ -21,11 +21,11 @@ public sealed class PathMatchingOptions
     /// <c>/users/</c> are distinct). When <see langword="false"/> (the default), a trailing slash is
     /// tolerated.
     /// </summary>
-    public bool Strict { get; init; }
+    public bool TrailingSlashSensitive { get; init; }
 
     /// <summary>
     /// When <see langword="true"/>, matching is case-sensitive. When <see langword="false"/> (the
     /// default), matching ignores case.
     /// </summary>
-    public bool Sensitive { get; init; }
+    public bool CaseSensitive { get; init; }
 }

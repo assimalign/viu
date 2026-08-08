@@ -81,7 +81,7 @@ the Visual Studio language service both consume, so build output and editor unde
 These eight dated decisions define Viu's C# and WebAssembly architecture:
 
 1. **Compiler-informed VDOM is the defining idea to keep.** The compiler and runtime share the
-   PatchFlags/ShapeFlags/SlotFlags bitmask vocabulary; the runtime patches only what flags say can
+   PatchFlags/ShapeFlags bitmask and SlotStability vocabulary; the runtime patches only what flags say can
    change, and the block tree flattens dynamic nodes. On WASM this matters *more* than in JS: every
    DOM mutation crosses the JS-interop boundary, so every skipped patch visit is a marshaling
    round-trip avoided.
@@ -185,7 +185,7 @@ and the arc resumes from the first approved incomplete unit in wave order.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
-| `V01.01.01.01` | Implement the PatchFlags, ShapeFlags, and SlotFlags bitmask model | W01 | P001 |
+| `V01.01.01.01` | Implement the PatchFlags/ShapeFlags bitmask and SlotStability model | W01 | P001 |
 | `V01.01.01.02` | Implement class, style, and display-string normalization helpers | W01 | P002 |
 | `V01.01.01.03` | Implement HTML, SVG, and MathML tag and attribute knowledge tables | W01 | P002 |
 
@@ -216,7 +216,7 @@ and the arc resumes from the first approved incomplete unit in wave order.
 | `V01.01.03.01` | Redesign the VNode model with shape flags and dynamic-children support | W01 | P001 |
 | `V01.01.03.02` | Implement the renderer factory with injected platform node-ops | W01 | P001 |
 | `V01.01.03.03` | Implement keyed children diffing with LIS minimal moves | W02 | P002 |
-| `V01.01.03.04` | Implement the scheduler with batched flush phases and NextTick | W01 | P001 |
+| `V01.01.03.04` | Implement the scheduler with batched flush phases and NextTickAsync | W01 | P001 |
 | `V01.01.03.05` | Integrate render effects for reactive re-rendering | W01 | P001 |
 | `V01.01.03.06` | Implement the component instance and Setup model | W02 | P001 |
 | `V01.01.03.07` | Implement props declaration, validation, and attrs fallthrough | W02 | P001 |

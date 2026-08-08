@@ -23,7 +23,7 @@ internal sealed class DeferredBrowserRouterHistory :
     private readonly List<NavigationCallback> _listeners = [];
     private BrowserRouterHistory? _history;
     private Task? _initialization;
-    private bool _isDestroyed;
+    private bool _isDisposed;
 
     internal DeferredBrowserRouterHistory(
         bool isHash,
@@ -63,7 +63,7 @@ internal sealed class DeferredBrowserRouterHistory :
     /// <inheritdoc/>
     public Action Listen(NavigationCallback callback)
     {
-        ObjectDisposedException.ThrowIf(_isDestroyed, this);
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
         ArgumentNullException.ThrowIfNull(callback);
         _listeners.Add(callback);
         bool isRemoved = false;
@@ -84,22 +84,22 @@ internal sealed class DeferredBrowserRouterHistory :
         => GetHistory().CreateHref(location);
 
     /// <inheritdoc/>
-    public void Destroy()
+    public void Dispose()
     {
-        if (_isDestroyed)
+        if (_isDisposed)
         {
             return;
         }
 
-        _isDestroyed = true;
+        _isDisposed = true;
         _listeners.Clear();
-        _history?.Destroy();
+        _history?.Dispose();
     }
 
     /// <inheritdoc/>
     public ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(_isDestroyed, this);
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
         return new ValueTask(
             _initialization ??= InitializeCoreAsync(cancellationToken));
     }
@@ -108,7 +108,7 @@ internal sealed class DeferredBrowserRouterHistory :
     {
         await _initializeBridge(cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        ObjectDisposedException.ThrowIf(_isDestroyed, this);
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
 
         IBrowserHistoryInterop browserHistoryInterop =
             _createBrowserHistoryInterop();
@@ -123,7 +123,7 @@ internal sealed class DeferredBrowserRouterHistory :
 
     private BrowserRouterHistory GetHistory()
     {
-        ObjectDisposedException.ThrowIf(_isDestroyed, this);
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
         return _history
             ?? throw new InvalidOperationException(NotReadyMessage);
     }

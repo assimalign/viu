@@ -209,10 +209,10 @@ internal static class VIfTransform
             var patchFlag = PatchFlags.StableFragment;
             if (!branch.IsTemplateIf && CountNonComment(children) == 1)
             {
-                patchFlag |= PatchFlags.DevRootFragment;
+                patchFlag |= PatchFlags.DevelopmentRootFragment;
             }
 
-            return context.CreateVNodeCall(
+            return context.CreateVirtualNodeCall(
                 context.Helper(HelperNames.Fragment),
                 Ir.ObjectExpression(new[] { keyProperty }),
                 TransformFreeze.FreezeChildren(children),
@@ -229,13 +229,13 @@ internal static class VIfTransform
         var inner = TransformUtilities.GetMemoedVNodeCall(codegen);
         var isMemo = !ReferenceEquals(inner, codegen);
 
-        var vnodeCall = inner;
-        if (vnodeCall is VNodeCall block)
+        var virtualNodeCall = inner;
+        if (virtualNodeCall is VirtualNodeCall block)
         {
-            vnodeCall = TransformUtilities.ConvertToBlock(block, context);
+            virtualNodeCall = TransformUtilities.ConvertToBlock(block, context);
         }
 
-        var withKey = TransformUtilities.InjectProperty(vnodeCall, keyProperty, context);
+        var withKey = TransformUtilities.InjectProperty(virtualNodeCall, keyProperty, context);
         if (!isMemo)
         {
             return withKey;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
@@ -12,6 +13,18 @@ namespace Assimalign.Viu.Router.Tests;
 // matcher runs in a plain .NET host with no other Viu library ([RTR-1], [RTR-7]).
 public class RouteMatcherResolveTests
 {
+    [Fact]
+    public void RouteLocation_DebuggerDisplay_DescribesImmutableLocationState()
+    {
+        var attribute = (DebuggerDisplayAttribute?)Attribute.GetCustomAttribute(
+            typeof(RouteLocation),
+            typeof(DebuggerDisplayAttribute));
+
+        attribute.ShouldNotBeNull();
+        attribute.Value.ShouldBe(
+            "Path = {Path,nq}, Name = {Name,nq}, Parameters = {Parameters.Count}, Matched = {Matched.Count}");
+    }
+
     [Fact]
     public void Resolve_UnmatchedPath_ReturnsEmptyMatchedWithoutThrowing()
     {
@@ -65,6 +78,23 @@ public class RouteMatcherResolveTests
 
         first.ShouldBe(second);
         first.GetHashCode().ShouldBe(second.GetHashCode());
+    }
+
+    [Fact]
+    public void EqualityOperators_DistinctEqualAndNullLocations_AreNullSafe()
+    {
+        var matcher = new RouteMatcher([new RouteRecord("/users/:id", name: "user")]);
+        RouteLocation first = matcher.Resolve("/users/42");
+        RouteLocation second = matcher.Resolve("/users/42");
+        RouteLocation? missing = null;
+
+        ReferenceEquals(first, second).ShouldBeFalse();
+        (first == second).ShouldBeTrue();
+        (first != second).ShouldBeFalse();
+        (missing == null).ShouldBeTrue();
+        (first == missing).ShouldBeFalse();
+        (missing == first).ShouldBeFalse();
+        (first != missing).ShouldBeTrue();
     }
 
     [Fact]

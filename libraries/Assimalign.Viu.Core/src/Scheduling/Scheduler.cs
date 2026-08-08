@@ -123,7 +123,7 @@ public static class Scheduler
     /// from post-flush callbacks. Specified by <c>[SCH-9]</c>.
     /// </summary>
     /// <returns>The current flush completion, or a completed task when no work is queued.</returns>
-    public static Task NextTick() => _flushCompletion?.Task ?? Task.CompletedTask;
+    public static Task NextTickAsync() => _flushCompletion?.Task ?? Task.CompletedTask;
 
     /// <summary>Runs pending pre-flush jobs immediately in order-key order.</summary>
     /// <remarks>Used by a synchronous renderer before it patches its tree.</remarks>

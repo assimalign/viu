@@ -70,7 +70,7 @@ public class RenderFunctionEmitterTests
         emitted.Code.ShouldContain("Dictionary<string, global::Assimalign.Viu.Components.ComponentSlot>");
         emitted.Code.ShouldContain("global::Assimalign.Viu.Components.ComponentSlot");
         emitted.Code.ShouldContain("new global::Assimalign.Viu.Components.ComponentInvocation(");
-        emitted.Code.ShouldContain("slotStability: (global::Assimalign.Viu.Components.SlotFlags)1");
+        emitted.Code.ShouldContain("slotStability: (global::Assimalign.Viu.Components.SlotStability)1");
         emitted.Code.ShouldContain("new global::Assimalign.Viu.Components.ComponentNode(");
     }
 

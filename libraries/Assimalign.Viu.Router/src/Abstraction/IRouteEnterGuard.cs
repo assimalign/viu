@@ -28,7 +28,10 @@ public interface IRouteEnterGuard
     /// </summary>
     /// <param name="to">The resolved location being navigated to.</param>
     /// <param name="from">The current location being navigated away from.</param>
-    /// <param name="cancellationToken">Signalled when this navigation is superseded by a later one.</param>
+    /// <param name="cancellationToken">Signals caller cancellation, supersession, or router disposal.</param>
     /// <returns>The guard's decision — allow, abort, or redirect.</returns>
-    Task<NavigationGuardResult> BeforeRouteEnter(RouteLocation to, RouteLocation from, CancellationToken cancellationToken);
+    Task<NavigationGuardResult> BeforeRouteEnterAsync(
+        RouteLocation to,
+        RouteLocation from,
+        CancellationToken cancellationToken);
 }

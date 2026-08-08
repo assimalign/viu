@@ -10,7 +10,9 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// container ([V01.01.06.09]) both project into this one block hierarchy, so a consumer downstream of
 /// the container parse never branches on which file it came from (<c>[VUE-2]</c>, <c>[VUE-9]</c>).
 /// The inherited <see cref="SyntaxNode.Location"/> covers the
-/// whole block, including either its <c>@name { }</c> or matching tag container.
+/// whole block, including either its <c>@name { }</c> or matching tag container. Derivation is
+/// assembly-closed so downstream stages only need to handle library-defined variants. Specified by
+/// <c>[SFC-DIAG-3]</c>.
 /// </summary>
 /// <remarks>
 /// Records give the block structural equality — the incremental-caching contract of [V01.01.06.01]:
@@ -21,6 +23,10 @@ namespace Assimalign.Viu.Syntax.SingleFileComponent;
 /// </remarks>
 public abstract record SingleFileComponentBlock : SyntaxNode
 {
+    private protected SingleFileComponentBlock()
+    {
+    }
+
     /// <summary>The block name exactly as authored (for example, <c>template</c>, <c>style</c>, or <c>docs</c>).</summary>
     public required string Name { get; init; }
 

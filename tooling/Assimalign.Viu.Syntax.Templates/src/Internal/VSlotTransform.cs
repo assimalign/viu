@@ -8,7 +8,7 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The <c>v-slot</c> compilation: builds a component's slots object annotated with <see cref="SlotFlags"/>,
+/// The <c>v-slot</c> compilation: builds a component's slots object annotated with <see cref="SlotStability"/>,
 /// and tracks slot scopes so nested slots are marked dynamic.
 /// </summary>
 internal static class VSlotTransform
@@ -115,7 +115,7 @@ internal static class VSlotTransform
     {
         context.Helper(HelperNames.WithCtx);
 
-        var slotsProperties = new List<Property>();
+        var slotsProperties = new List<ObjectProperty>();
         var dynamicSlots = new List<TemplateSyntaxNode>();
         var hasDynamicSlots = context.ScopeVSlot > 0 || context.ScopeVFor > 0;
 
@@ -298,10 +298,10 @@ internal static class VSlotTransform
         }
 
         var slotFlag = hasDynamicSlots
-            ? SlotFlags.Dynamic
-            : HasForwardedSlots(children, context) ? SlotFlags.Forwarded : SlotFlags.Stable;
+            ? SlotStability.Dynamic
+            : HasForwardedSlots(children, context) ? SlotStability.Forwarded : SlotStability.Stable;
 
-        var allProperties = new List<Property>(slotsProperties)
+        var allProperties = new List<ObjectProperty>(slotsProperties)
         {
             Ir.ObjectProperty("_", Ir.SimpleExpression(((int)slotFlag).ToString(CultureInfo.InvariantCulture), false)),
         };
@@ -327,7 +327,7 @@ internal static class VSlotTransform
 
     private static ObjectExpression BuildDynamicSlot(ExpressionNode name, FunctionExpression fn, int? index)
     {
-        var properties = new List<Property>
+        var properties = new List<ObjectProperty>
         {
             Ir.ObjectProperty("name", name),
             Ir.ObjectProperty("fn", fn),

@@ -2,12 +2,12 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// A navigation that did not complete. Returned from
-/// <see cref="Router.Push"/>/<see cref="Router.Replace"/> and handed to every
+/// <see cref="Router.PushAsync"/>/<see cref="Router.ReplaceAsync"/> and handed to every
 /// <see cref="AfterNavigationHook"/>, it records the failure <see cref="Type"/> and the
 /// <see cref="To"/>/<see cref="From"/> locations involved. Specified by <c>[RTR-6]</c>.
 /// </summary>
 /// <remarks>
-/// A failure is a plain returned value, never an exception: <see cref="Router.Push"/> completes
+/// A failure is a plain returned value, never an exception: <see cref="Router.PushAsync"/> completes
 /// with it rather than throwing, and only a genuinely unexpected guard exception faults the returned
 /// task. An abort, a cancellation, and a duplicate are all ordinary outcomes of a correct
 /// application, so keeping them out of exception control flow means a caller that ignores the return

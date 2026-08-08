@@ -32,7 +32,7 @@ public static class CompilerDomKnowledge
 
     /// <summary>Whether <paramref name="tag"/> is a known MathML element.</summary>
     /// <param name="tag">The tag name (matched case-sensitively).</param>
-    public static bool IsMathMLTag(string tag) => MathTagSet.Contains(tag);
+    public static bool IsMathMlTag(string tag) => MathTagSet.Contains(tag);
 
     /// <summary>Whether <paramref name="tag"/> is a void element per the WHATWG void-element list.</summary>
     /// <param name="tag">The tag name (matched case-insensitively).</param>
@@ -40,7 +40,7 @@ public static class CompilerDomKnowledge
 
     /// <summary>Whether <paramref name="tag"/> is a native HTML/SVG/MathML element.</summary>
     /// <param name="tag">The tag name.</param>
-    public static bool IsNativeTag(string tag) => IsHtmlTag(tag) || IsSvgTag(tag) || IsMathMLTag(tag);
+    public static bool IsNativeTag(string tag) => IsHtmlTag(tag) || IsSvgTag(tag) || IsMathMlTag(tag);
 
     /// <summary>Whether <paramref name="attributeName"/> is a known HTML attribute.</summary>
     /// <param name="attributeName">The attribute name (matched case-sensitively).</param>

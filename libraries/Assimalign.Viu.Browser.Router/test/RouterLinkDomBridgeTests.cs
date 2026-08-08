@@ -160,7 +160,7 @@ public class RouterLinkDomBridgeTests
 
             order.ShouldBe(["ready", "initialize", "resolve", "mount", "unmount"]);
             BrowserObjectEvents.Invoker.ShouldBeNull();
-            (await router.Push("/next")).ShouldBeNull();
+            (await router.PushAsync("/next")).ShouldBeNull();
             navigationCount.ShouldBe(2);
         }
         finally

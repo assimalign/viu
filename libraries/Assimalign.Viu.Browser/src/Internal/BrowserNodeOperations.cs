@@ -131,7 +131,7 @@ internal static class BrowserNodeOperations
         => PurgeReleasedHandles(BrowserDomBridge.SetElementText(nodeHandle, string.Empty));
 
     /// <summary>Registry sizes for leak diagnostics: JS nodes, JS listener maps, .NET invokers.</summary>
-    internal static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
+    internal static (int JavaScriptNodes, int JavaScriptListenerMaps, int ManagedListeners) GetRegistryDiagnostics()
     {
         var sizes = BrowserDomBridge.GetRegistrySizes();
         return (sizes[0], sizes[1], ActiveInvokerCount);

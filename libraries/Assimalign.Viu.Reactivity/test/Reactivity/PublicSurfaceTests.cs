@@ -147,7 +147,7 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ReadonlyComputed_SetterIsANonThrowingNoOp()
+    public void ReadOnlyComputed_SetterIsANonThrowingNoOp()
     {
         var readonlyComputed = Reactive.Computed(() => 41);
         readonlyComputed.IsReadOnly.ShouldBeTrue();

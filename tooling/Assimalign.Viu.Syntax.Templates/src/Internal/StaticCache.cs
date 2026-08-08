@@ -69,7 +69,7 @@ internal static class StaticCache
                 {
                     if (constantType >= ConstantType.CanCache)
                     {
-                        if (context.GetCodegenNode(element) is VNodeCall codegenNode)
+                        if (context.GetCodegenNode(element) is VirtualNodeCall codegenNode)
                         {
                             context.SetCodegenNode(element, codegenNode with { PatchFlag = PatchFlags.Cached });
                         }
@@ -81,13 +81,13 @@ internal static class StaticCache
                 else
                 {
                     // The element may have dynamic children, but its props can still be eligible for caching.
-                    if (context.GetCodegenNode(element) is VNodeCall { Props: { } props } codegenNode)
+                    if (context.GetCodegenNode(element) is VirtualNodeCall { Properties: { } props } codegenNode)
                     {
                         var flag = codegenNode.PatchFlag;
                         if ((flag is null or PatchFlags.NeedPatch or PatchFlags.Text) &&
                             ConstantAnalysis.GetGeneratedPropsConstantType(element, context) >= ConstantType.CanCache)
                         {
-                            context.SetCodegenNode(element, codegenNode with { Props = context.Cache(props) });
+                            context.SetCodegenNode(element, codegenNode with { Properties = context.Cache(props) });
                         }
                     }
                 }
@@ -145,7 +145,7 @@ internal static class StaticCache
 
         // The DOM stringification hook, gated to non-SSR: contiguous stringifiable cached runs above the
         // thresholds collapse into a single static insert ([SFC-OPT-2]).
-        if (toCache.Count > 0 && !context.Ssr && !context.InSSR)
+        if (toCache.Count > 0 && !context.IsServerRendering && !context.IsNestedServerRendering)
         {
             StaticStringifier.Run(node, context);
         }

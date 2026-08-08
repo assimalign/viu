@@ -86,7 +86,7 @@ internal abstract class Watcher
         {
             return;
         }
-        if (_flush == WatchFlushMode.Sync || _scheduler is null)
+        if (_flush == WatchFlushMode.Synchronous || _scheduler is null)
         {
             React();
             return;

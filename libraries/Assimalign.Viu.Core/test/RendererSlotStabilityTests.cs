@@ -22,24 +22,24 @@ public sealed class RendererSlotStabilityTests
             ["default"] = static _ => new TextNode("content"),
         };
 
-        new ComponentInvocation().SlotStability.ShouldBe(SlotFlags.Stable);
-        new ComponentInvocation(slots: slots).SlotStability.ShouldBe(SlotFlags.Stable);
-        new ComponentInvocation(slots: slots, slotStability: SlotFlags.Dynamic)
-            .SlotStability.ShouldBe(SlotFlags.Dynamic);
+        new ComponentInvocation().SlotStability.ShouldBe(SlotStability.Stable);
+        new ComponentInvocation(slots: slots).SlotStability.ShouldBe(SlotStability.Stable);
+        new ComponentInvocation(slots: slots, slotStability: SlotStability.Dynamic)
+            .SlotStability.ShouldBe(SlotStability.Dynamic);
     }
 
     [Fact]
     public void ComponentInvocation_InvalidSlotStability_ThrowsArgumentOutOfRangeException()
     {
         Should.Throw<ArgumentOutOfRangeException>(
-            () => new ComponentInvocation(slotStability: (SlotFlags)0));
+            () => new ComponentInvocation(slotStability: (SlotStability)0));
     }
 
     [Fact]
     public void Render_StableSlotsWithUnchangedArguments_SkipsChildRenderAndUpdate()
     {
         SlotScenario result = RunDirectScenario(
-            SlotFlags.Stable,
+            SlotStability.Stable,
             "before",
             "after");
 
@@ -53,7 +53,7 @@ public sealed class RendererSlotStabilityTests
     public void Render_DynamicSlots_ForceChildRenderAndUpdate()
     {
         SlotScenario result = RunDirectScenario(
-            SlotFlags.Dynamic,
+            SlotStability.Dynamic,
             "before",
             "after");
 
@@ -67,7 +67,7 @@ public sealed class RendererSlotStabilityTests
     public void Render_DynamicSlotsPatchFlag_OverridesStableClassification()
     {
         SlotScenario result = RunDirectScenario(
-            SlotFlags.Stable,
+            SlotStability.Stable,
             "before",
             "after",
             new RenderPlan(PatchFlags.DynamicSlots));
@@ -80,7 +80,7 @@ public sealed class RendererSlotStabilityTests
     [Fact]
     public void Render_ForwardedSlotsFromStableParent_InheritStableSkip()
     {
-        SlotScenario result = RunForwardedScenario(SlotFlags.Stable);
+        SlotScenario result = RunForwardedScenario(SlotStability.Stable);
 
         result.Counter.RenderCount.ShouldBe(1);
         result.Counter.BeforeUpdateCount.ShouldBe(0);
@@ -90,7 +90,7 @@ public sealed class RendererSlotStabilityTests
     [Fact]
     public void Render_ForwardedSlotsFromDynamicParent_InheritDynamicForce()
     {
-        SlotScenario result = RunForwardedScenario(SlotFlags.Dynamic);
+        SlotScenario result = RunForwardedScenario(SlotStability.Dynamic);
 
         result.Counter.RenderCount.ShouldBe(2);
         result.Counter.BeforeUpdateCount.ShouldBe(1);
@@ -122,7 +122,7 @@ public sealed class RendererSlotStabilityTests
             [
                 new DirectiveInvocation(typeof(RootTransferDirectiveToken)),
             ],
-            slotStability: SlotFlags.Stable);
+            slotStability: SlotStability.Stable);
         var request = new ComponentNode(reference, invocation);
         var application = new ApplicationContext(
             new ApplicationOptions
@@ -151,7 +151,7 @@ public sealed class RendererSlotStabilityTests
     }
 
     private static SlotScenario RunDirectScenario(
-        SlotFlags slotStability,
+        SlotStability slotStability,
         string initialText,
         string nextText,
         RenderPlan? nextRenderPlan = null)
@@ -178,7 +178,7 @@ public sealed class RendererSlotStabilityTests
             host.Container.DescendantText);
     }
 
-    private static SlotScenario RunForwardedScenario(SlotFlags parentSlotFlags)
+    private static SlotScenario RunForwardedScenario(SlotStability parentSlotStability)
     {
         using var host = new RendererParityHost();
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
@@ -197,7 +197,7 @@ public sealed class RendererSlotStabilityTests
             _ => new ForwardingSlotOwnerComponent(childReference));
         ComponentNode initial = CreateForwardingOwnerRequest(
             parentReference,
-            parentSlotFlags,
+            parentSlotStability,
             "before");
         ApplicationContext application = CreateApplication(
             initial,
@@ -209,7 +209,7 @@ public sealed class RendererSlotStabilityTests
         renderer.Render(
             CreateForwardingOwnerRequest(
                 parentReference,
-                parentSlotFlags,
+                parentSlotStability,
                 "after"),
             host.Container);
         host.RunScheduledFlushes();
@@ -229,7 +229,7 @@ public sealed class RendererSlotStabilityTests
 
     private static ComponentNode CreateSlotRequest(
         ComponentReference reference,
-        SlotFlags slotStability,
+        SlotStability slotStability,
         string text,
         RenderPlan? renderPlan = null) =>
         new(
@@ -244,7 +244,7 @@ public sealed class RendererSlotStabilityTests
 
     private static ComponentNode CreateForwardingOwnerRequest(
         ComponentReference reference,
-        SlotFlags slotStability,
+        SlotStability slotStability,
         string content) =>
         new(
             reference,
@@ -321,7 +321,7 @@ public sealed class RendererSlotStabilityTests
                         {
                             ["default"] = _ => new TextNode(content),
                         },
-                        slotStability: SlotFlags.Forwarded));
+                        slotStability: SlotStability.Forwarded));
             };
     }
 

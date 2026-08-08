@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Router;
 /// <see cref="CurrentRoute"/> — a shallow reference over the resolved location, so a navigation is
 /// one trigger rather than one per changed field — resolves targets and hrefs through the matcher
 /// and history, and drives navigations through the asynchronous, guarded, cancellable pipeline with
-/// <see cref="Push"/>/<see cref="Replace"/>.
+/// <see cref="PushAsync"/>/<see cref="ReplaceAsync"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -39,7 +39,7 @@ namespace Assimalign.Viu.Router;
 /// <para>
 /// <b>Three deliberate API shapes</b> (see <c>docs/DESIGN.md</c>): a guard returns a
 /// <see cref="NavigationGuardResult"/> rather than invoking a continuation, so it decides exactly
-/// once (<c>[RTR-5]</c>); <see cref="Push"/> completes with a <see cref="NavigationFailure"/> for
+/// once (<c>[RTR-5]</c>); <see cref="PushAsync"/> completes with a <see cref="NavigationFailure"/> for
 /// abort/cancel/duplicate and faults only on a genuinely unexpected guard exception (routed to
 /// <see cref="OnError"/>), keeping routine outcomes out of exception control flow; and a redirect
 /// loop throws <see cref="NavigationRedirectException"/> in every configuration, not only in
@@ -74,7 +74,10 @@ public sealed class Router : IDisposable
     private bool _disposed;
 
     /// <summary>Creates a router over an existing matcher and history.</summary>
-    /// <param name="history">The history integration (memory, web, or hash) driving locations.</param>
+    /// <param name="history">
+    /// The borrowed history integration (memory, web, or hash) driving locations. The caller retains
+    /// ownership and disposes it after this router.
+    /// </param>
     /// <param name="matcher">The route table and matcher resolving locations.</param>
     /// <exception cref="ArgumentNullException"><paramref name="history"/> or <paramref name="matcher"/> is null.</exception>
     public Router(IRouterHistory history, IRouteMatcher matcher)
@@ -92,7 +95,10 @@ public sealed class Router : IDisposable
     }
 
     /// <summary>Creates a router over a fresh <see cref="RouteMatcher"/> built from <paramref name="routes"/>.</summary>
-    /// <param name="history">The history integration driving locations.</param>
+    /// <param name="history">
+    /// The borrowed history integration driving locations. The caller retains ownership and
+    /// disposes it after this router.
+    /// </param>
     /// <param name="routes">The top-level route records.</param>
     /// <exception cref="ArgumentNullException"><paramref name="history"/> or <paramref name="routes"/> is null.</exception>
     public Router(IRouterHistory history, IEnumerable<RouteRecord> routes)
@@ -105,7 +111,7 @@ public sealed class Router : IDisposable
     /// navigation drives every <see cref="RouterView"/> and the active-class computation of every
     /// <see cref="RouterLink"/> through the normal reactivity graph.
     /// </summary>
-    public IReactiveReference<RouteLocation> CurrentRoute => _currentRoute;
+    public IReactiveReadOnlyReference<RouteLocation> CurrentRoute => _currentRoute;
 
     /// <summary>
     /// The default active class applied to a <see cref="RouterLink"/> whose target is an inclusive
@@ -196,7 +202,7 @@ public sealed class Router : IDisposable
 
     /// <summary>
     /// Registers a handler for unexpected exceptions thrown by guards during navigation. A
-    /// <see cref="NavigationFailure"/> is returned from <see cref="Push"/> rather than routed here.
+    /// <see cref="NavigationFailure"/> is returned from <see cref="PushAsync"/> rather than routed here.
     /// </summary>
     /// <param name="handler">The error handler to register.</param>
     /// <returns>A delegate that unregisters <paramref name="handler"/> when invoked.</returns>
@@ -211,19 +217,27 @@ public sealed class Router : IDisposable
     /// exception (also routed to <see cref="OnError"/>).
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
+    /// <param name="cancellationToken">Cancels this navigation without cancelling a later navigation.</param>
     /// <returns>The navigation outcome.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
-    public Task<NavigationFailure?> Push(string location) => Navigate(location, replace: false);
+    public Task<NavigationFailure?> PushAsync(
+        string location,
+        CancellationToken cancellationToken = default) =>
+        Navigate(location, replace: false, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Navigates to <paramref name="location"/> through the guard pipeline, replacing the current
     /// history entry and updating <see cref="CurrentRoute"/> on success. Resolves with the same
-    /// navigation result as <see cref="Push"/>.
+    /// navigation result as <see cref="PushAsync"/>.
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
+    /// <param name="cancellationToken">Cancels this navigation without cancelling a later navigation.</param>
     /// <returns>The navigation outcome.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="location"/> is null.</exception>
-    public Task<NavigationFailure?> Replace(string location) => Navigate(location, replace: true);
+    public Task<NavigationFailure?> ReplaceAsync(
+        string location,
+        CancellationToken cancellationToken = default) =>
+        Navigate(location, replace: true, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Runs the initial navigation and resolves when it settles. The first call
@@ -273,7 +287,10 @@ public sealed class Router : IDisposable
     /// <summary>Moves one entry forward in history.</summary>
     public void Forward() => Go(1);
 
-    /// <summary>Removes the history listener and cancels any in-flight navigation so nothing outlives the router.</summary>
+    /// <summary>
+    /// Removes the history listener and cancels any in-flight navigation so nothing outlives the
+    /// router. The borrowed history is not disposed.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)
@@ -282,9 +299,16 @@ public sealed class Router : IDisposable
         }
         _disposed = true;
         _unlisten();
-        _pendingNavigation?.Cancel();
-        _pendingNavigation?.Dispose();
+        CancellationTokenSource? pendingNavigation = _pendingNavigation;
         _pendingNavigation = null;
+        try
+        {
+            pendingNavigation?.Cancel();
+        }
+        finally
+        {
+            pendingNavigation?.Dispose();
+        }
     }
 
     // Registers an in-component leave guard for a record and returns its remover (called by
@@ -374,7 +398,29 @@ public sealed class Router : IDisposable
         int redirectCount,
         CancellationToken cancellationToken)
     {
-        var token = BeginNavigation(cancellationToken);
+        CancellationTokenSource cancellationSource = BeginNavigation(cancellationToken);
+        try
+        {
+            return await PushWithRedirectCore(
+                to,
+                replace,
+                redirectedFrom,
+                redirectCount,
+                cancellationSource.Token);
+        }
+        finally
+        {
+            CompleteNavigation(cancellationSource);
+        }
+    }
+
+    private async Task<NavigationFailure?> PushWithRedirectCore(
+        RouteLocation to,
+        bool replace,
+        RouteLocation? redirectedFrom,
+        int redirectCount,
+        CancellationToken token)
+    {
         var from = _currentRoute.Value;
         NavigationFailure? failure;
         // Dedup only when `from` already has a matched chain:
@@ -413,12 +459,12 @@ public sealed class Router : IDisposable
                     var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
                     // afterEach fires for the final navigation only — the redirect recurses before
                     // the after-hooks run — so return the recursion's result directly.
-                    return await PushWithRedirect(
+                    return await PushWithRedirectCore(
                         redirectTarget,
                         replace,
                         redirectedFrom ?? to,
                         redirectCount + 1,
-                        cancellationToken);
+                        token);
                 case NavigationOutcomeKind.Abort:
                     failure = new NavigationFailure(NavigationFailureType.Aborted, to, from);
                     break;
@@ -576,7 +622,7 @@ public sealed class Router : IDisposable
             if (record.RouteEnterGuard is { } enterGuard
                 && !ContainsRecord(from.Matched, record))
             {
-                guards.Add(enterGuard.BeforeRouteEnter);
+                guards.Add(enterGuard.BeforeRouteEnterAsync);
             }
         }
         return guards;
@@ -649,16 +695,45 @@ public sealed class Router : IDisposable
 
     // Supersede any in-flight navigation and start a fresh cancellation scope for this one. A
     // caller token is linked rather than substituted so later navigations can still supersede it.
-    // The current source is disposed by Dispose; a superseded source remains alive while its guard
-    // still holds the token and becomes collectible when that navigation settles.
-    private CancellationToken BeginNavigation(
+    // Cancellation is synchronous on Viu's single event loop, so a superseded source can release its
+    // caller-token registration immediately after signalling its observers.
+    private CancellationTokenSource BeginNavigation(
         CancellationToken cancellationToken = default)
     {
-        _pendingNavigation?.Cancel();
-        _pendingNavigation = cancellationToken.CanBeCanceled
+        CancellationTokenSource navigation = cancellationToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
             : new CancellationTokenSource();
-        return _pendingNavigation.Token;
+        CancellationTokenSource? previous = _pendingNavigation;
+        _pendingNavigation = navigation;
+        try
+        {
+            previous?.Cancel();
+        }
+        catch
+        {
+            if (ReferenceEquals(_pendingNavigation, navigation))
+            {
+                _pendingNavigation = null;
+            }
+            navigation.Dispose();
+            throw;
+        }
+        finally
+        {
+            previous?.Dispose();
+        }
+        return navigation;
+    }
+
+    private void CompleteNavigation(CancellationTokenSource cancellationSource)
+    {
+        if (!ReferenceEquals(_pendingNavigation, cancellationSource))
+        {
+            return;
+        }
+
+        _pendingNavigation = null;
+        cancellationSource.Dispose();
     }
 
     private static bool IsSameLocation(RouteLocation from, RouteLocation to) => from.Equals(to);
@@ -680,70 +755,85 @@ public sealed class Router : IDisposable
         }
         var to = _matcher.Resolve(location);
         var from = _currentRoute.Value;
-        var token = BeginNavigation();
-        var urlRestored = false;
-        NavigationFailure? failure;
+        CancellationTokenSource cancellationSource = BeginNavigation();
         try
         {
-            if (IsSameLocation(from, to))
+            CancellationToken token = cancellationSource.Token;
+            var urlRestored = false;
+            NavigationFailure? failure;
+            try
             {
-                failure = new NavigationFailure(NavigationFailureType.Duplicated, to, from);
-            }
-            else
-            {
-                var outcome = await RunNavigationPipeline(to, from, token);
-                switch (outcome.Kind)
+                if (IsSameLocation(from, to))
                 {
-                    case NavigationOutcomeKind.Redirect:
-                        // Restore the popped URL, then re-navigate to the redirect target as a push
-                        // (a silent go back by -delta, then the redirected navigation).
-                        RestorePopLocation(information);
-                        urlRestored = true;
-                        var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
-                        await PushWithRedirect(
-                            redirectTarget,
-                            replace: false,
-                            redirectedFrom: to,
-                            redirectCount: 0,
-                            cancellationToken: default);
-                        return;
-                    case NavigationOutcomeKind.Abort:
-                        failure = new NavigationFailure(NavigationFailureType.Aborted, to, from);
-                        break;
-                    case NavigationOutcomeKind.Cancel:
-                        failure = new NavigationFailure(NavigationFailureType.Cancelled, to, from);
-                        break;
-                    default:
-                        if (token.IsCancellationRequested)
-                        {
+                    failure = new NavigationFailure(NavigationFailureType.Duplicated, to, from);
+                }
+                else
+                {
+                    var outcome = await RunNavigationPipeline(to, from, token);
+                    switch (outcome.Kind)
+                    {
+                        case NavigationOutcomeKind.Redirect:
+                            // Restore the popped URL, then re-navigate to the redirect target as a push
+                            // (a silent go back by -delta, then the redirected navigation).
+                            RestorePopLocation(information);
+                            urlRestored = true;
+                            var redirectTarget = ResolveRedirectTarget(outcome.Redirect!);
+                            await PushWithRedirectCore(
+                                redirectTarget,
+                                replace: false,
+                                redirectedFrom: to,
+                                redirectCount: 0,
+                                token);
+                            return;
+                        case NavigationOutcomeKind.Abort:
+                            failure = new NavigationFailure(NavigationFailureType.Aborted, to, from);
+                            break;
+                        case NavigationOutcomeKind.Cancel:
                             failure = new NavigationFailure(NavigationFailureType.Cancelled, to, from);
-                        }
-                        else
-                        {
-                            FinalizeNavigation(to, isPush: false, replace: false);
-                            failure = null;
-                        }
-                        break;
+                            break;
+                        default:
+                            if (token.IsCancellationRequested)
+                            {
+                                failure = new NavigationFailure(NavigationFailureType.Cancelled, to, from);
+                            }
+                            else
+                            {
+                                FinalizeNavigation(to, isPush: false, replace: false);
+                                failure = null;
+                            }
+                            break;
+                    }
                 }
             }
-        }
-        catch (Exception exception)
-        {
-            // Restore only if a redirect leg has not already done so, to avoid a double compensating go.
-            if (!urlRestored)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
+                failure = new NavigationFailure(
+                    NavigationFailureType.Cancelled,
+                    to,
+                    from);
+            }
+            catch (Exception exception)
+            {
+                // Restore only if a redirect leg has not already done so, to avoid a double compensating go.
+                if (!urlRestored && ReferenceEquals(_pendingNavigation, cancellationSource))
+                {
+                    RestorePopLocation(information);
+                }
+                TriggerError(exception, to, from);
+                return;
+            }
+            if (failure is not null && ReferenceEquals(_pendingNavigation, cancellationSource))
+            {
+                // Aborted / cancelled / duplicated pop: undo the browser's position change so the URL
+                // matches the untouched CurrentRoute.
                 RestorePopLocation(information);
             }
-            TriggerError(exception, to, from);
-            return;
+            TriggerAfterEach(to, from, failure);
         }
-        if (failure is not null)
+        finally
         {
-            // Aborted / cancelled / duplicated pop: undo the browser's position change so the URL
-            // matches the untouched CurrentRoute.
-            RestorePopLocation(information);
+            CompleteNavigation(cancellationSource);
         }
-        TriggerAfterEach(to, from, failure);
     }
 
     private void RestorePopLocation(NavigationInformation information)

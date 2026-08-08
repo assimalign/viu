@@ -147,14 +147,27 @@ public sealed class ComponentWrapperTests
     }
 
     [Fact]
-    public async Task Trigger_ReactiveListener_DrainsDeterministicScheduler()
+    public async Task TriggerAsync_ReactiveListener_DrainsDeterministicScheduler()
     {
         using ComponentWrapper wrapper = ViuTest.Mount(new InteractiveComponent());
         wrapper.Text().ShouldBe("0");
 
-        await wrapper.Trigger("click");
+        await wrapper.TriggerAsync("click");
 
         wrapper.Text().ShouldBe("1");
+    }
+
+    [Fact]
+    public async Task SetValueAsync_ComponentAndElementWrappers_DispatchInputAndDrainScheduler()
+    {
+        using ComponentWrapper wrapper = ViuTest.Mount(new InputComponent());
+
+        await wrapper.SetValueAsync("component");
+        wrapper.Text().ShouldBe("component");
+
+        ElementWrapper element = wrapper.Get("input");
+        await element.SetValueAsync("element");
+        wrapper.Text().ShouldBe("element");
     }
 
     [Fact]
@@ -294,6 +307,24 @@ public sealed class ComponentWrapperTests
                     ElementBinding.Event("click", (Action)(() => _count.Value++)),
                 ],
                 children: new[] { new TextNode(_count.Value.ToString()) });
+        }
+    }
+
+    private sealed class InputComponent : IComponent
+    {
+        private readonly Reference<object?> _value = new(string.Empty);
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return _ => new ElementNode(
+                new QualifiedName("input"),
+                bindings:
+                [
+                    ElementBinding.Property("value", _value.Value),
+                    ElementBinding.Event("input", (Action<object?>)(value => _value.Value = value)),
+                ],
+                children: new[] { new TextNode(_value.Value?.ToString() ?? string.Empty) });
         }
     }
 

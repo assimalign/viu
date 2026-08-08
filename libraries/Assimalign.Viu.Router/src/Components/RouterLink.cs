@@ -86,8 +86,8 @@ public sealed class RouterLink : IComponent
             Task<NavigationFailure?> navigation = ReadBoolean(
                 context.Bindings.Parameters,
                 "replace")
-                    ? router.Replace(to)
-                    : router.Push(to);
+                    ? router.ReplaceAsync(to)
+                    : router.PushAsync(to);
             ObserveNavigation(navigation);
         }
 

@@ -55,16 +55,16 @@ public sealed class ServerRenderSerializationTests
     [Fact]
     public void DynamicAttribute_BooleanUnsafeAndCasingRules_AreApplied()
     {
-        ServerRender.SsrRenderDynamicAttr("disabled", true).ShouldBe(" disabled");
-        ServerRender.SsrRenderDynamicAttr("disabled", false).ShouldBeEmpty();
-        ServerRender.SsrRenderDynamicAttr("contenteditable", true)
+        ServerRender.SsrRenderDynamicAttribute("disabled", true).ShouldBe(" disabled");
+        ServerRender.SsrRenderDynamicAttribute("disabled", false).ShouldBeEmpty();
+        ServerRender.SsrRenderDynamicAttribute("contenteditable", true)
             .ShouldBe(" contenteditable=\"true\"");
-        ServerRender.SsrRenderDynamicAttr("bad=name", "value").ShouldBeEmpty();
-        ServerRender.SsrRenderDynamicAttr("viewBox", "0 0 1 1")
+        ServerRender.SsrRenderDynamicAttribute("bad=name", "value").ShouldBeEmpty();
+        ServerRender.SsrRenderDynamicAttribute("viewBox", "0 0 1 1")
             .ShouldBe(" viewbox=\"0 0 1 1\"");
-        ServerRender.SsrRenderDynamicAttr("viewBox", "0 0 1 1", "svg")
+        ServerRender.SsrRenderDynamicAttribute("viewBox", "0 0 1 1", "svg")
             .ShouldBe(" viewBox=\"0 0 1 1\"");
-        ServerRender.SsrRenderDynamicAttr("myAttribute", "x", "my-widget")
+        ServerRender.SsrRenderDynamicAttribute("myAttribute", "x", "my-widget")
             .ShouldBe(" myAttribute=\"x\"");
     }
 
@@ -81,7 +81,7 @@ public sealed class ServerRenderSerializationTests
             ElementBinding.Event("click", (Action)(() => { })),
         ];
 
-        ServerRender.SsrRenderAttrs(bindings, new QualifiedName("div"))
+        ServerRender.SsrRenderAttributes(bindings, new QualifiedName("div"))
             .ShouldBe(" id=\"app\"");
     }
 
@@ -99,7 +99,7 @@ public sealed class ServerRenderSerializationTests
             ElementBinding.Attribute(new QualifiedName("className"), "raw"),
         ];
 
-        ServerRender.SsrRenderAttrs(bindings, new QualifiedName("div"))
+        ServerRender.SsrRenderAttributes(bindings, new QualifiedName("div"))
             .ShouldBe(" class=\"a b\" style=\"font-size:10px;\" class=\"raw\"");
     }
 

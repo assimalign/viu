@@ -40,7 +40,7 @@ public sealed class TestHydrationReader : HydrationNodeReader<TestNode>
             return null;
         }
 
-        int index = parent.Children.IndexOf(node);
+        int index = parent.IndexOfChild(node);
         return index >= 0 && index + 1 < parent.Children.Count
             ? parent.Children[index + 1]
             : null;

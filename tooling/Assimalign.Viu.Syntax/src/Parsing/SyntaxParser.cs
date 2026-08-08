@@ -10,7 +10,9 @@ namespace Assimalign.Viu.Syntax;
 /// generator programs against registered providers — parsers are <em>registered</em> for the sources
 /// they understand (see <see cref="AggregateSyntaxParser{T}"/>) rather than hard-wired, so the same
 /// pipeline can host the template parser, the browser-language parsers, and user-supplied parsers for
-/// custom blocks or file types.
+/// custom blocks or file types. Direct derivation from the non-generic root is assembly-closed;
+/// external implementations derive through the typed parser contract so their result algebra remains
+/// explicit.
 /// </summary>
 /// <remarks>
 /// Implementations run at build time inside netstandard2.0 Roslyn generator hosts
@@ -22,6 +24,10 @@ namespace Assimalign.Viu.Syntax;
 /// </remarks>
 public abstract class SyntaxParser
 {
+    private protected SyntaxParser()
+    {
+    }
+
     /// <summary>Parses bare <paramref name="text"/> — a <see cref="SyntaxSource"/> with no name or language metadata.</summary>
     /// <param name="text">The source text to parse.</param>
     /// <param name="cancellationToken">Cancels the parse.</param>

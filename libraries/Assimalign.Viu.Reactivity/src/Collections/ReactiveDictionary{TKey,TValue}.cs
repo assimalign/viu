@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Assimalign.Viu.Reactivity;
@@ -24,6 +25,7 @@ namespace Assimalign.Viu.Reactivity;
 /// </summary>
 /// <typeparam name="TKey">The key type.</typeparam>
 /// <typeparam name="TValue">The value type.</typeparam>
+[DebuggerDisplay("Count = {_items.Count}")]
 public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>, IReactiveTraversable
     where TKey : notnull
 {

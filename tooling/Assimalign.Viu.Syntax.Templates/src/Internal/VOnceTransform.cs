@@ -16,7 +16,7 @@ internal static class VOnceTransform
             return null;
         }
 
-        if (context.SeenOnce.Contains(element) || context.InVOnce || context.InSSR)
+        if (context.SeenOnce.Contains(element) || context.InVOnce || context.IsNestedServerRendering)
         {
             return null;
         }
@@ -37,7 +37,7 @@ internal static class VOnceTransform
             var codegenNode = context.GetCodegenNode(current);
             if (codegenNode is not null)
             {
-                context.SetCodegenNode(current, context.Cache(codegenNode, isVNode: true, inVOnce: true));
+                context.SetCodegenNode(current, context.Cache(codegenNode, isVirtualNode: true, inVOnce: true));
             }
         };
     }

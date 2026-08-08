@@ -37,7 +37,7 @@ public sealed class StateStoreScopeDisposalTests
         CounterStore counter = counterDefinition.Use(registry);
         CounterStore other = otherDefinition.Use(registry);
 
-        counterDefinition.Dispose(registry);
+        counterDefinition.Remove(registry);
         counter.Increment();
         other.Increment();
 
@@ -83,7 +83,7 @@ public sealed class StateStoreScopeDisposalTests
             });
         definition.Use(registry);
 
-        definition.Dispose(registry);
+        definition.Remove(registry);
 
         cleanupRuns.ShouldBe(1);
     }

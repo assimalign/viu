@@ -9,12 +9,12 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </summary>
 public sealed record DirectiveTransformResult
 {
-    /// <summary>The properties this directive contributes to the element's props object.</summary>
-    public required IReadOnlyList<Property> Properties { get; init; }
+    /// <summary>The properties this directive contributes to the element's properties object.</summary>
+    public required IReadOnlyList<ObjectProperty> Properties { get; init; }
 
     /// <summary>
     /// The runtime directive helper to apply (e.g. <c>vShow</c>, <c>vModelText</c>), or <see langword="null"/>
-    /// when the directive contributes only props. A directive that compiles away entirely leaves this null.
+    /// when the directive contributes only properties. A directive that compiles away entirely leaves this null.
     /// </summary>
     public RuntimeHelper? NeedRuntime { get; init; }
 

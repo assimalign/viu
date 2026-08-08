@@ -175,7 +175,7 @@ public sealed class SchedulerTests : IDisposable
         failure.Message.ShouldContain("runaway watcher");
         failure.Message.ShouldContain("7");
         runs.ShouldBe(100);
-        Scheduler.NextTick().IsCompleted.ShouldBeTrue();
+        Scheduler.NextTickAsync().IsCompleted.ShouldBeTrue();
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public sealed class SchedulerTests : IDisposable
         var trailing = new SchedulerJob(() => trailingRuns++) { Identifier = 2 };
         Scheduler.QueueJob(failing);
         Scheduler.QueueJob(trailing);
-        Task tick = Scheduler.NextTick();
+        Task tick = Scheduler.NextTickAsync();
 
         Exception? caught = null;
         try
@@ -241,7 +241,7 @@ public sealed class SchedulerTests : IDisposable
     }
 
     [Fact]
-    public async Task NextTick_PostFlushQueuesRender_WaitsForFollowUpCycle()
+    public async Task NextTickAsync_PostFlushQueuesRender_WaitsForFollowUpCycle()
     {
         var order = new List<string>();
         Scheduler.QueuePostFlushCallback(new SchedulerJob(() =>
@@ -249,7 +249,7 @@ public sealed class SchedulerTests : IDisposable
             order.Add("post");
             Scheduler.QueueJob(new SchedulerJob(() => order.Add("follow-up")));
         }));
-        Task tick = Scheduler.NextTick();
+        Task tick = Scheduler.NextTickAsync();
 
         tick.IsCompleted.ShouldBeFalse();
         _pump.RunUntilIdle();
@@ -259,9 +259,9 @@ public sealed class SchedulerTests : IDisposable
     }
 
     [Fact]
-    public async Task NextTick_NoQueuedWork_IsAlreadyCompleted()
+    public async Task NextTickAsync_NoQueuedWork_IsAlreadyCompleted()
     {
-        Task tick = Scheduler.NextTick();
+        Task tick = Scheduler.NextTickAsync();
 
         tick.IsCompleted.ShouldBeTrue();
         await tick;
@@ -276,7 +276,7 @@ public sealed class SchedulerTests : IDisposable
 
         Scheduler.Reset();
         Scheduler.IsFlushPending.ShouldBeFalse();
-        Scheduler.NextTick().IsCompleted.ShouldBeTrue();
+        Scheduler.NextTickAsync().IsCompleted.ShouldBeTrue();
 
         Scheduler.QueueJob(job);
         _pump.RunUntilIdle();

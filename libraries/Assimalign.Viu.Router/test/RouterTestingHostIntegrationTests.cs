@@ -44,7 +44,7 @@ public sealed class RouterTestingHostIntegrationTests
                 _ => NavigationGuardResult.Allow,
             }));
 
-        (await router.Push("/section/1/details")).ShouldBeNull();
+        (await router.PushAsync("/section/1/details")).ShouldBeNull();
         using Assimalign.Viu.Testing.ComponentWrapper wrapper =
             MountView(router, layout, detail, blocked, allowed);
         ComponentContext? layoutContext = layout.Context;
@@ -52,13 +52,13 @@ public sealed class RouterTestingHostIntegrationTests
         wrapper.Html().ShouldBe(
             "<div class=\"layout\"><span class=\"value\">1</span></div>");
 
-        NavigationFailure? blockedFailure = await router.Push("/blocked");
+        NavigationFailure? blockedFailure = await router.PushAsync("/blocked");
         await wrapper.NextTickAsync();
         blockedFailure.ShouldNotBeNull();
         blockedFailure.Type.ShouldBe(NavigationFailureType.Aborted);
         router.CurrentRoute.Value.Path.ShouldBe("/section/1/details");
 
-        (await router.Push("/redirect")).ShouldBeNull();
+        (await router.PushAsync("/redirect")).ShouldBeNull();
         await wrapper.NextTickAsync();
         router.CurrentRoute.Value.Path.ShouldBe("/section/2/details");
         wrapper.Html().ShouldBe(
@@ -68,7 +68,7 @@ public sealed class RouterTestingHostIntegrationTests
         layout.SetupCount.ShouldBe(1);
         detail.SetupCount.ShouldBe(1);
 
-        (await router.Push("/allowed")).ShouldBeNull();
+        (await router.PushAsync("/allowed")).ShouldBeNull();
         await wrapper.NextTickAsync();
         wrapper.Html().ShouldBe("<div class=\"allowed\">allowed</div>");
         layout.IsUnmounted.ShouldBeTrue();

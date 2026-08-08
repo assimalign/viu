@@ -7,7 +7,7 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The element transform: on exit it builds the element's <see cref="VNodeCall"/> code-generation node,
+/// The element transform: on exit it builds the element's <see cref="VirtualNodeCall"/> code-generation node,
 /// resolving the vnode tag (including dynamic components), building its props, and attaching its children or
 /// slots. Tag resolution, prop building, and directive-argument building all live here because each
 /// depends on the results of the others.
@@ -17,7 +17,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// building and because [V01.01.05.03] requires the <c>FULL_PROPS</c> escalation and the <c>dynamicProps</c>
 /// list. The element-level patch-flag refinement it drives — static class/style elision, the <c>TEXT</c> flag
 /// for a single dynamic text child, and the block-emission decisions stamped onto the resulting
-/// <see cref="VNodeCall"/> (<c>shouldUseBlock</c>) — landed in [V01.01.05.06].
+/// <see cref="VirtualNodeCall"/> (<c>shouldUseBlock</c>) — landed in [V01.01.05.06].
 /// </remarks>
 internal static class TransformElement
 {
@@ -53,7 +53,7 @@ internal static class TransformElement
         if (element.Properties.Count > 0)
         {
             var built = BuildProps(element, context, element.Properties, isComponent, isDynamicComponent);
-            vnodeProps = built.Props;
+            vnodeProps = built.Properties;
             patchFlag = built.PatchFlag;
             dynamicPropNames = built.DynamicPropNames;
             if (built.Directives.Count > 0)
@@ -125,7 +125,7 @@ internal static class TransformElement
             vnodeDynamicProps = StringifyDynamicPropNames(dynamicPropNames);
         }
 
-        var codegenNode = context.CreateVNodeCall(
+        var codegenNode = context.CreateVirtualNodeCall(
             vnodeTag,
             vnodeProps,
             vnodeChildren,
@@ -174,7 +174,7 @@ internal static class TransformElement
         var builtIn = CoreComponent(tag) ?? context.IsBuiltInComponent?.Invoke(tag);
         if (builtIn is not null)
         {
-            if (!context.Ssr)
+            if (!context.IsServerRendering)
             {
                 context.Helper(builtIn);
             }
@@ -197,7 +197,7 @@ internal static class TransformElement
     {
         var tag = element.Tag;
         var hasChildren = element.Children.Count > 0;
-        var elementProperties = new List<Property>();
+        var elementProperties = new List<ObjectProperty>();
         var mergeArguments = new List<TemplateSyntaxNode>();
         var runtimeDirectives = new List<DirectiveNode>();
         var shouldUseBlock = false;
@@ -216,7 +216,7 @@ internal static class TransformElement
             if (elementProperties.Count > 0)
             {
                 mergeArguments.Add(Ir.ObjectExpression(DedupeProperties(elementProperties), element.Location));
-                elementProperties = new List<Property>();
+                elementProperties = new List<ObjectProperty>();
             }
 
             if (argument is not null)
@@ -235,7 +235,7 @@ internal static class TransformElement
             }
         }
 
-        void AnalyzePatchFlag(Property property)
+        void AnalyzePatchFlag(ObjectProperty property)
         {
             var key = property.Key;
             var value = property.Value;
@@ -345,7 +345,7 @@ internal static class TransformElement
                     continue;
                 }
 
-                if (isVOn && context.Ssr)
+                if (isVOn && context.IsServerRendering)
                 {
                     continue;
                 }
@@ -391,13 +391,13 @@ internal static class TransformElement
 
                 if (isVBind && HasModifier(directive, "prop"))
                 {
-                    patchFlag |= (int)PatchFlags.NeedHydration;
+                    patchFlag |= (int)PatchFlags.NeedsHydration;
                 }
 
                 if (context.DirectiveTransforms.TryGetValue(name, out var directiveTransform))
                 {
                     var result = directiveTransform(directive, element, context, null);
-                    if (!context.Ssr)
+                    if (!context.IsServerRendering)
                     {
                         foreach (var built in result.Properties)
                         {
@@ -449,7 +449,7 @@ internal static class TransformElement
 
         if (hasDynamicKeys)
         {
-            patchFlag |= (int)PatchFlags.FullProps;
+            patchFlag |= (int)PatchFlags.FullProperties;
         }
         else
         {
@@ -465,30 +465,30 @@ internal static class TransformElement
 
             if (dynamicPropNames.Count > 0)
             {
-                patchFlag |= (int)PatchFlags.Props;
+                patchFlag |= (int)PatchFlags.Properties;
             }
 
             if (hasHydrationEventBinding)
             {
-                patchFlag |= (int)PatchFlags.NeedHydration;
+                patchFlag |= (int)PatchFlags.NeedsHydration;
             }
         }
 
         if (!shouldUseBlock &&
-            (patchFlag == 0 || patchFlag == (int)PatchFlags.NeedHydration) &&
+            (patchFlag == 0 || patchFlag == (int)PatchFlags.NeedsHydration) &&
             (hasReference || hasVnodeHook || runtimeDirectives.Count > 0))
         {
             patchFlag |= (int)PatchFlags.NeedPatch;
         }
 
-        if (!context.InSSR && propsExpression is not null)
+        if (!context.IsNestedServerRendering && propsExpression is not null)
         {
             propsExpression = NormalizeProps(propsExpression, context, hasStyleBinding);
         }
 
         return new BuildPropsResult
         {
-            Props = propsExpression,
+            Properties = propsExpression,
             Directives = runtimeDirectives,
             PatchFlag = (PatchFlags)patchFlag,
             DynamicPropNames = dynamicPropNames,
@@ -543,7 +543,7 @@ internal static class TransformElement
             }
 
             var trueExpression = Ir.SimpleExpression("true", false, directive.Location);
-            var modifierProperties = new List<Property>();
+            var modifierProperties = new List<ObjectProperty>();
             foreach (var modifier in directive.Modifiers)
             {
                 modifierProperties.Add(Ir.ObjectProperty(modifier, trueExpression));
@@ -591,7 +591,7 @@ internal static class TransformElement
 
                 if (!hasDynamicKey)
                 {
-                    var updated = new List<Property>(objectExpression.Properties);
+                    var updated = new List<ObjectProperty>(objectExpression.Properties);
                     if (classIndex >= 0 && !TransformUtilities.IsStaticExpression(updated[classIndex].Value))
                     {
                         updated[classIndex] = updated[classIndex] with
@@ -615,7 +615,7 @@ internal static class TransformElement
                         }
                     }
 
-                    return objectExpression with { Properties = new SyntaxList<Property>(updated.ToArray()) };
+                    return objectExpression with { Properties = new SyntaxList<ObjectProperty>(updated.ToArray()) };
                 }
 
                 return Ir.CallExpression(context.Helper(HelperNames.NormalizeProps), new object[] { objectExpression });
@@ -628,10 +628,10 @@ internal static class TransformElement
         }
     }
 
-    private static List<Property> DedupeProperties(List<Property> properties)
+    private static List<ObjectProperty> DedupeProperties(List<ObjectProperty> properties)
     {
-        var known = new Dictionary<string, Property>();
-        var deduped = new List<Property>();
+        var known = new Dictionary<string, ObjectProperty>();
+        var deduped = new List<ObjectProperty>();
         foreach (var property in properties)
         {
             if (property.Key is CompoundExpressionNode || property.Key is SimpleExpressionNode { IsStatic: false })
@@ -665,7 +665,7 @@ internal static class TransformElement
         return deduped;
     }
 
-    private static Property MergeAsArray(Property existing, Property incoming)
+    private static ObjectProperty MergeAsArray(ObjectProperty existing, ObjectProperty incoming)
     {
         if (existing.Value is ArrayExpression array)
         {

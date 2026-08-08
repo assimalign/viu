@@ -19,9 +19,6 @@ namespace Assimalign.Viu.Components;
 [Flags]
 public enum PatchFlags
 {
-    // Deviates from the repository whole-word naming rule per design decision: Props,
-    // FullProps, and DevRootFragment are frozen compiler-runtime identifiers [RND-FLAGS-1].
-
     /// <summary>No optimization hints; the node requires the normal full patch walk.</summary>
     None = 0,
 
@@ -39,21 +36,21 @@ public enum PatchFlags
 
     /// <summary>
     /// An element with named dynamic properties; its plan also identifies the binding indices
-    /// that require comparison. Mutually exclusive with <see cref="FullProps"/>.
+    /// that require comparison. Mutually exclusive with <see cref="FullProperties"/>.
     /// </summary>
-    Props = 1 << 3,
+    Properties = 1 << 3,
 
     /// <summary>
     /// An element whose property names are dynamic, requiring a full property diff and replacing
-    /// the <see cref="Class"/>, <see cref="Style"/>, and <see cref="Props"/> shortcuts.
+    /// the <see cref="Class"/>, <see cref="Style"/>, and <see cref="Properties"/> shortcuts.
     /// </summary>
-    FullProps = 1 << 4,
+    FullProperties = 1 << 4,
 
     /// <summary>
     /// An element or component requiring hydration work beyond property patching, such as
     /// attaching event listeners or applying a visibility directive.
     /// </summary>
-    NeedHydration = 1 << 5,
+    NeedsHydration = 1 << 5,
 
     /// <summary>
     /// A fragment whose child order is stable, allowing children to patch pairwise without
@@ -82,7 +79,7 @@ public enum PatchFlags
     /// <summary>
     /// Development-only marker for a root fragment created solely by root-level template comments.
     /// </summary>
-    DevRootFragment = 1 << 11,
+    DevelopmentRootFragment = 1 << 11,
 
     /// <summary>
     /// Whole-value sentinel (<c>-1</c>) for a cached static subtree that diffing skips entirely.

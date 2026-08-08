@@ -49,7 +49,7 @@ The framework reference resolves to two NuGet packages (the
 
 | Package | Contents | When restored |
 | --- | --- | --- |
-| `Assimalign.Viu.App.Ref` | `ref/net10.0/` reference assemblies, `data/FrameworkList.xml`, `analyzers/dotnet/cs/` generators | Compile time |
+| `Assimalign.Viu.App.Ref` | `ref/net10.0/` reference assemblies, `data/FrameworkList.xml`, `data/PackageOverrides.txt` for standalone-package conflict resolution, `analyzers/dotnet/cs/` generators | Compile time |
 | `Assimalign.Viu.App.Runtime.browser-wasm` | `runtimes/browser-wasm/lib/net10.0/` implementation assemblies, `data/RuntimeList.xml` | App build/publish |
 
 Opt out / pin independently:

@@ -7,7 +7,7 @@ namespace Assimalign.Viu.Router;
 /// that would otherwise recurse until the stack overflows. Unlike a <see cref="NavigationFailure"/>,
 /// this is a genuine error: a loop is always a bug in the route table or its guards, so it is routed
 /// to every <see cref="NavigationErrorHandler"/> and faults the task returned by
-/// <see cref="Router.Push"/>/<see cref="Router.Replace"/>. Specified by <c>[RTR-6]</c>.
+/// <see cref="Router.PushAsync"/>/<see cref="Router.ReplaceAsync"/>. Specified by <c>[RTR-6]</c>.
 /// </summary>
 /// <remarks>
 /// The depth cap is fixed and active in every configuration, not just development builds: an

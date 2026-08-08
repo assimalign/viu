@@ -100,8 +100,8 @@ public static class TestNodeOperations
                 Detach(child);
                 int insertIndex = anchor is null
                     ? parentElement.Children.Count
-                    : parentElement.Children.IndexOf(anchor);
-                parentElement.Children.Insert(insertIndex, child);
+                    : parentElement.IndexOfChild(anchor);
+                parentElement.InsertChild(insertIndex, child);
                 child.Parent = parentElement;
                 operationLog.Add(
                     new TestNodeOperation(
@@ -158,13 +158,13 @@ public static class TestNodeOperations
                 };
                 int insertIndex = anchor is null
                     ? parentElement.Children.Count
-                    : parentElement.Children.IndexOf(anchor);
+                    : parentElement.IndexOfChild(anchor);
                 if (insertIndex < 0)
                 {
                     insertIndex = parentElement.Children.Count;
                 }
 
-                parentElement.Children.Insert(insertIndex, staticNode);
+                parentElement.InsertChild(insertIndex, staticNode);
                 staticNode.Parent = parentElement;
                 operationLog.Add(
                     new TestNodeOperation(
@@ -193,10 +193,10 @@ public static class TestNodeOperations
                 || nextBinding.Name != previousBinding.Name
                 || nextBinding.Kind != previousBinding.Kind)
             {
-                element.Properties.Remove(previousName);
+                element.RemoveProperty(previousName);
                 if (previousBinding.Kind == ElementBindingKind.Event)
                 {
-                    element.EventListeners.Remove(previousBinding.Name.LocalName);
+                    element.RemoveEventListener(previousBinding.Name.LocalName);
                 }
             }
         }
@@ -209,11 +209,11 @@ public static class TestNodeOperations
         string nextName = nextBinding.Name.ToString();
         if (nextBinding.Value is null)
         {
-            element.Properties.Remove(nextName);
+            element.RemoveProperty(nextName);
         }
         else
         {
-            element.Properties[nextName] = nextBinding.Value;
+            element.SetProperty(nextName, nextBinding.Value);
         }
 
         if (nextBinding.Kind != ElementBindingKind.Event)
@@ -223,11 +223,11 @@ public static class TestNodeOperations
 
         if (nextBinding.Value is Delegate listener)
         {
-            element.EventListeners[nextBinding.Name.LocalName] = listener;
+            element.SetEventListener(nextBinding.Name.LocalName, listener);
         }
         else
         {
-            element.EventListeners.Remove(nextBinding.Name.LocalName);
+            element.RemoveEventListener(nextBinding.Name.LocalName);
         }
     }
 
@@ -268,7 +268,7 @@ public static class TestNodeOperations
             return null;
         }
 
-        int index = parent.Children.IndexOf(node);
+        int index = parent.IndexOfChild(node);
         return index >= 0 && index + 1 < parent.Children.Count
             ? parent.Children[index + 1]
             : null;
@@ -281,7 +281,7 @@ public static class TestNodeOperations
             return;
         }
 
-        parent.Children.Remove(node);
+        parent.RemoveChild(node);
         node.Parent = null;
     }
 }

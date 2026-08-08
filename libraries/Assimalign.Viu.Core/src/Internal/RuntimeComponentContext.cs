@@ -92,7 +92,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
 
     internal ComponentInvocation Invocation { get; private set; }
 
-    internal SlotFlags EffectiveSlotStability { get; private set; } = SlotFlags.Stable;
+    internal SlotStability EffectiveSlotStability { get; private set; } = SlotStability.Stable;
 
     ComponentInvocation IAsynchronousComponentRuntime.Invocation => Invocation;
 
@@ -232,14 +232,14 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     internal void UpdateMountReference(MountReference? mountReference) =>
         MountReference = mountReference;
 
-    private SlotFlags ResolveEffectiveSlotStability(SlotFlags slotStability) => slotStability switch
+    private SlotStability ResolveEffectiveSlotStability(SlotStability slotStability) => slotStability switch
     {
-        SlotFlags.Stable => SlotFlags.Stable,
-        SlotFlags.Dynamic => SlotFlags.Dynamic,
-        SlotFlags.Forwarded => (Parent as RuntimeComponentContext)?.EffectiveSlotStability
-            == SlotFlags.Stable
-                ? SlotFlags.Stable
-                : SlotFlags.Dynamic,
+        SlotStability.Stable => SlotStability.Stable,
+        SlotStability.Dynamic => SlotStability.Dynamic,
+        SlotStability.Forwarded => (Parent as RuntimeComponentContext)?.EffectiveSlotStability
+            == SlotStability.Stable
+                ? SlotStability.Stable
+                : SlotStability.Dynamic,
         _ => throw new ArgumentOutOfRangeException(nameof(slotStability)),
     };
 

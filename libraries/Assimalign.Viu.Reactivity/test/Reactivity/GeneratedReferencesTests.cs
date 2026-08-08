@@ -8,8 +8,8 @@ namespace Assimalign.Viu.Reactivity.Tests;
 // consume the generated output rather than a hand-written stand-in.
 
 /// <summary>A read-only reactive object: reads still track, writes warn and do nothing.</summary>
-[Reactive(Readonly = true)]
-internal partial class ReadonlyProfile
+[Reactive(ReadOnly = true)]
+internal partial class ReadOnlyProfile
 {
     /// <summary>The profile handle (read-only after construction).</summary>
     public partial string Handle { get; set; }
@@ -76,17 +76,17 @@ public sealed class GeneratedReferencesTests
     }
 
     [Fact]
-    public void ReadonlyReactiveObject_IsReadonly_AndStillReactive()
+    public void ReadOnlyReactiveObject_IsReadOnly_AndStillReactive()
     {
-        var profile = new ReadonlyProfile();
+        var profile = new ReadOnlyProfile();
 
         // A read-only reactive object is BOTH readonly and reactive: rejecting writes does not stop
         // reads from tracking.
-        Reactive.IsReadonly(profile).ShouldBeTrue();
+        Reactive.IsReadOnly(profile).ShouldBeTrue();
         Reactive.IsReactive(profile).ShouldBeTrue();
 
         // A mutable [Reactive] object is reactive but not readonly.
-        Reactive.IsReadonly(new ReactivePerson { Name = "A" }).ShouldBeFalse();
+        Reactive.IsReadOnly(new ReactivePerson { Name = "A" }).ShouldBeFalse();
     }
 
     [Fact]

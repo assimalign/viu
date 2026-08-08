@@ -96,7 +96,7 @@ internal static class ServerMarkupSerializer
         string name = element.Name.ToString();
         state.Push("<");
         state.Push(name);
-        state.Push(ServerRender.SsrRenderAttrs(element.Bindings, element.Name));
+        state.Push(ServerRender.SsrRenderAttributes(element.Bindings, element.Name));
 
         if (HtmlSerializationRules.IsVoidElement(element.Name))
         {

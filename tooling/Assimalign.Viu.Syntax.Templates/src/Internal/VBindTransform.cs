@@ -64,7 +64,7 @@ internal static class VBindTransform
                 : WrapCompound((CompoundExpressionNode)argument, $"{context.HelperString(HelperNames.Camelize)}(", ")");
         }
 
-        if (!context.InSSR)
+        if (!context.IsNestedServerRendering)
         {
             if (HasModifier(directive, "prop"))
             {

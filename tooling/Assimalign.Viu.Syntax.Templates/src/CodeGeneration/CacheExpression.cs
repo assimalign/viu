@@ -14,7 +14,7 @@ public sealed record CacheExpression : TemplateSyntaxNode
     /// <summary>The value to cache.</summary>
     public required TemplateSyntaxNode Value { get; init; }
 
-    /// <summary>Whether the cached value is a vnode requiring block-tracking to be paused.</summary>
+    /// <summary>Whether the cached value is a virtual node requiring block tracking to be paused.</summary>
     public bool NeedPauseTracking { get; init; }
 
     /// <summary>Whether the cache was produced inside a <c>v-once</c>.</summary>
@@ -24,5 +24,5 @@ public sealed record CacheExpression : TemplateSyntaxNode
     public bool NeedArraySpread { get; init; }
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsCacheExpression;
+    public override NodeType NodeType => NodeType.CacheExpression;
 }

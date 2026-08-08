@@ -431,7 +431,7 @@ paths:
     mutation of the instance it holds."* A summary that says less after the edit is a regression.
   - **Intent markers must survive.** Where a clause like `(upstream parity)` was encoding "this is
     deliberate, do not 'fix' it", restate the intent as a Viu design decision. Where it pinned a
-    frozen value layout (`PatchFlags`, `ShapeFlags`, `SlotFlags`, the SSR hydration markers), restate
+    frozen value layout (`PatchFlags`, `ShapeFlags`, `SlotStability`, the SSR hydration markers), restate
     it as Viu's own stability guarantee — the layout is a contract with previously compiled output.
 - **Pinning behavior.** Behavior is pinned by (a) the prose in the doc comment itself, (b) a
   `[Vxx.xx.xx]` WBS reference to the issue that specified it, and (c) a test asserting the chosen

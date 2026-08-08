@@ -14,8 +14,9 @@ components.Register(
         new ComponentContract(renderCacheSize: 0, displayName: nameof(App)),
         static _ => new App()));
 EmptyServiceProvider services = new();
+using IRouterHistory history = RouterHistory.CreateWebHash();
 using Router router = new(
-    RouterHistory.CreateWebHash(),
+    history,
     [new RouteRecord("/")]);
 
 await new BrowserApplicationBuilder()

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 using Shouldly;
 using Xunit;
@@ -12,6 +13,18 @@ namespace Assimalign.Viu.Testing.Tests;
 
 public sealed class TestNodeOperationsTests
 {
+    [Fact]
+    public void TestElement_DebuggerDisplay_DescribesBackingHostState()
+    {
+        var attribute = (DebuggerDisplayAttribute?)Attribute.GetCustomAttribute(
+            typeof(TestElement),
+            typeof(DebuggerDisplayAttribute));
+
+        attribute.ShouldNotBeNull();
+        attribute.Value.ShouldBe(
+            "<{Name,nq}> #{Identifier} Properties = {_properties.Count}, Children = {_children.Count}, EventListeners = {_eventListeners.Count}");
+    }
+
     [Fact]
     public void Insert_ChildBeforeAnchor_PreservesHostTopology()
     {
@@ -63,6 +76,37 @@ public sealed class TestNodeOperationsTests
         secondRuns.ShouldBe(1);
         log.Count(TestNodeOperationType.PatchAttribute).ShouldBe(2);
         log.StructuralOperationCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void TestElement_PublicCollections_AreReadOnlyLiveViewsOfHostState()
+    {
+        TestNodeOperationLog log = new();
+        RendererOptions<TestNode> options = TestNodeOperations.Create(log);
+        TestElement element = (TestElement)options.CreateElement(new QualifiedName("button"));
+        TestNode child = options.CreateText("label");
+        TestNode externalChild = options.CreateText("external");
+        Action listener = static () => { };
+        IReadOnlyDictionary<string, object?> properties = element.Properties;
+        IReadOnlyList<TestNode> children = element.Children;
+        IReadOnlyDictionary<string, Delegate> eventListeners = element.EventListeners;
+
+        options.Insert(child, element, null);
+        options.PatchAttribute(
+            element,
+            null,
+            ElementBinding.Attribute(new QualifiedName("title"), "action"));
+        options.PatchAttribute(element, null, ElementBinding.Event("click", listener));
+
+        properties["title"].ShouldBe("action");
+        children.ShouldHaveSingleItem().ShouldBeSameAs(child);
+        eventListeners["click"].ShouldBeSameAs(listener);
+        Should.Throw<NotSupportedException>(
+            () => ((IDictionary<string, object?>)properties).Add("external", true));
+        Should.Throw<NotSupportedException>(
+            () => ((ICollection<TestNode>)children).Add(externalChild));
+        Should.Throw<NotSupportedException>(
+            () => ((IDictionary<string, Delegate>)eventListeners).Add("external", listener));
     }
 
     [Fact]

@@ -15,15 +15,15 @@ public class PatchFlagNamesTests
     [InlineData(PatchFlags.Text, "TEXT")]
     [InlineData(PatchFlags.Class, "CLASS")]
     [InlineData(PatchFlags.Style, "STYLE")]
-    [InlineData(PatchFlags.Props, "PROPS")]
-    [InlineData(PatchFlags.FullProps, "FULL_PROPS")]
-    [InlineData(PatchFlags.NeedHydration, "NEED_HYDRATION")]
+    [InlineData(PatchFlags.Properties, "PROPS")]
+    [InlineData(PatchFlags.FullProperties, "FULL_PROPS")]
+    [InlineData(PatchFlags.NeedsHydration, "NEED_HYDRATION")]
     [InlineData(PatchFlags.StableFragment, "STABLE_FRAGMENT")]
     [InlineData(PatchFlags.KeyedFragment, "KEYED_FRAGMENT")]
     [InlineData(PatchFlags.UnkeyedFragment, "UNKEYED_FRAGMENT")]
     [InlineData(PatchFlags.NeedPatch, "NEED_PATCH")]
     [InlineData(PatchFlags.DynamicSlots, "DYNAMIC_SLOTS")]
-    [InlineData(PatchFlags.DevRootFragment, "DEV_ROOT_FRAGMENT")]
+    [InlineData(PatchFlags.DevelopmentRootFragment, "DEV_ROOT_FRAGMENT")]
     [InlineData(PatchFlags.Cached, "CACHED")]
     [InlineData(PatchFlags.Bail, "BAIL")]
     public void EveryFlag_FormatsAsItsStableDiagnosticName(PatchFlags flag, string expected)
@@ -35,21 +35,21 @@ public class PatchFlagNamesTests
     public void Combined_flags_format_as_a_comma_separated_list_in_bit_order()
     {
         PatchFlagNames.Format(PatchFlags.Text | PatchFlags.Class).ShouldBe("TEXT, CLASS");
-        PatchFlagNames.Format(PatchFlags.Class | PatchFlags.Style | PatchFlags.Props)
+        PatchFlagNames.Format(PatchFlags.Class | PatchFlags.Style | PatchFlags.Properties)
             .ShouldBe("CLASS, STYLE, PROPS");
-        PatchFlagNames.Format(PatchFlags.StableFragment | PatchFlags.DevRootFragment)
+        PatchFlagNames.Format(PatchFlags.StableFragment | PatchFlags.DevelopmentRootFragment)
             .ShouldBe("STABLE_FRAGMENT, DEV_ROOT_FRAGMENT");
-        PatchFlagNames.Format(PatchFlags.Text | PatchFlags.NeedHydration | PatchFlags.DynamicSlots)
+        PatchFlagNames.Format(PatchFlags.Text | PatchFlags.NeedsHydration | PatchFlags.DynamicSlots)
             .ShouldBe("TEXT, NEED_HYDRATION, DYNAMIC_SLOTS");
     }
 
     [Fact]
     public void All_positive_flags_combined_format_in_ascending_bit_order()
     {
-        var all = PatchFlags.Text | PatchFlags.Class | PatchFlags.Style | PatchFlags.Props
-            | PatchFlags.FullProps | PatchFlags.NeedHydration | PatchFlags.StableFragment
+        var all = PatchFlags.Text | PatchFlags.Class | PatchFlags.Style | PatchFlags.Properties
+            | PatchFlags.FullProperties | PatchFlags.NeedsHydration | PatchFlags.StableFragment
             | PatchFlags.KeyedFragment | PatchFlags.UnkeyedFragment | PatchFlags.NeedPatch
-            | PatchFlags.DynamicSlots | PatchFlags.DevRootFragment;
+            | PatchFlags.DynamicSlots | PatchFlags.DevelopmentRootFragment;
 
         PatchFlagNames.Format(all).ShouldBe(
             "TEXT, CLASS, STYLE, PROPS, FULL_PROPS, NEED_HYDRATION, STABLE_FRAGMENT, "

@@ -97,7 +97,7 @@ internal static class VModelTransform
         }
 
         // Native v-model doesn't need the modelValue prop — it is passed as binding.value.
-        var filtered = new List<Property>(baseResult.Properties.Count);
+        var filtered = new List<ObjectProperty>(baseResult.Properties.Count);
         foreach (var property in baseResult.Properties)
         {
             if (property.Key is SimpleExpressionNode { Content: "modelValue" })
@@ -138,7 +138,7 @@ internal static class VModelTransform
         // eventArg is "$event" in the opaque (non-TS) build.
         var assignment = CreateAssignment(expression);
 
-        var properties = new List<Property>
+        var properties = new List<ObjectProperty>
         {
             Ir.ObjectProperty(propertyName, directive.Expression!),
             Ir.ObjectProperty(eventName, assignment),
@@ -264,7 +264,7 @@ internal static class VModelTransform
         }
     }
 
-    private static DirectiveTransformResult Empty() => new() { Properties = Array.Empty<Property>() };
+    private static DirectiveTransformResult Empty() => new() { Properties = Array.Empty<ObjectProperty>() };
 
     private static string JsonString(string value) => "\"" + value + "\"";
 }

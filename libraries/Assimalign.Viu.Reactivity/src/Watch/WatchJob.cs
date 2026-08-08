@@ -24,7 +24,7 @@ public sealed class WatchJob
         ArgumentNullException.ThrowIfNull(callback);
         Sequence = sequence;
         _run = callback;
-        Flush = WatchFlushMode.Sync;
+        Flush = WatchFlushMode.Synchronous;
     }
 
     internal WatchJob(Action run, WatchFlushMode flush)

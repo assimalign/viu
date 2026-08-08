@@ -14,7 +14,7 @@ internal readonly record struct ReactiveClassModel(
     string TypeParameterList,
     string AccessibilityKeyword,
     bool Shallow,
-    bool Readonly,
+    bool ReadOnly,
     EquatableArray<ReactivePropertyModel> Properties)
 {
     /// <summary>A stable, unique file hint for <c>AddSource</c> built from the fully-qualified name.</summary>

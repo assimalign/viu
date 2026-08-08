@@ -62,7 +62,7 @@ used by compiled renderers for static subtree identity, stable handlers, and mem
 code calls through its frame parameter and qualified public APIs, not mutable static helper state
 (`[SFC-CG-2]`, `[SFC-OPT-1]`).
 
-`RenderPlan`, `PatchFlags`, `ShapeFlags`, and `SlotFlags` are data contracts between compiled output
+`RenderPlan`, `PatchFlags`, `ShapeFlags`, and `SlotStability` are data contracts between compiled output
 and Core. Their meanings and numeric layouts are frozen; Core may optimize only when the supplied
 plan proves the relevant structure (`[RND-FLAGS-1]` through `[RND-FLAGS-6]`, `[RND-BLOCK-1]`
 through `[RND-BLOCK-7]`). Hand-authored trees default to `RenderPlan.None` and remain correct through

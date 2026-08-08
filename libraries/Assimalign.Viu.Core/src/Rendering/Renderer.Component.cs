@@ -120,9 +120,9 @@ public sealed partial class Renderer<TNode>
         TNode container)
     {
         ComponentNode previous = (ComponentNode)mounted.Value;
-        SlotFlags previousSlotStability = mounted.Context.EffectiveSlotStability;
+        SlotStability previousSlotStability = mounted.Context.EffectiveSlotStability;
         mounted.Activation.Update(next);
-        SlotFlags nextSlotStability = mounted.Context.EffectiveSlotStability;
+        SlotStability nextSlotStability = mounted.Context.EffectiveSlotStability;
         bool mustForwardMountReference =
             mounted.Instance is AsynchronousComponentWrapper
             && !ReferenceEquals(previous.MountReference, next.MountReference);
@@ -145,8 +145,8 @@ public sealed partial class Renderer<TNode>
     private static bool ShouldUpdateComponent(
         ComponentNode previous,
         ComponentNode next,
-        SlotFlags previousSlotStability,
-        SlotFlags nextSlotStability)
+        SlotStability previousSlotStability,
+        SlotStability nextSlotStability)
     {
         PatchFlags patchFlags = next.RenderPlan.PatchFlags;
         if ((int)patchFlags > 0
@@ -166,7 +166,7 @@ public sealed partial class Renderer<TNode>
         if (!HaveSameSlotStructure(
                 previousInvocation.Slots,
                 nextInvocation.Slots)
-            || nextSlotStability == SlotFlags.Dynamic
+            || nextSlotStability == SlotStability.Dynamic
             || previousSlotStability != nextSlotStability)
         {
             return true;

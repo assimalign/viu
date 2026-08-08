@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Assimalign.Viu.Reactivity;
 
@@ -22,6 +23,7 @@ namespace Assimalign.Viu.Reactivity;
 /// </para>
 /// </summary>
 /// <typeparam name="T">The element type.</typeparam>
+[DebuggerDisplay("Count = {_items.Count}")]
 public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>, IReactiveTraversable
 {
     private readonly List<T> _items;

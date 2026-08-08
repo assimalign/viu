@@ -51,7 +51,7 @@ public sealed class RoutedSsrHydrationIntegrationTests
                     component: new ComponentNode(page.Reference),
                     argumentsResolver: RouteComponentArguments.FromParameters()),
             ]);
-        (await router.Push("/items/42")).ShouldBeNull();
+        (await router.PushAsync("/items/42")).ShouldBeNull();
         ComponentFactory components = new();
         components.Register(RouterView.Registration);
         components.Register(page);

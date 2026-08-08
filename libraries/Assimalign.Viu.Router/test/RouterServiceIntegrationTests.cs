@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Testing;
 
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
@@ -15,13 +16,23 @@ namespace Assimalign.Viu.Router.Tests;
 public class RouterServiceIntegrationTests
 {
     [Fact]
+    public void CurrentRoute_ExposesCovariantReadOnlyReferenceContract()
+    {
+        var router = new Router(RouterHistory.CreateMemory(), []);
+
+        IReactiveReadOnlyReference<RouteLocation> currentRoute = router.CurrentRoute;
+
+        currentRoute.Value.ShouldBeSameAs(RouteLocation.Start);
+    }
+
+    [Fact]
     public void RouterView_ResolvesRouterFromTheExplicitApplicationServiceProvider()
     {
         TrackingComponent view = LabelView("service");
         var router = new Router(
             RouterHistory.CreateMemory(),
             [new RouteRecord("/a", component: view.Request)]);
-        _ = router.Push("/a");
+        _ = router.PushAsync("/a");
         var services = new RecordingServiceProvider(router);
         ComponentMountOptions options = OptionsFor(router, view);
         options.Services = services;

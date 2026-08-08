@@ -40,17 +40,17 @@ internal static class PatchFlagsExtensions
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool HasDynamicStyle() => flags.Has(PatchFlags.Style);
 
-        /// <summary>Returns <see langword="true"/> when the vnode has dynamic non-class/style props (<see cref="PatchFlags.Props"/>).</summary>
+        /// <summary>Returns <see langword="true"/> when the virtual node has dynamic non-class/style properties (<see cref="PatchFlags.Properties"/>).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasDynamicProps() => flags.Has(PatchFlags.Props);
+        public bool HasDynamicProperties() => flags.Has(PatchFlags.Properties);
 
-        /// <summary>Returns <see langword="true"/> when the vnode requires a full props diff (<see cref="PatchFlags.FullProps"/>).</summary>
+        /// <summary>Returns <see langword="true"/> when the virtual node requires a full properties diff (<see cref="PatchFlags.FullProperties"/>).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasFullProps() => flags.Has(PatchFlags.FullProps);
+        public bool HasFullProperties() => flags.Has(PatchFlags.FullProperties);
 
-        /// <summary>Returns <see langword="true"/> when the vnode needs listener/<c>v-show</c> work during hydration (<see cref="PatchFlags.NeedHydration"/>).</summary>
+        /// <summary>Returns <see langword="true"/> when the virtual node needs listener/<c>v-show</c> work during hydration (<see cref="PatchFlags.NeedsHydration"/>).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool NeedsHydration() => flags.Has(PatchFlags.NeedHydration);
+        public bool NeedsHydration() => flags.Has(PatchFlags.NeedsHydration);
 
         /// <summary>Returns <see langword="true"/> when the vnode is a fragment with stable children order (<see cref="PatchFlags.StableFragment"/>).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -72,9 +72,9 @@ internal static class PatchFlagsExtensions
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool HasDynamicSlots() => flags.Has(PatchFlags.DynamicSlots);
 
-        /// <summary>Returns <see langword="true"/> when the vnode is a development-only root fragment created for root-level comments (<see cref="PatchFlags.DevRootFragment"/>).</summary>
+        /// <summary>Returns <see langword="true"/> when the virtual node is a development-only root fragment created for root-level comments (<see cref="PatchFlags.DevelopmentRootFragment"/>).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsDevRootFragment() => flags.Has(PatchFlags.DevRootFragment);
+        public bool IsDevelopmentRootFragment() => flags.Has(PatchFlags.DevelopmentRootFragment);
 
         /// <summary>
         /// Returns <see langword="true"/> when the vnode is a cached static vnode

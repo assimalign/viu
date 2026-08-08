@@ -49,7 +49,7 @@ public abstract class ReactiveValue : IReactiveTrackedReference, IReactiveReadOn
 
     /// <summary>
     /// Whether this value rejects writes (reads still track), surfaced through
-    /// <see cref="Reactive.IsReadonly"/>. A getter-only <see cref="Computed{T}"/> and a setter-less
+    /// <see cref="Reactive.IsReadOnly"/>. A getter-only <see cref="Computed{T}"/> and a setter-less
     /// projected reference report <see langword="true"/>; a plain, shallow, custom, or writable
     /// computed reference reports <see langword="false"/>. Writing a read-only value warns and is a
     /// no-op rather than throwing: a binding that assigns a derived value is an authoring mistake to

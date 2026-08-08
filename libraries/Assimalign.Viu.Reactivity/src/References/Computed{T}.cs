@@ -57,7 +57,7 @@ public sealed class Computed<T> : ReactiveValue<T>
 
     /// <summary>
     /// A getter-only computed is read-only; a writable computed is not. Surfaced through
-    /// <see cref="Reactive.IsReadonly"/>.
+    /// <see cref="Reactive.IsReadOnly"/>.
     /// </summary>
     public override bool IsReadOnly => _setter is null;
 
@@ -196,5 +196,4 @@ public sealed class Computed<T> : ReactiveValue<T>
         }
     }
 }
-
 

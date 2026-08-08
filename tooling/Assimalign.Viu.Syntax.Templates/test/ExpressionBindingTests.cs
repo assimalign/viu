@@ -414,7 +414,7 @@ public class ExpressionBindingTests
 
         // The content's template offset, taken from an opaque (non-prefixed) parse of the same input.
         var opaque = TransformTestHelpers.Transform(source);
-        var vnode = opaque.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var vnode = opaque.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         var interpolation = vnode.Children.ShouldBeOfType<InterpolationNode>();
         var expressionStart = interpolation.Content.Location.Start.Offset;
 
@@ -734,16 +734,16 @@ public class ExpressionBindingTests
 
     private static object PropertyValue(TransformResult result, string key)
     {
-        var vnode = result.RootCodegen().ShouldBeOfType<VNodeCall>();
-        var properties = vnode.Props.ShouldBeOfType<ObjectExpression>();
+        var vnode = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
+        var properties = vnode.Properties.ShouldBeOfType<ObjectExpression>();
         var property = properties.Properties.First(p => p.Key is SimpleExpressionNode s && s.Content == key);
         return property.Value;
     }
 
     private static string FlattenProps(TransformResult result)
     {
-        var vnode = result.RootCodegen().ShouldBeOfType<VNodeCall>();
-        return vnode.Props is null ? string.Empty : FlattenTree(vnode.Props);
+        var vnode = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
+        return vnode.Properties is null ? string.Empty : FlattenTree(vnode.Properties);
     }
 
     // Concatenates a rewritten expression back to source text for assertion.
@@ -772,16 +772,16 @@ public class ExpressionBindingTests
         ObjectExpression obj => "{" + string.Join(",", obj.Properties.Select(p => FlattenTree(p.Key) + ":" + FlattenTree(p.Value))) + "}",
         ArrayExpression array => "[" + string.Join(",", array.Elements.Select(FlattenTree)) + "]",
         CallExpression call => FlattenTree(call.Callee) + "(" + string.Join(",", call.Arguments.Select(FlattenTree)) + ")",
-        VNodeCall vnode => FlattenVNode(vnode),
+        VirtualNodeCall vnode => FlattenVirtualNode(vnode),
         _ => node.ToString() ?? string.Empty,
     };
 
-    private static string FlattenVNode(VNodeCall vnode)
+    private static string FlattenVirtualNode(VirtualNodeCall vnode)
     {
         var parts = new List<string> { FlattenTree(vnode.Tag) };
-        if (vnode.Props is not null)
+        if (vnode.Properties is not null)
         {
-            parts.Add(FlattenTree(vnode.Props));
+            parts.Add(FlattenTree(vnode.Properties));
         }
 
         if (vnode.Children is not null)

@@ -3,7 +3,7 @@ using System;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A transform that translates a single directive on an element into vnode properties (and optionally a
+/// A transform that translates a single directive on an element into virtual-node properties (and optionally a
 /// runtime directive). Directive transforms are keyed by directive name and run
 /// during element prop building. A platform compiler can wrap a base transform through the
 /// <paramref name="augmentor"/>.

@@ -7,7 +7,7 @@ namespace Assimalign.Viu.Router;
 /// any unexpected exception thrown by a guard, or by the infinite-redirect safeguard, during
 /// navigation, along with the target and current locations. A <see cref="NavigationFailure"/>
 /// (abort, cancel, duplicate) is <b>not</b> routed here: an expected non-completion is a value
-/// returned from <see cref="Router.Push"/>/<see cref="Router.Replace"/>, while this handler exists
+/// returned from <see cref="Router.PushAsync"/>/<see cref="Router.ReplaceAsync"/>, while this handler exists
 /// only for the unexpected — the split keeps a routine aborted navigation from reading as a bug.
 /// </summary>
 /// <param name="error">The exception thrown during navigation.</param>

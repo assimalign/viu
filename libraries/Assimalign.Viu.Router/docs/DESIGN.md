@@ -49,7 +49,9 @@ typed failure model in `[RTR-5]` and `[RTR-6]`.
 
 Web and hash history need asynchronous module initialization, so no constructor blocks on
 JavaScript. `ReadyAsync` completes initialization and the initial navigation before an application
-mounts routed content. Application lifetime ordering is supplied by Browser.Router, not by this
+mounts routed content. A Router borrows its `IRouterHistory`: dispose the Router first to remove its
+subscription, then dispose the history to release the environment listener. History disposal is
+terminal and idempotent. Application lifetime ordering is supplied by Browser.Router, not by this
 package.
 
 ## AOT and WASM seams

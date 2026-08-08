@@ -1,1 +1,3 @@
 #nullable enable
+*REMOVED*Assimalign.Viu.State.StateStoreDefinition<TStore>.Dispose(Assimalign.Viu.State.IStateStoreRegistry! registry) -> bool
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Remove(Assimalign.Viu.State.IStateStoreRegistry! registry) -> bool

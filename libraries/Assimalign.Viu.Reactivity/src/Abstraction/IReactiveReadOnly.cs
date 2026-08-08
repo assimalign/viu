@@ -2,7 +2,7 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// Reports whether a reactive value rejects writes. Implementing this interface is what makes a
-/// value answer <see cref="Reactive.IsReadonly"/> without a type test per concrete kind. Specified
+/// value answer <see cref="Reactive.IsReadOnly"/> without a type test per concrete kind. Specified
 /// by <c>[RCT-5]</c>.
 /// </summary>
 public interface IReactiveReadOnly

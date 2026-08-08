@@ -27,7 +27,7 @@ public sealed class ComponentMountOptions
     public IReadOnlyList<DirectiveInvocation>? RootDirectives { get; set; }
 
     /// <summary>Gets or sets the root slot-set stability classification.</summary>
-    public SlotFlags SlotStability { get; set; } = SlotFlags.Stable;
+    public SlotStability SlotStability { get; set; } = SlotStability.Stable;
 
     /// <summary>Gets or sets the static contract used when mounting a supplied component instance.</summary>
     public ComponentContract? RootContract { get; set; }

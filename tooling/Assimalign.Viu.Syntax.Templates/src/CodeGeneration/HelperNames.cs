@@ -32,25 +32,25 @@ public static class HelperNames
     /// <summary>Opens an optimization block.</summary>
     public static readonly RuntimeHelper OpenBlock = new("openBlock");
 
-    /// <summary>Creates a component block vnode.</summary>
+    /// <summary>Creates a component block virtual node.</summary>
     public static readonly RuntimeHelper CreateBlock = new("createBlock");
 
-    /// <summary>Creates an element block vnode.</summary>
+    /// <summary>Creates an element block virtual node.</summary>
     public static readonly RuntimeHelper CreateElementBlock = new("createElementBlock");
 
-    /// <summary>Creates a component vnode.</summary>
+    /// <summary>Creates a component virtual node.</summary>
     public static readonly RuntimeHelper CreateVNode = new("createVNode");
 
-    /// <summary>Creates an element vnode.</summary>
+    /// <summary>Creates an element virtual node.</summary>
     public static readonly RuntimeHelper CreateElementVNode = new("createElementVNode");
 
-    /// <summary>Creates a comment vnode.</summary>
+    /// <summary>Creates a comment virtual node.</summary>
     public static readonly RuntimeHelper CreateComment = new("createCommentVNode");
 
-    /// <summary>Creates a text vnode.</summary>
+    /// <summary>Creates a text virtual node.</summary>
     public static readonly RuntimeHelper CreateText = new("createTextVNode");
 
-    /// <summary>Creates a static vnode.</summary>
+    /// <summary>Creates a static virtual node.</summary>
     public static readonly RuntimeHelper CreateStatic = new("createStaticVNode");
 
     /// <summary>Resolves a component by name.</summary>
@@ -62,7 +62,7 @@ public static class HelperNames
     /// <summary>Resolves a directive by name.</summary>
     public static readonly RuntimeHelper ResolveDirective = new("resolveDirective");
 
-    /// <summary>Applies runtime directives to a vnode.</summary>
+    /// <summary>Applies runtime directives to a virtual node.</summary>
     public static readonly RuntimeHelper WithDirectives = new("withDirectives");
 
     /// <summary>Renders a list for <c>v-for</c>.</summary>
@@ -77,7 +77,7 @@ public static class HelperNames
     /// <summary>Stringifies an interpolation value.</summary>
     public static readonly RuntimeHelper ToDisplayString = new("toDisplayString");
 
-    /// <summary>Merges multiple props sources.</summary>
+    /// <summary>Merges multiple properties sources.</summary>
     public static readonly RuntimeHelper MergeProps = new("mergeProps");
 
     /// <summary>Normalizes a dynamic <c>class</c> binding.</summary>
@@ -86,10 +86,10 @@ public static class HelperNames
     /// <summary>Normalizes a dynamic <c>style</c> binding.</summary>
     public static readonly RuntimeHelper NormalizeStyle = new("normalizeStyle");
 
-    /// <summary>Normalizes a props object with dynamic keys.</summary>
+    /// <summary>Normalizes a properties object with dynamic keys.</summary>
     public static readonly RuntimeHelper NormalizeProps = new("normalizeProps");
 
-    /// <summary>Guards a reactive props object.</summary>
+    /// <summary>Guards a reactive properties object.</summary>
     public static readonly RuntimeHelper GuardReactiveProps = new("guardReactiveProps");
 
     /// <summary>Normalizes a <c>v-on="object"</c> handlers map.</summary>

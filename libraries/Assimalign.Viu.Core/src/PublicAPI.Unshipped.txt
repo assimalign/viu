@@ -1,1 +1,3 @@
 #nullable enable
+*REMOVED*static Assimalign.Viu.Scheduler.NextTick() -> System.Threading.Tasks.Task!
+static Assimalign.Viu.Scheduler.NextTickAsync() -> System.Threading.Tasks.Task!

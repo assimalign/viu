@@ -33,14 +33,14 @@ internal static class TransformTraversal
         switch (node)
         {
             case CommentNode:
-                if (!context.Ssr)
+                if (!context.IsServerRendering)
                 {
                     context.Helper(HelperNames.CreateComment);
                 }
 
                 break;
             case InterpolationNode:
-                if (!context.Ssr)
+                if (!context.IsServerRendering)
                 {
                     context.Helper(HelperNames.ToDisplayString);
                 }

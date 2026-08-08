@@ -24,8 +24,8 @@ public class NamespaceTests
     {
         var math = ParseHtml("<math><mi/></math>").Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
 
-        math.Namespace.ShouldBe(ElementNamespace.MathML);
-        math.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>().Namespace.ShouldBe(ElementNamespace.MathML);
+        math.Namespace.ShouldBe(ElementNamespace.MathMl);
+        math.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>().Namespace.ShouldBe(ElementNamespace.MathMl);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class NamespaceTests
         var mtext = math.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
         var div = mtext.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
 
-        mtext.Namespace.ShouldBe(ElementNamespace.MathML);
+        mtext.Namespace.ShouldBe(ElementNamespace.MathMl);
         div.Namespace.ShouldBe(ElementNamespace.Html);
     }
 
@@ -60,7 +60,7 @@ public class NamespaceTests
         var annotation = math.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
         var svg = annotation.Children.ShouldHaveSingleItem().ShouldBeOfType<ElementNode>();
 
-        annotation.Namespace.ShouldBe(ElementNamespace.MathML);
+        annotation.Namespace.ShouldBe(ElementNamespace.MathMl);
         svg.Namespace.ShouldBe(ElementNamespace.Svg);
     }
 

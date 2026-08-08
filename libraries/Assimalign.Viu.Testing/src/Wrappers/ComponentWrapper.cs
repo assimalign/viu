@@ -195,7 +195,7 @@ public sealed class ComponentWrapper : IDisposable
     /// <param name="eventName">The event binding's local name.</param>
     /// <param name="payload">The optional event payload.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task Trigger(string eventName, object? payload = null)
+    public async Task TriggerAsync(string eventName, object? payload = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
         TestElement element = RootElement()
@@ -208,12 +208,12 @@ public sealed class ComponentWrapper : IDisposable
     /// <summary>Sets the first rendered element's value, dispatches input, and drains the scheduler.</summary>
     /// <param name="value">The new host value.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task SetValue(object? value)
+    public async Task SetValueAsync(object? value)
     {
         TestElement element = RootElement()
             ?? throw new InvalidOperationException(
                 "The wrapped host range has no element to update.");
-        element.Properties["value"] = value;
+        element.SetProperty("value", value);
         await TestEventDispatcher.TriggerAsync(element, "input", value).ConfigureAwait(false);
         await _flush.RunAsync().ConfigureAwait(false);
     }

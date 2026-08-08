@@ -32,15 +32,15 @@ internal static class Ir
         => new() { Parts = new SyntaxList<object>(parts), Location = LocationStub };
 
     /// <summary>Creates an object property with a static string key.</summary>
-    public static Property ObjectProperty(string key, TemplateSyntaxNode value)
+    public static ObjectProperty ObjectProperty(string key, TemplateSyntaxNode value)
         => new() { Key = SimpleExpression(key, true), Value = value, Location = LocationStub };
 
     /// <summary>Creates an object property with an expression key.</summary>
-    public static Property ObjectProperty(ExpressionNode key, TemplateSyntaxNode value)
+    public static ObjectProperty ObjectProperty(ExpressionNode key, TemplateSyntaxNode value)
         => new() { Key = key, Value = value, Location = LocationStub };
 
     /// <summary>Creates an object literal.</summary>
-    public static ObjectExpression ObjectExpression(IReadOnlyList<Property> properties, SourceLocation? location = null)
+    public static ObjectExpression ObjectExpression(IReadOnlyList<ObjectProperty> properties, SourceLocation? location = null)
         => new() { Properties = ToList(properties), Location = location ?? LocationStub };
 
     /// <summary>Creates an array literal.</summary>

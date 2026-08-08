@@ -33,7 +33,7 @@ public class StaticCacheTests
         var result = Transform("<div><span>static</span></div>");
 
         var cachedSpan = ChildCodegen(result, 0).ShouldBeOfType<CacheExpression>();
-        var vnode = cachedSpan.Value.ShouldBeOfType<VNodeCall>();
+        var vnode = cachedSpan.Value.ShouldBeOfType<VirtualNodeCall>();
         vnode.PatchFlag.ShouldBe(PatchFlags.Cached);
         result.Cached.Count.ShouldBe(1);
     }
@@ -45,11 +45,11 @@ public class StaticCacheTests
         // live block even when fully static.
         var result = Transform("<div><span>static</span></div>");
 
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().IsBlock.ShouldBeTrue();
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().IsBlock.ShouldBeTrue();
     }
 
     [Fact]
-    public void StaticProps_OnDynamicChildElement_AreCached()
+    public void StaticProperties_OnDynamicChildElement_AreCached()
     {
         // The element has a dynamic child (TEXT flag) so its subtree is not cached, but its static props
         // object is: both cached subtrees and cached props objects route through the same per-instance
@@ -57,9 +57,9 @@ public class StaticCacheTests
         // are eligible even though the root vnode is not.
         var result = Transform("<div class=\"card\">{{ msg }}</div>", prefixIdentifiers: true);
 
-        var vnode = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var vnode = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         vnode.PatchFlag.ShouldBe(PatchFlags.Text);
-        vnode.Props.ShouldBeOfType<CacheExpression>();
+        vnode.Properties.ShouldBeOfType<CacheExpression>();
         result.Cached.Count.ShouldBe(1);
     }
 
@@ -71,7 +71,7 @@ public class StaticCacheTests
         // A :key makes the element a block; a block (that is not svg/foreignObject/math) is never constant.
         var result = Transform("<div><span :key=\"k\">x</span></div>", prefixIdentifiers: true);
 
-        ChildCodegen(result, 0).ShouldBeOfType<VNodeCall>().IsBlock.ShouldBeTrue();
+        ChildCodegen(result, 0).ShouldBeOfType<VirtualNodeCall>().IsBlock.ShouldBeTrue();
         result.Cached.Count.ShouldBe(0);
     }
 
@@ -82,7 +82,7 @@ public class StaticCacheTests
         var result = Transform("<div><span ref=\"r\">x</span></div>");
 
         var codegen = ChildCodegen(result, 0);
-        codegen.ShouldBeOfType<VNodeCall>().PatchFlag.ShouldBe(PatchFlags.NeedPatch);
+        codegen.ShouldBeOfType<VirtualNodeCall>().PatchFlag.ShouldBe(PatchFlags.NeedPatch);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class StaticCacheTests
         // A component is not a plain element, so it is never cached as a static subtree.
         var result = Transform("<div><Comp></Comp></div>");
 
-        ChildCodegen(result, 0).ShouldBeOfType<VNodeCall>().IsComponent.ShouldBeTrue();
+        ChildCodegen(result, 0).ShouldBeOfType<VirtualNodeCall>().IsComponent.ShouldBeTrue();
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class StaticCacheTests
         // An interpolation child poisons the parent's constant type, so the parent is not cached.
         var result = Transform("<div><span>{{ dynamic }}</span></div>", prefixIdentifiers: true);
 
-        ChildCodegen(result, 0).ShouldBeOfType<VNodeCall>().PatchFlag.ShouldBe(PatchFlags.Text);
+        ChildCodegen(result, 0).ShouldBeOfType<VirtualNodeCall>().PatchFlag.ShouldBe(PatchFlags.Text);
         result.Cached.Count.ShouldBe(0);
     }
 
@@ -259,7 +259,7 @@ public class StaticCacheTests
     }
 
     [Fact]
-    public void CachedStaticProps_EmitRenderCacheAssignment()
+    public void CachedStaticProperties_EmitRenderCacheAssignment()
     {
         string code = Emit("<div class=\"card\">{{ msg }}</div>", prefixIdentifiers: true).Code;
 
@@ -359,7 +359,7 @@ public class StaticCacheTests
     // The codegen node of the index-th child of the single root element.
     private static TemplateSyntaxNode? ChildCodegen(TransformResult result, int index)
     {
-        var root = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var root = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         var children = (SyntaxList<TemplateChildNode>)root.Children!;
         return result.GetCodegenNode(children[index]);
     }

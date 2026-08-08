@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- The helper-contract conformance project references the runtime assemblies beside Syntax.Templates.
-         Keep its sources out of this project's implicit globs so the linked PatchFlags/SlotFlags copies do
+         Keep its sources out of this project's implicit globs so the linked PatchFlags/SlotStability copies do
          not collide with the Components identities referenced by the helper-contract assembly. -->
     <Compile Remove="Assimalign.Viu.Syntax.Templates.HelperContractTests/**" />
     <None Remove="Assimalign.Viu.Syntax.Templates.HelperContractTests/**" />

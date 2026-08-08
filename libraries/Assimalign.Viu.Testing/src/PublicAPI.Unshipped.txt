@@ -1,1 +1,17 @@
 #nullable enable
+*REMOVED*Assimalign.Viu.Testing.ComponentMountOptions.SlotStability.get -> Assimalign.Viu.Components.SlotFlags
+*REMOVED*Assimalign.Viu.Testing.ComponentWrapper.SetValue(object? value) -> System.Threading.Tasks.Task!
+*REMOVED*Assimalign.Viu.Testing.ComponentWrapper.Trigger(string! eventName, object? payload = null) -> System.Threading.Tasks.Task!
+*REMOVED*Assimalign.Viu.Testing.ElementWrapper.SetValue(object? value) -> System.Threading.Tasks.Task!
+*REMOVED*Assimalign.Viu.Testing.ElementWrapper.Trigger(string! eventName, object? payload = null) -> System.Threading.Tasks.Task!
+*REMOVED*Assimalign.Viu.Testing.TestElement.Children.get -> System.Collections.Generic.List<Assimalign.Viu.Testing.TestNode!>!
+*REMOVED*Assimalign.Viu.Testing.TestElement.EventListeners.get -> System.Collections.Generic.Dictionary<string!, System.Delegate!>!
+*REMOVED*Assimalign.Viu.Testing.TestElement.Properties.get -> System.Collections.Generic.Dictionary<string!, object?>!
+Assimalign.Viu.Testing.ComponentMountOptions.SlotStability.get -> Assimalign.Viu.Components.SlotStability
+Assimalign.Viu.Testing.ComponentWrapper.SetValueAsync(object? value) -> System.Threading.Tasks.Task!
+Assimalign.Viu.Testing.ComponentWrapper.TriggerAsync(string! eventName, object? payload = null) -> System.Threading.Tasks.Task!
+Assimalign.Viu.Testing.ElementWrapper.SetValueAsync(object? value) -> System.Threading.Tasks.Task!
+Assimalign.Viu.Testing.ElementWrapper.TriggerAsync(string! eventName, object? payload = null) -> System.Threading.Tasks.Task!
+Assimalign.Viu.Testing.TestElement.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Testing.TestNode!>!
+Assimalign.Viu.Testing.TestElement.EventListeners.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Delegate!>!
+Assimalign.Viu.Testing.TestElement.Properties.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!

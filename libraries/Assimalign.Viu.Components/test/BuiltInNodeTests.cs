@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 using Shouldly;
 using Xunit;
@@ -9,6 +11,18 @@ namespace Assimalign.Viu.Components.Tests;
 
 public sealed class BuiltInNodeTests
 {
+    [Fact]
+    public void ElementNode_DebuggerDisplay_DescribesStoredStructure()
+    {
+        var attribute = (DebuggerDisplayAttribute?)Attribute.GetCustomAttribute(
+            typeof(ElementNode),
+            typeof(DebuggerDisplayAttribute));
+
+        attribute.ShouldNotBeNull();
+        attribute.Value.ShouldBe(
+            "<{Name,nq}> Bindings = {Bindings.Count}, Children = {Children.Count}, Directives = {Directives.Count}");
+    }
+
     [Fact]
     public void SuspenseNode_InvocationSlots_StayUnevaluatedAtConstruction()
     {

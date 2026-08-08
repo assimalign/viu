@@ -1547,7 +1547,7 @@ public sealed partial class Renderer<TNode>
             return;
         }
 
-        if ((flags & PatchFlags.FullProps) != 0)
+        if ((flags & PatchFlags.FullProperties) != 0)
         {
             PatchAttributes(element, previous.Bindings, next.Bindings);
             return;
@@ -1563,7 +1563,7 @@ public sealed partial class Renderer<TNode>
             PatchNamedBinding(element, previous.Bindings, next.Bindings, "style");
         }
 
-        if ((flags & PatchFlags.Props) != 0)
+        if ((flags & PatchFlags.Properties) != 0)
         {
             IReadOnlyList<int>? indices = next.RenderPlan.DynamicBindingIndices;
             if (indices is null)

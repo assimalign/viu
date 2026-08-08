@@ -79,7 +79,7 @@ internal static class TransformText
                     callArguments.Add(child);
                 }
 
-                if (!context.Ssr && ConstantAnalysis.GetConstantType(child) == ConstantType.NotConstant)
+                if (!context.IsServerRendering && ConstantAnalysis.GetConstantType(child) == ConstantType.NotConstant)
                 {
                     callArguments.Add(((int)PatchFlags.Text).ToString(CultureInfo.InvariantCulture));
                 }

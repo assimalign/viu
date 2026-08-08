@@ -30,9 +30,9 @@ public class VIfTransformTests
 
         var conditional = result.GetCodegenNode(ifNode).ShouldBeOfType<ConditionalExpression>();
         conditional.Test.StaticContent().ShouldBe("ok");
-        var consequent = conditional.Consequent.ShouldBeOfType<VNodeCall>();
+        var consequent = conditional.Consequent.ShouldBeOfType<VirtualNodeCall>();
         consequent.IsBlock.ShouldBeTrue();
-        consequent.Props.ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("0");
+        consequent.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("0");
         conditional.Alternate.ShouldBeOfType<CallExpression>().Callee
             .ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("createCommentVNode");
     }
@@ -56,12 +56,12 @@ public class VIfTransformTests
         var ifNode = result.Children[0].ShouldBeOfType<IfNode>();
 
         var conditional = result.GetCodegenNode(ifNode).ShouldBeOfType<ConditionalExpression>();
-        conditional.Consequent.ShouldBeOfType<VNodeCall>().Props
-            .ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("0");
+        conditional.Consequent.ShouldBeOfType<VirtualNodeCall>().Properties
+            .ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("0");
         // else branch has no condition, so the alternate is its block directly (key 1).
-        var alternate = conditional.Alternate.ShouldBeOfType<VNodeCall>();
+        var alternate = conditional.Alternate.ShouldBeOfType<VirtualNodeCall>();
         alternate.Tag.ShouldBe("\"p\"");
-        alternate.Props.ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("1");
+        alternate.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("1");
     }
 
     [Fact]
@@ -75,10 +75,10 @@ public class VIfTransformTests
         conditional.Test.StaticContent().ShouldBe("a");
         var nested = conditional.Alternate.ShouldBeOfType<ConditionalExpression>();
         nested.Test.StaticContent().ShouldBe("b");
-        nested.Consequent.ShouldBeOfType<VNodeCall>().Props
-            .ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("1");
-        nested.Alternate.ShouldBeOfType<VNodeCall>().Props
-            .ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("2");
+        nested.Consequent.ShouldBeOfType<VirtualNodeCall>().Properties
+            .ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("1");
+        nested.Alternate.ShouldBeOfType<VirtualNodeCall>().Properties
+            .ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("2");
     }
 
     [Fact]
@@ -90,10 +90,10 @@ public class VIfTransformTests
         ifNode.Branches[0].Children.Count.ShouldBe(2);
 
         var conditional = result.GetCodegenNode(ifNode).ShouldBeOfType<ConditionalExpression>();
-        var fragment = conditional.Consequent.ShouldBeOfType<VNodeCall>();
+        var fragment = conditional.Consequent.ShouldBeOfType<VirtualNodeCall>();
         fragment.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         fragment.ShouldHavePatchFlag(PatchFlags.StableFragment);
-        fragment.Props.ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("0");
+        fragment.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("0");
     }
 
     [Fact]

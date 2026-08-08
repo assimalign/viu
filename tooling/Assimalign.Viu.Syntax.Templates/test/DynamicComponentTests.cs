@@ -13,7 +13,7 @@ public class DynamicComponentTests
     {
         var result = TransformTestHelpers.Transform("<component :is=\"foo\"></component>");
 
-        var codegen = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var codegen = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         var tag = codegen.Tag.ShouldBeOfType<CallExpression>();
         tag.Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("resolveDynamicComponent");
         tag.Arguments[0].ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("foo");
@@ -26,7 +26,7 @@ public class DynamicComponentTests
     {
         var result = TransformTestHelpers.Transform("<component is=\"foo\"></component>");
 
-        var tag = result.CodegenNode.ShouldBeOfType<VNodeCall>().Tag.ShouldBeOfType<CallExpression>();
+        var tag = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Tag.ShouldBeOfType<CallExpression>();
         tag.Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("resolveDynamicComponent");
         var expression = tag.Arguments[0].ShouldBeOfType<SimpleExpressionNode>();
         expression.Content.ShouldBe("foo");
@@ -38,7 +38,7 @@ public class DynamicComponentTests
     {
         var result = TransformTestHelpers.Transform("<MyComponent></MyComponent>");
 
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().Tag.ShouldBe("_component_MyComponent");
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Tag.ShouldBe("_component_MyComponent");
         result.ShouldUseHelper("resolveComponent");
         result.Components.ShouldContain("MyComponent");
     }
@@ -48,6 +48,6 @@ public class DynamicComponentTests
     {
         var result = TransformTestHelpers.Transform("<Teleport to=\"#modal\"><div></div></Teleport>");
 
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Teleport");
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Teleport");
     }
 }

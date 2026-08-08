@@ -1,13 +1,13 @@
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// Classification assigned by template compilation to a component's slot collection, telling the
+/// Stability classification assigned by template compilation to a component's slot collection, telling the
 /// runtime how aggressively slot content must re-render. This is a plain enumeration, not a
 /// bitmask: a slot collection has exactly one value. Numeric values are a frozen, additive-only
 /// compiler-runtime contract. Specified by <c>[RND-FLAGS-1]</c>, <c>[RND-FLAGS-5]</c>, and
 /// <c>[RND-FLAGS-6]</c>.
 /// </summary>
-public enum SlotFlags
+public enum SlotStability
 {
     /// <summary>
     /// Slots referencing only slot parameters or context-stable state; the child need not force an

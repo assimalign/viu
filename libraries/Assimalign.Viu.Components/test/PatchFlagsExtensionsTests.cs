@@ -11,15 +11,15 @@ public class PatchFlagsExtensionsTests
     [InlineData(PatchFlags.Text)]
     [InlineData(PatchFlags.Class)]
     [InlineData(PatchFlags.Style)]
-    [InlineData(PatchFlags.Props)]
-    [InlineData(PatchFlags.FullProps)]
-    [InlineData(PatchFlags.NeedHydration)]
+    [InlineData(PatchFlags.Properties)]
+    [InlineData(PatchFlags.FullProperties)]
+    [InlineData(PatchFlags.NeedsHydration)]
     [InlineData(PatchFlags.StableFragment)]
     [InlineData(PatchFlags.KeyedFragment)]
     [InlineData(PatchFlags.UnkeyedFragment)]
     [InlineData(PatchFlags.NeedPatch)]
     [InlineData(PatchFlags.DynamicSlots)]
-    [InlineData(PatchFlags.DevRootFragment)]
+    [InlineData(PatchFlags.DevelopmentRootFragment)]
     public void Bail_never_satisfies_a_positive_flag_check(PatchFlags positive)
     {
         // -2 in two's complement has every bit except bit 0 set, so an unguarded bitwise test
@@ -31,15 +31,15 @@ public class PatchFlagsExtensionsTests
     [InlineData(PatchFlags.Text)]
     [InlineData(PatchFlags.Class)]
     [InlineData(PatchFlags.Style)]
-    [InlineData(PatchFlags.Props)]
-    [InlineData(PatchFlags.FullProps)]
-    [InlineData(PatchFlags.NeedHydration)]
+    [InlineData(PatchFlags.Properties)]
+    [InlineData(PatchFlags.FullProperties)]
+    [InlineData(PatchFlags.NeedsHydration)]
     [InlineData(PatchFlags.StableFragment)]
     [InlineData(PatchFlags.KeyedFragment)]
     [InlineData(PatchFlags.UnkeyedFragment)]
     [InlineData(PatchFlags.NeedPatch)]
     [InlineData(PatchFlags.DynamicSlots)]
-    [InlineData(PatchFlags.DevRootFragment)]
+    [InlineData(PatchFlags.DevelopmentRootFragment)]
     public void Cached_never_satisfies_a_positive_flag_check(PatchFlags positive)
     {
         // -1 has every bit set, so every unguarded bitwise test would match. The guarded
@@ -55,15 +55,15 @@ public class PatchFlagsExtensionsTests
         flags.HasText().ShouldBeFalse();
         flags.HasDynamicClass().ShouldBeFalse();
         flags.HasDynamicStyle().ShouldBeFalse();
-        flags.HasDynamicProps().ShouldBeFalse();
-        flags.HasFullProps().ShouldBeFalse();
+        flags.HasDynamicProperties().ShouldBeFalse();
+        flags.HasFullProperties().ShouldBeFalse();
         flags.NeedsHydration().ShouldBeFalse();
         flags.IsStableFragment().ShouldBeFalse();
         flags.IsKeyedFragment().ShouldBeFalse();
         flags.IsUnkeyedFragment().ShouldBeFalse();
         flags.NeedsPatch().ShouldBeFalse();
         flags.HasDynamicSlots().ShouldBeFalse();
-        flags.IsDevRootFragment().ShouldBeFalse();
+        flags.IsDevelopmentRootFragment().ShouldBeFalse();
 
         flags.IsBail().ShouldBeTrue();
         flags.IsCached().ShouldBeFalse();
@@ -88,15 +88,15 @@ public class PatchFlagsExtensionsTests
         PatchFlags.Text.HasText().ShouldBeTrue();
         PatchFlags.Class.HasDynamicClass().ShouldBeTrue();
         PatchFlags.Style.HasDynamicStyle().ShouldBeTrue();
-        PatchFlags.Props.HasDynamicProps().ShouldBeTrue();
-        PatchFlags.FullProps.HasFullProps().ShouldBeTrue();
-        PatchFlags.NeedHydration.NeedsHydration().ShouldBeTrue();
+        PatchFlags.Properties.HasDynamicProperties().ShouldBeTrue();
+        PatchFlags.FullProperties.HasFullProperties().ShouldBeTrue();
+        PatchFlags.NeedsHydration.NeedsHydration().ShouldBeTrue();
         PatchFlags.StableFragment.IsStableFragment().ShouldBeTrue();
         PatchFlags.KeyedFragment.IsKeyedFragment().ShouldBeTrue();
         PatchFlags.UnkeyedFragment.IsUnkeyedFragment().ShouldBeTrue();
         PatchFlags.NeedPatch.NeedsPatch().ShouldBeTrue();
         PatchFlags.DynamicSlots.HasDynamicSlots().ShouldBeTrue();
-        PatchFlags.DevRootFragment.IsDevRootFragment().ShouldBeTrue();
+        PatchFlags.DevelopmentRootFragment.IsDevelopmentRootFragment().ShouldBeTrue();
 
         PatchFlags.Text.HasDynamicClass().ShouldBeFalse();
         PatchFlags.Class.HasText().ShouldBeFalse();
@@ -106,13 +106,13 @@ public class PatchFlagsExtensionsTests
     [Fact]
     public void Predicates_work_on_combined_flags()
     {
-        var flags = PatchFlags.Text | PatchFlags.Class | PatchFlags.NeedHydration;
+        var flags = PatchFlags.Text | PatchFlags.Class | PatchFlags.NeedsHydration;
 
         flags.HasText().ShouldBeTrue();
         flags.HasDynamicClass().ShouldBeTrue();
         flags.NeedsHydration().ShouldBeTrue();
         flags.HasDynamicStyle().ShouldBeFalse();
-        flags.HasDynamicProps().ShouldBeFalse();
+        flags.HasDynamicProperties().ShouldBeFalse();
         flags.IsCached().ShouldBeFalse();
         flags.IsBail().ShouldBeFalse();
 

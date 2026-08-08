@@ -186,19 +186,19 @@ pinned by a snapshot test in `RenderFunctionEmitterTests`.
 
 | Described shape | Viu C# output | Why |
 | --- | --- | --- |
-| `(_openBlock(), _createElementBlock(tag, ...))` | `_createElementBlock(_openBlock(), tag, ...)` | C# has no comma operator. C# guarantees left-to-right argument evaluation, so the block opens before any child argument is evaluated and the block factory closes it — the same open/collect/close sequence. |
-| `{ id: x, onClick: h }` props/slots objects | `_createProps(("id", x), ("onClick", _withHandler(h)))` | C# has no object literals with arbitrary keys. Static keys become string literals; dynamic keys emit as (contract-typed string) expressions. |
+| `(_openBlock(), createNode(tag, ...))` | `frame.OpenBlock();` followed by node construction, `frame.Track(node)`, and `frame.CloseBlock()` | C# has no comma operator. Explicit statements preserve the open/collect/close order and keep block state on the mount-owned frame. |
+| `{ id: x, onClick: h }` property/slot objects | `ElementBinding` or `ComponentBinding` entries in an owned collection | C# has no object literals with arbitrary keys. Static keys become string literals; dynamic keys are evaluated as strings before the typed binding is constructed. |
 | `[a, b]` children/argument arrays | `new object?[] { a, b }` | A C# collection expression needs a target type, which an object-typed children argument cannot supply. The runtime helper surface accepts object-typed children and normalizes them. |
-| `["title", "id"]` dynamicProps | `["title", "id"]` (verbatim) | The dynamicProps parameter is `string[]` in the helper contract, so the stringified array is already a valid target-typed C# collection expression. |
-| `_cache[0] \|\| (_cache[0] = v)` | `(_cache[0] ??= v)` | JavaScript falsy-guarded assignment becomes null-coalescing assignment. |
-| `(setBlockTracking(-1, true), (_cache[0] = v).cacheIndex = 0, setBlockTracking(1), _cache[0])` | `_setCache(0, _setBlockTracking(-1, true), v)` | The comma sequence collapses into a helper: argument order pauses tracking before `v` is created; `_setCache` stamps the cache index, resumes tracking, and returns the value. |
-| `[...(cacheExpr)]` | `_spreadCache(cacheExpr)` | No spread operator; the helper clones the cached array. |
-| inline handler values (`$event => ...`, method refs) | wrapped in `_withHandler(...)` | A C# lambda or method group has no natural type in an object-typed position; the helper's delegate parameter supplies the target type. `_withModifiers`/`_withKeys` calls are not wrapped — their own contract signatures type the inner lambda. |
+| `["title", "id"]` dynamic properties | `["title", "id"]` (verbatim) | The dynamic-properties parameter is `string[]` in the helper contract, so the stringified array is already a valid target-typed C# collection expression. |
+| `_cache[0] \|\| (_cache[0] = v)` | `frame.GetOrAddCache(0, ...)` | The mount-owned frame provides typed cache identity without an ambient array or falsy-value ambiguity. |
+| `(setBlockTracking(-1, true), cache, setBlockTracking(1))` | balanced `frame.SetBlockTracking(-1);` / `frame.SetBlockTracking(1);` statements around the cache write | Statements preserve ordering directly and runtime recovery restores the same frame after a failed render. |
+| `[...(cacheExpr)]` | a typed array/list clone emitted at the use site | C# has no spread operator; generated code copies the cached sequence without requiring a mutable global helper ABI. |
+| inline handler values (`$event => ...`, method refs) | target-typed `ComponentEventHandler`/`BrowserEventHandler` construction or `frame.CacheHandler(...)` | Explicit runtime delegate types give lambdas and method groups a type in object-valued binding positions; cached handlers are owned by the mount frame. |
 | single-statement **call** handler (`$event => (call)`) | `__event => { call; }` (statement-block lambda) | JavaScript has no `void`; C# does, and a parenthesized void call binds no delegate. A call is the only single-statement shape that can be void, so it emits as a statement-block lambda (binds the `Action<…>` overload, discarding any value). Increments/assignments/value expressions yield a value and keep `__event => (expr)`. See the inline-handler divergence note above ([V01.01.05.05.01], issue #143). |
-| `$slots` / `$event` | `_ctx.__slots` / `__event` | `$` is not legal in C# identifiers; `__event` is the [V01.01.05.04] event-variable contract and `__slots` follows the same spelling rule. |
+| `$slots` / `$event` | component invocation slot access / `__event` | `$` is not legal in C# identifiers; the event local keeps the [V01.01.05.04] spelling while slots compile into typed lazy `ComponentSlot` closures. |
 | `undefined` / `void 0` | `null` | No `undefined` in C#. |
-| `{}` (renderSlot's empty-props placeholder) | `_createProps()` | Same object-literal rule as props. |
-| `{ trim: true }` directive-modifier bag (`withDirectives` tuple slot 3) | `_createModifiers(("trim", true))` | Same object-literal rule as props, but a **different helper**: a directive binding types its modifiers `IReadOnlyDictionary<string, bool>`, while `_createProps` yields `IReadOnlyDictionary<string, object?>`. The property helper in this slot type-checks and then reads back as *no modifiers*, silently disabling `.lazy`/`.trim`/`.number` on native `v-model` ([SFC-CG-6], [V01.01.05.03.01]). |
+| `{}` (render-slot empty-properties placeholder) | an empty typed binding collection | The generated contract distinguishes component arguments, slots, listeners, and directive modifiers rather than passing an untyped property bag. |
+| `{ trim: true }` directive-modifier bag | an `IReadOnlyDictionary<string, bool>` passed to `DirectiveInvocation` | Directive modifiers remain Boolean-valued and cannot be confused with object-valued element/component bindings ([SFC-CG-6], [V01.01.05.03.01]). |
 | `const` statements, ` === `/` !== ` (v-memo bodies) | `var`, ` == `/` != ` | Lexical bridging of the JavaScript statement spellings the v-memo transform authors as raw strings. |
 | `JSON.stringify(text)` | C# string literal (`SymbolDisplay.FormatLiteral`) | Same role, C# escaping rules. |
 | 2-space indent | 4-space indent | Repository C# convention; cosmetic. |
@@ -245,27 +245,24 @@ Browser tests, and `Assimalign.Viu.Generators.Syntax.CompiledFixtureTests` pin t
 
 What code generation requires of each DOM member, mapped to the runtime machinery it forwards to:
 
-- `_vShow`, `_vModelText`, `_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic` — compiler
-  tokens lowered to `DirectiveInvocation(typeof(VShow), value)` and the corresponding Browser directive
-  type. Native `v-model` values are emitted as
+- VShow and the VModel directive tokens lower to `DirectiveInvocation(typeof(VShow), value)` and the
+  corresponding qualified Browser directive type. Native `v-model` values are emitted as
   `new ViuModelBinding(exp, value => { exp = value; })`, carrying the current value and reflection-free
   write-back action together inside the invocation.
-- `_withModifiers(...)` / `_withKeys(...)` — the `v-on` modifier / key guard wrappers,
-  each **returning `Action<BrowserEvent>`** (the dispatchable handler the event
-  invoker registry understands) and forwarding to `BrowserEvents.WithModifiers` / `BrowserEvents.WithKeys`. The
-  handler parameter is **overloaded**, not a single `Action` — this reconciles the earlier
-  `_withModifiers(handler, string[])` pin: the emitter (`VOnTransform`) can write the handler as a value-returning
+- `BrowserEvents.WithModifiers(...)` / `BrowserEvents.WithKeys(...)` are the qualified `v-on`
+  modifier/key guard calls. Each returns the dispatchable `Action<BrowserEvent>` understood by the event
+  invoker registry. The handler parameter is **overloaded**, not a single `Action`: the emitter
+  (`VOnTransform`) can write the handler as a value-returning
   inline expression lambda (`__event => (expr)`), a statement-block lambda for a single-statement call
   (`__event => { call; }`, the void-capable shape — see the single-statement call-handler divergence above) or a
   multi-statement body, or a member/method-group reference (`_ctx.save`), and a parenthesized void call cannot
   bind to `Func<BrowserEvent, object?>`. The
   overload set — `Func<BrowserEvent, object?>`, `Action<BrowserEvent>`, `Func<object?>`, `Action` (each with
-  `params string[]`) — target-types every one of those, mirroring `_withHandler`'s multi-overload rationale.
+  `params string[]`) — target-types every one of those without an ambient handler helper.
   Because both return `Action<BrowserEvent>`, a stacked `@keyup.enter.prevent` nests cleanly as
-  `_withKeys(_withModifiers(handler, ["prevent"]), ["enter"])` (the outer call resolves the inner result through
-  the `Action<BrowserEvent>` arm). These are **not** wrapped in `_withHandler` — their own signatures type the
-  inner lambda.
-- `_Transition` lowers to the structural `TransitionNode`; `_TransitionGroup` lowers to a
+  `BrowserEvents.WithKeys(BrowserEvents.WithModifiers(handler, ["prevent"]), ["enter"])`; the outer call
+  resolves the inner result through the `Action<BrowserEvent>` arm.
+- Transition lowers to the structural `TransitionNode`; TransitionGroup lowers to a
   `ComponentNode` carrying `ComponentReference.ForName("TransitionGroup")`. Browser's composition
   resolves the named group while Core executes the host-neutral structural transition node.
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Assimalign.Viu.Components;
 
@@ -7,6 +8,7 @@ namespace Assimalign.Viu.Components;
 /// Describes a namespaced element, its host bindings, directives, and child structure.
 /// </summary>
 /// <remarks>Specified by <c>[CMP-3]</c>.</remarks>
+[DebuggerDisplay("<{Name,nq}> Bindings = {Bindings.Count}, Children = {Children.Count}, Directives = {Directives.Count}")]
 public sealed class ElementNode : CompositeVirtualNode
 {
     /// <summary>Initializes an immutable element node from copied collection snapshots.</summary>

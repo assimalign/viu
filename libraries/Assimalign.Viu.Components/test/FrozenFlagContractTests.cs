@@ -14,15 +14,15 @@ public sealed class FrozenFlagContractTests
         ((int)PatchFlags.Text).ShouldBe(1);
         ((int)PatchFlags.Class).ShouldBe(2);
         ((int)PatchFlags.Style).ShouldBe(4);
-        ((int)PatchFlags.Props).ShouldBe(8);
-        ((int)PatchFlags.FullProps).ShouldBe(16);
-        ((int)PatchFlags.NeedHydration).ShouldBe(32);
+        ((int)PatchFlags.Properties).ShouldBe(8);
+        ((int)PatchFlags.FullProperties).ShouldBe(16);
+        ((int)PatchFlags.NeedsHydration).ShouldBe(32);
         ((int)PatchFlags.StableFragment).ShouldBe(64);
         ((int)PatchFlags.KeyedFragment).ShouldBe(128);
         ((int)PatchFlags.UnkeyedFragment).ShouldBe(256);
         ((int)PatchFlags.NeedPatch).ShouldBe(512);
         ((int)PatchFlags.DynamicSlots).ShouldBe(1024);
-        ((int)PatchFlags.DevRootFragment).ShouldBe(2048);
+        ((int)PatchFlags.DevelopmentRootFragment).ShouldBe(2048);
         ((int)PatchFlags.Cached).ShouldBe(-1);
         ((int)PatchFlags.Bail).ShouldBe(-2);
     }
@@ -44,10 +44,10 @@ public sealed class FrozenFlagContractTests
     }
 
     [Fact]
-    public void SlotFlags_Values_PreservePlainEnumerationLayout()
+    public void SlotStability_Values_PreservePlainEnumerationLayout()
     {
-        ((int)SlotFlags.Stable).ShouldBe(1);
-        ((int)SlotFlags.Dynamic).ShouldBe(2);
-        ((int)SlotFlags.Forwarded).ShouldBe(3);
+        ((int)SlotStability.Stable).ShouldBe(1);
+        ((int)SlotStability.Dynamic).ShouldBe(2);
+        ((int)SlotStability.Forwarded).ShouldBe(3);
     }
 }

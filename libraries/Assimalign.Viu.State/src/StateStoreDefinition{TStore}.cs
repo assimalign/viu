@@ -109,7 +109,7 @@ public sealed class StateStoreDefinition<TStore>
     /// </summary>
     /// <param name="registry">The registry that may own the store.</param>
     /// <returns><see langword="true"/> when a materialized store was removed.</returns>
-    public bool Dispose(IStateStoreRegistry registry)
+    public bool Remove(IStateStoreRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
         return registry.Remove(this);

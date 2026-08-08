@@ -59,7 +59,7 @@ internal sealed class ParserContext : ITokenizerCallbacks
     {
         input = source;
         tokenizer.Mode = options.Mode;
-        tokenizer.InXml = options.RootNamespace is ElementNamespace.Svg or ElementNamespace.MathML;
+        tokenizer.InXml = options.RootNamespace is ElementNamespace.Svg or ElementNamespace.MathMl;
         tokenizer.DelimiterOpen = options.DelimiterOpen.ToCharArray();
         tokenizer.DelimiterClose = options.DelimiterClose.ToCharArray();
 
@@ -479,7 +479,7 @@ internal sealed class ParserContext : ITokenizerCallbacks
         else
         {
             stack.Insert(0, element);
-            if (element.Namespace is ElementNamespace.Svg or ElementNamespace.MathML)
+            if (element.Namespace is ElementNamespace.Svg or ElementNamespace.MathMl)
             {
                 tokenizer.InXml = true;
             }

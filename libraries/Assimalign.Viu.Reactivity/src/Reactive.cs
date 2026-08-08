@@ -61,7 +61,10 @@ public static class Reactive
     /// </summary>
     /// <param name="action">The reactive function to track.</param>
     /// <param name="scheduler">Optional scheduler invoked on invalidation instead of a re-run.</param>
-    /// <returns>The effect handle (use <see cref="ReactiveEffect.Run"/>/<see cref="ReactiveEffect.Stop"/>).</returns>
+    /// <returns>
+    /// The effect handle. Use <see cref="ReactiveEffect.Run"/> to execute explicitly and
+    /// <see cref="ReactiveEffect.Stop"/> or <see cref="ReactiveEffect.Dispose"/> for idempotent teardown.
+    /// </returns>
     public static ReactiveEffect Effect(Action action, Action? scheduler = null)
     {
         var effect = new ReactiveEffect(action) { Scheduler = scheduler };
@@ -304,7 +307,7 @@ public static class Reactive
     public static WatchHandle WatchEffect(Action<OnCleanup> effect, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(effect);
-        var watcher = new EffectWatcher(effect, options?.Flush ?? WatchFlushMode.Sync, options?.Scheduler);
+        var watcher = new EffectWatcher(effect, options?.Flush ?? WatchFlushMode.Synchronous, options?.Scheduler);
         return new WatchHandle(watcher);
     }
 
@@ -358,13 +361,13 @@ public static class Reactive
 
     /// <summary>
     /// Whether <paramref name="value"/> is a read-only reactive view — a getter-only
-    /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(Readonly = true)]</c>/
-    /// <c>[ShallowReactive(Readonly = true)]</c> object. Keys on
+    /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(ReadOnly = true)]</c>/
+    /// <c>[ShallowReactive(ReadOnly = true)]</c> object. Keys on
     /// <see cref="IReactiveReadOnly.IsReadOnly"/> for references and generated reactive objects.
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> rejects writes.</returns>
-    public static bool IsReadonly(object? value)
+    public static bool IsReadOnly(object? value)
         => value is IReactiveReadOnly reactiveReadOnly && reactiveReadOnly.IsReadOnly;
 
     /// <summary>
@@ -458,21 +461,6 @@ public static class Reactive
     }
 
     /// <summary>
-    /// Returns the raw, non-reactive view of <paramref name="value"/>. Viu wraps nothing, so a
-    /// source-generated <c>[Reactive]</c> object (or any non-collection value) is its own raw and is
-    /// returned by identity — reads through the returned instance still track, because it <em>is</em>
-    /// the reactive instance. That is a direct consequence of having no proxy layer
-    /// (<c>[RCT-6]</c>) and is stated plainly because it means this overload cannot hand back an
-    /// untracked view. For one, use the reactive-collection overloads (which return the underlying
-    /// storage) or a generated object's <c>ToRawValues()</c> view (emitted per <c>[Reactive]</c>
-    /// class straight over the raw backing fields).
-    /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="value">The value to unwrap.</param>
-    /// <returns><paramref name="value"/> itself.</returns>
-    public static T ToRaw<T>(T value) => value;
-
-    /// <summary>
     /// Returns the untracked underlying <see cref="List{T}"/> of <paramref name="list"/>. It is the
     /// same live storage, so reads off it do not track and writes through it do not trigger (an
     /// effect reading the reactive list does not re-run).
@@ -552,7 +540,7 @@ public static class Reactive
             alwaysCallback,
             unsetOldValue,
             options?.Immediate ?? false,
-            options?.Flush ?? WatchFlushMode.Sync,
+            options?.Flush ?? WatchFlushMode.Synchronous,
             options?.Scheduler,
             options?.Once ?? false);
         return new WatchHandle(watcher);

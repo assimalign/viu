@@ -91,11 +91,11 @@ internal static class DomKnowledge
 
     /// <summary>Whether <paramref name="tag"/> is a known MathML element.</summary>
     /// <param name="tag">The tag name (case-sensitive per MathML Core).</param>
-    public static bool IsMathMLTag(string tag) => MathTagSet.Contains(tag);
+    public static bool IsMathMlTag(string tag) => MathTagSet.Contains(tag);
 
-    /// <inheritdoc cref="IsMathMLTag(string)"/>
+    /// <inheritdoc cref="IsMathMlTag(string)"/>
     /// <remarks>Allocation-free for span-shaped tokens (compiler tokenization).</remarks>
-    public static bool IsMathMLTag(ReadOnlySpan<char> tag) => MathTagLookup.Contains(tag);
+    public static bool IsMathMlTag(ReadOnlySpan<char> tag) => MathTagLookup.Contains(tag);
 
     /// <summary>Whether <paramref name="tag"/> is a WHATWG void element (it never has children or a closing tag).</summary>
     /// <param name="tag">The tag name.</param>

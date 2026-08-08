@@ -32,5 +32,5 @@ public sealed record FunctionExpression : TemplateSyntaxNode
     public bool IsSlot { get; init; }
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsFunctionExpression;
+    public override NodeType NodeType => NodeType.FunctionExpression;
 }

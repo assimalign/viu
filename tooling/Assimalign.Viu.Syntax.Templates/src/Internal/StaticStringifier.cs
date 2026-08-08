@@ -51,7 +51,7 @@ internal static class StaticStringifier
     /// Stringifies eligible contiguous cached-static runs among <paramref name="node"/>'s children.
     /// Bails for slot content, and
     /// only rewrites a <see cref="RootNode"/>'s working children or a plain element's
-    /// <see cref="VNodeCall"/> children.
+    /// <see cref="VirtualNodeCall"/> children.
     /// </summary>
     /// <param name="node">The container whose children were just cached.</param>
     /// <param name="context">The transform context.</param>
@@ -71,7 +71,7 @@ internal static class StaticStringifier
             StringifyChildren(context.WorkingChildrenOf(root, root.Children), context);
         }
         else if (node is ElementNode element &&
-                 context.GetCodegenNode(element) is VNodeCall { Children: SyntaxList<TemplateChildNode> frozenChildren } vnode)
+                 context.GetCodegenNode(element) is VirtualNodeCall { Children: SyntaxList<TemplateChildNode> frozenChildren } vnode)
         {
             var children = new List<TemplateSyntaxNode>(frozenChildren.Count);
             foreach (var child in frozenChildren)

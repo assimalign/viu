@@ -1,1 +1,19 @@
 #nullable enable
+*REMOVED*Assimalign.Viu.Reactivity.IReactiveObject.ToRaw() -> object!
+*REMOVED*Assimalign.Viu.Reactivity.ReactiveAttribute.Readonly.get -> bool
+*REMOVED*Assimalign.Viu.Reactivity.ReactiveAttribute.Readonly.set -> void
+*REMOVED*Assimalign.Viu.Reactivity.ShallowReactiveAttribute.Readonly.get -> bool
+*REMOVED*Assimalign.Viu.Reactivity.ShallowReactiveAttribute.Readonly.set -> void
+*REMOVED*Assimalign.Viu.Reactivity.WatchFlushMode.Sync = 0 -> Assimalign.Viu.Reactivity.WatchFlushMode
+*REMOVED*static Assimalign.Viu.Reactivity.Reactive.IsReadonly(object? value) -> bool
+*REMOVED*static Assimalign.Viu.Reactivity.Reactive.ToRaw<T>(T value) -> T
+Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<T>
+Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<T>.Value.get -> T
+Assimalign.Viu.Reactivity.ReactiveAttribute.ReadOnly.get -> bool
+Assimalign.Viu.Reactivity.ReactiveAttribute.ReadOnly.set -> void
+Assimalign.Viu.Reactivity.ReactiveEffect.Dispose() -> void
+Assimalign.Viu.Reactivity.ReactiveValue<T>.Peek() -> T
+Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ReadOnly.get -> bool
+Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ReadOnly.set -> void
+Assimalign.Viu.Reactivity.WatchFlushMode.Synchronous = 0 -> Assimalign.Viu.Reactivity.WatchFlushMode
+static Assimalign.Viu.Reactivity.Reactive.IsReadOnly(object? value) -> bool

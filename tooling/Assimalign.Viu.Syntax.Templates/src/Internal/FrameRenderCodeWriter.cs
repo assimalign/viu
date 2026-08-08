@@ -17,7 +17,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <remarks>
 /// Each block is emitted as an ordered <c>OpenBlock</c>, descendant construction and tracking,
 /// <c>CloseBlock</c> sequence. Node construction uses the closed public node algebra directly.
-/// Property sets, lists, and slots dissolve into dictionaries, loops, and closures in the consumer
+/// ObjectProperty sets, lists, and slots dissolve into dictionaries, loops, and closures in the consumer
 /// compilation. Specified by <c>[SFC-CG-1]</c>, <c>[SFC-CG-2]</c>, and <c>[RND-BLOCK-3]</c>.
 /// </remarks>
 internal sealed class FrameRenderCodeWriter
@@ -89,7 +89,7 @@ internal sealed class FrameRenderCodeWriter
                 return EmitTextNode(EmitCompoundExpression(compound), (int)PatchFlags.Text);
             case CommentNode comment:
                 return EmitCommentNode(StringLiteral(comment.Content));
-            case VNodeCall virtualNode:
+            case VirtualNodeCall virtualNode:
                 return EmitVirtualNode(virtualNode);
             case CallExpression call:
                 return EmitCallAsVirtualValue(call);
@@ -113,7 +113,7 @@ internal sealed class FrameRenderCodeWriter
         }
     }
 
-    private CodeExpression EmitVirtualNode(VNodeCall node)
+    private CodeExpression EmitVirtualNode(VirtualNodeCall node)
     {
         if (node.IsBlock)
         {
@@ -137,14 +137,14 @@ internal sealed class FrameRenderCodeWriter
         };
     }
 
-    private CodeExpression EmitElementNode(VNodeCall node, VirtualNodeTag tag)
+    private CodeExpression EmitElementNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
-        ElementPropertyEmission properties = EmitElementProperties(node.Props);
+        ElementPropertyEmission properties = EmitElementProperties(node.Properties);
         CodeExpression children = EmitChildren(node.Children);
         CodeExpression directives = EmitDirectiveInvocations(node.Directives);
         CodeExpression dynamicBindingIndices = EmitDynamicBindingIndices(
             properties.BindingsName,
-            ParseDynamicPropertyNames(node.DynamicProps));
+            ParseDynamicPropertyNames(node.DynamicProperties));
         CodeExpression renderPlan = EmitRenderPlan(node, dynamicBindingIndices);
         string nodeName = NextName("node");
 
@@ -176,9 +176,9 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private CodeExpression EmitFragmentNode(VNodeCall node)
+    private CodeExpression EmitFragmentNode(VirtualNodeCall node)
     {
-        GenericPropertyEmission properties = EmitGenericProperties(node.Props, PropertyValuePurpose.Generic);
+        GenericPropertyEmission properties = EmitGenericProperties(node.Properties, PropertyValuePurpose.Generic);
         CodeExpression children = EmitChildren(node.Children);
         CodeExpression renderPlan = EmitRenderPlan(node, CodeExpression.Literal("null"));
         string nodeName = NextName("node");
@@ -201,9 +201,9 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private CodeExpression EmitTeleportNode(VNodeCall node)
+    private CodeExpression EmitTeleportNode(VirtualNodeCall node)
     {
-        GenericPropertyEmission properties = EmitGenericProperties(node.Props, PropertyValuePurpose.Generic);
+        GenericPropertyEmission properties = EmitGenericProperties(node.Properties, PropertyValuePurpose.Generic);
         CodeExpression children = EmitChildren(node.Children);
         CodeExpression renderPlan = EmitRenderPlan(node, CodeExpression.Literal("null"));
         string targetName = NextName("targetIdentifier");
@@ -245,10 +245,10 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private CodeExpression EmitComponentNode(VNodeCall node, VirtualNodeTag tag)
+    private CodeExpression EmitComponentNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ComponentInvocationEmission invocation = EmitComponentInvocation(
-            node.Props,
+            node.Properties,
             node.Children,
             node.Directives);
         CodeExpression renderPlan = EmitRenderPlan(node, CodeExpression.Literal("null"));
@@ -276,10 +276,10 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private CodeExpression EmitStructuralComponentNode(VNodeCall node, string typeName)
+    private CodeExpression EmitStructuralComponentNode(VirtualNodeCall node, string typeName)
     {
         ComponentInvocationEmission invocation = EmitComponentInvocation(
-            node.Props,
+            node.Properties,
             node.Children,
             node.Directives);
         if (node.IsBlock)
@@ -296,11 +296,11 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private CodeExpression EmitDynamicNode(VNodeCall node, VirtualNodeTag tag)
+    private CodeExpression EmitDynamicNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
-        ElementPropertyEmission elementProperties = EmitElementProperties(node.Props);
+        ElementPropertyEmission elementProperties = EmitElementProperties(node.Properties);
         ComponentInvocationEmission componentInvocation = EmitComponentInvocation(
-            node.Props,
+            node.Properties,
             node.Children,
             node.Directives);
         CodeExpression children = EmitChildren(node.Children);
@@ -473,7 +473,7 @@ internal sealed class FrameRenderCodeWriter
 
         Push(");");
         EndLine();
-        if (patchFlags > 0 && patchFlags != (int)PatchFlags.NeedHydration)
+        if (patchFlags > 0 && patchFlags != (int)PatchFlags.NeedsHydration)
         {
             AppendStatement($"frame.Track({nodeName});");
         }
@@ -505,19 +505,19 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private void TrackIfRequired(VNodeCall node, string nodeName)
+    private void TrackIfRequired(VirtualNodeCall node, string nodeName)
     {
         int patchFlags = node.PatchFlag is null ? 0 : (int)node.PatchFlag.Value;
         bool shouldTrack = node.IsBlock
             || node.IsComponent
-            || (patchFlags > 0 && patchFlags != (int)PatchFlags.NeedHydration);
+            || (patchFlags > 0 && patchFlags != (int)PatchFlags.NeedsHydration);
         if (shouldTrack)
         {
             AppendStatement($"frame.Track({nodeName});");
         }
     }
 
-    private CodeExpression EmitRenderPlan(VNodeCall node, CodeExpression dynamicBindingIndices)
+    private CodeExpression EmitRenderPlan(VirtualNodeCall node, CodeExpression dynamicBindingIndices)
     {
         int patchFlags = node.PatchFlag is null ? 0 : (int)node.PatchFlag.Value;
         if (!node.IsBlock && patchFlags == 0 && dynamicBindingIndices.Text == "null")
@@ -723,7 +723,7 @@ internal sealed class FrameRenderCodeWriter
         AppendExpression(directives);
         Push(", slotStability: (");
         Push(ComponentsNamespace);
-        Push(".SlotFlags)");
+        Push(".SlotStability)");
         Push(slots.Stability.ToString(CultureInfo.InvariantCulture));
         Push(");");
         EndLine();
@@ -814,7 +814,7 @@ internal sealed class FrameRenderCodeWriter
 
         for (int index = 0; index < objectExpression.Properties.Count; index++)
         {
-            Property property = objectExpression.Properties[index];
+            ObjectProperty property = objectExpression.Properties[index];
             if (index > 0)
             {
                 expression.Append(", ");
@@ -830,7 +830,7 @@ internal sealed class FrameRenderCodeWriter
         return expression;
     }
 
-    private CodeExpression EmitPropertyValue(Property property, PropertyValuePurpose purpose)
+    private CodeExpression EmitPropertyValue(ObjectProperty property, PropertyValuePurpose purpose)
     {
         bool isHandler = IsHandlerKey(property.Key);
         bool isReference = IsStaticPropertyName(property.Key, "ref");
@@ -1007,7 +1007,7 @@ internal sealed class FrameRenderCodeWriter
         string slotsName = NextName("slots");
         AppendStatement(
             $"var {slotsName} = new global::System.Collections.Generic.Dictionary<string, {ComponentsNamespace}.ComponentSlot>(global::System.StringComparer.Ordinal);");
-        int stability = (int)SlotFlags.Stable;
+        int stability = (int)SlotStability.Stable;
 
         switch (node)
         {
@@ -1031,7 +1031,7 @@ internal sealed class FrameRenderCodeWriter
                     }
                 }
 
-                stability = (int)SlotFlags.Dynamic;
+                stability = (int)SlotStability.Dynamic;
                 break;
             default:
                 // Component children are expected to be a compiled slot set. Preserve a useful default
@@ -1041,7 +1041,7 @@ internal sealed class FrameRenderCodeWriter
                 AppendStatement(
                     $"{ComponentsNamespace}.ComponentSlot {slotName} = slotArguments => {value.Text};");
                 AppendStatement($"{slotsName}[\"default\"] = {slotName};");
-                stability = (int)SlotFlags.Dynamic;
+                stability = (int)SlotStability.Dynamic;
                 break;
         }
 
@@ -1055,7 +1055,7 @@ internal sealed class FrameRenderCodeWriter
     {
         for (int index = 0; index < objectExpression.Properties.Count; index++)
         {
-            Property property = objectExpression.Properties[index];
+            ObjectProperty property = objectExpression.Properties[index];
             if (IsStaticPropertyName(property.Key, "_"))
             {
                 stability = ParseRawInteger(property.Value);
@@ -1194,8 +1194,8 @@ internal sealed class FrameRenderCodeWriter
         ObjectExpression descriptor,
         string slotsName)
     {
-        Property? nameProperty = FindStaticProperty(descriptor, "name");
-        Property? functionProperty = FindStaticProperty(descriptor, "fn");
+        ObjectProperty? nameProperty = FindStaticProperty(descriptor, "name");
+        ObjectProperty? functionProperty = FindStaticProperty(descriptor, "fn");
         if (nameProperty is null || functionProperty?.Value is not FunctionExpression function)
         {
             return;
@@ -1233,11 +1233,11 @@ internal sealed class FrameRenderCodeWriter
         AppendLine("}");
     }
 
-    private static Property? FindStaticProperty(ObjectExpression expression, string name)
+    private static ObjectProperty? FindStaticProperty(ObjectExpression expression, string name)
     {
         for (int index = 0; index < expression.Properties.Count; index++)
         {
-            Property property = expression.Properties[index];
+            ObjectProperty property = expression.Properties[index];
             if (IsStaticPropertyName(property.Key, name))
             {
                 return property;
@@ -1824,7 +1824,7 @@ internal sealed class FrameRenderCodeWriter
                 return EmitFunctionExpression(function);
             case CacheExpression cache:
                 return EmitCachedVirtualValue(cache);
-            case VNodeCall virtualNode:
+            case VirtualNodeCall virtualNode:
                 return EmitVirtualNode(virtualNode);
             case ConditionalExpression conditional:
                 return EmitConditionalVirtualValue(conditional);

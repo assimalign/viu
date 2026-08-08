@@ -233,7 +233,7 @@ public sealed class GeneratedComponentFixtureTests
     }
 
     [Fact]
-    public void InteractionProbe_BindsPropsFallthroughEmitListenerAndNativeModel()
+    public void InteractionProbe_BindsPropertiesFallthroughEmitListenerAndNativeModel()
     {
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
         ComponentFactory factory = CreateFactory(fixtures);
@@ -299,7 +299,7 @@ public sealed class GeneratedComponentFixtureTests
                 StringComparison.Ordinal))
             .Value
             .ShouldContain(
-                "slotStability: (global::Assimalign.Viu.Components.SlotFlags)2");
+                "slotStability: (global::Assimalign.Viu.Components.SlotStability)2");
 
         SetReferenceValue(owner, "ShowSlot", false);
         host.RunScheduledFlushes();

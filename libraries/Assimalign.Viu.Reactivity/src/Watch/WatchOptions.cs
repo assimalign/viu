@@ -38,14 +38,14 @@ public sealed class WatchOptions
 
     /// <summary>
     /// When the callback runs relative to the change. Defaults to
-    /// <see cref="WatchFlushMode.Sync"/> in the standalone reactivity layer; the runtime sets
+    /// <see cref="WatchFlushMode.Synchronous"/> in the standalone reactivity layer; the runtime sets
     /// <see cref="WatchFlushMode.Pre"/> and supplies a <see cref="Scheduler"/>.
     /// </summary>
-    public WatchFlushMode Flush { get; set; } = WatchFlushMode.Sync;
+    public WatchFlushMode Flush { get; set; } = WatchFlushMode.Synchronous;
 
     /// <summary>
     /// The scheduler that delivers <see cref="WatchFlushMode.Pre"/>/<see cref="WatchFlushMode.Post"/>
-    /// callbacks. Required for those modes; ignored for <see cref="WatchFlushMode.Sync"/>. When a
+    /// callbacks. Required for those modes; ignored for <see cref="WatchFlushMode.Synchronous"/>. When a
     /// pre/post watcher has no scheduler it falls back to synchronous delivery.
     /// </summary>
     public IReactiveWatchScheduler? Scheduler { get; set; }

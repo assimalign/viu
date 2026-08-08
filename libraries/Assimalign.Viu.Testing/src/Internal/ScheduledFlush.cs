@@ -18,7 +18,7 @@ internal sealed class ScheduledFlush : IDisposable
     internal async Task RunAsync()
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        Task tick = Scheduler.NextTick();
+        Task tick = Scheduler.NextTickAsync();
         _pump.RunUntilIdle();
         await tick.ConfigureAwait(false);
     }

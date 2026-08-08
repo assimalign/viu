@@ -4,7 +4,8 @@ namespace Assimalign.Viu.Syntax.Html;
 /// The base of every plain-HTML syntax node: an immutable, value-comparable record rooting the
 /// document tree on the shared <see cref="SyntaxNode"/> contract, with the HTML-specific
 /// <see cref="HtmlSyntaxNodeKind"/> discriminator. Node categories follow the WHATWG HTML parsing
-/// model (https://html.spec.whatwg.org/multipage/parsing.html).
+/// model (https://html.spec.whatwg.org/multipage/parsing.html). Derivation is assembly-closed so
+/// consumers can handle the library-defined node variants explicitly. Specified by <c>[SFC-DIAG-3]</c>.
 /// </summary>
 /// <remarks>
 /// This hierarchy covers plain HTML <em>documents</em> processed by build tooling — above all the WASM
@@ -16,6 +17,10 @@ namespace Assimalign.Viu.Syntax.Html;
 /// </remarks>
 public abstract record HtmlSyntaxNode : SyntaxNode
 {
+    private protected HtmlSyntaxNode()
+    {
+    }
+
     /// <summary>The node kind discriminator.</summary>
     public abstract HtmlSyntaxNodeKind Kind { get; }
 

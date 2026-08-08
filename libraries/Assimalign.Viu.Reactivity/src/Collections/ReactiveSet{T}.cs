@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Assimalign.Viu.Reactivity;
 
@@ -19,6 +20,7 @@ namespace Assimalign.Viu.Reactivity;
 /// </para>
 /// </summary>
 /// <typeparam name="T">The member type.</typeparam>
+[DebuggerDisplay("Count = {_items.Count}")]
 public sealed class ReactiveSet<T> : ISet<T>, IReadOnlyCollection<T>, IReactiveTraversable
 {
     private readonly HashSet<T> _items;

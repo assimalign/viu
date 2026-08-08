@@ -25,5 +25,5 @@ public sealed class ReactiveAttribute : Attribute
     /// When <see langword="true"/>, generated setters reject writes with a dev-mode warning and do
     /// not mutate or trigger, while reads still track. Default <see langword="false"/>.
     /// </summary>
-    public bool Readonly { get; set; }
+    public bool ReadOnly { get; set; }
 }

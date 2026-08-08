@@ -43,7 +43,7 @@ internal static class VMemoTransform
             // code-generation node installed for that record and carries its rewritten dependencies.
             ElementNode target = context.CurrentNode as ElementNode ?? element;
             DirectiveNode targetDirective = TransformUtilities.FindDirective(target, "memo") ?? directive;
-            if (context.GetCodegenNode(target) is not VNodeCall codegenNode)
+            if (context.GetCodegenNode(target) is not VirtualNodeCall codegenNode)
             {
                 return;
             }

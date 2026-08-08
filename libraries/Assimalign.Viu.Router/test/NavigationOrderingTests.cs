@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,7 +42,7 @@ public class NavigationOrderingTests
                 ]),
             ]);
 
-        await router.Push("/section/a");
+        await router.PushAsync("/section/a");
         using var wrapper = MountView(router, layout, leafA, leafB);
         router.BeforeEach((_, _, _) =>
         {
@@ -56,7 +57,7 @@ public class NavigationOrderingTests
         router.AfterEach((_, _, _) => log.Add("afterEach"));
         log.Clear();
 
-        await router.Push("/section/b");
+        await router.PushAsync("/section/b");
         await wrapper.NextTickAsync();
 
         log.ShouldBe(
@@ -85,11 +86,11 @@ public class NavigationOrderingTests
                 new RouteRecord("/a", component: blocking.Request),
                 new RouteRecord("/b", component: viewB.Request),
             ]);
-        await router.Push("/a");
+        await router.PushAsync("/a");
         using var wrapper = MountView(router, blocking, viewB);
         wrapper.Html().ShouldBe("<div class=\"a\">a</div>");
 
-        NavigationFailure? failure = await router.Push("/b");
+        NavigationFailure? failure = await router.PushAsync("/b");
         await wrapper.NextTickAsync();
 
         failure.ShouldNotBeNull();
@@ -106,10 +107,10 @@ public class NavigationOrderingTests
         var router = new Router(
             RouterHistory.CreateMemory(),
             [new RouteRecord("/users/:id", component: view.Request)]);
-        await router.Push("/users/1");
+        await router.PushAsync("/users/1");
         using var wrapper = MountView(router, view);
 
-        NavigationFailure? failure = await router.Push("/users/2");
+        NavigationFailure? failure = await router.PushAsync("/users/2");
         await wrapper.NextTickAsync();
 
         failure.ShouldBeNull();
@@ -140,22 +141,45 @@ public class NavigationOrderingTests
                 new RouteRecord("/a", component: view.Request),
                 new RouteRecord("/b", component: view.Request),
             ]);
-        await router.Push("/a");
+        await router.PushAsync("/a");
         using var wrapper = MountView(router, view);
         ComponentContext? firstContext = view.Context;
 
-        await router.Push("/b");
+        await router.PushAsync("/b");
         await wrapper.NextTickAsync();
 
         leaveRuns.ShouldBe(1);
         view.SetupCount.ShouldBe(2);
         view.Context.ShouldNotBeSameAs(firstContext);
 
-        await router.Push("/a");
+        await router.PushAsync("/a");
         await wrapper.NextTickAsync();
 
         leaveRuns.ShouldBe(2);
         view.SetupCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task RouterGuards_DepthOutsideCurrentMatchedRoute_ThrowsArgumentOutOfRangeException()
+    {
+        TrackingComponent view = LabelView("view");
+        var router = new Router(
+            RouterHistory.CreateMemory(),
+            [new RouteRecord("/view", component: view.Request)]);
+        await router.PushAsync("/view");
+        using var wrapper = MountView(router, view);
+        ComponentContext context = view.Context.ShouldNotBeNull();
+        NavigationGuard guard = static (_, _, _) =>
+            Task.FromResult(NavigationGuardResult.Allow);
+
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteLeave(context, guard, depth: -1));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteLeave(context, guard, depth: 1));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteUpdate(context, guard, depth: -1));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteUpdate(context, guard, depth: 1));
     }
 
     private static TrackingComponent GuardedLayout(List<string> log)
@@ -253,7 +277,7 @@ public class NavigationOrderingTests
             _log = log;
         }
 
-        public Task<NavigationGuardResult> BeforeRouteEnter(
+        public Task<NavigationGuardResult> BeforeRouteEnterAsync(
             RouteLocation to,
             RouteLocation from,
             CancellationToken cancellationToken)

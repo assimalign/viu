@@ -59,14 +59,14 @@ public class DomKnowledgeTests
     [InlineData("mfrac")]
     [InlineData("annotation-xml")]
     [InlineData("munderover")]
-    public void IsMathMLTag_KnowsRepresentativeMembers(string tag)
-        => DomKnowledge.IsMathMLTag(tag).ShouldBeTrue();
+    public void IsMathMlTag_KnowsRepresentativeMembers(string tag)
+        => DomKnowledge.IsMathMlTag(tag).ShouldBeTrue();
 
     [Fact]
-    public void IsMathMLTag_RejectsNonMembers()
+    public void IsMathMlTag_RejectsNonMembers()
     {
-        DomKnowledge.IsMathMLTag("div").ShouldBeFalse();
-        DomKnowledge.IsMathMLTag("svg").ShouldBeFalse();
+        DomKnowledge.IsMathMlTag("div").ShouldBeFalse();
+        DomKnowledge.IsMathMlTag("svg").ShouldBeFalse();
     }
 
     [Theory]
@@ -165,7 +165,7 @@ public class DomKnowledgeTests
         DomKnowledge.IsHtmlTag("my-component".AsSpan()).ShouldBeFalse();
         DomKnowledge.IsSvgTag("foreignObject".AsSpan()).ShouldBeTrue();
         DomKnowledge.IsSvgTag("foreignobject".AsSpan()).ShouldBeFalse(); // case-sensitive holds
-        DomKnowledge.IsMathMLTag("annotation-xml".AsSpan()).ShouldBeTrue();
+        DomKnowledge.IsMathMlTag("annotation-xml".AsSpan()).ShouldBeTrue();
         DomKnowledge.IsVoidTag("br".AsSpan()).ShouldBeTrue();
         DomKnowledge.IsBooleanAttribute("checked".AsSpan()).ShouldBeTrue();
         DomKnowledge.IsKnownHtmlAttribute("tabindex".AsSpan()).ShouldBeTrue();

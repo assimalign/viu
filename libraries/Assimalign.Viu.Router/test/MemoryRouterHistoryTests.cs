@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using Shouldly;
@@ -203,20 +204,23 @@ public class MemoryRouterHistoryTests
     }
 
     [Fact]
-    public void Destroy_ResetsToRootAndClearsListeners()
+    public void Dispose_IsTerminalAndIdempotent()
     {
         var history = CreateHistory();
         history.Push("/a");
-        var notifications = 0;
-        history.Listen((to, from, information) => notifications++);
+        history.Listen(static (_, _, _) => { });
 
-        history.Destroy();
+        history.Dispose();
+        history.Dispose();
 
-        history.Location.ShouldBe("/");
-        history.State.Position.ShouldBe(0);
-        history.Push("/b");
-        history.Go(-1);
-        notifications.ShouldBe(0);   // the pre-destroy listener is gone
+        Should.Throw<ObjectDisposedException>(() => _ = history.Base);
+        Should.Throw<ObjectDisposedException>(() => _ = history.Location);
+        Should.Throw<ObjectDisposedException>(() => _ = history.State);
+        Should.Throw<ObjectDisposedException>(() => history.Push("/b"));
+        Should.Throw<ObjectDisposedException>(() => history.Replace("/b"));
+        Should.Throw<ObjectDisposedException>(() => history.Go(-1));
+        Should.Throw<ObjectDisposedException>(() => history.Listen(static (_, _, _) => { }));
+        Should.Throw<ObjectDisposedException>(() => history.CreateHref("/b"));
     }
 
     [Theory]

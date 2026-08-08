@@ -32,7 +32,9 @@ public static class RouterGuards
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context"/> or <paramref name="guard"/> is null.
     /// </exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="depth"/> is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="depth"/> does not identify a record in the current matched route chain.
+    /// </exception>
     public static void OnBeforeRouteLeave(
         ComponentContext context,
         NavigationGuard guard,
@@ -51,7 +53,9 @@ public static class RouterGuards
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context"/> or <paramref name="guard"/> is null.
     /// </exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="depth"/> is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="depth"/> does not identify a record in the current matched route chain.
+    /// </exception>
     public static void OnBeforeRouteUpdate(
         ComponentContext context,
         NavigationGuard guard,
@@ -79,7 +83,10 @@ public static class RouterGuards
         var matched = router.CurrentRoute.Value.Matched;
         if (depth >= matched.Count)
         {
-            return;
+            throw new ArgumentOutOfRangeException(
+                nameof(depth),
+                depth,
+                "The guard depth must identify a record in the current matched route chain.");
         }
 
         RouteRecord record = matched[depth];

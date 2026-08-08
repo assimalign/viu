@@ -1,1 +1,23 @@
 #nullable enable
+*REMOVED*Assimalign.Viu.Router.IRouteEnterGuard.BeforeRouteEnter(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationGuardResult!>!
+*REMOVED*Assimalign.Viu.Router.IRouterHistory.Destroy() -> void
+*REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Sensitive.get -> bool
+*REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Sensitive.init -> void
+*REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Strict.get -> bool
+*REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Strict.init -> void
+*REMOVED*Assimalign.Viu.Router.Router.CurrentRoute.get -> Assimalign.Viu.Reactivity.IReactiveReference<Assimalign.Viu.Router.RouteLocation!>!
+*REMOVED*Assimalign.Viu.Router.Router.Push(string! location) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+*REMOVED*Assimalign.Viu.Router.Router.Replace(string! location) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+Assimalign.Viu.Router.IRouteEnterGuard.BeforeRouteEnterAsync(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationGuardResult!>!
+Assimalign.Viu.Router.IRouterHistory.Dispose() -> void
+Assimalign.Viu.Router.PathMatchingOptions.CaseSensitive.get -> bool
+Assimalign.Viu.Router.PathMatchingOptions.CaseSensitive.init -> void
+Assimalign.Viu.Router.PathMatchingOptions.TrailingSlashSensitive.get -> bool
+Assimalign.Viu.Router.PathMatchingOptions.TrailingSlashSensitive.init -> void
+Assimalign.Viu.Router.Router.CurrentRoute.get -> Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<Assimalign.Viu.Router.RouteLocation!>!
+Assimalign.Viu.Router.Router.PushAsync(string! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+Assimalign.Viu.Router.Router.ReplaceAsync(string! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+static Assimalign.Viu.Router.RouteLocation.operator !=(Assimalign.Viu.Router.RouteLocation? left, Assimalign.Viu.Router.RouteLocation? right) -> bool
+static Assimalign.Viu.Router.RouteLocation.operator ==(Assimalign.Viu.Router.RouteLocation? left, Assimalign.Viu.Router.RouteLocation? right) -> bool
+static Assimalign.Viu.Router.RouteParameters.operator !=(Assimalign.Viu.Router.RouteParameters? left, Assimalign.Viu.Router.RouteParameters? right) -> bool
+static Assimalign.Viu.Router.RouteParameters.operator ==(Assimalign.Viu.Router.RouteParameters? left, Assimalign.Viu.Router.RouteParameters? right) -> bool

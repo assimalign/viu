@@ -91,7 +91,7 @@ public static class BrowserRuntime
     /// C#-side listener entries. A mount/unmount cycle must return these to their prior sizes
     /// (the [V01.01.04.01] lifecycle contract).
     /// </summary>
-    public static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
+    public static (int JavaScriptNodes, int JavaScriptListenerMaps, int ManagedListeners) GetRegistryDiagnostics()
     {
         EnsureBridgeInitialized();
         return BrowserNodeOperations.GetRegistryDiagnostics();

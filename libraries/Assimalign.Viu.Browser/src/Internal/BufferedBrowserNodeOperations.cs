@@ -37,7 +37,7 @@ namespace Assimalign.Viu.Browser;
 /// Ambient by activation: <see cref="Activate"/> points event dispatch, directive operations, and
 /// transition operations at this instance and <see cref="Deactivate"/> restores them.
 /// <see cref="RendererOptions{TNode}.Commit"/> integrates buffered writes with synchronous renders,
-/// reactive rerenders, post-render hooks, and <see cref="Scheduler.NextTick"/>. Single active
+/// reactive rerenders, post-render hooks, and <see cref="Scheduler.NextTickAsync"/>. Single active
 /// buffered renderer per process (single-threaded JS event-loop model); not thread-safe.
 /// </summary>
 internal sealed class BufferedBrowserNodeOperations

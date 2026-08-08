@@ -95,7 +95,7 @@ public sealed class ElementWrapper
     /// <param name="eventName">The event binding's local name.</param>
     /// <param name="payload">The optional event payload.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task Trigger(string eventName, object? payload = null)
+    public async Task TriggerAsync(string eventName, object? payload = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
         await TestEventDispatcher.TriggerAsync(_element, eventName, payload).ConfigureAwait(false);
@@ -105,9 +105,9 @@ public sealed class ElementWrapper
     /// <summary>Sets the host value property, dispatches input, and drains the scheduler.</summary>
     /// <param name="value">The new host value.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task SetValue(object? value)
+    public async Task SetValueAsync(object? value)
     {
-        _element.Properties["value"] = value;
+        _element.SetProperty("value", value);
         await TestEventDispatcher.TriggerAsync(_element, "input", value).ConfigureAwait(false);
         await _flush.RunAsync().ConfigureAwait(false);
     }

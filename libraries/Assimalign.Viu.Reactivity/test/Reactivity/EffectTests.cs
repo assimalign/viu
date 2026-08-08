@@ -313,5 +313,27 @@ public sealed class EffectTests
         effect.RunIfDirty();
         runs.ShouldBe(2);
     }
+
+    [Fact]
+    public void Dispose_ActiveEffect_StopsOnceAndLeavesLaterWritesUnobserved()
+    {
+        var source = Reactive.Reference(1);
+        var runs = 0;
+        var stops = 0;
+        var effect = Reactive.Effect(() =>
+        {
+            runs++;
+            _ = source.Value;
+        });
+        effect.OnStop = () => stops++;
+
+        effect.Dispose();
+        effect.Dispose();
+        source.Value = 2;
+
+        effect.IsActive.ShouldBeFalse();
+        runs.ShouldBe(1);
+        stops.ShouldBe(1);
+    }
 }
 

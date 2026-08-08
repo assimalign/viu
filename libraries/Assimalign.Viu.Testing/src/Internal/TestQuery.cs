@@ -65,8 +65,8 @@ internal static class TestQuery
             return [];
         }
 
-        int firstIndex = parent.Children.IndexOf(first);
-        int lastIndex = parent.Children.IndexOf(last);
+        int firstIndex = parent.IndexOfChild(first);
+        int lastIndex = parent.IndexOfChild(last);
         if (firstIndex < 0 || lastIndex < firstIndex)
         {
             return [];

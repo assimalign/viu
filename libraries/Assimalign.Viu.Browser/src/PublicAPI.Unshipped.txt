@@ -1,1 +1,3 @@
 #nullable enable
+*REMOVED*static Assimalign.Viu.Browser.BrowserRuntime.GetRegistryDiagnostics() -> (int JsNodes, int JsListenerMaps, int DotnetListeners)
+static Assimalign.Viu.Browser.BrowserRuntime.GetRegistryDiagnostics() -> (int JavaScriptNodes, int JavaScriptListenerMaps, int ManagedListeners)

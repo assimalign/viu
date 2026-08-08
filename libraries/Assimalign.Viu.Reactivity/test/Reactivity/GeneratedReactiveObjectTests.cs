@@ -71,13 +71,11 @@ public sealed class GeneratedReactiveObjectTests
     }
 
     [Fact]
-    public void ReactiveObject_ExposesRawAndPerPropertyDependency()
+    public void ReactiveObject_ExposesPerPropertyDependency()
     {
         var person = new ReactivePerson { Name = "Ada" };
         var reactive = (IReactiveObject)person;
 
-        // No identity-swapping wrapper: the instance is its own raw (documented divergence from reactive()).
-        reactive.ToRaw().ShouldBeSameAs(person);
         reactive.GetDependency("Name").ShouldNotBeNull();
         reactive.GetDependency("Age").ShouldNotBeNull();
         reactive.GetDependency("DoesNotExist").ShouldBeNull();

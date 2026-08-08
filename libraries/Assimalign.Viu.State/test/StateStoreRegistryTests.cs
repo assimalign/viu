@@ -172,7 +172,7 @@ public sealed class StateStoreRegistryTests
         CounterStore second = secondDefinition.Use(registry);
 
         // [STA-2] Removing one definition ends only that child lifetime.
-        firstDefinition.Dispose(registry).ShouldBeTrue();
+        firstDefinition.Remove(registry).ShouldBeTrue();
         CounterStore rebuilt = firstDefinition.Use(registry);
 
         rebuilt.ShouldNotBeSameAs(first);
@@ -189,7 +189,7 @@ public sealed class StateStoreRegistryTests
             StateStores.Define("disposable", static () => new DisposableStore());
         DisposableStore store = definition.Use(registry);
 
-        definition.Dispose(registry).ShouldBeTrue();
+        definition.Remove(registry).ShouldBeTrue();
 
         store.IsDisposed.ShouldBeTrue();
     }

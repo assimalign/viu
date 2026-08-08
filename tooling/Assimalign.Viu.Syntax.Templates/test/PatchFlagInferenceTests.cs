@@ -12,8 +12,8 @@ namespace Assimalign.Viu.Syntax.Templates;
 // compiled output and runtime must agree on every bit, and a value is additive only, never renumbered.
 public class PatchFlagInferenceTests
 {
-    private static VNodeCall RootVNode(string source)
-        => TransformTestHelpers.Transform(source).RootCodegen().ShouldBeOfType<VNodeCall>();
+    private static VirtualNodeCall RootVirtualNode(string source)
+        => TransformTestHelpers.Transform(source).RootCodegen().ShouldBeOfType<VirtualNodeCall>();
 
     // ---- TEXT (1 << 0) ----
 
@@ -21,7 +21,7 @@ public class PatchFlagInferenceTests
     public void DynamicTextChild_FlagsTextOnly()
     {
         // transformElement.ts: a single interpolation/compound child with NOT_CONSTANT value => TEXT.
-        var codegen = RootVNode("<div>{{ message }}</div>");
+        var codegen = RootVirtualNode("<div>{{ message }}</div>");
 
         codegen.PatchFlag.ShouldBe(PatchFlags.Text);
         ((int)codegen.PatchFlag!.Value).ShouldBe(1);
@@ -31,7 +31,7 @@ public class PatchFlagInferenceTests
     public void StaticTextChild_HasNoPatchFlag()
     {
         // A plain text child can never change, so no flag is emitted (the vnode carries the text directly).
-        var codegen = RootVNode("<div>hello</div>");
+        var codegen = RootVirtualNode("<div>hello</div>");
 
         codegen.PatchFlag.ShouldBeNull();
     }
@@ -40,7 +40,7 @@ public class PatchFlagInferenceTests
     public void DynamicTextChildWithDynamicClass_CombinesClassAndText()
     {
         // Flags are a bitset: :class => CLASS, {{ x }} => TEXT, combined = 2 | 1 = 3.
-        var codegen = RootVNode("<div :class=\"cls\">{{ message }}</div>");
+        var codegen = RootVirtualNode("<div :class=\"cls\">{{ message }}</div>");
 
         codegen.ShouldHavePatchFlag(PatchFlags.Class);
         codegen.ShouldHavePatchFlag(PatchFlags.Text);
@@ -54,7 +54,7 @@ public class PatchFlagInferenceTests
     public void OnlyStaticAttributes_EmitNoPatchFlag()
     {
         // buildProps only runs analyzePatchFlag on directive-produced props; static attributes never flag.
-        var codegen = RootVNode("<div class=\"a\" style=\"color:red\" id=\"x\"></div>");
+        var codegen = RootVirtualNode("<div class=\"a\" style=\"color:red\" id=\"x\"></div>");
 
         codegen.PatchFlag.ShouldBeNull();
     }
@@ -62,75 +62,75 @@ public class PatchFlagInferenceTests
     // ---- PROPS (1 << 3) and the dynamicProps list ----
 
     [Fact]
-    public void DynamicProps_CollectsExactNamesInSourceOrder()
+    public void DynamicProperties_CollectsExactNamesInSourceOrder()
     {
         // vBind.spec.ts: non-class/style dynamic bindings => PROPS with an ordered dynamicProps name list.
-        var codegen = RootVNode("<div :foo=\"a\" :bar=\"b\"></div>");
+        var codegen = RootVirtualNode("<div :foo=\"a\" :bar=\"b\"></div>");
 
-        codegen.PatchFlag.ShouldBe(PatchFlags.Props);
-        codegen.DynamicProps.ShouldBe("[\"foo\", \"bar\"]");
+        codegen.PatchFlag.ShouldBe(PatchFlags.Properties);
+        codegen.DynamicProperties.ShouldBe("[\"foo\", \"bar\"]");
     }
 
     [Fact]
     public void KeyBinding_IsNeverCollectedAsDynamicProp()
     {
         // analyzePatchFlag skips `key`: the diff handles keys structurally, not as a patched prop.
-        var codegen = RootVNode("<div :key=\"k\" :foo=\"a\"></div>");
+        var codegen = RootVirtualNode("<div :key=\"k\" :foo=\"a\"></div>");
 
-        codegen.DynamicProps.ShouldBe("[\"foo\"]");
+        codegen.DynamicProperties.ShouldBe("[\"foo\"]");
     }
 
     // ---- FULL_PROPS (1 << 4): replaces CLASS/STYLE/PROPS ----
 
     [Fact]
-    public void DynamicArgument_EscalatesToFullPropsAndReplacesFinerFlags()
+    public void DynamicArgument_EscalatesToFullPropertiesAndReplacesFinerFlags()
     {
         // A dynamic v-bind argument makes the prop keys themselves dynamic, so FULL_PROPS is set *instead*
         // of CLASS/STYLE/PROPS (the else-branch in buildProps is skipped entirely when hasDynamicKeys).
-        var codegen = RootVNode("<div :[key]=\"v\" :class=\"c\" :style=\"s\" :foo=\"f\"></div>");
+        var codegen = RootVirtualNode("<div :[key]=\"v\" :class=\"c\" :style=\"s\" :foo=\"f\"></div>");
 
-        codegen.PatchFlag.ShouldBe(PatchFlags.FullProps);
+        codegen.PatchFlag.ShouldBe(PatchFlags.FullProperties);
         ((int)codegen.PatchFlag!.Value).ShouldBe(16);
         (codegen.PatchFlag!.Value & PatchFlags.Class).ShouldBe((PatchFlags)0);
         (codegen.PatchFlag!.Value & PatchFlags.Style).ShouldBe((PatchFlags)0);
-        (codegen.PatchFlag!.Value & PatchFlags.Props).ShouldBe((PatchFlags)0);
+        (codegen.PatchFlag!.Value & PatchFlags.Properties).ShouldBe((PatchFlags)0);
     }
 
     [Fact]
-    public void ObjectSpreadVBind_EscalatesToFullProps()
+    public void ObjectSpreadVBind_EscalatesToFullProperties()
     {
         // v-bind="obj" merges an object whose keys are unknown at compile time => FULL_PROPS.
-        var codegen = RootVNode("<div v-bind=\"obj\" :class=\"c\"></div>");
+        var codegen = RootVirtualNode("<div v-bind=\"obj\" :class=\"c\"></div>");
 
-        codegen.PatchFlag.ShouldBe(PatchFlags.FullProps);
+        codegen.PatchFlag.ShouldBe(PatchFlags.FullProperties);
     }
 
     // ---- NEED_HYDRATION (1 << 5) ----
 
     [Fact]
-    public void NonClickEventListener_FlagsNeedHydration()
+    public void NonClickEventListener_FlagsNeedsHydration()
     {
         // transformElement.ts: a non-click, non-reserved event binding needs its listener attached during
         // hydration even when nothing else changes. The handler name is also a dynamic prop (no cacheHandlers),
         // so the flag is PROPS | NEED_HYDRATION = 8 | 32 = 40.
-        var codegen = RootVNode("<div @foo=\"bar\"></div>");
+        var codegen = RootVirtualNode("<div @foo=\"bar\"></div>");
 
-        codegen.ShouldHavePatchFlag(PatchFlags.NeedHydration);
-        codegen.ShouldHavePatchFlag(PatchFlags.Props);
-        ((int)codegen.PatchFlag!.Value).ShouldBe((int)(PatchFlags.Props | PatchFlags.NeedHydration));
+        codegen.ShouldHavePatchFlag(PatchFlags.NeedsHydration);
+        codegen.ShouldHavePatchFlag(PatchFlags.Properties);
+        ((int)codegen.PatchFlag!.Value).ShouldBe((int)(PatchFlags.Properties | PatchFlags.NeedsHydration));
         ((int)codegen.PatchFlag!.Value).ShouldBe(40);
-        codegen.DynamicProps.ShouldBe("[\"onFoo\"]");
+        codegen.DynamicProperties.ShouldBe("[\"onFoo\"]");
     }
 
     [Fact]
-    public void ClickEventListener_OmitsNeedHydration()
+    public void ClickEventListener_OmitsNeedsHydration()
     {
         // onClick is deliberately excluded from NEED_HYDRATION: hydration gives click a dedicated fast path.
-        var codegen = RootVNode("<button @click=\"onClick\"></button>");
+        var codegen = RootVirtualNode("<button @click=\"onClick\"></button>");
 
-        (codegen.PatchFlag!.Value & PatchFlags.NeedHydration).ShouldBe((PatchFlags)0);
-        codegen.PatchFlag.ShouldBe(PatchFlags.Props);
-        codegen.DynamicProps.ShouldBe("[\"onClick\"]");
+        (codegen.PatchFlag!.Value & PatchFlags.NeedsHydration).ShouldBe((PatchFlags)0);
+        codegen.PatchFlag.ShouldBe(PatchFlags.Properties);
+        codegen.DynamicProperties.ShouldBe("[\"onClick\"]");
     }
 
     // ---- NEED_PATCH (1 << 9) ----
@@ -139,7 +139,7 @@ public class PatchFlagInferenceTests
     public void TemplateReferenceOnly_FlagsNeedPatch()
     {
         // A ref with no dynamic props still needs runtime work (assigning the ref), so NEED_PATCH is emitted.
-        var codegen = RootVNode("<div ref=\"root\"></div>");
+        var codegen = RootVirtualNode("<div ref=\"root\"></div>");
 
         codegen.PatchFlag.ShouldBe(PatchFlags.NeedPatch);
         ((int)codegen.PatchFlag!.Value).ShouldBe(512);
@@ -150,7 +150,7 @@ public class PatchFlagInferenceTests
     {
         // A user directive with no other dynamic bindings => NEED_PATCH, plus a resolveDirective registration.
         var result = TransformTestHelpers.Transform("<div v-custom=\"x\"></div>");
-        var codegen = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var codegen = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
 
         codegen.PatchFlag.ShouldBe(PatchFlags.NeedPatch);
         result.ShouldUseHelper("resolveDirective");
@@ -159,30 +159,30 @@ public class PatchFlagInferenceTests
     }
 
     [Fact]
-    public void NeedPatchIsSuppressed_WhenElementAlreadyHasDynamicProps()
+    public void NeedPatchIsSuppressed_WhenElementAlreadyHasDynamicProperties()
     {
         // NEED_PATCH only fills the gap when patchFlag is otherwise 0 (or NEED_HYDRATION): a ref alongside a
         // dynamic prop rides the PROPS diff instead of adding NEED_PATCH.
-        var codegen = RootVNode("<div ref=\"root\" :foo=\"a\"></div>");
+        var codegen = RootVirtualNode("<div ref=\"root\" :foo=\"a\"></div>");
 
-        codegen.PatchFlag.ShouldBe(PatchFlags.Props);
+        codegen.PatchFlag.ShouldBe(PatchFlags.Properties);
         (codegen.PatchFlag!.Value & PatchFlags.NeedPatch).ShouldBe((PatchFlags)0);
     }
 
     // ---- component class/style as dynamic props ----
 
     [Fact]
-    public void Component_TreatsDynamicClassAndStyleAsRegularProps()
+    public void Component_TreatsDynamicClassAndStyleAsRegularProperties()
     {
         // For a component, class/style are ordinary props (not element attributes), so they escalate PROPS and
         // land in dynamicProps rather than setting the CLASS/STYLE bits.
-        var codegen = RootVNode("<Comp :class=\"c\" :style=\"s\" :foo=\"f\"></Comp>");
+        var codegen = RootVirtualNode("<Comp :class=\"c\" :style=\"s\" :foo=\"f\"></Comp>");
 
         codegen.IsComponent.ShouldBeTrue();
-        codegen.PatchFlag.ShouldBe(PatchFlags.Props);
+        codegen.PatchFlag.ShouldBe(PatchFlags.Properties);
         (codegen.PatchFlag!.Value & PatchFlags.Class).ShouldBe((PatchFlags)0);
         (codegen.PatchFlag!.Value & PatchFlags.Style).ShouldBe((PatchFlags)0);
-        codegen.DynamicProps.ShouldBe("[\"class\", \"style\", \"foo\"]");
+        codegen.DynamicProperties.ShouldBe("[\"class\", \"style\", \"foo\"]");
     }
 
     // ---- DYNAMIC_SLOTS (1 << 10) ----
@@ -191,7 +191,7 @@ public class PatchFlagInferenceTests
     public void DynamicSlotName_FlagsDynamicSlots()
     {
         // buildSlots: a non-static slot name forces the component's slots dynamic (DYNAMIC_SLOTS).
-        var codegen = RootVNode("<Comp><template #[name]>x</template></Comp>");
+        var codegen = RootVirtualNode("<Comp><template #[name]>x</template></Comp>");
 
         codegen.ShouldHavePatchFlag(PatchFlags.DynamicSlots);
     }
@@ -213,7 +213,7 @@ public class PatchFlagInferenceTests
     [InlineData("<div :class=\"c\">{{ x }}</div>", 3)]       // CLASS | TEXT
     public void EmittedPatchFlag_IsBitIdenticalToUpstream(string template, int expected)
     {
-        var codegen = RootVNode(template);
+        var codegen = RootVirtualNode(template);
 
         ((int)codegen.PatchFlag!.Value).ShouldBe(expected);
     }
@@ -227,11 +227,11 @@ public class PatchFlagInferenceTests
         // dynamicProps, and all).
         const string template = "<div :class=\"c\" :foo=\"a\" @bar=\"h\">{{ x }}</div>";
 
-        var first = RootVNode(template);
-        var second = RootVNode(template);
+        var first = RootVirtualNode(template);
+        var second = RootVirtualNode(template);
 
         first.ShouldBe(second);
         first.PatchFlag.ShouldBe(second.PatchFlag);
-        first.DynamicProps.ShouldBe(second.DynamicProps);
+        first.DynamicProperties.ShouldBe(second.DynamicProperties);
     }
 }

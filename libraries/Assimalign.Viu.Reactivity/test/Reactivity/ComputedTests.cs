@@ -67,6 +67,35 @@ public sealed class ComputedTests
     }
 
     [Fact]
+    public void Peek_StaleComputed_RefreshesWithoutSubscribingTheCaller()
+    {
+        var source = Reactive.Reference(1);
+        var getterRuns = 0;
+        var effectRuns = 0;
+        var observed = 0;
+        var doubled = Reactive.Computed(() =>
+        {
+            getterRuns++;
+            return source.Value * 2;
+        });
+
+        Reactive.Effect(() =>
+        {
+            effectRuns++;
+            observed = doubled.Peek();
+        });
+
+        source.Value = 2;
+
+        effectRuns.ShouldBe(1);
+        getterRuns.ShouldBe(1);
+        observed.ShouldBe(2);
+        doubled.Peek().ShouldBe(4);
+        getterRuns.ShouldBe(2);
+        effectRuns.ShouldBe(1);
+    }
+
+    [Fact]
     public void ChainedComputedsRecomputeMinimally()
     {
         var a = Reactive.Reference(1);
@@ -183,7 +212,7 @@ public sealed class ComputedTests
     }
 
     [Fact]
-    public void ReadonlyComputed_WriteDoesNotThrowOrChangeValue()
+    public void ReadOnlyComputed_WriteDoesNotThrowOrChangeValue()
     {
         var computed = Reactive.Computed(() => 1);
         computed.IsWritable.ShouldBeFalse();

@@ -17,15 +17,15 @@ public class PatchFlagsParityTests
     [InlineData(PatchFlags.Text, 1)]
     [InlineData(PatchFlags.Class, 1 << 1)]
     [InlineData(PatchFlags.Style, 1 << 2)]
-    [InlineData(PatchFlags.Props, 1 << 3)]
-    [InlineData(PatchFlags.FullProps, 1 << 4)]
-    [InlineData(PatchFlags.NeedHydration, 1 << 5)]
+    [InlineData(PatchFlags.Properties, 1 << 3)]
+    [InlineData(PatchFlags.FullProperties, 1 << 4)]
+    [InlineData(PatchFlags.NeedsHydration, 1 << 5)]
     [InlineData(PatchFlags.StableFragment, 1 << 6)]
     [InlineData(PatchFlags.KeyedFragment, 1 << 7)]
     [InlineData(PatchFlags.UnkeyedFragment, 1 << 8)]
     [InlineData(PatchFlags.NeedPatch, 1 << 9)]
     [InlineData(PatchFlags.DynamicSlots, 1 << 10)]
-    [InlineData(PatchFlags.DevRootFragment, 1 << 11)]
+    [InlineData(PatchFlags.DevelopmentRootFragment, 1 << 11)]
     [InlineData(PatchFlags.Cached, -1)]
     [InlineData(PatchFlags.Bail, -2)]
     public void EveryFlag_MatchesFrozenValueBitForBit(PatchFlags flag, int expected)
@@ -37,15 +37,15 @@ public class PatchFlagsParityTests
     [InlineData(PatchFlags.Text, 1)]
     [InlineData(PatchFlags.Class, 2)]
     [InlineData(PatchFlags.Style, 4)]
-    [InlineData(PatchFlags.Props, 8)]
-    [InlineData(PatchFlags.FullProps, 16)]
-    [InlineData(PatchFlags.NeedHydration, 32)]
+    [InlineData(PatchFlags.Properties, 8)]
+    [InlineData(PatchFlags.FullProperties, 16)]
+    [InlineData(PatchFlags.NeedsHydration, 32)]
     [InlineData(PatchFlags.StableFragment, 64)]
     [InlineData(PatchFlags.KeyedFragment, 128)]
     [InlineData(PatchFlags.UnkeyedFragment, 256)]
     [InlineData(PatchFlags.NeedPatch, 512)]
     [InlineData(PatchFlags.DynamicSlots, 1024)]
-    [InlineData(PatchFlags.DevRootFragment, 2048)]
+    [InlineData(PatchFlags.DevelopmentRootFragment, 2048)]
     public void PositiveFlags_MatchFrozenValueTable(PatchFlags flag, int expected)
     {
         ((int)flag).ShouldBe(expected);
@@ -63,15 +63,15 @@ public class PatchFlagsParityTests
                 PatchFlags.Text,
                 PatchFlags.Class,
                 PatchFlags.Style,
-                PatchFlags.Props,
-                PatchFlags.FullProps,
-                PatchFlags.NeedHydration,
+                PatchFlags.Properties,
+                PatchFlags.FullProperties,
+                PatchFlags.NeedsHydration,
                 PatchFlags.StableFragment,
                 PatchFlags.KeyedFragment,
                 PatchFlags.UnkeyedFragment,
                 PatchFlags.NeedPatch,
                 PatchFlags.DynamicSlots,
-                PatchFlags.DevRootFragment,
+                PatchFlags.DevelopmentRootFragment,
                 PatchFlags.Cached,
                 PatchFlags.Bail,
             ],
@@ -96,6 +96,6 @@ public class PatchFlagsParityTests
 
         ((int)combined).ShouldBe(1 | 2 | 4);
         (combined & PatchFlags.Text).ShouldBe(PatchFlags.Text);
-        (combined & PatchFlags.Props).ShouldBe((PatchFlags)0);
+        (combined & PatchFlags.Properties).ShouldBe((PatchFlags)0);
     }
 }

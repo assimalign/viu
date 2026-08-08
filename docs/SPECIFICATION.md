@@ -329,14 +329,14 @@ host-event merge.
 
 ### 4.6 Slots
 
-`[CMP-18]` Generated slot sets carry a `SlotFlags` classification — `Stable`, `Dynamic`, or
+`[CMP-18]` Generated slot sets carry a `SlotStability` classification — `Stable`, `Dynamic`, or
 `Forwarded` — in the immutable invocation's `SlotStability` property. Core's component-update gate
 consumes that classification to **skip** child renders for structurally stable slots while forcing
 updates for dynamic and effectively-dynamic forwarded slots.
 
-`[CMP-19]` `ComponentInvocation.SlotStability` defaults to `SlotFlags.Stable` for empty or fixed
+`[CMP-19]` `ComponentInvocation.SlotStability` defaults to `SlotStability.Stable` for empty or fixed
 hand-authored slot sets. A caller whose slot structure can change MUST explicitly supply
-`SlotFlags.Dynamic`; a caller forwarding its parent's slots MUST supply `SlotFlags.Forwarded`.
+`SlotStability.Dynamic`; a caller forwarding its parent's slots MUST supply `SlotStability.Forwarded`.
 An over-optimistic classification manifests as a child that silently stops updating.
 
 ### 4.7 Lifecycle
@@ -534,8 +534,9 @@ degrades to the behavior the component would have had without the root convenien
 ### 5.1 The type model
 
 `[RCT-1]` `ReactiveValue` / `ReactiveValue<T>` is the engine base class; it holds the dependency
-cell inline as a field. `IReactiveReference` and `IReactiveReference<T>` are the public,
-substitutable contracts. Every Reactivity-owned public interface is prefixed `IReactive*`.
+cell inline as a field. `IReactiveReference`, covariant get-only
+`IReactiveReadOnlyReference<T>`, and mutable `IReactiveReference<T>` are the public substitutable
+contracts. Every Reactivity-owned public interface is prefixed `IReactive*`.
 
 `[RCT-2]` Hot-path dispatch rule: per-trigger notification, patching, and diffing MUST dispatch
 through an **abstract base-class vtable**, not an interface. Interface dispatch is for cold public
@@ -558,7 +559,13 @@ dependency access (forced triggering, graph inspection) additionally require
 `[RCT-5]` `Reactive` is the static facade: `Reference`, `ShallowReference`, `CustomReference`,
 `Computed`; `Effect`; `EffectScope`, `CurrentScope`, `OnScopeDispose`; `Watch`, `WatchEffect`;
 `TriggerReference`; `PauseTracking`, `ResetTracking`, `StartBatch`, `EndBatch`; and the inspection
-and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadonly`, `ToRaw`, `MarkRaw`.
+and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadOnly`, collection-specific
+`ToRaw`, and `MarkRaw`. Generic identity conversion and raw-object conversion are not part of the
+surface; generated objects instead expose a typed `ToRawValues()` view over their backing values.
+`ReactiveValue<T>.Peek()` returns a fresh value without subscribing the ambient caller, while a
+stale computed still refreshes and tracks its own sources. Tracking state is restored if the read
+throws. `ReactiveEffect` implements `IDisposable`; `Dispose()` is exactly the idempotent `Stop()`
+operation.
 
 ### 5.3 There is no proxy
 
@@ -641,7 +648,7 @@ after a flush instead of retaining engine objects.
 
 ### 6.2 The flag vocabulary
 
-`[RND-FLAGS-1]` `PatchFlags`, `ShapeFlags`, and `SlotFlags` (owned by
+`[RND-FLAGS-1]` `PatchFlags`, `ShapeFlags`, and `SlotStability` (owned by
 `Assimalign.Viu.Components`) are
 **the interface between build-time analysis and runtime patching**. Their bit layout is a frozen
 contract between compiled output and the runtime: changing a value silently breaks components
@@ -649,8 +656,8 @@ compiled by an earlier Viu, so **values are additive only**. Naming the zero `Pa
 `None` is additive and does not change the frozen layout.
 
 `[RND-FLAGS-2]` `PatchFlags` positive members are single bits and combine with bitwise OR: `Text`,
-`Class`, `Style`, `Props`, `FullProps`, `NeedHydration`, `StableFragment`, `KeyedFragment`,
-`UnkeyedFragment`, `NeedPatch`, `DynamicSlots`, `DevRootFragment`.
+`Class`, `Style`, `Properties`, `FullProperties`, `NeedsHydration`, `StableFragment`, `KeyedFragment`,
+`UnkeyedFragment`, `NeedPatch`, `DynamicSlots`, `DevelopmentRootFragment`.
 
 `[RND-FLAGS-3]` `Cached` (`-1`) and `Bail` (`-2`) are **whole-value sentinels, never bit
 combinations**. Because every negative `int` has most bits set, a naive bitwise test against a
@@ -662,15 +669,15 @@ skips entirely; `Bail` marks a tree that MUST fall back to a full diff.
 output. The closed `VirtualNode` algebra is authoritative for runtime shape dispatch; the enum's
 layout remains stable even where a current runtime path no longer consumes it.
 
-`[RND-FLAGS-5]` `SlotFlags` is a plain enumeration, not a bitmask: a slot collection has exactly one
+`[RND-FLAGS-5]` `SlotStability` is a plain enumeration, not a bitmask: a slot collection has exactly one
 of `Stable`, `Dynamic`, `Forwarded`. `ComponentInvocation.SlotStability` transports that value from
 compiled output to Core, defaults to `Stable`, and is consumed by the component-update gate after
 `Forwarded` is resolved against the active parent.
 
-`[RND-FLAGS-6]` `PatchFlags.cs` and `SlotFlags.cs` are `<Compile Include>`-linked into the
+`[RND-FLAGS-6]` `PatchFlags.cs` and `SlotStability.cs` are `<Compile Include>`-linked into the
 `netstandard2.0` generator projects. **Their file paths are frozen**; moving them requires updating
 every linking csproj in the same change. The authoritative paths are
-`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotFlags.cs}`.
+`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotStability.cs}`.
 
 ### 6.3 The block tree
 
@@ -750,8 +757,8 @@ four paths:
 | positive patch flags | flag-selective | only the `Text` fast path |
 | otherwise | full diff | full diff under the new flags |
 
-`[RND-PATCH-4]` **Flag-selective binding patching**: `FullProps` degrades to a full binding diff;
-otherwise `Class` patches only `class`, `Style` patches only `style`, and `Props` patches exactly the
+`[RND-PATCH-4]` **Flag-selective binding patching**: `FullProperties` degrades to a full binding diff;
+otherwise `Class` patches only `class`, `Style` patches only `style`, and `Properties` patches exactly the
 indices listed in `RenderPlan.DynamicBindingIndices`. A null index list is unknown and therefore
 falls back to the full binding diff. Non-positive flags patch nothing.
 
@@ -844,9 +851,9 @@ that instance.
 chain. Exceeding it throws `InvalidOperationException` naming the job — the diagnostic for a
 reactive effect that mutates its own dependencies.
 
-`[SCH-9]` **`NextTick()`** returns a task that completes after the current or next flush chain, and
+`[SCH-9]` **`NextTickAsync()`** returns a task that completes after the current or next flush chain, and
 `Task.CompletedTask` when nothing is queued. A post-flush callback that queues more work causes
-another cycle to run — sharing the same recursion bookkeeping — **before** `NextTick` resolves.
+another cycle to run — sharing the same recursion bookkeeping — **before** `NextTickAsync` resolves.
 
 `[SCH-10]` **The commit boundary fires twice per flush** and MUST be idempotent (a no-op when
 nothing is buffered):
@@ -866,7 +873,7 @@ is a **no-op while a scheduled flush is running**: that flush owns the drain, an
 renders are never double-applied.
 
 `[SCH-12]` **On exception**, the flush abandons the remaining queue deterministically: queued flags
-are cleared so every job can re-queue, `NextTick` is resolved so awaiters do not hang, and the
+are cleared so every job can re-queue, `NextTickAsync` is resolved so awaiters do not hang, and the
 exception is rethrown to the host.
 
 ### 6.7 Host abstraction
@@ -921,7 +928,7 @@ collide.
 `libraries/Assimalign.Viu.Core/src/Rendering/RendererOptions{TNode}.cs`;
 `libraries/Assimalign.Viu.Core/src/Internal/Mounted*.cs`;
 `libraries/Assimalign.Viu.Core/src/Scheduling/{Scheduler,SchedulerJob}.cs`;
-`libraries/Assimalign.Viu.Components/src/{PatchFlags,ShapeFlags,SlotFlags}.cs`;
+`libraries/Assimalign.Viu.Components/src/{PatchFlags,ShapeFlags,SlotStability}.cs`;
 `libraries/Assimalign.Viu.Components/src/Optimization/RenderPlan.cs`;
 `libraries/Assimalign.Viu.Browser/docs/{DESIGN.md,ADR-0001-interop-marshaling.md}`;
 `libraries/Assimalign.Viu.Components/src/{VirtualNode,ComponentRenderFrame}.cs`;
@@ -1222,6 +1229,13 @@ not input.
 downstream tooling has something to work with. An unterminated block yields its content to end of
 file and still appears in the descriptor.
 
+`[SFC-DIAG-3]` **Parser-produced node algebras are explicit.** Template, HTML, and
+single-file-component abstract node roots expose no parameterless construction path outside their
+own assembly; external parser extensibility goes through the generic parser registration seam, not
+by injecting variants into those trees. CSS record roots remain mechanically derivable, so every
+CSS writer and rewriter MUST handle each supported built-in variant explicitly and throw
+`InvalidOperationException` for an unsupported node rather than silently dropping or copying it.
+
 ### 8.8 Component-usage validation
 
 `[SFC-USE-1]` A template that uses a component is checked against that component's **declared**
@@ -1376,7 +1390,7 @@ the migration arc.
 
 `[STY-8]` **Deferred with `[STY-6]`.** When restored: a `v-bind()` change updates the host without
 re-rendering the component — on a buffered host the properties are written into the command frame
-and the owning context queues its renderer-specific commit, reaching the host before `NextTick`
+and the owning context queues its renderer-specific commit, reaching the host before `NextTickAsync`
 with no render.
 
 ### 10.4 Viu Utilities
@@ -1531,8 +1545,11 @@ scope; Core uses that scope's still-valid `Context` as the nested component's pa
 `RouteLocation`, `RouteParameters`, `PathMatchingOptions`, and the ranked path parser run in a plain
 .NET test host using no other Viu library.
 
-`[RTR-2]` `RouteLocation` has **value equality**, so a navigation layer can compare and snapshot
-cheaply. `RouteParameters` accessors are **boxing-free and reflection-free**
+`[RTR-2]` `RouteLocation` and `RouteParameters` have **value equality** with matching null-safe
+`==` and `!=` operators, so a navigation layer can compare and snapshot cheaply.
+`Router.CurrentRoute` exposes the covariant get-only reactive-reference contract; only Router can
+replace the current location.
+`RouteParameters` accessors are **boxing-free and reflection-free**
 (`GetString`/`TryGetString`, `GetInteger`/`TryGetInteger`, `GetStrings`), with immutable
 `With`/`WithMany` builders.
 
@@ -1542,12 +1559,17 @@ browser-history bridge when `Router.ReadyAsync` first needs it; `RouterHistory.I
 remains an optional prewarming call. `UseRouter` awaits readiness with
 `IApplicationContext.Stopping` before the host terminal mounts and removes the DOM bridge during
 reverse-order application cleanup [APP-4], [APP-5]. History state marshals as a **flat,
-primitives-only** payload.
+primitives-only** payload. Every history is an idempotent, terminal `IDisposable`: after disposal
+all other members throw `ObjectDisposedException`. A Router borrows its history; the owner disposes
+the Router first and then the history, making environment-listener ownership explicit.
 
 `[RTR-4]` `RouterView` and `RouterLink` resolve `Router` from nullable
 `ComponentContext.Services`.
 **`RouterView` takes its nesting depth as an explicit argument** (default `0`), and a nested layout
 passes the next depth explicitly, because Viu has no hierarchical component dependency API [CMP-24].
+An in-component guard depth outside the current matched route chain throws
+`ArgumentOutOfRangeException`; registration never silently drops a guard because its explicit depth
+is invalid.
 
 `[RTR-5]` **Guards return their decision; they do not call a continuation.** A `NavigationGuard`
 returns a `NavigationGuardResult` — `Allow`, `Abort`, or a redirect — from an awaitable,
@@ -1555,8 +1577,12 @@ cancellable signature. An exhaustive result type lets the compiler check that ev
 and lets the pipeline guarantee a guard decides exactly once.
 
 `[RTR-6]` A navigation that does not complete yields a `NavigationFailure` typed `Aborted`,
-`Cancelled`, or `Duplicated`, returned from `Push`/`Replace` and passed to every after-navigation
-hook. A guard-redirect chain that exceeds the safety cap throws `NavigationRedirectException`.
+`Cancelled`, or `Duplicated`, returned from cancellable `PushAsync`/`ReplaceAsync` and passed to
+every after-navigation hook. A caller cancellation participates in the same cancellation outcome as
+a navigation superseded by a later request. One cancellation token spans an entire redirect chain.
+A superseded pop navigation reports `Cancelled` to its after-navigation hooks but cannot compensate
+history after a newer navigation owns the pipeline. A guard-redirect chain that exceeds the safety
+cap throws `NavigationRedirectException`.
 
 `[RTR-7]` **Boundary.** `Assimalign.Viu.Router` references Components and Reactivity but **not Core
 and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` is the
@@ -1665,8 +1691,12 @@ installer, no admin rights.
 
 `[PKG-2]` The framework ships as the **`Assimalign.Viu.App` shared framework**: a
 `KnownFrameworkReference` registration resolving to the `Assimalign.Viu.App.Ref` targeting pack
-(compile references + `data/FrameworkList.xml`) and per-RID `Assimalign.Viu.App.Runtime.<rid>`
-runtime packs (`browser-wasm` today).
+(compile references + `data/FrameworkList.xml` + `data/PackageOverrides.txt`) and per-RID
+`Assimalign.Viu.App.Runtime.<rid>` runtime packs (`browser-wasm` today). The targeting pack's
+package-override manifest lists every framework assembly that is also published as a standalone
+package at the effective NuGet package version, so the framework copy wins conflict resolution when
+an SDK-path consumer also references that package. Runtime packs do not carry the targeting-only
+override manifest.
 
 `[PKG-3]` **Generators are delivered as analyzers through the ref pack** — `analyzers/dotnet/cs`
 with `<File Type="Analyzer">` manifest entries — so an SDK consumer gets `[Reactive]` and
@@ -1709,6 +1739,10 @@ it move together.
 
 `[CONF-3]` Unit tests are **DOM-free by default**. The runtime is exercised through
 `Assimalign.Viu.Testing`'s in-memory host; real-browser coverage is a separate end-to-end harness.
+`TestElement` exposes read-only live views of its properties, listeners, and ordered children, so
+tests can inspect host state without mutating renderer-owned storage. `ComponentWrapper` and
+`ElementWrapper` name event/value operations `TriggerAsync` and `SetValueAsync`; their returned task
+completes only after the deterministic scheduler has drained.
 
 `[CONF-4]` For reactivity and caching semantics a test MUST assert **run counts** (effect runs,
 getter invocations), not only final values: caching and dependency-tracking bugs hide behind

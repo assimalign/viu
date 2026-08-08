@@ -154,6 +154,19 @@ public sealed class RouteParameters : IEquatable<RouteParameters>
     internal bool TryGetRawValue(string name, out RouteParameterValue value)
         => values.TryGetValue(name, out value);
 
+    /// <summary>Determines whether two parameter sets have the same value.</summary>
+    /// <param name="left">The first parameter set.</param>
+    /// <param name="right">The second parameter set.</param>
+    /// <returns>True when both values are null or value-equal; otherwise false.</returns>
+    public static bool operator ==(RouteParameters? left, RouteParameters? right) =>
+        ReferenceEquals(left, right) || (left is not null && left.Equals(right));
+
+    /// <summary>Determines whether two parameter sets have different values.</summary>
+    /// <param name="left">The first parameter set.</param>
+    /// <param name="right">The second parameter set.</param>
+    /// <returns>True when exactly one value is null or their values differ; otherwise false.</returns>
+    public static bool operator !=(RouteParameters? left, RouteParameters? right) => !(left == right);
+
     /// <inheritdoc/>
     public bool Equals(RouteParameters? other)
     {

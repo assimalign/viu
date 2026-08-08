@@ -20,26 +20,50 @@ internal sealed class MemoryRouterHistory : IRouterHistory
 
     private readonly List<(string Location, RouterHistoryState State)> queue = [];
     private readonly List<NavigationCallback> listeners = [];
+    private readonly string normalizedBase;
     private int position;
+    private bool isDisposed;
 
     internal MemoryRouterHistory(string? @base)
     {
-        Base = HistoryPathNormalization.NormalizeBase(@base);
+        normalizedBase = HistoryPathNormalization.NormalizeBase(@base);
         Reset();
     }
 
     /// <inheritdoc/>
-    public string Base { get; }
+    public string Base
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return normalizedBase;
+        }
+    }
 
     /// <inheritdoc/>
-    public string Location => queue[position].Location;
+    public string Location
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return queue[position].Location;
+        }
+    }
 
     /// <inheritdoc/>
-    public RouterHistoryState State => queue[position].State;
+    public RouterHistoryState State
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return queue[position].State;
+        }
+    }
 
     /// <inheritdoc/>
     public void Push(string location, RouterHistoryState? data = null)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         var newState = RouterHistoryStateBuilder.BuildForPush(State, location, data?.Scroll);
         SetLocation(location, newState);
@@ -48,6 +72,7 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     /// <inheritdoc/>
     public void Replace(string location, RouterHistoryState? data = null)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         // Drop the current entry and step back, then re-add at the same index through SetLocation,
         // which truncates any forward entries — a replace must not leave a stale forward branch.
@@ -60,6 +85,7 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     /// <inheritdoc/>
     public void Go(int delta, bool triggerListeners = true)
     {
+        ThrowIfDisposed();
         var from = Location;
         // A zero delta is treated as forward: in memory it cannot reload the way the browser would,
         // so only a strictly negative delta counts as "back".
@@ -74,6 +100,7 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     /// <inheritdoc/>
     public Action Listen(NavigationCallback callback)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(callback);
         listeners.Add(callback);
         return () => listeners.Remove(callback);
@@ -82,15 +109,21 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     /// <inheritdoc/>
     public string CreateHref(string location)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         return HistoryPathNormalization.CreateHref(Base, location);
     }
 
     /// <inheritdoc/>
-    public void Destroy()
+    public void Dispose()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        isDisposed = true;
         listeners.Clear();
-        Reset();
     }
 
     // Advance the position, then append at the tip or truncate-from-here and append.
@@ -120,4 +153,6 @@ internal sealed class MemoryRouterHistory : IRouterHistory
         position = 0;
         queue.Add((Start, RouterHistoryStateBuilder.BuildInitial(Start, position: 0)));
     }
+
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(isDisposed, this);
 }

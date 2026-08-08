@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Assimalign.Viu.Router;
 
@@ -15,6 +16,7 @@ namespace Assimalign.Viu.Router;
 /// A path resolution that matched nothing returns an instance with an empty
 /// <see cref="Matched"/> chain rather than throwing.
 /// </remarks>
+[DebuggerDisplay("Path = {Path,nq}, Name = {Name,nq}, Parameters = {Parameters.Count}, Matched = {Matched.Count}")]
 public sealed class RouteLocation : IEquatable<RouteLocation>
 {
     private static readonly IReadOnlyList<RouteRecord> EmptyMatched = Array.Empty<RouteRecord>();
@@ -69,6 +71,19 @@ public sealed class RouteLocation : IEquatable<RouteLocation>
 
     /// <summary>The matched leaf record (the deepest matched child), or <see langword="null"/> when unmatched.</summary>
     public RouteRecord? Route => Matched.Count > 0 ? Matched[^1] : null;
+
+    /// <summary>Determines whether two locations have the same value.</summary>
+    /// <param name="left">The first location.</param>
+    /// <param name="right">The second location.</param>
+    /// <returns>True when both values are null or value-equal; otherwise false.</returns>
+    public static bool operator ==(RouteLocation? left, RouteLocation? right) =>
+        ReferenceEquals(left, right) || (left is not null && left.Equals(right));
+
+    /// <summary>Determines whether two locations have different values.</summary>
+    /// <param name="left">The first location.</param>
+    /// <param name="right">The second location.</param>
+    /// <returns>True when exactly one value is null or their values differ; otherwise false.</returns>
+    public static bool operator !=(RouteLocation? left, RouteLocation? right) => !(left == right);
 
     /// <inheritdoc/>
     public bool Equals(RouteLocation? other)

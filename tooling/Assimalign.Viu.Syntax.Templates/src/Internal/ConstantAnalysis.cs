@@ -13,7 +13,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <see cref="ConstantType.NotConstant"/> because it cannot see their code-generation nodes. The
 /// context-aware <see cref="GetConstantType(TemplateSyntaxNode, TransformContext)"/> is the full subtree
 /// analysis the static-caching walk ([V01.01.05.07]) uses: it resolves an element's
-/// <see cref="VNodeCall"/> through the transform side table, propagates <see cref="ConstantType.NotConstant"/>
+/// <see cref="VirtualNodeCall"/> through the transform side table, propagates <see cref="ConstantType.NotConstant"/>
 /// from any non-constant child, prop, or <c>v-bind</c> expression, memoizes each element's level in
 /// <see cref="TransformContext.ConstantCache"/>, and deliberately demotes a fully static
 /// <c>svg</c>/<c>foreignObject</c>/<c>math</c> block back to a plain vnode as a side effect.
@@ -114,7 +114,7 @@ internal static class ConstantAnalysis
             return cached;
         }
 
-        if (context.GetCodegenNode(element) is not VNodeCall codegenNode)
+        if (context.GetCodegenNode(element) is not VirtualNodeCall codegenNode)
         {
             return ConstantType.NotConstant;
         }
@@ -203,9 +203,9 @@ internal static class ConstantAnalysis
             }
 
             context.RemoveHelper(HelperNames.OpenBlock);
-            context.RemoveHelper(TransformContext.GetVNodeBlockHelper(context.InSSR, codegenNode.IsComponent));
+            context.RemoveHelper(TransformContext.GetVirtualNodeBlockHelper(context.IsNestedServerRendering, codegenNode.IsComponent));
             context.SetCodegenNode(element, codegenNode with { IsBlock = false });
-            context.Helper(TransformContext.GetVNodeHelper(context.InSSR, codegenNode.IsComponent));
+            context.Helper(TransformContext.GetVirtualNodeHelper(context.IsNestedServerRendering, codegenNode.IsComponent));
         }
 
         context.ConstantCache[element] = returnType;
@@ -217,12 +217,12 @@ internal static class ConstantAnalysis
     /// every key and value must be constant, and helper-wrapped values (<c>normalizeClass</c>, …) are
     /// unwrapped to their argument's constant-type.
     /// </summary>
-    /// <param name="element">The element whose <see cref="VNodeCall.Props"/> is analyzed.</param>
+    /// <param name="element">The element whose <see cref="VirtualNodeCall.Properties"/> is analyzed.</param>
     /// <param name="context">The transform context.</param>
     public static ConstantType GetGeneratedPropsConstantType(ElementNode element, TransformContext context)
     {
         var returnType = ConstantType.CanStringify;
-        if (context.GetCodegenNode(element) is not VNodeCall { Props: ObjectExpression properties })
+        if (context.GetCodegenNode(element) is not VirtualNodeCall { Properties: ObjectExpression properties })
         {
             return returnType;
         }

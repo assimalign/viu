@@ -212,7 +212,7 @@ public static partial class ServerRender
     /// Property and event bindings are excluded. Class and style are normalized, boolean attributes
     /// render by presence, and unsafe dynamic names are dropped. Specified by <c>[SSR-6]</c>.
     /// </remarks>
-    public static string SsrRenderAttrs(
+    public static string SsrRenderAttributes(
         IReadOnlyList<ElementBinding>? bindings,
         QualifiedName? elementName = null)
     {
@@ -286,7 +286,7 @@ public static partial class ServerRender
     /// <param name="value">The scalar value.</param>
     /// <returns>The attribute with a leading space, or an empty string for an unsupported value.</returns>
     /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
-    public static string SsrRenderAttr(string key, object? value)
+    public static string SsrRenderAttribute(string key, object? value)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         if (!IsRenderableAttributeValue(value))
@@ -308,7 +308,7 @@ public static partial class ServerRender
     /// <param name="tag">The optional owning tag used to preserve SVG and custom-element casing.</param>
     /// <returns>The attribute with a leading space, or an empty string when unsafe or absent.</returns>
     /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
-    public static string SsrRenderDynamicAttr(
+    public static string SsrRenderDynamicAttribute(
         string key,
         object? value,
         string? tag = null)

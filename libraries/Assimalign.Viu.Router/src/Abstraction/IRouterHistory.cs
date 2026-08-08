@@ -16,12 +16,17 @@ namespace Assimalign.Viu.Router;
 /// thread-safe: the router targets the single-threaded JS event loop.
 /// <para>
 /// Web and hash histories initialize their browser bridge through <see cref="Router.ReadyAsync"/>.
-/// <see cref="Listen"/> and <see cref="Destroy"/> are valid before readiness so a router can attach
+/// <see cref="Listen"/> and <see cref="IDisposable.Dispose"/> are valid before readiness so a router can attach
 /// and detach safely; every other synchronous member throws <see cref="InvalidOperationException"/>
 /// until readiness completes.
 /// </para>
+/// <para>
+/// Disposal is terminal and idempotent. After disposal every member except another
+/// <see cref="IDisposable.Dispose"/> throws <see cref="ObjectDisposedException"/>; owners can
+/// therefore prove that no listener or environment operation survives the history lifetime.
+/// </para>
 /// </remarks>
-public interface IRouterHistory
+public interface IRouterHistory : IDisposable
 {
     /// <summary>
     /// The normalized base path prepended to every location written to the environment and stripped
@@ -83,8 +88,8 @@ public interface IRouterHistory
     string CreateHref(string location);
 
     /// <summary>
-    /// Tears the history down: removes every registered listener and, in web/hash mode, unsubscribes
-    /// the underlying <c>popstate</c> handler so no interop listener leaks.
+    /// Releases the history: removes every registered listener and, in web/hash mode, unsubscribes
+    /// the underlying <c>popstate</c> handler so no interop listener leaks. Repeated disposal is safe.
     /// </summary>
-    void Destroy();
+    new void Dispose();
 }

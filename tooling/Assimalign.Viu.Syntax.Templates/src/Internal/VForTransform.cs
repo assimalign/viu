@@ -149,7 +149,7 @@ internal static class VForTransform
             : keyProperty is not null ? PatchFlags.KeyedFragment : PatchFlags.UnkeyedFragment;
 
         var renderExpression = Ir.CallExpression(context.Helper(HelperNames.RenderList), renderExpArguments);
-        workingFor.CodegenNode = context.CreateVNodeCall(
+        workingFor.CodegenNode = context.CreateVirtualNodeCall(
             context.Helper(HelperNames.Fragment),
             null,
             renderExpression,
@@ -197,7 +197,7 @@ internal static class VForTransform
             }
             else if (needFragmentWrapper)
             {
-                childBlock = context.CreateVNodeCall(
+                childBlock = context.CreateVirtualNodeCall(
                     context.Helper(HelperNames.Fragment),
                     keyProperty is not null ? Ir.ObjectExpression(new[] { keyProperty }) : null,
                     TransformFreeze.FreezeChildren(children),
@@ -210,10 +210,10 @@ internal static class VForTransform
             }
             else
             {
-                var elementBlock = (VNodeCall)context.GetCodegenNode(children[0])!;
+                var elementBlock = (VirtualNodeCall)context.GetCodegenNode(children[0])!;
                 if (isTemplate && keyProperty is not null)
                 {
-                    elementBlock = (VNodeCall)TransformUtilities.InjectProperty(elementBlock, keyProperty, context);
+                    elementBlock = (VirtualNodeCall)TransformUtilities.InjectProperty(elementBlock, keyProperty, context);
                 }
 
                 var targetIsBlock = !isStableFragment;
@@ -222,11 +222,11 @@ internal static class VForTransform
                     if (elementBlock.IsBlock)
                     {
                         context.RemoveHelper(HelperNames.OpenBlock);
-                        context.RemoveHelper(TransformContext.GetVNodeBlockHelper(context.InSSR, elementBlock.IsComponent));
+                        context.RemoveHelper(TransformContext.GetVirtualNodeBlockHelper(context.IsNestedServerRendering, elementBlock.IsComponent));
                     }
                     else
                     {
-                        context.RemoveHelper(TransformContext.GetVNodeHelper(context.InSSR, elementBlock.IsComponent));
+                        context.RemoveHelper(TransformContext.GetVirtualNodeHelper(context.IsNestedServerRendering, elementBlock.IsComponent));
                     }
                 }
 
@@ -234,11 +234,11 @@ internal static class VForTransform
                 if (targetIsBlock)
                 {
                     context.Helper(HelperNames.OpenBlock);
-                    context.Helper(TransformContext.GetVNodeBlockHelper(context.InSSR, elementBlock.IsComponent));
+                    context.Helper(TransformContext.GetVirtualNodeBlockHelper(context.IsNestedServerRendering, elementBlock.IsComponent));
                 }
                 else
                 {
-                    context.Helper(TransformContext.GetVNodeHelper(context.InSSR, elementBlock.IsComponent));
+                    context.Helper(TransformContext.GetVirtualNodeHelper(context.IsNestedServerRendering, elementBlock.IsComponent));
                 }
 
                 context.SetCodegenNode(children[0], elementBlock);
@@ -261,11 +261,11 @@ internal static class VForTransform
             }
 
             var finalRenderExpression = renderExpression with { Arguments = new SyntaxList<object>(renderExpArguments.ToArray()) };
-            workingFor.CodegenNode = ((VNodeCall)workingFor.CodegenNode!) with { Children = finalRenderExpression };
+            workingFor.CodegenNode = ((VirtualNodeCall)workingFor.CodegenNode!) with { Children = finalRenderExpression };
         };
     }
 
-    private static Property? ResolveKeyProperty(ElementNode element, out ExpressionNode? keyExpression)
+    private static ObjectProperty? ResolveKeyProperty(ElementNode element, out ExpressionNode? keyExpression)
     {
         keyExpression = null;
         var keyProperty = TransformUtilities.FindProperty(element, "key", dynamicOnly: false, allowEmpty: true);

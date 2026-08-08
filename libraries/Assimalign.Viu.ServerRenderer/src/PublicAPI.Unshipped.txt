@@ -1,1 +1,7 @@
 #nullable enable
+*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttr(string! key, object? value) -> string!
+*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttrs(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ElementBinding!>? bindings, Assimalign.Viu.Components.QualifiedName? elementName = null) -> string!
+*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderDynamicAttr(string! key, object? value, string? tag = null) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttribute(string! key, object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttributes(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ElementBinding!>? bindings, Assimalign.Viu.Components.QualifiedName? elementName = null) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderDynamicAttribute(string! key, object? value, string? tag = null) -> string!

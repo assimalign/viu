@@ -29,7 +29,7 @@ and root and descendant event histories remain separate (component-model seams S
 
 `TestSchedulerPump` installs `Scheduler.UseFlushDispatcher` and owns the returned restoration lease.
 `ViuTest` resets ambient scheduler state before a mount and after disposal. Wrapper interactions
-await event handlers, capture `Scheduler.NextTick`, drain every queued continuation, and then await
+await event handlers, capture `Scheduler.NextTickAsync`, drain every queued continuation, and then await
 the tick. Tests observe post-flush state without wall-clock delays or a test-framework
 `SynchronizationContext` (component-model seam S2, `[SCH-9]`).
 

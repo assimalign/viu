@@ -12,6 +12,27 @@ namespace Assimalign.Viu.Router.Tests;
 public sealed class DeferredBrowserRouterHistoryTests
 {
     [Fact]
+    public void InitializedBrowserHistory_DisposeUnsubscribesAndIsTerminal()
+    {
+        var interop = new RecordingBrowserHistoryInterop();
+        var history = new BrowserRouterHistory(interop, string.Empty);
+
+        history.Dispose();
+        history.Dispose();
+
+        interop.UnsubscribeCount.ShouldBe(1);
+        Should.Throw<ObjectDisposedException>(() => _ = history.Base);
+        Should.Throw<ObjectDisposedException>(() => _ = history.Location);
+        Should.Throw<ObjectDisposedException>(() => _ = history.State);
+        Should.Throw<ObjectDisposedException>(() => history.Push("/next"));
+        Should.Throw<ObjectDisposedException>(() => history.Replace("/next"));
+        Should.Throw<ObjectDisposedException>(() => history.Go(-1));
+        Should.Throw<ObjectDisposedException>(
+            () => history.Listen(static (_, _, _) => { }));
+        Should.Throw<ObjectDisposedException>(() => history.CreateHref("/next"));
+    }
+
+    [Fact]
     [SupportedOSPlatform("browser")]
     public void CreateWebAndHash_BeforeReady_DeferSynchronousStateAccess()
     {
@@ -31,7 +52,41 @@ public sealed class DeferredBrowserRouterHistoryTests
 
             stopListening();
             stopListening();
-            history.Destroy();
+            history.Dispose();
+            Should.Throw<ObjectDisposedException>(() => _ = history.Location);
+            Should.NotThrow(history.Dispose);
         }
+    }
+
+    private sealed class RecordingBrowserHistoryInterop : IBrowserHistoryInterop
+    {
+        internal int UnsubscribeCount { get; private set; }
+
+        public BrowserHistorySnapshot ReadSnapshot() =>
+            new("/", string.Empty, string.Empty, "example.test", 1, null);
+
+        public string? ReadBaseHref() => null;
+
+        public void Push(
+            string currentUrl,
+            RouterHistoryState amendedCurrentState,
+            string toUrl,
+            RouterHistoryState newState)
+        {
+        }
+
+        public void Replace(string toUrl, RouterHistoryState newState)
+        {
+        }
+
+        public void Go(int delta)
+        {
+        }
+
+        public void Subscribe(Action<BrowserHistorySnapshot> onPopState)
+        {
+        }
+
+        public void Unsubscribe() => UnsubscribeCount++;
     }
 }

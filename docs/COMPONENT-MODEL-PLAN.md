@@ -56,7 +56,7 @@ concrete defects. The counterproposal in §2 corrected those defects and is the 
    `withCtx`/re-render granularity, not a refactor. (All three independent critics converged on this.)
 4. **The former common utility package needed a landing zone for the netstandard2.0 link.** The
    compiler host cannot reference net10.0 assemblies, so `Syntax.Templates` *links source files*
-   (`PatchFlags.cs`, `SlotFlags.cs`, `DomKnowledgeData.cs`) from their shipping owners at frozen paths. Contents
+   (`PatchFlags.cs`, `SlotStability.cs`, `DomKnowledgeData.cs`) from their shipping owners at frozen paths. Contents
    must be re-homed deliberately, with the `[RND-FLAGS]` path clause updated in the same commit.
 5. **The `.viu` pipeline was unmodeled** and the early prototype missed a
    shim it should have diagnosed: `IComponentWarningContext` is another public capability-by-cast
@@ -162,7 +162,7 @@ nobody wrote" — extended from internals to capability discovery.)
 | `IComponent` (authored contract: `ComponentRenderer Setup(ComponentContext)`) + `ComponentBase` | Components | interface / abstract base (name lands last — see migration; `[CMP-31]` posture kept: the base does not implement the interface) |
 | `ComponentContext` | Components | **public abstract**, protected ctor — full surface below |
 | `ComponentLifecycle`, `ComponentRenderer`, `ComponentSlot`, `ComponentActivator`, `ComponentRegistration` (now `(Reference, Contract, Activator)`), `IComponentFactory`/`ComponentFactory` | Components | as today, contract moves onto registration |
-| `PatchFlags/SlotFlags/ShapeFlags`, `NameNormalization` (+ hyphenation) | Components | frozen value contracts, relocated with their tests during the arc |
+| `PatchFlags/SlotStability/ShapeFlags`, `NameNormalization` (+ hyphenation) | Components | frozen value contracts, relocated with their tests during the arc |
 | `RuntimeComponentContext : ComponentContext` | Core | **internal sealed** — the only runtime implementation; owns emit once-dedup, ambient `Run`, `SuspenseBoundary`, per-mount default cache, initial-mount warning gate |
 | `MountedComponent`, mounted node variants, built-in executors (renderer partials) | Core | internal |
 | `ComponentHost.RenderAsync(...) → IComponentRenderScope { Tree; Context; DisposeAsync=abort }` | Core | public — T05's decided shape; packages activate → setup-in-scope → prefetch → render-once → abort exactly as `ServerComponentRenderer.cs:30-54` sequences it today |
@@ -337,7 +337,7 @@ generality — the exact opposite of closed-for-modification.
 
 | Content | New home | Note |
 |---|---|---|
-| `PatchFlags`, `SlotFlags`, `ShapeFlags` | Components | frozen layout preserved; `Syntax.Templates` linked-source paths re-pointed, `[RND-FLAGS]` frozen-path clause updated in the same commit |
+| `PatchFlags`, `SlotStability`, `ShapeFlags` | Components | frozen layout preserved; `Syntax.Templates` linked-source paths re-pointed, `[RND-FLAGS]` frozen-path clause updated in the same commit |
 | `NameNormalization` (+ hyphenation pulled from `StyleAndClassNormalization`) | Components | required by the pure `ComponentBindings.Resolve` alias tables |
 | `StyleAndClassNormalization` (value normalization), `DisplayStringFormatter` | Core | consumers (Core, Browser, ServerRenderer) all reference Core |
 | `LooseEquality`, `NumberCoercion` | Browser | sole consumer |

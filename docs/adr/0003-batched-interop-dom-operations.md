@@ -44,7 +44,7 @@ crossings as possible and keep each one cheap.**
   interop between renders.
 - Static content is stringified aggressively and inserted via `innerHTML` (`insertStaticContent`),
   collapsing many node ops into one.
-- The compiler and runtime share the `PatchFlags`/`ShapeFlags`/`SlotFlags` bitmask vocabulary (in
+- The compiler and runtime share the `PatchFlags`/`ShapeFlags`/`SlotStability` bitmask vocabulary (in
   `Assimalign.Viu.Components`); the renderer patches only what the flags mark dynamic, and the block
   tree flattens dynamic nodes so patching skips the static structure.
 - JS-side handles and event listeners are always cleaned up deterministically (two-sided release).
