@@ -17,8 +17,9 @@ fresh source-level audit rather than carrying those stale findings forward.
 
 `frameworks/Assimalign.Viu.App.props` currently places these assemblies in the browser shared
 framework: `Assimalign.Viu.App`, `.Components`, `.Reactivity`, `.State`, `.Core`, and `.Browser`.
-`Assimalign.Viu.Shared` no longer exists. Components, Reactivity, State, Core, and Browser are also
-packable libraries; D2/G1 requires the framework packs to override those same-version package assets.
+The former common-primitives package no longer exists. Components, Reactivity, State, Core, and
+Browser are also packable libraries; D2/G1 requires the framework packs to override those
+same-version package assets.
 
 The Syntax, compiler, UtilityCss, language-service, and language-server assemblies are build/editor
 tooling, not runtime app references. ServerRenderer, Router, Browser.Router, and Testing remain
@@ -187,8 +188,11 @@ the six decisions remains pending:
 
 The work completed in the required order: mechanical/naming changes, behavior/contract changes,
 package-overrides integration and external packaged-consumer proof, D11 closure, then PublicAPI
-baselines. The final warning-as-error solution build, no-build solution tests, PublicAPI analyzer,
-compiled-fixture, repository-state, and D8 scans are recorded in `.hardening/REPORT-item3.md`.
+baselines. The completing change reported its warning-as-error build, solution tests, PublicAPI
+analyzer, compiled-fixture, repository-state, and D8 scans in
+[#318](https://github.com/assimalign/viu/pull/318); the branch-local `.hardening` report was not
+retained in the repository. The 2026-08-08 documentation reconciliation independently reran the
+solution build and test inventory and records the result in [`.docs-reconcile.md`](../.docs-reconcile.md).
 
 D8 is checked after every group: every `InternalsVisibleTo` target must be the owning library's test
 assembly. No production or cross-library grant is acceptable.

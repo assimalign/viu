@@ -829,7 +829,7 @@ old children, and mounts the surplus new children. No key comparison is performe
 
 `[RND-KEY-4]` The longest-increasing-subsequence pass exists to make host moves **minimal**, not
 merely correct: a naive placement pass would move every node after the first reorder. Positions with
-no old counterpart (encoded as `0`) are excluded from the subsequence.
+no matched old position (encoded as `0`) are excluded from the subsequence.
 
 `[RND-KEY-5]` When nothing moved, the subsequence pass is skipped entirely.
 
@@ -1379,9 +1379,10 @@ compatibility", "Generator compatibility contract"; `docs/UTILITY-CSS-DESIGN.md`
 
 ### 10.1 Scoped CSS
 
-`[STY-1]` **Deferred.** Runtime style-scope identifiers are parked until the `[V01.01.15]` arc is
-complete. The adopted `ComponentContract`, `ComponentContext`, `VirtualNode` algebra, host contract,
-server serializer, and generated registration carry no style-scope state or stamping operation.
+`[STY-1]` **Deferred under `[V01.01.06.12]`.** The `[V01.01.15]` arc is complete, but runtime
+style-scope identifiers remain parked. The adopted `ComponentContract`, `ComponentContext`,
+`VirtualNode` algebra, host contract, server serializer, and generated registration carry no
+style-scope state or stamping operation.
 Reintroduction is additive: it MAY add one contract/context value plus compiler, serializer, and host
 emission without changing the four-lifetime model. Until that work lands, this clause imposes no
 runtime scope-identifier requirement.
@@ -1405,7 +1406,7 @@ member name (`$style.a-b` → `$style.a_b`), the same name the emitter writes as
 
 ### 10.3 `v-bind()` in CSS
 
-`[STY-6]` **Deferred with the scoped-CSS feature until the `[V01.01.15]` arc completes.**
+`[STY-6]` **Deferred under `[V01.01.06.12]` after completion of the `[V01.01.15]` arc.**
 `v-bind()` in a style block compiles to a `CssVariables` binding emitted from the generated setup
 path with an explicit `ComponentContext` owner. During the deferral the compiler emits no CSS
 variable application, and the Browser host retains the designed single-element
