@@ -50,8 +50,9 @@ public sealed class ComponentRenderFrame
 
     /// <summary>
     /// Gets the fixed-size per-mount cache used by generated code for cached subtrees and other
-    /// compiler-owned values. A cached static subtree retains reference identity across renders.
-    /// Specified by <c>[SFC-OPT-1]</c>.
+    /// compiler-owned values. A cached static subtree retains description identity across renders
+    /// and MAY be returned at multiple positions; mounted and host state remains occurrence-local.
+    /// Specified by <c>[RND-2]</c>, <c>[RND-4]</c>, and <c>[SFC-OPT-1]</c>.
     /// </summary>
     public object?[] Cache { get; }
 
@@ -75,8 +76,9 @@ public sealed class ComponentRenderFrame
     }
 
     /// <summary>
-    /// Records a direct dynamic descendant in the innermost open block when tracking is enabled.
-    /// Calling this method without an open block is a harmless no-op.
+    /// Appends one direct dynamic occurrence to the innermost open block when tracking is enabled.
+    /// Repeated calls with the same node retain every occurrence in order. Calling this method
+    /// without an open block is a harmless no-op.
     /// </summary>
     /// <param name="node">The non-null node whose bindings or text may change.</param>
     public void Track(VirtualNode node)
@@ -89,10 +91,10 @@ public sealed class ComponentRenderFrame
     }
 
     /// <summary>
-    /// Ends the innermost block and returns an immutable direct-descendant snapshot. An empty
-    /// snapshot means an optimized block with no dynamic descendants; <see langword="null"/>
-    /// means the global tracking depth was suspended. Specified by <c>[RND-BLOCK-2]</c> and
-    /// <c>[RND-BLOCK-3]</c>.
+    /// Ends the innermost block and returns an immutable ordered occurrence snapshot, preserving
+    /// repeated references. An empty snapshot means an optimized block with no dynamic descendants;
+    /// <see langword="null"/> means the global tracking depth was suspended. Specified by
+    /// <c>[RND-BLOCK-2]</c> and <c>[RND-BLOCK-3]</c>.
     /// </summary>
     /// <returns>
     /// The block snapshot, or <see langword="null"/> while global tracking is suspended.

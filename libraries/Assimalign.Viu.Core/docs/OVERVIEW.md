@@ -10,10 +10,11 @@ the operations supplied by a host. Core contains no browser handles or interop [
 
 `Renderer<TNode>` mounts, patches, moves, hydrates, and unmounts the ten closed node variants. Each
 renderer owns its mounted tree and stable `MountedComponentView<TNode>` identities. Element and
-fragment updates consume compiler `RenderPlan` information where available, including the distinct
-`Cached` and `Bail` whole-value paths; keyed children preserve retained host identity and minimize
-moves [RND-1] through [RND-6], [RND-BLOCK-1] through [RND-BLOCK-6], and [RND-KEY-1] through
-[RND-KEY-3].
+fragment blocks retain ordered mounted dynamic-occurrence lists aligned with compiler `RenderPlan`
+information, so aliased immutable descriptions still own distinct mounted and host state. Updates
+also preserve the distinct `Cached` and `Bail` whole-value paths; keyed children retain host identity
+and minimize moves [RND-1] through [RND-6], [RND-BLOCK-1] through [RND-BLOCK-6], and [RND-KEY-1]
+through [RND-KEY-3].
 
 `RendererOptions<TNode>` is the complete host contract. It carries creation, insertion, removal,
 navigation, binding-patch, commit, static-content, teleport-resolution, and hydration-reader

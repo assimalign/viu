@@ -51,6 +51,25 @@ public sealed class ComponentRenderFrameTests
     }
 
     [Fact]
+    public void CloseBlock_RepeatedTrackedReference_PreservesEveryOccurrenceInOrder()
+    {
+        // [RND-BLOCK-1]/[RND-BLOCK-3] The block contract is an occurrence list,
+        // so compiler-cached aliases are never deduplicated by description identity.
+        ComponentRenderFrame frame = new();
+        TextNode cached = new("cached");
+
+        frame.OpenBlock();
+        frame.Track(cached);
+        frame.Track(cached);
+        frame.Track(cached);
+        IReadOnlyList<VirtualNode>? block = frame.CloseBlock();
+
+        block.ShouldNotBeNull();
+        block.Count.ShouldBe(3);
+        block.ShouldAllBe(node => ReferenceEquals(node, cached));
+    }
+
+    [Fact]
     public void CloseBlock_NestedBlocks_EachBlockIsolatesItsOwnDynamicChildren()
     {
         ComponentRenderFrame frame = new();

@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 
-using Assimalign.Viu.Components;
-
 namespace Assimalign.Viu;
 
 internal sealed class MountedTree<TNode>
@@ -10,9 +8,6 @@ internal sealed class MountedTree<TNode>
     internal IApplicationContext? Application;
 
     internal MountedNode<TNode>? Root;
-
-    internal Dictionary<VirtualNode, MountedNode<TNode>> Nodes { get; } =
-        new(ReferenceEqualityComparer.Instance);
 
     internal List<MountedTransition<TNode>> PendingTransitionRemovals { get; } = [];
 }

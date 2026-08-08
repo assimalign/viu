@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
@@ -16,6 +18,8 @@ internal abstract class MountedNode<TNode>
     internal RuntimeComponentContext? Owner;
 
     internal bool IsUnmounted;
+
+    internal List<MountedNode<TNode>>? BlockChildren;
 
     internal abstract TNode FirstHostNode { get; }
 

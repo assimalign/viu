@@ -33,7 +33,9 @@ A `ComponentRenderer` receives its mount's `ComponentRenderFrame` — the per-mo
 and block assembly — so there is no ambient render-helper state and no public static helper
 class; compiled output binds through the frame parameter, never through statics imported by name.
 The frame supports nested/disabled block tracking, compiler-sized cache slots, stable handler caching, and
-memo dependency snapshots; cached static subtrees retain identity for one mount ([SFC-OPT-1]).
+memo dependency snapshots. Block snapshots preserve ordered occurrences, including repeated node
+references; cached static subtrees retain description identity for one mount while every render
+position keeps independent mounted state ([RND-2], [RND-4], [SFC-OPT-1]).
 Code-first components are `ComponentRegistration.Define(name, contract, setup)` wrapping a
 `ComponentSetup` delegate (composition-only per
 [ADR-0004](../../../../docs/adr/0004-composition-only-component-model.md); no options-object

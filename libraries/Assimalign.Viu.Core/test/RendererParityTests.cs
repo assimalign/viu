@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using Shouldly;
 using Xunit;
@@ -187,6 +188,110 @@ public sealed class RendererParityTests
 
         renderer.Render(null, host.Container);
 
+        host.Container.Children.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Render_BlockPatchesAliasedDynamicOccurrences_PositionallyAndUnmountsAll()
+    {
+        // [RND-2]/[RND-4]/[SFC-OPT-1] A v-for-shaped block can retain one cached
+        // description at several positions. Each position owns a distinct mounted host node.
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        var cached = new ElementNode(
+            new QualifiedName("signal"),
+            bindings:
+            [
+                ElementBinding.Attribute(new QualifiedName("data-state"), "cached"),
+            ],
+            renderPlan: new RenderPlan(PatchFlags.Cached));
+        VirtualNode[] previousDynamic = [cached, cached, cached];
+        renderer.Render(
+            RepeatedBlock(previousDynamic, previousDynamic),
+            host.Container);
+        RendererParityNode list = host.Container.Children.ShouldHaveSingleItem();
+        RendererParityNode[] originalSignals = list.Children
+            .Select(row => row.Children.ShouldHaveSingleItem())
+            .ToArray();
+        originalSignals.Distinct().Count().ShouldBe(3);
+        var changedFirst = new ElementNode(
+            new QualifiedName("signal"),
+            bindings:
+            [
+                ElementBinding.Attribute(new QualifiedName("data-state"), "changed"),
+            ],
+            renderPlan: new RenderPlan(PatchFlags.FullProperties));
+        VirtualNode[] nextDynamic = [changedFirst, cached, cached];
+
+        renderer.Render(
+            RepeatedBlock(nextDynamic, nextDynamic),
+            host.Container);
+
+        RendererParityNode[] patchedSignals = list.Children
+            .Select(row => row.Children.ShouldHaveSingleItem())
+            .ToArray();
+        patchedSignals.ShouldBe(originalSignals);
+        patchedSignals[0].Bindings["data-state"].ShouldBe("changed");
+        patchedSignals[1].Bindings["data-state"].ShouldBe("cached");
+        patchedSignals[2].Bindings["data-state"].ShouldBe("cached");
+
+        Renderer<RendererParityNode>.UnmountVisitCount = 0;
+        renderer.Render(null, host.Container);
+
+        host.Container.Children.ShouldBeEmpty();
+        Renderer<RendererParityNode>.UnmountVisitCount.ShouldBe(4);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void Render_BlockMixesTrackedAndUntrackedAlias_FallsBackToOccurrenceDiff(
+        int dynamicIndex)
+    {
+        // [RND-4]/[RND-BLOCK-4] Description identity cannot distinguish a tracked
+        // occurrence from an untracked alias, so either ordering must take the full diff.
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        var cached = new ElementNode(
+            new QualifiedName("signal"),
+            bindings:
+            [
+                ElementBinding.Attribute(new QualifiedName("data-state"), "cached"),
+            ],
+            renderPlan: new RenderPlan(PatchFlags.Cached));
+        VirtualNode[] previousValues = [cached, cached];
+        renderer.Render(
+            RepeatedBlock(previousValues, [cached]),
+            host.Container);
+        RendererParityNode list = host.Container.Children.ShouldHaveSingleItem();
+        RendererParityNode[] originalSignals = list.Children
+            .Select(row => row.Children.ShouldHaveSingleItem())
+            .ToArray();
+        var changed = new ElementNode(
+            new QualifiedName("signal"),
+            bindings:
+            [
+                ElementBinding.Attribute(new QualifiedName("data-state"), "changed"),
+            ],
+            renderPlan: new RenderPlan(PatchFlags.FullProperties));
+        VirtualNode[] nextValues = [cached, cached];
+        nextValues[dynamicIndex] = changed;
+
+        renderer.Render(
+            RepeatedBlock(nextValues, [changed]),
+            host.Container);
+
+        RendererParityNode[] patchedSignals = list.Children
+            .Select(row => row.Children.ShouldHaveSingleItem())
+            .ToArray();
+        patchedSignals.ShouldBe(originalSignals);
+        for (int index = 0; index < patchedSignals.Length; index++)
+        {
+            patchedSignals[index].Bindings["data-state"].ShouldBe(
+                index == dynamicIndex ? "changed" : "cached");
+        }
+
+        renderer.Render(null, host.Container);
         host.Container.Children.ShouldBeEmpty();
     }
 
@@ -512,6 +617,28 @@ public sealed class RendererParityTests
         return new ElementNode(
             new QualifiedName("list"),
             children: children);
+    }
+
+    private static ElementNode RepeatedBlock(
+        IReadOnlyList<VirtualNode> values,
+        IReadOnlyList<VirtualNode> dynamicChildren)
+    {
+        var rows = new List<VirtualNode>(values.Count);
+        for (int index = 0; index < values.Count; index++)
+        {
+            rows.Add(
+                new ElementNode(
+                    new QualifiedName("row"),
+                    children: [values[index]],
+                    key: index));
+        }
+
+        return new ElementNode(
+            new QualifiedName("list"),
+            children: rows,
+            renderPlan: new RenderPlan(
+                PatchFlags.NeedPatch,
+                dynamicChildren: dynamicChildren));
     }
 
     private sealed class RendererViewIdentityComponent : IComponent

@@ -628,20 +628,29 @@ compiler-cached static subtrees MAY retain reference identity across results [SF
 and emits the minimal host operations that reconcile them.
 
 `[RND-2]` The mounted representation is a parallel hierarchy of internal sealed engine types rooted
-per host container. These own host nodes, ranges, anchors, child lists, directive bindings,
-transition state, reference jobs, and links to the prior immutable descriptions. No mounted engine
-type is part of the authoring vocabulary.
+per host container. It is **occurrence-based**: every position in a render result owns distinct
+mounted bookkeeping and host state, even when multiple positions reference the same compiler-cached
+`VirtualNode` description [SFC-OPT-1]. Mounted nodes own host nodes, ranges, anchors, child lists,
+block-local mounted dynamic-occurrence lists, directive bindings, transition state, reference jobs,
+and links to the prior immutable descriptions. No mounted engine type is part of the authoring
+vocabulary.
 
 `[RND-3]` Mounted component bookkeeping additionally owns the activated `IComponent`, its runtime
-`ComponentContext`, reactive render effect, per-mount `ComponentRenderFrame`, and mounted subtree.
-**That state never returns to the immutable authoring model** [CMP-2].
+`ComponentContext`, reactive render effect, per-mount `ComponentRenderFrame`, and mounted subtree. A
+frame cache MAY share one immutable description among positions within that activation, but never
+shares mounted bookkeeping or a host node. **That state never returns to the immutable authoring
+model** [CMP-2].
 
-`[RND-4]` The mounted tree maps each `VirtualNode` description by reference identity to a current
-mounted representative. This map is what makes block patching ([§6.3](#63-the-block-tree)) possible:
-a block root can look up the mounted node for a dynamic descendant without walking the tree to find
-it. When one compiler-cached static description occupies multiple positions, the parallel mounted
-hierarchy remains authoritative for every occurrence and the map retains the most recently registered
-representative; cached static descriptions are not block-dynamic descendants.
+`[RND-4]` Each optimized mounted block owns an ordered list of mounted dynamic occurrences aligned
+one-for-one with its current `RenderPlan.DynamicChildren`. A compatible patch pairs mounted occurrence
+`i` with the next description at `DynamicChildren[i]`; a replacement is written back to both the
+mounted ownership hierarchy and the block-local list. An incompatible shape takes the full-diff path
+and rebuilds the list when the resulting association is unambiguous. When a tracked description is
+also present in untracked positions within the same block scope, description identity cannot identify
+the tracked subset; the block MUST take the full-diff path and keep its mounted occurrence list
+unavailable. `VirtualNode` reference identity is description identity, **not mount
+identity**: repeated references remain distinct mounted occurrences, and no representative selected
+by description identity may drive patching or teardown.
 
 `[RND-5]` `Renderer<TNode>.Render(node, container, application)` mounts on first call and patches
 thereafter. Passing a null `VirtualNode` unmounts the current root and forgets the container. A
@@ -696,7 +705,8 @@ The block tree is the mechanism that turns compile-time knowledge into skipped r
 
 - `PatchFlags` — what may change;
 - `DynamicBindingIndices` — the element-binding indices that may change, or null when unknown; and
-- `DynamicChildren` — the direct dynamic descendants collected for a block root.
+- `DynamicChildren` — the ordered direct dynamic occurrences collected for a block root; repeated
+  references are retained rather than deduplicated.
 
 `RenderPlan.None` is the metadata for hand-authored, unoptimized values and requires the normal full
 diff.
@@ -716,28 +726,35 @@ single most consequential error a producer of this metadata can make.
 its per-mount `ComponentRenderFrame`: `OpenBlock()`, `Track(VirtualNode)`, then `CloseBlock()` to
 obtain the immutable direct-descendant snapshot attached to the block root's `RenderPlan`.
 A separate expression-sequencing token and its helper family do not exist in this contract. `RenderPlan` copies
-its list inputs into read-only snapshots, so attached metadata cannot be mutated.
+its list inputs into read-only snapshots, so attached metadata cannot be mutated. Every `Track` call
+appends one occurrence in order, including repeated calls with the same `VirtualNode` reference.
 
 `[RND-BLOCK-4]` **Block patching is attempted only when the old and new block shapes agree.** The
-renderer requires: both `DynamicChildren` lists non-null, **equal in count**, and every old dynamic
-child still registered in the mounted-tree map. If any condition fails, the renderer MUST fall back
-to a full child diff. A mismatched block shape is a correctness event, never a crash.
+renderer requires both `DynamicChildren` lists to be non-null and **equal in count**, plus an old
+block-local mounted occurrence list of the same count whose entry `i` is live and still linked to old
+`DynamicChildren[i]`. Association MUST be unambiguous: if a tracked description reference also occurs
+outside the tracked list in that block scope, the renderer MUST fall back to a full child diff. If any
+condition fails, the renderer MUST full-diff, then rebuild the mounted occurrence list only when the
+resulting association is unambiguous. A mismatched or ambiguous block shape is a correctness event,
+never a crash.
 
 `[RND-BLOCK-5]` When block patching succeeds, each dynamic descendant is patched **in place, in its
-own host parent**, bypassing the parent children diff. If patching replaces a mounted node (a type
-change), the renderer MUST thread the replacement through the mounted ownership graph so later
-moves and unmounts never retain the removed node.
+own host parent and by occurrence-list index**, bypassing the parent children diff. If patching
+replaces a mounted node (a type change), the renderer MUST thread the replacement through both the
+mounted ownership graph and the block-local occurrence list so later moves and unmounts never retain
+the removed node.
 
-`[RND-BLOCK-6]` **Block-aware teardown.** Unmounting a block visits only its collected dynamic
-descendants. Two cases retain the full walk, because skipping them would leak: non-positive
+`[RND-BLOCK-6]` **Block-aware teardown.** Unmounting a block visits its stored mounted dynamic
+occurrences, preserving distinct visits when descriptions are aliased. Two cases retain the full
+walk, because skipping them would leak: non-positive
 patch-flag trees (`None`, `Cached`, or `Bail`), and fragments that are not `StableFragment` — that is,
 keyed and unkeyed fragment blocks. No unmodeled once-tracking bit participates in this decision.
 
-`[RND-BLOCK-7]` A child skipped by an optimized teardown MUST still be *released*: unregistered from
-the mounted-tree map, marked unmounted, and its pending reference job invalidated. A skipped child
-that is a `ComponentNode` or `TeleportNode`, carries a `MountReference`, a node lifecycle hook, a
-directive binding, or a transition MUST receive a **full unmount visit** instead of a release,
-because those carry external effects.
+`[RND-BLOCK-7]` A child skipped by an optimized teardown MUST still be *released*: its
+occurrence-local mounted bookkeeping is released, it is marked unmounted, and its pending reference
+job is invalidated. A skipped child that is a `ComponentNode` or `TeleportNode`, carries a
+`MountReference`, a node lifecycle hook, a directive binding, or a transition MUST receive a **full
+unmount visit** instead of a release, because those carry external effects.
 
 ### 6.4 Patch dispatch
 
@@ -1212,6 +1229,9 @@ render line, falls back to the generated file.
 
 `[SFC-OPT-1]` A fully static subtree is marked `PatchFlags.Cached` and stored in a
 `ComponentRenderFrame.Cache` slot, so it is created once per mount and reused across every re-render.
+One cached description MAY occupy multiple positions in one render result, including cache access
+inside list generation; only the immutable description is shared, and every position mounts
+independently [RND-2] [RND-4].
 The generated `ComponentContract.RenderCacheSize` carries the exact non-negative slot count,
 including zero, and Core constructs each mount's frame from that value. The legacy contract
 constructor that predates compiler cache-size metadata alone receives a 64-slot compatibility

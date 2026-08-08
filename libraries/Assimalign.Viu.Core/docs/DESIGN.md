@@ -15,8 +15,12 @@ framework's central execution vocabulary. Mounted nodes, activations, built-in s
 
 `Renderer<TNode>` owns one mounted tree and dispatches the ten closed `VirtualNodeKind` variants. It
 never writes host state into a `VirtualNode`. Stable mounted identities hold host handles, ranges,
-parent links, effects, previous descriptions, and built-in execution state (`[CMP-1]` through
-`[CMP-3]`, `[RND-1]`).
+parent links, effects, previous descriptions, and built-in execution state. Every render position
+has its own mounted identity even when positions share an immutable description; optimized blocks
+retain an ordered mounted occurrence list rather than selecting a representative by description
+identity. When a tracked description also occurs in untracked positions, identity cannot select the
+tracked subset and the renderer falls back to the full structural diff (`[CMP-1]` through `[CMP-3]`,
+`[RND-1]` through `[RND-4]`).
 
 Patch behavior is selected from explicit compiler data. Block-local children constrain visits;
 `PatchFlags` choose narrow attribute or text paths; `Cached` reuses a whole value; `Bail` forces full

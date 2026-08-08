@@ -90,7 +90,6 @@ public sealed partial class Renderer<TNode>
                 }
 
                 Unmount(tree, tree.Root, removeHostNodes: true);
-                tree.Nodes.Clear();
                 tree.Root = null;
                 _containerTrees.Remove(container);
             }
@@ -474,7 +473,7 @@ public sealed partial class Renderer<TNode>
             DirectiveHookKind.BeforeUpdate);
 
         bool blockPatched = flags != PatchFlags.Bail
-            && TryPatchBlockChildren(tree, previous, next, mounted.HostNode);
+            && TryPatchBlockChildren(tree, mounted, previous, next, mounted.HostNode);
         bool incompatibleBlock = !blockPatched
             && (previous.RenderPlan.IsBlock || next.RenderPlan.IsBlock);
         if (incompatibleBlock)
@@ -495,7 +494,6 @@ public sealed partial class Renderer<TNode>
             PatchElementAttributes(mounted.HostNode, previous, next);
             PatchElementText(tree, mounted, previous, next);
             CarryForwardStaticChildren(
-                tree,
                 previous.Children,
                 next.Children,
                 mounted.Children);
@@ -554,7 +552,7 @@ public sealed partial class Renderer<TNode>
             && mounted.Children.Count == 1
             && next.Children[0] is TextNode)
         {
-            if (!tree.Nodes.ContainsKey(next.Children[0]))
+            if (!ReferenceEquals(mounted.Children[0].Value, next.Children[0]))
             {
                 mounted.Children[0] = Patch(
                     tree,
@@ -613,7 +611,7 @@ public sealed partial class Renderer<TNode>
         bool blockPatched = flags != PatchFlags.Bail
             && flags != PatchFlags.Cached
             && (flags & PatchFlags.StableFragment) != 0
-            && TryPatchBlockChildren(tree, previous, next, container);
+            && TryPatchBlockChildren(tree, mounted, previous, next, container);
         if (flags != PatchFlags.Cached && !blockPatched)
         {
             mounted.Children = PatchChildren(
@@ -629,7 +627,6 @@ public sealed partial class Renderer<TNode>
         else if (blockPatched)
         {
             CarryForwardStaticChildren(
-                tree,
                 previous.Children,
                 next.Children,
                 mounted.Children);
@@ -924,6 +921,7 @@ public sealed partial class Renderer<TNode>
 
     private bool TryPatchBlockChildren(
         MountedTree<TNode> tree,
+        MountedNode<TNode> block,
         CompositeVirtualNode previous,
         CompositeVirtualNode next,
         TNode fallbackContainer)
@@ -932,22 +930,27 @@ public sealed partial class Renderer<TNode>
         IReadOnlyList<VirtualNode>? nextDynamic = next.RenderPlan.DynamicChildren;
         if (previousDynamic is null
             || nextDynamic is null
-            || previousDynamic.Count != nextDynamic.Count)
+            || previousDynamic.Count != nextDynamic.Count
+            || block.BlockChildren is not { } currentDynamic
+            || currentDynamic.Count != previousDynamic.Count)
         {
             return false;
         }
 
         for (int index = 0; index < previousDynamic.Count; index++)
         {
-            if (!tree.Nodes.ContainsKey(previousDynamic[index]))
+            MountedNode<TNode> current = currentDynamic[index];
+            if (current.IsUnmounted
+                || !ReferenceEquals(current.Value, previousDynamic[index]))
             {
                 return false;
             }
         }
 
+        var nextMounted = new List<MountedNode<TNode>>(nextDynamic.Count);
         for (int index = 0; index < previousDynamic.Count; index++)
         {
-            MountedNode<TNode> current = tree.Nodes[previousDynamic[index]];
+            MountedNode<TNode> current = currentDynamic[index];
             TNode parent = HostParentOrFallback(current.FirstHostNode, fallbackContainer);
             MountedNode<TNode> replacement = Patch(
                 tree,
@@ -956,12 +959,15 @@ public sealed partial class Renderer<TNode>
                 parent,
                 GetNextHostNode(current),
                 current.Owner);
-            if (!ReferenceEquals(current, replacement) && tree.Root is not null)
+            if (!ReferenceEquals(current, replacement))
             {
-                ReplaceMountedNodeReference(tree.Root, current, replacement);
+                ReplaceMountedNodeReference(block, current, replacement);
             }
+
+            nextMounted.Add(replacement);
         }
 
+        block.BlockChildren = nextMounted;
         return true;
     }
 
@@ -1035,7 +1041,6 @@ public sealed partial class Renderer<TNode>
     }
 
     private static void CarryForwardStaticChildren(
-        MountedTree<TNode> tree,
         IReadOnlyList<VirtualNode> previousValues,
         IReadOnlyList<VirtualNode> nextValues,
         IReadOnlyList<MountedNode<TNode>> mountedChildren)
@@ -1051,30 +1056,23 @@ public sealed partial class Renderer<TNode>
             VirtualNode previous = previousValues[index];
             VirtualNode next = nextValues[index];
             MountedNode<TNode> mounted = mountedChildren[index];
-            if (ReferenceEquals(previous, next) || tree.Nodes.ContainsKey(next))
+            if (ReferenceEquals(mounted.Value, next))
             {
                 continue;
             }
 
-            if (!IsSameNodeType(previous, next))
+            if (!ReferenceEquals(mounted.Value, previous)
+                || !IsSameNodeType(previous, next))
             {
                 continue;
-            }
-
-            if (tree.Nodes.TryGetValue(previous, out MountedNode<TNode>? registered)
-                && ReferenceEquals(registered, mounted))
-            {
-                tree.Nodes.Remove(previous);
             }
 
             mounted.Value = next;
-            tree.Nodes[next] = mounted;
             switch (previous, next, mounted)
             {
                 case (ElementNode previousElement, ElementNode nextElement,
                     MountedElement<TNode> element):
                     CarryForwardStaticChildren(
-                        tree,
                         previousElement.Children,
                         nextElement.Children,
                         element.Children);
@@ -1082,7 +1080,6 @@ public sealed partial class Renderer<TNode>
                 case (FragmentNode previousFragment, FragmentNode nextFragment,
                     MountedRange<TNode> fragment):
                     CarryForwardStaticChildren(
-                        tree,
                         previousFragment.Children,
                         nextFragment.Children,
                         fragment.Children);
@@ -1090,12 +1087,13 @@ public sealed partial class Renderer<TNode>
                 case (TeleportNode previousTeleport, TeleportNode nextTeleport,
                     MountedTeleport<TNode> teleport):
                     CarryForwardStaticChildren(
-                        tree,
                         previousTeleport.Children,
                         nextTeleport.Children,
                         teleport.Children);
                     break;
             }
+
+            RefreshBlockChildren(mounted);
         }
     }
 
@@ -1909,25 +1907,37 @@ public sealed partial class Renderer<TNode>
         if (plan.PatchFlags == PatchFlags.Bail
             || (int)plan.PatchFlags <= 0
             || plan.DynamicChildren is null
+            || parent.BlockChildren is not { } dynamicChildren
+            || dynamicChildren.Count != plan.DynamicChildren.Count
             || (parent.Value is FragmentNode
                 && (plan.PatchFlags & PatchFlags.StableFragment) == 0))
         {
             return false;
         }
 
-        HashSet<MountedNode<TNode>> visited = new(ReferenceEqualityComparer.Instance);
-        for (int index = 0; index < plan.DynamicChildren.Count; index++)
+        for (int index = 0; index < dynamicChildren.Count; index++)
         {
-            if (tree.Nodes.TryGetValue(
-                plan.DynamicChildren[index],
-                out MountedNode<TNode>? dynamicMounted)
-                && visited.Add(dynamicMounted))
+            if (dynamicChildren[index].IsUnmounted
+                || !ReferenceEquals(
+                    dynamicChildren[index].Value,
+                    plan.DynamicChildren[index]))
+            {
+                return false;
+            }
+        }
+
+        HashSet<MountedNode<TNode>> visited = new(ReferenceEqualityComparer.Instance);
+        for (int index = 0; index < dynamicChildren.Count; index++)
+        {
+            MountedNode<TNode> dynamicMounted = dynamicChildren[index];
+            if (visited.Add(dynamicMounted))
             {
                 Unmount(tree, dynamicMounted, removeHostNodes);
             }
         }
 
         ReleaseSkippedChildren(tree, children, visited);
+        parent.BlockChildren = null;
         return true;
     }
 
@@ -2187,10 +2197,14 @@ public sealed partial class Renderer<TNode>
         VirtualNode value,
         MountedNode<TNode> mounted)
     {
-        // [RND-4]/[SFC-OPT-1] A cached immutable description may occupy multiple static
-        // positions. The hierarchy owns every mount; this acceleration map retains the most
-        // recently registered representative, matching ReplaceValue and Unregister below.
-        tree.Nodes[value] = mounted;
+        _ = tree;
+        if (!ReferenceEquals(value, mounted.Value))
+        {
+            throw new InvalidOperationException(
+                "A mounted occurrence must register its own immutable description.");
+        }
+
+        RefreshBlockChildren(mounted);
     }
 
     private static void ReplaceValue(
@@ -2198,24 +2212,113 @@ public sealed partial class Renderer<TNode>
         MountedNode<TNode> mounted,
         VirtualNode next)
     {
-        VirtualNode previous = mounted.Value;
-        if (tree.Nodes.TryGetValue(previous, out MountedNode<TNode>? registered)
-            && ReferenceEquals(registered, mounted))
-        {
-            tree.Nodes.Remove(previous);
-        }
-
+        _ = tree;
         mounted.Value = next;
-        tree.Nodes[next] = mounted;
+        RefreshBlockChildren(mounted);
     }
 
     private static void Unregister(MountedTree<TNode> tree, MountedNode<TNode> mounted)
     {
-        if (tree.Nodes.TryGetValue(mounted.Value, out MountedNode<TNode>? registered)
-            && ReferenceEquals(registered, mounted))
+        _ = tree;
+        mounted.BlockChildren = null;
+    }
+
+    private static void RefreshBlockChildren(MountedNode<TNode> mounted)
+    {
+        if (mounted.Value is not CompositeVirtualNode composite
+            || composite.RenderPlan.DynamicChildren is not { } dynamicValues
+            || OwnedChildren(mounted) is not { } children)
         {
-            tree.Nodes.Remove(mounted.Value);
+            mounted.BlockChildren = null;
+            return;
         }
+
+        if (dynamicValues.Count == 0)
+        {
+            mounted.BlockChildren = [];
+            return;
+        }
+
+        var occurrences = new Dictionary<VirtualNode, Queue<MountedNode<TNode>>>(
+            ReferenceEqualityComparer.Instance);
+        for (int index = 0; index < children.Count; index++)
+        {
+            CollectBlockOccurrences(children[index], occurrences);
+        }
+
+        var dynamicCounts = new Dictionary<VirtualNode, int>(
+            ReferenceEqualityComparer.Instance);
+        for (int index = 0; index < dynamicValues.Count; index++)
+        {
+            VirtualNode dynamicValue = dynamicValues[index];
+            dynamicCounts.TryGetValue(dynamicValue, out int count);
+            dynamicCounts[dynamicValue] = count + 1;
+        }
+
+        foreach ((VirtualNode dynamicValue, int count) in dynamicCounts)
+        {
+            if (!occurrences.TryGetValue(
+                    dynamicValue,
+                    out Queue<MountedNode<TNode>>? candidates)
+                || candidates.Count != count)
+            {
+                // [RND-BLOCK-4] Description identity cannot identify which occurrences are
+                // dynamic when the same description also occurs outside the tracked list.
+                mounted.BlockChildren = null;
+                return;
+            }
+        }
+
+        var blockChildren = new List<MountedNode<TNode>>(dynamicValues.Count);
+        for (int index = 0; index < dynamicValues.Count; index++)
+        {
+            if (!occurrences.TryGetValue(
+                    dynamicValues[index],
+                    out Queue<MountedNode<TNode>>? candidates)
+                || candidates.Count == 0)
+            {
+                mounted.BlockChildren = null;
+                return;
+            }
+
+            blockChildren.Add(candidates.Dequeue());
+        }
+
+        mounted.BlockChildren = blockChildren;
+    }
+
+    private static IReadOnlyList<MountedNode<TNode>>? OwnedChildren(
+        MountedNode<TNode> mounted) =>
+        mounted switch
+        {
+            MountedElement<TNode> element => element.Children,
+            MountedRange<TNode> range when range.Value is FragmentNode => range.Children,
+            MountedTeleport<TNode> teleport => teleport.Children,
+            _ => null,
+        };
+
+    private static void CollectBlockOccurrences(
+        MountedNode<TNode> mounted,
+        Dictionary<VirtualNode, Queue<MountedNode<TNode>>> occurrences)
+    {
+        if (!mounted.Value.RenderPlan.IsBlock
+            && OwnedChildren(mounted) is { } children)
+        {
+            for (int index = 0; index < children.Count; index++)
+            {
+                CollectBlockOccurrences(children[index], occurrences);
+            }
+        }
+
+        if (!occurrences.TryGetValue(
+                mounted.Value,
+                out Queue<MountedNode<TNode>>? candidates))
+        {
+            candidates = new Queue<MountedNode<TNode>>();
+            occurrences.Add(mounted.Value, candidates);
+        }
+
+        candidates.Enqueue(mounted);
     }
 
     private static bool HasHostNode(TNode? node) =>

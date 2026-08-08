@@ -83,6 +83,7 @@ internal sealed class CompiledFixtureAssembly
             "MixedAuthoring.viu",
             "RouterOutletShell.viu",
             "RouterFirstView.viu",
+            "RouterAliasedSlotHost.viu",
             "RouterRepeatedStaticView.viu",
             "VueProbe.vue",
         ];

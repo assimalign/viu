@@ -20,8 +20,8 @@ public sealed class RenderPlan
     /// <param name="patchFlags">The categories that may change.</param>
     /// <param name="dynamicBindingIndices">The binding indices that may change, or null when unknown.</param>
     /// <param name="dynamicChildren">
-    /// The direct dynamic descendants, an empty collection for a static block, or null when this is
-    /// not a compatible compiler block.
+    /// The ordered direct dynamic occurrences, including repeated references, an empty collection
+    /// for a static block, or null when this is not a compatible compiler block.
     /// </param>
     public RenderPlan(
         PatchFlags patchFlags = PatchFlags.None,
@@ -60,8 +60,8 @@ public sealed class RenderPlan
     public IReadOnlyList<int>? DynamicBindingIndices { get; }
 
     /// <summary>
-    /// Gets direct dynamic descendants, an empty collection for a static block, or null when this
-    /// node does not carry compatible block metadata.
+    /// Gets ordered direct dynamic occurrences, preserving repeated references; an empty collection
+    /// denotes a static block and null denotes a node without compatible block metadata.
     /// </summary>
     public IReadOnlyList<VirtualNode>? DynamicChildren { get; }
 

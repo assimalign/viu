@@ -37,8 +37,6 @@ public sealed partial class Renderer<TNode>
             hasTarget: false,
             [],
             owner);
-        Register(tree, value, mounted);
-
         if (value.IsDisabled)
         {
             mounted.Children = MountChildren(
@@ -72,6 +70,7 @@ public sealed partial class Renderer<TNode>
             mounted.ChildrenMounted = true;
         }
 
+        Register(tree, value, mounted);
         return mounted;
     }
 
@@ -83,7 +82,6 @@ public sealed partial class Renderer<TNode>
     {
         TeleportNode previous = (TeleportNode)mounted.Value;
         CancelDeferredTeleport(mounted);
-        ReplaceValue(tree, mounted, next);
         bool canReuseDeferredTarget = next.IsDeferred
             && mounted.HasTarget
             && string.Equals(
@@ -133,6 +131,7 @@ public sealed partial class Renderer<TNode>
                     moveChildrenToTarget: false);
             }
 
+            ReplaceValue(tree, mounted, next);
             return;
         }
 
@@ -158,6 +157,7 @@ public sealed partial class Renderer<TNode>
             }
 
             QueueDeferredTeleportMount(tree, mounted, originContainer);
+            ReplaceValue(tree, mounted, next);
             return;
         }
 
@@ -175,6 +175,7 @@ public sealed partial class Renderer<TNode>
                 mounted.ChildrenMounted = false;
             }
 
+            ReplaceValue(tree, mounted, next);
             return;
         }
 
@@ -204,6 +205,8 @@ public sealed partial class Renderer<TNode>
                 mounted.Owner);
             mounted.ChildrenMounted = true;
         }
+
+        ReplaceValue(tree, mounted, next);
     }
 
     private void PatchTeleportChildren(
@@ -219,7 +222,7 @@ public sealed partial class Renderer<TNode>
         PatchFlags flags = next.RenderPlan.PatchFlags;
         bool blockPatched = flags != PatchFlags.Bail
             && flags != PatchFlags.Cached
-            && TryPatchBlockChildren(tree, previous, next, container);
+            && TryPatchBlockChildren(tree, mounted, previous, next, container);
         if (flags != PatchFlags.Cached && !blockPatched)
         {
             mounted.Children = PatchChildren(
@@ -235,7 +238,6 @@ public sealed partial class Renderer<TNode>
         else if (blockPatched)
         {
             CarryForwardStaticChildren(
-                tree,
                 previousChildren,
                 nextChildren,
                 mounted.Children);
@@ -271,6 +273,7 @@ public sealed partial class Renderer<TNode>
                         UnmountChildren(tree, mounted.Children, removeHostNodes: true);
                         mounted.Children.Clear();
                         mounted.ChildrenMounted = false;
+                        RefreshBlockChildren(mounted);
                     }
 
                     return;
@@ -285,6 +288,7 @@ public sealed partial class Renderer<TNode>
                         mounted.TargetAnchor,
                         mounted.Owner);
                     mounted.ChildrenMounted = true;
+                    RefreshBlockChildren(mounted);
                 }
 
                 NormalizeTeleportTargetOrder(tree);

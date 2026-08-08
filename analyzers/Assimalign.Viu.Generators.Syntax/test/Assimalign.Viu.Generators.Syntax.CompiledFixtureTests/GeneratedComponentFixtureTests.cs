@@ -245,9 +245,9 @@ public sealed class GeneratedComponentFixtureTests
     [Fact]
     public async Task RouterOutlet_NavigationSwapsGeneratedViewsWithRepeatedCachedStaticChildren()
     {
-        // [RND-1]/[RND-4]/[SFC-OPT-1] A static child cached inside v-for is one
-        // VirtualNode instance presented at every repeated position. Routing must still replace
-        // the previous generated component and mount one distinct host node per position.
+        // [RND-2]/[RND-4]/[SFC-OPT-1] Each generated row passes one cached static slot
+        // description to two tracked slot outlets. The transition-wrapped route swap must retain
+        // two distinct mounted occurrences per row through the mounted-triggered update.
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
         ComponentFactory factory = CreateFactory(fixtures);
         RegisterRouterView(factory);
@@ -288,11 +288,29 @@ public sealed class GeneratedComponentFixtureTests
             .ToArray();
         mountedNames.ShouldNotContain("RouterFirstView");
         mountedNames.ShouldContain("RouterRepeatedStaticView");
+        MountedComponentView<CompiledFixtureNode> repeatedMounted = renderer
+            .GetMountedComponentViews(host.Container)
+            .Single(view => string.Equals(
+                view.Instance.GetType().Name,
+                "RouterRepeatedStaticView",
+                StringComparison.Ordinal));
+        MountedComponentView<CompiledFixtureNode>[] aliasedHosts = renderer
+            .GetMountedComponentViews(host.Container)
+            .Where(view => string.Equals(
+                view.Instance.GetType().Name,
+                "RouterAliasedSlotHost",
+                StringComparison.Ordinal))
+            .ToArray();
+        aliasedHosts.Length.ShouldBe(3);
         host.FindElements("li").Count.ShouldBe(3);
         IReadOnlyList<CompiledFixtureNode> repeatedSpans = host.FindElements("span");
         repeatedSpans.Count.ShouldBe(3);
         repeatedSpans.ShouldAllBe(
             span => Equals(span.Bindings["class"], "signal-dot"));
+        IReadOnlyList<CompiledFixtureNode> replacements = host.FindElements("strong");
+        replacements.Count.ShouldBe(3);
+        replacements.ShouldAllBe(
+            strong => Equals(strong.Bindings["class"], "replacement"));
         host.Container.DescendantText.ShouldContain("reference:tracked");
         host.Container.DescendantText.ShouldContain("computed:cached");
         host.Container.DescendantText.ShouldContain("effect:scheduled");
@@ -301,8 +319,23 @@ public sealed class GeneratedComponentFixtureTests
                 "RouterRepeatedStaticView.SingleFileComponent.g.cs",
                 StringComparison.Ordinal))
             .Value;
-        repeatedGenerated.ShouldContain("frame.GetOrAddCache<");
+        repeatedGenerated.ShouldContain(
+            "frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>");
         repeatedGenerated.ShouldContain("\"signal-dot\"");
+        string hostGenerated = fixtures.GeneratedSources
+            .Single(pair => pair.Key.EndsWith(
+                "RouterAliasedSlotHost.SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .Value;
+        Regex.Matches(hostGenerated, @"frame\.Track\(slotNode\d+\)").Count.ShouldBe(2);
+
+        (await router.PushAsync("/first")).ShouldBeNull();
+        host.RunScheduledFlushes();
+
+        repeatedMounted.IsMounted.ShouldBeFalse();
+        aliasedHosts.ShouldAllBe(view => !view.IsMounted);
+        host.FindElements("li").ShouldBeEmpty();
+        host.Container.DescendantText.ShouldContain("first compiled route");
 
         renderer.Render(null, host.Container);
     }

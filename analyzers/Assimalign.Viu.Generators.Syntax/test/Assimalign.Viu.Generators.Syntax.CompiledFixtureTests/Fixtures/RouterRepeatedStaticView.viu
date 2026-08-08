@@ -2,7 +2,14 @@
 <section class="compiled-repeated-route">
   <ol>
     <li v-for="signal in Signals" :key="signal">
-      <span class="signal-dot" aria-hidden="true"></span>
+      <RouterAliasedSlotHost>
+        <template #default>
+          <span class="signal-dot" aria-hidden="true"></span>
+        </template>
+        <template #replacement>
+          <strong class="replacement">updated</strong>
+        </template>
+      </RouterAliasedSlotHost>
       <code>{{ signal }}</code>
     </li>
   </ol>

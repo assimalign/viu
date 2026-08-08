@@ -1,9 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
 
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Testing;
 
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
@@ -15,6 +18,75 @@ namespace Assimalign.Viu.Router.Tests;
 // [RTR-7].
 public sealed class RouterTestingHostIntegrationTests
 {
+    [Fact]
+    public async Task Navigate_TransitionWrappedAliasedBlock_PatchesEveryOccurrenceAndSwapsViews()
+    {
+        ComponentRegistration firstRegistration = new(
+            ComponentReference.ForType(typeof(FirstRouteView)),
+            new ComponentContract(displayName: nameof(FirstRouteView)),
+            static _ => new FirstRouteView());
+        ComponentRegistration repeatedRegistration = new(
+            ComponentReference.ForType(typeof(TransitionRepeatedRouteView)),
+            new ComponentContract(
+                renderCacheSize: 1,
+                displayName: nameof(TransitionRepeatedRouteView)),
+            static _ => new TransitionRepeatedRouteView());
+        Router router = new(
+            RouterHistory.CreateMemory(),
+            [
+                new RouteRecord(
+                    "/first",
+                    component: new ComponentNode(firstRegistration.Reference)),
+                new RouteRecord(
+                    "/repeated",
+                    component: new ComponentNode(repeatedRegistration.Reference)),
+            ]);
+        (await router.PushAsync("/first")).ShouldBeNull();
+        var shell = new TransitionRouterShell(router);
+        using ComponentWrapper wrapper = ComponentTest.Mount(
+            shell,
+            OptionsForRegistrations(
+                router,
+                firstRegistration,
+                repeatedRegistration));
+        ComponentWrapper firstWrapper = wrapper.GetComponent<FirstRouteView>();
+        FirstRouteView firstInstance = firstWrapper.Instance.ShouldBeOfType<FirstRouteView>();
+        await wrapper.NextTickAsync();
+        shell.TransitionCalls.Clear();
+
+        (await router.PushAsync("/repeated")).ShouldBeNull();
+        await wrapper.NextTickAsync();
+
+        firstWrapper.Exists().ShouldBeFalse();
+        firstInstance.UnmountCount.ShouldBe(1);
+        ComponentWrapper repeatedWrapper =
+            wrapper.GetComponent<TransitionRepeatedRouteView>();
+        TransitionRepeatedRouteView repeatedInstance = repeatedWrapper.Instance
+            .ShouldBeOfType<TransitionRepeatedRouteView>();
+        IReadOnlyList<ElementWrapper> signals = wrapper.FindAll("signal");
+        signals.Count.ShouldBe(3);
+        signals[0].Attribute("data-state").ShouldBe("changed");
+        signals[1].Attribute("data-state").ShouldBe("cached");
+        signals[2].Attribute("data-state").ShouldBe("cached");
+        shell.TransitionCalls.ShouldBe(
+        [
+            "beforeLeave",
+            "leave",
+            "afterLeave",
+            "beforeEnter",
+            "enter",
+            "afterEnter",
+        ]);
+
+        (await router.PushAsync("/first")).ShouldBeNull();
+        await wrapper.NextTickAsync();
+
+        repeatedWrapper.Exists().ShouldBeFalse();
+        repeatedInstance.UnmountCount.ShouldBe(1);
+        wrapper.FindAll("signal").ShouldBeEmpty();
+        wrapper.GetComponent<FirstRouteView>().Exists().ShouldBeTrue();
+    }
+
     [Fact]
     public async Task Navigate_DistinctRouteViewComponentsWithRepeatedCachedNode_UnmountsPreviousAndMountsNext()
     {
@@ -173,6 +245,101 @@ public sealed class RouterTestingHostIntegrationTests
                         Element("li", children: [cachedDot]),
                         Element("li", children: [cachedDot]),
                     ]);
+            };
+        }
+    }
+
+    private sealed class TransitionRouterShell : IComponent
+    {
+        private readonly Router _router;
+
+        internal TransitionRouterShell(Router router)
+        {
+            _router = router;
+        }
+
+        internal List<string> TransitionCalls { get; } = [];
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return _ =>
+            {
+                string path = _router.CurrentRoute.Value.Path;
+                var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    [TransitionProperties.ResolvedArgument] = new TransitionProperties
+                    {
+                        Mode = "out-in",
+                        OnBeforeEnter = _ => TransitionCalls.Add("beforeEnter"),
+                        OnEnter = (_, complete) =>
+                        {
+                            TransitionCalls.Add("enter");
+                            complete();
+                        },
+                        OnAfterEnter = _ => TransitionCalls.Add("afterEnter"),
+                        OnBeforeLeave = _ => TransitionCalls.Add("beforeLeave"),
+                        OnLeave = (_, complete) =>
+                        {
+                            TransitionCalls.Add("leave");
+                            complete();
+                        },
+                        OnAfterLeave = _ => TransitionCalls.Add("afterLeave"),
+                    },
+                };
+                var slots = new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+                {
+                    ["default"] = _ => new ElementNode(
+                        new QualifiedName("section"),
+                        children: [new ComponentNode(RouterView.Registration.Reference)],
+                        key: path),
+                };
+                return new TransitionNode(new ComponentInvocation(arguments, slots));
+            };
+        }
+    }
+
+    private sealed class TransitionRepeatedRouteView : IComponent
+    {
+        private readonly Reference<bool> _replaceFirst = Reactive.Reference(false);
+
+        internal int UnmountCount { get; private set; }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            context.Lifecycle.OnMounted(() => _replaceFirst.Value = true);
+            context.Lifecycle.OnUnmounted(() => UnmountCount++);
+            return frame =>
+            {
+                ElementNode cached = frame.GetOrAddCache(
+                    0,
+                    static () => new ElementNode(
+                        new QualifiedName("signal"),
+                        bindings: Attributes(("data-state", "cached")),
+                        renderPlan: new RenderPlan(PatchFlags.Cached)));
+                VirtualNode first = _replaceFirst.Value
+                    ? new ElementNode(
+                        new QualifiedName("signal"),
+                        bindings: Attributes(("data-state", "changed")),
+                        renderPlan: new RenderPlan(PatchFlags.FullProperties))
+                    : cached;
+                VirtualNode[] signals = [first, cached, cached];
+                var rows = new List<VirtualNode>(signals.Length);
+                for (int index = 0; index < signals.Length; index++)
+                {
+                    rows.Add(
+                        new ElementNode(
+                            new QualifiedName("row"),
+                            children: [signals[index]],
+                            key: index));
+                }
+
+                return new ElementNode(
+                    new QualifiedName("list"),
+                    children: rows,
+                    renderPlan: new RenderPlan(
+                        PatchFlags.NeedPatch,
+                        dynamicChildren: signals));
             };
         }
     }
