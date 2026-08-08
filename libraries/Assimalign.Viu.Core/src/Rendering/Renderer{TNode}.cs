@@ -2187,7 +2187,10 @@ public sealed partial class Renderer<TNode>
         VirtualNode value,
         MountedNode<TNode> mounted)
     {
-        tree.Nodes.Add(value, mounted);
+        // [RND-4]/[SFC-OPT-1] A cached immutable description may occupy multiple static
+        // positions. The hierarchy owns every mount; this acceleration map retains the most
+        // recently registered representative, matching ReplaceValue and Unregister below.
+        tree.Nodes[value] = mounted;
     }
 
     private static void ReplaceValue(

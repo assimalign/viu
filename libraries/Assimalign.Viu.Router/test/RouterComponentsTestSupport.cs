@@ -19,6 +19,15 @@ internal static class RouterComponentsTestSupport
         return ComponentTest.Mount(RouterView.Registration, OptionsFor(router, components));
     }
 
+    public static ComponentWrapper MountRegisteredView(
+        Router router,
+        params ComponentRegistration[] registrations)
+    {
+        return ComponentTest.Mount(
+            RouterView.Registration,
+            OptionsForRegistrations(router, registrations));
+    }
+
     public static ComponentWrapper MountLink(
         Router router,
         IReadOnlyDictionary<string, object?> arguments,
@@ -34,12 +43,25 @@ internal static class RouterComponentsTestSupport
         Router router,
         params TrackingComponent[] components)
     {
+        ComponentRegistration[] registrations = new ComponentRegistration[components.Length];
+        for (int index = 0; index < components.Length; index++)
+        {
+            registrations[index] = components[index].Registration;
+        }
+
+        return OptionsForRegistrations(router, registrations);
+    }
+
+    public static ComponentMountOptions OptionsForRegistrations(
+        Router router,
+        params ComponentRegistration[] registrations)
+    {
         ComponentFactory componentFactory = new();
         componentFactory.Register(RouterView.Registration);
         componentFactory.Register(RouterLink.Registration);
-        for (int index = 0; index < components.Length; index++)
+        for (int index = 0; index < registrations.Length; index++)
         {
-            componentFactory.Register(components[index].Registration);
+            componentFactory.Register(registrations[index]);
         }
 
         return new ComponentMountOptions

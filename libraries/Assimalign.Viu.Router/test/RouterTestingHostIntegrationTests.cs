@@ -4,6 +4,7 @@ using Shouldly;
 using Xunit;
 
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Testing;
 
 using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 
@@ -14,6 +15,63 @@ namespace Assimalign.Viu.Router.Tests;
 // [RTR-7].
 public sealed class RouterTestingHostIntegrationTests
 {
+    [Fact]
+    public async Task Navigate_DistinctRouteViewComponentsWithRepeatedCachedNode_UnmountsPreviousAndMountsNext()
+    {
+        ComponentRegistration firstRegistration = new(
+            ComponentReference.ForType(typeof(FirstRouteView)),
+            new ComponentContract(
+                renderCacheSize: 0,
+                displayName: nameof(FirstRouteView)),
+            static _ => new FirstRouteView());
+        ComponentRegistration repeatedRegistration = new(
+            ComponentReference.ForType(typeof(RepeatedCachedRouteView)),
+            new ComponentContract(
+                renderCacheSize: 1,
+                displayName: nameof(RepeatedCachedRouteView)),
+            static _ => new RepeatedCachedRouteView());
+        Router router = new(
+            RouterHistory.CreateMemory(),
+            [
+                new RouteRecord(
+                    "/first",
+                    component: new ComponentNode(firstRegistration.Reference)),
+                new RouteRecord(
+                    "/repeated",
+                    component: new ComponentNode(repeatedRegistration.Reference)),
+            ]);
+
+        (await router.PushAsync("/first")).ShouldBeNull();
+        using ComponentWrapper wrapper = MountRegisteredView(
+            router,
+            firstRegistration,
+            repeatedRegistration);
+        ComponentWrapper firstWrapper = wrapper.GetComponent<FirstRouteView>();
+        FirstRouteView firstInstance = firstWrapper.Instance.ShouldBeOfType<FirstRouteView>();
+        firstWrapper.Exists().ShouldBeTrue();
+        wrapper.FindComponent<RepeatedCachedRouteView>().ShouldBeNull();
+        wrapper.Html().ShouldBe(
+            "<section class=\"first-route\">first</section>");
+
+        (await router.PushAsync("/repeated")).ShouldBeNull();
+        await wrapper.NextTickAsync();
+
+        firstWrapper.Exists().ShouldBeFalse();
+        firstWrapper.Html().ShouldBeEmpty();
+        firstInstance.UnmountCount.ShouldBe(1);
+        wrapper.FindComponent<FirstRouteView>().ShouldBeNull();
+        ComponentWrapper repeatedWrapper =
+            wrapper.GetComponent<RepeatedCachedRouteView>();
+        repeatedWrapper.Exists().ShouldBeTrue();
+        repeatedWrapper.Context.ShouldNotBeSameAs(firstWrapper.Context);
+        repeatedWrapper.Instance.ShouldBeOfType<RepeatedCachedRouteView>()
+            .SetupCount.ShouldBe(1);
+        wrapper.Html().ShouldBe(
+            "<ul class=\"repeated-route\"><li><span class=\"signal-dot\"></span></li>" +
+            "<li><span class=\"signal-dot\"></span></li>" +
+            "<li><span class=\"signal-dot\"></span></li></ul>");
+    }
+
     [Fact]
     public async Task Navigate_BlockAllowRedirect_NestedDepthAndKeys_ComposeEndToEnd()
     {
@@ -74,5 +132,48 @@ public sealed class RouterTestingHostIntegrationTests
         layout.IsUnmounted.ShouldBeTrue();
         detail.IsUnmounted.ShouldBeTrue();
         allowed.SetupCount.ShouldBe(1);
+    }
+
+    private sealed class FirstRouteView : IComponent
+    {
+        internal int UnmountCount { get; private set; }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            context.Lifecycle.OnUnmounted(() => UnmountCount++);
+            return static _ => Element(
+                "section",
+                Attributes(("class", "first-route")),
+                [Text("first")]);
+        }
+    }
+
+    private sealed class RepeatedCachedRouteView : IComponent
+    {
+        internal int SetupCount { get; private set; }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            SetupCount++;
+            return frame =>
+            {
+                // [V01.01.15.02]/[SFC-OPT-1]: generated v-for output can present one cached
+                // immutable static node in several live positions during one component mount.
+                ElementNode cachedDot = frame.GetOrAddCache(
+                    0,
+                    static () => new ElementNode(
+                        new QualifiedName("span"),
+                        bindings: Attributes(("class", "signal-dot")),
+                        renderPlan: new RenderPlan(PatchFlags.Cached)));
+                return Element(
+                    "ul",
+                    Attributes(("class", "repeated-route")),
+                    [
+                        Element("li", children: [cachedDot]),
+                        Element("li", children: [cachedDot]),
+                        Element("li", children: [cachedDot]),
+                    ]);
+            };
+        }
     }
 }

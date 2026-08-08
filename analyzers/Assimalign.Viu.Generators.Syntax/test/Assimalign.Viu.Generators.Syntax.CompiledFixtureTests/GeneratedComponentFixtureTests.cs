@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
@@ -11,6 +12,9 @@ using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.Router;
+
+using ViuRouter = Assimalign.Viu.Router.Router;
 
 namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 
@@ -239,6 +243,71 @@ public sealed class GeneratedComponentFixtureTests
     }
 
     [Fact]
+    public async Task RouterOutlet_NavigationSwapsGeneratedViewsWithRepeatedCachedStaticChildren()
+    {
+        // [RND-1]/[RND-4]/[SFC-OPT-1] A static child cached inside v-for is one
+        // VirtualNode instance presented at every repeated position. Routing must still replace
+        // the previous generated component and mount one distinct host node per position.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        RegisterRouterView(factory);
+        ComponentNode firstRoute = new(ComponentReference.ForName("RouterFirstView"));
+        ComponentNode repeatedRoute = new(
+            ComponentReference.ForName("RouterRepeatedStaticView"));
+        using var router = new ViuRouter(
+            RouterHistory.CreateMemory(),
+            [
+                new RouteRecord("/first", component: firstRoute),
+                new RouteRecord("/repeated", component: repeatedRoute),
+            ]);
+        (await router.PushAsync("/first")).ShouldBeNull();
+        ComponentNode root = new(ComponentReference.ForName("RouterOutletShell"));
+        ApplicationContext application = CreateApplication(
+            root,
+            factory,
+            new RouterServiceProvider(router));
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+
+        renderer.Render(root, host.Container, application);
+        host.RunScheduledFlushes();
+        MountedComponentView<CompiledFixtureNode> firstMounted = renderer
+            .GetMountedComponentViews(host.Container)
+            .Single(view => string.Equals(
+                view.Instance.GetType().Name,
+                "RouterFirstView",
+                StringComparison.Ordinal));
+        host.Container.DescendantText.ShouldContain("first compiled route");
+
+        (await router.PushAsync("/repeated")).ShouldBeNull();
+        host.RunScheduledFlushes();
+
+        firstMounted.IsMounted.ShouldBeFalse();
+        string[] mountedNames = renderer.GetMountedComponentViews(host.Container)
+            .Select(view => view.Instance.GetType().Name)
+            .ToArray();
+        mountedNames.ShouldNotContain("RouterFirstView");
+        mountedNames.ShouldContain("RouterRepeatedStaticView");
+        host.FindElements("li").Count.ShouldBe(3);
+        IReadOnlyList<CompiledFixtureNode> repeatedSpans = host.FindElements("span");
+        repeatedSpans.Count.ShouldBe(3);
+        repeatedSpans.ShouldAllBe(
+            span => Equals(span.Bindings["class"], "signal-dot"));
+        host.Container.DescendantText.ShouldContain("reference:tracked");
+        host.Container.DescendantText.ShouldContain("computed:cached");
+        host.Container.DescendantText.ShouldContain("effect:scheduled");
+        string repeatedGenerated = fixtures.GeneratedSources
+            .Single(pair => pair.Key.EndsWith(
+                "RouterRepeatedStaticView.SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .Value;
+        repeatedGenerated.ShouldContain("frame.GetOrAddCache<");
+        repeatedGenerated.ShouldContain("\"signal-dot\"");
+
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
     public void PatchProbe_PreservesIfForKeyedMovesAndMemoSemantics()
     {
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
@@ -388,9 +457,20 @@ public sealed class GeneratedComponentFixtureTests
         return factory;
     }
 
+    private static void RegisterRouterView(ComponentFactory factory)
+    {
+        factory.Register(RouterView.Registration);
+        factory.Register(
+            new ComponentRegistration(
+                ComponentReference.ForName("RouterView"),
+                RouterView.Registration.Contract,
+                RouterView.Registration.Activator));
+    }
+
     private static ApplicationContext CreateApplication(
         ComponentNode root,
-        ComponentFactory factory)
+        ComponentFactory factory,
+        IServiceProvider? services = null)
     {
         var directives = new DirectiveRegistry(
         [
@@ -416,6 +496,7 @@ public sealed class GeneratedComponentFixtureTests
                 RootComponent = root,
                 Components = factory,
                 Directives = directives,
+                Services = services,
                 WarnHandler = warning => throw new InvalidOperationException(warning),
             });
     }
@@ -483,4 +564,17 @@ public sealed class GeneratedComponentFixtureTests
         componentType.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
             .Single(type => type.Name.Contains(category, StringComparison.Ordinal)
                 && type.Name.Contains("Marker", StringComparison.Ordinal));
+
+    private sealed class RouterServiceProvider : IServiceProvider
+    {
+        private readonly ViuRouter _router;
+
+        internal RouterServiceProvider(ViuRouter router)
+        {
+            _router = router;
+        }
+
+        public object? GetService(Type serviceType) =>
+            serviceType == typeof(ViuRouter) ? _router : null;
+    }
 }

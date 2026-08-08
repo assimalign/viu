@@ -148,6 +148,49 @@ public sealed class RendererParityTests
     }
 
     [Fact]
+    public void Render_BlockAddsSecondCachedNodePosition_PreservesBothMountedHostNodes()
+    {
+        // [RND-1]/[RND-4]/[SFC-OPT-1] One compiler-cached description may retain reference
+        // identity when a block update presents it at an additional static position.
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        var cached = new ElementNode(
+            new QualifiedName("cached"),
+            bindings:
+            [
+                ElementBinding.Attribute(new QualifiedName("data-static"), "yes"),
+            ],
+            renderPlan: new RenderPlan(PatchFlags.Cached));
+        ElementNode previousBranch = Element("branch", cached);
+        renderer.Render(
+            Element(
+                "root",
+                new RenderPlan(PatchFlags.NeedPatch, dynamicChildren: [previousBranch]),
+                previousBranch),
+            host.Container);
+        ElementNode nextBranch = Element("branch", cached, cached);
+
+        renderer.Render(
+            Element(
+                "root",
+                new RenderPlan(PatchFlags.NeedPatch, dynamicChildren: [nextBranch]),
+                nextBranch),
+            host.Container);
+
+        RendererParityNode root = host.Container.Children.ShouldHaveSingleItem();
+        RendererParityNode branch = root.Children.ShouldHaveSingleItem();
+        branch.Children.Count.ShouldBe(2);
+        branch.Children[0].Description.ShouldBe("cached");
+        branch.Children[1].Description.ShouldBe("cached");
+        branch.Children[0].Bindings["data-static"].ShouldBe("yes");
+        branch.Children[1].Bindings["data-static"].ShouldBe("yes");
+
+        renderer.Render(null, host.Container);
+
+        host.Container.Children.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Render_BailWholeValue_UsesFullDiffDespiteBlockMetadata()
     {
         using var host = new RendererParityHost();

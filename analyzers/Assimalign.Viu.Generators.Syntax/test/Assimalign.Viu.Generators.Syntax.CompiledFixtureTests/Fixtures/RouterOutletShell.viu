@@ -1,0 +1,8 @@
+<template>
+<main class="compiled-router-outlet">
+  <RouterView />
+</main>
+</template>
+
+@script {
+}

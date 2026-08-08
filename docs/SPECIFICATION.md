@@ -636,9 +636,12 @@ type is part of the authoring vocabulary.
 `ComponentContext`, reactive render effect, per-mount `ComponentRenderFrame`, and mounted subtree.
 **That state never returns to the immutable authoring model** [CMP-2].
 
-`[RND-4]` The mounted tree maps each `VirtualNode` description to its mounted bookkeeping by
-reference identity. This map is what makes block patching ([§6.3](#63-the-block-tree)) possible: a
-block root can look up the mounted node for a dynamic descendant without walking the tree to find it.
+`[RND-4]` The mounted tree maps each `VirtualNode` description by reference identity to a current
+mounted representative. This map is what makes block patching ([§6.3](#63-the-block-tree)) possible:
+a block root can look up the mounted node for a dynamic descendant without walking the tree to find
+it. When one compiler-cached static description occupies multiple positions, the parallel mounted
+hierarchy remains authoritative for every occurrence and the map retains the most recently registered
+representative; cached static descriptions are not block-dynamic descendants.
 
 `[RND-5]` `Renderer<TNode>.Render(node, container, application)` mounts on first call and patches
 thereafter. Passing a null `VirtualNode` unmounts the current root and forgets the container. A

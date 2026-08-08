@@ -1,0 +1,17 @@
+<template>
+<section class="compiled-repeated-route">
+  <ol>
+    <li v-for="signal in Signals" :key="signal">
+      <span class="signal-dot" aria-hidden="true"></span>
+      <code>{{ signal }}</code>
+    </li>
+  </ol>
+</section>
+</template>
+
+@script {
+using System.Collections.Generic;
+
+public IReadOnlyList<string> Signals { get; } =
+    new[] { "reference:tracked", "computed:cached", "effect:scheduled" };
+}

@@ -17,6 +17,7 @@ using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Generators.Syntax;
 using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.Router;
 
 namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 
@@ -80,6 +81,9 @@ internal sealed class CompiledFixtureAssembly
             "SlotChild.viu",
             "SlotOwner.viu",
             "MixedAuthoring.viu",
+            "RouterOutletShell.viu",
+            "RouterFirstView.viu",
+            "RouterRepeatedStaticView.viu",
             "VueProbe.vue",
         ];
         var additionalFiles = ImmutableArray.CreateBuilder<AdditionalText>(fixtureNames.Length);
@@ -175,6 +179,7 @@ internal sealed class CompiledFixtureAssembly
         paths.Add(typeof(ComponentBase).Assembly.Location);
         paths.Add(typeof(Renderer<>).Assembly.Location);
         paths.Add(typeof(Reactive).Assembly.Location);
+        paths.Add(typeof(RouterView).Assembly.Location);
         paths.Add(typeof(ModelBinding).Assembly.Location);
         return paths
             .Select(path => MetadataReference.CreateFromFile(path))
