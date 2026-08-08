@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
@@ -9,6 +11,7 @@ namespace Assimalign.Viu.Reactivity;
 /// Not thread-safe: designed for the single-threaded JS event-loop model.
 /// </summary>
 /// <typeparam name="T">The type of the contained value (never boxed by <see cref="Value"/>).</typeparam>
+[DebuggerDisplay("Value = {Peek(),nq}")]
 public abstract class ReactiveValue<T> : ReactiveValue, IReactiveReference<T>
 {
     private protected ReactiveValue()
@@ -25,6 +28,25 @@ public abstract class ReactiveValue<T> : ReactiveValue, IReactiveReference<T>
     /// (<c>[RCT-8]</c>).
     /// </summary>
     public abstract T Value { get; set; }
+
+    /// <summary>
+    /// Gets the current fresh value without subscribing the ambient caller. A stale computed still
+    /// refreshes and tracks its own sources; only the caller's dependency collection is paused.
+    /// Tracking state is restored even when the value getter throws. Specified by <c>[RCT-5]</c>.
+    /// </summary>
+    /// <returns>The current value.</returns>
+    public T Peek()
+    {
+        ReactivityState.PauseTracking();
+        try
+        {
+            return Value;
+        }
+        finally
+        {
+            ReactivityState.ResetTracking();
+        }
+    }
 
     /// <summary>
     /// The typed <see cref="Value"/> as <see cref="object"/> (boxing value types); reading tracks.

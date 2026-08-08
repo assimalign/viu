@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -6,68 +7,67 @@ using Assimalign.Viu;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The write surface threaded through a server render: the append target plus the ambient
-/// <see cref="SsrContext"/>. It is the object the component-tree
-/// runtime renderer carries, and the same surface the compiler-generated <c>ssrRender</c> bodies
-/// ([V01.01.07.02]) will receive, so both paths append to one buffer and share one
-/// <see cref="Context"/>. Instances are created by the renderer; helpers and generated code receive
-/// one and never construct it. Not thread-safe (single-threaded JS event-loop model).
+/// Provides the push-based write surface shared by runtime traversal and compiler-produced server
+/// render bodies.
 /// </summary>
+/// <remarks>
+/// Callers escape before pushing; raw static markup and hydration markers therefore pass through
+/// unchanged. Instances are renderer-owned and not thread-safe. Specified by <c>[SSR-1]</c>,
+/// <c>[SSR-3]</c>, and <c>[SSR-6]</c>.
+/// </remarks>
 public sealed class SsrRenderState
 {
     private readonly SsrWriter _writer;
-    private readonly SsrRenderState? _componentIdentifierSource;
-    private int _nextComponentIdentifier;
 
     internal SsrRenderState(
         SsrWriter writer,
         SsrContext context,
         IApplicationContext application,
-        CancellationToken cancellationToken,
-        SsrRenderState? componentIdentifierSource = null)
+        ComponentHost componentHost,
+        CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(componentHost);
         _writer = writer;
-        _componentIdentifierSource = componentIdentifierSource;
         Context = context;
         Application = application;
+        ComponentHost = componentHost;
         CancellationToken = cancellationToken;
     }
 
-    /// <summary>The render's <see cref="SsrContext"/>, shared by every nested state.</summary>
+    /// <summary>Gets the context shared by the root and every nested or teleported subtree.</summary>
+    /// <remarks>Specified by <c>[SSR-7]</c>.</remarks>
     public SsrContext Context { get; }
 
-    /// <summary>Gets the application composition context for the rendered tree.</summary>
+    /// <summary>Gets the immutable borrowed application composition for this render.</summary>
+    /// <remarks>Specified by <c>[SSR-2]</c> and <c>[SSR-9]</c>.</remarks>
     public IApplicationContext Application { get; }
 
-    /// <summary>The cancellation token for the render, observed at write/flush boundaries.</summary>
+    /// <summary>Gets cancellation observed by prefetch, traversal, writing, and flushing.</summary>
+    /// <remarks>Specified by <c>[SSR-5]</c>.</remarks>
     public CancellationToken CancellationToken { get; }
 
-    internal SsrWriter Writer => _writer;
+    internal ComponentHost ComponentHost { get; }
 
-    internal int NextComponentIdentifier()
-    {
-        return _componentIdentifierSource?.NextComponentIdentifier()
-            ?? checked(++_nextComponentIdentifier);
-    }
-
-    /// <summary>
-    /// Appends an already-escaped HTML fragment to the render buffer.
-    /// Callers escape before pushing — this method never transforms its input, so raw markup
-    /// (<c>v-html</c>, static components, comment markers) passes through verbatim.
-    /// </summary>
-    /// <param name="chunk">The serialized fragment.</param>
+    /// <summary>Appends an already escaped or deliberately raw HTML fragment.</summary>
+    /// <param name="chunk">The non-null serialized fragment.</param>
+    /// <remarks>This method performs no transformation under <c>[SSR-6]</c>.</remarks>
     public void Push(string chunk)
     {
-        if (!string.IsNullOrEmpty(chunk))
+        ArgumentNullException.ThrowIfNull(chunk);
+        if (chunk.Length > 0)
         {
             _writer.Append(chunk);
         }
     }
 
-    /// <summary>
-    /// Flushes buffered content to the backing writer in streaming mode and awaits its flush, applying
-    /// backpressure; a no-op when rendering to a string. The renderer calls this at component-subtree
-    /// boundaries so completed subtrees stream out without buffering the whole document.
-    /// </summary>
+    /// <summary>Flushes the current streaming chunk and awaits destination backpressure.</summary>
+    /// <returns>A task completing when the backing writer has flushed, or immediately in string mode.</returns>
+    /// <remarks>Completed component subtrees call this boundary under <c>[SSR-1]</c>.</remarks>
     public Task FlushAsync() => _writer.FlushAsync(CancellationToken);
+
+    internal SsrRenderState CreateBuffer(SsrWriter writer) =>
+        new(writer, Context, Application, ComponentHost, CancellationToken);
 }

@@ -1,10 +1,7 @@
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// The kinds of node operations the test adapter records, split per creation kind so an assertion
-/// can distinguish "created an element" from "created a text node". The structural operations are
-/// <see cref="Insert"/> and <see cref="Remove"/>.
-/// </summary>
+/// <summary>Identifies an observable operation performed by the in-memory host.</summary>
+/// <remarks>Specified by <c>[RND-HOST-1]</c>, <c>[RND-HOST-4]</c>, and <c>[CONF-3]</c>.</remarks>
 public enum TestNodeOperationType
 {
     /// <summary>An element was created.</summary>
@@ -16,21 +13,21 @@ public enum TestNodeOperationType
     /// <summary>A comment node was created.</summary>
     CreateComment,
 
-    /// <summary>A text node's content was set.</summary>
+    /// <summary>Character data changed.</summary>
     SetText,
 
-    /// <summary>A node was inserted into a parent (optionally before an anchor).</summary>
+    /// <summary>A node was inserted or moved.</summary>
     Insert,
 
-    /// <summary>A node was removed from its parent.</summary>
+    /// <summary>A node was removed.</summary>
     Remove,
 
-    /// <summary>A single attribute, property, or event binding was patched on an element.</summary>
+    /// <summary>An immutable element binding difference was applied.</summary>
     PatchAttribute,
 
-    /// <summary>A compiler-produced scoped-style identifier was stamped on an element.</summary>
-    SetScopeIdentifier,
-
-    /// <summary>A raw static-markup chunk was inserted in one operation.</summary>
+    /// <summary>A compiler-trusted static payload was inserted.</summary>
     InsertStaticContent,
+
+    /// <summary>The buffered-host commit boundary was reached.</summary>
+    Commit,
 }

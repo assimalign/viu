@@ -97,7 +97,7 @@ internal static class VModelTransform
         }
 
         // Native v-model doesn't need the modelValue prop — it is passed as binding.value.
-        var filtered = new List<Property>(baseResult.Properties.Count);
+        var filtered = new List<ObjectProperty>(baseResult.Properties.Count);
         foreach (var property in baseResult.Properties)
         {
             if (property.Key is SimpleExpressionNode { Content: "modelValue" })
@@ -138,7 +138,7 @@ internal static class VModelTransform
         // eventArg is "$event" in the opaque (non-TS) build.
         var assignment = CreateAssignment(expression);
 
-        var properties = new List<Property>
+        var properties = new List<ObjectProperty>
         {
             Ir.ObjectProperty(propertyName, directive.Expression!),
             Ir.ObjectProperty(eventName, assignment),
@@ -193,14 +193,43 @@ internal static class VModelTransform
     /// and its assignment lambda together. Specified by <c>[SFC-CG-7]</c>.
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
-    /// <returns>The generated <c>ViuModelBinding</c> construction.</returns>
-    internal static CompoundExpressionNode CreateNativeBinding(ExpressionNode expression)
-        => Ir.CompoundExpression(
-            "new global::Assimalign.Viu.Browser.ViuModelBinding(",
+    /// <param name="modifiers">The compile-time modifier names carried by the typed binding.</param>
+    /// <returns>The generated <c>ModelBinding</c> construction.</returns>
+    internal static CompoundExpressionNode CreateNativeBinding(
+        ExpressionNode expression,
+        IReadOnlyList<SimpleExpressionNode> modifiers)
+    {
+        if (modifiers.Count == 0)
+        {
+            return Ir.CompoundExpression(
+                "new global::Assimalign.Viu.Browser.ModelBinding(",
+                expression,
+                ", ",
+                CreateAssignmentAction(expression),
+                ")");
+        }
+
+        var parts = new List<object>
+        {
+            "new global::Assimalign.Viu.Browser.ModelBinding(",
             expression,
             ", ",
             CreateAssignmentAction(expression),
-            ")");
+            ", new string[] { ",
+        };
+        for (var index = 0; index < modifiers.Count; index++)
+        {
+            if (index > 0)
+            {
+                parts.Add(", ");
+            }
+
+            parts.Add(JsonString(modifiers[index].Content));
+        }
+
+        parts.Add(" })");
+        return Ir.CompoundExpression(parts.ToArray());
+    }
 
     private static ExpressionNode BuildEventName(ExpressionNode? argument)
     {
@@ -235,7 +264,7 @@ internal static class VModelTransform
         }
     }
 
-    private static DirectiveTransformResult Empty() => new() { Properties = Array.Empty<Property>() };
+    private static DirectiveTransformResult Empty() => new() { Properties = Array.Empty<ObjectProperty>() };
 
     private static string JsonString(string value) => "\"" + value + "\"";
 }

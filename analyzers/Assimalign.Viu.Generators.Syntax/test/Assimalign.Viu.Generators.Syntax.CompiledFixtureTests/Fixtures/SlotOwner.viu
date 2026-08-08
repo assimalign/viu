@@ -1,0 +1,14 @@
+<template>
+<SlotChild>
+  <template #default v-if="ShowSlot">
+    <span>{{ SlotText }}</span>
+  </template>
+</SlotChild>
+</template>
+
+@script {
+using Assimalign.Viu.Reactivity;
+
+public Reference<string> SlotText = Reactive.Reference("slot-first");
+public Reference<bool> ShowSlot = Reactive.Reference(true);
+}

@@ -1,0 +1,8 @@
+<template>
+<main class="mixed-authoring">
+  <CodeFirstChild />
+</main>
+</template>
+
+@script {
+}

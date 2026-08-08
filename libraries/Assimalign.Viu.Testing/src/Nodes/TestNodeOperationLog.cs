@@ -2,58 +2,59 @@ using System.Collections.Generic;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// The queryable, resettable record of every node operation the test adapter performed. Operation
-/// counts are the CoreCLR-side proxy for host-boundary call counts: one logged text or attribute
-/// operation corresponds to one host operation unless a platform adapter batches it, which is what
-/// makes the interop budget ([RND-IO-1]) assertable without a browser.
-/// </summary>
+/// <summary>Records and queries every host operation issued through the test renderer options.</summary>
+/// <remarks>
+/// Commit counts expose Core's per-renderer batch seam without a browser. Specified by
+/// <c>[RND-HOST-4]</c>, <c>[RND-IO-1]</c>, and <c>[CONF-3]</c>.
+/// </remarks>
 public sealed class TestNodeOperationLog
 {
     private readonly List<TestNodeOperation> _operations = [];
 
-    /// <summary>The recorded operations, oldest first.</summary>
+    /// <summary>Gets recorded operations in execution order.</summary>
     public IReadOnlyList<TestNodeOperation> Operations => _operations;
 
-    /// <summary>Clears the log — typically right after mounting, to isolate a patch.</summary>
+    /// <summary>Clears all recorded operations.</summary>
     public void Reset() => _operations.Clear();
 
-    /// <summary>Counts the recorded operations of <paramref name="type"/>.</summary>
-    /// <param name="type">The operation kind to count.</param>
+    /// <summary>Counts operations of the requested kind.</summary>
+    /// <param name="type">The operation kind.</param>
+    /// <returns>The matching count.</returns>
     public int Count(TestNodeOperationType type)
     {
-        var count = 0;
-        foreach (var operation in _operations)
+        int count = 0;
+        for (int index = 0; index < _operations.Count; index++)
         {
-            if (operation.Type == type)
+            if (_operations[index].Type == type)
             {
                 count++;
             }
         }
+
         return count;
     }
 
-    /// <summary>Returns the recorded operations of <paramref name="type"/>, oldest first.</summary>
-    /// <param name="type">The operation kind to filter by.</param>
+    /// <summary>Returns operations of the requested kind in execution order.</summary>
+    /// <param name="type">The operation kind.</param>
+    /// <returns>A detached list of matching operations.</returns>
     public IReadOnlyList<TestNodeOperation> OfType(TestNodeOperationType type)
     {
-        var matches = new List<TestNodeOperation>();
-        foreach (var operation in _operations)
+        List<TestNodeOperation> matches = [];
+        for (int index = 0; index < _operations.Count; index++)
         {
+            TestNodeOperation operation = _operations[index];
             if (operation.Type == type)
             {
                 matches.Add(operation);
             }
         }
+
         return matches;
     }
 
-    /// <summary>
-    /// The number of structural operations recorded (<see cref="TestNodeOperationType.Insert"/>
-    /// plus <see cref="TestNodeOperationType.Remove"/>).
-    /// </summary>
-    public int StructuralOperationCount
-        => Count(TestNodeOperationType.Insert) + Count(TestNodeOperationType.Remove);
+    /// <summary>Gets the total number of insert and remove operations.</summary>
+    public int StructuralOperationCount =>
+        Count(TestNodeOperationType.Insert) + Count(TestNodeOperationType.Remove);
 
     internal void Add(in TestNodeOperation operation) => _operations.Add(operation);
 }

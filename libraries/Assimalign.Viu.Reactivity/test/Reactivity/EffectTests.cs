@@ -66,12 +66,12 @@ public sealed class EffectTests
         outerRuns.ShouldBe(1);
         innerRuns.ShouldBe(1);
 
-        // Inner dep must not leak into the outer effect.
+        // The inner dependency must not leak into the outer effect.
         innerRef.Value = 11;
         outerRuns.ShouldBe(1);
         innerRuns.ShouldBe(2);
 
-        // Outer dep read after the inner effect was created still belongs to the outer effect.
+        // The outer dependency read after the inner effect was created still belongs to the outer effect.
         outerRef.Value = 2;
         outerRuns.ShouldBe(2);
         innerRuns.ShouldBe(3); // outer re-run created a second inner effect
@@ -216,11 +216,12 @@ public sealed class EffectTests
             },
             scheduler: () => invalidations++);
 
-        Reactive.StartBatch();
-        a.Value = 10;
-        b.Value = 20;
-        a.Value = 11;
-        Reactive.EndBatch();
+        using (Reactive.Batch())
+        {
+            a.Value = 10;
+            b.Value = 20;
+            a.Value = 11;
+        }
 
         invalidations.ShouldBe(1);
     }
@@ -312,6 +313,28 @@ public sealed class EffectTests
         count.Value = 2;
         effect.RunIfDirty();
         runs.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Dispose_ActiveEffect_StopsOnceAndLeavesLaterWritesUnobserved()
+    {
+        var source = Reactive.Reference(1);
+        var runs = 0;
+        var stops = 0;
+        var effect = Reactive.Effect(() =>
+        {
+            runs++;
+            _ = source.Value;
+        });
+        effect.OnStop = () => stops++;
+
+        effect.Dispose();
+        effect.Dispose();
+        source.Value = 2;
+
+        effect.IsActive.ShouldBeFalse();
+        runs.ShouldBe(1);
+        stops.ShouldBe(1);
     }
 }
 

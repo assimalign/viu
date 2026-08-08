@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- This suite hosts Roslyn, emits a transient assembly, and reflects over the generated
+         component types. It is test infrastructure rather than a shipping AOT surface. -->
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
+    <ViuPackageReference Include="xunit" />
+    <ViuPackageReference Include="xunit.runner.visualstudio" />
+    <ViuPackageReference Include="Shouldly" />
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuProjectReference Include="Assimalign.Viu.Browser" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
+    <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+    <ViuProjectReference Include="Assimalign.Viu.Router" />
+  </ItemGroup>
+  <ItemGroup>
+    <ViuPrivateProjectReference Include="Assimalign.Viu.Generators.Syntax" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\**\*.viu;Fixtures\**\*.vue"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

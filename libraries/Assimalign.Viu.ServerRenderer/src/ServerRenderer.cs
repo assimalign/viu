@@ -9,21 +9,22 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// Renders the unified Viu component tree to HTML without a browser, DOM, or JavaScript interop host.
+/// Renders Viu's host-neutral virtual tree to WHATWG-serialized HTML without a browser, DOM, or
+/// JavaScript interop boundary.
 /// </summary>
 /// <remarks>
-/// Each template request is activated through the application-selected
-/// <see cref="IComponentFactory"/>. Server-prefetch lifecycle callbacks are awaited before their
-/// component subtree serializes. Render state is per call; applications should also be per request
-/// when their borrowed services or state are request-scoped.
+/// Each call owns its write state and component render leases. Applications should be composed per
+/// request when their borrowed services or state are request-scoped. Specified by
+/// <c>[SSR-1]</c> through <c>[SSR-10]</c>.
 /// </remarks>
 public static class ServerRenderer
 {
-    /// <summary>Renders a configured server-render application to an HTML string.</summary>
-    /// <param name="application">The server-render composition to render.</param>
-    /// <param name="context">The per-render context, or null for a new context.</param>
-    /// <param name="cancellationToken">Cancels prefetch or writing for this render.</param>
-    /// <returns>The serialized HTML.</returns>
+    /// <summary>Renders one configured server application to an HTML string.</summary>
+    /// <param name="application">The immutable per-render application composition.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for component prefetch and rendering.</param>
+    /// <returns>The completed WHATWG HTML serialization.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c>, <c>[SSR-2]</c>, and <c>[SSR-6]</c>.</remarks>
     public static async Task<string> RenderToStringAsync(
         ServerRenderApplication application,
         SsrContext? context = null,
@@ -41,31 +42,39 @@ public static class ServerRenderer
     }
 
     /// <summary>
-    /// Renders a primitive component tree without template activation or application services.
+    /// Renders one virtual tree without separately configuring component registrations or services.
     /// </summary>
-    /// <param name="rootComponent">The root tree value.</param>
-    /// <param name="context">The per-render context, or null for a new context.</param>
-    /// <param name="cancellationToken">Cancels rendering.</param>
-    /// <returns>The serialized HTML.</returns>
+    /// <param name="rootComponent">The root value in Viu's closed virtual-node algebra.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for rendering.</param>
+    /// <returns>The completed WHATWG HTML serialization.</returns>
     /// <remarks>
-    /// If the tree contains a template request, render a <see cref="ServerRenderApplication"/> configured
-    /// with an <see cref="IComponentFactory"/> and service provider instead.
+    /// A tree containing <see cref="ComponentNode"/> values must instead use a
+    /// <see cref="ServerRenderApplication"/> with registrations for those values. Specified by
+    /// <c>[SSR-1]</c>, <c>[SSR-3]</c>, and <c>[SSR-6]</c>.
     /// </remarks>
     public static Task<string> RenderToStringAsync(
-        IComponent rootComponent,
+        VirtualNode rootComponent,
         SsrContext? context = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(rootComponent);
-        return RenderToStringAsync(CreatePrimitiveApplication(rootComponent), context, cancellationToken);
+        return RenderToStringAsync(
+            CreatePrimitiveApplication(rootComponent),
+            context,
+            cancellationToken);
     }
 
-    /// <summary>Streams a configured server-render application to a text writer.</summary>
-    /// <param name="application">The server-render composition to render.</param>
-    /// <param name="writer">The destination writer.</param>
-    /// <param name="context">The per-render context, or null for a new context.</param>
-    /// <param name="cancellationToken">Cancels prefetch or writing for this render.</param>
-    /// <returns>A task that completes after all content is flushed.</returns>
+    /// <summary>
+    /// Streams one configured server application, flushing completed component subtrees so the
+    /// destination controls backpressure.
+    /// </summary>
+    /// <param name="application">The immutable per-render application composition.</param>
+    /// <param name="writer">The externally owned destination writer.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for prefetch, writes, and flushes.</param>
+    /// <returns>A task that completes after all produced content has been flushed.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c>, <c>[SSR-4]</c>, and <c>[SSR-10]</c>.</remarks>
     public static Task RenderToStreamAsync(
         ServerRenderApplication application,
         TextWriter writer,
@@ -82,15 +91,16 @@ public static class ServerRenderer
     }
 
     /// <summary>
-    /// Streams a primitive component tree without template activation or application services.
+    /// Streams one virtual tree without separately configuring component registrations or services.
     /// </summary>
-    /// <param name="rootComponent">The root tree value.</param>
-    /// <param name="writer">The destination writer.</param>
-    /// <param name="context">The per-render context, or null for a new context.</param>
-    /// <param name="cancellationToken">Cancels rendering.</param>
-    /// <returns>A task that completes after all content is flushed.</returns>
+    /// <param name="rootComponent">The root value in Viu's closed virtual-node algebra.</param>
+    /// <param name="writer">The externally owned destination writer.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for writes and flushes.</param>
+    /// <returns>A task that completes after all produced content has been flushed.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c>, <c>[SSR-3]</c>, and <c>[SSR-6]</c>.</remarks>
     public static Task RenderToStreamAsync(
-        IComponent rootComponent,
+        VirtualNode rootComponent,
         TextWriter writer,
         SsrContext? context = null,
         CancellationToken cancellationToken = default)
@@ -103,12 +113,13 @@ public static class ServerRenderer
             cancellationToken);
     }
 
-    private static ServerRenderApplication CreatePrimitiveApplication(IComponent rootComponent)
+    private static ServerRenderApplication CreatePrimitiveApplication(VirtualNode rootComponent)
     {
-        return new ServerRenderApplication(
-            rootComponent,
-            EmptyComponentFactory.Instance,
-            EmptyServiceProvider.Instance);
+        ApplicationOptions options = new()
+        {
+            RootComponent = rootComponent,
+        };
+        return new ServerRenderApplication(new ApplicationContext(options));
     }
 
     private static async Task RenderCoreAsync(
@@ -118,14 +129,26 @@ public static class ServerRenderer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        IApplicationContext applicationContext = application.Context;
+        ComponentHost componentHost = new(
+            new ComponentRuntimeOptions(
+                applicationContext.Components,
+                new ApplicationWatchScheduler(),
+                applicationContext.Services,
+                applicationContext.ErrorHandler,
+                applicationContext.WarnHandler,
+                applicationContext.EventObserver));
         SsrRenderState state = new(
             writer,
             context,
-            application.Context,
+            applicationContext,
+            componentHost,
             cancellationToken);
-        await ComponentTreeSerializer
-            .RenderAsync(state, application.Context.RootComponent, owner: null)
-            .ConfigureAwait(false);
+
+        await ServerMarkupSerializer.RenderAsync(
+            state,
+            applicationContext.RootComponent,
+            null).ConfigureAwait(false);
         await state.FlushAsync().ConfigureAwait(false);
         context.ResolveTeleports();
     }

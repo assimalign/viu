@@ -1,19 +1,13 @@
-using System.Collections.Generic;
-using System.Linq;
-
 using Shouldly;
 using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
 // Pins the specificity ranking model: static beats dynamic beats catch-all, independent of the order
-// routes were added to the table. These cases are what freezes the PathScore weight scale — a change
-// to any weight shows up here first.
+// routes were added to the table. These public outcomes freeze Viu's ranking contract without
+// coupling the suite to its private score representation.
 public class RouteRankingTests
 {
-    private static IReadOnlyList<string> OrderedPaths(RouteMatcher matcher)
-        => matcher.Matchers.Select(entry => entry.NormalizedPath).ToArray();
-
     [Fact]
     public void Resolve_StaticSegment_OutranksDynamicSegment()
     {
@@ -55,20 +49,6 @@ public class RouteRankingTests
         matcher.Resolve("/users/new").Name.ShouldBe("new-user");
         matcher.Resolve("/users/42").Name.ShouldBe("user");
         matcher.Resolve("/anything").Name.ShouldBe("not-found");
-    }
-
-    [Fact]
-    public void Matchers_AreOrderedByDescendingSpecificity()
-    {
-        var matcher = new RouteMatcher(
-        [
-            new RouteRecord("/:pathMatch(.*)*"),
-            new RouteRecord("/users/:id"),
-            new RouteRecord("/users/new"),
-        ]);
-
-        // Static-most-specific first; catch-all last, regardless of insertion order.
-        OrderedPaths(matcher).ShouldBe(new[] { "/users/new", "/users/:id", "/:pathMatch(.*)*" });
     }
 
     [Fact]

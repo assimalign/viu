@@ -2,7 +2,8 @@ using System;
 
 namespace Assimalign.Viu;
 
-/// <summary>A reusable runtime directive expressed as a bundle of delegate hooks.</summary>
+/// <summary>Provides a reusable runtime directive as a bundle of delegate hooks.</summary>
+/// <remarks>Specified by <c>[CMP-7]</c> and <c>[HYD-4]</c>.</remarks>
 public sealed record Directive : IDirective
 {
     /// <inheritdoc/>
@@ -26,9 +27,9 @@ public sealed record Directive : IDirective
     /// <inheritdoc/>
     public DirectiveHook? Unmounted { get; init; }
 
-    /// <summary>Creates the function-directive shorthand used for mounted and updated.</summary>
-    /// <param name="hook">The shared hook.</param>
-    /// <returns>The directive.</returns>
+    /// <summary>Creates the shorthand whose shared hook runs for mounted and updated phases.</summary>
+    /// <param name="hook">The shared lifecycle hook.</param>
+    /// <returns>The reusable directive.</returns>
     public static Directive FromFunction(DirectiveHook hook)
     {
         ArgumentNullException.ThrowIfNull(hook);

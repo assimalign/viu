@@ -1,7 +1,7 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// How a template identifier is bound to its component: the source (data, props, <c>&lt;script setup&gt;</c>
+/// How a template identifier is bound to its component: the source (data, properties, <c>&lt;script setup&gt;</c>
 /// state, options-API members) and, for setup state, whether it is a reactive reference that the compiler must
 /// unwrap.
 /// </summary>

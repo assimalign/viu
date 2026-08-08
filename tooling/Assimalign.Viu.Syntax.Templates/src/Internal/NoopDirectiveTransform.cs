@@ -15,5 +15,5 @@ internal static class NoopDirectiveTransform
         ElementNode element,
         TransformContext context,
         Func<DirectiveTransformResult, DirectiveTransformResult>? augmentor)
-        => new() { Properties = Array.Empty<Property>() };
+        => new() { Properties = Array.Empty<ObjectProperty>() };
 }

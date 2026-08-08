@@ -14,7 +14,7 @@ public sealed class SingleFileComponentRedesignTests
     private const string RootNamespace = "Demo";
 
     [Fact]
-    public void Template_GeneratesComponentTemplateContextAndSynchronousSetupHook()
+    public void Template_GeneratesComponentContextAndSynchronousSetupHook()
     {
         const string source =
             "<template>\n" +
@@ -41,14 +41,14 @@ public sealed class SingleFileComponentRedesignTests
         // [SFC-CG-4] The base class carries Context and the root-level lifecycle registration surface;
         // the interface stays on the partial because the declaration members are explicit implementations.
         generated.ShouldContain(
-            "partial class Panel : global::Assimalign.Viu.Components.ComponentTemplateBase, "
-            + "global::Assimalign.Viu.Components.IComponentTemplate");
-        generated.ShouldNotContain("IComponentContext Context { get; set; }");
+            "partial class Panel : global::Assimalign.Viu.Components.ComponentBase, "
+            + "global::Assimalign.Viu.Components.IComponent");
+        generated.ShouldNotContain("IComponent" + "Context Context { get; set; }");
         generated.ShouldContain("partial void OnSetup();");
         generated.ShouldContain("Context = context;\n            OnSetup();");
         generated.ShouldContain(
             "global::Assimalign.Viu.Components.ComponentRenderer " +
-            "global::Assimalign.Viu.Components.IComponentTemplate.Setup(");
+            "global::Assimalign.Viu.Components.IComponent.Setup(");
     }
 
     [Fact]
@@ -69,12 +69,13 @@ public sealed class SingleFileComponentRedesignTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "Neutral.SingleFileComponent.g.cs");
-        generated.ShouldContain("using static global::Assimalign.Viu.RenderHelpers;");
+        generated.ShouldNotContain("using static");
+        generated.ShouldNotContain("Render" + "Helpers");
         generated.ShouldNotContain("Assimalign.Viu.Browser");
     }
 
     [Fact]
-    public void DomModifierTemplate_ImportsBrowserHelpersAsARequiredCapability()
+    public void DomModifierTemplate_QualifiesBrowserCapability()
     {
         const string source =
             "<template>\n" +
@@ -94,8 +95,8 @@ public sealed class SingleFileComponentRedesignTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "BrowserButton.SingleFileComponent.g.cs");
-        generated.ShouldContain("using static global::Assimalign.Viu.Browser.DomRenderHelpers;");
-        generated.ShouldContain("_withModifiers");
+        generated.ShouldNotContain("using static");
+        generated.ShouldContain("global::Assimalign.Viu.Browser.BrowserEvents.WithModifiers");
     }
 
     [Fact]
@@ -116,9 +117,7 @@ public sealed class SingleFileComponentRedesignTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "SlotHost.SingleFileComponent.g.cs");
-        generated.ShouldContain(
-            "IReadOnlyDictionary<string, global::Assimalign.Viu.Components.ComponentSlot> " +
-            "__slots => Context.Slots;");
+        generated.ShouldContain("component.Context!.Bindings.Slots.TryGetValue");
     }
 
     [Fact]
@@ -140,7 +139,7 @@ public sealed class SingleFileComponentRedesignTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         GeneratorTestHarness.GeneratedSource(outcome, "Counter.SingleFileComponent.g.cs")
-            .ShouldContain("_toDisplayString(_ctx.Count.Value)");
+            .ShouldContain("component.Count.Value");
     }
 
     [Fact]
@@ -167,6 +166,31 @@ public sealed class SingleFileComponentRedesignTests
         conflicts.Length.ShouldBe(2);
         conflicts.ShouldAllBe(
             diagnostic => diagnostic.Location.GetLineSpan().Path == $"{ProjectDirectory}/Conflict.viu");
+    }
+
+    [Fact]
+    public void AuthoredLifecycleField_OwnsItsName_AndSuppressesGeneratedOverloads()
+    {
+        const string source =
+            "<template>\n" +
+            "    <div />\n" +
+            "</template>\n" +
+            "@script {\n" +
+            "    private global::System.Action<global::System.Action> OnMounted = callback => callback();\n" +
+            "}\n";
+
+        var outcome = GeneratorTestHarness.Run(
+            $"{ProjectDirectory}/LifecycleOwner.viu",
+            source,
+            RootNamespace,
+            ProjectDirectory);
+
+        outcome.Diagnostics.ShouldBeEmpty();
+        var generated = GeneratorTestHarness.GeneratedSource(
+            outcome,
+            "LifecycleOwner.SingleFileComponent.g.cs");
+        generated.ShouldContain("Action<global::System.Action> OnMounted");
+        generated.ShouldNotContain("protected void OnMounted(");
     }
 
     [Fact]
@@ -234,8 +258,8 @@ public sealed class SingleFileComponentRedesignTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "AsyncButton.SingleFileComponent.g.cs");
-        generated.ShouldContain("_withHandler(_ctx.SaveAsync)");
-        generated.ShouldNotContain("_ctx.SaveAsync();");
+        generated.ShouldContain("RenderGlue.Handler(component.SaveAsync)");
+        generated.ShouldNotContain("component.SaveAsync();");
     }
 
     [Fact]
@@ -260,6 +284,6 @@ public sealed class SingleFileComponentRedesignTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "InlineAsyncButton.SingleFileComponent.g.cs");
-        generated.ShouldContain("_withHandler(async () => await _ctx.SaveAsync())");
+        generated.ShouldContain("RenderGlue.Handler(async () => await component.SaveAsync())");
     }
 }

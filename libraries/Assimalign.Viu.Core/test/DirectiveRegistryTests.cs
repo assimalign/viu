@@ -4,69 +4,47 @@ using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu;
+
 namespace Assimalign.Viu.Core.Tests;
 
 public sealed class DirectiveRegistryTests
 {
     [Fact]
-    public void Resolve_HyphenatedName_ResolvesRawCamelAndPascalRegistrations()
+    public void Resolve_RegisteredTypeToken_ReturnsBorrowedDirective()
     {
-        IDirective raw = new Directive();
-        IDirective camel = new Directive();
-        IDirective pascal = new Directive();
-        DirectiveRegistry registry = new(
+        IDirective directive = new Directive();
+        var registry = new DirectiveRegistry(
         [
-            new KeyValuePair<string, IDirective>("raw-directive", raw),
-            new KeyValuePair<string, IDirective>("camelDirective", camel),
-            new KeyValuePair<string, IDirective>("PascalDirective", pascal),
+            new KeyValuePair<Type, IDirective>(typeof(DirectiveToken), directive),
         ]);
 
-        registry.Resolve("raw-directive").ShouldBeSameAs(raw);
-        registry.Resolve("camel-directive").ShouldBeSameAs(camel);
-        registry.Resolve("pascal-directive").ShouldBeSameAs(pascal);
+        registry.Resolve(typeof(DirectiveToken)).ShouldBeSameAs(directive);
+        registry.Resolve(typeof(UnregisteredDirectiveToken)).ShouldBeNull();
     }
 
     [Fact]
-    public void Resolve_AliasEquivalentRegistrations_PrefersRawThenCamelThenPascal()
-    {
-        IDirective raw = new Directive();
-        IDirective camel = new Directive();
-        IDirective pascal = new Directive();
-        DirectiveRegistry registry = new(
-        [
-            new KeyValuePair<string, IDirective>("my-directive", raw),
-            new KeyValuePair<string, IDirective>("myDirective", camel),
-            new KeyValuePair<string, IDirective>("MyDirective", pascal),
-        ]);
-        DirectiveRegistry fallbackRegistry = new(
-        [
-            new KeyValuePair<string, IDirective>("myDirective", camel),
-            new KeyValuePair<string, IDirective>("MyDirective", pascal),
-        ]);
-
-        registry.Resolve("my-directive").ShouldBeSameAs(raw);
-        registry.Resolve("myDirective").ShouldBeSameAs(camel);
-        registry.Resolve("MyDirective").ShouldBeSameAs(pascal);
-        fallbackRegistry.Resolve("my-directive").ShouldBeSameAs(camel);
-    }
-
-    [Fact]
-    public void Constructor_DuplicateRawName_Throws()
+    public void Constructor_DuplicateTypeToken_Throws()
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
-            () =>
-            {
-                _ = new DirectiveRegistry(
-                [
-                    new KeyValuePair<string, IDirective>(
-                        "duplicate-directive",
-                        new Directive()),
-                    new KeyValuePair<string, IDirective>(
-                        "duplicate-directive",
-                        new Directive()),
-                ]);
-            });
+            () => _ = new DirectiveRegistry(
+            [
+                new KeyValuePair<Type, IDirective>(
+                    typeof(DirectiveToken),
+                    new Directive()),
+                new KeyValuePair<Type, IDirective>(
+                    typeof(DirectiveToken),
+                    new Directive()),
+            ]));
 
         exception.Message.ShouldContain("registered more than once");
+    }
+
+    private sealed class DirectiveToken
+    {
+    }
+
+    private sealed class UnregisteredDirectiveToken
+    {
     }
 }

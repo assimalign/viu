@@ -14,8 +14,8 @@ namespace Assimalign.Viu.Router;
 /// history reconstruct adjacency after a <c>popstate</c> that the application never observed, and
 /// <see cref="Position"/> is a monotonically assigned counter: comparing the arriving entry's
 /// position to the leaving entry's yields the signed navigation distance
-/// (<see cref="NavigationInformation.Delta"/>) that drives back/forward detection. Value equality
-/// (a record) so a navigation pipeline can compare and snapshot state cheaply.
+/// (<see cref="NavigationInformation.Delta"/>) that drives back/forward detection. Record value
+/// equality lets a navigation pipeline compare and snapshot state cheaply.
 /// </para>
 /// </remarks>
 /// <param name="Back">The location of the previous entry, or <see langword="null"/> at the start of history.</param>

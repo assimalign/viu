@@ -14,5 +14,7 @@
     <ViuProjectReference Include="Assimalign.Viu.Components" />
     <!-- RouterView/RouterLink are exercised DOM-free through the in-memory Testing renderer. -->
     <ViuProjectReference Include="Assimalign.Viu.Testing" />
+    <!-- Routed SSR/hydration is an integration-only edge; Router production remains host-free. -->
+    <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
   </ItemGroup>
 </Project>

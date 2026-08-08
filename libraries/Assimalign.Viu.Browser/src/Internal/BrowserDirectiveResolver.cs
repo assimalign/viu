@@ -1,37 +1,49 @@
 using System;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// Resolves the browser directives emitted by the template compiler.
-/// </summary>
-/// <remarks>
-/// The browser builder installs this resolver by default. Applications remain free to replace it
-/// through <see cref="ApplicationOptions.Directives"/>.
-/// </remarks>
+/// <summary>Resolves Browser's compiler-known directive token types without reflection.</summary>
 internal sealed class BrowserDirectiveResolver : IDirectiveResolver
 {
-    internal static readonly BrowserDirectiveResolver Instance = new();
+    public static BrowserDirectiveResolver Instance { get; } = new();
 
     private BrowserDirectiveResolver()
     {
     }
 
-    /// <inheritdoc/>
-    public IDirective? Resolve(string name)
+    public IDirective? Resolve(Type directiveType)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        return name switch
+        ArgumentNullException.ThrowIfNull(directiveType);
+        if (directiveType == typeof(VModelText))
         {
-            "show" => VShow.Instance,
-            "modelText" => VModelText.Instance,
-            "modelCheckbox" => VModelCheckbox.Instance,
-            "modelRadio" => VModelRadio.Instance,
-            "modelSelect" => VModelSelect.Instance,
-            "modelDynamic" => VModelDynamic.Instance,
-            _ => null,
-        };
+            return VModelText.Instance;
+        }
+
+        if (directiveType == typeof(VModelCheckbox))
+        {
+            return VModelCheckbox.Instance;
+        }
+
+        if (directiveType == typeof(VModelRadio))
+        {
+            return VModelRadio.Instance;
+        }
+
+        if (directiveType == typeof(VModelSelect))
+        {
+            return VModelSelect.Instance;
+        }
+
+        if (directiveType == typeof(VModelDynamic))
+        {
+            return VModelDynamic.Instance;
+        }
+
+        if (directiveType == typeof(CssVariables))
+        {
+            return CssVariables.Instance;
+        }
+
+        return directiveType == typeof(VShow) ? VShow.Instance : null;
     }
 }

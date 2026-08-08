@@ -17,7 +17,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetDiagnostics_MalformedBlockHeader_ProjectsParserDiagnostic()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "@script\n", 1);
 
         var diagnostics = service.GetDiagnostics(DocumentUri);
@@ -31,7 +31,7 @@ public class LanguageServiceTests
     [Fact]
     public void ChangeDocument_RangedEditRepairsSourceAndRefreshesParseResult()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "@script\n", 1);
 
         var changed = service.ChangeDocument(
@@ -52,7 +52,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetCompletions_RootWithTemplate_DoesNotOfferDuplicateSingletonBlock()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             DocumentUri,
             "<template>\n    <div/>\n</template>\n",
@@ -72,7 +72,7 @@ public class LanguageServiceTests
     {
         // The hybrid .viu container ([V01.01.06.10]): template and style are offered as tag
         // snippets while the C# script block keeps the @-block snippet.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "", 1);
 
         var completions = service.GetCompletions(
@@ -94,7 +94,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetCompletions_TemplateDirectiveContext_OffersVueCompatibleDirectives()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             DocumentUri,
             "<template>\n    <div v-\n</template>\n",
@@ -115,7 +115,7 @@ public class LanguageServiceTests
         // Transition-window pin ([V01.01.06.10]): the legacy '@template { }' container parses with a
         // Warning-severity migration diagnostic (VIU1015), and completion keeps working inside it
         // until the container is removed.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             DocumentUri,
             "@template {\n    <div v-\n}\n",
@@ -139,7 +139,7 @@ public class LanguageServiceTests
         const string templateLine = "    <div class=\"flex gap-\"></div>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var candidateStart = templateLine.IndexOf("gap-", StringComparison.Ordinal);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -168,7 +168,7 @@ public class LanguageServiceTests
         var candidateStart = templateLine.IndexOf(
             "p-car",
             StringComparison.Ordinal);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         var utilityCssLanguageService =
             service.ShouldBeAssignableTo<IUtilityCssLanguageService>();
         utilityCssLanguageService.ConfigureUtilityStylesheet(
@@ -196,7 +196,7 @@ public class LanguageServiceTests
         const string candidate = "vu:bg-blue-500";
         var source =
             $"<template>\n    <div class=\"{candidate}\"></div>\n</template>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
             .ConfigureUtilityStylesheet(
                 DocumentUri,
@@ -221,7 +221,7 @@ public class LanguageServiceTests
         const string candidatePrefix = "brand-";
         var source =
             $"<template>\n    <div class=\"{candidatePrefix}\"></div>\n</template>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
             .ConfigureUtilityStylesheet(
                 DocumentUri,
@@ -252,7 +252,7 @@ public class LanguageServiceTests
         const string candidatePrefix = "theme-midnight:bg-blue-";
         var source =
             $"<template>\n    <div class=\"{candidatePrefix}\"></div>\n</template>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
             .ConfigureUtilityStylesheet(
                 DocumentUri,
@@ -299,7 +299,7 @@ public class LanguageServiceTests
                     }
                     """),
             });
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
             .ConfigureUtilityStylesheet(
                 DocumentUri,
@@ -329,7 +329,7 @@ public class LanguageServiceTests
             "    <div :class=\"['bg-blue-', active ? 'flex' : 'hidden']\"></div>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var candidateStart = templateLine.IndexOf("bg-blue-", StringComparison.Ordinal);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -347,7 +347,7 @@ public class LanguageServiceTests
         var templateLine = $"    <button class=\"{candidate}\"></button>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var candidateStart = templateLine.IndexOf(candidate, StringComparison.Ordinal);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var hover = service.GetHover(
@@ -369,7 +369,7 @@ public class LanguageServiceTests
         const string templateLine = "    <p>gap-</p>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var candidateEnd = templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -385,7 +385,7 @@ public class LanguageServiceTests
         const string templateLine = "  <div class=\"flex gap-\"></div>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var candidateStart = templateLine.IndexOf("gap-", StringComparison.Ordinal);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -402,7 +402,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetCompletions_VueRoot_OffersTagBasedBlocksAndSkipsExistingTemplate()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             VueDocumentUri,
             "<template><div /></template>\n",
@@ -422,7 +422,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetCompletions_VueRoot_OffersOnlyMissingOrdinaryAndSetupScriptSlots()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             VueDocumentUri,
             "<script lang=\"csharp\">public int Ordinary;</script>\n",
@@ -451,7 +451,7 @@ public class LanguageServiceTests
         const string source =
             "<script>export default {}</script>\n" +
             "<script setup lang=\"csharp\">public int Count;</script>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var diagnostics = service.GetDiagnostics(VueDocumentUri);
@@ -466,7 +466,7 @@ public class LanguageServiceTests
             "<script lang=\"csharp\">\n" +
             "  Context.\n" +
             "</script>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -481,7 +481,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetCompletions_ComponentContextMemberAccess_OffersContextContract()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             DocumentUri,
             "@script {\n    Context.\n}\n",
@@ -501,7 +501,7 @@ public class LanguageServiceTests
     public void GetCompletions_StyleTagHeader_OffersStyleAttributeOptions()
     {
         // Hybrid .viu ([V01.01.06.10]): style block options are tag attributes on the <style> header.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "<style ", 1);
 
         var completions = service.GetCompletions(
@@ -516,7 +516,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetCompletions_TemplateTagHeader_OffersTemplateAttributeOptions()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "<template ", 1);
 
         var completions = service.GetCompletions(
@@ -530,7 +530,7 @@ public class LanguageServiceTests
     public void GetCompletions_ClosedTemplateTagHeader_DoesNotOfferHeaderOptions()
     {
         // Past '>' the tag header is complete; the cursor sits in block content, not the header.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "<template>", 1);
 
         var completions = service.GetCompletions(
@@ -545,7 +545,7 @@ public class LanguageServiceTests
     {
         // Transition-window pin ([V01.01.06.10]): the legacy '@style ' header keeps completing its
         // options until the @-container is removed.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "@style ", 1);
 
         var completions = service.GetCompletions(
@@ -560,7 +560,7 @@ public class LanguageServiceTests
     [Fact]
     public void GetHover_ReactiveReference_ReturnsDeveloperDocumentationAndTokenRange()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(
             DocumentUri,
             "@script {\n    Reactive.Reference(0);\n}\n",
@@ -579,7 +579,7 @@ public class LanguageServiceTests
     [Fact]
     public void CloseDocument_OpenDocument_RemovesLanguageResults()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "@script\n", 1);
 
         service.CloseDocument(DocumentUri).ShouldBeTrue();

@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace Assimalign.Viu.Syntax.Css;
@@ -52,6 +53,9 @@ internal static class CssSelectorWriter
                 case CssPseudoSelectorNode pseudo:
                     builder.Append(pseudo.Location.Source);
                     break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported CSS selector node '{part.GetType().FullName}'.");
             }
         }
     }
@@ -59,9 +63,10 @@ internal static class CssSelectorWriter
     private static string RenderCombinator(CssCombinatorKind kind)
         => kind switch
         {
+            CssCombinatorKind.Descendant => " ",
             CssCombinatorKind.Child => " > ",
             CssCombinatorKind.NextSibling => " + ",
             CssCombinatorKind.SubsequentSibling => " ~ ",
-            _ => " ",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported CSS combinator kind."),
         };
 }

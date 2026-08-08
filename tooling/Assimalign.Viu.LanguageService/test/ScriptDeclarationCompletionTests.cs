@@ -133,7 +133,7 @@ public class ScriptDeclarationCompletionTests
             "public int Second;\n" +
             "    \n" +
             "</script>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -186,7 +186,7 @@ public class ScriptDeclarationCompletionTests
     {
         var source = $"@script {{\n{scriptBody}\n{typedLine}\n}}\n";
         var typedLineIndex = 1 + scriptBody.Count(character => character == '\n') + 1;
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
         return service.GetCompletions(
             DocumentUri,

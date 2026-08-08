@@ -139,7 +139,7 @@ Single-file component script parse information — an informational (or `Hidden`
 ### VIU1204
 
 Single-file component generated-member conflict — the `@script` block declares `Context`, which is supplied
-by the generated `IComponentTemplate` bridge, or declares `OnSetup` in any shape other than the supported
+by the generated `IComponent` implementation, or declares `OnSetup` in any shape other than the supported
 `partial void OnSetup()` implementation. The diagnostic is mapped to the conflicting identifier.
 
 ### VIU1205

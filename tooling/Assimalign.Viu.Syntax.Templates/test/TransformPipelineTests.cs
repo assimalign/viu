@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -20,7 +20,7 @@ public class TransformPipelineTests
     {
         var result = TransformTestHelpers.Transform("<div></div>");
 
-        var codegen = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var codegen = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         codegen.Tag.ShouldBe("\"div\"");
         codegen.IsBlock.ShouldBeTrue();
         result.ShouldUseHelper("createElementBlock");
@@ -32,7 +32,7 @@ public class TransformPipelineTests
     {
         var result = TransformTestHelpers.Transform("<div></div><span></span>");
 
-        var codegen = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var codegen = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         codegen.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         codegen.ShouldHavePatchFlag(PatchFlags.StableFragment);
         codegen.IsBlock.ShouldBeTrue();
@@ -113,7 +113,7 @@ public class TransformPipelineTests
 
         var result = TransformTestHelpers.Transform("<div><span></span><b></b></div>", options);
 
-        var div = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var div = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         var children = div.Children.ShouldBeOfType<SyntaxList<TemplateChildNode>>();
         children.Count.ShouldBe(1);
         children[0].ShouldBeOfType<ElementNode>().Tag.ShouldBe("b");

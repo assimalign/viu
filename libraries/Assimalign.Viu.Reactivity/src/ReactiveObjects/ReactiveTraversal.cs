@@ -15,6 +15,7 @@ namespace Assimalign.Viu.Reactivity;
 /// <see cref="Depth"/> ceiling bounds descent. Not thread-safe
 /// (single-threaded JS event-loop model); construct one per traversal.
 /// </para>
+/// Specified by <c>[RCT-6]</c> and <c>[RCT-7]</c>.
 /// </summary>
 public sealed class ReactiveTraversal
 {
@@ -57,7 +58,7 @@ public sealed class ReactiveTraversal
             return;
         }
 
-        // A ref: reading BoxedValue tracks the ref's own dependency, then we recurse one level into the
+        // A reference: reading BoxedValue tracks the reference's own dependency, then we recurse one level into the
         // unwrapped value: a reference contributes its own dependency, then the walk descends one
         // level into what it holds.
         if (value is ReactiveValue reference)
@@ -85,4 +86,3 @@ public sealed class ReactiveTraversal
         // (Viu cannot reflect into plain CLR objects — see IReactiveTraversable remarks).
     }
 }
-

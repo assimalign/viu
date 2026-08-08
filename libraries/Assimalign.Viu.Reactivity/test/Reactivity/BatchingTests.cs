@@ -20,18 +20,19 @@ public sealed class BatchingTests
         });
         runs.ShouldBe(1);
 
-        Reactive.StartBatch();
-        a.Value = 10;
-        b.Value = 20;
-        runs.ShouldBe(1); // deferred while the batch is open
-        Reactive.EndBatch();
+        using (Reactive.Batch())
+        {
+            a.Value = 10;
+            b.Value = 20;
+            runs.ShouldBe(1); // deferred while the batch is open
+        }
 
         runs.ShouldBe(2);
         sum.ShouldBe(30);
     }
 
     [Fact]
-    public void NestedBatchesFlushOnlyAtTheOutermostEnd()
+    public void NestedBatchesFlushOnlyAtTheOutermostDisposeAndDoubleDisposeIsIdempotent()
     {
         var count = Reactive.Reference(1);
         var runs = 0;
@@ -42,38 +43,49 @@ public sealed class BatchingTests
         });
         runs.ShouldBe(1);
 
-        Reactive.StartBatch();
-        Reactive.StartBatch();
+        using IDisposable outerBatch = Reactive.Batch();
+        using IDisposable innerBatch = Reactive.Batch();
         count.Value = 2;
-        Reactive.EndBatch();
-        runs.ShouldBe(1); // inner end does not flush
+        innerBatch.Dispose();
+        innerBatch.Dispose();
+        runs.ShouldBe(1); // inner disposal and double-disposal do not flush the outer batch
 
         count.Value = 3;
-        Reactive.EndBatch();
+        outerBatch.Dispose();
+        outerBatch.Dispose();
         runs.ShouldBe(2); // one coalesced run
     }
 
     [Fact]
-    public void EndBatchWithoutStartBatchThrowsAndBatchingStillWorksAfterwards()
+    public void Batch_ExceptionInsideScope_FlushesAndResumesEffects()
     {
-        Should.Throw<InvalidOperationException>(Reactive.EndBatch);
-
-        // The failed call must not have corrupted the depth: batching still coalesces.
         var count = Reactive.Reference(1);
         var runs = 0;
+        var seen = 0;
         Reactive.Effect(() =>
         {
             runs++;
-            _ = count.Value;
+            seen = count.Value;
         });
         runs.ShouldBe(1);
 
-        Reactive.StartBatch();
-        count.Value = 2;
-        count.Value = 3;
-        runs.ShouldBe(1); // deferred while the batch is open
-        Reactive.EndBatch();
+        Should.Throw<InvalidOperationException>(
+            () =>
+            {
+                using (Reactive.Batch())
+                {
+                    count.Value = 2;
+                    runs.ShouldBe(1);
+                    throw new InvalidOperationException("batch failure");
+                }
+            });
+
         runs.ShouldBe(2);
+        seen.ShouldBe(2);
+
+        count.Value = 3;
+        runs.ShouldBe(3);
+        seen.ShouldBe(3);
     }
 
     [Fact]

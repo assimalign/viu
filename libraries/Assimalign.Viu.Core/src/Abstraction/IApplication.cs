@@ -4,41 +4,33 @@ using System.Threading.Tasks;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Represents the platform-neutral lifetime of a persistent Viu host.
-/// </summary>
+/// <summary>Represents the platform-neutral lifetime of one persistent Viu host.</summary>
 /// <remarks>
-/// Runtime middleware surrounds the complete mounted lifetime, while composition remains frozen in
-/// <see cref="Context"/>. Host-specific mount operations belong to their platform assemblies so this
-/// contract does not acquire a Browser or future WebView dependency. Not thread-safe. Specified by
-/// <c>[APP-1]</c> through <c>[APP-7]</c> and delivered by <c>[V01.01.14.08]</c>.
+/// Runtime middleware surrounds the complete mounted lifetime. Host packages supply the terminal
+/// mount operation without adding a host-node type to this contract. The lifetime is single-use and
+/// single-threaded. Specified by <c>[APP-1]</c> through <c>[APP-7]</c>.
 /// </remarks>
 public interface IApplication : IAsyncDisposable
 {
-    /// <summary>Gets the immutable composition and observable runtime state for this application.</summary>
+    /// <summary>Gets the frozen application composition and observable lifetime state.</summary>
     IApplicationContext Context { get; }
 
     /// <summary>Appends middleware around the complete application execution.</summary>
-    /// <param name="middleware">The runtime middleware.</param>
+    /// <param name="middleware">The middleware to append without deduplication.</param>
     /// <returns>This application.</returns>
-    /// <exception cref="InvalidOperationException">
-    /// The application has already begun executing.
-    /// </exception>
+    /// <exception cref="InvalidOperationException">Execution has already begun.</exception>
     IApplication Use(ApplicationMiddleware middleware);
 
     /// <summary>
-    /// Starts the application middleware pipeline once and returns after the host terminal has
-    /// mounted and entered its Running state.
+    /// Starts the application exactly once and returns after the host terminal signals that its
+    /// root has mounted. An already-cancelled token is observed after the single-use claim.
     /// </summary>
-    /// <param name="cancellationToken">Requests graceful shutdown during or after startup.</param>
-    /// <returns>A task that completes when startup succeeds or the pipeline ends before mounting.</returns>
-    /// <exception cref="InvalidOperationException">The application has already started.</exception>
+    /// <param name="cancellationToken">Requests graceful shutdown.</param>
+    /// <returns>A task representing startup through the running signal.</returns>
     ValueTask StartAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Requests graceful shutdown and waits for application cleanup.</summary>
-    /// <param name="cancellationToken">
-    /// Cancels only this caller's wait; application cleanup continues.
-    /// </param>
-    /// <returns>A task that completes after application cleanup.</returns>
+    /// <summary>Requests graceful shutdown and waits for lifetime cleanup.</summary>
+    /// <param name="cancellationToken">Cancels this caller's wait, never shared cleanup.</param>
+    /// <returns>A task representing cleanup completion.</returns>
     ValueTask StopAsync(CancellationToken cancellationToken = default);
 }

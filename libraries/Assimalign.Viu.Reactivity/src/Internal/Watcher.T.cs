@@ -4,11 +4,11 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// The value-watching <see cref="Watcher"/> behind <c>Watch(source, callback)</c> — the
-/// getter/old-value/callback loop underneath
-/// (<c>packages/reactivity/src/watch.ts</c>). Each reaction re-runs the (possibly deep-traversing)
+/// getter/old-value/callback loop underneath. Each reaction re-runs the (possibly deep-traversing)
 /// getter inside the effect to collect the new value and refresh dependencies, then delivers the
 /// callback when the value changed — or unconditionally for a deep/forced watcher. The previous value
-/// is preserved across reactions and handed to the callback as <c>oldValue</c>.
+/// is preserved across reactions and handed to the callback as <c>oldValue</c>. Specified by
+/// <c>[RCT-5]</c> and <c>[RCT-12]</c>.
 /// </summary>
 /// <typeparam name="T">The watched value type (an object array for the multi-source form).</typeparam>
 internal sealed class Watcher<T> : Watcher

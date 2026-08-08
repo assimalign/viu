@@ -55,7 +55,7 @@ parser needs knowledge of C#, CSS, or template-expression semantics. Downstream 
 block contents: the template compiler (`Assimalign.Viu.Syntax.Templates`) for the template block, the
 CSS library for the style blocks, and script analysis for `@script` ([V01.01.06.03]). The source
 generator that composes those parsers then assembles the result into the mountable component — the
-compiled render, merged C# script, compiled styles, and the `IComponentTemplate` bridge that makes a
+compiled render, merged C# script, compiled styles, and the generated `IComponent` implementation that makes a
 template-bearing component a real runtime component ([V01.01.06.07]). None of that lives here: this
 library's output is the descriptor, nothing more.
 

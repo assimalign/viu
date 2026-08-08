@@ -7,23 +7,23 @@ inactive host nodes move into a renderer-owned storage container, then move back
 ```csharp
 Reference<string> selected = Reactive.Reference("editor");
 
-ITemplateComponent root = KeepAlive.CreateComponent(
-    include: new[] { "Editor", "Preview" },
-    exclude: null,
-    maximum: 2,
-    child: _ => selected.Value == "editor"
-        ? ComponentTree.Template<Editor>()
-        : ComponentTree.Template<Preview>());
+VirtualNode root = new KeepAliveNode(
+    new ComponentInvocation(
+        arguments: new Dictionary<string, object?>
+        {
+            ["include"] = new[] { "Editor", "Preview" },
+            ["maximum"] = 2,
+        },
+        slots: new Dictionary<string, ComponentSlot>
+        {
+            ["default"] = _ => new ComponentNode(
+                ComponentReference.ForName(
+                    selected.Value == "editor" ? "Editor" : "Preview")),
+        }));
 
-IComponentFactory components = new ComponentFactory(
-[
-    new ComponentRegistration(
-        typeof(Editor),
-        static () => new Editor()),
-    new ComponentRegistration(
-        typeof(Preview),
-        static () => new Preview()),
-]);
+ComponentFactory components = new();
+components.Register(editorRegistration);
+components.Register(previewRegistration);
 ```
 
 Core activates `KeepAlive`, `Suspense`, and `BaseTransition` as reserved framework built-ins, so
@@ -39,7 +39,7 @@ reactive scope, and rendered subtree; its factory activator and `Setup` method d
 Templates opt into cache lifecycle through their ordinary component context:
 
 ```csharp
-public ComponentRenderer Setup(IComponentContext context)
+public ComponentRenderer Setup(ComponentContext context)
 {
     context.Lifecycle.OnActivated(RefreshVisibleDataAsync);
     context.Lifecycle.OnDeactivated(PausePolling);

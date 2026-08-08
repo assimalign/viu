@@ -106,12 +106,14 @@ public class ReactivityBenchmarks
     [Benchmark]
     public int BatchedWriteCoalescing()
     {
-        Reactive.StartBatch();
-        for (var index = 0; index < BatchedWriteCount; index++)
+        using (Reactive.Batch())
         {
-            _batchReference.Value = _counter++;
+            for (var index = 0; index < BatchedWriteCount; index++)
+            {
+                _batchReference.Value = _counter++;
+            }
         }
-        Reactive.EndBatch();
+
         return _sink;
     }
 

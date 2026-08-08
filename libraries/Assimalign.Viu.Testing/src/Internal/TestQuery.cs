@@ -38,8 +38,7 @@ internal static class TestQuery
         return result;
     }
 
-    internal static List<TestElement> DescendantElementsOf(
-        IReadOnlyList<TestNode> roots)
+    internal static List<TestElement> DescendantElementsOf(IReadOnlyList<TestNode> roots)
     {
         List<TestElement> result = [];
         for (int index = 0; index < roots.Count; index++)
@@ -50,24 +49,24 @@ internal static class TestQuery
         return result;
     }
 
-    internal static List<TestNode> HostNodes(TestElement container)
-    {
-        return new List<TestNode>(container.Children);
-    }
+    internal static List<TestNode> HostNodes(TestElement container) =>
+        new(container.Children);
 
-    internal static List<TestNode> HostNodes(
-        MountedTemplateNode<TestNode> template)
+    internal static List<TestNode> HostNodes(MountedComponentView<TestNode> view)
     {
-        TestNode first = template.Subtree.FirstHostNode;
-        TestNode last = template.Subtree.LastHostNode;
-        TestElement? parent = first.Parent;
-        if (parent is null || !ReferenceEquals(parent, last.Parent))
+        TestNode? first = view.FirstHostNode;
+        TestNode? last = view.LastHostNode;
+        TestElement? parent = first?.Parent;
+        if (first is null
+            || last is null
+            || parent is null
+            || !ReferenceEquals(parent, last.Parent))
         {
             return [];
         }
 
-        int firstIndex = parent.Children.IndexOf(first);
-        int lastIndex = parent.Children.IndexOf(last);
+        int firstIndex = parent.IndexOfChild(first);
+        int lastIndex = parent.IndexOfChild(last);
         if (firstIndex < 0 || lastIndex < firstIndex)
         {
             return [];
@@ -99,9 +98,7 @@ internal static class TestQuery
         }
     }
 
-    private static void CollectElementNodes(
-        TestNode node,
-        List<TestElement> elements)
+    private static void CollectElementNodes(TestNode node, List<TestElement> elements)
     {
         if (node is not TestElement element)
         {
@@ -115,12 +112,10 @@ internal static class TestQuery
         }
     }
 
-    private static string? AttributeString(TestElement element, string name)
-    {
-        return element.Properties.TryGetValue(name, out object? value)
+    private static string? AttributeString(TestElement element, string name) =>
+        element.Properties.TryGetValue(name, out object? value)
             ? value?.ToString()
             : null;
-    }
 
     private static bool HasClass(TestElement element, string className)
     {
@@ -130,9 +125,7 @@ internal static class TestQuery
             return false;
         }
 
-        string[] tokens = classes.Split(
-            ' ',
-            StringSplitOptions.RemoveEmptyEntries);
+        string[] tokens = classes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         for (int index = 0; index < tokens.Length; index++)
         {
             if (string.Equals(tokens[index], className, StringComparison.Ordinal))
@@ -160,9 +153,6 @@ internal static class TestQuery
 
         string name = body[..equalsIndex].Trim();
         string value = body[(equalsIndex + 1)..].Trim().Trim('"', '\'');
-        return string.Equals(
-            AttributeString(element, name),
-            value,
-            StringComparison.Ordinal);
+        return string.Equals(AttributeString(element, name), value, StringComparison.Ordinal);
     }
 }

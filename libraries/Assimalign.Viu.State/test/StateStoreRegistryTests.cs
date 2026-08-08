@@ -1,22 +1,41 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.Components;
-using Assimalign.Viu.Reactivity;
-
 using Shouldly;
 using Xunit;
+
+using Assimalign.Viu.Reactivity;
+using Assimalign.Viu.State;
 
 namespace Assimalign.Viu.State.Tests;
 
 public sealed class StateStoreRegistryTests
 {
     [Fact]
+    public void Use_SameDefinitionAndRegistry_ReturnsOneRegistryOwnedStore()
+    {
+        using var registry = StateStores.CreateRegistry();
+        var activationCount = 0;
+        var definition = new StateStoreDefinition<CounterStore>(
+            "counter",
+            _ =>
+            {
+                activationCount++;
+                return new CounterStore();
+            });
+
+        var first = definition.Use(registry);
+        var second = definition.Use(registry);
+
+        second.ShouldBeSameAs(first);
+        activationCount.ShouldBe(1);
+        registry.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public void GetOrCreate_SameDefinition_UsesOneDetachedRootAndOneAttachedStoreScope()
     {
         MessageService message = new("state");
-        ComponentFactory components =
-            new(Array.Empty<ComponentRegistration>());
         DictionaryServiceProvider services = new(
             new Dictionary<Type, object>
             {
@@ -25,7 +44,6 @@ public sealed class StateStoreRegistryTests
         TestReactiveEffectScopeFactory effectScopes = new();
         TestReactiveWatchScheduler watchScheduler = new();
         using StateStoreRegistry registry = new(
-            components,
             services,
             effectScopes,
             watchScheduler);
@@ -36,16 +54,16 @@ public sealed class StateStoreRegistryTests
             {
                 setupRuns++;
                 context.Scope.ShouldBeSameAs(effectScopes.CreatedScopes[1]);
-                context.Components.ShouldBeSameAs(components);
                 context.Services.ShouldBeSameAs(services);
                 context.WatchScheduler.ShouldBeSameAs(watchScheduler);
-                context.Owner.ShouldBeNull();
-                MessageService service =
-                    (MessageService)context.Services.GetService(
-                        typeof(MessageService))!;
-                return new MessageStateStore(service.Message);
+                object? resolvedService = context.Services!.GetService(
+                    typeof(MessageService));
+                MessageService resolvedMessage =
+                    resolvedService.ShouldBeOfType<MessageService>();
+                return new MessageStateStore(resolvedMessage.Message);
             });
 
+        // [STA-2] One definition in one registry is a reference-identity cache hit.
         MessageStateStore first = registry.GetOrCreate(definition);
         MessageStateStore second = registry.GetOrCreate(definition);
 
@@ -64,7 +82,7 @@ public sealed class StateStoreRegistryTests
     }
 
     [Fact]
-    public void GetOrCreate_DifferentDefinitionWithSameKey_ThrowsTypedDuplicateError()
+    public void GetOrCreate_DifferentDefinitionWithSameOrdinalKey_ThrowsTypedDuplicateError()
     {
         using StateStoreRegistry registry =
             StateStoreTestSupport.CreateRegistry();
@@ -75,6 +93,7 @@ public sealed class StateStoreRegistryTests
 
         registry.GetOrCreate(first);
 
+        // [STA-2] A key collision never replaces the owning definition.
         DuplicateStateStoreKeyException exception =
             Should.Throw<DuplicateStateStoreKeyException>(
                 () => registry.GetOrCreate(second));
@@ -83,17 +102,34 @@ public sealed class StateStoreRegistryTests
     }
 
     [Fact]
+    public void GetOrCreate_KeyComparison_IsOrdinalAndCaseSensitive()
+    {
+        using StateStoreRegistry registry =
+            StateStoreTestSupport.CreateRegistry();
+        StateStoreDefinition<CounterStore> lower =
+            StateStores.Define("counter", static () => new CounterStore());
+        StateStoreDefinition<CounterStore> upper =
+            StateStores.Define("Counter", static () => new CounterStore());
+
+        CounterStore lowerStore = lower.Use(registry);
+        CounterStore upperStore = upper.Use(registry);
+
+        lowerStore.ShouldNotBeSameAs(upperStore);
+        registry.Count.ShouldBe(2);
+    }
+
+    [Fact]
     public void GetOrCreate_SetupThrows_StopsChildScopeWithoutRegisteringEntry()
     {
         TestReactiveEffectScopeFactory effectScopes = new();
         using StateStoreRegistry registry = new(
-            StateStoreTestSupport.Components,
-            StateStoreTestSupport.Services,
+            services: null,
             effectScopes);
         StateStoreDefinition<CounterStore> definition = new(
             "counter",
             _ => throw new InvalidOperationException("boom"));
 
+        // [STA-2] Failed setup leaves no partial entry and stops its new child scope.
         Should.Throw<InvalidOperationException>(
             () => registry.GetOrCreate(definition));
 
@@ -104,7 +140,27 @@ public sealed class StateStoreRegistryTests
     }
 
     [Fact]
-    public void Remove_StopsOnlyTheSelectedStoreAndNextUseCreatesAFreshInstance()
+    public void GetOrCreate_SetupReturnsNull_StopsChildScopeWithoutRegisteringEntry()
+    {
+        TestReactiveEffectScopeFactory effectScopes = new();
+        using StateStoreRegistry registry = new(
+            services: null,
+            effectScopes);
+        StateStoreDefinition<CounterStore> definition = new(
+            "counter",
+            _ => null!);
+
+        InvalidOperationException exception =
+            Should.Throw<InvalidOperationException>(
+                () => registry.GetOrCreate(definition));
+
+        exception.Message.ShouldContain("counter");
+        registry.Count.ShouldBe(0);
+        effectScopes.CreatedScopes[1].IsActive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Remove_StopsOnlySelectedStoreAndNextUseCreatesFreshInstance()
     {
         using StateStoreRegistry registry =
             StateStoreTestSupport.CreateRegistry();
@@ -115,7 +171,8 @@ public sealed class StateStoreRegistryTests
         CounterStore first = firstDefinition.Use(registry);
         CounterStore second = secondDefinition.Use(registry);
 
-        firstDefinition.Dispose(registry).ShouldBeTrue();
+        // [STA-2] Removing one definition ends only that child lifetime.
+        firstDefinition.Remove(registry).ShouldBeTrue();
         CounterStore rebuilt = firstDefinition.Use(registry);
 
         rebuilt.ShouldNotBeSameAs(first);
@@ -124,18 +181,32 @@ public sealed class StateStoreRegistryTests
     }
 
     [Fact]
-    public void Dispose_StopsRootAndEveryChild_ClearsActiveRegistryAndIsIdempotent()
+    public void Remove_DisposesMaterializedStore()
+    {
+        using StateStoreRegistry registry =
+            StateStoreTestSupport.CreateRegistry();
+        StateStoreDefinition<DisposableStore> definition =
+            StateStores.Define("disposable", static () => new DisposableStore());
+        DisposableStore store = definition.Use(registry);
+
+        definition.Remove(registry).ShouldBeTrue();
+
+        store.IsDisposed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Dispose_StopsRootAndChildrenClearsAmbientAndIsIdempotent()
     {
         TestReactiveEffectScopeFactory effectScopes = new();
         StateStoreRegistry registry = new(
-            StateStoreTestSupport.Components,
-            StateStoreTestSupport.Services,
+            services: null,
             effectScopes);
         StateStoreDefinition<CounterStore> definition =
             StateStores.Define("counter", static () => new CounterStore());
         definition.Use(registry);
         StateStores.SetActiveRegistry(registry);
 
+        // [STA-2] Registry disposal ends every store lifetime and is idempotent.
         Should.NotThrow(
             () =>
             {
@@ -149,26 +220,6 @@ public sealed class StateStoreRegistryTests
         StateStores.ActiveRegistry.ShouldBeNull();
         Should.Throw<ObjectDisposedException>(
             () => definition.Use(registry));
-    }
-
-    private sealed class MessageStateStore
-    {
-        internal MessageStateStore(string message)
-        {
-            Message = message;
-        }
-
-        internal string Message { get; }
-    }
-
-    private sealed class MessageService
-    {
-        internal MessageService(string message)
-        {
-            Message = message;
-        }
-
-        internal string Message { get; }
     }
 
     private sealed class DictionaryServiceProvider : IServiceProvider
@@ -188,31 +239,38 @@ public sealed class StateStoreRegistryTests
         }
     }
 
-    private sealed class TestReactiveEffectScopeFactory :
-        IReactiveEffectScopeFactory
+    private sealed class DisposableStore : IDisposable
     {
-        internal List<TestReactiveEffectScope> CreatedScopes { get; } = new();
+        internal bool IsDisposed { get; private set; }
 
-        internal List<bool> CreatedDetachedValues { get; } = new();
+        public void Dispose() => IsDisposed = true;
+    }
 
-        public IReactiveEffectScope Create(bool isDetached = false)
+    private sealed class MessageService
+    {
+        internal MessageService(string message)
         {
-            TestReactiveEffectScope scope = new(
-                isDetached
-                    ? null
-                    : TestReactiveEffectScope.Current);
-            CreatedScopes.Add(scope);
-            CreatedDetachedValues.Add(isDetached);
-            return scope;
+            Message = message;
         }
+
+        internal string Message { get; }
+    }
+
+    private sealed class MessageStateStore
+    {
+        internal MessageStateStore(string message)
+        {
+            Message = message;
+        }
+
+        internal string Message { get; }
     }
 
     private sealed class TestReactiveEffectScope : IReactiveEffectScope
     {
         private readonly List<TestReactiveEffectScope> _children = new();
 
-        internal TestReactiveEffectScope(
-            TestReactiveEffectScope? parent)
+        internal TestReactiveEffectScope(TestReactiveEffectScope? parent)
         {
             Parent = parent;
             parent?._children.Add(this);
@@ -220,9 +278,11 @@ public sealed class StateStoreRegistryTests
 
         internal static TestReactiveEffectScope? Current { get; private set; }
 
+        public bool IsActive { get; private set; } = true;
+
         internal TestReactiveEffectScope? Parent { get; }
 
-        public bool IsActive { get; private set; } = true;
+        public void Dispose() => Stop();
 
         public void Run(Action action)
         {
@@ -275,7 +335,27 @@ public sealed class StateStoreRegistryTests
                 child.Stop();
             }
         }
+    }
 
-        public void Dispose() => Stop();
+    private sealed class TestReactiveEffectScopeFactory : IReactiveEffectScopeFactory
+    {
+        internal List<bool> CreatedDetachedValues { get; } = new();
+
+        internal List<TestReactiveEffectScope> CreatedScopes { get; } = new();
+
+        public IReactiveEffectScope Create(bool isDetached = false)
+        {
+            TestReactiveEffectScope scope = new(
+                isDetached
+                    ? null
+                    : TestReactiveEffectScope.Current);
+            CreatedScopes.Add(scope);
+            CreatedDetachedValues.Add(isDetached);
+            return scope;
+        }
+    }
+
+    private sealed class CounterStore
+    {
     }
 }

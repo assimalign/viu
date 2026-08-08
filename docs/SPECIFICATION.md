@@ -2,16 +2,15 @@
 
 ## 0. Status, scope, and conformance language
 
-**Status:** Draft — normative for implemented behavior.
+**Status:** Draft — normative for implemented behavior and explicitly adopted migration standards.
 **Adopted:** 2026-08-02 (standalone-framework decision).
 **Applies to:** every `Assimalign.Viu.*` library, generator, SDK, and extension in this repository.
 
 This document is the normative description of Viu's own semantics. Where an implementation and this
 document disagree, one of them is a defect; this document is the arbiter of intent.
 
-**Viu is a standalone C#/.NET WebAssembly UI framework. It is not a port of, binding to, or
-derivative of any JavaScript framework, and no external project's behavior is authoritative for
-Viu's semantics.**
+**Viu is a standalone C#/.NET WebAssembly UI framework. Its semantics are owned here and by the
+repository's conformance tests; external projects do not define them.**
 
 Immediately, the thing that must not be lost from that statement:
 
@@ -34,7 +33,8 @@ exists, or records an observable consequence of one.
 **This specification describes implemented behavior only.** Anything not yet implemented appears
 solely in [§17 (Non-goals and current limits)](#17-non-goals-and-current-limits) — never in the body
 as though it exists. A section that describes a partially implemented capability MUST state its
-current limit inline and cross-reference §17.
+current limit inline and cross-reference §17. The temporary owner-authorized document-status note
+after [DOC-2] identifies the sole migration exception.
 
 ### 0.3 Clause identifiers
 
@@ -80,16 +80,15 @@ The principal runtime, compiler, and editor assemblies and their responsibilitie
 
 | Library | Responsibility |
 | --- | --- |
-| `Assimalign.Viu.Shared` | The compiler↔runtime flag vocabulary, value normalization, HTML/SVG/MathML knowledge tables |
-| `Assimalign.Viu.Components` | The immutable component-tree vocabulary and the activation contract |
+| `Assimalign.Viu.Components` | The closed `VirtualNode` vocabulary, authored-component contract, registrations, bindings, render plans, and compiler↔runtime flag values |
 | `Assimalign.Viu.Reactivity` | The dependency engine, reference primitives, effects, scopes, watch |
-| `Assimalign.Viu.State` | Store definitions and the registry that owns their reactive lifetimes |
-| `Assimalign.Viu.Core` | Host-neutral application, renderer, scheduler, hydration, built-in components |
+| `Assimalign.Viu.State` | A store convention attached through services and the ambient reactive scope; the registry owns store lifetimes |
+| `Assimalign.Viu.Core` | The Application Model, renderer and scheduler engine, hydration, internal built-in executors, and host-facing operations |
 | `Assimalign.Viu.Browser` | The browser host adapter: interop bridge, DOM directives, transitions |
 | `Assimalign.Viu.ServerRenderer` | HTML serialization and the hydration marker protocol |
 | `Assimalign.Viu.Router` / `Assimalign.Viu.Browser.Router` | The DOM-free router core and its browser click/history bridge |
 | `Assimalign.Viu.Testing` | The in-memory host and component test wrappers |
-| `Assimalign.Viu.Syntax*` | The build-time parser cluster: templates, `.viu`/`.vue` containers, CSS, HTML, JavaScript |
+| `Assimalign.Viu.Syntax*` | The build-time parser cluster: templates, `.viu`/`.vue` containers, CSS, and HTML |
 | `Assimalign.Viu.Compiler.*` | Build-time composition roots for CSS and single-file-component projection |
 | `Assimalign.Viu.UtilityCss` | The independently published utility CSS compiler and compatibility engine |
 | `Assimalign.Viu.LanguageService` / `.LanguageServer` | Editor semantics and their Language Server Protocol process boundary |
@@ -143,9 +142,9 @@ lands on the main thread through the JavaScript event loop.
 Viu never scans assemblies and never calls `Activator.CreateInstance`.
 
 `[EXE-5]` Component activation is **explicit delegate dispatch**. `IComponentFactory` resolves a
-template by registered type or registered name; `ComponentRegistration` carries an explicit
-activator delegate. An application MAY close those delegates over a generated resolver, a
-dependency-injection container, or hand-written composition.
+`ComponentReference` to a `ComponentRegistration`; the registration carries the reference, the
+static `ComponentContract`, and an explicit `ComponentActivator`. An application MAY close an
+activator over a generated resolver, a dependency-injection container, or hand-written composition.
 
 `[EXE-6]` Shipping libraries MUST set `<IsAotCompatible>true</IsAotCompatible>`.
 
@@ -189,68 +188,101 @@ them back, and .NET purges its listener delegates in the same call.
 `docs/adr/0003-batched-interop-dom-operations.md`;
 `libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`;
 `libraries/Assimalign.Viu.Core/src/Scheduling/Scheduler.cs`;
-`libraries/Assimalign.Viu.Components/src/Activation/{ComponentFactory,ComponentRegistration}.cs`;
-`docs/ARCHITECTURE.md` §"AOT and ownership rules".*
+`libraries/Assimalign.Viu.Components/src/Activation/ComponentFactory.cs`;
+`libraries/Assimalign.Viu.Components/src/Components/ComponentRegistration.cs`.*
 
 ---
 
 ## 4. The component model
 
-### 4.1 Three lifetimes
+### 4.1 Four lifetimes
 
-`[CMP-1]` Viu separates three roles that a single object would otherwise conflate:
+`[CMP-1]` Viu separates four roles that a single object would otherwise conflate:
 
 | Role | Type | Lifetime |
 | --- | --- | --- |
-| Render description | `IComponent` | Recreated by every render |
-| Authored behavior | `IComponentTemplate` | One instance per mounted template request |
-| Runtime bookkeeping | Internal Core `MountedRenderNode<TNode>` variants | Mount through unmount |
+| Immutable render description | `VirtualNode` and its sealed variants | One render result; compiler-cached immutable subtrees may retain identity |
+| Static identity, contract, and activation | `ComponentReference`, `ComponentContract`, `ComponentRegistration` | Readable for the registration's lifetime, before activation |
+| Activated authored behavior | `IComponent` | One instance per mounted component invocation |
+| Mounted bookkeeping | Internal Core engine types | Mount through unmount |
 
-`[CMP-2]` `IComponent` values are **immutable descriptions**. Mounted host state — host nodes,
+`[CMP-2]` `VirtualNode` values are **immutable descriptions**. Mounted host state — host nodes,
 anchors, ranges, reactive render effects, parent links, prior-tree state — is owned internally by
-Core and MUST NOT be written back onto an `IComponent`.
+Core and MUST NOT be written back onto a `VirtualNode`, an authored `IComponent`, or a static
+registration.
+
+The parent-created `ComponentInvocation` (`Arguments`, `Slots`, `Listeners`, `Directives`) and the
+mounted `ComponentBindings` (`Parameters`, `Slots`, `FallthroughBindings`) are different lifetimes
+and deliberately share no interface. The pure transformation is
+`ComponentBindings.Resolve(ComponentContract, ComponentInvocation,
+ICollection<ComponentBindingDiagnostic>?)`; the runtime owns per-mount default caching and
+initial-warning gating around its diagnostics.
+
+The authored `ComponentContext` is a public abstract Components type with a protected constructor.
+Its exact surface is `ComponentBindings Bindings`, `IServiceProvider? Services`,
+`ComponentLifecycle Lifecycle`, `IReactiveEffectScope Scope`,
+`IReactiveWatchScheduler? WatchScheduler`, `ComponentContext? Parent`,
+`Emit(string, params object?[])`, `Expose(object?)`, `Warn(string)`, concrete scoped
+`Watch<TValue>(Func<TValue>, Action<TValue,TValue>)`, and protected
+`OnWatchError(Exception)`. Core supplies the only runtime implementation. No runtime API accepts a
+consumer-derived context, and the context carries no convention-specific or style-scope member.
 
 ### 4.2 The tree vocabulary
 
-`[CMP-3]` The component tree has exactly seven kinds, discriminated by `ComponentKind`:
+`[CMP-3]` `VirtualNode` is a closed abstract algebra: its constructor is `private protected`, every
+shipping variant is sealed, and a variant fixes its own `VirtualNodeKind`, so kind and runtime type
+cannot disagree. The algebra has exactly ten kinds:
 
-| `ComponentKind` | Interface | Describes |
+| `VirtualNodeKind` | Sealed variant | Describes |
 | --- | --- | --- |
-| `Element` | `IElementComponent` | A host element |
-| `Template` | `ITemplateComponent` | A user-authored template mount request |
-| `Text` | `ITextComponent` | A text value |
-| `Comment` | `ICommentComponent` | A comment or empty placeholder |
-| `Static` | `IStaticComponent` | A pre-rendered static range |
-| `Fragment` | `IFragmentComponent` | A group of siblings |
-| `Teleport` | `ITeleportComponent` | Content rendered into a different host container |
+| `Element` | `ElementNode` | A qualified host element, bindings, directives, and children |
+| `Text` | `TextNode` | A text value |
+| `Comment` | `CommentNode` | A comment or empty placeholder |
+| `Static` | `StaticNode` | A compiler-trusted static payload |
+| `Fragment` | `FragmentNode` | A transparent group of siblings |
+| `Component` | `ComponentNode` | A non-activating invocation of registered authored behavior |
+| `Teleport` | `TeleportNode` | Content rendered into a host-resolved target |
+| `KeepAlive` | `KeepAliveNode` | A component subtree eligible for retained mounted state |
+| `Suspense` | `SuspenseNode` | Lazy content and fallback branches coordinated by asynchronous work |
+| `Transition` | `TransitionNode` | Lazy content decorated with host-provided transition behavior |
 
-`ComponentTree` is the public factory for these values.
+Applications and generated code construct the sealed node types directly. `ComponentNode` carries a
+`ComponentReference` and a raw immutable `ComponentInvocation`; it does not activate the component.
 
 ### 4.3 Activation
 
-`[CMP-4]` `IComponentFactory` is **only** a component resolver. It declares `Create(Type)` and
-`Create(string)`, plus a default-implemented generic `Create<TComponent>()` that forwards to
-`Create(Type)`. It does **not** implement or inherit `IServiceProvider`.
+`[CMP-4]` `IComponentFactory` is **only** a registration resolver. `Resolve(ComponentReference)`
+returns the matching `ComponentRegistration` or throws when none is registered;
+`TryResolve(ComponentReference, out ComponentRegistration?)` probes without activation. The factory
+does **not** implement `IServiceProvider`, discover constructors, or activate a component itself.
+Each registration exposes exactly `ComponentReference Reference`, `ComponentContract Contract`, and
+`ComponentActivator Activator`; its contract is therefore readable before activation.
 
-`[CMP-5]` `IApplicationContext` carries the `IComponentFactory` and the `IServiceProvider` as
-**independent** values. An application MAY supply one object for both roles; the contracts do not
-require it.
+`[CMP-5]` `IApplicationContext` carries the `IComponentFactory` and nullable `IServiceProvider` as
+**independent** values. Services are opt-in. An application MAY supply one object for both roles;
+the contracts do not require it.
 
-`[CMP-6]` The built-in `ComponentFactory` resolves a registered name by trying the raw name, then
-its camel-case spelling, then the Pascal-case spelling of that — so a `my-widget` request resolves a
-`myWidget` or `MyWidget` registration. Name lookup is **ordinal**. A duplicate registered component
-type, or a duplicate registered name, throws `ArgumentException` at construction. An unregistered
-type or name throws `InvalidOperationException` at resolution: runtime constructor discovery is not
-a fallback [EXE-4].
+`[CMP-6]` The built-in `ComponentFactory` stores explicit registrations keyed by
+`ComponentReference`. Registering a duplicate reference throws; name identity is ordinal, and an
+unregistered reference throws `InvalidOperationException` from `Resolve`. Runtime constructor
+discovery is never a fallback [EXE-4].
 
-`[CMP-7]` An `ITemplateComponent` is a **non-activating** mount request: it identifies its template
-by explicit `Type` or by registered name and carries immutable argument, slot, parent-listener,
-directive, key, and optimization snapshots. Core selects the matching `IComponentFactory.Create`
-overload at mount time.
+`[CMP-7]` A `ComponentNode` is a **non-activating** mount request. Its `ComponentReference` uses an
+explicit type token or registered name, while its `ComponentInvocation` carries immutable raw
+argument, slot, parent-listener, and directive snapshots. Key, mount reference, and `RenderPlan`
+belong to the node. Core resolves the reference to a registration at mount time.
 
-`[CMP-8]` `IComponentTemplate.Setup(IComponentContext)` is **synchronous** and returns the render
-closure (`ComponentRenderer`), so Core establishes the component's reactive scope deterministically
-before any asynchronous work can interleave.
+`[CMP-8]` `IComponent` has exactly one member: synchronous
+`ComponentRenderer Setup(ComponentContext context)`. Core runs setup inside the mounted component's reactive scope before any
+asynchronous work can interleave. The renderer receives that mount's `ComponentRenderFrame` and
+returns the current immutable `VirtualNode?` subtree; compiler-cached static subtrees MAY retain
+identity across renders [SFC-OPT-1].
+
+`[CMP-34]` `ComponentRegistration.Define(string, ComponentContract, ComponentSetup)` creates a
+reflection-free code-first registration backed by
+`ComponentRenderer ComponentSetup(ComponentContext context)`. It is composition-only: there is no
+options-object overload. Hand-built output defaults to `RenderPlan.None` and therefore uses a full
+diff unless the author supplies compiler-equivalent plans through the render frame.
 
 ### 4.4 Ownership
 
@@ -258,11 +290,12 @@ before any asynchronous work can interleave.
 provider, and the state registry. Core and its application objects *borrow* them and MUST NOT
 dispose them.
 
-`[CMP-10]` Core **owns** each activated template instance and MUST dispose it (when it implements
-`IDisposable`) on setup failure or on unmount.
+`[CMP-10]` Core **owns** each activated `IComponent` instance and MUST dispose it on setup failure
+or unmount when it implements `IAsyncDisposable` or `IDisposable`; asynchronous disposal takes
+precedence when both are implemented.
 
-`[CMP-11]` Viu does not create dependency-injection scopes automatically. A custom factory MAY bind
-a scope to the template instance it returns.
+`[CMP-11]` Viu does not create dependency-injection scopes automatically. A custom activator MAY
+bind a scope to the component instance it returns.
 
 ### 4.5 Parameters, events, and fallthrough
 
@@ -270,40 +303,45 @@ a scope to the template instance it returns.
 most once per mounted instance**, and an optional validator. A required-value or validator failure
 **warns without discarding** the supplied value.
 
-`[CMP-13]` The declaration name is canonical in `IComponentContext.Arguments`. A parent render MAY
-spell a parameter in camel-case or kebab-case; both resolve to the canonical declaration name.
+`[CMP-13]` The declaration name is canonical in `ComponentContext.Bindings.Parameters`. A parent
+invocation MAY spell a parameter in camel-case or kebab-case; `ComponentBindings.Resolve` matches
+aliases and publishes the value under the canonical declaration name.
 
-`[CMP-14]` `ComponentEvent` MAY validate the complete ordered argument list. `IComponentContext.Emit`
-accepts zero or more ordered arguments. A kebab-case emission matches a camel-case listener.
+`[CMP-14]` `ComponentEvent` MAY validate the complete ordered argument list.
+`ComponentContext.Emit` accepts zero or more ordered arguments. A kebab-case emission matches a
+camel-case listener.
 
-`[CMP-15]` `ComponentEventListener` supports single-payload and all-arguments handler forms, each in
-synchronous and `Task`-returning shapes. A single-payload listener receives the first argument, or
-`null` for an argument-free emission. Every `Task` returned by a multicast asynchronous listener is
-observed through the component error pipeline.
+`[CMP-15]` `ComponentEventListener` receives one immutable `IReadOnlyList<object?>` snapshot for an
+emission. Generated or authored adapters MAY project that list into strongly typed handler shapes;
+the invocation stores the one listener delegate contract and event delivery itself is synchronous.
 
-`[CMP-16]` A listener MAY be marked `IsOnce`. Once-state belongs to the **mounted instance** and
-survives parent updates. Both an ordinary and a `Once` listener MAY run for a single emission.
+`[CMP-16]` A generated listener MAY be wrapped for once-only delivery. Once-state belongs to the
+**mounted instance** and survives parent updates. Both an ordinary and a once-only listener MAY run
+for one emission.
 
-`[CMP-17]` **Fallthrough.** Declared `onX` and `onXOnce` listeners are consumed as component events.
-Undeclared listeners remain fallthrough attributes. When attribute inheritance is enabled and the
-template renders a single element root, Core merges fallthrough properties: classes **space-join**,
+`[CMP-17]` **Fallthrough.** `ComponentBindings.Resolve` consumes declared listeners as component
+events and places undeclared invocation bindings in `FallthroughBindings`. When contract-level
+inheritance is enabled and the component renders a single element root, Core merges fallthrough
+bindings: classes **space-join**,
 style declarations **merge with the parent value winning**, and compatible event delegates
 **combine in root-then-parent order**. Declared component-event listeners never enter this
 host-event merge.
 
 ### 4.6 Slots
 
-`[CMP-18]` `ComponentSlots` carries `SlotFlags` metadata — `Stable`, `Dynamic`, or `Forwarded` —
-preserved from compilation into the immutable template request. Core uses that classification to
-**skip** child renders for structurally stable slots while forcing updates for dynamic and
-effectively-dynamic forwarded slots.
+`[CMP-18]` Generated slot sets carry a `SlotStability` classification — `Stable`, `Dynamic`, or
+`Forwarded` — in the immutable invocation's `SlotStability` property. Core's component-update gate
+consumes that classification to **skip** child renders for structurally stable slots while forcing
+updates for dynamic and effectively-dynamic forwarded slots.
 
-`[CMP-19]` A hand-authored slot collection that cannot prove stability MUST report
-`SlotFlags.Dynamic`. An over-optimistic flag manifests as a child that silently stops updating.
+`[CMP-19]` `ComponentInvocation.SlotStability` defaults to `SlotStability.Stable` for empty or fixed
+hand-authored slot sets. A caller whose slot structure can change MUST explicitly supply
+`SlotStability.Dynamic`; a caller forwarding its parent's slots MUST supply `SlotStability.Forwarded`.
+An over-optimistic classification manifests as a child that silently stops updating.
 
 ### 4.7 Lifecycle
 
-`[CMP-20]` `IComponentLifecycle` exposes **named, typed hooks**, not an enum-keyed callback
+`[CMP-20]` `ComponentLifecycle` exposes **named, typed hooks**, not an enum-keyed callback
 registry: before-mount, mounted, before-update, updated, before-unmount, unmounted, activated,
 deactivated, and `OnServerPrefetch`. Each accepts a synchronous or a `Task`-returning callback.
 
@@ -312,42 +350,55 @@ returned `Task` and routes faults through `OnErrorCaptured` to the application e
 does not await it. `OnServerPrefetch` is the sole awaited hook, and only during server rendering
 ([§11](#11-server-rendering-and-hydration)), because serialization must wait for its data.
 
-`[CMP-22]` `IComponentLifecycle` exposes the **component-lifetime `CancellationToken`**. It is
+`[CMP-22]` `ComponentLifecycle` exposes the **component-lifetime `CancellationToken`**. It is
 cancelled during unmount, *after* before-unmount callbacks start and *before* effect-scope and
 subtree teardown.
 
 `[CMP-23]` The application-level error handler is the **terminal sink** for observed render,
 lifecycle, watcher, and event faults that no ancestor `OnErrorCaptured` hook stopped.
 
-### 4.8 No component-tree provide/inject
+### 4.8 Explicit component-model seams
 
 `[CMP-24]` Viu has **no hierarchical component-tree dependency API**. Component dependencies are
 explicit:
 
 - parameters and slots for parent-to-child data;
-- `IComponentContext.Services` for application services;
-- State definitions and explicit registries for shared state; and
-- `IComponentContext.Components` for deliberate component resolution.
+- nullable `ComponentContext.Services` for application-composed services;
+- the ambient reactive scope for scope-bound conventions; and
+- `ComponentReference` values for deliberate registration resolution at mount.
 
 This is a decision, not a deferral (see [§17](#17-non-goals-and-current-limits)). It has visible
 consequences elsewhere: `RouterView` takes its nesting depth as an explicit argument
 ([§12](#12-routing)) precisely because no ambient hierarchical channel exists.
 
+`[CMP-33]` A library MAY attach to the component model only through a designed seam: the host
+contract and public operations, `ComponentContext.Services` plus the ambient reactive scope, the
+generated-code ABI, or application composition. Capability discovery by casting a
+`ComponentContext`, cross-library friend access, and bridge interfaces are prohibited. If an
+integration needs one, the seam is missing and the seam — not a shim — MUST be fixed.
+
 #### Application composition and lifetime
 
-`[APP-1]` A runnable `IApplication` has the internal single-use state machine **Created → Starting →
-Running → Stopping → Stopped**, with failure edges from Starting, Running, and Stopping. `StartAsync`
-synchronously claims the application by moving it from Created to Starting exactly once, begins the
-middleware pipeline as an independently observed asynchronous task, and waits until the host terminal
-has mounted and signalled Running. Every later `StartAsync` call throws, including after stopping or
-failure. `IApplicationContext.IsRunning` is true only between that mounted signal and the beginning of
-stopping. An already-cancelled token is observed only after the claim and therefore follows the
-ordinary **Starting → Stopping → Stopped** path without mounting.
+`[APP-1]` A runnable `IApplication` is coordinated by Core's public sealed
+`ApplicationLifetime` over the promoted `ApplicationState` values **Created → Starting → Running →
+Stopping → Stopped**, with `Failed` edges from Starting, Running, and Stopping. Constructing the
+lifetime claims its application context exactly once; a second attachment is rejected. `StartAsync`
+synchronously claims execution by moving from Created to Starting exactly once, begins the
+middleware pipeline as an independently observed asynchronous task, and waits until the host
+terminal has mounted and signalled Running. Every later `StartAsync` call throws, including after
+stopping or failure. `IApplicationContext.IsRunning` is true only between that mounted signal and
+the beginning of stopping. An already-cancelled token is observed only after the claim and therefore
+follows the ordinary **Starting → Stopping → Stopped** path without mounting.
+
+`ApplicationLifetime` owns the platform-invariant transitions exposed by `StartExecution`,
+`SignalRunning`, `RequestStopping`, `CompleteStopping`, and `Fail`, plus `State`, `HasFailed`,
+`Stopping`, `IsStoppingCancellation`, and `Dispose`. `Fail` MUST cancel `Stopping` before it invokes
+the one-shot error report, so observers see shutdown requested before failure notification.
 
 `[APP-2]` Application composition and runtime behavior are separate phases. The lean
 `IApplicationBuilder` exposes only `ConfigureApplication(Action<ApplicationOptions>)` and `Build()`.
 `ApplicationOptions` is the single builder composition surface for the root component, component
-factory, service provider, state registry, directive resolver, and diagnostics. `Build()` snapshots
+factory, nullable opt-in service provider, state registry, directive resolver, and diagnostics. `Build()` snapshots
 those borrowed values into a read-only `IApplicationContext`; later option mutation cannot alter the
 built context. `Use(ApplicationMiddleware)` decorates the already-built application's live execution
 and cannot add or replace composition.
@@ -381,10 +432,11 @@ cleanup in reverse registration order. `StopAsync` awaits the pipeline task; its
 that caller's wait, never the cleanup. Cleanup surrounding a failing inner delegate still runs through
 ordinary asynchronous `try`/`finally` semantics. A pipeline failure after startup moves the
 application to Failed, is reported once through `IApplicationContext.ErrorHandler`, and remains on the
-pipeline task so `StopAsync` and `RunAsync` surface it. Startup and host failures follow the same
-reporting path; cancellation requested through Stopping is normal shutdown [APP-1].
+pipeline task so `StopAsync` and `RunAsync` surface it. Startup and host failures call
+`ApplicationLifetime.Fail`, whose cancel-before-report and one-shot behavior is normative [APP-1];
+cancellation requested through Stopping is normal shutdown.
 
-`[APP-6]` The component factory, service provider, state registry, directive resolver, and other
+`[APP-6]` The component factory, nullable service provider, state registry, directive resolver, and other
 composition dependencies are **borrowed**. Viu never disposes them when an application stops, fails,
 or is asynchronously disposed; their external composition root retains ownership [CMP-9].
 
@@ -400,11 +452,11 @@ separate per-render composition and also does not participate in this pipeline [
 `[CMP-26]` A component MAY declare its inputs on the **properties that receive them**: `[Parameter]`
 on a settable instance property of a `.viu` / `.vue` `@script` class. The single-file-component source
 generator reads the attribute at build time and synthesizes the equivalent `ComponentParameter` into
-the generated partial's `IComponentTemplate.Parameters`. The attribute is a **compile-time
-declaration only** — nothing is discovered by reflection, and the resulting declaration is the same
-static value an imperative one produces [CMP-12]. The attributes take effect only inside a compiled
-single-file component's script block; a hand-authored `IComponentTemplate` declares its surface
-imperatively.
+the static `ComponentContract` carried by the generated `ComponentRegistration`. The attribute is a
+**compile-time declaration only** — nothing is discovered by reflection, and the resulting
+declaration is the same static value a hand-authored registration supplies [CMP-12]. The attributes
+take effect only inside a compiled single-file component's script block; a hand-authored
+`IComponent` declares its surface through its registration's contract.
 
 `[CMP-27]` **Name derivation.** The canonical argument or event name is the **camel-case spelling of
 the declaring member's name**: the leading run of upper-case letters lower-cases whole, except that a
@@ -412,76 +464,68 @@ run longer than one keeps its last letter capitalized when a lower-case letter f
 `title`, `ModelValue` → `modelValue`, `URL` → `url`, `HTMLContent` → `htmlContent`). The attribute's
 `Name` overrides the derivation and MUST be a non-empty constant string literal, which is how a
 spelling no C# identifier can produce — `update:modelValue`, `model-value` — is declared. The derived
-name is canonical in `IComponentContext.Arguments`, and a parent's kebab-case spelling still resolves
-to it [CMP-13].
+name is canonical in `ComponentContext.Bindings.Parameters`, and a parent's kebab-case spelling still
+resolves to it [CMP-13].
 
 `[CMP-28]` **Requiredness.** A parameter is required when the attribute sets `IsRequired` **or** when
-the property carries the C# `required` modifier. Viu activates a template through a parameterless
-`new T()` [EXE-4], so no object initializer exists to satisfy C#'s own required-member rule: a
+the property carries the C# `required` modifier. A generated registration's explicit activator uses
+a parameterless `new T()` [EXE-4], so no object initializer exists to satisfy C#'s own required-member rule: a
 `required` declared parameter therefore makes the generated partial emit a `[SetsRequiredMembers]`
-parameterless constructor. The requirement is Viu's to enforce ([CMP-12] warns at mount), not C#'s.
-The scaffold emits no constructor when the script block declares one of its own.
+parameterless constructor used by its explicit activator delegate. The requirement is Viu's to
+enforce ([CMP-12] warns at mount), not C#'s. The scaffold emits no constructor when the script block
+declares one of its own.
 
 `[CMP-29]` **Binding.** The generated scaffold assigns each declared property from
-`IComponentContext.Arguments` **once during setup, before `OnSetup`, and again at the head of every
-render pass**. Core replaces the argument snapshot before a child re-renders, so a declared property
-always reflects the parent's current value. The property's value at setup time — its initializer, or
-the type's default when it has none — is captured **once per mounted instance** as that parameter's
-default and restored on any pass where the parent supplies no argument; the capture is the attribute
-form's equivalent of `ComponentParameter.DefaultFactory` and shares its at-most-once evaluation
-[CMP-12]. Values are read through the typed `IComponentArguments.Get<T>`: an argument whose runtime
-value is not of the property's type yields that type's default, with no coercion.
+`ComponentContext.Bindings.Parameters` **once during setup, before `OnSetup`, and again at the head
+of every render pass**. Core replaces the resolved bindings before a child re-renders, so a declared
+property always reflects the parent's current value. The property's value at setup time — its
+initializer, or the type's default when it has none — is captured **once per mounted instance** as
+that parameter's default and restored on any pass where the parent supplies no argument; the capture
+is the attribute form's equivalent of `ComponentParameter.DefaultFactory` and shares its at-most-once
+evaluation [CMP-12]. A value whose runtime type is incompatible with the property yields that type's
+default, with no coercion.
 
 `[CMP-30]` **Events.** A component MAY declare an output event on the method that emits it:
 `[Event]` on a non-generic, instance `partial void` method with no body and by-value parameters only.
 The generator synthesizes the `ComponentEvent` — whose validator asserts the emitted argument count —
-and implements the method as an `IComponentContext.Emit` of the declared name with the method's
+and implements the method as a `ComponentContext.Emit` of the declared name with the method's
 parameters as the ordered payload. A method rather than a property is the anchor because an event
 carries a payload *signature* rather than a value; the consequence is that the event name is spelled
 exactly once, in the attribute, and the component's own call site is strongly typed.
 
-`[CMP-31]` **Coexistence.** The imperative and attribute forms are exclusive **per kind**: a
-component that declares `[Parameter]` properties MUST NOT also declare a `Parameters` member, and one
-that declares `[Event]` methods MUST NOT also declare an `Events` member. Either mix is a build
-error. Parameters and events stay independent, so an imperative `Parameters` collection and
-attribute-declared events coexist. The rule has two reasons: the generated declaration is an
-*explicit* interface implementation and would silently shadow an authored collection, and an
-attribute-declared surface is usable as a build-time contract only when it is complete.
+`[CMP-31]` **Explicit authored-contract opt-in.** `ComponentBase` deliberately does not implement
+`IComponent`. It is an optional authoring base that stores the protected `ComponentContext`; the
+authored or generated partial MUST opt into `IComponent` and provide `Setup` explicitly. This keeps
+base-class convenience separate from the authored contract and prevents an incomplete partial from
+becoming activatable accidentally.
 
 ### 4.10 Root-level lifecycle registration
 
-`[CMP-32]` A component MAY register a lifecycle callback **at the root of its own class** —
-`OnMounted(callback)` — instead of through the context — `Context.Lifecycle.OnMounted(callback)`.
-`ComponentTemplateBase` declares one **protected** pass-through per `IComponentLifecycle` registration
-method, with the identical name and signature, and the compiled single-file component derives from it
-[SFC-CG-4]. The root form is the **specified equivalent** of the context form: it registers the same
-callback with the same registrar, so the two forms carry identical timing [CMP-20], identical
-asynchronous observation [CMP-21], and identical error routing [CMP-23]. Callbacks registered for one
-phase run in **registration order**, and that order is the order the registrations were made
-regardless of which form each used, so the two forms MAY be mixed freely within one component. The
-root form adds no state: there is exactly one registrar per mounted component, reached through
-`IComponentContext.Lifecycle` either way.
+`[CMP-32]` A compiled single-file component MAY register a lifecycle callback **at the root of its
+own class** — `OnMounted(callback)` — instead of through the context —
+`Context.Lifecycle.OnMounted(callback)`. Generator-emitted internal glue supplies the protected
+forwarding members; `ComponentBase` itself does not declare them [CMP-31], [SFC-CG-4]. The root form
+is the **specified equivalent** of the context form: it registers the same callback with the same
+`ComponentLifecycle`, so the two forms carry identical timing [CMP-20], identical asynchronous
+observation [CMP-21], and identical error routing [CMP-23]. Callbacks registered for one phase run in
+**registration order**, and that order is the order the registrations were made regardless of which
+form each used, so the two forms MAY be mixed freely within one component.
 
-A component MAY declare its own member with one of these names. An identical signature **hides** the
-inherited pass-through under ordinary C# member-hiding rules — the authored member wins at every call
-site inside the component, C# reports the hiding as a warning rather than an error, no registration
-happens through it, and the hidden hook stays reachable through the context form. A different
-signature is an ordinary overload and hides nothing. The pass-throughs are therefore *not* reserved
-names in the sense of [SFC-CG-1]: a collision degrades to the behavior the component would have had
-without them.
+A component MAY declare its own member with one of these names. Root-level lifecycle names are not
+reserved: generated glue MUST leave an authored member authoritative at its call sites, and the
+context form remains available. A different signature is an ordinary overload. A collision therefore
+degrades to the behavior the component would have had without the root convenience.
 
-*Authority: `libraries/Assimalign.Viu.Components/src/Abstraction/*.cs` (21 interfaces);
-`libraries/Assimalign.Viu.Components/src/{Tree,Metadata,Slots,Activation}/*.cs`
-(`Metadata/{ParameterAttribute,EventAttribute}.cs` for [CMP-26]-[CMP-31];
-`ComponentTemplateBase.cs` for [CMP-32]);
-`libraries/Assimalign.Viu.Core/src/Internal/{ComponentContext,ComponentLifecycle,MountedComponent}.cs`;
+*Authority: `libraries/Assimalign.Viu.Components/src/Abstraction/{IComponent,IComponentFactory}.cs`;
+`libraries/Assimalign.Viu.Components/src/{ComponentContext,ComponentRenderFrame}.cs`;
+`libraries/Assimalign.Viu.Components/src/{Components,Tree,BuiltIns,Activation,Delegates,Optimization}/*.cs`;
+`libraries/Assimalign.Viu.Core/src/{Rendering,Internal,Abstraction}/*.cs`;
 `libraries/Assimalign.Viu.Core/src/Abstraction/{IApplication,IApplicationBuilder,IApplicationContext}.cs`;
 `libraries/Assimalign.Viu.Core/src/Delegates/{ApplicationDelegate,ApplicationMiddleware}.cs`;
 `libraries/Assimalign.Viu.Core/src/Application/{ApplicationContext,ApplicationOptions}.cs`;
 `libraries/Assimalign.Viu.Core/src/Extensions/ApplicationExtensions.cs`;
 `libraries/Assimalign.Viu.Browser/src/{BrowserApplication,BrowserApplicationBuilder}.cs`;
-`libraries/Assimalign.Viu.Components/docs/OVERVIEW.md`; `docs/ARCHITECTURE.md`;
-`libraries/Assimalign.Viu.Core/docs/OVERVIEW.md`.*
+`docs/COMPONENT-MODEL-PLAN.md` §§2, 8, 9.*
 
 ---
 
@@ -490,8 +534,9 @@ without them.
 ### 5.1 The type model
 
 `[RCT-1]` `ReactiveValue` / `ReactiveValue<T>` is the engine base class; it holds the dependency
-cell inline as a field. `IReactiveReference` and `IReactiveReference<T>` are the public,
-substitutable contracts. Every Reactivity-owned public interface is prefixed `IReactive*`.
+cell inline as a field. `IReactiveReference`, covariant get-only
+`IReactiveReadOnlyReference<T>`, and mutable `IReactiveReference<T>` are the public substitutable
+contracts. Every Reactivity-owned public interface is prefixed `IReactive*`.
 
 `[RCT-2]` Hot-path dispatch rule: per-trigger notification, patching, and diffing MUST dispatch
 through an **abstract base-class vtable**, not an interface. Interface dispatch is for cold public
@@ -501,7 +546,9 @@ API boundaries. First-party references therefore derive from `ReactiveValue<T>` 
 `[RCT-3]` The reference primitives are `Reference<T>`, `ShallowReference<T>`, `CustomReference<T>`,
 and `Computed<T>`. `Computed<T>` plays a dual role in the dependency graph — it is both a value
 others subscribe to and a subscriber to its own sources — and realizes the subscriber half by
-**composition** over an internal sealed subscriber rather than by multiple inheritance.
+**composition** over an internal sealed subscriber rather than by multiple inheritance. Their
+constructors, plus `ReactiveEffect` and `EffectScope` construction, are non-public; `Reactive` is
+the sanctioned creation facade.
 
 `[RCT-4]` An external `IReactiveReference<T>` implementation is responsible for tracking its own
 reads and triggering on changed writes; the interface cannot enforce correct tracking.
@@ -513,8 +560,18 @@ dependency access (forced triggering, graph inspection) additionally require
 
 `[RCT-5]` `Reactive` is the static facade: `Reference`, `ShallowReference`, `CustomReference`,
 `Computed`; `Effect`; `EffectScope`, `CurrentScope`, `OnScopeDispose`; `Watch`, `WatchEffect`;
-`TriggerReference`; `PauseTracking`, `ResetTracking`, `StartBatch`, `EndBatch`; and the inspection
-and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadonly`, `ToRaw`, `MarkRaw`.
+`TriggerReference`; `PauseTracking`, `ResetTracking`, `Batch`; and the inspection
+and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadOnly`, collection-specific
+`ToRaw`, and `MarkRaw`. Generic identity conversion and raw-object conversion are not part of the
+surface; generated objects instead expose a typed `ToRawValues()` view over their backing values.
+`ReactiveValue<T>.Peek()` returns a fresh value without subscribing the ambient caller, while a
+stale computed still refreshes and tracks its own sources. Tracking state is restored if the read
+throws. `ReactiveEffect` implements `IDisposable`; `Dispose()` is exactly the idempotent `Stop()`
+operation. `Reactive.CurrentScope` is the only public ambient-scope accessor. `Reactive.Batch()`
+returns an idempotent disposable that closes exactly the one nesting level it opened: inner
+disposal never flushes while an outer batch remains, outermost disposal flushes queued effects,
+and exception unwind through `using` restores effect delivery. The allocation-free raw start/end
+pair is internal to the dependency engine.
 
 ### 5.3 There is no proxy
 
@@ -565,68 +622,94 @@ this section's guarantees affordable.
 
 ### 6.1 The hierarchical tree
 
-`[RND-1]` A render produces a **fresh immutable tree**. Rendering never mutates the prior tree.
-`Renderer<TNode>` reconciles the new tree against the mounted representation of the old one and
-emits the minimal host operations that reconcile them.
+`[RND-1]` A render produces an **immutable tree result**. Rendering never mutates the prior tree;
+compiler-cached static subtrees MAY retain reference identity across results [SFC-OPT-1].
+`Renderer<TNode>` reconciles the returned tree against the mounted representation of the old one
+and emits the minimal host operations that reconcile them.
 
-`[RND-2]` The mounted representation is a parallel hierarchy of internal sealed
-`MountedRenderNode<TNode>` variants — `MountedElementNode`, `MountedFragmentNode`,
-`MountedLeafNode` (text and comment), `MountedStaticNode`, `MountedTeleportNode`,
-`MountedTemplateNode` — rooted at a `MountedTree<TNode>` per host container. These own host nodes,
-ranges, anchors, child lists, directive bindings, transition hooks, and reference jobs.
+`[RND-2]` The mounted representation is a parallel hierarchy of internal sealed engine types rooted
+per host container. It is **occurrence-based**: every position in a render result owns distinct
+mounted bookkeeping and host state, even when multiple positions reference the same compiler-cached
+`VirtualNode` description [SFC-OPT-1]. Mounted nodes own host nodes, ranges, anchors, child lists,
+block-local mounted dynamic-occurrence lists, directive bindings, transition state, reference jobs,
+and links to the prior immutable descriptions. No mounted engine type is part of the authoring
+vocabulary.
 
-`[RND-3]` `MountedTemplateNode<TNode>` additionally owns the activated `IComponentTemplate`, its
-`IComponentContext`, its reactive render effect, and its mounted subtree. **That state never returns
-to the immutable authoring model** [CMP-2].
+`[RND-3]` Mounted component bookkeeping additionally owns the activated `IComponent`, its runtime
+`ComponentContext`, reactive render effect, per-mount `ComponentRenderFrame`, and mounted subtree. A
+frame cache MAY share one immutable description among positions within that activation, but never
+shares mounted bookkeeping or a host node. **That state never returns to the immutable authoring
+model** [CMP-2].
 
-`[RND-4]` `MountedTree<TNode>.Components` maps each `IComponent` to its mounted node by reference
-identity. This map is what makes block patching ([§6.3](#63-the-block-tree)) possible: a block root
-can look up the mounted node for a dynamic descendant without walking the tree to find it.
+`[RND-4]` Each optimized mounted block owns an ordered list of mounted dynamic occurrences aligned
+one-for-one with its current `RenderPlan.DynamicChildren`. A compatible patch pairs mounted occurrence
+`i` with the next description at `DynamicChildren[i]`; a replacement is written back to both the
+mounted ownership hierarchy and the block-local list. An incompatible shape takes the full-diff path
+and rebuilds the list when the resulting association is unambiguous. When a tracked description is
+also present in untracked positions within the same block scope, description identity cannot identify
+the tracked subset; the block MUST take the full-diff path and keep its mounted occurrence list
+unavailable. `VirtualNode` reference identity is description identity, **not mount
+identity**: repeated references remain distinct mounted occurrences, and no representative selected
+by description identity may drive patching or teardown.
 
-`[RND-5]` `Renderer<TNode>.Render(component, container, application)` mounts on first call and
-patches thereafter. Passing `null` unmounts the current root and forgets the container. A mounted
-container retains the first supplied `IApplicationContext`; supplying a different one throws
+`[RND-5]` `Renderer<TNode>.Render(node, container, application)` mounts on first call and patches
+thereafter. Passing a null `VirtualNode` unmounts the current root and forgets the container. A
+mounted container retains the first supplied `IApplicationContext`; supplying a different one throws
 `InvalidOperationException`.
+
+`[RND-6]` `MountedComponentView<TNode>` (where `TNode : class`) is the public cold-path view of one
+mounted authored component. It exposes exactly `ComponentNode Request`, `IComponent Instance`,
+`ComponentContext Context`, `TNode? FirstHostNode`, `TNode? LastHostNode`, and
+`bool IsMounted`. Core caches one view per mounted component node, so the view's reference identity
+is stable for that node across enumerations for the life of the mount; consumers reacquire views
+after a flush instead of retaining engine objects.
 
 ### 6.2 The flag vocabulary
 
-`[RND-FLAGS-1]` `PatchFlags`, `ShapeFlags`, and `SlotFlags` (owned by `Assimalign.Viu.Shared`) are
+`[RND-FLAGS-1]` `PatchFlags`, `ShapeFlags`, and `SlotStability` (owned by
+`Assimalign.Viu.Components`) are
 **the interface between build-time analysis and runtime patching**. Their bit layout is a frozen
 contract between compiled output and the runtime: changing a value silently breaks components
-compiled by an earlier Viu, so **values are additive only**.
+compiled by an earlier Viu, so **values are additive only**. Naming the zero `PatchFlags` value
+`None` is additive and does not change the frozen layout.
 
 `[RND-FLAGS-2]` `PatchFlags` positive members are single bits and combine with bitwise OR: `Text`,
-`Class`, `Style`, `Props`, `FullProps`, `NeedHydration`, `StableFragment`, `KeyedFragment`,
-`UnkeyedFragment`, `NeedPatch`, `DynamicSlots`, `DevRootFragment`.
+`Class`, `Style`, `Properties`, `FullProperties`, `NeedsHydration`, `StableFragment`, `KeyedFragment`,
+`UnkeyedFragment`, `NeedPatch`, `DynamicSlots`, `DevelopmentRootFragment`.
 
 `[RND-FLAGS-3]` `Cached` (`-1`) and `Bail` (`-2`) are **whole-value sentinels, never bit
 combinations**. Because every negative `int` has most bits set, a naive bitwise test against a
 negative value spuriously succeeds. Every positive-bit check MUST therefore be gated on
-`flags > 0`; the predicates in `PatchFlagsExtensions` do this. `Cached` marks a subtree the diff
+`flags > 0`; every runtime and generated predicate MUST enforce that gate. `Cached` marks a subtree the diff
 skips entirely; `Bail` marks a tree that MUST fall back to a full diff.
 
-`[RND-FLAGS-4]` `ShapeFlags` encodes what a node is and what shape its children take, so the runtime
-branches on bitwise checks rather than type tests.
+`[RND-FLAGS-4]` `ShapeFlags` retains its frozen node/child-shape values for previously compiled
+output. The closed `VirtualNode` algebra is authoritative for runtime shape dispatch; the enum's
+layout remains stable even where a current runtime path no longer consumes it.
 
-`[RND-FLAGS-5]` `SlotFlags` is a plain enumeration, not a bitmask: a slot collection has exactly one
-of `Stable`, `Dynamic`, `Forwarded`.
+`[RND-FLAGS-5]` `SlotStability` is a plain enumeration, not a bitmask: a slot collection has exactly one
+of `Stable`, `Dynamic`, `Forwarded`. `ComponentInvocation.SlotStability` transports that value from
+compiled output to Core, defaults to `Stable`, and is consumed by the component-update gate after
+`Forwarded` is resolved against the active parent.
 
-`[RND-FLAGS-6]` `PatchFlags.cs` and `SlotFlags.cs` are `<Compile Include>`-linked into the
+`[RND-FLAGS-6]` `PatchFlags.cs` and `SlotStability.cs` are `<Compile Include>`-linked into the
 `netstandard2.0` generator projects. **Their file paths are frozen**; moving them requires updating
-every linking csproj in the same change.
+every linking csproj in the same change. The authoritative paths are
+`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotStability.cs}`.
 
 ### 6.3 The block tree
 
 The block tree is the mechanism that turns compile-time knowledge into skipped runtime work.
 
-`[RND-BLOCK-1]` `ComponentOptimization` carries the compiler→runtime hints on every tree value:
+`[RND-BLOCK-1]` `RenderPlan` carries the compiler→runtime hints on every `VirtualNode`:
 
 - `PatchFlags` — what may change;
-- `DynamicProperties` — the property names that may change when `PatchFlags.Props` is set;
-- `DynamicChildren` — the dynamic descendants collected for a block root;
-- `HasOnce` — whether suspended block tracking (`v-once`) occurred inside the block.
+- `DynamicBindingIndices` — the element-binding indices that may change, or null when unknown; and
+- `DynamicChildren` — the ordered direct dynamic occurrences collected for a block root; repeated
+  references are retained rather than deduplicated.
 
-`ComponentOptimization.None` is the metadata for hand-authored, unoptimized values.
+`RenderPlan.None` is the metadata for hand-authored, unoptimized values and requires the normal full
+diff.
 
 `[RND-BLOCK-2]` **The three-state rule for `DynamicChildren` is normative:**
 
@@ -639,61 +722,71 @@ The block tree is the mechanism that turns compile-time knowledge into skipped r
 `IsBlock` is defined as `DynamicChildren is not null`. Confusing the null and empty cases is the
 single most consequential error a producer of this metadata can make.
 
-`[RND-BLOCK-3]` Generated render code **opens a block, collects its dynamic descendants, and
-attaches the immutable snapshot to the block root**. `ComponentOptimization` copies both list
-arguments defensively into read-only snapshots at construction, so the metadata cannot be mutated
-after it is attached.
+`[RND-BLOCK-3]` **Superseded emission form.** Generated render code uses statement-form calls against
+its per-mount `ComponentRenderFrame`: `OpenBlock()`, `Track(VirtualNode)`, then `CloseBlock()` to
+obtain the immutable direct-descendant snapshot attached to the block root's `RenderPlan`.
+A separate expression-sequencing token and its helper family do not exist in this contract. `RenderPlan` copies
+its list inputs into read-only snapshots, so attached metadata cannot be mutated. Every `Track` call
+appends one occurrence in order, including repeated calls with the same `VirtualNode` reference.
 
 `[RND-BLOCK-4]` **Block patching is attempted only when the old and new block shapes agree.** The
-renderer requires: both `DynamicChildren` lists non-null, **equal in count**, and every old dynamic
-child still registered in the mounted-tree map. If any condition fails, the renderer MUST fall back
-to a full child diff. A mismatched block shape is a correctness event, never a crash.
+renderer requires both `DynamicChildren` lists to be non-null and **equal in count**, plus an old
+block-local mounted occurrence list of the same count whose entry `i` is live and still linked to old
+`DynamicChildren[i]`. Association MUST be unambiguous: if a tracked description reference also occurs
+outside the tracked list in that block scope, the renderer MUST fall back to a full child diff. If any
+condition fails, the renderer MUST full-diff, then rebuild the mounted occurrence list only when the
+resulting association is unambiguous. A mismatched or ambiguous block shape is a correctness event,
+never a crash.
 
 `[RND-BLOCK-5]` When block patching succeeds, each dynamic descendant is patched **in place, in its
-own host parent**, bypassing the parent children diff. If patching replaces a mounted node (a type
-change), the renderer MUST thread the replacement through the mounted ownership graph so later
-moves and unmounts never retain the removed node.
+own host parent and by occurrence-list index**, bypassing the parent children diff. If patching
+replaces a mounted node (a type change), the renderer MUST thread the replacement through both the
+mounted ownership graph and the block-local occurrence list so later moves and unmounts never retain
+the removed node.
 
-`[RND-BLOCK-6]` **Block-aware teardown.** Unmounting a block visits only its collected dynamic
-descendants. Three cases retain the full walk, because skipping them would leak: `HasOnce` blocks;
-bailed (non-positive patch-flag) trees; and fragments that are not `StableFragment` — that is,
-keyed and unkeyed fragment blocks.
+`[RND-BLOCK-6]` **Block-aware teardown.** Unmounting a block visits its stored mounted dynamic
+occurrences, preserving distinct visits when descriptions are aliased. Two cases retain the full
+walk, because skipping them would leak: non-positive
+patch-flag trees (`None`, `Cached`, or `Bail`), and fragments that are not `StableFragment` — that is,
+keyed and unkeyed fragment blocks. No unmodeled once-tracking bit participates in this decision.
 
-`[RND-BLOCK-7]` A child skipped by an optimized teardown MUST still be *released*: unregistered from
-the mounted-tree map, marked unmounted, and its pending reference job invalidated. A skipped child
-that carries a template, a teleport, a template reference, a node lifecycle hook, a directive
-binding, or a transition MUST receive a **full unmount visit** instead of a release, because those
-carry external effects.
+`[RND-BLOCK-7]` A child skipped by an optimized teardown MUST still be *released*: its
+occurrence-local mounted bookkeeping is released, it is marked unmounted, and its pending reference
+job is invalidated. A skipped child that is a `ComponentNode` or `TeleportNode`, carries a
+`MountReference`, a node lifecycle hook, a directive binding, or a transition MUST receive a **full
+unmount visit** instead of a release, because those carry external effects.
 
 ### 6.4 Patch dispatch
 
 `[RND-PATCH-1]` `Patch` decides in this order:
 
 1. no mounted node → **mount**;
-2. the same `IComponent` instance by reference → **no-op** (the tree did not change here);
-3. not the same component type → **unmount the old subtree and mount the new one** at the old node's
+2. the same `VirtualNode` instance by reference → **no-op** (the tree did not change here);
+3. not the same node type → **unmount the old subtree and mount the new one** at the old node's
    next-sibling anchor, preserving the old owner context;
 4. otherwise → dispatch to the per-kind patch routine.
 
-`[RND-PATCH-2]` `IsSameComponentType` requires equal `ComponentKind` and equal `Key`, and then, by
-kind: equal ordinal `Tag` for elements; equal template identity for templates (by `TemplateType`
-when either side declares one, otherwise by ordinal `TemplateName`); equal ordinal `Content` for
-static ranges. Text, comment, fragment, and teleport kinds match on kind and key alone.
+`[RND-PATCH-2]` `IsSameNodeType` requires the same sealed `VirtualNode` variant and equal `Key`, and
+then, by variant: equal `QualifiedName` for elements; equal `ComponentReference` for component
+invocations; equal format and ordinal content for static ranges. Text, comment, fragment, teleport,
+and structural built-in nodes match on concrete type and key unless their executor specifies a
+stronger identity rule.
 
 `[RND-PATCH-3]` **Element patching** returns early for a cached element, and otherwise selects one of
 four paths:
 
 | Condition | Attributes | Children |
 | --- | --- | --- |
-| `PatchFlags == Cached` (early return) | none | none — only the transition and template reference update |
+| `PatchFlags == Cached` (early return) | none | none — only the transition and `MountReference` update |
 | block children patched | flag-selective | skipped, except a `Text` fast path |
 | either side is a block but block patching failed | full diff | full diff, forced to `Bail` |
 | positive patch flags | flag-selective | only the `Text` fast path |
 | otherwise | full diff | full diff under the new flags |
 
-`[RND-PATCH-4]` **Flag-selective attribute patching**: `FullProps` degrades to a full attribute
-diff; otherwise `Class` patches only `class`, `Style` patches only `style`, and `Props` patches
-exactly the names listed in `DynamicProperties`. Non-positive flags patch nothing.
+`[RND-PATCH-4]` **Flag-selective binding patching**: `FullProperties` degrades to a full binding diff;
+otherwise `Class` patches only `class`, `Style` patches only `style`, and `Properties` patches exactly the
+indices listed in `RenderPlan.DynamicBindingIndices`. A null index list is unknown and therefore
+falls back to the full binding diff. Non-positive flags patch nothing.
 
 `[RND-PATCH-5]` **Attribute value comparison.** An attribute is written to the host only when its
 value changed — except `value`, which is **always** written, because a host may have mutated it out
@@ -784,15 +877,15 @@ that instance.
 chain. Exceeding it throws `InvalidOperationException` naming the job — the diagnostic for a
 reactive effect that mutates its own dependencies.
 
-`[SCH-9]` **`NextTick()`** returns a task that completes after the current or next flush chain, and
+`[SCH-9]` **`NextTickAsync()`** returns a task that completes after the current or next flush chain, and
 `Task.CompletedTask` when nothing is queued. A post-flush callback that queues more work causes
-another cycle to run — sharing the same recursion bookkeeping — **before** `NextTick` resolves.
+another cycle to run — sharing the same recursion bookkeeping — **before** `NextTickAsync` resolves.
 
 `[SCH-10]` **The commit boundary fires twice per flush** and MUST be idempotent (a no-op when
 nothing is buffered):
 
 1. after the job queue drains and **before** post-flush callbacks, so `mounted`/`updated` hooks that
-   read the host (layout, template references) observe the committed render; and
+   read the host (layout, mount references) observe the committed render; and
 2. **after** post-flush callbacks, because those hooks — and post-flush directive hooks — can
    themselves write, and their writes must commit in the same flush rather than strand until the
    next one.
@@ -806,18 +899,19 @@ is a **no-op while a scheduled flush is running**: that flush owns the drain, an
 renders are never double-applied.
 
 `[SCH-12]` **On exception**, the flush abandons the remaining queue deterministically: queued flags
-are cleared so every job can re-queue, `NextTick` is resolved so awaiters do not hang, and the
+are cleared so every job can re-queue, `NextTickAsync` is resolved so awaiters do not hang, and the
 exception is rethrown to the host.
 
 ### 6.7 Host abstraction
 
 `[RND-HOST-1]` `RendererOptions<TNode>` is the complete host contract. Required operations:
 `Insert`, `Remove`, `CreateElement`, `CreateText`, `CreateComment`, `SetText`, `ParentNode`,
-`NextSibling`, `PatchAttribute`. Optional operations: `SetScopeIdentifier`,
-`ResolveTeleportTarget`, `Commit`, `InsertStaticContent`, `CreateHydrationReader`.
+`NextSibling`, `PatchAttribute`. Optional operations: `ResolveTeleportTarget`, `Commit`,
+`InsertStaticContent`, `CreateHydrationReader`. Style-scope stamping is absent while [STY-1] is
+Deferred; reintroduction is additive.
 
 `[RND-HOST-2]` A capability whose operation is absent is **unavailable, not degraded**. Rendering an
-`IStaticComponent` requires `InsertStaticContent`; hydration requires `CreateHydrationReader` and
+`StaticNode` requires `InsertStaticContent`; hydration requires `CreateHydrationReader` and
 throws `NotSupportedException` without it.
 
 `[RND-HOST-3]` **Core contains no host handles and no interop.** A host that uses a value-type
@@ -860,10 +954,11 @@ collide.
 `libraries/Assimalign.Viu.Core/src/Rendering/RendererOptions{TNode}.cs`;
 `libraries/Assimalign.Viu.Core/src/Internal/Mounted*.cs`;
 `libraries/Assimalign.Viu.Core/src/Scheduling/{Scheduler,SchedulerJob}.cs`;
-`libraries/Assimalign.Viu.Shared/src/{PatchFlags,ShapeFlags,SlotFlags}.cs`;
-`libraries/Assimalign.Viu.Components/src/Optimization/ComponentOptimization.cs`;
+`libraries/Assimalign.Viu.Components/src/{PatchFlags,ShapeFlags,SlotStability}.cs`;
+`libraries/Assimalign.Viu.Components/src/Optimization/RenderPlan.cs`;
 `libraries/Assimalign.Viu.Browser/docs/{DESIGN.md,ADR-0001-interop-marshaling.md}`;
-`libraries/Assimalign.Viu.Core/docs/OVERVIEW.md`; `docs/ARCHITECTURE.md` §"Block-tree updates".*
+`libraries/Assimalign.Viu.Components/src/{VirtualNode,ComponentRenderFrame}.cs`;
+`docs/COMPONENT-MODEL-PLAN.md` §§2, 9.*
 
 ---
 
@@ -873,15 +968,16 @@ Each built-in is specified with its **current limits** inline.
 
 ### 7.1 Teleport
 
-`[BLT-1]` `ITeleportComponent` renders its children into a different host container while remaining
-logically positioned in the tree. The renderer emits origin anchors at the logical position and
-manages the target range separately.
+`[BLT-1]` `TeleportNode` is the structural description of content rendered into a different host
+container while remaining logically positioned in the virtual tree. It carries `TargetIdentifier`,
+`Children`, `IsDisabled`, and `IsDeferred`; the engine-internal executor emits origin anchors at the
+logical position and manages the target range separately.
 
 `[BLT-2]` `IsDeferred` postpones **target-side setup** to the current render's post-flush phase, so
 a target rendered later in the same tree resolves. A disabled Teleport still mounts its content at
 the logical position **immediately**; only target-side setup defers.
 
-`[BLT-3]` Teleport content moves between the logical and target containers when `Disabled` changes.
+`[BLT-3]` Teleport content moves between the logical and target containers when `IsDisabled` changes.
 Block dynamic-child patching applies to teleport content, with static host carry-forward.
 
 `[BLT-4]` Target resolution goes through `RendererOptions<TNode>.ResolveTeleportTarget`. A target
@@ -890,8 +986,11 @@ content.
 
 ### 7.2 KeepAlive
 
-`[BLT-5]` `KeepAlive` moves inactive keyed template subtrees into **renderer-owned detached
-storage**, preserving their component instances and reactive scopes rather than unmounting them.
+`[BLT-5]` `KeepAliveNode` is a structural node carrying one lazy `ComponentInvocation`. Its default
+slot supplies content without evaluation at description time; include, exclude, and maximum inputs
+ride `Invocation.Arguments`. The engine-internal executor moves inactive keyed component subtrees
+into **renderer-owned detached storage**, preserving their component instances and reactive scopes
+rather than unmounting them.
 
 `[BLT-6]` It implements component-name include/exclude filtering, reactive cache pruning when the
 filter changes, and **child-before-parent** activation callbacks. A **positive** `maximum` enables
@@ -900,28 +999,33 @@ missing value, or an unparseable string means **unbounded**.
 
 ### 7.3 Transitions
 
-`[BLT-7]` `BaseTransition` is the **host-neutral** insertion/removal choreography. Core owns
-transition identity, cancellation, mode sequencing, insertion, and deferred removal. It knows
-nothing about CSS.
+`[BLT-7]` `TransitionNode` is a structural node carrying one lazy `ComponentInvocation`. Its default
+slot supplies the decorated child without evaluation at description time; name, mode, appear, class,
+and hook inputs ride `Invocation.Arguments`. Core's internal executor owns the **host-neutral**
+insertion/removal choreography — identity, cancellation, mode sequencing, insertion, and deferred
+removal — and knows nothing about CSS.
 
-`[BLT-8]` The browser `Transition` and `TransitionGroup` are host components layered on it: Browser
+`[BLT-8]` Browser's transition directive vocabulary and group behavior attach through the host seam:
+Browser
 owns class names, double-animation-frame scheduling, forced reflow, computed or explicit end timing,
 and element handles.
 
-`[BLT-9]` `ComponentTransitionScope` attaches one shared transition state to multiple immutable
-children and can finish a pending enter phase before a host performs layout measurement.
-`ComponentHost.GetKeyedChildElements<TNode>` exposes an ordered key→first-host-element snapshot; it
-observes the **outgoing** tree during before-update and the **patched incoming** tree during
-updated. That pair of snapshots is what a host's FLIP pass measures against.
+`[BLT-9]` Transition execution MAY attach one shared internal transition state to multiple immutable
+children and finish a pending enter phase before a host performs layout measurement. The host sees
+ordered key-to-first-element snapshots of the **outgoing** tree during before-update and the
+**patched incoming** tree during updated; that pair is what a FLIP pass measures against. The
+snapshot operation is a designed host seam, not mounted-engine access.
 
-`[BLT-10]` For a persisted transition, Core binds a host-neutral `ComponentTransition` to directive
+`[BLT-10]` For a persisted transition, Core binds its internal host-neutral state to directive
 bindings. The renderer **skips its own insertion/removal transition** for persisted hooks, so the
 directive and the renderer never both drive the same phase.
 
 ### 7.4 Suspense
 
-`[BLT-11]` `Suspense` implements pending-branch storage, fallback ownership, nested boundary
-accounting, and coordinated reveal.
+`[BLT-11]` `SuspenseNode` is a structural node carrying one lazy `ComponentInvocation`. Its default
+slot supplies content and its `fallback` slot supplies the fallback, both unevaluated at description
+time. The engine-internal executor implements pending-branch storage, fallback ownership, nested
+boundary accounting, and coordinated reveal.
 
 `[BLT-12]` **Limit — Suspense hydration is not implemented.** Hydrating a Suspense boundary throws
 `NotSupportedException` with a descriptive message, rather than attempting a partial or incorrect
@@ -933,20 +1037,21 @@ effects run when the detached branch mounts. See [§17](#17-non-goals-and-curren
 
 ### 7.5 Asynchronous and dynamic components
 
-`[BLT-14]` Asynchronous component definitions retain **explicit `IComponentFactory` activation**,
-deduplicate concurrent loads for the same definition, and integrate with server prefetch and
-Suspense.
+`[BLT-14]` Asynchronous component definitions retain **explicit registration resolution and
+delegate activation**, deduplicate concurrent loads for the same definition, and integrate with
+server prefetch and Suspense. `AsynchronousComponents.Define(...)` is the public definition facade.
 
-`[BLT-15]` A **plain dynamic string resolves to an element tag**, not a registered component,
-because `IComponentFactory` deliberately has no registration-probe API [CMP-4]. Use
-`DynamicComponents.Named(name)` to select a registered component name explicitly. This is a
-correctness-preserving choice: probing would require the factory to answer "do you have this?",
-which no arbitrary resolver can be required to answer.
+`[BLT-15]` Dynamic structure is explicit. A dynamic element constructs an `ElementNode` with a
+`QualifiedName`; a dynamic registered component constructs a `ComponentNode` with
+`ComponentReference.ForName(name)`. The renderer MUST NOT guess whether a plain string is a tag or a
+registration. `DynamicComponents.Resolve(...)` normalizes a selector and
+`DynamicComponents.Create(...)` creates its closed-algebra node.
 
-*Authority: `libraries/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
+*Authority: `libraries/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
+`libraries/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.KeepAlive.cs,Renderer.Suspense.cs,Renderer.Hydration.cs}`;
-`libraries/Assimalign.Viu.Core/docs/{OVERVIEW.md,KEEP-ALIVE.md,ASYNCHRONOUS-AND-DYNAMIC-COMPONENTS.md}`;
-`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions; `docs/ARCHITECTURE.md` §"Runtime capabilities".*
+`libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions;
+`docs/COMPONENT-MODEL-PLAN.md` §§2, 9.*
 
 ---
 
@@ -1027,32 +1132,51 @@ diagnostic span — is unchanged.
 
 ### 8.5 The code-generation contract
 
-`[SFC-CG-1]` The generated render member is
-`internal static object? Render(<ComponentClass> _ctx, object?[] _cache)`, accompanied by
-`internal const int RenderCacheSize`. **`Render` and `RenderCacheSize` are reserved member names** in
-a `.viu` component's partial class.
+`[SFC-CG-1]` Generated setup returns a `ComponentRenderer(ComponentRenderFrame)` whose invocation
+produces `VirtualNode?`. The frame owns per-mount cache slots and block assembly. Generated render
+implementation names are collision-safe internal details; `.viu` authoring reserves no `Render`,
+cache, or underscore-prefixed helper members. The frame exposes exactly `Cache`, `OpenBlock`,
+`SetBlockTracking`, `Track`, `CloseBlock`, `GetOrAddCache`, `SetCache`, `CacheHandler<TDelegate>`,
+and `Memo` — the complete compiled-output surface for block assembly, cached values, stable handler
+identity, and memoized subtrees. Generated code MUST NOT assume an unlisted frame member; adding a
+member is an additive amendment to this clause in the same change.
 
-`[SFC-CG-2]` Generated code binds **by name** against `global::Assimalign.Viu.RenderHelpers` through
-a file-level `using static`, plus `global::Assimalign.Viu.Browser.DomRenderHelpers` for DOM
-directives. **No `Assimalign.Viu.Syntax.*` assembly references any runtime assembly**; the
-name-binding contract flows one way.
+`[SFC-CG-2]` Generated render code calls through its frame parameter and qualified APIs; it MUST NOT
+use file-level static imports or an underscore name-binding convention. The compiler/runtime ABI has
+three tiers:
 
-`[SFC-CG-3]` A component that declares its surface by attribute ([CMP-26], [CMP-30]) additionally
-reserves the generated members `__ViuDeclaredParameters`, `__ViuDeclaredEvents`,
-`__ViuBindParameters`, `__viuParameterDefaultsCaptured`, and `__viuParameterDefault_<Property>` in its
-partial class. The two declaration collections are emitted as **explicit** `IComponentTemplate`
-implementations, so they can never collide with an authored member of the same name — which is also
-why declaring both forms is an error [CMP-31].
+1. **Public by necessity:** `ComponentRenderFrame`, node constructors, component reference/contract/
+   invocation values, normalization APIs, the hidden `ComponentHotReload` registration ABI, and
+   Browser directive identity tokens where state or type identity crosses assemblies.
+2. **Dissolved helpers:** statement-form emission, direct constructors, loops, closures, and
+   collection literals replace helpers that need no shared identity.
+3. **Consumer-internal glue:** the source generator emits any residual helper as an internal type in
+   the consumer compilation, calling only tier-one public surface. It is not loose source linked by
+   the SDK.
+
+`ComponentHotReload.Register` and `ComponentHotReload.ApplyUpdates` are the only remaining runtime
+calls bound by generated member names; Browser directive values remain bound by type identity. No
+`Assimalign.Viu.Syntax.*` assembly
+references a runtime assembly.
+
+`[SFC-CG-3]` A component that declares its surface by attribute ([CMP-26], [CMP-30]) emits one static
+`ComponentContract` carried by its `ComponentRegistration`, so the runtime and tooling read
+parameters and events before activation. Binding/default bookkeeping is generator-internal and uses
+collision-safe emitted names; no such member name is reserved for author code.
 
 `[SFC-CG-4]` A component with a template block is generated as
-`partial class <Name> : ComponentTemplateBase, IComponentTemplate`. The base class supplies the
-`Context` property the generated `Setup` assigns once per mount before `OnSetup` runs, and the
-protected root-level lifecycle registration surface [CMP-32]. `IComponentTemplate` stays on the
-partial itself because the scaffold's declaration members are *explicit* interface implementations
-[SFC-CG-3], which C# permits only on a type that lists the interface. Because the base type is
-declared by the generated partial, **no other partial declaration of the component may name a
-different base class**. A component with no template block stays a plain partial class with neither
+`partial class <Name> : ComponentBase, IComponent`. `ComponentBase` supplies only the protected
+`Context` storage and deliberately does not implement `IComponent` [CMP-31]. Generated setup assigns
+that context before `OnSetup`, rebinds declared properties per [CMP-29], and returns the frame-based
+renderer; generator-internal glue preserves the root lifecycle authoring form [CMP-32]. Because the
+base type is declared by the generated partial, **no other partial declaration may name a different
+base class**. A component with no template block stays a plain partial class with neither
 [V01.01.06.07].
+
+When development metadata emission is enabled, a generated module initializer calls hidden
+`ComponentHotReload.Register` with the component type, stable identifier, and generated
+template/script/style marker types. The generator gates emission from configuration; authored
+components implement no public hot-reload metadata interface.
 
 `[SFC-CG-5]` **Generated-file identity.** Each emitted component occupies exactly one `AddSource` hint
 name, derived from its path alone as
@@ -1068,20 +1192,17 @@ into it. The hash reads only the component's own path, so a discriminated name i
 build and in any order MSBuild presents the files; a component that collides with nothing keeps its
 readable hint name unchanged [V01.01.06.10.01].
 
-`[SFC-CG-6]` **The runtime-directive tuple.** `_withDirectives` receives one `object?[]` per
-directive, positional: `[0]` the directive reference, `[1]` its bound value, `[2]` its string
-argument or null, `[3]` its modifier bag. Slot `[3]` is `IReadOnlyDictionary<string, bool>` and is
-built by `_createModifiers`, **not** by the `_createProps` property helper — the two bags differ in
-value type (`bool` versus `object?`), and a property bag in the modifier slot type-checks yet reads
-back as *no modifiers at all*. Core therefore rejects any other non-null shape in slot `[3]` rather
-than degrading silently. Slots `[2]` and `[3]` are emitted only when the directive has an argument or
-modifiers; an absent leading slot is filled with `null` so the positions never shift.
+`[SFC-CG-6]` **Superseded directive emission.** The positional runtime-directive tuple and its helper
+calls are removed. Generated code constructs `DirectiveInvocation` with the compile-time-known
+directive type token and the render value; directive-specific argument and modifier shaping belongs
+to qualified Browser APIs or consumer-internal generated glue. Core MUST NOT recover a directive by
+reflection.
 
-`[SFC-CG-7]` **Native `v-model` carriers.** On a native control the compiler selects the runtime
-directive from the element and its `type` — `input`/`textarea` → `_vModelText`, `type="checkbox"` →
-`_vModelCheckbox`, `type="radio"` → `_vModelRadio`, `select` → `_vModelSelect`, and a dynamic
-`:type` (or a dynamically keyed `v-bind`) → `_vModelDynamic`, which re-resolves per render from the
-element's current tag and type. `type="file"` is an error. Each directive reflects the model through
+`[SFC-CG-7]` **Native `v-model` carriers.** On a native control the compiler selects the qualified
+Browser directive token from the element and its `type`: text for `input`/`textarea`, checkbox for
+`type="checkbox"`, radio for `type="radio"`, select for `select`, and dynamic for a dynamic `:type`
+or dynamically keyed `v-bind`. The dynamic token re-resolves per render from the element's current
+tag and type. `type="file"` is an error. Each directive reflects the model through
 the DOM property that carries it and commits user edits from the event that carries them: `value` +
 `input` for text-like inputs and `textarea`, `checked` + `change` for checkbox and radio, and option
 `selected` + `change` for `select` — matching the events those controls fire per
@@ -1091,11 +1212,11 @@ committed value and re-syncs the element on change, and `.number` (implied by `t
 coerces it numerically.
 
 Because Viu has no `this`-proxy and no reflection, a native `v-model` cannot recover its setter from
-the `onUpdate:modelValue` prop the way a component `v-model` does. Slot `[1]` therefore carries a
-`ViuModelBinding` holding **both** the current value and the generated write-back delegate; the
-`onUpdate:modelValue` prop is still emitted for uniformity but is inert on a native element, which
-the DOM patcher skips rather than binding as a listener. The `modelValue` prop is not emitted at all
-on a native element.
+the `onUpdate:modelValue` prop the way a component `v-model` does. The `DirectiveInvocation` value
+therefore carries a `ModelBinding` holding **both** the current value and the generated write-back
+delegate; the `onUpdate:modelValue` prop is still emitted for uniformity but is inert on a native
+element, which the DOM patcher skips rather than binding as a listener. The `modelValue` prop is not
+emitted at all on a native element.
 
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
@@ -1106,8 +1227,15 @@ render line, falls back to the generated file.
 
 ### 8.6 Static optimization
 
-`[SFC-OPT-1]` A fully static subtree is marked `PatchFlags.Cached` and wrapped in a per-instance
-render-cache slot, so it is created once per instance and reused across every re-render.
+`[SFC-OPT-1]` A fully static subtree is marked `PatchFlags.Cached` and stored in a
+`ComponentRenderFrame.Cache` slot, so it is created once per mount and reused across every re-render.
+One cached description MAY occupy multiple positions in one render result, including cache access
+inside list generation; only the immutable description is shared, and every position mounts
+independently [RND-2] [RND-4].
+The generated `ComponentContract.RenderCacheSize` carries the exact non-negative slot count,
+including zero, and Core constructs each mount's frame from that value. The legacy contract
+constructor that predates compiler cache-size metadata alone receives a 64-slot compatibility
+fallback; newly generated contracts always supply the exact value.
 
 `[SFC-OPT-2]` Contiguous runs of cached, stringifiable siblings collapse into a single static
 insert. The thresholds are **`NODE_COUNT = 20`** consecutive stringifiable nodes and
@@ -1130,6 +1258,13 @@ not input.
 `[SFC-DIAG-2]` A structurally openable block **always opens**, so its content is still sliced and
 downstream tooling has something to work with. An unterminated block yields its content to end of
 file and still appears in the descriptor.
+
+`[SFC-DIAG-3]` **Parser-produced node algebras are explicit.** Template, HTML, and
+single-file-component abstract node roots expose no parameterless construction path outside their
+own assembly; external parser extensibility goes through the generic parser registration seam, not
+by injecting variants into those trees. CSS record roots remain mechanically derivable, so every
+CSS writer and rewriter MUST handle each supported built-in variant explicitly and throw
+`InvalidOperationException` for an unsupported node rather than silently dropping or copying it.
 
 ### 8.8 Component-usage validation
 
@@ -1244,12 +1379,12 @@ compatibility", "Generator compatibility contract"; `docs/UTILITY-CSS-DESIGN.md`
 
 ### 10.1 Scoped CSS
 
-`[STY-1]` A generated template exposes its style scope through `IComponentTemplate.ScopeIdentifier`:
-a `data-v-<hash>` identifier derived by `StyleScopeId` as an FNV-1a hash over the **project-relative**
-component path. Both build-time hosts — the source generator and the bundling MSBuild task — MUST
-derive the identical id, or the scoped CSS will not match the stamped elements. The compiler rewrites
-the block's selectors to that scope; the renderer stamps the identifier on host elements through the
-optional `RendererOptions<TNode>.SetScopeIdentifier` operation.
+`[STY-1]` **Deferred.** Runtime style-scope identifiers are parked until the `[V01.01.15]` arc is
+complete. The adopted `ComponentContract`, `ComponentContext`, `VirtualNode` algebra, host contract,
+server serializer, and generated registration carry no style-scope state or stamping operation.
+Reintroduction is additive: it MAY add one contract/context value plus compiler, serializer, and host
+emission without changing the four-lifetime model. Until that work lands, this clause imposes no
+runtime scope-identifier requirement.
 
 ### 10.2 CSS Modules
 
@@ -1270,19 +1405,23 @@ member name (`$style.a-b` → `$style.a_b`), the same name the emitter writes as
 
 ### 10.3 `v-bind()` in CSS
 
-`[STY-6]` `v-bind()` in a style block compiles to `CssVariables.UseCssVariables(context, getter)`
-emitted from the generated setup path, taking an **explicit `IComponentContext`** so ownership is
-unambiguous.
+`[STY-6]` **Deferred with the scoped-CSS feature until the `[V01.01.15]` arc completes.**
+`v-bind()` in a style block compiles to a `CssVariables` binding emitted from the generated setup
+path with an explicit `ComponentContext` owner. During the deferral the compiler emits no CSS
+variable application, and the Browser host retains the designed single-element
+`CssVariables.Bind` directive as the primitive the restored feature builds on.
 
-`[STY-7]` After mount, a post-flush watcher tracks the getter's reactive dependencies and applies
-each hashed custom property to **every current outermost host element** reported by `ComponentHost`
-— fragment roots included. The updated hook reapplies when a component changes its element or
-fragment roots; before unmount the component stops the watcher.
+`[STY-7]` **Deferred with `[STY-6]`.** When restored: after mount, a post-flush watcher tracks the
+getter's reactive dependencies and applies each hashed custom property to every current outermost
+host element — fragment roots included — reapplying on root-set changes and stopping before
+unmount. Restoration requires the component-root host-range seam recorded in
+`docs/COMPONENT-MODEL-PLAN.md`; introducing that seam is part of the restoration work item, not
+the migration arc.
 
-`[STY-8]` **A `v-bind()` change updates the host without re-rendering the component.** On a buffered
-host the properties are written into the command frame and the owning context queues its
-renderer-specific commit, so the change reaches the host before `NextTick` even though no render
-occurred.
+`[STY-8]` **Deferred with `[STY-6]`.** When restored: a `v-bind()` change updates the host without
+re-rendering the component — on a buffered host the properties are written into the command frame
+and the owning context queues its renderer-specific commit, reaching the host before `NextTickAsync`
+with no render.
 
 ### 10.4 Viu Utilities
 
@@ -1318,25 +1457,27 @@ boundary:
 ### 11.1 Server rendering
 
 `[SSR-1]` `ServerRenderer.RenderToStringAsync` renders a configured `ServerRenderApplication` to a string;
-`RenderToStreamAsync` writes **completed template subtrees** to a `TextWriter` and awaits the
+`RenderToStreamAsync` writes **completed component subtrees** to a `TextWriter` and awaits the
 writer's `FlushAsync`, so the destination controls backpressure.
 
 `[SSR-2]` `ServerRenderApplication` is a plain per-render composition object carrying an immutable
 `IApplicationContext` **without a host node type**. It does not implement `IApplication`, owns no
 persistent mounted lifetime, and does not participate in top-level application middleware [APP-7].
 
-`[SSR-3]` ServerRenderer consumes the **same `IComponent` tree** client renderers patch; it does not
-maintain a second node model. `ComponentTreeSerializer` dispatches the seven `ComponentKind` values
-[CMP-3].
+`[SSR-3]` ServerRenderer consumes the **same `VirtualNode` algebra** client renderers patch; it does
+not maintain a second node model. The server serializer dispatches the ten closed
+`VirtualNodeKind` variants [CMP-3].
 
-`[SSR-4]` `ServerComponentRenderer` reuses Core's `MountedComponent` pipeline: activate a fresh
-template, create the live `IComponentContext` and reactive effect scope, run synchronous `Setup`,
-**await every `OnServerPrefetch` callback** [CMP-21], invoke the renderer once, serialize the
-subtree, then stop the scope, cancel the component token, and dispose the mount-owned template.
+`[SSR-4]` ServerRenderer obtains a one-shot lease through
+`ComponentHost.RenderAsync(ComponentRenderRequest)`. Core resolves the registration, activates a
+fresh `IComponent`, creates its live `ComponentContext` and reactive scope, runs synchronous `Setup`
+inside that scope, **awaits every `OnServerPrefetch` callback** [CMP-21], and invokes the returned
+`ComponentRenderer` once before exposing the tree for serialization.
 
 `[SSR-5]` Client-only before-mount, mounted, update, and unmount callbacks **do not run** during
-server rendering. Render cancellation interrupts the prefetch wait and cancels the component token
-during cleanup.
+server rendering. Render cancellation interrupts the prefetch wait. Disposing the render scope
+aborts the component lifetime, cancels its token, stops its reactive scope, and disposes the authored
+instance without invoking client hooks.
 
 `[SSR-6]` Escaping targets **WHATWG HTML serialization**: `"`, `&`, `'`, `<`, `>` are escaped, and
 comment terminators are repeatedly removed from comment content. Attribute serialization skips
@@ -1361,13 +1502,18 @@ to the hydration protocol.
 | Element | `<tag attributes>children</tag>` |
 | Void element | `<tag attributes>` |
 | Fragment | `<!--[-->children<!--]-->` |
-| Template | the rendered subtree, with no wrapper |
+| Component | the rendered subtree, with no wrapper |
 | Enabled teleport | `<!--teleport start--><!--teleport end-->` |
 | Disabled teleport | `<!--teleport start-->children<!--teleport end-->` |
 
 `[SSR-MARKERS-2]` An enabled teleport's **target buffer** receives its children followed by
 `<!--teleport anchor-->`. A disabled teleport renders children in place and contributes only the
 target anchor. A missing or non-string target emits the origin anchors and skips target content.
+
+`[SSR-MARKERS-3]` Core's public `HydrationMarkers` is the single owner of every marker in
+[SSR-MARKERS-1] and [SSR-MARKERS-2]. Core hydration, ServerRenderer, and Testing MUST consume that
+vocabulary rather than duplicating literals or a parallel grammar. This ownership change does not
+alter any wire value.
 
 ### 11.3 Hydration
 
@@ -1377,7 +1523,9 @@ markers of [SSR-MARKERS-1] through a host-supplied `HydrationNodeReader<TNode>`.
 `[HYD-2]` **Hydration is a client-host responsibility.** Browser supplies a reader over one batched
 host-tree snapshot per root or teleport target, so every structural, kind, text, and attribute read
 after that stays in managed memory. Testing supplies a live-tree reader and an immutable-snapshot
-reader. ServerRenderer itself stays free of host-node types.
+reader. `TestRendererOptions.SnapshotSemantics` selects between them; the same non-positional options
+record also carries strict-removal validation wherever Testing creates renderer operations.
+ServerRenderer itself stays free of host-node types.
 
 `[HYD-3]` `Hydrate` throws `NotSupportedException` when the host supplies no
 `CreateHydrationReader`, and `InvalidOperationException` when the container already holds a mounted
@@ -1400,17 +1548,26 @@ already carries the trailing `<!--teleport anchor-->` the walker requires.
 ### 11.4 The hosting boundary
 
 `[SSR-8]` **No `Assimalign.Viu.*` library may reference a web framework.** Hosting is a downstream
-adapter over a host-agnostic contract. ServerRenderer references Shared, Components, and Core, and
+adapter over a host-agnostic contract. ServerRenderer references Components and Core, and
 has no DOM, Browser, WebView2, or JavaScript-interop dependency.
 
 `[SSR-9]` A server host SHOULD create **one server-render application per request** when services or
 state are request-scoped. The supplied factory, service provider, and state registry are borrowed
 and are never disposed by ServerRenderer [CMP-9], [APP-6].
 
+`[SSR-10]` `ComponentHost.RenderAsync(ComponentRenderRequest, CancellationToken = default)` returns an
+`IComponentRenderScope` exposing exactly `VirtualNode? Tree` and `ComponentContext Context`.
+The operation resolves and activates one registration, runs setup inside the component scope, awaits
+server prefetch, and invokes the renderer once. `DisposeAsync` aborts and releases the lease without
+client mount, update, or unmount hooks. A nested `ComponentRenderRequest` carries the active parent
+scope; Core uses that scope's still-valid `Context` as the nested component's parent.
+
 *Authority: `libraries/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
+`libraries/Assimalign.Viu.Core/src/{Abstraction/IComponentRenderScope.cs,Rendering/ComponentHost.cs,Rendering/ComponentRenderRequest.cs}`;
 `libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Hydration;
-`libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md`.*
+`libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md`;
+`docs/COMPONENT-MODEL-PLAN.md` §8.2.*
 
 ---
 
@@ -1420,8 +1577,11 @@ and are never disposed by ServerRenderer [CMP-9], [APP-6].
 `RouteLocation`, `RouteParameters`, `PathMatchingOptions`, and the ranked path parser run in a plain
 .NET test host using no other Viu library.
 
-`[RTR-2]` `RouteLocation` has **value equality**, so a navigation layer can compare and snapshot
-cheaply. `RouteParameters` accessors are **boxing-free and reflection-free**
+`[RTR-2]` `RouteLocation` and `RouteParameters` have **value equality** with matching null-safe
+`==` and `!=` operators, so a navigation layer can compare and snapshot cheaply.
+`Router.CurrentRoute` exposes the covariant get-only reactive-reference contract; only Router can
+replace the current location.
+`RouteParameters` accessors are **boxing-free and reflection-free**
 (`GetString`/`TryGetString`, `GetInteger`/`TryGetInteger`, `GetStrings`), with immutable
 `With`/`WithMany` builders.
 
@@ -1431,24 +1591,43 @@ browser-history bridge when `Router.ReadyAsync` first needs it; `RouterHistory.I
 remains an optional prewarming call. `UseRouter` awaits readiness with
 `IApplicationContext.Stopping` before the host terminal mounts and removes the DOM bridge during
 reverse-order application cleanup [APP-4], [APP-5]. History state marshals as a **flat,
-primitives-only** payload.
+primitives-only** payload. Every history is an idempotent, terminal `IDisposable`: after disposal
+all other members throw `ObjectDisposedException`. A Router borrows its history; the owner disposes
+the Router first and then the history, making environment-listener ownership explicit.
+`RouterHistoryNavigationOptions` is a flags value whose `SuppressListeners` bit controls `Go`;
+`RouterHistoryEntryOptions` is a readonly value carrying the non-bitwise scroll input to `Push` and
+`Replace`. `RouterHistoryState.Replaced` remains an observed output fact, never an operation switch.
 
-`[RTR-4]` `RouterView` and `RouterLink` resolve `Router` from `IComponentContext.Services`.
+`[RTR-4]` `RouterView` and `RouterLink` resolve `Router` from nullable
+`ComponentContext.Services`.
 **`RouterView` takes its nesting depth as an explicit argument** (default `0`), and a nested layout
 passes the next depth explicitly, because Viu has no hierarchical component dependency API [CMP-24].
+An in-component guard depth outside the current matched route chain throws
+`ArgumentOutOfRangeException`; registration never silently drops a guard because its explicit depth
+is invalid. `RouterLinkClickEvent` carries system keys as one `RouterLinkModifiers` flags value;
+its individual key properties are computed projections retained for click-contract and test
+inspection.
 
 `[RTR-5]` **Guards return their decision; they do not call a continuation.** A `NavigationGuard`
 returns a `NavigationGuardResult` — `Allow`, `Abort`, or a redirect — from an awaitable,
 cancellable signature. An exhaustive result type lets the compiler check that every path decides,
-and lets the pipeline guarantee a guard decides exactly once.
+and lets the pipeline guarantee a guard decides exactly once. The result exposes a
+`NavigationGuardOutcomeKind` plus exactly the applicable payload: a failed outcome carries its
+`NavigationFailureType`, while a redirected outcome carries a `NavigationRedirectTarget`
+discriminated as a location or named route. Callers never infer the outcome from a string or null.
 
 `[RTR-6]` A navigation that does not complete yields a `NavigationFailure` typed `Aborted`,
-`Cancelled`, or `Duplicated`, returned from `Push`/`Replace` and passed to every after-navigation
-hook. A guard-redirect chain that exceeds the safety cap throws `NavigationRedirectException`.
+`Cancelled`, or `Duplicated`, returned from cancellable `PushAsync`/`ReplaceAsync` and passed to
+every after-navigation hook. A caller cancellation participates in the same cancellation outcome as
+a navigation superseded by a later request. One cancellation token spans an entire redirect chain.
+A superseded pop navigation reports `Cancelled` to its after-navigation hooks but cannot compensate
+history after a newer navigation owns the pipeline. A guard-redirect chain that exceeds the safety
+cap throws `NavigationRedirectException`.
 
 `[RTR-7]` **Boundary.** `Assimalign.Viu.Router` references Components and Reactivity but **not Core
 and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` is the
-click-dispatch bridge, and the browser history edge is gated by `[SupportedOSPlatform("browser")]`.
+click-dispatch bridge that maps browser modifier flags onto `RouterLinkModifiers`, and the browser
+history edge is gated by `[SupportedOSPlatform("browser")]`.
 
 `[RTR-8]` **Limit.** Lazy route components and scroll behavior are not implemented
 ([V01.01.08.05]); every route component resolves eagerly. See [§17](#17-non-goals-and-current-limits).
@@ -1460,24 +1639,26 @@ click-dispatch bridge, and the browser history edge is gated by `[SupportedOSPla
 
 ## 13. State
 
-`[STA-1]` `StateStoreDefinition<TStore>` is an **explicit, AOT-safe setup delegate**. A definition is
-reusable metadata identified by `Key`; mutable state is always registry-owned.
+`[STA-1]` `StateStoreDefinition<TStore>` is reusable metadata with a diagnostic `Identifier` and an
+explicit, AOT-safe `StateStoreActivator<TStore>(IStateContext)`. Mutable store instances are always
+registry-owned; the identifier is not reflection-backed activation or registry identity.
 
-`[STA-2]` `StateStoreRegistry` creates **one detached root reactive scope** at construction and one
-**child scope plus instance per definition key**. Resolving the same definition in one registry is a
-cache hit by reference identity; different registries produce isolated instances. Disposing the
-registry stops the root scope, which cascades through every child scope. A setup failure stops the
-newly created child scope and adds no partial entry. Resolving a different definition under an owned
-key raises `DuplicateStateStoreKeyException`.
+`[STA-2]` `IStateStoreRegistry` lazily creates **one store instance and one detached `EffectScope`
+per definition object**. Resolving the same definition in one registry is a cache hit by reference
+identity; different registries produce isolated instances. Removing a definition or disposing the
+registry disposes its store and stops its scope. A setup failure stops the newly created scope and
+adds no partial entry.
 
 `[STA-3]` The caller's ambient component scope is **never** the store scope's parent. Store lifetime
 is registry lifetime, not mount lifetime.
 
-`[STA-4]` Core's mounted context implements the **State-owned** `IStateStoreContext` capability, so
-`definition.Use(componentContext)` locates the application registry **without making Components
-depend on State**. The application-global path deliberately records **no owner**; otherwise the
-first component to resolve a global store would become its owner and setup behavior would depend on
-mount order. A caller creating an isolated feature registry MAY pass an owner explicitly.
+`[STA-4]` **Superseded bridge.** State attaches through the designed convention seam [CMP-33].
+`definition.Use(componentContext)` first resolves `IStateStoreRegistry` through nullable
+`componentContext.Services`, then uses the ambient active registry, and otherwise throws. It MUST
+NOT cast the context, require a friend grant, or introduce a bridge interface. The application-global
+path deliberately records **no owner**; otherwise the first component to resolve a global store
+would become its owner and setup behavior would depend on mount order. An isolated feature creates
+and owns another registry, then passes that registry explicitly to `definition.Use(registry)`.
 
 `[STA-5]` `StateStore<TState>` is **optional**. It offers `Patch`, `Reset`, `Subscribe`, and
 `OnAction` over source-generated `[Reactive]` state. The live `State` object is never replaced.
@@ -1499,7 +1680,7 @@ helper — there is no interception layer [RCT-6]. Asynchronous helpers await th
 the after-hook, so it receives the resolved value; faults run error hooks and then propagate.
 
 *Authority: `libraries/Assimalign.Viu.State/{src,docs/{OVERVIEW,DESIGN}.md}`;
-`docs/ARCHITECTURE.md` §State.*
+`docs/COMPONENT-MODEL-PLAN.md` §2a.*
 
 ---
 
@@ -1551,8 +1732,12 @@ installer, no admin rights.
 
 `[PKG-2]` The framework ships as the **`Assimalign.Viu.App` shared framework**: a
 `KnownFrameworkReference` registration resolving to the `Assimalign.Viu.App.Ref` targeting pack
-(compile references + `data/FrameworkList.xml`) and per-RID `Assimalign.Viu.App.Runtime.<rid>`
-runtime packs (`browser-wasm` today).
+(compile references + `data/FrameworkList.xml` + `data/PackageOverrides.txt`) and per-RID
+`Assimalign.Viu.App.Runtime.<rid>` runtime packs (`browser-wasm` today). The targeting pack's
+package-override manifest lists every framework assembly that is also published as a standalone
+package at the effective NuGet package version, so the framework copy wins conflict resolution when
+an SDK-path consumer also references that package. Runtime packs do not carry the targeting-only
+override manifest.
 
 `[PKG-3]` **Generators are delivered as analyzers through the ref pack** — `analyzers/dotnet/cs`
 with `<File Type="Analyzer">` manifest entries — so an SDK consumer gets `[Reactive]` and
@@ -1595,6 +1780,12 @@ it move together.
 
 `[CONF-3]` Unit tests are **DOM-free by default**. The runtime is exercised through
 `Assimalign.Viu.Testing`'s in-memory host; real-browser coverage is a separate end-to-end harness.
+`TestElement` exposes read-only live views of its properties, listeners, and ordered children, so
+tests can inspect host state without mutating renderer-owned storage. `ComponentWrapper` and
+`ElementWrapper` name event/value operations `TriggerAsync` and `SetValueAsync`; their returned task
+completes only after the deterministic scheduler has drained. `TestRenderer` and
+`TestNodeOperations.Create` both accept the same `TestRendererOptions` record, so snapshot and
+strict-removal behavior cannot depend on positional Boolean order.
 
 `[CONF-4]` For reactivity and caching semantics a test MUST assert **run counts** (effect runs,
 getter invocations), not only final values: caching and dependency-tracking bugs hide behind
@@ -1608,8 +1799,8 @@ correct-looking values.
 
 ### 17.1 Non-goals — decisions, not deferrals
 
-- **Not a port.** Viu makes no parity guarantee with any external project, has no "upstream wins"
-  rule, and tracks no external project's version.
+- **Standalone semantics.** Viu makes no semantic-equivalence guarantee with an external project,
+  has no external-precedence rule, and tracks no external project's version as its own contract.
 - **No options-style component authoring, no mixins, no global-properties bag.** Component logic is a
   setup function returning reactive state and handlers.
 - **No component-tree provide/inject** [CMP-24].
@@ -1657,7 +1848,7 @@ lands in this specification.**
 `[PERF-3]` A finding MUST NOT be adopted without a measured delta against
 `benchmarks/Assimalign.Viu.Testing.Benchmarks` and/or `benchmarks/baselines/InteropCounts.json`.
 
-`[PERF-4]` Semantic, API, and behavioral parity with an external project is **out of scope** for that
+`[PERF-4]` Matching an external project's semantics, API, or behavior is **out of scope** for that
 channel and MUST NOT be raised through it.
 
 ---
@@ -1693,11 +1884,11 @@ doc comments. Viu Utilities already follows this pattern
 
 | Term | Meaning in Viu |
 | --- | --- |
-| **component tree** | The immutable `IComponent` hierarchy a render produces |
-| **template** | An `IComponentTemplate` — authored component behavior, one instance per mount |
-| **template request** | An `ITemplateComponent` — a non-activating description of a template to mount |
-| **mounted node** | An internal `MountedRenderNode<TNode>` — the runtime bookkeeping for one tree value |
-| **block** | A tree value whose `ComponentOptimization.DynamicChildren` is non-null [RND-BLOCK-2] |
+| **virtual tree** | The immutable `VirtualNode` hierarchy a render produces |
+| **authored component** | An `IComponent` — activated behavior, one instance per mounted invocation |
+| **component invocation** | A `ComponentNode` plus its raw `ComponentInvocation`; a non-activating request resolved at mount |
+| **mounted node** | Internal Core bookkeeping for one virtual-tree value |
+| **block** | A `VirtualNode` whose `RenderPlan.DynamicChildren` is non-null [RND-BLOCK-2] |
 | **dynamic children** | A block root's collected dynamic descendants |
 | **patch flag** | A `PatchFlags` value: what the compiler proved can change |
 | **shape flag** | A `ShapeFlags` value: what a node is and what shape its children take |

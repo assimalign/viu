@@ -2,43 +2,31 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.State.Tests;
 
 internal static class StateStoreTestSupport
 {
-    internal static IComponentFactory Components { get; } =
-        new ComponentFactory(Array.Empty<ComponentRegistration>());
-
-    internal static IServiceProvider Services { get; } =
-        new EmptyServiceProvider();
-
     internal static StateStoreRegistry CreateRegistry(
-        IReactiveWatchScheduler? scheduler = null)
+        IReactiveWatchScheduler? scheduler = null,
+        IServiceProvider? services = null)
         => new(
-            Components,
-            Services,
+            services,
             new ReactiveEffectScopeFactory(),
             scheduler);
-
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType) => null;
-    }
 }
 
 internal sealed class TestReactiveWatchScheduler : IReactiveWatchScheduler
 {
-    private readonly Queue<WatchJob> _preFlush = new();
     private readonly Queue<WatchJob> _postFlush = new();
+    private readonly Queue<WatchJob> _preFlush = new();
     private readonly HashSet<WatchJob> _queued =
         new(ReferenceEqualityComparer.Instance);
 
-    internal int ScheduleCalls { get; private set; }
-
     internal int PendingCount => _queued.Count;
+
+    internal int ScheduleCalls { get; private set; }
 
     public void Schedule(WatchJob job)
     {

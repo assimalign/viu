@@ -1,27 +1,20 @@
 using System;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// The <c>v-model</c> directive for text inputs and <c>&lt;textarea&gt;</c>.
-/// Reflects the model onto <c>el.value</c> and
-/// writes user edits back through the binding's <see cref="ViuModelBinding.Setter"/>. IME safety:
-/// input updates are suppressed between <c>compositionstart</c> and <c>compositionend</c>. Modifiers:
-/// <c>.lazy</c> listens on <c>change</c> instead of <c>input</c>; <c>.number</c> coerces via
-/// <see cref="NumberCoercion.LooseToNumber(object?)"/> (non-numeric input is left untouched);
-/// <c>.trim</c> trims the bound value and re-syncs the element on <c>change</c> (blur). Reads the DOM
-/// value from the dispatched <see cref="BrowserEvent"/> payload, never a follow-up interop read.
-/// Stateless singleton (<see cref="Instance"/>) referenced by the compiled <c>v-model</c> transform
-/// ([V01.01.05.03]); per-element state lives in <see cref="BrowserModelState"/>.
-/// </summary>
+/// <summary>Provides Browser text-control two-way model behavior.</summary>
+/// <remarks>
+/// The directive reflects the current model into <c>value</c>, writes input through the generated
+/// setter, suppresses incomplete IME composition, and honors <c>lazy</c>, <c>trim</c>, and
+/// <c>number</c>. It is a qualified public type token and reusable singleton; per-element state is
+/// host-owned. Specified by <c>[SFC-CG-6]</c> and <c>[SFC-CG-7]</c>.
+/// </remarks>
 public sealed class VModelText : IDirective
 {
-    /// <summary>The shared directive instance the compiler references.</summary>
-    public static readonly VModelText Instance = new();
+    /// <summary>Gets the reusable Browser text-model directive.</summary>
+    public static VModelText Instance { get; } = new();
 
     private VModelText()
     {
@@ -42,53 +35,25 @@ public sealed class VModelText : IDirective
     private static void OnCreated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        var operations = BrowserDirectiveOperations.Require();
-        var handle = BrowserModelDirective.Handle(element);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
         operations.GetState(handle).Assign = BrowserModelDirective.Carrier(binding)?.Setter;
-
-        var lazy = BrowserModelDirective.HasModifier(binding, "lazy");
-        var trim = BrowserModelDirective.HasModifier(binding, "trim");
-        var castToNumber = BrowserModelDirective.HasModifier(binding, "number")
-            || BrowserModelDirective.IsNumberType(component);
-
-        if (lazy)
-        {
-            operations.SetModelListener(handle, "onChange",
-                (Action<BrowserEvent>)(browserEvent => OnChange(operations, handle, browserEvent, lazy: true, trim, castToNumber)));
-        }
-        else
-        {
-            operations.SetModelListener(handle, "onInput",
-                (Action<BrowserEvent>)(browserEvent => Commit(operations, handle, browserEvent, trim, castToNumber)));
-            operations.SetModelListener(handle, "onCompositionstart",
-                (Action<BrowserEvent>)(_ => operations.GetState(handle).Composing = true));
-            operations.SetModelListener(handle, "onCompositionend",
-                (Action<BrowserEvent>)(browserEvent => OnCompositionEnd(operations, handle, browserEvent, trim, castToNumber)));
-            // 'change' also ends a composition and drives the trim re-sync, so it is bound too.
-            operations.SetModelListener(handle, "onChange",
-                (Action<BrowserEvent>)(browserEvent => OnChange(operations, handle, browserEvent, lazy: false, trim, castToNumber)));
-        }
-
-        // Focus tracking gates the lazy/trim write guards below without an activeElement interop
-        // read. A listener on the element fires for its own (non-bubbling) focus/blur in the target
-        // phase; real browser focus is exercised by the e2e harness ([V01.01.11.03]).
-        operations.SetModelListener(handle, "onFocus", (Action)(() => operations.GetState(handle).Focused = true));
-        operations.SetModelListener(handle, "onBlur", (Action)(() => operations.GetState(handle).Focused = false));
+        ConfigureListeners(operations, handle, binding, value);
     }
 
     private static void OnMounted(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        var operations = BrowserDirectiveOperations.Require();
-        var handle = BrowserModelDirective.Handle(element);
-        // A null model reflects as the empty string, never the literal "null".
-        var formatted = BrowserModelDirective.FormatValue(BrowserModelDirective.Carrier(binding)?.Value);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        string formatted = BrowserModelDirective.FormatValue(
+            BrowserModelDirective.Carrier(binding)?.Value);
         operations.SetValueGuarded(handle, formatted);
         operations.GetState(handle).CurrentValue = formatted;
     }
@@ -96,99 +61,158 @@ public sealed class VModelText : IDirective
     private static void OnBeforeUpdate(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        var operations = BrowserDirectiveOperations.Require();
-        var handle = BrowserModelDirective.Handle(element);
-        var state = operations.GetState(handle);
-        state.Assign = BrowserModelDirective.Carrier(binding)?.Setter; // refresh the assigner
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        BrowserModelState state = operations.GetState(handle);
+        state.Assign = BrowserModelDirective.Carrier(binding)?.Setter;
+        ConfigureListeners(operations, handle, binding, value);
         if (state.Composing)
-        {
-            return; // never clobber an in-progress composition
-        }
-        var model = BrowserModelDirective.Carrier(binding)?.Value;
-        var newValue = BrowserModelDirective.FormatValue(model);
-        // Primary guard: the DOM already shows the model (also protects a focused caret).
-        if (string.Equals(state.CurrentValue, newValue, StringComparison.Ordinal))
         {
             return;
         }
+
+        object? model = BrowserModelDirective.Carrier(binding)?.Value;
+        string nextValue = BrowserModelDirective.FormatValue(model);
+        if (string.Equals(state.CurrentValue, nextValue, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         if (state.Focused)
         {
-            // Focus-gated so a re-render never rewrites the value the user is actively editing. The
-            // range-input carve-out is deferred (uncommon; e2e harness [V01.01.11.03]).
-            var lazy = BrowserModelDirective.HasModifier(binding, "lazy");
-            var trim = BrowserModelDirective.HasModifier(binding, "trim");
-            if (lazy
+            if (BrowserModelDirective.HasModifier(binding, "lazy")
                 && LooseEquality.LooseEqual(
                     model,
                     BrowserModelDirective.ModelValue(binding.PreviousValue)))
             {
                 return;
             }
-            if (trim && string.Equals(state.CurrentValue.Trim(), newValue, StringComparison.Ordinal))
+
+            if (BrowserModelDirective.HasModifier(binding, "trim")
+                && string.Equals(
+                    state.CurrentValue.Trim(),
+                    nextValue,
+                    StringComparison.Ordinal))
             {
                 return;
             }
         }
-        operations.SetValueGuarded(handle, newValue);
-        state.CurrentValue = newValue;
+
+        operations.SetValueGuarded(handle, nextValue);
+        state.CurrentValue = nextValue;
     }
 
     private static void OnBeforeUnmount(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
-        => BrowserDirectiveOperations.Require().ReleaseState(BrowserModelDirective.Handle(element));
-
-    // The DOM value -> model commit shared by input/change/compositionend. Trim runs before number
-    // coercion: trimming first is what lets " 42 " parse.
-    private static void Commit(BrowserDirectiveOperations operations, int handle, BrowserEvent browserEvent, bool trim, bool castToNumber)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        var state = operations.GetState(handle);
+        BrowserDirectiveOperations.Require().ReleaseState(
+            BrowserModelDirective.Handle(element));
+    }
+
+    private static void ConfigureListeners(
+        BrowserDirectiveOperations operations,
+        int handle,
+        DirectiveBinding binding,
+        ElementNode value)
+    {
+        bool lazy = BrowserModelDirective.HasModifier(binding, "lazy");
+        bool trim = BrowserModelDirective.HasModifier(binding, "trim");
+        bool castToNumber = BrowserModelDirective.HasModifier(binding, "number")
+            || BrowserModelDirective.IsNumberType(value);
+
+        operations.SetModelListener(handle, "onInput", lazy
+            ? null
+            : (Action<BrowserEvent>)(browserEvent =>
+                Commit(operations, handle, browserEvent, trim, castToNumber)));
+        operations.SetModelListener(handle, "onCompositionstart", lazy
+            ? null
+            : (Action<BrowserEvent>)(_ => operations.GetState(handle).Composing = true));
+        operations.SetModelListener(handle, "onCompositionend", lazy
+            ? null
+            : (Action<BrowserEvent>)(browserEvent =>
+                OnCompositionEnd(operations, handle, browserEvent, trim, castToNumber)));
+        operations.SetModelListener(
+            handle,
+            "onChange",
+            (Action<BrowserEvent>)(browserEvent =>
+                OnChange(operations, handle, browserEvent, lazy, trim, castToNumber)));
+        operations.SetModelListener(
+            handle,
+            "onFocus",
+            (Action)(() => operations.GetState(handle).Focused = true));
+        operations.SetModelListener(
+            handle,
+            "onBlur",
+            (Action)(() => operations.GetState(handle).Focused = false));
+    }
+
+    private static void Commit(
+        BrowserDirectiveOperations operations,
+        int handle,
+        BrowserEvent browserEvent,
+        bool trim,
+        bool castToNumber)
+    {
+        BrowserModelState state = operations.GetState(handle);
         if (state.Composing)
         {
             return;
         }
-        var domValue = browserEvent.TargetValue ?? string.Empty;
-        state.CurrentValue = domValue;
-        var candidate = trim ? domValue.Trim() : domValue;
-        var modelValue = castToNumber ? NumberCoercion.LooseToNumber(candidate) : candidate;
-        state.Assign?.Invoke(modelValue);
+
+        string browserValue = browserEvent.TargetValue ?? string.Empty;
+        state.CurrentValue = browserValue;
+        string candidate = trim ? browserValue.Trim() : browserValue;
+        state.Assign?.Invoke(castToNumber
+            ? NumberCoercion.LooseToNumber(candidate)
+            : candidate);
     }
 
-    private static void OnChange(BrowserDirectiveOperations operations, int handle, BrowserEvent browserEvent, bool lazy, bool trim, bool castToNumber)
+    private static void OnChange(
+        BrowserDirectiveOperations operations,
+        int handle,
+        BrowserEvent browserEvent,
+        bool lazy,
+        bool trim,
+        bool castToNumber)
     {
-        var state = operations.GetState(handle);
+        BrowserModelState state = operations.GetState(handle);
         if (lazy)
         {
-            Commit(operations, handle, browserEvent, trim, castToNumber); // .lazy commits on change
+            Commit(operations, handle, browserEvent, trim, castToNumber);
         }
         else if (state.Composing)
         {
-            // A composition can be ended by 'change' too, not only by compositionend.
             state.Composing = false;
             Commit(operations, handle, browserEvent, trim, castToNumber);
         }
+
         if (trim)
         {
-            // Re-sync the element to the trimmed value on blur/change so what is displayed is what
-            // the model holds.
-            var trimmed = (browserEvent.TargetValue ?? string.Empty).Trim();
+            string trimmed = (browserEvent.TargetValue ?? string.Empty).Trim();
             state.CurrentValue = trimmed;
             operations.SetValueGuarded(handle, trimmed);
         }
     }
 
-    private static void OnCompositionEnd(BrowserDirectiveOperations operations, int handle, BrowserEvent browserEvent, bool trim, bool castToNumber)
+    private static void OnCompositionEnd(
+        BrowserDirectiveOperations operations,
+        int handle,
+        BrowserEvent browserEvent,
+        bool trim,
+        bool castToNumber)
     {
-        var state = operations.GetState(handle);
+        BrowserModelState state = operations.GetState(handle);
         if (!state.Composing)
         {
             return;
         }
+
         state.Composing = false;
         Commit(operations, handle, browserEvent, trim, castToNumber);
     }

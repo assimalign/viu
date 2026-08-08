@@ -18,7 +18,7 @@
                                             .nupkg .nuspec (flows to consumers).
 
                                             Usage (by assembly name only):
-                                              <ViuProjectReference Include="Assimalign.Viu.Shared" />
+                                              <ViuProjectReference Include="Assimalign.Viu.Components" />
 
           ViuPrivateProjectReference  - PRIVATE code reference. Same compile
                                             + CopyLocal behaviour, but the

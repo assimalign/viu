@@ -1,5 +1,5 @@
 using Xunit;
 
-// Core's scheduler and Reactivity use ambient state for the browser's single-threaded event-loop
-// model, so their tests must not execute concurrently.
+// Core's scheduler is intentionally ambient and single-threaded, so tests that exercise it must
+// not overlap another renderer or scheduler test in this assembly.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]

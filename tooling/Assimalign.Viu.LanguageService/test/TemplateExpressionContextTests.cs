@@ -69,7 +69,7 @@ public class TemplateExpressionContextTests
     {
         const string templateLine = "    <div :class=\"ShellClass\"></div>";
         var source = $"<template>\n{templateLine}\n</template>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var hover = service.GetHover(
@@ -87,7 +87,7 @@ public class TemplateExpressionContextTests
         var caret = templateLine.IndexOf(typedPrefix, StringComparison.Ordinal) + typedPrefix.Length;
         caret.ShouldBeGreaterThan(typedPrefix.Length - 1, "the probe text must occur in the line");
 
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
         return service.GetCompletions(DocumentUri, new LanguagePosition(1, caret));
     }

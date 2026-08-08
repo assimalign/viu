@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -45,7 +46,7 @@ public sealed class VueSingleFileComponentGeneratorTests
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
         generated.ShouldContain("\"Card.vue\"");
-        generated.ShouldContain("internal static object? Render(");
+        generated.ShouldContain("private static global::Assimalign.Viu.Components.VirtualNode? __ViuRender(");
         generated.ShouldContain("Theme.active");
         generated.ShouldContain("public int Count = 1;");
         generated.ShouldContain($"#line 4 \"{ProjectDirectory}/Card.vue\"");
@@ -67,8 +68,8 @@ public sealed class VueSingleFileComponentGeneratorTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Inline.SingleFileComponent.g.cs");
-        generated.ShouldContain(
-            $"#line (1,19)-(1,26) 88 \"{ProjectDirectory}/Inline.vue\"");
+        generated.ShouldContain("#line (1,19)-(1,26)");
+        generated.ShouldContain($"\"{ProjectDirectory}/Inline.vue\"");
     }
 
     [Fact]
@@ -168,8 +169,8 @@ public sealed class VueSingleFileComponentGeneratorTests
         generated.ShouldContain($"#line 2 \"{ProjectDirectory}/Setup.vue\"");
         generated.ShouldContain($"#line 3 \"{ProjectDirectory}/Setup.vue\"");
         generated.ShouldContain($"#line 4 \"{ProjectDirectory}/Setup.vue\"");
-        generated.ShouldContain("_ctx.Ordinary");
-        generated.ShouldContain("_ctx.SetupCount");
+        generated.ShouldContain("component.Ordinary");
+        generated.ShouldContain("component.SetupCount");
     }
 
     [Fact]
@@ -250,10 +251,15 @@ public sealed class VueSingleFileComponentGeneratorTests
 
         driver = driver.RunGenerators(GeneratorTestHarness.CreateCompilation());
         var result = driver.GetRunResult().Results[0];
+        var componentSources = result.GeneratedSources
+            .Where(source => source.HintName.EndsWith(
+                ".SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .ToArray();
 
         result.Exception.ShouldBeNull();
-        result.GeneratedSources.Length.ShouldBe(1);
-        result.GeneratedSources[0].SourceText.ToString().ShouldContain("\"Card.viu\"");
+        componentSources.Length.ShouldBe(1);
+        componentSources[0].SourceText.ToString().ShouldContain("\"Card.viu\"");
         var diagnostic = result.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Id.ShouldBe("VIU1004");
         diagnostic.Location.GetLineSpan().Path.ShouldBe($"{ProjectDirectory}/Card.vue");

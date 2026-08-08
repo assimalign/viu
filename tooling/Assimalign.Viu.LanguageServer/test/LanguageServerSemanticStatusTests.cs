@@ -258,7 +258,7 @@ public class LanguageServerSemanticStatusTests
     /// open-time feed runs on the loop thread while request-time feeds run on request tasks.
     /// </summary>
     private sealed class ContextRecordingLanguageService :
-        IViuLanguageService,
+        ILanguageService,
         IScriptSemanticLanguageService
     {
         private readonly object synchronization = new();

@@ -1,0 +1,16 @@
+<template>
+<article class="aliased-slot-host">
+  <slot :name="ActiveSlotName" />
+  <slot />
+</article>
+</template>
+
+@script {
+using Assimalign.Viu.Reactivity;
+
+public Reference<bool> ReplaceFirst { get; } = Reactive.Reference(false);
+
+public string ActiveSlotName => ReplaceFirst.Value ? "replacement" : "default";
+
+partial void OnSetup() => OnMounted(() => ReplaceFirst.Value = true);
+}

@@ -116,16 +116,16 @@ internal static class TransformUtilities
     }
 
     /// <summary>Turns a vnode call into a block, registering the block helpers.</summary>
-    public static VNodeCall ConvertToBlock(VNodeCall node, TransformContext context)
+    public static VirtualNodeCall ConvertToBlock(VirtualNodeCall node, TransformContext context)
     {
         if (node.IsBlock)
         {
             return node;
         }
 
-        context.RemoveHelper(TransformContext.GetVNodeHelper(context.InSSR, node.IsComponent));
+        context.RemoveHelper(TransformContext.GetVirtualNodeHelper(context.IsNestedServerRendering, node.IsComponent));
         context.Helper(HelperNames.OpenBlock);
-        context.Helper(TransformContext.GetVNodeBlockHelper(context.InSSR, node.IsComponent));
+        context.Helper(TransformContext.GetVirtualNodeBlockHelper(context.IsNestedServerRendering, node.IsComponent));
         return node with { IsBlock = true };
     }
 
@@ -133,11 +133,11 @@ internal static class TransformUtilities
     /// Injects <paramref name="property"/> as the first prop of a vnode call or <c>renderSlot</c> call
     ///, returning the rewritten node.
     /// </summary>
-    public static TemplateSyntaxNode InjectProperty(TemplateSyntaxNode node, Property property, TransformContext context)
+    public static TemplateSyntaxNode InjectProperty(TemplateSyntaxNode node, ObjectProperty property, TransformContext context)
     {
-        var isVNodeCall = node is VNodeCall;
-        var properties = isVNodeCall
-            ? ((VNodeCall)node).Props
+        var isVirtualNodeCall = node is VirtualNodeCall;
+        var properties = isVirtualNodeCall
+            ? ((VirtualNodeCall)node).Properties
             : ((CallExpression)node).Arguments.Count > 2 ? ((CallExpression)node).Arguments[2] as TemplateSyntaxNode : null;
 
         TemplateSyntaxNode? propertiesWithInjection;
@@ -191,9 +191,9 @@ internal static class TransformUtilities
                 new object[] { Ir.ObjectExpression(new[] { property }), properties });
         }
 
-        if (isVNodeCall)
+        if (isVirtualNodeCall)
         {
-            return ((VNodeCall)node) with { Props = propertiesWithInjection };
+            return ((VirtualNodeCall)node) with { Properties = propertiesWithInjection };
         }
 
         var arguments = new List<object>(((CallExpression)node).Arguments);
@@ -206,11 +206,11 @@ internal static class TransformUtilities
         return ((CallExpression)node) with { Arguments = new SyntaxList<object>(arguments.ToArray()) };
     }
 
-    private static ObjectExpression Unshift(ObjectExpression target, Property property)
+    private static ObjectExpression Unshift(ObjectExpression target, ObjectProperty property)
     {
-        var properties = new List<Property>(target.Properties.Count + 1) { property };
+        var properties = new List<ObjectProperty>(target.Properties.Count + 1) { property };
         properties.AddRange(target.Properties);
-        return target with { Properties = new SyntaxList<Property>(properties.ToArray()) };
+        return target with { Properties = new SyntaxList<ObjectProperty>(properties.ToArray()) };
     }
 
     private static SyntaxList<object> ReplaceAt(SyntaxList<object> arguments, int index, object value)
@@ -236,7 +236,7 @@ internal static class TransformUtilities
         return new SyntaxList<object>(array);
     }
 
-    private static bool HasProperty(Property property, ObjectExpression target)
+    private static bool HasProperty(ObjectProperty property, ObjectExpression target)
     {
         if (property.Key is not SimpleExpressionNode key)
         {

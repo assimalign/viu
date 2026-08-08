@@ -33,7 +33,7 @@ public sealed class HintNameCollisionTests
         var result = driver.GetRunResult().Results[0];
 
         result.Exception.ShouldBeNull();
-        result.GeneratedSources.Length.ShouldBe(2);
+        ComponentSources(result).Count.ShouldBe(2);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public sealed class HintNameCollisionTests
         var result = driver.GetRunResult().Results[0];
 
         result.Exception.ShouldBeNull();
-        result.GeneratedSources.Length.ShouldBe(2);
+        ComponentSources(result).Count.ShouldBe(2);
     }
 
     [Fact]
@@ -70,8 +70,9 @@ public sealed class HintNameCollisionTests
         var result = driver.GetRunResult().Results[0];
 
         result.Exception.ShouldBeNull();
-        result.GeneratedSources.Length.ShouldBe(2);
-        result.GeneratedSources
+        var componentSources = ComponentSources(result);
+        componentSources.Count.ShouldBe(2);
+        componentSources
             .Select(source => source.HintName)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count()
@@ -130,11 +131,18 @@ public sealed class HintNameCollisionTests
         var result = driver.GetRunResult().Results[0];
 
         result.Exception.ShouldBeNull();
-        return result.GeneratedSources
+        return ComponentSources(result)
             .Select(source => source.HintName)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
     }
+
+    private static IReadOnlyList<GeneratedSourceResult> ComponentSources(GeneratorRunResult result)
+        => result.GeneratedSources
+            .Where(source => source.HintName.EndsWith(
+                ".SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .ToList();
 
     [Fact]
     public void TemplateDiagnosticOnTheBlockStartLine_AddsTheBlockColumn()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 using Assimalign.Viu.Components;
@@ -6,43 +7,45 @@ using Assimalign.Viu.State;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Provides the frozen composition and observable runtime state shared by one application.
-/// </summary>
+/// <summary>Provides one application's frozen composition and observable runtime state.</summary>
 /// <remarks>
-/// Composition members never change after the application is built. <see cref="IsRunning"/> and
-/// <see cref="Stopping"/> expose the host-owned lifetime without making middleware depend on a
-/// separate execution object. Specified by <c>[APP-1]</c>, <c>[APP-2]</c>, and <c>[APP-5]</c>.
+/// Composition members are borrowed and never disposed by Core. <see cref="IsRunning"/> and
+/// <see cref="Stopping"/> are controlled by the context's single attached
+/// <see cref="ApplicationLifetime"/>. Specified by <c>[APP-1]</c>, <c>[APP-2]</c>, and
+/// <c>[APP-6]</c>.
 /// </remarks>
 public interface IApplicationContext
 {
-    /// <summary>Gets whether the host terminal is mounted and has not begun stopping.</summary>
+    /// <summary>Gets whether the host has signalled Running and has not begun stopping.</summary>
     bool IsRunning { get; }
 
-    /// <summary>Gets the token that signals graceful application shutdown.</summary>
+    /// <summary>Gets the shared graceful-shutdown signal.</summary>
     CancellationToken Stopping { get; }
 
-    /// <summary>Gets the root value in the unified component tree.</summary>
-    IComponent RootComponent { get; }
+    /// <summary>Gets the immutable root render description.</summary>
+    VirtualNode RootComponent { get; }
 
-    /// <summary>Gets the application-selected component resolver.</summary>
+    /// <summary>Gets the borrowed component registration resolver.</summary>
     IComponentFactory Components { get; }
 
-    /// <summary>Gets the independently supplied application service resolver.</summary>
-    IServiceProvider Services { get; }
+    /// <summary>
+    /// Gets the optional application service provider. When a state registry is configured, this
+    /// provider resolves it before delegating other service requests.
+    /// </summary>
+    IServiceProvider? Services { get; }
 
-    /// <summary>Gets the optional application state registry.</summary>
+    /// <summary>Gets the optional borrowed state registry composed for the application.</summary>
     IStateStoreRegistry? State { get; }
 
-    /// <summary>Gets the optional application directive resolver.</summary>
+    /// <summary>Gets the optional borrowed reflection-free directive resolver.</summary>
     IDirectiveResolver? Directives { get; }
 
-    /// <summary>
-    /// Gets the terminal handler for render, lifecycle, watcher, and event errors that no
-    /// component error-capture hook stopped.
-    /// </summary>
-    Action<Exception, IComponentContext?, string>? ErrorHandler { get; }
+    /// <summary>Gets the terminal component and application error handler.</summary>
+    Action<Exception, ComponentContext?, string>? ErrorHandler { get; }
 
     /// <summary>Gets the application warning handler.</summary>
     Action<string>? WarnHandler { get; }
+
+    /// <summary>Gets the optional observer invoked after a component event listener runs.</summary>
+    Action<ComponentContext, string, IReadOnlyList<object?>>? EventObserver { get; }
 }

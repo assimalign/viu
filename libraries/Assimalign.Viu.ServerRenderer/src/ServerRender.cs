@@ -2,62 +2,110 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The by-name SSR helper library: the string-producing and push-based helpers a server render
-/// calls into. The pure-string members (<see cref="EscapeHtml(string)"/>,
-/// <see cref="SsrRenderAttrs(IComponentAttributeCollection?, string?)"/>, <see cref="SsrRenderClass"/>,
-/// <see cref="SsrRenderStyle"/>, <see cref="SsrInterpolate"/>, …) are used both by the component-tree
-/// runtime renderer (<see cref="ServerRenderer"/>) and, later, by the compiler-generated
-/// <c>ssrRender</c> bodies ([V01.01.07.02]). The <c>*Async</c> members are the push-based helpers the
-/// generated code awaits, forwarding to the same engine the runtime renderer uses so both paths
-/// produce byte-identical output — compiled rendering is an optimization, never a second semantics.
-/// <para>
-/// Escaping is security-adjacent, so the escape set is fixed and test-pinned:
-/// <see cref="EscapeHtml(string)"/> escapes <c>"</c>, <c>&amp;</c>, <c>'</c>, <c>&lt;</c>, and
-/// <c>&gt;</c> — deliberately a superset of the WHATWG minimal set, so one routine is correct for
-/// both text and attribute values and no caller has to choose. See
-/// <see href="https://html.spec.whatwg.org/multipage/parsing.html#serialising-html-fragments">WHATWG HTML serialization</see>.
-/// Specified by <c>[SSR-6]</c>.
-/// </para>
-/// Not thread-safe (single-threaded JS event-loop model).
+/// Provides the public entry points and by-name helpers used by runtime and compiler-produced
+/// server rendering.
 /// </summary>
+/// <remarks>
+/// Compiled rendering is an optimization over the same escaping, attribute, marker, teleport, and
+/// lease-backed traversal semantics as <see cref="ServerRenderer"/>. HTML escaping targets the
+/// WHATWG fragment-serialization format and is reflection-free for trimming and AOT safety.
+/// Specified by <c>[SSR-1]</c>, <c>[SSR-3]</c>, and <c>[SSR-6]</c>.
+/// </remarks>
 public static partial class ServerRender
 {
-    // The five characters EscapeHtml rewrites, vectorized so the common no-escape-needed case is an
-    // allocation-free scan (SearchValues is the .NET 8+ fast path).
-    private static readonly SearchValues<char> EscapableCharacters = SearchValues.Create("\"&'<>");
+    private static readonly SearchValues<char> EscapableCharacters =
+        SearchValues.Create("\"&'<>");
+    private static readonly IReadOnlyDictionary<string, object?> EmptySlotArguments =
+        new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
+
+    /// <summary>Renders one configured application to a completed HTML string.</summary>
+    /// <param name="application">The immutable per-render application composition.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for component prefetch and rendering.</param>
+    /// <returns>The completed WHATWG HTML serialization.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c> and <c>[SSR-2]</c>.</remarks>
+    public static Task<string> RenderToStringAsync(
+        ServerRenderApplication application,
+        SsrContext? context = null,
+        CancellationToken cancellationToken = default) =>
+        ServerRenderer.RenderToStringAsync(application, context, cancellationToken);
+
+    /// <summary>Renders one host-neutral virtual tree to a completed HTML string.</summary>
+    /// <param name="rootComponent">The root virtual node.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for rendering.</param>
+    /// <returns>The completed WHATWG HTML serialization.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c> and <c>[SSR-3]</c>.</remarks>
+    public static Task<string> RenderToStringAsync(
+        VirtualNode rootComponent,
+        SsrContext? context = null,
+        CancellationToken cancellationToken = default) =>
+        ServerRenderer.RenderToStringAsync(rootComponent, context, cancellationToken);
+
+    /// <summary>Streams one configured application with component-subtree flush boundaries.</summary>
+    /// <param name="application">The immutable per-render application composition.</param>
+    /// <param name="writer">The externally owned destination writer.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for prefetch, writes, and flushes.</param>
+    /// <returns>A task completing after all produced content has flushed.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c>, <c>[SSR-4]</c>, and <c>[SSR-10]</c>.</remarks>
+    public static Task RenderToStreamAsync(
+        ServerRenderApplication application,
+        TextWriter writer,
+        SsrContext? context = null,
+        CancellationToken cancellationToken = default) =>
+        ServerRenderer.RenderToStreamAsync(application, writer, context, cancellationToken);
+
+    /// <summary>Streams one host-neutral virtual tree to a text writer.</summary>
+    /// <param name="rootComponent">The root virtual node.</param>
+    /// <param name="writer">The externally owned destination writer.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for writes and flushes.</param>
+    /// <returns>A task completing after all produced content has flushed.</returns>
+    /// <remarks>Specified by <c>[SSR-1]</c> and <c>[SSR-3]</c>.</remarks>
+    public static Task RenderToStreamAsync(
+        VirtualNode rootComponent,
+        TextWriter writer,
+        SsrContext? context = null,
+        CancellationToken cancellationToken = default) =>
+        ServerRenderer.RenderToStreamAsync(rootComponent, writer, context, cancellationToken);
 
     /// <summary>
-    /// Escapes text or an attribute value for HTML: <c>"</c> → <c>&amp;quot;</c>, <c>&amp;</c> → <c>&amp;amp;</c>,
-    /// <c>'</c> → <c>&amp;#39;</c>, <c>&lt;</c> → <c>&amp;lt;</c>, <c>&gt;</c> → <c>&amp;gt;</c>. Returns the input
-    /// unchanged when it contains none of those characters.
+    /// Escapes quotation marks, ampersands, apostrophes, less-than signs, and greater-than signs
+    /// for HTML text or attribute content.
     /// </summary>
-    /// <param name="value">The raw text; null yields the empty string.</param>
-    /// <returns>The escaped text.</returns>
+    /// <param name="value">The raw text; null yields an empty string.</param>
+    /// <returns>The escaped value, or the original string when no character needs escaping.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
     public static string EscapeHtml(string? value)
     {
         if (string.IsNullOrEmpty(value))
         {
             return string.Empty;
         }
-        var firstIndex = value.AsSpan().IndexOfAny(EscapableCharacters);
+
+        int firstIndex = value.AsSpan().IndexOfAny(EscapableCharacters);
         if (firstIndex < 0)
         {
             return value;
         }
-        var builder = new StringBuilder(value.Length + 16);
+
+        StringBuilder builder = new(value.Length + 16);
         builder.Append(value, 0, firstIndex);
-        for (var index = firstIndex; index < value.Length; index++)
+        for (int index = firstIndex; index < value.Length; index++)
         {
             switch (value[index])
             {
@@ -81,271 +129,255 @@ public static partial class ServerRender
                     break;
             }
         }
+
         return builder.ToString();
     }
 
-    /// <summary>
-    /// Escapes an arbitrary value as HTML text, coercing it to its display string first. Null yields
-    /// the empty string.
-    /// </summary>
-    /// <param name="value">The value to coerce and escape.</param>
-    public static string EscapeHtml(object? value) => EscapeHtml(DisplayStringFormatter.ToDisplayString(value));
+    /// <summary>Formats an arbitrary value and escapes it as HTML text.</summary>
+    /// <param name="value">The interpolation or attribute value; null yields an empty string.</param>
+    /// <returns>The deterministic escaped display string.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
+    public static string EscapeHtml(object? value) =>
+        EscapeHtml(DisplayStringFormatter.ToDisplayString(value));
 
-    /// <summary>
-    /// Strips the comment-terminating sequences from comment content so it cannot break out of its
-    /// <c>&lt;!-- --&gt;</c> wrapper. Stripping is applied repeatedly until the result stops changing, so
-    /// overlapping sequences cannot reconstitute a terminator after a single pass.
-    /// </summary>
-    /// <param name="source">The comment content.</param>
-    /// <returns>The sanitized comment content.</returns>
+    /// <summary>Repeatedly removes sequences that can terminate or reopen an HTML comment.</summary>
+    /// <param name="source">The raw comment content; null yields an empty string.</param>
+    /// <returns>Content safe to place between HTML comment delimiters.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
     public static string EscapeHtmlComment(string? source)
     {
         if (string.IsNullOrEmpty(source))
         {
             return string.Empty;
         }
+
         string previous;
-        var current = source;
+        string current = source;
         do
         {
             previous = current;
             current = CommentStripPattern().Replace(current, string.Empty);
         }
         while (!string.Equals(current, previous, StringComparison.Ordinal));
+
         return current;
     }
 
-    /// <summary>Renders a comment node as <c>&lt;!--content--&gt;</c>.</summary>
-    /// <param name="content">The comment content; empty yields the <c>&lt;!----&gt;</c> anchor.</param>
-    public static string SsrRenderComment(string? content) => "<!--" + EscapeHtmlComment(content) + "-->";
+    /// <summary>Serializes one comment node, including the stable empty-comment anchor.</summary>
+    /// <param name="content">The raw comment content.</param>
+    /// <returns>The complete serialized comment.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c> and <c>[SSR-MARKERS-1]</c>.</remarks>
+    public static string SsrRenderComment(string? content) =>
+        string.Concat("<!--", EscapeHtmlComment(content), "-->");
 
-    /// <summary>
-    /// Renders an interpolation: the value's display string, escaped.
-    /// </summary>
-    /// <param name="value">The interpolated value.</param>
-    public static string SsrInterpolate(object? value) => EscapeHtml(DisplayStringFormatter.ToDisplayString(value));
+    /// <summary>Formats and escapes one template interpolation.</summary>
+    /// <param name="value">The interpolation value.</param>
+    /// <returns>The escaped display string.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
+    public static string SsrInterpolate(object? value) =>
+        EscapeHtml(DisplayStringFormatter.ToDisplayString(value));
 
-    /// <summary>
-    /// Normalizes a class binding to its flat class string, then escapes it.
-    /// </summary>
-    /// <param name="value">The class binding: string, list, or name/flag map.</param>
-    public static string SsrRenderClass(object? value) => EscapeHtml(StyleAndClassNormalization.NormalizeClass(value));
+    /// <summary>Normalizes, flattens, and escapes one class binding.</summary>
+    /// <param name="value">A supported class binding shape.</param>
+    /// <returns>The escaped ordered class string.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
+    public static string SsrRenderClass(object? value) =>
+        EscapeHtml(StyleAndClassNormalization.NormalizeClass(value));
 
-    /// <summary>
-    /// Normalizes, stringifies, and escapes a style binding. A string passes through escaped; a map is
-    /// normalized, then serialized to inline CSS, then escaped.
-    /// </summary>
-    /// <param name="value">The style binding: string, list, or property map.</param>
+    /// <summary>Normalizes, stringifies, and escapes one style binding.</summary>
+    /// <param name="value">A supported style binding shape.</param>
+    /// <returns>The escaped inline CSS string.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
     public static string SsrRenderStyle(object? value)
     {
-        if (value is null || (value is string empty && empty.Length == 0))
+        if (value is null || value is string { Length: 0 })
         {
             return string.Empty;
         }
+
         if (value is string text)
         {
             return EscapeHtml(text);
         }
-        var normalized = StyleAndClassNormalization.NormalizeStyle(value);
+
+        object? normalized = StyleAndClassNormalization.NormalizeStyle(value);
         return EscapeHtml(StyleAndClassNormalization.StringifyStyle(normalized));
     }
 
-    /// <summary>
-    /// Serializes an element's attributes to an attribute string. Skips the
-    /// reserved props (<c>key</c>, <c>ref</c>, <c>ref_for</c>, <c>ref_key</c>, <c>innerHTML</c>,
-    /// <c>textContent</c>), event handlers (<c>onX</c>), <c>.</c>-prefixed force-property bindings, and
-    /// <c>value</c> on a <c>&lt;textarea&gt;</c>; strips a leading <c>^</c> force-attribute marker; routes
-    /// <c>class</c>/<c>style</c> through their normalizers and <c>className</c> to a direct string; and
-    /// serializes the rest through <see cref="SsrRenderDynamicAttr"/>.
-    /// </summary>
-    /// <param name="attributes">The element attributes, or null.</param>
-    /// <param name="tag">The owning element tag (drives the <c>textarea</c> and custom-element rules), or null.</param>
-    /// <returns>The attribute string, each attribute preceded by a space; empty when there are none.</returns>
-    public static string SsrRenderAttrs(
-        IComponentAttributeCollection? attributes,
-        string? tag = null)
+    /// <summary>Serializes the attribute bindings for one element.</summary>
+    /// <param name="bindings">The immutable host bindings, or null.</param>
+    /// <param name="elementName">The optional owning element name used for casing and textarea rules.</param>
+    /// <returns>Serialized attributes, each including its leading space.</returns>
+    /// <remarks>
+    /// Property and event bindings are excluded. Class and style are normalized, boolean attributes
+    /// render by presence, and unsafe dynamic names are dropped. Specified by <c>[SSR-6]</c>.
+    /// </remarks>
+    public static string SsrRenderAttributes(
+        IReadOnlyList<ElementBinding>? bindings,
+        QualifiedName? elementName = null)
     {
-        if (attributes is null || attributes.Count == 0)
+        if (bindings is null || bindings.Count == 0)
         {
             return string.Empty;
         }
 
         StringBuilder builder = new();
-        for (int index = 0; index < attributes.Count; index++)
+        for (int index = 0; index < bindings.Count; index++)
         {
-            IComponentAttribute attribute = attributes[index];
-            string rawName = attribute.Name;
-            object? value = attribute.Value;
-            if (ShouldIgnoreProperty(rawName)
-                || IsEventHandlerName(rawName)
-                || (string.Equals(tag, "textarea", StringComparison.Ordinal) && string.Equals(rawName, "value", StringComparison.Ordinal))
-                || rawName.StartsWith('.'))
+            ElementBinding binding = bindings[index];
+            if (binding.Kind != ElementBindingKind.Attribute)
             {
                 continue;
             }
-            // A leading '^' forces attribute rendering; the marker itself is not emitted.
-            var name = rawName.StartsWith('^') ? rawName[1..] : rawName;
+
+            string rawName = binding.Name.ToString();
+            if (ShouldIgnoreAttribute(rawName)
+                || IsEventHandlerName(rawName)
+                || rawName.StartsWith(".", StringComparison.Ordinal)
+                || (elementName is { } owner
+                    && string.Equals(
+                        owner.LocalName,
+                        "textarea",
+                        StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(
+                        binding.Name.LocalName,
+                        "value",
+                        StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            string name = rawName.StartsWith('^') ? rawName[1..] : rawName;
+            object? value = binding.Value;
             if (string.Equals(name, "class", StringComparison.Ordinal))
             {
-                builder.Append(" class=\"").Append(SsrRenderClass(value)).Append('"');
+                builder.Append(" class=\"");
+                builder.Append(SsrRenderClass(value));
+                builder.Append('"');
             }
             else if (string.Equals(name, "style", StringComparison.Ordinal))
             {
-                builder.Append(" style=\"").Append(SsrRenderStyle(value)).Append('"');
+                builder.Append(" style=\"");
+                builder.Append(SsrRenderStyle(value));
+                builder.Append('"');
             }
             else if (string.Equals(name, "className", StringComparison.Ordinal))
             {
-                // className coerces directly to a string, never through class normalization: it is the
-                // raw DOM property spelling, so an author who used it asked for a verbatim value.
-                if (value is not null)
+                if (IsRenderableAttributeValue(value))
                 {
-                    builder.Append(" class=\"").Append(EscapeHtml(DisplayStringFormatter.FormatScalar(value))).Append('"');
+                    builder.Append(" class=\"");
+                    builder.Append(EscapeHtml(DisplayStringFormatter.FormatScalar(value!)));
+                    builder.Append('"');
                 }
             }
             else
             {
-                builder.Append(SsrRenderDynamicAttr(name, value, tag));
+                bool preserveCase = elementName is { } namedOwner
+                    && HtmlSerializationRules.ShouldPreserveAttributeCase(namedOwner);
+                builder.Append(RenderDynamicAttribute(name, value, preserveCase));
             }
         }
+
         return builder.ToString();
     }
 
-    /// <summary>
-    /// Serializes one attribute with a statically known, pre-validated key, skipping the name-safety
-    /// check <see cref="SsrRenderDynamicAttr"/> performs. Returns the empty string when the value is
-    /// not renderable.
-    /// </summary>
-    /// <param name="key">The attribute name (already the correct casing).</param>
-    /// <param name="value">The attribute value.</param>
-    public static string SsrRenderAttr(string key, object? value)
+    /// <summary>Serializes one statically validated attribute name and scalar value.</summary>
+    /// <param name="key">The prevalidated attribute name.</param>
+    /// <param name="value">The scalar value.</param>
+    /// <returns>The attribute with a leading space, or an empty string for an unsupported value.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
+    public static string SsrRenderAttribute(string key, object? value)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         if (!IsRenderableAttributeValue(value))
         {
             return string.Empty;
         }
-        return " " + key + "=\"" + EscapeHtml(DisplayStringFormatter.FormatScalar(value!)) + "\"";
+
+        return string.Concat(
+            " ",
+            key,
+            "=\"",
+            EscapeHtml(DisplayStringFormatter.FormatScalar(value!)),
+            "\"");
     }
 
-    /// <summary>
-    /// Serializes one attribute with a dynamic (unknown) key:
-    /// preserves the raw name on custom elements and SVG, else maps to the attribute name or lowercases;
-    /// renders boolean attributes by presence; renders a safe name as <c>name="value"</c> (or bare for an
-    /// empty string); and skips an SSR-unsafe attribute name.
-    /// </summary>
-    /// <param name="key">The prop name.</param>
-    /// <param name="value">The prop value.</param>
-    /// <param name="tag">The owning element tag, or null.</param>
-    public static string SsrRenderDynamicAttr(string key, object? value, string? tag = null)
+    /// <summary>Serializes one dynamically named attribute.</summary>
+    /// <param name="key">The untrusted attribute or property name.</param>
+    /// <param name="value">The scalar value.</param>
+    /// <param name="tag">The optional owning tag used to preserve SVG and custom-element casing.</param>
+    /// <returns>The attribute with a leading space, or an empty string when unsafe or absent.</returns>
+    /// <remarks>Specified by <c>[SSR-6]</c>.</remarks>
+    public static string SsrRenderDynamicAttribute(
+        string key,
+        object? value,
+        string? tag = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        if (!IsRenderableAttributeValue(value))
-        {
-            return string.Empty;
-        }
-        string attributeKey;
-        if (tag is not null && (tag.IndexOf('-', StringComparison.Ordinal) > 0 || DomKnowledge.IsSvgTag(tag)))
-        {
-            // Custom elements and SVG are case-sensitive, so the author's casing is preserved verbatim
-            // rather than lowercased or mapped.
-            attributeKey = key;
-        }
-        else
-        {
-            var mapped = DomKnowledge.GetAttributeName(key);
-            attributeKey = string.Equals(mapped, key, StringComparison.Ordinal)
-                ? key.ToLowerInvariant()
-                : mapped;
-        }
-        if (DomKnowledge.IsBooleanAttribute(attributeKey))
-        {
-            return IncludeBooleanAttribute(value) ? " " + attributeKey : string.Empty;
-        }
-        if (DomKnowledge.IsSsrSafeAttributeName(attributeKey))
-        {
-            return value is string { Length: 0 }
-                ? " " + attributeKey
-                : " " + attributeKey + "=\"" + EscapeHtml(DisplayStringFormatter.FormatScalar(value!)) + "\"";
-        }
-        // Unsafe attribute name (contains '>', '/', '=', quotes, or whitespace/control): dropped rather
-        // than escaped. Escaping the name is not sound — the parser would still see markup — so the only
-        // safe outcome is to omit the attribute entirely [SSR-6].
-        return string.Empty;
+        return RenderDynamicAttribute(
+            key,
+            value,
+            HtmlSerializationRules.ShouldPreserveAttributeCase(tag));
     }
 
-    // ==== Push-based async helpers (the surface the compiled ssrRender bodies await) =============
-
-    /// <summary>
-    /// Renders a child tree value. Template requests run their full
-    /// server lifecycle — setup, server prefetch, and subtree render — while primitive values serialize
-    /// directly. The child inherits <paramref name="parent"/>'s component context.
-    /// </summary>
-    /// <param name="state">The write surface.</param>
+    /// <summary>Serializes a child tree through the same lease-backed runtime traversal.</summary>
+    /// <param name="state">The active renderer-owned write state.</param>
     /// <param name="component">The child tree value.</param>
-    /// <param name="parent">The rendering parent context, or null.</param>
+    /// <param name="parent">The active parent lease for nested component activation.</param>
+    /// <returns>A task completing after the child serializes.</returns>
+    /// <remarks>
+    /// Passing the lease rather than a context prevents capability casts and preserves nested
+    /// ancestry under <c>[SSR-10]</c>.
+    /// </remarks>
     public static Task SsrRenderComponentAsync(
         SsrRenderState state,
-        IComponent component,
-        IComponentContext? parent = null)
+        VirtualNode? component,
+        IComponentRenderScope? parent = null)
     {
         ArgumentNullException.ThrowIfNull(state);
-        ArgumentNullException.ThrowIfNull(component);
-        return ComponentTreeSerializer.RenderAsync(
-            state,
-            component,
-            RequireComponentContext(parent));
+        return ServerMarkupSerializer.RenderAsync(state, component, parent);
     }
 
-    /// <summary>
-    /// Renders a slot outlet, bracketed by the <c>&lt;!--[--&gt;</c>/<c>&lt;!--]--&gt;</c> fragment
-    /// hydration anchors so the walker can find the outlet's child range without an element wrapper.
-    /// Invokes the named slot with
-    /// <paramref name="slotArguments"/> (the scoped-slot scope), falling back to <paramref name="fallback"/>
-    /// when the slot is absent or renders empty.
-    /// </summary>
-    /// <param name="state">The write surface.</param>
-    /// <param name="slots">The rendering instance's slots, or null.</param>
-    /// <param name="name">The slot name (<c>"default"</c> for the default slot).</param>
-    /// <param name="slotArguments">The scoped-slot arguments, or null for an empty argument set.</param>
-    /// <param name="parent">The rendering context (the slot content's descendants' parent).</param>
-    /// <param name="fallback">The fallback content factory, or null.</param>
+    /// <summary>Renders one named slot inside fragment hydration anchors.</summary>
+    /// <param name="state">The active renderer-owned write state.</param>
+    /// <param name="slots">The invocation's lazy slot map, or null.</param>
+    /// <param name="name">The non-empty slot name.</param>
+    /// <param name="slotArguments">The scoped-slot arguments, or null for an empty map.</param>
+    /// <param name="parent">The active parent render lease.</param>
+    /// <param name="fallback">Fallback content used when the slot is absent or empty.</param>
+    /// <returns>A task completing after the anchored slot range serializes.</returns>
+    /// <remarks>Specified by <c>[SSR-MARKERS-1]</c> and <c>[SSR-10]</c>.</remarks>
     public static async Task SsrRenderSlotAsync(
         SsrRenderState state,
         IReadOnlyDictionary<string, ComponentSlot>? slots,
         string name,
-        IComponentArguments? slotArguments = null,
-        IComponentContext? parent = null,
-        Func<IComponent?>? fallback = null)
+        IReadOnlyDictionary<string, object?>? slotArguments = null,
+        IComponentRenderScope? parent = null,
+        Func<VirtualNode?>? fallback = null)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        state.Push(SsrMarkers.FragmentStart);
+        state.Push(HydrationMarkers.FragmentStart);
 
-        IComponent? content = null;
+        VirtualNode? content = null;
         if (slots is not null && slots.TryGetValue(name, out ComponentSlot? slot))
         {
-            content = slot(slotArguments ?? new ComponentArguments());
+            content = slot(slotArguments ?? EmptySlotArguments);
         }
 
         content ??= fallback?.Invoke();
-        if (content is not null)
-        {
-            await ComponentTreeSerializer
-                .RenderAsync(state, content, RequireComponentContext(parent))
-                .ConfigureAwait(false);
-        }
-
-        state.Push(SsrMarkers.FragmentEnd);
+        await ServerMarkupSerializer.RenderAsync(state, content, parent).ConfigureAwait(false);
+        state.Push(HydrationMarkers.FragmentEnd);
     }
 
-    /// <summary>
-    /// Iterates a <c>v-for</c> source, awaiting <paramref name="renderItem"/> per entry. Supports an integer count (<c>n in 5</c>, value one-based), a dictionary
-    /// (value, key), and any other enumerable (item, zero-based index). The callback does the pushing, so
-    /// this helper writes nothing itself.
-    /// </summary>
-    /// <param name="source">The iterated source: an <see cref="int"/> count, dictionary, or enumerable.</param>
-    /// <param name="renderItem">Renders one entry as <c>(value, key)</c>.</param>
-    public static async Task SsrRenderListAsync(object? source, Func<object?, object?, Task> renderItem)
+    /// <summary>Iterates a count, dictionary, or enumerable for compiler-produced list rendering.</summary>
+    /// <param name="source">An integer count, dictionary, enumerable, or null.</param>
+    /// <param name="renderItem">The asynchronous item renderer receiving value then key/index.</param>
+    /// <returns>A task completing after every item renderer has completed in source order.</returns>
+    /// <remarks>List rendering is deterministic and allocation-safe under <c>[SSR-3]</c>.</remarks>
+    public static async Task SsrRenderListAsync(
+        object? source,
+        Func<object?, object?, Task> renderItem)
     {
         ArgumentNullException.ThrowIfNull(renderItem);
         switch (source)
@@ -353,38 +385,37 @@ public static partial class ServerRender
             case null:
                 break;
             case int count:
-                for (var index = 0; index < count; index++)
+                for (int index = 0; index < count; index++)
                 {
                     await renderItem(index + 1, index).ConfigureAwait(false);
                 }
+
                 break;
             case IDictionary dictionary:
                 foreach (DictionaryEntry entry in dictionary)
                 {
                     await renderItem(entry.Value, entry.Key).ConfigureAwait(false);
                 }
+
                 break;
             case IEnumerable enumerable:
-                var enumerableIndex = 0;
-                foreach (var item in enumerable)
+                int enumerableIndex = 0;
+                foreach (object? item in enumerable)
                 {
                     await renderItem(item, enumerableIndex++).ConfigureAwait(false);
                 }
+
                 break;
         }
     }
 
-    /// <summary>
-    /// Renders a <c>&lt;Teleport&gt;</c>: the origin position gets the
-    /// <c>&lt;!--teleport start--&gt;</c>/<c>&lt;!--teleport end--&gt;</c> anchor pair, while
-    /// <paramref name="contentRenderer"/>'s output is buffered against <paramref name="target"/> in the
-    /// <see cref="SsrContext"/> (with the trailing <c>&lt;!--teleport anchor--&gt;</c>). A disabled teleport
-    /// renders its content in place instead, leaving only the anchor in the target buffer.
-    /// </summary>
-    /// <param name="state">The write surface.</param>
-    /// <param name="contentRenderer">Renders the teleport content into the supplied state.</param>
-    /// <param name="target">The target selector (the <c>to</c> prop); a null/empty target skips the content.</param>
-    /// <param name="disabled">Whether the teleport is disabled (content stays in place).</param>
+    /// <summary>Serializes teleport origin markers and target-buffer content.</summary>
+    /// <param name="state">The active renderer-owned write state.</param>
+    /// <param name="contentRenderer">The callback that serializes teleport children.</param>
+    /// <param name="target">The target identifier; null or empty skips target content.</param>
+    /// <param name="disabled">Whether content remains at the origin.</param>
+    /// <returns>A task completing after origin and target contributions are complete.</returns>
+    /// <remarks>Specified by <c>[SSR-7]</c> and <c>[SSR-MARKERS-2]</c>.</remarks>
     public static async Task SsrRenderTeleportAsync(
         SsrRenderState state,
         Func<SsrRenderState, Task> contentRenderer,
@@ -393,95 +424,109 @@ public static partial class ServerRender
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(contentRenderer);
-        state.Push(SsrMarkers.TeleportStart);
+        state.Push(HydrationMarkers.TeleportStart);
         if (string.IsNullOrEmpty(target))
         {
-            state.Push(SsrMarkers.TeleportEnd);
+            state.Push(HydrationMarkers.TeleportEnd);
             return;
         }
+
         if (disabled)
         {
             await contentRenderer(state).ConfigureAwait(false);
-            state.Context.AppendTeleport(target, SsrMarkers.TeleportAnchor);
+            state.Context.AppendTeleport(target, HydrationMarkers.TeleportAnchor);
         }
         else
         {
             SsrWriter bufferWriter = new();
-            SsrRenderState bufferState = new(
-                bufferWriter,
-                state.Context,
-                state.Application,
-                state.CancellationToken,
-                state);
+            SsrRenderState bufferState = state.CreateBuffer(bufferWriter);
             await contentRenderer(bufferState).ConfigureAwait(false);
-            bufferState.Push(SsrMarkers.TeleportAnchor);
+            bufferState.Push(HydrationMarkers.TeleportAnchor);
             state.Context.AppendTeleport(target, bufferWriter.ToStringResult());
         }
-        state.Push(SsrMarkers.TeleportEnd);
+
+        state.Push(HydrationMarkers.TeleportEnd);
     }
 
-    /// <summary>
-    /// Renders a <c>&lt;Suspense&gt;</c>'s default branch, awaiting its async dependencies server-side
-    /// — server rendering resolves the branch and never emits the fallback, because a server response
-    /// has no later moment at which to swap it in. Because the walk already awaits each descendant component's <c>ServerPrefetch</c>, invoking
-    /// <paramref name="defaultBranch"/> resolves the branch's async data before returning. Full boundary
-    /// semantics (the fallback branch, error capture) arrive with the runtime Suspense component
-    /// ([V01.01.03.20]).
-    /// </summary>
-    /// <param name="state">The write surface.</param>
-    /// <param name="defaultBranch">Renders the default-branch content into the supplied state.</param>
-    public static Task SsrRenderSuspenseAsync(SsrRenderState state, Func<SsrRenderState, Task> defaultBranch)
+    /// <summary>Renders only a suspense boundary's resolved default branch on the server.</summary>
+    /// <param name="state">The active renderer-owned write state.</param>
+    /// <param name="defaultBranch">The asynchronous default-branch renderer.</param>
+    /// <returns>The branch task, including descendant prefetch waits.</returns>
+    /// <remarks>The fallback never appears in server output, as specified by <c>[SSR-4]</c>.</remarks>
+    public static Task SsrRenderSuspenseAsync(
+        SsrRenderState state,
+        Func<SsrRenderState, Task> defaultBranch)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(defaultBranch);
         return defaultBranch(state);
     }
 
-    // Renderer metadata, not markup: key/ref/ref_key/ref_for are reconciliation inputs, and
-    // innerHTML/textContent are applied as child overrides rather than attributes. The empty name is
-    // ignored too, so a malformed binding cannot emit a nameless attribute.
-    private static bool ShouldIgnoreProperty(string name) => name switch
+    private static string RenderDynamicAttribute(
+        string key,
+        object? value,
+        bool preserveCase)
+    {
+        if (!IsRenderableAttributeValue(value))
+        {
+            return string.Empty;
+        }
+
+        string mapped = preserveCase
+            ? key
+            : HtmlSerializationRules.GetAttributeName(key);
+        string attributeKey = preserveCase
+            || !string.Equals(mapped, key, StringComparison.Ordinal)
+            ? mapped
+            : key.ToLowerInvariant();
+
+        if (HtmlSerializationRules.IsBooleanAttribute(attributeKey))
+        {
+            return IncludeBooleanAttribute(value)
+                ? string.Concat(" ", attributeKey)
+                : string.Empty;
+        }
+
+        if (!HtmlSerializationRules.IsSsrSafeAttributeName(attributeKey))
+        {
+            return string.Empty;
+        }
+
+        return value is string { Length: 0 }
+            ? string.Concat(" ", attributeKey)
+            : string.Concat(
+                " ",
+                attributeKey,
+                "=\"",
+                EscapeHtml(DisplayStringFormatter.FormatScalar(value!)),
+                "\"");
+    }
+
+    private static bool ShouldIgnoreAttribute(string name) => name switch
     {
         "" or "key" or "ref" or "innerHTML" or "textContent" or "ref_key" or "ref_for" => true,
         _ => false,
     };
 
-    // A handler name is 'on' followed by a non-lowercase letter (onClick, on:foo, on-x), so an ordinary
-    // word like "onions" is not mistaken for one.
-    private static bool IsEventHandlerName(string name)
-        => name.Length > 2 && name[0] == 'o' && name[1] == 'n' && !char.IsAsciiLetterLower(name[2]);
+    private static bool IsEventHandlerName(string name) =>
+        name.Length > 2
+        && name[0] == 'o'
+        && name[1] == 'n'
+        && !char.IsAsciiLetterLower(name[2]);
 
-    // Only scalars serialize to an attribute value: string, bool, or a numeric type, and never null.
-    // An object or collection has no meaningful attribute spelling, so it is skipped.
     private static bool IsRenderableAttributeValue(object? value) => value switch
     {
         null => false,
         string => true,
         bool => true,
-        sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal => true,
+        sbyte or byte or short or ushort or int or uint or long or ulong or float or double
+            or decimal => true,
         _ => false,
     };
 
-    // A boolean attribute is emitted by presence for any truthy value, and also for the empty string —
-    // the disabled="" spelling HTML treats as set.
-    private static bool IncludeBooleanAttribute(object? value)
-        => StyleAndClassNormalization.IsTruthy(value) || value is string { Length: 0 };
+    private static bool IncludeBooleanAttribute(object? value) =>
+        StyleAndClassNormalization.IsTruthy(value) || value is string { Length: 0 };
 
-    private static ComponentContext? RequireComponentContext(IComponentContext? context)
-    {
-        return context switch
-        {
-            null => null,
-            ComponentContext componentContext => componentContext,
-            _ => throw new ArgumentException(
-                "The parent context must be a context created by the Viu component runtime.",
-                nameof(context)),
-        };
-    }
-
-    // Every sequence that could terminate or reopen a comment, including the leading '>' and '->' forms
-    // a parser accepts at the start of comment content. Applied repeatedly by EscapeHtmlComment so
-    // overlapping matches cannot re-form a terminator.
     [GeneratedRegex("^(?:-?>)+|<!--|-->|--!>|<!-$")]
     private static partial Regex CommentStripPattern();
 }

@@ -272,7 +272,7 @@ public sealed class SingleFileComponentScriptTests
     }
 
     [Fact]
-    public void HoistedUsings_CoexistWithRenderHelperPreamble_ProducingValidCSharp()
+    public void HoistedUsings_PrecedeNamespaceWithoutLegacyRenderHelperPreamble()
     {
         // Guards the [V01.01.06.03.01] + [V01.01.05.05] seam interaction: when a component has BOTH a
         // <template> (emitting the `using static` render-helper preamble) and an @script with leading
@@ -292,9 +292,7 @@ public sealed class SingleFileComponentScriptTests
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Widget.SingleFileComponent.g.cs");
 
-        // The `using static` render-helper preamble precedes the hoisted using, which precedes the namespace.
-        generated.IndexOf("using static", StringComparison.Ordinal)
-            .ShouldBeLessThan(generated.IndexOf("using System.Text", StringComparison.Ordinal));
+        generated.ShouldNotContain("using static");
         generated.IndexOf("using System.Text", StringComparison.Ordinal)
             .ShouldBeLessThan(generated.IndexOf("namespace Demo", StringComparison.Ordinal));
 
@@ -534,7 +532,7 @@ public sealed class SingleFileComponentScriptTests
     public void ScriptReference_DrivesRenderUnwrap_EndToEnd()
     {
         // The [V01.01.06.03] -> [V01.01.05.05] hand-off: the @script block declares a Reference<int>
-        // member, so the template's use of it compiles to a _ctx-routed .Value unwrap in the emitted
+        // member, so the template's use of it compiles through the generated typed unwrap in the emitted
         // render body — the whole point of feeding script-classified BindingMetadata into the template
         // compiler: without the classification the compiler cannot tell a reference member from an
         // ordinary one, and would emit the cell itself where the template asked for its value.
@@ -550,6 +548,6 @@ public sealed class SingleFileComponentScriptTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Counter.SingleFileComponent.g.cs");
-        generated.ShouldContain("_toDisplayString(_ctx.Count.Value)");
+        generated.ShouldContain("component.Count.Value");
     }
 }

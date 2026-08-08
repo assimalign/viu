@@ -107,7 +107,7 @@ public sealed class ReactiveGenerator : IIncrementalGenerator
         }
 
         var properties = CollectProperties(symbol, diagnostics);
-        var isReadonly = ReadReadonlyFlag(context.Attributes);
+        var isReadOnly = ReadReadOnlyFlag(context.Attributes);
 
         var model = new ReactiveClassModel(
             Namespace: symbol.ContainingNamespace.IsGlobalNamespace ? null : symbol.ContainingNamespace.ToDisplayString(),
@@ -116,7 +116,7 @@ public sealed class ReactiveGenerator : IIncrementalGenerator
             TypeParameterList: FormatTypeParameters(symbol.TypeParameters),
             AccessibilityKeyword: AccessibilityKeyword(symbol.DeclaredAccessibility),
             Shallow: shallow,
-            Readonly: isReadonly,
+            ReadOnly: isReadOnly,
             Properties: properties);
 
         return new ReactiveGeneratorResult(model, ToArray(diagnostics));
@@ -192,7 +192,7 @@ public sealed class ReactiveGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static bool ReadReadonlyFlag(ImmutableArray<AttributeData> attributes)
+    private static bool ReadReadOnlyFlag(ImmutableArray<AttributeData> attributes)
     {
         if (attributes.Length == 0)
         {
@@ -200,7 +200,7 @@ public sealed class ReactiveGenerator : IIncrementalGenerator
         }
         foreach (var argument in attributes[0].NamedArguments)
         {
-            if (argument.Key == "Readonly" && argument.Value.Value is bool value)
+            if (argument.Key == "ReadOnly" && argument.Value.Value is bool value)
             {
                 return value;
             }

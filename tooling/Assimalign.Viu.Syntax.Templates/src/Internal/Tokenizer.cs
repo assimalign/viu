@@ -59,7 +59,7 @@ internal sealed class Tokenizer
     public TemplateParseMode Mode { get; set; } = TemplateParseMode.Base;
 
     /// <summary>Whether the tokenizer is at the root level of a single-file component.</summary>
-    public bool InSfcRoot => Mode == TemplateParseMode.Sfc && callbacks.OpenElementCount == 0;
+    public bool InSingleFileComponentRoot => Mode == TemplateParseMode.SingleFileComponent && callbacks.OpenElementCount == 0;
 
     /// <summary>Resets all state so the instance can parse again.</summary>
     public void Reset()
@@ -382,7 +382,7 @@ internal sealed class Tokenizer
         else if (sequenceIndex == 0)
         {
             if (CurrentSequence == TokenizerSequences.TitleEnd ||
-                (CurrentSequence == TokenizerSequences.TextareaEnd && !InSfcRoot))
+                (CurrentSequence == TokenizerSequences.TextareaEnd && !InSingleFileComponentRoot))
             {
                 // Title/textarea are RCDATA: interpolation is still parsed (entities decoded later).
                 if (!InVPre && character == DelimiterOpen[0])
@@ -504,7 +504,7 @@ internal sealed class Tokenizer
             {
                 State = TokenizerState.InTagName;
             }
-            else if (InSfcRoot)
+            else if (InSingleFileComponentRoot)
             {
                 State = TokenizerState.InSfcRootTagName;
             }

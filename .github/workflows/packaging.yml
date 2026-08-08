@@ -126,8 +126,14 @@ jobs:
             'Assimalign.Viu.Components',
             'Assimalign.Viu.Core',
             'Assimalign.Viu.Reactivity',
-            'Assimalign.Viu.Shared',
             'Assimalign.Viu.State'
+          )
+          $expectedFrameworkPackageOverrides = @(
+            'Assimalign.Viu.Components',
+            'Assimalign.Viu.Reactivity',
+            'Assimalign.Viu.State',
+            'Assimalign.Viu.Core',
+            'Assimalign.Viu.Browser'
           )
 
           function Assert-FrameworkPackage {
@@ -135,7 +141,8 @@ jobs:
               [Parameter(Mandatory)]
               [System.IO.FileInfo] $Package,
               [Parameter(Mandatory)]
-              [string] $ManifestPath
+              [string] $ManifestPath,
+              [string[]] $ExpectedPackageOverrides = @()
             )
 
             $archive = [System.IO.Compression.ZipFile]::OpenRead($Package.FullName)
@@ -171,6 +178,60 @@ jobs:
                   throw "$($Package.Name) must contain exactly one $assemblyFileName, found $($matchingEntries.Count)"
                 }
               }
+
+              $packageOverridesEntry = $archive.GetEntry('data/PackageOverrides.txt')
+              if ($ExpectedPackageOverrides.Count -eq 0) {
+                if ($null -ne $packageOverridesEntry) {
+                  throw "$($Package.Name) must not carry targeting-only data/PackageOverrides.txt"
+                }
+              }
+              else {
+                if ($null -eq $packageOverridesEntry) {
+                  throw "$($Package.Name) is missing data/PackageOverrides.txt"
+                }
+
+                $nuspecEntries = @(
+                  $archive.Entries |
+                    Where-Object { $_.FullName.EndsWith('.nuspec', [System.StringComparison]::OrdinalIgnoreCase) }
+                )
+                if ($nuspecEntries.Count -ne 1) {
+                  throw "$($Package.Name) must contain exactly one nuspec, found $($nuspecEntries.Count)"
+                }
+
+                $nuspecReader = [System.IO.StreamReader]::new($nuspecEntries[0].Open())
+                try {
+                  [xml] $nuspec = $nuspecReader.ReadToEnd()
+                }
+                finally {
+                  $nuspecReader.Dispose()
+                }
+                $packageVersion = $nuspec.SelectSingleNode(
+                  "//*[local-name()='metadata']/*[local-name()='version']").InnerText
+
+                $packageOverridesReader = [System.IO.StreamReader]::new(
+                  $packageOverridesEntry.Open())
+                try {
+                  $actualPackageOverrides = @(
+                    $packageOverridesReader.ReadToEnd() -split '\r?\n' |
+                      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                      Sort-Object
+                  )
+                }
+                finally {
+                  $packageOverridesReader.Dispose()
+                }
+                $expectedPackageOverrideLines = @(
+                  $ExpectedPackageOverrides |
+                    ForEach-Object { "$_|$packageVersion" } |
+                    Sort-Object
+                )
+                $packageOverrideDifference = @(
+                  Compare-Object $expectedPackageOverrideLines $actualPackageOverrides
+                )
+                if ($packageOverrideDifference.Count -ne 0) {
+                  throw "$($Package.Name) package overrides differ from the framework contract: $($packageOverrideDifference | Out-String)"
+                }
+              }
             }
             finally {
               $archive.Dispose()
@@ -184,7 +245,10 @@ jobs:
           if ($runtimePackage.Count -ne 1) { throw "Expected exactly one browser-wasm runtime pack, found $($runtimePackage.Count)" }
           if ($sdkPackage.Count -ne 1) { throw "Expected exactly one SDK package, found $($sdkPackage.Count)" }
 
-          Assert-FrameworkPackage -Package $referencePackage[0] -ManifestPath 'data/FrameworkList.xml'
+          Assert-FrameworkPackage `
+            -Package $referencePackage[0] `
+            -ManifestPath 'data/FrameworkList.xml' `
+            -ExpectedPackageOverrides $expectedFrameworkPackageOverrides
           Assert-FrameworkPackage -Package $runtimePackage[0] -ManifestPath 'data/RuntimeList.xml'
 
           # The ref pack's analyzer payload is the computed ProjectReference closure of the syntax

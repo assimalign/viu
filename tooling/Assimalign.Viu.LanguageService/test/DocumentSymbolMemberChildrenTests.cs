@@ -31,7 +31,7 @@ public class DocumentSymbolMemberChildrenTests
     [Fact]
     public void GetDocumentSymbols_ScriptMembers_SurfaceAsChildrenInDeclarationOrder()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, Source, 1);
 
         var script = service.GetDocumentSymbols(DocumentUri)
@@ -56,7 +56,7 @@ public class DocumentSymbolMemberChildrenTests
         // The strongest possible pin on the position composition: the selection range, applied to the
         // real document text, must reproduce the declared identifier exactly. Any off-by-one in the
         // block-to-file arithmetic fails this on every member.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, Source, 1);
 
         var script = service.GetDocumentSymbols(DocumentUri)
@@ -83,7 +83,7 @@ public class DocumentSymbolMemberChildrenTests
             "</template>\n" +
             "@script {\n" +
             "}\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var script = service.GetDocumentSymbols(DocumentUri)

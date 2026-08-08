@@ -1,0 +1,23 @@
+<template>
+<main class="compiled-router-outlet">
+  <SynchronousTransition>
+    <section :key="CurrentPath" class="compiled-route-frame">
+      <RouterView />
+    </section>
+  </SynchronousTransition>
+</main>
+</template>
+
+@script {
+using System;
+
+using ViuRouter = Assimalign.Viu.Router.Router;
+
+private ViuRouter Router { get; set; } = null!;
+
+public string CurrentPath => Router.CurrentRoute.Value.Path;
+
+partial void OnSetup() =>
+    Router = Context!.Services?.GetService(typeof(ViuRouter)) as ViuRouter
+        ?? throw new InvalidOperationException("RouterOutletShell requires Router services.");
+}

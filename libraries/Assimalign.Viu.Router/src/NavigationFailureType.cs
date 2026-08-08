@@ -6,6 +6,7 @@ namespace Assimalign.Viu.Router;
 /// not represented here at all: it re-enters the pipeline, and the outcome reported to the caller is
 /// that of the final navigation.
 /// </summary>
+/// <remarks>Specified by <c>[RTR-6]</c>.</remarks>
 public enum NavigationFailureType
 {
     /// <summary>

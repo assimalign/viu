@@ -3,71 +3,10 @@ using Xunit;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Pins the factory base-resolution helpers of RouterHistory — how the web mode defaults its base
-// from a document <base href> and how the hash mode computes a hash base — plus the memory mode's
-// no-browser guarantee.
+// Pins the public memory-history factory contract on a plain .NET host. Browser base normalization
+// remains an implementation detail of the platform-gated history edge. Specified by [RTR-3].
 public class RouterHistoryFactoryTests
 {
-    private static FakeBrowserHistoryInterop Interop(
-        string host = "example.com",
-        string pathname = "/",
-        string search = "")
-        => new(new BrowserHistorySnapshot(pathname, search, string.Empty, host, 1, null));
-
-    [Fact]
-    public void ResolveWebBase_ConfiguredBase_Normalized()
-    {
-        var resolved = RouterHistory.ResolveWebBase(Interop(), "/app/");
-
-        resolved.ShouldBe("/app");
-    }
-
-    [Fact]
-    public void ResolveWebBase_NoBase_UsesBaseHrefWithOriginStripped()
-    {
-        var interop = Interop();
-        interop.BaseHref = "https://example.com/base/";
-
-        var resolved = RouterHistory.ResolveWebBase(interop, basePath: null);
-
-        resolved.ShouldBe("/base");
-    }
-
-    [Fact]
-    public void ResolveWebBase_NoBaseAndNoBaseElement_DefaultsToEmpty()
-    {
-        var interop = Interop();
-        interop.BaseHref = null;
-
-        var resolved = RouterHistory.ResolveWebBase(interop, basePath: null);
-
-        resolved.ShouldBe("");   // "/" default -> trailing slash trimmed
-    }
-
-    [Fact]
-    public void ResolveHashBase_NoBase_DerivesFromLocationWithHash()
-    {
-        var resolved = RouterHistory.ResolveHashBase(Interop(pathname: "/folder/"), basePath: null);
-
-        resolved.ShouldBe("/folder/#");
-    }
-
-    [Fact]
-    public void ResolveHashBase_ConfiguredBase_GetsAHash()
-    {
-        var resolved = RouterHistory.ResolveHashBase(Interop(), "/app/");
-
-        resolved.ShouldBe("/app/#");
-    }
-
-    [Fact]
-    public void ResolveHashBase_HostlessFileUrl_YieldsBareHash()
-    {
-        var resolved = RouterHistory.ResolveHashBase(Interop(host: string.Empty, pathname: "/folder/"), basePath: null);
-
-        resolved.ShouldBe("#");
-    }
-
     [Fact]
     public void CreateMemory_NeedsNoInitializationAndIsInteropFree()
     {

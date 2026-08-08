@@ -1,0 +1,21 @@
+#nullable enable
+*REMOVED*Assimalign.Viu.Components.ComponentInvocation.ComponentInvocation(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, Assimalign.Viu.Components.SlotFlags slotStability = Assimalign.Viu.Components.SlotFlags.Stable) -> void
+*REMOVED*Assimalign.Viu.Components.ComponentInvocation.SlotStability.get -> Assimalign.Viu.Components.SlotFlags
+*REMOVED*Assimalign.Viu.Components.PatchFlags.DevRootFragment = 2048 -> Assimalign.Viu.Components.PatchFlags
+*REMOVED*Assimalign.Viu.Components.PatchFlags.FullProps = 16 -> Assimalign.Viu.Components.PatchFlags
+*REMOVED*Assimalign.Viu.Components.PatchFlags.NeedHydration = 32 -> Assimalign.Viu.Components.PatchFlags
+*REMOVED*Assimalign.Viu.Components.PatchFlags.Props = 8 -> Assimalign.Viu.Components.PatchFlags
+*REMOVED*Assimalign.Viu.Components.SlotFlags
+*REMOVED*Assimalign.Viu.Components.SlotFlags.Dynamic = 2 -> Assimalign.Viu.Components.SlotFlags
+*REMOVED*Assimalign.Viu.Components.SlotFlags.Forwarded = 3 -> Assimalign.Viu.Components.SlotFlags
+*REMOVED*Assimalign.Viu.Components.SlotFlags.Stable = 1 -> Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Components.ComponentInvocation.ComponentInvocation(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, Assimalign.Viu.Components.SlotStability slotStability = Assimalign.Viu.Components.SlotStability.Stable) -> void
+Assimalign.Viu.Components.ComponentInvocation.SlotStability.get -> Assimalign.Viu.Components.SlotStability
+Assimalign.Viu.Components.PatchFlags.DevelopmentRootFragment = 2048 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.FullProperties = 16 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.NeedsHydration = 32 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Properties = 8 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.SlotStability
+Assimalign.Viu.Components.SlotStability.Dynamic = 2 -> Assimalign.Viu.Components.SlotStability
+Assimalign.Viu.Components.SlotStability.Forwarded = 3 -> Assimalign.Viu.Components.SlotStability
+Assimalign.Viu.Components.SlotStability.Stable = 1 -> Assimalign.Viu.Components.SlotStability

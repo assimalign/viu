@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.ServerRenderer;
 
 namespace Assimalign.Viu.VisualStudio;
 

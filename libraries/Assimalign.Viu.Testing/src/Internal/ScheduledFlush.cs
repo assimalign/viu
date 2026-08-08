@@ -5,40 +5,32 @@ using Assimalign.Viu;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Drives the captured scheduler flush deterministically for a mounted wrapper — the bridge
-/// between <see cref="TestSchedulerPump"/> (which captures scheduled flushes) and the awaitable
-/// <see cref="Scheduler.NextTick"/> contract. <see cref="RunAsync"/>
-/// captures the pending flush's completion, pumps every captured flush to completion, then awaits —
-/// so a caller awaiting <c>Trigger</c>/<c>SetValue</c>/<c>NextTickAsync</c> observes post-update
-/// state without a wall-clock delay and without an ambient <c>SynchronizationContext</c>.
-/// </summary>
 internal sealed class ScheduledFlush : IDisposable
 {
     private readonly TestSchedulerPump _pump;
-    private bool _disposed;
+    private bool _isDisposed;
 
-    public ScheduledFlush(TestSchedulerPump pump)
+    internal ScheduledFlush(TestSchedulerPump pump)
     {
         _pump = pump;
     }
 
-    public async Task RunAsync()
+    internal async Task RunAsync()
     {
-        // Capture the pending flush's completion AFTER the caller queued its jobs, then drive every
-        // captured flush (including ones queued while draining) to completion.
-        var tick = Scheduler.NextTick();
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        Task tick = Scheduler.NextTickAsync();
         _pump.RunUntilIdle();
-        await tick;
+        await tick.ConfigureAwait(false);
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        if (_isDisposed)
         {
             return;
         }
-        _disposed = true;
+
         _pump.Dispose();
+        _isDisposed = true;
     }
 }

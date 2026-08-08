@@ -4,16 +4,20 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Assimalign.Viu.ServerRenderer.DomKnowledgeFixture/**" />
+    <None Remove="Assimalign.Viu.ServerRenderer.DomKnowledgeFixture/**" />
+  </ItemGroup>
+  <ItemGroup>
     <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
     <ViuPackageReference Include="xunit" />
     <ViuPackageReference Include="xunit.runner.visualstudio" />
     <ViuPackageReference Include="Shouldly" />
   </ItemGroup>
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
-    <!-- Round-trip tests parse real SSR output and hydrate it through Testing's live and immutable
-         snapshot readers, pinning the cross-package marker and adoption contract. -->
-    <ViuProjectReference Include="Assimalign.Viu.Testing" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
+    <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
+    <ViuProjectReference Include="Assimalign.Viu.ServerRenderer.DomKnowledgeFixture" />
   </ItemGroup>
 </Project>

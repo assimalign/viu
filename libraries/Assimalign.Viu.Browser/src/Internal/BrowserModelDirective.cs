@@ -1,133 +1,141 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// Shared helpers for the DOM <c>v-model</c> directives — unboxing the element handle, reading the
-/// <see cref="ViuModelBinding"/> carrier and the directive modifiers, and formatting values for the
-/// DOM the same invariant way the patch engine does. Keeps <see cref="VModelText"/> and its
-/// siblings free of duplicated boilerplate; every operation is reflection-free.
-/// </summary>
+/// <summary>Provides shared reflection-free operations for Browser model directives.</summary>
 internal static class BrowserModelDirective
 {
-    /// <summary>Unboxes the directive element argument to its int node handle.</summary>
-    /// <param name="element">The boxed platform node from the directive hook.</param>
-    /// <exception cref="InvalidOperationException"><paramref name="element"/> is not a boxed int handle.</exception>
-    public static int Handle(object? element)
-        => element is int handle
-            ? handle
-            : throw new InvalidOperationException(
-                "A DOM v-model/v-show directive ran against a non-DOM node; the element handle must be an int.");
+    private static readonly string[] ModelListenerNames =
+    [
+        "onInput",
+        "onChange",
+        "onCompositionstart",
+        "onCompositionend",
+        "onFocus",
+        "onBlur",
+    ];
 
-    /// <summary>Whether a directive modifier (the <c>bar</c> in <c>v-model.bar</c>) is present.</summary>
-    /// <param name="binding">The directive binding.</param>
-    /// <param name="name">The modifier name.</param>
+    public static int Handle(object element) => element is int handle
+        ? handle
+        : throw new InvalidOperationException(
+            "A Browser model or show directive requires an integer browser-node handle.");
+
+    public static ModelBinding? Carrier(DirectiveBinding binding) =>
+        binding.Value as ModelBinding;
+
+    public static object? ModelValue(object? binding) =>
+        (binding as ModelBinding)?.Value;
+
     public static bool HasModifier(DirectiveBinding binding, string name)
-        => binding.Modifiers.TryGetValue(name, out var present) && present;
-
-    /// <summary>The <see cref="ViuModelBinding"/> carried by the binding value, or null.</summary>
-    /// <param name="binding">The directive binding.</param>
-    public static ViuModelBinding? Carrier(DirectiveBinding binding) => binding.Value as ViuModelBinding;
-
-    /// <summary>The model value from a binding's carrier, or null when the carrier is absent.</summary>
-    /// <param name="binding">
-    /// The directive binding value (its current <see cref="DirectiveBinding.Value"/> or
-    /// <see cref="DirectiveBinding.PreviousValue"/>).
-    /// </param>
-    public static object? ModelValue(object? binding) => (binding as ViuModelBinding)?.Value;
-
-    /// <summary>Formats a value for the DOM (null → empty; invariant scalar otherwise), matching the patch engine.</summary>
-    /// <param name="value">The value to format.</param>
-    public static string FormatValue(object? value)
-        => value is null ? string.Empty : DisplayStringFormatter.FormatScalar(value);
-
-    /// <summary>
-    /// Reads a raw component attribute (the bound <c>:value</c>, <c>true-value</c>, and similar
-    /// values), preserving object identity.
-    /// </summary>
-    /// <param name="component">The immutable element component.</param>
-    /// <param name="name">The property name.</param>
-    public static object? Property(IElementComponent component, string name)
     {
-        component.Attributes.TryGetValue(name, out object? value);
-        return value;
-    }
-
-    /// <summary>Whether the component declares an attribute with the supplied name.</summary>
-    /// <param name="component">The immutable element component.</param>
-    /// <param name="name">The attribute name.</param>
-    /// <returns>True when the attribute is present, including when its value is null.</returns>
-    public static bool HasProperty(IElementComponent component, string name)
-        => component.Attributes.TryGetValue(name, out _);
-
-    /// <summary>
-    /// Whether the component declares <c>type="number"</c>, which implies numeric coercion even
-    /// without an explicit <c>.number</c> modifier.
-    /// </summary>
-    /// <param name="component">The immutable element component.</param>
-    public static bool IsNumberType(IElementComponent component)
-        => string.Equals(
-            FormatValue(Property(component, "type")),
-            "number",
-            StringComparison.Ordinal);
-
-    /// <summary>Whether a model value is an ordered list — array/set checkbox and multi-select semantics branch here first.</summary>
-    /// <param name="value">The model value.</param>
-    public static bool IsList([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] object? value)
-        => value is IList; // string does not implement IList, so no explicit exclusion is needed.
-
-    /// <summary>
-    /// Whether a model value is a set. Reflection-free: after
-    /// <see cref="IsList(object?)"/> has been ruled out, any non-string, non-dictionary enumerable
-    /// is treated as a set — matching the <c>IList</c>-or-<c>ISet</c> model contract for
-    /// checkbox/select <c>v-model</c>.
-    /// </summary>
-    /// <param name="value">The model value (already known not to be a list).</param>
-    public static bool IsSet([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] object? value)
-        => value is IEnumerable and not string and not IDictionary and not IList;
-
-    /// <summary>Copies an enumerable model collection into a fresh <see cref="List{T}"/>: the model is reassigned rather than mutated in place, which is what makes the change observable to a reference binding.</summary>
-    /// <param name="values">The source collection.</param>
-    public static List<object?> CopyToList(IEnumerable values)
-    {
-        var copy = new List<object?>();
-        foreach (var item in values)
+        IReadOnlyList<string>? modifiers = Carrier(binding)?.Modifiers;
+        if (modifiers is null)
         {
-            copy.Add(item);
+            return false;
         }
-        return copy;
-    }
 
-    /// <summary>Copies an enumerable model set into a fresh <see cref="HashSet{T}"/>, for the same reassign-not-mutate reason as <see cref="CopyToList(IEnumerable)"/>.</summary>
-    /// <param name="values">The source set.</param>
-    public static HashSet<object?> CopyToSet(IEnumerable values)
-    {
-        var copy = new HashSet<object?>();
-        foreach (var item in values)
+        for (int index = 0; index < modifiers.Count; index++)
         {
-            copy.Add(item);
-        }
-        return copy;
-    }
-
-    /// <summary>Whether a set contains a value by strict equality — deliberately not loose equality, because a set's membership is defined by its own identity semantics.</summary>
-    /// <param name="values">The set.</param>
-    /// <param name="value">The value to test.</param>
-    public static bool SetContains(IEnumerable values, object? value)
-    {
-        foreach (var item in values)
-        {
-            if (Equals(item, value))
+            if (string.Equals(modifiers[index], name, StringComparison.Ordinal))
             {
                 return true;
             }
         }
+
         return false;
+    }
+
+    public static string FormatValue(object? value) =>
+        value is null ? string.Empty : DisplayStringFormatter.FormatScalar(value);
+
+    public static object? Property(ElementNode element, string name)
+    {
+        for (int index = element.Bindings.Count - 1; index >= 0; index--)
+        {
+            ElementBinding binding = element.Bindings[index];
+            if (binding.Kind != ElementBindingKind.Event
+                && string.Equals(binding.Name.LocalName, name, StringComparison.Ordinal))
+            {
+                return binding.Value;
+            }
+        }
+
+        return null;
+    }
+
+    public static bool HasProperty(ElementNode element, string name)
+    {
+        for (int index = element.Bindings.Count - 1; index >= 0; index--)
+        {
+            ElementBinding binding = element.Bindings[index];
+            if (binding.Kind != ElementBindingKind.Event
+                && string.Equals(binding.Name.LocalName, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool IsNumberType(ElementNode element) =>
+        string.Equals(
+            FormatValue(Property(element, "type")),
+            "number",
+            StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsList([NotNullWhen(true)] object? value) => value is IList;
+
+    public static bool IsSet([NotNullWhen(true)] object? value) =>
+        value is IEnumerable and not string and not IDictionary and not IList;
+
+    public static List<object?> CopyToList(IEnumerable values)
+    {
+        List<object?> copy = [];
+        foreach (object? value in values)
+        {
+            copy.Add(value);
+        }
+
+        return copy;
+    }
+
+    public static HashSet<object?> CopyToSet(IEnumerable values)
+    {
+        HashSet<object?> copy = [];
+        foreach (object? value in values)
+        {
+            copy.Add(value);
+        }
+
+        return copy;
+    }
+
+    public static bool SetContains(IEnumerable values, object? value)
+    {
+        foreach (object? entry in values)
+        {
+            if (Equals(entry, value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void ClearModelListeners(
+        BrowserDirectiveOperations operations,
+        int handle)
+    {
+        for (int index = 0; index < ModelListenerNames.Length; index++)
+        {
+            operations.SetModelListener(handle, ModelListenerNames[index], null);
+        }
     }
 }

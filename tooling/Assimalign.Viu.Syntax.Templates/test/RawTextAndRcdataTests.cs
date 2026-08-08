@@ -92,8 +92,8 @@ public class RawTextAndRcdataTests
     public void Parse_AfterSfcRawTextThenBaseParse_DoesNotThrow()
     {
         // parse.spec.ts 'should reset inRCDATA state': a fresh parse is unaffected by a prior SFC parse.
-        var sfcOptions = new ParserOptions { Mode = TemplateParseMode.Sfc, OnError = _ => { } };
-        TemplateParser.Parse("<Foo>", sfcOptions);
+        var singleFileComponentOptions = new ParserOptions { Mode = TemplateParseMode.SingleFileComponent, OnError = _ => { } };
+        TemplateParser.Parse("<Foo>", singleFileComponentOptions);
 
         var root = TestHelpers.Parse("{ foo }");
         root.Children.ShouldHaveSingleItem().ShouldBeOfType<TextNode>().Content.ShouldBe("{ foo }");

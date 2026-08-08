@@ -84,8 +84,6 @@ namespace Demo
             }
         }
 
-        object global::Assimalign.Viu.Reactivity.IReactiveObject.ToRaw() => this;
-
         global::Assimalign.Viu.Reactivity.Dependency? global::Assimalign.Viu.Reactivity.IReactiveObject.GetDependency(string propertyName)
         {
             switch (propertyName)
@@ -181,33 +179,33 @@ namespace Demo
     }
 
     [Fact]
-    public void ReadonlyReactive_SetterWarnsAndDoesNotTrigger_ButReadsStillTrack()
+    public void ReadOnlyReactive_SetterWarnsAndDoesNotTrigger_ButReadsStillTrack()
     {
         const string source = """
             using Assimalign.Viu.Reactivity;
             namespace Demo;
-            [Reactive(Readonly = true)]
+            [Reactive(ReadOnly = true)]
             public partial class Frozen { public partial string Name { get; set; } }
             """;
 
         var generated = GeneratorTestHarness.GeneratedSource(GeneratorTestHarness.Run(source), "Frozen.Reactive.g.cs");
 
         generated.ShouldContain("this.__NameDependency.Track();"); // reads still track
-        generated.ShouldContain("[Viu warn] Set operation on key \\\"Name\\\" failed: target is readonly.");
+        generated.ShouldContain("[Viu warn] Set operation on key \\\"Name\\\" failed: target is read-only.");
         generated.ShouldNotContain(".Trigger();"); // readonly setter does not trigger
     }
 
     [Fact]
-    public void ReadonlyReactive_OverridesIReactiveObjectIsReadOnly_ForIsReadonly()
+    public void ReadOnlyReactive_OverridesIReactiveObjectIsReadOnly_ForIsReadOnly()
     {
         // R6: the readonly flag folded into IReactiveObject. A readonly variant overrides the
-        // IReactiveObject.IsReadOnly default-interface member to true so Reactive.IsReadonly() reports
+        // IReactiveObject.IsReadOnly default-interface member to true so Reactive.IsReadOnly() reports
         // a source-generated readonly object — the port of readonly()'s IS_READONLY flag. There is no
         // separate marker interface any more (the class only implements IReactiveObject).
         const string source = """
             using Assimalign.Viu.Reactivity;
             namespace Demo;
-            [Reactive(Readonly = true)]
+            [Reactive(ReadOnly = true)]
             public partial class Frozen { public partial string Name { get; set; } }
             """;
 

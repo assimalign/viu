@@ -12,5 +12,5 @@ public sealed record ArrayExpression : TemplateSyntaxNode
     public required SyntaxList<object> Elements { get; init; }
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsArrayExpression;
+    public override NodeType NodeType => NodeType.ArrayExpression;
 }

@@ -16,12 +16,17 @@ namespace Assimalign.Viu.Router;
 /// thread-safe: the router targets the single-threaded JS event loop.
 /// <para>
 /// Web and hash histories initialize their browser bridge through <see cref="Router.ReadyAsync"/>.
-/// <see cref="Listen"/> and <see cref="Destroy"/> are valid before readiness so a router can attach
+/// <see cref="Listen"/> and <see cref="IDisposable.Dispose"/> are valid before readiness so a router can attach
 /// and detach safely; every other synchronous member throws <see cref="InvalidOperationException"/>
 /// until readiness completes.
 /// </para>
+/// <para>
+/// Disposal is terminal and idempotent. After disposal every member except another
+/// <see cref="IDisposable.Dispose"/> throws <see cref="ObjectDisposedException"/>; owners can
+/// therefore prove that no listener or environment operation survives the history lifetime.
+/// </para>
 /// </remarks>
-public interface IRouterHistory
+public interface IRouterHistory : IDisposable
 {
     /// <summary>
     /// The normalized base path prepended to every location written to the environment and stripped
@@ -46,26 +51,25 @@ public interface IRouterHistory
     /// position counter (<c>history.pushState</c> in web mode).
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
-    /// <param name="data">Optional extra state to merge onto the new entry, or <see langword="null"/>.</param>
-    void Push(string location, RouterHistoryState? data = null);
+    /// <param name="options">Optional caller-provided entry values. History-owned state is computed internally.</param>
+    void Push(string location, RouterHistoryEntryOptions options = default);
 
     /// <summary>
     /// Replaces the current entry with one for <paramref name="location"/>, preserving the position
     /// counter (<c>history.replaceState</c> in web mode).
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
-    /// <param name="data">Optional extra state to merge onto the entry, or <see langword="null"/>.</param>
-    void Replace(string location, RouterHistoryState? data = null);
+    /// <param name="options">Optional caller-provided entry values. History-owned state is computed internally.</param>
+    void Replace(string location, RouterHistoryEntryOptions options = default);
 
     /// <summary>
     /// Moves through history by <paramref name="delta"/> entries (negative is backward;
-    /// <c>history.go</c> in web mode). When <paramref name="triggerListeners"/> is
-    /// <see langword="false"/>, the resulting navigation does not notify listeners — used by the
-    /// router to reposition history silently.
+    /// <c>history.go</c> in web mode). <see cref="RouterHistoryNavigationOptions.SuppressListeners"/>
+    /// repositions history silently without notifying listeners.
     /// </summary>
     /// <param name="delta">The signed number of entries to move.</param>
-    /// <param name="triggerListeners">Whether the resulting navigation notifies listeners.</param>
-    void Go(int delta, bool triggerListeners = true);
+    /// <param name="options">Options controlling the movement; the default notifies listeners.</param>
+    void Go(int delta, RouterHistoryNavigationOptions options = RouterHistoryNavigationOptions.None);
 
     /// <summary>
     /// Registers a listener for browser-initiated navigations (back/forward, memory
@@ -83,8 +87,8 @@ public interface IRouterHistory
     string CreateHref(string location);
 
     /// <summary>
-    /// Tears the history down: removes every registered listener and, in web/hash mode, unsubscribes
-    /// the underlying <c>popstate</c> handler so no interop listener leaks.
+    /// Releases the history: removes every registered listener and, in web/hash mode, unsubscribes
+    /// the underlying <c>popstate</c> handler so no interop listener leaks. Repeated disposal is safe.
     /// </summary>
-    void Destroy();
+    new void Dispose();
 }

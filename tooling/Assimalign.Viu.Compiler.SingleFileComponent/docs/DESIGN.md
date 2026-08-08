@@ -69,10 +69,9 @@ of it.
   the generator; inputs arrive as already-read text in `SingleFileComponentProjectionInput`.
 - **No reflection, no dynamic codegen.** Recoverable by design: malformed input still produces a
   model plus diagnostics; the only expected exception is `OperationCanceledException`.
-- **All-internal surface.** The facade's result exposes the whole evolving model graph, so a public
-  surface would freeze ~14 model types as API. The `InternalsVisibleTo` list in
-  `src/Properties/AssemblyInfo.cs` IS the sanctioned-consumer declaration (the two hosts + test
-  assemblies), matching the `Assimalign.Viu.Compiler.Css` → generator precedent.
+- **Explicit host contract.** The facade and the model values crossing into generator and editor hosts
+  form a public build-time contract. Implementation-only types remain internal, and only this
+  library's tests receive friend access.
 - **Packaging.** The assembly joins the generator's computed analyzer closure (packed at
   `analyzers/dotnet/cs` and listed in the ref pack's `FrameworkList.xml`) and the self-contained
   language-server publish. Roslyn itself never rides along — `PackageReference` assets do not enter

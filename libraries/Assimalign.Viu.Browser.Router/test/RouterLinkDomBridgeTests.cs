@@ -37,10 +37,14 @@ public class RouterLinkDomBridgeTests
     [Fact]
     public void Invoke_MapsEachSystemModifier()
     {
-        Bridge(Click(modifiers: BrowserEventModifiers.Control)).ControlKey.ShouldBeTrue();
+        RouterLinkClickEvent control = Bridge(Click(modifiers: BrowserEventModifiers.Control));
+        control.Modifiers.ShouldBe(RouterLinkModifiers.Control);
+        control.ControlKey.ShouldBeTrue();
         Bridge(Click(modifiers: BrowserEventModifiers.Shift)).ShiftKey.ShouldBeTrue();
         Bridge(Click(modifiers: BrowserEventModifiers.Alt)).AltKey.ShouldBeTrue();
         Bridge(Click(modifiers: BrowserEventModifiers.Meta)).MetaKey.ShouldBeTrue();
+        Bridge(Click(modifiers: BrowserEventModifiers.Control | BrowserEventModifiers.Meta))
+            .Modifiers.ShouldBe(RouterLinkModifiers.Control | RouterLinkModifiers.Meta);
         Bridge(Click()).HasSystemModifier.ShouldBeFalse();
     }
 
@@ -60,7 +64,7 @@ public class RouterLinkDomBridgeTests
         var browserEvent = Click();
         // A handler that intercepts, as RouterLink does for an unmodified primary-button click.
         RouterLinkDomBridge.Invoke(value => ((RouterLinkClickEvent)value!).PreventDefault(), browserEvent);
-        browserEvent.ToResponseFlags().ShouldBe(2); // preventDefault re-crosses the boundary to JS
+        browserEvent.DefaultPrevented.ShouldBeTrue();
     }
 
     [Fact]
@@ -68,7 +72,7 @@ public class RouterLinkDomBridgeTests
     {
         var browserEvent = Click(button: 1);
         RouterLinkDomBridge.Invoke(_ => { }, browserEvent); // fall-through handler
-        browserEvent.ToResponseFlags().ShouldBe(0);
+        browserEvent.DefaultPrevented.ShouldBeFalse();
     }
 
     [Fact]
@@ -77,7 +81,7 @@ public class RouterLinkDomBridgeTests
         // The browser already applied the arrival prevent, so a bailing guard re-crosses nothing.
         var browserEvent = Click(defaultPrevented: true);
         RouterLinkDomBridge.Invoke(_ => { }, browserEvent);
-        browserEvent.ToResponseFlags().ShouldBe(0);
+        browserEvent.DefaultPrevented.ShouldBeTrue();
     }
 
     [Fact]
@@ -160,7 +164,7 @@ public class RouterLinkDomBridgeTests
 
             order.ShouldBe(["ready", "initialize", "resolve", "mount", "unmount"]);
             BrowserObjectEvents.Invoker.ShouldBeNull();
-            (await router.Push("/next")).ShouldBeNull();
+            (await router.PushAsync("/next")).ShouldBeNull();
             navigationCount.ShouldBe(2);
         }
         finally
@@ -213,7 +217,7 @@ public class RouterLinkDomBridgeTests
         RouterLinkDomBridge.Invoke(ClickListener(wrapper), browserEvent);
 
         router.CurrentRoute.Value.Path.ShouldBe("/users/1"); // client-side navigation happened
-        browserEvent.ToResponseFlags().ShouldBe(2);          // ...and the full page load was suppressed
+        browserEvent.DefaultPrevented.ShouldBeTrue();        // ...and the full page load was suppressed
     }
 
     [Theory]
@@ -230,7 +234,7 @@ public class RouterLinkDomBridgeTests
         RouterLinkDomBridge.Invoke(ClickListener(wrapper), browserEvent);
 
         router.CurrentRoute.Value.Path.ShouldBe("/"); // no client-side navigation
-        browserEvent.ToResponseFlags().ShouldBe(0);   // default not prevented
+        browserEvent.DefaultPrevented.ShouldBeFalse(); // default not prevented
     }
 
     [Fact]
@@ -243,7 +247,7 @@ public class RouterLinkDomBridgeTests
         RouterLinkDomBridge.Invoke(ClickListener(wrapper), browserEvent);
 
         router.CurrentRoute.Value.Path.ShouldBe("/"); // guard bailed on the arrival prevent
-        browserEvent.ToResponseFlags().ShouldBe(0);   // already prevented; not re-signaled
+        browserEvent.DefaultPrevented.ShouldBeTrue(); // arrival state remains prevented
     }
 
     // Runs the bridge with a capturing handler and returns the RouterLinkClickEvent it synthesized.
@@ -254,8 +258,8 @@ public class RouterLinkDomBridgeTests
         return captured!;
     }
 
-    // A synthesized click; the BrowserEvent constructor is internal (production events come only from
-    // the dispatch [JSExport]), reached here through Browser's InternalsVisibleTo.
+    // A synthesized click through Browser's public host-event carrier. Production values originate
+    // in the dispatch [JSExport], while tests construct the same closed field set directly.
     private static BrowserEvent Click(
         int button = 0,
         BrowserEventModifiers modifiers = BrowserEventModifiers.None,
@@ -281,16 +285,16 @@ public class RouterLinkDomBridgeTests
         var options = new ComponentMountOptions
         {
             Services = new RouterServiceProvider(router),
-            Arguments = new ComponentArguments(
-                [
-                    new KeyValuePair<string, object?>("to", to),
-                ]),
+            Arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["to"] = to,
+            },
             Slots = new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
             {
-                ["default"] = _ => ComponentTree.Text("link"),
+                ["default"] = _ => new TextNode("link"),
             },
         };
-        return ViuTest.Mount(new RouterLink(), options);
+        return ComponentTest.Mount(RouterLink.Registration, options);
     }
 
     private sealed class RouterServiceProvider : IServiceProvider
@@ -324,8 +328,8 @@ public class RouterLinkDomBridgeTests
         {
             _order = order;
             _context = new TestApplicationContext(
-                ComponentTree.Element("main"),
-                new ComponentFactory(Array.Empty<ComponentRegistration>()),
+                new ElementNode(new QualifiedName("main")),
+                new ComponentFactory(),
                 new EmptyServiceProvider(),
                 _stoppingSource.Token);
         }
@@ -467,7 +471,7 @@ public class RouterLinkDomBridgeTests
     private sealed class TestApplicationContext : IApplicationContext
     {
         internal TestApplicationContext(
-            IComponent rootComponent,
+            VirtualNode rootComponent,
             IComponentFactory components,
             IServiceProvider services,
             CancellationToken stopping)
@@ -478,19 +482,21 @@ public class RouterLinkDomBridgeTests
             Stopping = stopping;
         }
 
-        public IComponent RootComponent { get; }
+        public VirtualNode RootComponent { get; }
 
         public IComponentFactory Components { get; }
 
-        public IServiceProvider Services { get; }
+        public IServiceProvider? Services { get; }
 
         public IStateStoreRegistry? State => null;
 
         public IDirectiveResolver? Directives => null;
 
-        public Action<Exception, IComponentContext?, string>? ErrorHandler => null;
+        public Action<Exception, ComponentContext?, string>? ErrorHandler => null;
 
         public Action<string>? WarnHandler => null;
+
+        public Action<ComponentContext, string, IReadOnlyList<object?>>? EventObserver => null;
 
         public bool IsRunning { get; internal set; }
 

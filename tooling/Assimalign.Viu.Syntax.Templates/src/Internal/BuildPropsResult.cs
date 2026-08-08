@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -11,7 +11,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 internal sealed record BuildPropsResult
 {
     /// <summary>The props expression (object, merge call, or single binding), or <see langword="null"/>.</summary>
-    public TemplateSyntaxNode? Props { get; init; }
+    public TemplateSyntaxNode? Properties { get; init; }
 
     /// <summary>The runtime directives to apply via <c>withDirectives</c>.</summary>
     public required IReadOnlyList<DirectiveNode> Directives { get; init; }

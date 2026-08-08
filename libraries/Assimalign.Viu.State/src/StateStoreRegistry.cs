@@ -1,95 +1,101 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 
-using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.State;
 
 /// <summary>
-/// The default per-application state store registry. Each store is created exactly once in a
-/// child scope of one detached registry root and is stopped with the registry.
+/// Owns one lazily materialized state-store set. Each store is created in an attached child of one
+/// detached registry scope, so component unmount never ends application state and registry disposal
+/// ends every store. Specified by <c>[STA-2]</c> and <c>[STA-3]</c>.
 /// </summary>
-/// <remarks>Not thread-safe; designed for the browser's single-threaded event loop.</remarks>
+/// <remarks>
+/// This type is not thread-safe. It is designed for Viu's single-threaded host event loop.
+/// Its lifetime contract is synchronous: stores implementing <see cref="IDisposable"/> are disposed,
+/// while an asynchronous-only store remains responsible for an explicit host-owned lifetime. The
+/// registry never blocks the host loop waiting for asynchronous disposal.
+/// </remarks>
 public sealed class StateStoreRegistry : IStateStoreRegistry
 {
-    private readonly IComponentFactory _components;
-    private readonly IServiceProvider _services;
-    private readonly IReactiveEffectScopeFactory _scopes;
+    private readonly Dictionary<string, StateStoreEntry> _entries =
+        new(StringComparer.Ordinal);
+    private readonly IReactiveEffectScopeFactory _effectScopes;
     private readonly IReactiveEffectScope _rootScope;
+    private readonly IServiceProvider? _services;
     private readonly IReactiveWatchScheduler? _watchScheduler;
-    private readonly Dictionary<string, StateStoreEntry> _stores = new(StringComparer.Ordinal);
 
-    /// <summary>Creates a state store registry.</summary>
-    /// <param name="components">The application-selected component resolver.</param>
-    /// <param name="services">The independently supplied application service resolver.</param>
-    /// <param name="scopes">The reactive scope factory.</param>
+    /// <summary>
+    /// Creates a registry with an explicit reactive scope factory. The factory creates one detached
+    /// root immediately; store scopes are created lazily as children of that root. Specified by
+    /// <c>[STA-2]</c> and <c>[STA-3]</c>.
+    /// </summary>
+    /// <param name="services">The optional externally owned application service provider.</param>
+    /// <param name="effectScopes">The reactive effect-scope factory.</param>
     /// <param name="watchScheduler">
-    /// The application watch scheduler, or null to use standalone Reactivity's synchronous watch
-    /// behavior.
+    /// The application watch scheduler, or <see langword="null"/> for synchronous delivery.
     /// </param>
     public StateStoreRegistry(
-        IComponentFactory components,
-        IServiceProvider services,
-        IReactiveEffectScopeFactory scopes,
+        IServiceProvider? services,
+        IReactiveEffectScopeFactory effectScopes,
         IReactiveWatchScheduler? watchScheduler = null)
     {
-        ArgumentNullException.ThrowIfNull(components);
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(scopes);
-        _components = components;
+        ArgumentNullException.ThrowIfNull(effectScopes);
         _services = services;
-        _scopes = scopes;
+        _effectScopes = effectScopes;
         _watchScheduler = watchScheduler;
-        _rootScope = scopes.Create(isDetached: true);
+        _rootScope = effectScopes.Create(isDetached: true);
     }
 
-    /// <inheritdoc/>
-    public int Count => _stores.Count;
+    /// <inheritdoc />
+    public int Count => _entries.Count;
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public bool IsDisposed { get; private set; }
 
-    /// <inheritdoc/>
-    public TStore GetOrCreate<TStore>(
-        StateStoreDefinition<TStore> definition,
-        IComponentContext? owner = null)
+    /// <inheritdoc />
+    public TStore GetOrCreate<TStore>(StateStoreDefinition<TStore> definition)
         where TStore : class
     {
         ArgumentNullException.ThrowIfNull(definition);
         ObjectDisposedException.ThrowIf(IsDisposed, this);
 
-        if (_stores.TryGetValue(definition.Key, out StateStoreEntry? entry))
+        if (_entries.TryGetValue(definition.Key, out StateStoreEntry? entry))
         {
             if (!ReferenceEquals(entry.Definition, definition))
             {
                 throw new DuplicateStateStoreKeyException(definition.Key);
             }
 
-            return (TStore)entry.Instance;
+            if (entry.Instance is TStore existingStore)
+            {
+                return existingStore;
+            }
+
+            throw new InvalidOperationException(
+                $"The registry entry for state store \"{definition.Key}\" has an invalid type.");
         }
 
         IReactiveEffectScope scope =
-            _rootScope.Run(() => _scopes.Create(isDetached: false));
+            _rootScope.Run(() => _effectScopes.Create(isDetached: false));
         try
         {
             StateContext context = new(
                 scope,
-                _components,
                 _services,
-                _watchScheduler,
-                owner);
+                _watchScheduler);
             IStateContext? previousContext = StateStoreSetupRuntime.Current;
             try
             {
                 StateStoreSetupRuntime.Current = context;
-                TStore instance = scope.Run(() => definition.Setup(context))
+                TStore store = scope.Run(() => definition.Setup(context))
                     ?? throw new InvalidOperationException(
                         $"State store setup for \"{definition.Key}\" returned null.");
-                _stores.Add(
+                _entries.Add(
                     definition.Key,
-                    new StateStoreEntry(definition, instance, scope));
-                return instance;
+                    new StateStoreEntry(definition, store, scope));
+                return store;
             }
             finally
             {
@@ -103,24 +109,30 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
         }
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public bool Remove<TStore>(StateStoreDefinition<TStore> definition)
         where TStore : class
     {
         ArgumentNullException.ThrowIfNull(definition);
         ObjectDisposedException.ThrowIf(IsDisposed, this);
-        if (!_stores.TryGetValue(definition.Key, out StateStoreEntry? entry)
+
+        if (!_entries.TryGetValue(definition.Key, out StateStoreEntry? entry)
             || !ReferenceEquals(entry.Definition, definition))
         {
             return false;
         }
 
-        _stores.Remove(definition.Key);
-        entry.Scope.Stop();
+        _entries.Remove(definition.Key);
+        entry.Dispose();
         return true;
     }
 
-    /// <summary>Stops every initialized store scope. Idempotent.</summary>
+    /// <summary>
+    /// Disposes every materialized store, stops every store scope and the detached root, clears the
+    /// ambient registry when it references this instance, and rejects future use. Teardown is
+    /// idempotent and continues after a cleanup failure before rethrowing the first failure.
+    /// Specified by <c>[STA-2]</c>.
+    /// </summary>
     public void Dispose()
     {
         if (IsDisposed)
@@ -129,17 +141,36 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
         }
 
         IsDisposed = true;
+        ExceptionDispatchInfo? error = null;
+        foreach (StateStoreEntry entry in _entries.Values)
+        {
+            try
+            {
+                entry.Dispose();
+            }
+            catch (Exception exception)
+            {
+                error ??= ExceptionDispatchInfo.Capture(exception);
+            }
+        }
+
         try
         {
             _rootScope.Stop();
         }
+        catch (Exception exception)
+        {
+            error ??= ExceptionDispatchInfo.Capture(exception);
+        }
         finally
         {
-            _stores.Clear();
+            _entries.Clear();
             if (ReferenceEquals(StateStores.ActiveRegistry, this))
             {
                 StateStores.SetActiveRegistry(null);
             }
         }
+
+        error?.Throw();
     }
 }

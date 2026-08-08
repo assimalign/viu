@@ -16,6 +16,42 @@ namespace Assimalign.Viu.Reactivity.Tests;
 public sealed class PublicSurfaceTests
 {
     [Fact]
+    public void ReactiveFactoryProducts_AreNotPubliclyConstructible()
+    {
+        // [RCT-5] makes Reactive the single public construction facade for these products.
+        typeof(Reference<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("Reference<T> must be created through Reactive.");
+        typeof(ShallowReference<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("ShallowReference<T> must be created through Reactive.");
+        typeof(CustomReference<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("CustomReference<T> must be created through Reactive.");
+        typeof(Computed<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("Computed<T> must be created through Reactive.");
+        typeof(ReactiveEffect)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("ReactiveEffect must be created through Reactive.");
+        typeof(EffectScope)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("EffectScope must be created through Reactive.");
+    }
+
+    [Fact]
+    public void CurrentScope_IsExposedOnlyThroughTheReactiveFacade()
+    {
+        // [RCT-5] exposes ambient scope lookup once, through the same Reactive facade.
+        typeof(EffectScope)
+            .GetProperty(nameof(EffectScope.Current), BindingFlags.Public | BindingFlags.Static)
+            .ShouldBeNull();
+        typeof(Reactive)
+            .GetProperty(nameof(Reactive.CurrentScope), BindingFlags.Public | BindingFlags.Static)
+            .ShouldNotBeNull();
+    }
+
+    [Fact]
     public void SubscriberLink_IsPublicSealedButNotPubliclyConstructible()
     {
         typeof(SubscriberLink).IsPublic.ShouldBeTrue();
@@ -66,9 +102,9 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void EveryRefKind_IsAReactiveValue()
+    public void EveryReferenceKind_IsAReactiveValue()
     {
-        // The is-ref check is now a class type-test (replacing the old is-IReference interface check).
+        // The reference check uses the public reactive-reference contract.
         (Reactive.Reference(1) is ReactiveValue).ShouldBeTrue();
         (Reactive.ShallowReference(1) is ReactiveValue).ShouldBeTrue();
         (Reactive.Computed(() => 1) is ReactiveValue).ShouldBeTrue();
@@ -147,27 +183,14 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ReadonlyComputed_SetterWarns_ThroughTheWarningsSink_AndDoesNotThrow()
+    public void ReadOnlyComputed_SetterIsANonThrowingNoOp()
     {
-        // Writing a getter-only computed warns in dev and is a no-op — it never throws. The warning
-        // routes through the runtime sink.
-        var captured = new System.Collections.Generic.List<string>();
-        var previousSink = RuntimeWarnings.Sink;
-        RuntimeWarnings.Sink = captured.Add;
-        try
-        {
-            var readonlyComputed = Reactive.Computed(() => 41);
-            readonlyComputed.IsReadOnly.ShouldBeTrue();
+        var readonlyComputed = Reactive.Computed(() => 41);
+        readonlyComputed.IsReadOnly.ShouldBeTrue();
 
-            Should.NotThrow(() => readonlyComputed.Value = 99);
+        Should.NotThrow(() => readonlyComputed.Value = 99);
 
-            readonlyComputed.Value.ShouldBe(41); // unchanged
-            captured.ShouldContain(message => message.Contains("readonly"));
-        }
-        finally
-        {
-            RuntimeWarnings.Sink = previousSink;
-        }
+        readonlyComputed.Value.ShouldBe(41);
     }
 
     [Fact]
@@ -257,4 +280,3 @@ public sealed class PublicSurfaceTests
         runs.ShouldBe(1);
     }
 }
-

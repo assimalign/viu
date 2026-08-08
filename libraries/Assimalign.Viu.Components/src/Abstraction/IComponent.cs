@@ -1,23 +1,19 @@
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// A value in Viu's render tree. This is the proposed common vocabulary for every value currently
-/// represented by a virtual node.
+/// Authored component behavior: one instance per mounted component invocation. The static
+/// identity and input/output declaration live on <see cref="ComponentRegistration"/>, not on the
+/// instance, so the runtime reads the contract before activation.
 /// </summary>
+/// <remarks>Specified by <c>[CMP-1]</c>, <c>[CMP-8]</c>, and <c>[CMP-10]</c>.</remarks>
 public interface IComponent
 {
-    /// <summary>Gets the component's renderer-dispatch kind.</summary>
-    ComponentKind Kind { get; }
-
-    /// <summary>Gets the optional identity used when diffing siblings.</summary>
-    object? Key { get; }
-
-    /// <summary>Gets the optional template-reference binding.</summary>
-    IComponentReference? Reference => null;
-
     /// <summary>
-    /// Gets compiler-produced optimization metadata for this tree value. Hand-authored values use
-    /// <see cref="ComponentOptimization.None"/>.
+    /// Runs the instance's synchronous setup and returns the render closure invoked for the
+    /// initial render and every reactive re-render. Setup is synchronous and the runtime invokes
+    /// it inside the mount's reactive scope.
     /// </summary>
-    ComponentOptimization Optimization => ComponentOptimization.None;
+    /// <param name="context">The runtime-provided authoring surface for this mounted instance.</param>
+    /// <returns>The render closure producing this instance's immutable subtree description.</returns>
+    ComponentRenderer Setup(ComponentContext context);
 }

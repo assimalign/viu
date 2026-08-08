@@ -14,5 +14,5 @@ public sealed record BlockStatement : TemplateSyntaxNode
     public required SyntaxList<object> Body { get; init; }
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsBlockStatement;
+    public override NodeType NodeType => NodeType.BlockStatement;
 }

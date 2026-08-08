@@ -70,7 +70,7 @@ public class LanguageServerCompletionKindTests
     /// the assertion is about the protocol boundary rather than about the semantic engine's ability
     /// to bind a namespace from an on-disk project.
     /// </summary>
-    private sealed class StubLanguageService : IViuLanguageService
+    private sealed class StubLanguageService : ILanguageService
     {
         public void OpenDocument(string documentUri, string text, int? version)
         {

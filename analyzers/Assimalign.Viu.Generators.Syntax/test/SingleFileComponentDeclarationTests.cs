@@ -13,7 +13,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// <summary>
 /// Tests for the attribute-declared component surface ([CMP-26]–[CMP-31]): <c>[Parameter]</c> properties
 /// and <c>[Event]</c> partial methods in an <c>@script</c> block become the generated partial's
-/// <c>IComponentTemplate.Parameters</c>/<c>Events</c>, its per-render argument binding, and its typed emit
+/// static <c>ComponentContract</c>, its per-render argument binding, and its typed emit
 /// implementations. The declaration is read and emitted entirely at build time — the sanctioned
 /// metaprogramming path — so nothing about it is discovered by reflection at runtime.
 /// </summary>
@@ -27,8 +27,7 @@ public sealed class SingleFileComponentDeclarationTests
     {
         // [CMP-27] The canonical argument name is the camel-case spelling of the property name, which is
         // exactly the name an imperative `new ComponentParameter("title")` declaration would have used.
-        // The declaration rides as an explicit interface implementation so it can never collide with an
-        // authored member.
+        // The declaration is embedded in the immutable generated component contract.
         var generated = Generate(
             "FeatureCard",
             "<template>\n" +
@@ -49,9 +48,50 @@ public sealed class SingleFileComponentDeclarationTests
         generated.ShouldContain(
             "new global::Assimalign.Viu.Components.ComponentParameter(\"eyebrow\", "
             + "parameterType: typeof(string)),");
+        generated.ShouldContain("parameters: new global::Assimalign.Viu.Components.ComponentParameter[]");
+    }
+
+    [Theory]
+    // [CMP-26]/[SFC-CG-3] The static contract carries the parameter's runtime type. A nullable
+    // reference annotation has no runtime type identity and cannot appear as a direct typeof operand,
+    // while a nullable value type is the distinct, legal Nullable<T> runtime type.
+    [InlineData("object?", "typeof(object)")]
+    [InlineData("string?", "typeof(string)")]
+    [InlineData("int?", "typeof(int?)")]
+    [InlineData("object", "typeof(object)")]
+    [InlineData("string", "typeof(string)")]
+    [InlineData("int", "typeof(int)")]
+    [InlineData("List<string>?", "global::Assimalign.Viu.Generated.RenderGlue.ParameterRuntimeType<List<string>?>()")]
+    [InlineData("dynamic?", "typeof(object)")]
+    [InlineData("dynamic", "typeof(object)")]
+    public void ParameterType_NullableAnnotations_ProduceLegalRuntimeTypeExpressions(
+        string declaredType,
+        string runtimeTypeExpression)
+    {
+        string usingDirective = declaredType.StartsWith("List<", StringComparison.Ordinal)
+            ? "    using System.Collections.Generic;\n\n"
+            : string.Empty;
+        var generated = Generate(
+            "TypeProbe",
+            "<template>\n" +
+            "    <div></div>\n" +
+            "</template>\n" +
+            "@script {\n" +
+            usingDirective +
+            $"    [Parameter] public {declaredType} Value {{ get; set; }}\n" +
+            "}\n");
+
         generated.ShouldContain(
-            "global::System.Collections.Generic.IReadOnlyList<global::Assimalign.Viu.Components.IComponentParameter>? "
-            + "global::Assimalign.Viu.Components.IComponentTemplate.Parameters => __ViuDeclaredParameters;");
+            $"ComponentParameter(\"value\", parameterType: {runtimeTypeExpression})");
+        generated.ShouldContain($"private {declaredType} __ViuParameterDefaultValue = default!;");
+        generated.ShouldNotContain("#pragma warning disable CS8639");
+        if (!string.Equals(
+                runtimeTypeExpression,
+                $"typeof({declaredType})",
+                StringComparison.Ordinal))
+        {
+            generated.ShouldNotContain($"typeof({declaredType})");
+        }
     }
 
     [Theory]
@@ -93,7 +133,9 @@ public sealed class SingleFileComponentDeclarationTests
             "}\n");
 
         generated.ShouldContain("ComponentParameter(\"model-value\", parameterType: typeof(int))");
-        generated.ShouldContain("Context.Arguments.Get<int>(\"model-value\")!");
+        generated.ShouldContain(
+            "RenderGlue.TryReadParameter<int>(bindings.Parameters, \"model-value\", " +
+            "out int __ViuParameterValueRating)");
     }
 
     [Fact]
@@ -112,16 +154,18 @@ public sealed class SingleFileComponentDeclarationTests
             "    [Parameter] public string Eyebrow { get; set; } = \"Feature\";\n" +
             "}\n");
 
-        generated.ShouldContain("private string __viuParameterDefault_Eyebrow = default!;");
-        generated.ShouldContain("__viuParameterDefault_Eyebrow = Eyebrow;");
-        generated.ShouldContain("Eyebrow = Context.Arguments.Contains(\"eyebrow\")");
-        generated.ShouldContain("? Context.Arguments.Get<string>(\"eyebrow\")!");
-        generated.ShouldContain(": __viuParameterDefault_Eyebrow;");
+        generated.ShouldContain("private string __ViuParameterDefaultEyebrow = default!;");
+        generated.ShouldContain("__ViuParameterDefaultEyebrow = Eyebrow;");
+        generated.ShouldContain(
+            "Eyebrow = global::Assimalign.Viu.Generated.RenderGlue.TryReadParameter<string>(" +
+            "bindings.Parameters, \"eyebrow\", out string __ViuParameterValueEyebrow)");
+        generated.ShouldContain("? __ViuParameterValueEyebrow");
+        generated.ShouldContain(": __ViuParameterDefaultEyebrow;");
 
         // Bound once during setup so OnSetup and the lifecycle see the initial arguments, and again at
         // the head of every render pass, after Core has replaced the argument snapshot.
-        generated.ShouldContain("Context = context;\n            __ViuBindParameters();\n            OnSetup();");
-        generated.ShouldContain("return () =>\n            {\n                __ViuBindParameters();");
+        generated.ShouldContain("Context = context;\n            __ViuBindParameters(context.Bindings);\n            OnSetup();");
+        generated.ShouldContain("return frame =>\n            {\n                __ViuBindParameters(context.Bindings);");
     }
 
     [Fact]
@@ -170,11 +214,9 @@ public sealed class SingleFileComponentDeclarationTests
             "new global::Assimalign.Viu.Components.ComponentEvent(\"update:modelValue\", static arguments => arguments.Count == 1),");
         generated.ShouldContain(
             "new global::Assimalign.Viu.Components.ComponentEvent(\"dismissed\", static arguments => arguments.Count == 0),");
-        generated.ShouldContain("public partial void Changed(int rating)\n            => Context.Emit(\"changed\", new object?[] { rating });");
-        generated.ShouldContain("public partial void Dismissed()\n            => Context.Emit(\"dismissed\", global::System.Array.Empty<object?>());");
-        generated.ShouldContain(
-            "global::System.Collections.Generic.IReadOnlyList<global::Assimalign.Viu.Components.IComponentEvent>? "
-            + "global::Assimalign.Viu.Components.IComponentTemplate.Events => __ViuDeclaredEvents;");
+        generated.ShouldContain("public partial void Changed(int rating)\n            => Context!.Emit(\"changed\", new object?[] { rating });");
+        generated.ShouldContain("public partial void Dismissed()\n            => Context!.Emit(\"dismissed\", global::System.Array.Empty<object?>());");
+        generated.ShouldContain("events: new global::Assimalign.Viu.Components.ComponentEvent[]");
     }
 
     [Fact]
@@ -203,7 +245,7 @@ public sealed class SingleFileComponentDeclarationTests
 
         generated.ShouldNotContain("__ViuDeclaredParameters");
         generated.ShouldNotContain("__ViuBindParameters");
-        generated.ShouldNotContain("IComponentTemplate.Parameters");
+        generated.ShouldNotContain("IComponent" + "Template.Parameters");
     }
 
     [Fact]
@@ -278,7 +320,7 @@ public sealed class SingleFileComponentDeclarationTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Split.SingleFileComponent.g.cs");
-        generated.ShouldContain("__ViuDeclaredEvents");
+        generated.ShouldContain("events: new global::Assimalign.Viu.Components.ComponentEvent[]");
         generated.ShouldNotContain("__ViuDeclaredParameters");
     }
 
@@ -350,7 +392,7 @@ public sealed class SingleFileComponentDeclarationTests
     [Fact]
     public void StyleOnlyComponent_IgnoresDeclarations()
     {
-        // A component without a template block is not an IComponentTemplate at all, so it has no
+        // A component without a template block has no runtime component contract, so it has no
         // Parameters/Events surface to hang a declaration on and the reader never runs.
         var generated = Generate(
             "Styles",

@@ -4,12 +4,11 @@ using System.Linq;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The canonical table of runtime helper references emitted by the transform pipeline or its render-code
-/// writer. Each field is a <see cref="RuntimeHelper"/> whose <see cref="RuntimeHelper.Name"/> equals the
-/// member name generated code binds against on <c>Assimalign.Viu.RenderHelpers</c> (and
-/// <c>DomRenderHelpers</c> for the DOM helpers below). The binding is <b>by name</b>: no
-/// <c>Assimalign.Viu.Syntax.*</c> assembly references any runtime assembly, so the name in this table is
-/// a one-way contract that a rename on either side breaks (<c>[SFC-CG-2]</c>).
+/// The canonical symbolic-operation table used by the template transform intermediate representation.
+/// Each field is a <see cref="RuntimeHelper"/> identity that lets transforms communicate an operation to
+/// the render writer. The writer lowers these identities to direct frame calls, virtual-node constructors,
+/// collection operations, typed Browser APIs, or the narrow generated adapter surface; their names are
+/// never emitted as a runtime lookup contract. Specified by <c>[SFC-CG-2]</c>.
 /// </summary>
 public static class HelperNames
 {
@@ -33,25 +32,25 @@ public static class HelperNames
     /// <summary>Opens an optimization block.</summary>
     public static readonly RuntimeHelper OpenBlock = new("openBlock");
 
-    /// <summary>Creates a component block vnode.</summary>
+    /// <summary>Creates a component block virtual node.</summary>
     public static readonly RuntimeHelper CreateBlock = new("createBlock");
 
-    /// <summary>Creates an element block vnode.</summary>
+    /// <summary>Creates an element block virtual node.</summary>
     public static readonly RuntimeHelper CreateElementBlock = new("createElementBlock");
 
-    /// <summary>Creates a component vnode.</summary>
+    /// <summary>Creates a component virtual node.</summary>
     public static readonly RuntimeHelper CreateVNode = new("createVNode");
 
-    /// <summary>Creates an element vnode.</summary>
+    /// <summary>Creates an element virtual node.</summary>
     public static readonly RuntimeHelper CreateElementVNode = new("createElementVNode");
 
-    /// <summary>Creates a comment vnode.</summary>
+    /// <summary>Creates a comment virtual node.</summary>
     public static readonly RuntimeHelper CreateComment = new("createCommentVNode");
 
-    /// <summary>Creates a text vnode.</summary>
+    /// <summary>Creates a text virtual node.</summary>
     public static readonly RuntimeHelper CreateText = new("createTextVNode");
 
-    /// <summary>Creates a static vnode.</summary>
+    /// <summary>Creates a static virtual node.</summary>
     public static readonly RuntimeHelper CreateStatic = new("createStaticVNode");
 
     /// <summary>Resolves a component by name.</summary>
@@ -63,7 +62,7 @@ public static class HelperNames
     /// <summary>Resolves a directive by name.</summary>
     public static readonly RuntimeHelper ResolveDirective = new("resolveDirective");
 
-    /// <summary>Applies runtime directives to a vnode.</summary>
+    /// <summary>Applies runtime directives to a virtual node.</summary>
     public static readonly RuntimeHelper WithDirectives = new("withDirectives");
 
     /// <summary>Renders a list for <c>v-for</c>.</summary>
@@ -78,7 +77,7 @@ public static class HelperNames
     /// <summary>Stringifies an interpolation value.</summary>
     public static readonly RuntimeHelper ToDisplayString = new("toDisplayString");
 
-    /// <summary>Merges multiple props sources.</summary>
+    /// <summary>Merges multiple properties sources.</summary>
     public static readonly RuntimeHelper MergeProps = new("mergeProps");
 
     /// <summary>Normalizes a dynamic <c>class</c> binding.</summary>
@@ -87,10 +86,10 @@ public static class HelperNames
     /// <summary>Normalizes a dynamic <c>style</c> binding.</summary>
     public static readonly RuntimeHelper NormalizeStyle = new("normalizeStyle");
 
-    /// <summary>Normalizes a props object with dynamic keys.</summary>
+    /// <summary>Normalizes a properties object with dynamic keys.</summary>
     public static readonly RuntimeHelper NormalizeProps = new("normalizeProps");
 
-    /// <summary>Guards a reactive props object.</summary>
+    /// <summary>Guards a reactive properties object.</summary>
     public static readonly RuntimeHelper GuardReactiveProps = new("guardReactiveProps");
 
     /// <summary>Normalizes a <c>v-on="object"</c> handlers map.</summary>
@@ -117,24 +116,8 @@ public static class HelperNames
     /// <summary>Compares two memo dependency arrays.</summary>
     public static readonly RuntimeHelper IsMemoSame = new("isMemoSame");
 
-    // ---- Writer-only helpers: bound against Assimalign.Viu.RenderHelpers. ----
-    // These names are serialized directly by RenderCodeWriter after transformation. Do not route them
-    // through TransformContext.Helper or HelperString: doing so would add them to TransformResult.Helpers
-    // and change that observable transform contract.
-
-    internal static readonly RuntimeHelper CreateProps = new("createProps");
-
-    internal static readonly RuntimeHelper CreateModifiers = new("createModifiers");
-
-    internal static readonly RuntimeHelper WithHandler = new("withHandler");
-
-    internal static readonly RuntimeHelper SetCache = new("setCache");
-
-    internal static readonly RuntimeHelper SpreadCache = new("spreadCache");
-
-    // ---- DOM helpers: bound against Assimalign.Viu.Browser.DomRenderHelpers ----
-    // Register every DOM helper through RegisterDomHelper. DomHelpers is derived from these declarations,
-    // so the source emitter's conditional using-static import cannot drift from the canonical names.
+    // Browser operation identities are registered together so composition roots can detect whether a
+    // template requires the Browser runtime closure without inspecting every transform node.
 
     /// <summary>The <c>v-model</c> directive for radio inputs.</summary>
     public static readonly RuntimeHelper VModelRadio = RegisterDomHelper("vModelRadio");

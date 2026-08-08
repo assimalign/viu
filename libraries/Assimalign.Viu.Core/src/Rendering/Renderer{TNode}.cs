@@ -1,42 +1,32 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.ExceptionServices;
 
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Mounts, patches, moves, and unmounts immutable component trees through host-supplied operations.
+/// Mounts, patches, moves, and unmounts immutable virtual trees through host-supplied operations.
 /// </summary>
+/// <typeparam name="TNode">The opaque host-node type.</typeparam>
 /// <remarks>
-/// The host-neutral core of Viu's rendering pipeline: every host — the browser DOM, the in-memory
-/// test host, a future native host — supplies node primitives through
-/// <see cref="RendererOptions{TNode}"/> and gets mounting, block-aware patching, moves, and
-/// unmounting without reimplementing the tree walk. A render produces a fresh immutable tree and
-/// the renderer reconciles it against the mounted representation of the previous one, emitting the
-/// minimal host operations that reconcile them (<c>[RND-1]</c>).
-/// Mounted host state remains internal and never leaks back onto the public
-/// <see cref="IComponent"/> values. The renderer is not thread-safe.
+/// The renderer owns a parallel sealed mounted hierarchy and never writes mounted state onto a
+/// <see cref="VirtualNode"/>. It is intentionally single-threaded. Specified by <c>[RND-1]</c>
+/// through <c>[RND-6]</c>.
 /// </remarks>
-/// <typeparam name="TNode">The platform node type.</typeparam>
 public sealed partial class Renderer<TNode>
     where TNode : notnull
 {
     private static readonly EqualityComparer<TNode> NodeComparer =
         EqualityComparer<TNode>.Default;
 
-    private readonly RendererOptions<TNode> _options;
     private readonly Dictionary<TNode, MountedTree<TNode>> _containerTrees =
         new(NodeComparer);
+    private readonly RendererOptions<TNode> _options;
+    private TransitionMountContext<TNode>? _activeTransitionMount;
     private int _nextComponentIdentifier;
-
-    /// <summary>Counts patch dispatches for block-tree behavior tests.</summary>
-    internal static int PatchVisitCount;
-
-    /// <summary>Counts internal unmount dispatches for teardown behavior tests.</summary>
-    internal static int UnmountVisitCount;
 
     internal Renderer(RendererOptions<TNode> options)
     {
@@ -54,29 +44,52 @@ public sealed partial class Renderer<TNode>
     }
 
     /// <summary>
-    /// Renders a component tree into a host container. Passing null unmounts the current root.
+    /// Gets or sets the number of patch dispatches observed by the test-host characterization
+    /// seam. Production code does not use this counter. Specified by <c>[RND-BLOCK-4]</c>.
     /// </summary>
-    /// <param name="component">The next immutable tree, or null to unmount.</param>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static int PatchVisitCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of unmount dispatches observed by the test-host characterization
+    /// seam. Production code does not use this counter. Specified by <c>[RND-BLOCK-7]</c>.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static int UnmountVisitCount { get; set; }
+
+    /// <summary>
+    /// Reconciles a fresh immutable tree into a host container. Passing null unmounts and forgets
+    /// the current root. The first application context supplied to a mounted container is sticky.
+    /// </summary>
+    /// <param name="value">The next immutable root, or null to unmount.</param>
     /// <param name="container">The host container.</param>
-    /// <param name="application">
-    /// The application composition context used to activate template components. Primitive-only
-    /// trees may omit it. A mounted container retains the first supplied context.
-    /// </param>
-    /// <returns>The root template context, or null when the root is not a template.</returns>
-    public IComponentContext? Render(
-        IComponent? component,
+    /// <param name="application">The optional application composition used for component nodes.</param>
+    /// <returns>The root component context, or null when the root is not an authored component.</returns>
+    /// <remarks>Specified by <c>[RND-5]</c>.</remarks>
+    public ComponentContext? Render(
+        VirtualNode? value,
         TNode container,
         IApplicationContext? application = null)
     {
-        ArgumentNullException.ThrowIfNull(container);
+        RequireHostNode(container, nameof(container));
         _containerTrees.TryGetValue(container, out MountedTree<TNode>? tree);
 
-        if (component is null)
+        if (value is null)
         {
             if (tree?.Root is not null)
             {
+                List<MountedTransition<TNode>> transitions =
+                    new(tree.PendingTransitionRemovals);
+                for (int index = 0; index < transitions.Count; index++)
+                {
+                    MountedTransition<TNode> transition = transitions[index];
+                    if (!transition.IsUnmounted)
+                    {
+                        Unmount(tree, transition, removeHostNodes: true);
+                    }
+                }
+
                 Unmount(tree, tree.Root, removeHostNodes: true);
-                tree.Components.Clear();
                 tree.Root = null;
                 _containerTrees.Remove(container);
             }
@@ -86,19 +99,14 @@ public sealed partial class Renderer<TNode>
             return null;
         }
 
+        Scheduler.FlushPreFlushCallbacks();
         if (tree is null)
         {
             tree = new MountedTree<TNode>
             {
                 Application = application,
             };
-            tree.Root = Mount(
-                tree,
-                component,
-                container,
-                default,
-                elementNamespace: null,
-                owner: null);
+            tree.Root = Mount(tree, value, container, default, owner: null);
             _containerTrees.Add(container, tree);
         }
         else
@@ -115,1194 +123,332 @@ public sealed partial class Renderer<TNode>
             tree.Root = Patch(
                 tree,
                 tree.Root,
-                component,
+                value,
                 container,
                 default,
-                elementNamespace: null,
                 owner: null);
         }
 
+        NormalizeTeleportTargetOrder(tree);
         QueueHostCommit();
         Scheduler.FlushAfterSynchronousRender();
-        return tree.Root is MountedTemplateNode<TNode> template
-            ? template.Instance.Context
+        return tree.Root is MountedComponent<TNode> component
+            ? component.Context
             : null;
     }
 
-    internal IReadOnlyList<MountedTemplateNode<TNode>> GetMountedTemplates(
-        TNode container)
+    /// <summary>
+    /// Returns the engine-cached cold-path views of all currently mounted authored components.
+    /// Repeated queries return the same view instance for the life of each mount.
+    /// </summary>
+    /// <param name="container">The rendered host container.</param>
+    /// <returns>The current component views in structural order.</returns>
+    /// <remarks>Specified by <c>[RND-6]</c>.</remarks>
+    public IReadOnlyList<MountedComponentView<TNode>> GetMountedComponentViews(TNode container)
     {
-        ArgumentNullException.ThrowIfNull(container);
-        if (!_containerTrees.TryGetValue(
-            container,
-            out MountedTree<TNode>? tree)
+        RequireHostNode(container, nameof(container));
+        if (!_containerTrees.TryGetValue(container, out MountedTree<TNode>? tree)
             || tree.Root is null)
         {
-            return Array.Empty<MountedTemplateNode<TNode>>();
+            return Array.Empty<MountedComponentView<TNode>>();
         }
 
-        List<MountedTemplateNode<TNode>> templates = [];
-        CollectMountedTemplates(tree.Root, templates);
-        return templates.AsReadOnly();
+        List<MountedComponentView<TNode>> views = [];
+        CollectMountedComponentViews(tree.Root, views);
+        return views.AsReadOnly();
     }
 
-    private static void CollectMountedTemplates(
-        MountedRenderNode<TNode> mounted,
-        List<MountedTemplateNode<TNode>> templates)
+    private static void CollectMountedComponentViews(
+        MountedNode<TNode> mounted,
+        List<MountedComponentView<TNode>> views)
     {
         switch (mounted)
         {
-            case MountedTemplateNode<TNode> template:
-                templates.Add(template);
-                CollectMountedTemplates(template.Subtree, templates);
+            case MountedComponent<TNode> component:
+                views.Add(component.View);
+                CollectMountedComponentViews(component.Subtree, views);
                 break;
-            case MountedElementNode<TNode> element:
-                CollectMountedTemplates(element.Children, templates);
+            case MountedElement<TNode> element:
+                CollectMountedComponentViews(element.Children, views);
                 break;
-            case MountedFragmentNode<TNode> fragment:
-                CollectMountedTemplates(fragment.Children, templates);
+            case MountedRange<TNode> range:
+                CollectMountedComponentViews(range.Children, views);
                 break;
-            case MountedTeleportNode<TNode> teleport:
-                CollectMountedTemplates(teleport.Children, templates);
+            case MountedTeleport<TNode> teleport:
+                CollectMountedComponentViews(teleport.Children, views);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                keepAlive.CollectViews(views);
+                break;
+            case MountedSuspense<TNode> suspense:
+                CollectMountedComponentViews(suspense.ActiveBranch, views);
+                break;
+            case MountedTransition<TNode> transition:
+                CollectMountedComponentViews(transition.Child, views);
                 break;
         }
     }
 
-    private static void CollectMountedTemplates(
-        IReadOnlyList<MountedRenderNode<TNode>> mounted,
-        List<MountedTemplateNode<TNode>> templates)
+    private static void CollectMountedComponentViews(
+        IReadOnlyList<MountedNode<TNode>> children,
+        List<MountedComponentView<TNode>> views)
     {
-        for (int index = 0; index < mounted.Count; index++)
+        for (int index = 0; index < children.Count; index++)
         {
-            CollectMountedTemplates(mounted[index], templates);
+            CollectMountedComponentViews(children[index], views);
         }
     }
 
-    private static IReadOnlyList<object> GetRootElementObjects(
-        MountedRenderNode<TNode> mounted)
-    {
-        List<object> elements = [];
-        CollectRootElementObjects(mounted, elements);
-        return elements.AsReadOnly();
-    }
-
-    private static void CollectRootElementObjects(
-        MountedRenderNode<TNode> mounted,
-        List<object> elements)
-    {
-        switch (mounted)
-        {
-            case MountedElementNode<TNode> element:
-                elements.Add(element.HostNode);
-                break;
-            case MountedTemplateNode<TNode> template:
-                CollectRootElementObjects(template.Subtree, elements);
-                break;
-            case MountedFragmentNode<TNode> fragment:
-                CollectRootElementObjects(fragment.Children, elements);
-                break;
-            case MountedTeleportNode<TNode> teleport:
-                CollectRootElementObjects(teleport.Children, elements);
-                break;
-        }
-    }
-
-    private static void CollectRootElementObjects(
-        IReadOnlyList<MountedRenderNode<TNode>> mounted,
-        List<object> elements)
-    {
-        for (int index = 0; index < mounted.Count; index++)
-        {
-            CollectRootElementObjects(mounted[index], elements);
-        }
-    }
-
-    private MountedRenderNode<TNode> Patch(
+    private MountedNode<TNode> Patch(
         MountedTree<TNode> tree,
-        MountedRenderNode<TNode>? current,
-        IComponent next,
+        MountedNode<TNode>? current,
+        VirtualNode next,
         TNode container,
         TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner,
+        bool allowTransitionLeave = true)
     {
         PatchVisitCount++;
         if (current is null)
         {
-            return Mount(tree, next, container, anchor, elementNamespace, owner);
+            return Mount(tree, next, container, anchor, owner);
         }
 
-        if (ReferenceEquals(current.Component, next))
+        if (ReferenceEquals(current.Value, next))
         {
             return current;
         }
 
-        if (!IsSameComponentType(current.Component, next))
+        if (!IsSameNodeType(current.Value, next))
         {
             TNode? replacementAnchor = GetNextHostNode(current);
-            ComponentContext? replacementOwner = current.Owner;
-            Unmount(tree, current, removeHostNodes: true);
-            return Mount(
-                tree,
-                next,
-                container,
-                replacementAnchor,
-                elementNamespace,
-                replacementOwner);
+            RuntimeComponentContext? replacementOwner = current.Owner;
+            if (allowTransitionLeave)
+            {
+                Remove(tree, current);
+            }
+            else
+            {
+                Unmount(tree, current, removeHostNodes: true);
+            }
+
+            return Mount(tree, next, container, replacementAnchor, replacementOwner);
         }
 
-        switch (next.Kind)
+        switch (current, next)
         {
-            case ComponentKind.Element:
-                PatchElement(
-                    tree,
-                    (MountedElementNode<TNode>)current,
-                    RequireElement(next),
-                    elementNamespace);
+            case (MountedElement<TNode> element, ElementNode elementValue):
+                PatchElement(tree, element, elementValue);
                 break;
-            case ComponentKind.Text:
-                PatchText(tree, (MountedLeafNode<TNode>)current, RequireText(next));
+            case (MountedLeaf<TNode> text, TextNode textValue):
+                PatchText(tree, text, textValue);
                 break;
-            case ComponentKind.Comment:
-                PatchComment(tree, (MountedLeafNode<TNode>)current, RequireComment(next));
+            case (MountedLeaf<TNode> comment, CommentNode commentValue):
+                PatchComment(tree, comment, commentValue);
                 break;
-            case ComponentKind.Static:
-                PatchStatic(tree, (MountedStaticNode<TNode>)current, RequireStatic(next));
+            case (MountedStatic<TNode> staticContent, StaticNode staticValue):
+                ReplaceValue(tree, staticContent, staticValue);
                 break;
-            case ComponentKind.Fragment:
-                PatchFragment(
-                    tree,
-                    (MountedFragmentNode<TNode>)current,
-                    RequireFragment(next),
-                    container,
-                    elementNamespace);
+            case (MountedRange<TNode> fragment, FragmentNode fragmentValue):
+                PatchFragment(tree, fragment, fragmentValue, container);
                 break;
-            case ComponentKind.Template:
-                PatchTemplate(
-                    tree,
-                    (MountedTemplateNode<TNode>)current,
-                    RequireTemplate(next),
-                    container,
-                    elementNamespace);
+            case (MountedComponent<TNode> component, ComponentNode componentValue):
+                PatchComponent(tree, component, componentValue, container);
                 break;
-            case ComponentKind.Teleport:
-                PatchTeleport(
-                    tree,
-                    (MountedTeleportNode<TNode>)current,
-                    RequireTeleport(next),
-                    container,
-                    elementNamespace);
+            case (MountedTeleport<TNode> teleport, TeleportNode teleportValue):
+                PatchTeleport(tree, teleport, teleportValue, container);
+                break;
+            case (MountedKeepAlive<TNode> keepAlive, KeepAliveNode keepAliveValue):
+                PatchKeepAlive(tree, keepAlive, keepAliveValue, container);
+                break;
+            case (MountedSuspense<TNode> suspense, SuspenseNode suspenseValue):
+                PatchSuspense(tree, suspense, suspenseValue, container);
+                break;
+            case (MountedTransition<TNode> transition, TransitionNode transitionValue):
+                PatchTransition(tree, transition, transitionValue, container);
                 break;
             default:
-                throw new InvalidOperationException($"Unknown component kind: {next.Kind}.");
+                throw new InvalidOperationException(
+                    "The mounted hierarchy no longer matches the closed virtual-node algebra.");
         }
 
         return current;
     }
 
-    private MountedRenderNode<TNode> Mount(
+    private MountedNode<TNode> Mount(
         MountedTree<TNode> tree,
-        IComponent component,
+        VirtualNode value,
         TNode container,
         TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        return component.Kind switch
+        return value switch
         {
-            ComponentKind.Element => MountElement(
-                tree,
-                RequireElement(component),
-                container,
-                anchor,
-                elementNamespace,
-                owner),
-            ComponentKind.Text => MountText(
-                tree,
-                RequireText(component),
-                container,
-                anchor,
-                owner),
-            ComponentKind.Comment => MountComment(
-                tree,
-                RequireComment(component),
-                container,
-                anchor,
-                owner),
-            ComponentKind.Static => MountStatic(
-                tree,
-                RequireStatic(component),
-                container,
-                anchor,
-                elementNamespace,
-                owner),
-            ComponentKind.Fragment => MountFragment(
-                tree,
-                RequireFragment(component),
-                container,
-                anchor,
-                elementNamespace,
-                owner),
-            ComponentKind.Template => MountTemplate(
-                tree,
-                RequireTemplate(component),
-                container,
-                anchor,
-                elementNamespace,
-                owner),
-            ComponentKind.Teleport => MountTeleport(
-                tree,
-                RequireTeleport(component),
-                container,
-                anchor,
-                elementNamespace,
-                owner),
-            _ => throw new InvalidOperationException(
-                $"Unknown component kind: {component.Kind}."),
+            ElementNode element => MountElement(tree, element, container, anchor, owner),
+            TextNode text => MountText(tree, text, container, anchor, owner),
+            CommentNode comment => MountComment(tree, comment, container, anchor, owner),
+            StaticNode staticContent => MountStatic(tree, staticContent, container, anchor, owner),
+            FragmentNode fragment => MountFragment(tree, fragment, container, anchor, owner),
+            ComponentNode component => MountComponent(tree, component, container, anchor, owner),
+            TeleportNode teleport => MountTeleport(tree, teleport, container, anchor, owner),
+            KeepAliveNode keepAlive => MountKeepAlive(tree, keepAlive, container, anchor, owner),
+            SuspenseNode suspense => MountSuspense(tree, suspense, container, anchor, owner),
+            TransitionNode transition => MountTransition(tree, transition, container, anchor, owner),
+            _ => throw new InvalidOperationException("Unknown virtual-node variant."),
         };
     }
 
-    private MountedElementNode<TNode> MountElement(
+    private MountedElement<TNode> MountElement(
         MountedTree<TNode> tree,
-        IElementComponent component,
+        ElementNode value,
         TNode container,
         TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        string? ownNamespace = ElementNamespace(component.Tag, elementNamespace);
-        TNode element = _options.CreateElement(component.Tag, ownNamespace);
-        if (owner?.ScopeIdentifier is { } scopeIdentifier)
-        {
-            _options.SetScopeIdentifier?.Invoke(element, scopeIdentifier);
-        }
-
+        TNode element = _options.CreateElement(value.Name);
         List<DirectiveBinding> directiveBindings = ResolveDirectiveBindings(
             tree,
-            component.Directives,
+            value.Directives,
             owner);
-        TransitionHooks? transition = TransitionComponents.Get(component);
-        BindDirectiveTransitions(directiveBindings, transition);
+        BindActiveTransition(tree, element, directiveBindings);
         InvokeDirectiveHooks(
             tree,
             element,
             directiveBindings,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             DirectiveHookKind.Created);
-        List<MountedRenderNode<TNode>> children = MountChildren(
+        MountAttributes(element, value.Bindings);
+        List<MountedNode<TNode>> children = MountChildren(
             tree,
-            component.Children,
+            value.Children,
             element,
             default,
-            ChildrenNamespace(component.Tag, ownNamespace),
             owner);
-        MountAttributes(element, component.Tag, component.Attributes, ownNamespace);
-        InvokeComponentNodeLifecycleHook(
+        InvokeVirtualNodeLifecycleHook(
             tree,
             owner,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             "onVnodeBeforeMount");
         InvokeDirectiveHooks(
             tree,
             element,
             directiveBindings,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             DirectiveHookKind.BeforeMount);
-        if (transition is { Persisted: false })
-        {
-            transition.BeforeEnter(element);
-        }
-
         _options.Insert(element, container, anchor);
-
-        MountedElementNode<TNode> mounted = new(
-            component,
+        MountedElement<TNode> mounted = new(
+            value,
             element,
             children,
             directiveBindings,
             owner);
-        mounted.Transition = transition;
         BindDirectiveHostElements(mounted, directiveBindings);
-        Register(tree, component, mounted);
-        UpdateReference(
-            tree,
-            mounted,
-            previousReference: null,
-            component.Reference,
-            element);
-        QueueComponentNodeLifecycleHook(
+        Register(tree, value, mounted);
+        UpdateReference(tree, mounted, null, value.MountReference);
+        QueueVirtualNodeLifecycleHook(
             tree,
             owner,
             mounted,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             "onVnodeMounted");
-        if (transition is { Persisted: false })
-        {
-            Scheduler.QueuePostFlushCallback(
-                new SchedulerJob(
-                    () =>
-                    {
-                        if (!mounted.IsUnmounted)
-                        {
-                            transition.Enter(element);
-                            QueueHostCommit();
-                        }
-                    })
-                {
-                    Name = "transition enter",
-                });
-        }
-
-        if (directiveBindings.Count > 0)
-        {
-            Scheduler.QueuePostFlushCallback(
-                new SchedulerJob(
-                    () =>
-                    {
-                        if (!mounted.IsUnmounted)
-                        {
-                            InvokeDirectiveHooks(
-                                tree,
-                                element,
-                                mounted.DirectiveBindings,
-                                RequireElement(mounted.Component),
-                                previousComponent: null,
-                                DirectiveHookKind.Mounted);
-                            QueueHostCommit();
-                        }
-                    })
-                {
-                    Name = "directive mounted lifecycle",
-                });
-        }
-
+        QueueDirectiveHooks(
+            tree,
+            mounted,
+            value,
+            previousValue: null,
+            DirectiveHookKind.Mounted);
         return mounted;
     }
 
-    private MountedLeafNode<TNode> MountText(
+    private MountedLeaf<TNode> MountText(
         MountedTree<TNode> tree,
-        ITextComponent component,
+        TextNode value,
         TNode container,
         TNode? anchor,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        TNode hostNode = _options.CreateText(component.Text);
+        TNode hostNode = _options.CreateText(value.Text);
         _options.Insert(hostNode, container, anchor);
-        MountedLeafNode<TNode> mounted = new(component, hostNode, owner);
-        Register(tree, component, mounted);
+        MountedLeaf<TNode> mounted = new(value, hostNode, owner);
+        Register(tree, value, mounted);
+        UpdateReference(tree, mounted, null, value.MountReference);
         return mounted;
     }
 
-    private MountedLeafNode<TNode> MountComment(
+    private MountedLeaf<TNode> MountComment(
         MountedTree<TNode> tree,
-        ICommentComponent component,
+        CommentNode value,
         TNode container,
         TNode? anchor,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        TNode hostNode = _options.CreateComment(component.Text ?? string.Empty);
+        TNode hostNode = _options.CreateComment(value.Text);
         _options.Insert(hostNode, container, anchor);
-        MountedLeafNode<TNode> mounted = new(component, hostNode, owner);
-        Register(tree, component, mounted);
+        MountedLeaf<TNode> mounted = new(value, hostNode, owner);
+        Register(tree, value, mounted);
         return mounted;
     }
 
-    private MountedStaticNode<TNode> MountStatic(
+    private MountedStatic<TNode> MountStatic(
         MountedTree<TNode> tree,
-        IStaticComponent component,
+        StaticNode value,
         TNode container,
         TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        InsertStaticContentDelegate<TNode>? insertStaticContent =
-            _options.InsertStaticContent;
-        if (insertStaticContent is null)
-        {
-            throw new NotSupportedException(
-                "This host does not provide InsertStaticContent, which static components require.");
-        }
-
-        (TNode first, TNode last) = insertStaticContent(
-            component.Content,
-            container,
-            anchor,
-            elementNamespace);
-        MountedStaticNode<TNode> mounted = new(component, first, last, owner);
-        Register(tree, component, mounted);
+        InsertStaticContentDelegate<TNode> insert = _options.InsertStaticContent
+            ?? throw new NotSupportedException(
+                "The active host does not support static-content insertion.");
+        (TNode first, TNode last) = insert(value.Format, value.Content, container, anchor);
+        RequireHostNode(first, "first static host node");
+        RequireHostNode(last, "last static host node");
+        MountedStatic<TNode> mounted = new(value, first, last, owner);
+        Register(tree, value, mounted);
         return mounted;
     }
 
-    private MountedFragmentNode<TNode> MountFragment(
+    private MountedRange<TNode> MountFragment(
         MountedTree<TNode> tree,
-        IFragmentComponent component,
+        FragmentNode value,
         TNode container,
         TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        TNode startAnchor = _options.CreateText(string.Empty);
-        TNode endAnchor = _options.CreateText(string.Empty);
+        TNode startAnchor = _options.CreateComment(HydrationMarkers.FragmentStartData);
+        TNode endAnchor = _options.CreateComment(HydrationMarkers.FragmentEndData);
         _options.Insert(startAnchor, container, anchor);
         _options.Insert(endAnchor, container, anchor);
-        List<MountedRenderNode<TNode>> children = MountChildren(
+        List<MountedNode<TNode>> children = MountChildren(
             tree,
-            component.Children,
+            value.Children,
             container,
             endAnchor,
-            elementNamespace,
             owner);
-
-        MountedFragmentNode<TNode> mounted =
-            new(component, startAnchor, endAnchor, children, owner);
-        Register(tree, component, mounted);
-        return mounted;
-    }
-
-    private MountedTemplateNode<TNode> MountTemplate(
-        MountedTree<TNode> tree,
-        ITemplateComponent component,
-        TNode container,
-        TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
-    {
-        if (IsSuspenseComponent(component))
-        {
-            return MountSuspense(
-                tree,
-                component,
-                container,
-                anchor,
-                elementNamespace,
-                owner);
-        }
-
-        IApplicationContext application = tree.Application
-            ?? throw new InvalidOperationException(
-                "Template components require an application context. Supply it to Render.");
-        int identifier = checked(++_nextComponentIdentifier);
-        MountedComponent instance = MountedComponent.Create(
-            application,
-            component,
-            owner,
-            identifier);
-        TransitionHooks? initialTransition =
-            TransitionComponents.Get(component);
-        MountedKeepAliveState<TNode>? keepAliveState =
-            CreateKeepAliveState(instance);
-        MountedRenderNode<TNode>? subtree = null;
-        MountedTemplateNode<TNode>? mounted = null;
-        ReactiveEffect? renderEffect = null;
-        SchedulerJob? renderJob = null;
-        SchedulerJob mountedJob = new(instance.InvokeMounted)
-        {
-            Name = "component mounted lifecycle",
-        };
-        SchedulerJob updatedJob = new(instance.InvokeUpdated)
-        {
-            Name = "component updated lifecycle",
-        };
-
-        try
-        {
-            IComponent RenderSubtree()
-            {
-                IComponent rendered = instance.Render();
-                TransitionHooks? transition =
-                    mounted?.Transition ?? initialTransition;
-                return transition is null
-                    ? rendered
-                    : TransitionComponents.Attach(rendered, transition);
-            }
-
-            void RenderComponent()
-            {
-                if (subtree is null)
-                {
-                    instance.InvokeBeforeMount();
-                    InvokeComponentNodeLifecycleHook(
-                        tree,
-                        owner,
-                        component,
-                        previousComponent: null,
-                        "onVnodeBeforeMount");
-                    IComponent initialRendered = RenderSubtree();
-                    subtree = Mount(
-                        tree,
-                        initialRendered,
-                        container,
-                        anchor,
-                        elementNamespace,
-                        instance.Context);
-                    if (keepAliveState is not null)
-                    {
-                        InitializeKeepAlive(
-                            tree,
-                            keepAliveState,
-                            instance,
-                            subtree);
-                    }
-
-                    QueueHostCommit();
-                    return;
-                }
-
-                instance.InvokeBeforeUpdate();
-                InvokePendingTemplateNodeBeforeUpdateHook(
-                    tree,
-                    mounted);
-                TNode fallbackContainer = mounted is null
-                    ? container
-                    : mounted.FallbackContainer;
-                TNode updateContainer = HostParentOrFallback(
-                    subtree.FirstHostNode,
-                    fallbackContainer);
-                TNode? updateAnchor = GetNextHostNode(subtree);
-                IComponent rendered = RenderSubtree();
-                subtree = keepAliveState is null
-                    ? Patch(
-                        tree,
-                        subtree,
-                        rendered,
-                        updateContainer,
-                        updateAnchor,
-                        mounted?.ElementNamespace ?? elementNamespace,
-                        instance.Context)
-                    : PatchKeepAlive(
-                        tree,
-                        keepAliveState,
-                        instance,
-                        subtree,
-                        rendered,
-                        updateContainer,
-                        updateAnchor,
-                        mounted?.ElementNamespace ?? elementNamespace);
-                if (mounted is not null)
-                {
-                    mounted.Subtree = subtree;
-                }
-
-                QueueHostCommit();
-                Scheduler.QueuePostFlushCallback(updatedJob);
-            }
-
-            renderEffect = instance.CreateRenderEffect(
-                RenderComponent,
-                () => Scheduler.QueueJob(renderJob!));
-            renderJob = new SchedulerJob(renderEffect.RunIfDirty)
-            {
-                Identifier = identifier,
-                Name = "component render",
-            };
-            renderEffect.Run();
-
-            mounted = new MountedTemplateNode<TNode>(
-                component,
-                instance,
-                subtree!,
-                renderEffect,
-                renderJob,
-                mountedJob,
-                updatedJob,
-                container,
-                elementNamespace,
-                owner);
-            mounted.Transition = initialTransition;
-            mounted.KeepAliveState = keepAliveState;
-            instance.Context.RootElementResolver =
-                () => GetRootElementObjects(mounted.Subtree);
-            instance.Context.KeyedChildElementResolver =
-                () => GetKeyedChildElementSnapshots(mounted.Subtree);
-            instance.Context.HostCommitScheduler = QueueHostCommit;
-            instance.RegisterHotReload(
-                () => ResetTemplateForHotReload(tree, mounted));
-            Register(tree, component, mounted);
-            UpdateReference(
-                tree,
-                mounted,
-                previousReference: null,
-                OwnTemplateReference(instance, component),
-                ComponentReferenceValue(instance.Context));
-            Scheduler.QueuePostFlushCallback(mountedJob);
-            QueueComponentNodeLifecycleHook(
-                tree,
-                owner,
-                mounted,
-                component,
-                previousComponent: null,
-                "onVnodeMounted");
-            return mounted;
-        }
-        catch
-        {
-            renderJob?.IsDisposed = true;
-            mountedJob.IsDisposed = true;
-            updatedJob.IsDisposed = true;
-            instance.AbortMount(
-                subtree is null
-                    ? null
-                    : () => Unmount(tree, subtree, removeHostNodes: true));
-            if (keepAliveState is not null)
-            {
-                _options.Remove(keepAliveState.StorageContainer);
-            }
-
-            throw;
-        }
-    }
-
-    private void PatchTemplate(
-        MountedTree<TNode> tree,
-        MountedTemplateNode<TNode> mounted,
-        ITemplateComponent next,
-        TNode container,
-        string? elementNamespace)
-    {
-        if (mounted.SuspenseState is not null)
-        {
-            PatchSuspense(
-                tree,
-                mounted,
-                next,
-                container,
-                elementNamespace);
-            return;
-        }
-
-        ITemplateComponent current = RequireTemplate(mounted.Component);
-        mounted.FallbackContainer = container;
-        mounted.ElementNamespace = elementNamespace;
-        mounted.Transition = TransitionComponents.Get(next);
-        bool forwardsRootBehavior =
-            mounted.Instance.Template is IComponentRootBehaviorForwarder;
-        bool shouldUpdate =
-            forwardsRootBehavior
-                && !Equals(current.Reference, next.Reference)
-            || ShouldUpdateTemplate(mounted, current, next);
-        if (shouldUpdate)
-        {
-            mounted.PendingNodeLifecycleComponent = next;
-            mounted.PreviousNodeLifecycleComponent = current;
-            mounted.Instance.Update(next);
-            Scheduler.InvalidateJob(mounted.RenderJob);
-            mounted.RenderEffect.Run();
-            QueueComponentNodeLifecycleHook(
-                tree,
-                mounted.Owner,
-                mounted,
-                next,
-                current,
-                "onVnodeUpdated");
-        }
-        else
-        {
-            mounted.Instance.UpdateRequest(next);
-        }
-
-        UpdateReference(
-            tree,
-            mounted,
-            forwardsRootBehavior ? null : current.Reference,
-            forwardsRootBehavior ? null : next.Reference,
-            ComponentReferenceValue(mounted.Instance.Context));
-        ReplaceRegistration(tree, mounted, next);
-    }
-
-    private static IComponentReference? OwnTemplateReference(
-        MountedComponent instance,
-        ITemplateComponent component)
-    {
-        return instance.Template is IComponentRootBehaviorForwarder
-            ? null
-            : component.Reference;
-    }
-
-    private static bool ShouldUpdateTemplate(
-        MountedTemplateNode<TNode> mounted,
-        ITemplateComponent current,
-        ITemplateComponent next)
-    {
-        PatchFlags patchFlags = next.Optimization.PatchFlags;
-        if (patchFlags > 0
-            && (patchFlags & PatchFlags.DynamicSlots) != 0)
-        {
-            return true;
-        }
-
-        if (current.Directives.Count > 0 || next.Directives.Count > 0)
-        {
-            return true;
-        }
-
-        IReadOnlyDictionary<string, ComponentSlot>? previousSlots = current.Slots;
-        IReadOnlyDictionary<string, ComponentSlot>? nextSlots = next.Slots;
-        if ((previousSlots is not null || nextSlots is not null)
-            && (nextSlots is null
-                || ResolveSlotFlags(
-                    nextSlots,
-                    mounted.Owner?.Slots) != SlotFlags.Stable))
-        {
-            return true;
-        }
-
-        IComponentArguments previousArguments = current.Arguments;
-        IComponentArguments nextArguments = next.Arguments;
-        if (ReferenceEquals(previousArguments, nextArguments))
-        {
-            return false;
-        }
-
-        IReadOnlyList<string>? dynamicProperties =
-            next.Optimization.DynamicProperties;
-        if (patchFlags > 0
-            && (patchFlags & PatchFlags.Props) != 0
-            && dynamicProperties is not null)
-        {
-            for (int index = 0; index < dynamicProperties.Count; index++)
-            {
-                string name = dynamicProperties[index];
-                if (mounted.Instance.Context.IsDeclaredEventListener(name))
-                {
-                    continue;
-                }
-
-                if (previousArguments.Contains(name)
-                    != nextArguments.Contains(name)
-                    || !Equals(
-                        previousArguments[name],
-                        nextArguments[name]))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        int previousCount = 0;
-        foreach (KeyValuePair<string, object?> previous in previousArguments)
-        {
-            if (mounted.Instance.Context.IsDeclaredEventListener(previous.Key))
-            {
-                continue;
-            }
-
-            previousCount++;
-            if (!nextArguments.Contains(previous.Key)
-                || !Equals(
-                    previous.Value,
-                    nextArguments[previous.Key]))
-            {
-                return true;
-            }
-        }
-
-        int nextCount = 0;
-        foreach (KeyValuePair<string, object?> nextArgument in nextArguments)
-        {
-            if (!mounted.Instance.Context.IsDeclaredEventListener(nextArgument.Key))
-            {
-                nextCount++;
-            }
-        }
-
-        return previousCount != nextCount;
-    }
-
-    private static SlotFlags ResolveSlotFlags(
-        IReadOnlyDictionary<string, ComponentSlot> slots,
-        IReadOnlyDictionary<string, ComponentSlot>? ownerSlots)
-    {
-        SlotFlags flags = slots is IComponentSlotCollection collection
-            ? collection.Flags
-            : SlotFlags.Stable;
-        if (flags != SlotFlags.Forwarded)
-        {
-            return flags;
-        }
-
-        return ownerSlots is IComponentSlotCollection
-            {
-                Flags: SlotFlags.Stable,
-            }
-                ? SlotFlags.Stable
-                : SlotFlags.Dynamic;
-    }
-
-    private MountedTeleportNode<TNode> MountTeleport(
-        MountedTree<TNode> tree,
-        ITeleportComponent component,
-        TNode container,
-        TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
-    {
-        TNode startAnchor = _options.CreateComment("teleport start");
-        TNode endAnchor = _options.CreateComment("teleport end");
-        _options.Insert(startAnchor, container, anchor);
-        _options.Insert(endAnchor, container, anchor);
-
-        bool hasTarget = false;
-        TNode targetContainer = default!;
-        TNode? targetAnchor = default;
-        bool childrenMounted = false;
-        List<MountedRenderNode<TNode>> children = [];
-        if (!component.IsDeferred)
-        {
-            hasTarget = TryResolveTeleportTarget(
-                component.Target,
-                out targetContainer);
-            if (hasTarget)
-            {
-                targetAnchor = _options.CreateText(string.Empty);
-                _options.Insert(targetAnchor, targetContainer, default);
-            }
-            else
-            {
-                WarnUnresolvedTeleportTarget(tree, component.Target);
-            }
-
-            childrenMounted = component.IsDisabled || hasTarget;
-            children = childrenMounted
-                ? MountChildren(
-                    tree,
-                    component.Children,
-                    component.IsDisabled ? container : targetContainer,
-                    component.IsDisabled ? endAnchor : targetAnchor,
-                    elementNamespace,
-                    owner)
-                : [];
-        }
-        else if (component.IsDisabled)
-        {
-            // A disabled deferred Teleport mounts in place immediately; only target resolution
-            // waits for the post-flush phase.
-            childrenMounted = true;
-            children = MountChildren(
-                tree,
-                component.Children,
-                container,
-                endAnchor,
-                elementNamespace,
-                owner);
-        }
-
-        MountedTeleportNode<TNode> mounted = new(
-            component,
+        MountedRange<TNode> mounted = new(
+            value,
             startAnchor,
             endAnchor,
-            hasTarget ? targetContainer : default,
-            targetAnchor,
-            hasTarget,
-            childrenMounted,
             children,
-            elementNamespace,
             owner);
-        Register(tree, component, mounted);
-        if (component.IsDeferred)
-        {
-            QueueDeferredTeleportMount(
-                tree,
-                mounted,
-                container,
-                elementNamespace);
-        }
-
+        Register(tree, value, mounted);
         return mounted;
-    }
-
-    private void PatchTeleport(
-        MountedTree<TNode> tree,
-        MountedTeleportNode<TNode> mounted,
-        ITeleportComponent next,
-        TNode container,
-        string? elementNamespace)
-    {
-        ITeleportComponent current = RequireTeleport(mounted.Component);
-        if (mounted.PendingMountJob is { } pendingMount)
-        {
-            pendingMount.IsDisposed = true;
-            mounted.PendingMountJob = null;
-            if (next.IsDeferred)
-            {
-                QueueDeferredTeleportPatch(
-                    tree,
-                    mounted,
-                    next,
-                    container,
-                    elementNamespace);
-                return;
-            }
-        }
-
-        TNode mainContainer = HostParentOrFallback(
-            mounted.StartAnchor,
-            container);
-        bool nextHasTarget = TryResolveTeleportTarget(
-            next.Target,
-            out TNode nextTargetContainer);
-        if (!nextHasTarget)
-        {
-            WarnUnresolvedTeleportTarget(tree, next.Target);
-        }
-
-        TNode? nextTargetAnchor = mounted.TargetAnchor;
-        if (nextHasTarget)
-        {
-            if (!mounted.HasTarget || !HasHostNode(nextTargetAnchor))
-            {
-                nextTargetAnchor = _options.CreateText(string.Empty);
-            }
-
-            if (!mounted.HasTarget
-                || !NodeComparer.Equals(
-                    mounted.TargetContainer!,
-                    nextTargetContainer))
-            {
-                _options.Insert(
-                    nextTargetAnchor!,
-                    nextTargetContainer,
-                    default);
-            }
-        }
-
-        bool shouldMountChildren = next.IsDisabled || nextHasTarget;
-        if (shouldMountChildren)
-        {
-            TNode nextChildrenContainer = next.IsDisabled
-                ? mainContainer
-                : nextTargetContainer;
-            TNode? nextChildrenAnchor = next.IsDisabled
-                ? mounted.EndAnchor
-                : nextTargetAnchor;
-            if (mounted.ChildrenMounted)
-            {
-                TNode currentChildrenContainer = current.IsDisabled
-                    ? mainContainer
-                    : mounted.TargetContainer!;
-                if (!NodeComparer.Equals(
-                    currentChildrenContainer,
-                    nextChildrenContainer))
-                {
-                    for (int index = 0; index < mounted.Children.Count; index++)
-                    {
-                        Move(
-                            mounted.Children[index],
-                            nextChildrenContainer,
-                            nextChildrenAnchor);
-                    }
-                }
-
-                bool patchedBlock = TryPatchBlockChildren(
-                    tree,
-                    current.Optimization,
-                    next.Optimization,
-                    nextChildrenContainer,
-                    elementNamespace);
-                if (patchedBlock)
-                {
-                    CarryForwardStaticChildren(
-                        tree,
-                        mounted.Children,
-                        current.Children,
-                        next.Children);
-                }
-                else
-                {
-                    mounted.Children = PatchChildren(
-                        tree,
-                        mounted.Children,
-                        next.Children,
-                        nextChildrenContainer,
-                        nextChildrenAnchor,
-                        elementNamespace,
-                        next.Optimization.PatchFlags,
-                        mounted.Owner);
-                }
-            }
-            else
-            {
-                mounted.Children = MountChildren(
-                    tree,
-                    next.Children,
-                    nextChildrenContainer,
-                    nextChildrenAnchor,
-                    elementNamespace,
-                    mounted.Owner);
-            }
-        }
-        else if (mounted.ChildrenMounted)
-        {
-            for (int index = 0; index < mounted.Children.Count; index++)
-            {
-                Unmount(tree, mounted.Children[index], removeHostNodes: true);
-            }
-
-            mounted.Children = [];
-        }
-
-        if (mounted.HasTarget && !nextHasTarget)
-        {
-            _options.Remove(mounted.TargetAnchor!);
-            nextTargetAnchor = default;
-        }
-
-        mounted.TargetContainer = nextHasTarget
-            ? nextTargetContainer
-            : default;
-        mounted.TargetAnchor = nextTargetAnchor;
-        mounted.HasTarget = nextHasTarget;
-        mounted.ChildrenMounted = shouldMountChildren;
-        mounted.ElementNamespace = elementNamespace;
-        ReplaceRegistration(tree, mounted, next);
-    }
-
-    private void QueueDeferredTeleportMount(
-        MountedTree<TNode> tree,
-        MountedTeleportNode<TNode> mounted,
-        TNode fallbackContainer,
-        string? elementNamespace)
-    {
-        SchedulerJob job = null!;
-        job = new SchedulerJob(
-            () =>
-            {
-                if (mounted.IsUnmounted
-                    || !ReferenceEquals(mounted.PendingMountJob, job))
-                {
-                    return;
-                }
-
-                mounted.PendingMountJob = null;
-                ITeleportComponent component =
-                    RequireTeleport(mounted.Component);
-                bool hasTarget = TryResolveTeleportTarget(
-                    component.Target,
-                    out TNode targetContainer);
-                TNode? targetAnchor = default;
-                if (hasTarget)
-                {
-                    targetAnchor = _options.CreateText(string.Empty);
-                    _options.Insert(
-                        targetAnchor,
-                        targetContainer,
-                        default);
-                }
-                else
-                {
-                    WarnUnresolvedTeleportTarget(
-                        tree,
-                        component.Target);
-                }
-
-                TNode mainContainer = HostParentOrFallback(
-                    mounted.StartAnchor,
-                    fallbackContainer);
-                bool shouldMountChildren =
-                    component.IsDisabled || hasTarget;
-                if (!mounted.ChildrenMounted
-                    && shouldMountChildren)
-                {
-                    mounted.Children = MountChildren(
-                        tree,
-                        component.Children,
-                        component.IsDisabled
-                            ? mainContainer
-                            : targetContainer,
-                        component.IsDisabled
-                            ? mounted.EndAnchor
-                            : targetAnchor,
-                        elementNamespace,
-                        mounted.Owner);
-                }
-                else if (mounted.ChildrenMounted
-                    && !component.IsDisabled
-                    && hasTarget)
-                {
-                    for (int index = 0;
-                        index < mounted.Children.Count;
-                        index++)
-                    {
-                        Move(
-                            mounted.Children[index],
-                            targetContainer,
-                            targetAnchor);
-                    }
-                }
-
-                mounted.TargetContainer = hasTarget
-                    ? targetContainer
-                    : default;
-                mounted.TargetAnchor = targetAnchor;
-                mounted.HasTarget = hasTarget;
-                mounted.ChildrenMounted = shouldMountChildren;
-                QueueHostCommit();
-            })
-        {
-            Name = "deferred teleport mount",
-        };
-        mounted.PendingMountJob = job;
-        Scheduler.QueuePostFlushCallback(job);
-    }
-
-    private void QueueDeferredTeleportPatch(
-        MountedTree<TNode> tree,
-        MountedTeleportNode<TNode> mounted,
-        ITeleportComponent next,
-        TNode container,
-        string? elementNamespace)
-    {
-        SchedulerJob job = null!;
-        job = new SchedulerJob(
-            () =>
-            {
-                if (mounted.IsUnmounted
-                    || !ReferenceEquals(mounted.PendingMountJob, job))
-                {
-                    return;
-                }
-
-                mounted.PendingMountJob = null;
-                PatchTeleport(
-                    tree,
-                    mounted,
-                    next,
-                    container,
-                    elementNamespace);
-                QueueHostCommit();
-            })
-        {
-            Name = "deferred teleport update",
-        };
-        mounted.PendingMountJob = job;
-        Scheduler.QueuePostFlushCallback(job);
     }
 
     private void PatchElement(
         MountedTree<TNode> tree,
-        MountedElementNode<TNode> mounted,
-        IElementComponent next,
-        string? elementNamespace)
+        MountedElement<TNode> mounted,
+        ElementNode next)
     {
-        IElementComponent current = RequireElement(mounted.Component);
-        ComponentOptimization currentOptimization = current.Optimization;
-        ComponentOptimization nextOptimization = next.Optimization;
-        PatchFlags patchFlags = nextOptimization.PatchFlags;
-        if (patchFlags == PatchFlags.Cached)
+        ElementNode previous = (ElementNode)mounted.Value;
+        PatchFlags flags = next.RenderPlan.PatchFlags;
+        if (flags == PatchFlags.Cached)
         {
-            mounted.Transition = TransitionComponents.Get(next);
-            UpdateReference(
-                tree,
-                mounted,
-                current.Reference,
-                next.Reference,
-                mounted.HostNode);
-            ReplaceRegistration(tree, mounted, next);
+            UpdateReference(tree, mounted, previous.MountReference, next.MountReference);
+            ReplaceValue(tree, mounted, next);
             return;
         }
 
@@ -1311,718 +457,395 @@ public sealed partial class Renderer<TNode>
             next.Directives,
             mounted.Owner,
             mounted.DirectiveBindings);
-        TransitionHooks? nextTransition = TransitionComponents.Get(next);
-        BindDirectiveTransitions(nextDirectiveBindings, nextTransition);
-        BindDirectiveHostElements(mounted, nextDirectiveBindings);
-        InvokeComponentNodeLifecycleHook(
+        BindActiveTransition(tree, mounted.HostNode, nextDirectiveBindings);
+        InvokeVirtualNodeLifecycleHook(
             tree,
             mounted.Owner,
             next,
-            current,
+            previous,
             "onVnodeBeforeUpdate");
         InvokeDirectiveHooks(
             tree,
             mounted.HostNode,
             nextDirectiveBindings,
             next,
-            current,
+            previous,
             DirectiveHookKind.BeforeUpdate);
-        string? ownNamespace = ElementNamespace(next.Tag, elementNamespace);
-        string? childNamespace = ChildrenNamespace(next.Tag, ownNamespace);
 
-        bool patchedBlock = TryPatchBlockChildren(
-            tree,
-            currentOptimization,
-            nextOptimization,
-            mounted.HostNode,
-            childNamespace);
-
-        if (patchedBlock)
+        bool blockPatched = flags != PatchFlags.Bail
+            && TryPatchBlockChildren(tree, mounted, previous, next, mounted.HostNode);
+        bool incompatibleBlock = !blockPatched
+            && (previous.RenderPlan.IsBlock || next.RenderPlan.IsBlock);
+        if (incompatibleBlock)
         {
-            PatchOptimizedAttributes(
-                mounted.HostNode,
-                next.Tag,
-                current.Attributes,
-                next.Attributes,
-                nextOptimization,
-                ownNamespace);
-            // The TEXT fast path still applies after block-children patching: a block root may
-            // itself carry PatchFlags.Text, and its own text content is not one of the dynamic
-            // descendants the block walk visited.
-            if ((patchFlags & PatchFlags.Text) != 0)
-            {
-                mounted.Children = PatchUnkeyedChildren(
-                    tree,
-                    mounted.Children,
-                    next.Children,
-                    mounted.HostNode,
-                    default,
-                    childNamespace,
-                    mounted.Owner);
-            }
-        }
-        else if (currentOptimization.IsBlock || nextOptimization.IsBlock)
-        {
-            PatchAttributes(
-                mounted.HostNode,
-                next.Tag,
-                current.Attributes,
-                next.Attributes,
-                ownNamespace);
+            PatchAttributes(mounted.HostNode, previous.Bindings, next.Bindings);
             mounted.Children = PatchChildren(
                 tree,
                 mounted.Children,
+                previous.Children,
                 next.Children,
                 mounted.HostNode,
                 default,
-                childNamespace,
-                PatchFlags.Bail,
-                mounted.Owner);
+                mounted.Owner,
+                PatchFlags.Bail);
         }
-        else if ((int)patchFlags > 0)
+        else if (blockPatched)
         {
-            PatchOptimizedAttributes(
-                mounted.HostNode,
-                next.Tag,
-                current.Attributes,
-                next.Attributes,
-                nextOptimization,
-                ownNamespace);
-            if ((patchFlags & PatchFlags.Text) != 0)
-            {
-                mounted.Children = PatchUnkeyedChildren(
-                    tree,
-                    mounted.Children,
-                    next.Children,
-                    mounted.HostNode,
-                    default,
-                    childNamespace,
-                    mounted.Owner);
-            }
+            PatchElementAttributes(mounted.HostNode, previous, next);
+            PatchElementText(tree, mounted, previous, next);
+            CarryForwardStaticChildren(
+                previous.Children,
+                next.Children,
+                mounted.Children);
+        }
+        else if ((int)flags > 0)
+        {
+            PatchElementAttributes(mounted.HostNode, previous, next);
+            PatchElementText(tree, mounted, previous, next);
         }
         else
         {
-            PatchAttributes(
-                mounted.HostNode,
-                next.Tag,
-                current.Attributes,
-                next.Attributes,
-                ownNamespace);
+            PatchAttributes(mounted.HostNode, previous.Bindings, next.Bindings);
             mounted.Children = PatchChildren(
                 tree,
                 mounted.Children,
+                previous.Children,
                 next.Children,
                 mounted.HostNode,
                 default,
-                childNamespace,
-                nextOptimization.PatchFlags,
-                mounted.Owner);
+                mounted.Owner,
+                flags);
         }
 
-        UpdateReference(
-            tree,
-            mounted,
-            current.Reference,
-            next.Reference,
-            mounted.HostNode);
-        ReplaceRegistration(tree, mounted, next);
+        UpdateReference(tree, mounted, previous.MountReference, next.MountReference);
+        ReplaceValue(tree, mounted, next);
         mounted.DirectiveBindings = nextDirectiveBindings;
-        mounted.Transition = nextTransition;
-        QueueComponentNodeLifecycleHook(
+        BindDirectiveHostElements(mounted, nextDirectiveBindings);
+        QueueVirtualNodeLifecycleHook(
             tree,
             mounted.Owner,
             mounted,
             next,
-            current,
+            previous,
             "onVnodeUpdated");
-        if (nextDirectiveBindings.Count > 0)
+        QueueDirectiveHooks(
+            tree,
+            mounted,
+            next,
+            previous,
+            DirectiveHookKind.Updated);
+    }
+
+    private void PatchElementText(
+        MountedTree<TNode> tree,
+        MountedElement<TNode> mounted,
+        ElementNode previous,
+        ElementNode next)
+    {
+        if ((next.RenderPlan.PatchFlags & PatchFlags.Text) == 0)
         {
-            Scheduler.QueuePostFlushCallback(
-                new SchedulerJob(
-                    () =>
-                    {
-                        if (!mounted.IsUnmounted)
-                        {
-                            InvokeDirectiveHooks(
-                                tree,
-                                mounted.HostNode,
-                                mounted.DirectiveBindings,
-                                RequireElement(mounted.Component),
-                                current,
-                                DirectiveHookKind.Updated);
-                            QueueHostCommit();
-                        }
-                    })
-                {
-                    Name = "directive updated lifecycle",
-                });
+            return;
         }
+
+        if (previous.Children.Count == 1
+            && next.Children.Count == 1
+            && mounted.Children.Count == 1
+            && next.Children[0] is TextNode)
+        {
+            if (!ReferenceEquals(mounted.Children[0].Value, next.Children[0]))
+            {
+                mounted.Children[0] = Patch(
+                    tree,
+                    mounted.Children[0],
+                    next.Children[0],
+                    mounted.HostNode,
+                    default,
+                    mounted.Owner);
+            }
+
+            return;
+        }
+
+        mounted.Children = PatchChildren(
+            tree,
+            mounted.Children,
+            previous.Children,
+            next.Children,
+            mounted.HostNode,
+            default,
+            mounted.Owner,
+            PatchFlags.Bail);
     }
 
     private void PatchText(
         MountedTree<TNode> tree,
-        MountedLeafNode<TNode> mounted,
-        ITextComponent next)
+        MountedLeaf<TNode> mounted,
+        TextNode next)
     {
-        ITextComponent current = RequireText(mounted.Component);
-        if (!string.Equals(current.Text, next.Text, StringComparison.Ordinal))
+        TextNode previous = (TextNode)mounted.Value;
+        if (!string.Equals(previous.Text, next.Text, StringComparison.Ordinal))
         {
             _options.SetText(mounted.HostNode, next.Text);
         }
 
-        ReplaceRegistration(tree, mounted, next);
+        UpdateReference(tree, mounted, previous.MountReference, next.MountReference);
+        ReplaceValue(tree, mounted, next);
     }
 
-    private void PatchComment(
+    private static void PatchComment(
         MountedTree<TNode> tree,
-        MountedLeafNode<TNode> mounted,
-        ICommentComponent next)
+        MountedLeaf<TNode> mounted,
+        CommentNode next)
     {
-        ReplaceRegistration(tree, mounted, next);
-    }
-
-    private void PatchStatic(
-        MountedTree<TNode> tree,
-        MountedStaticNode<TNode> mounted,
-        IStaticComponent next)
-    {
-        ReplaceRegistration(tree, mounted, next);
+        ReplaceValue(tree, mounted, next);
     }
 
     private void PatchFragment(
         MountedTree<TNode> tree,
-        MountedFragmentNode<TNode> mounted,
-        IFragmentComponent next,
-        TNode container,
-        string? elementNamespace)
+        MountedRange<TNode> mounted,
+        FragmentNode next,
+        TNode container)
     {
-        IFragmentComponent current = RequireFragment(mounted.Component);
-        PatchFlags patchFlags = next.Optimization.PatchFlags;
-        bool isStableBlock =
-            (int)patchFlags > 0
-            && (patchFlags & PatchFlags.StableFragment) != 0
-            && TryPatchBlockChildren(
-                tree,
-                current.Optimization,
-                next.Optimization,
-                container,
-                elementNamespace);
-
-        if (!isStableBlock)
+        FragmentNode previous = (FragmentNode)mounted.Value;
+        PatchFlags flags = next.RenderPlan.PatchFlags;
+        bool blockPatched = flags != PatchFlags.Bail
+            && flags != PatchFlags.Cached
+            && (flags & PatchFlags.StableFragment) != 0
+            && TryPatchBlockChildren(tree, mounted, previous, next, container);
+        if (flags != PatchFlags.Cached && !blockPatched)
         {
             mounted.Children = PatchChildren(
                 tree,
                 mounted.Children,
+                previous.Children,
                 next.Children,
                 container,
                 mounted.EndAnchor,
-                elementNamespace,
-                patchFlags,
-                mounted.Owner);
+                mounted.Owner,
+                flags);
+        }
+        else if (blockPatched)
+        {
+            CarryForwardStaticChildren(
+                previous.Children,
+                next.Children,
+                mounted.Children);
         }
 
-        ReplaceRegistration(tree, mounted, next);
+        ReplaceValue(tree, mounted, next);
     }
 
-    private bool TryPatchBlockChildren(
+    private List<MountedNode<TNode>> MountChildren(
         MountedTree<TNode> tree,
-        ComponentOptimization current,
-        ComponentOptimization next,
-        TNode fallbackContainer,
-        string? elementNamespace)
-    {
-        IReadOnlyList<IComponent>? currentChildren = current.DynamicChildren;
-        IReadOnlyList<IComponent>? nextChildren = next.DynamicChildren;
-        if (currentChildren is null
-            || nextChildren is null
-            || currentChildren.Count != nextChildren.Count)
-        {
-            return false;
-        }
-
-        for (int index = 0; index < currentChildren.Count; index++)
-        {
-            if (!tree.Components.ContainsKey(currentChildren[index]))
-            {
-                return false;
-            }
-        }
-
-        for (int index = 0; index < nextChildren.Count; index++)
-        {
-            MountedRenderNode<TNode> currentChild =
-                tree.Components[currentChildren[index]];
-            TNode childContainer = HostParentOrFallback(
-                currentChild.FirstHostNode,
-                fallbackContainer);
-            MountedRenderNode<TNode> patchedChild = Patch(
-                tree,
-                currentChild,
-                nextChildren[index],
-                childContainer,
-                default,
-                elementNamespace,
-                currentChild.Owner);
-            if (!ReferenceEquals(patchedChild, currentChild))
-            {
-                // Block patching deliberately bypasses the parent children diff. Thread a
-                // type-changing replacement back through the mounted ownership graph so later
-                // moves and unmounts never retain the removed mounted node.
-                ReplaceMountedNodeReferences(
-                    tree,
-                    currentChild,
-                    patchedChild);
-            }
-        }
-
-        return true;
-    }
-
-    private static void ReplaceMountedNodeReferences(
-        MountedTree<TNode> tree,
-        MountedRenderNode<TNode> current,
-        MountedRenderNode<TNode> replacement)
-    {
-        if (tree.Root is null)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(tree.Root, current))
-        {
-            tree.Root = replacement;
-            return;
-        }
-
-        HashSet<MountedRenderNode<TNode>> visited =
-            new(ReferenceEqualityComparer.Instance);
-        ReplaceMountedNodeReferences(
-            tree.Root,
-            current,
-            replacement,
-            visited);
-    }
-
-    private static void ReplaceMountedNodeReferences(
-        MountedRenderNode<TNode> mounted,
-        MountedRenderNode<TNode> current,
-        MountedRenderNode<TNode> replacement,
-        HashSet<MountedRenderNode<TNode>> visited)
-    {
-        if (!visited.Add(mounted))
-        {
-            return;
-        }
-
-        switch (mounted)
-        {
-            case MountedElementNode<TNode> element:
-                ReplaceMountedNodeReferences(
-                    element.Children,
-                    current,
-                    replacement,
-                    visited);
-                break;
-            case MountedFragmentNode<TNode> fragment:
-                ReplaceMountedNodeReferences(
-                    fragment.Children,
-                    current,
-                    replacement,
-                    visited);
-                break;
-            case MountedTeleportNode<TNode> teleport:
-                ReplaceMountedNodeReferences(
-                    teleport.Children,
-                    current,
-                    replacement,
-                    visited);
-                break;
-            case MountedTemplateNode<TNode> template:
-                if (ReferenceEquals(template.Subtree, current))
-                {
-                    template.Subtree = replacement;
-                }
-                else
-                {
-                    ReplaceMountedNodeReferences(
-                        template.Subtree,
-                        current,
-                        replacement,
-                        visited);
-                }
-
-                ReplaceKeepAliveNodeReferences(
-                    template.KeepAliveState,
-                    current,
-                    replacement,
-                    visited);
-                ReplaceSuspenseNodeReferences(
-                    template.SuspenseState,
-                    current,
-                    replacement,
-                    visited);
-                break;
-        }
-    }
-
-    private static void ReplaceMountedNodeReferences(
-        List<MountedRenderNode<TNode>> mounted,
-        MountedRenderNode<TNode> current,
-        MountedRenderNode<TNode> replacement,
-        HashSet<MountedRenderNode<TNode>> visited)
-    {
-        for (int index = 0; index < mounted.Count; index++)
-        {
-            if (ReferenceEquals(mounted[index], current))
-            {
-                mounted[index] = replacement;
-            }
-            else
-            {
-                ReplaceMountedNodeReferences(
-                    mounted[index],
-                    current,
-                    replacement,
-                    visited);
-            }
-        }
-    }
-
-    private static void ReplaceKeepAliveNodeReferences(
-        MountedKeepAliveState<TNode>? state,
-        MountedRenderNode<TNode> current,
-        MountedRenderNode<TNode> replacement,
-        HashSet<MountedRenderNode<TNode>> visited)
-    {
-        if (state is null)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(state.ActiveNode, current))
-        {
-            state.ActiveNode = replacement;
-        }
-        else if (state.ActiveNode is { } active)
-        {
-            ReplaceMountedNodeReferences(
-                active,
-                current,
-                replacement,
-                visited);
-        }
-
-        foreach (KeepAliveCacheEntry<TNode> entry in state.Cache.Values)
-        {
-            if (ReferenceEquals(entry.Node, current))
-            {
-                entry.Node = replacement;
-                entry.ComponentName = ComponentName(replacement);
-            }
-            else
-            {
-                ReplaceMountedNodeReferences(
-                    entry.Node,
-                    current,
-                    replacement,
-                    visited);
-            }
-        }
-    }
-
-    private static void ReplaceSuspenseNodeReferences(
-        MountedSuspenseState<TNode>? state,
-        MountedRenderNode<TNode> current,
-        MountedRenderNode<TNode> replacement,
-        HashSet<MountedRenderNode<TNode>> visited)
-    {
-        if (state is null)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(state.ContentBranch, current))
-        {
-            state.ContentBranch = replacement;
-        }
-        else
-        {
-            ReplaceMountedNodeReferences(
-                state.ContentBranch,
-                current,
-                replacement,
-                visited);
-        }
-
-        if (ReferenceEquals(state.FallbackBranch, current))
-        {
-            state.FallbackBranch = replacement;
-        }
-        else if (state.FallbackBranch is { } fallback)
-        {
-            ReplaceMountedNodeReferences(
-                fallback,
-                current,
-                replacement,
-                visited);
-        }
-    }
-
-    private static void CarryForwardStaticChildren(
-        MountedTree<TNode> tree,
-        IReadOnlyList<MountedRenderNode<TNode>> mountedChildren,
-        IReadOnlyList<IComponent> currentChildren,
-        IReadOnlyList<IComponent> nextChildren)
-    {
-        int count = Math.Min(
-            mountedChildren.Count,
-            Math.Min(currentChildren.Count, nextChildren.Count));
-        for (int index = 0; index < count; index++)
-        {
-            MountedRenderNode<TNode> mounted = mountedChildren[index];
-            IComponent current = currentChildren[index];
-            IComponent next = nextChildren[index];
-            if (!IsSameComponentType(current, next))
-            {
-                continue;
-            }
-
-            if (ReferenceEquals(mounted.Component, current)
-                && !ReferenceEquals(current, next))
-            {
-                ReplaceRegistration(tree, mounted, next);
-            }
-
-            switch (mounted)
-            {
-                case MountedElementNode<TNode> element
-                    when current is IElementComponent currentElement
-                    && next is IElementComponent nextElement:
-                    CarryForwardStaticChildren(
-                        tree,
-                        element.Children,
-                        currentElement.Children,
-                        nextElement.Children);
-                    break;
-                case MountedFragmentNode<TNode> fragment
-                    when current is IFragmentComponent currentFragment
-                    && next is IFragmentComponent nextFragment:
-                    CarryForwardStaticChildren(
-                        tree,
-                        fragment.Children,
-                        currentFragment.Children,
-                        nextFragment.Children);
-                    break;
-                case MountedTeleportNode<TNode> teleport
-                    when current is ITeleportComponent currentTeleport
-                    && next is ITeleportComponent nextTeleport:
-                    CarryForwardStaticChildren(
-                        tree,
-                        teleport.Children,
-                        currentTeleport.Children,
-                        nextTeleport.Children);
-                    break;
-            }
-        }
-    }
-
-    private List<MountedRenderNode<TNode>> PatchChildren(
-        MountedTree<TNode> tree,
-        List<MountedRenderNode<TNode>> current,
-        IReadOnlyList<IComponent> next,
+        IReadOnlyList<VirtualNode> values,
         TNode container,
-        TNode? parentAnchor,
-        string? elementNamespace,
-        PatchFlags patchFlags,
-        ComponentContext? owner)
+        TNode? anchor,
+        RuntimeComponentContext? owner)
     {
-        if ((int)patchFlags > 0
-            && (patchFlags & PatchFlags.UnkeyedFragment) != 0)
+        List<MountedNode<TNode>> children = new(values.Count);
+        for (int index = 0; index < values.Count; index++)
         {
-            return PatchUnkeyedChildren(
+            children.Add(Mount(tree, values[index], container, anchor, owner));
+        }
+
+        return children;
+    }
+
+    private List<MountedNode<TNode>> PatchChildren(
+        MountedTree<TNode> tree,
+        List<MountedNode<TNode>> current,
+        IReadOnlyList<VirtualNode> previousValues,
+        IReadOnlyList<VirtualNode> nextValues,
+        TNode container,
+        TNode? endAnchor,
+        RuntimeComponentContext? owner,
+        PatchFlags flags)
+    {
+        return (int)flags > 0 && (flags & PatchFlags.UnkeyedFragment) != 0
+            ? PatchUnkeyedChildren(
                 tree,
                 current,
-                next,
+                nextValues,
                 container,
-                parentAnchor,
-                elementNamespace,
+                endAnchor,
+                owner)
+            : PatchKeyedChildren(
+                tree,
+                current,
+                previousValues,
+                nextValues,
+                container,
+                endAnchor,
                 owner);
-        }
-
-        return PatchKeyedChildren(
-            tree,
-            current,
-            next,
-            container,
-            parentAnchor,
-            elementNamespace,
-            owner);
     }
 
-    private List<MountedRenderNode<TNode>> PatchUnkeyedChildren(
+    private List<MountedNode<TNode>> PatchUnkeyedChildren(
         MountedTree<TNode> tree,
-        List<MountedRenderNode<TNode>> current,
-        IReadOnlyList<IComponent> next,
+        List<MountedNode<TNode>> current,
+        IReadOnlyList<VirtualNode> nextValues,
         TNode container,
-        TNode? parentAnchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        TNode? endAnchor,
+        RuntimeComponentContext? owner)
     {
-        int commonCount = Math.Min(current.Count, next.Count);
-        List<MountedRenderNode<TNode>> result = new(next.Count);
+        int commonCount = Math.Min(current.Count, nextValues.Count);
+        List<MountedNode<TNode>> nextMounted = new(nextValues.Count);
         for (int index = 0; index < commonCount; index++)
         {
-            result.Add(
-                Patch(
-                    tree,
-                    current[index],
-                    next[index],
-                    container,
-                    parentAnchor,
-                    elementNamespace,
-                    owner));
+            TNode? anchor = index + 1 < current.Count
+                ? current[index + 1].FirstHostNode
+                : endAnchor;
+            nextMounted.Add(Patch(
+                tree,
+                current[index],
+                nextValues[index],
+                container,
+                anchor,
+                owner));
+        }
+
+        for (int index = commonCount; index < nextValues.Count; index++)
+        {
+            nextMounted.Add(Mount(tree, nextValues[index], container, endAnchor, owner));
         }
 
         for (int index = commonCount; index < current.Count; index++)
         {
-            Unmount(tree, current[index], removeHostNodes: true);
+            Remove(tree, current[index]);
         }
 
-        for (int index = commonCount; index < next.Count; index++)
-        {
-            result.Add(
-                Mount(
-                    tree,
-                    next[index],
-                    container,
-                    parentAnchor,
-                    elementNamespace,
-                    owner));
-        }
-
-        return result;
+        return nextMounted;
     }
 
-    private List<MountedRenderNode<TNode>> PatchKeyedChildren(
+    private List<MountedNode<TNode>> PatchKeyedChildren(
         MountedTree<TNode> tree,
-        List<MountedRenderNode<TNode>> current,
-        IReadOnlyList<IComponent> next,
+        List<MountedNode<TNode>> current,
+        IReadOnlyList<VirtualNode> previousValues,
+        IReadOnlyList<VirtualNode> nextValues,
         TNode container,
-        TNode? parentAnchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        TNode? endAnchor,
+        RuntimeComponentContext? owner)
     {
-        int nextCount = next.Count;
-        MountedRenderNode<TNode>?[] nextMounted =
-            new MountedRenderNode<TNode>?[nextCount];
-        int[] nextIndexToCurrentIndex = new int[nextCount];
-        bool[] claimedNextIndices = new bool[nextCount];
-        Dictionary<object, int> keyedNextIndices = new();
-        bool hasKeyedChild = false;
-        bool hasKeylessChild = false;
-        Action<string>? warn = tree.Application?.WarnHandler;
-
-        for (int index = 0; index < nextCount; index++)
+        Dictionary<object, int> keyToNextIndex = [];
+        bool hasKeyed = false;
+        bool hasKeyless = false;
+        for (int index = 0; index < nextValues.Count; index++)
         {
-            object? key = next[index].Key;
-            if (key is not null)
+            object? key = nextValues[index].Key;
+            if (key is null)
             {
-                hasKeyedChild = true;
-                if (keyedNextIndices.ContainsKey(key))
+                if (nextValues[index] is not CommentNode)
                 {
-                    warn?.Invoke(
-                        $"Duplicate keys found during update: \"{key}\". "
-                        + "Make sure keys are unique.");
+                    hasKeyless = true;
                 }
 
-                keyedNextIndices[key] = index;
-            }
-            else if (next[index] is not ICommentComponent)
-            {
-                hasKeylessChild = true;
-            }
-        }
-
-        if (hasKeyedChild && hasKeylessChild)
-        {
-            warn?.Invoke(
-                "Mixed keyed and unkeyed children detected during update. "
-                + "Give every iterated child a key (or none) so the keyed diff "
-                + "can track them reliably.");
-        }
-
-        int highestNextIndex = -1;
-        bool moved = false;
-        for (int currentIndex = 0; currentIndex < current.Count; currentIndex++)
-        {
-            MountedRenderNode<TNode> currentChild = current[currentIndex];
-            int nextIndex = FindNextIndex(
-                currentChild,
-                next,
-                keyedNextIndices,
-                claimedNextIndices);
-            if (nextIndex < 0)
-            {
-                Unmount(tree, currentChild, removeHostNodes: true);
                 continue;
             }
 
-            claimedNextIndices[nextIndex] = true;
-            nextIndexToCurrentIndex[nextIndex] = currentIndex + 1;
-            if (nextIndex < highestNextIndex)
+            hasKeyed = true;
+            if (!keyToNextIndex.TryAdd(key, index))
+            {
+                tree.Application?.WarnHandler?.Invoke(
+                    $"Duplicate sibling key '{key}' was encountered; the first position wins.");
+            }
+        }
+
+        if (hasKeyed && hasKeyless)
+        {
+            tree.Application?.WarnHandler?.Invoke(
+                "A sibling collection mixes keyed and keyless non-comment nodes.");
+        }
+
+        MountedNode<TNode>?[] nextMounted = new MountedNode<TNode>?[nextValues.Count];
+        int[] previousIndexByNext = new int[nextValues.Count];
+        bool[] claimed = new bool[nextValues.Count];
+        bool moved = false;
+        int greatestNextIndex = 0;
+
+        for (int previousIndex = 0; previousIndex < current.Count; previousIndex++)
+        {
+            MountedNode<TNode> previousMounted = current[previousIndex];
+            VirtualNode previousValue = previousIndex < previousValues.Count
+                ? previousValues[previousIndex]
+                : previousMounted.Value;
+            int nextIndex = -1;
+            if (previousValue.Key is { } key
+                && keyToNextIndex.TryGetValue(key, out int keyedIndex)
+                && !claimed[keyedIndex]
+                && IsSameNodeType(previousValue, nextValues[keyedIndex]))
+            {
+                nextIndex = keyedIndex;
+            }
+            else if (previousValue.Key is null)
+            {
+                nextIndex = FindNextKeylessIndex(
+                    previousValue,
+                    nextValues,
+                    claimed);
+            }
+
+            if (nextIndex < 0)
+            {
+                Remove(tree, previousMounted);
+                continue;
+            }
+
+            claimed[nextIndex] = true;
+            previousIndexByNext[nextIndex] = previousIndex + 1;
+            if (nextIndex < greatestNextIndex)
             {
                 moved = true;
             }
             else
             {
-                highestNextIndex = nextIndex;
+                greatestNextIndex = nextIndex;
             }
 
             nextMounted[nextIndex] = Patch(
                 tree,
-                currentChild,
-                next[nextIndex],
+                previousMounted,
+                nextValues[nextIndex],
                 container,
-                parentAnchor,
-                elementNamespace,
+                endAnchor,
                 owner);
         }
 
-        int[] stableSequence = moved
-            ? GetLongestIncreasingSubsequence(nextIndexToCurrentIndex)
-            : Array.Empty<int>();
-        int stableCursor = stableSequence.Length - 1;
-
-        for (int nextIndex = nextCount - 1; nextIndex >= 0; nextIndex--)
+        int[] longestIncreasingSubsequence = moved
+            ? GetLongestIncreasingSubsequence(previousIndexByNext)
+            : [];
+        int sequenceIndex = longestIncreasingSubsequence.Length - 1;
+        for (int nextIndex = nextValues.Count - 1; nextIndex >= 0; nextIndex--)
         {
-            TNode? anchor = nextIndex + 1 < nextCount
+            TNode? anchor = nextIndex + 1 < nextMounted.Length
                 ? nextMounted[nextIndex + 1]!.FirstHostNode
-                : parentAnchor;
-
-            if (nextIndexToCurrentIndex[nextIndex] == 0)
+                : endAnchor;
+            if (nextMounted[nextIndex] is null)
             {
                 nextMounted[nextIndex] = Mount(
                     tree,
-                    next[nextIndex],
+                    nextValues[nextIndex],
                     container,
                     anchor,
-                    elementNamespace,
                     owner);
             }
             else if (moved)
             {
-                if (stableCursor < 0 || stableSequence[stableCursor] != nextIndex)
+                if (sequenceIndex < 0
+                    || longestIncreasingSubsequence[sequenceIndex] != nextIndex)
                 {
                     Move(nextMounted[nextIndex]!, container, anchor);
+                    ReorderTeleportTargetRange(
+                        nextMounted[nextIndex]!,
+                        nextMounted,
+                        nextIndex);
                 }
                 else
                 {
-                    stableCursor--;
+                    sequenceIndex--;
                 }
             }
         }
 
-        List<MountedRenderNode<TNode>> result = new(nextCount);
+        List<MountedNode<TNode>> result = new(nextValues.Count);
         for (int index = 0; index < nextMounted.Length; index++)
         {
             result.Add(nextMounted[index]!);
@@ -2031,27 +854,16 @@ public sealed partial class Renderer<TNode>
         return result;
     }
 
-    private static int FindNextIndex(
-        MountedRenderNode<TNode> current,
-        IReadOnlyList<IComponent> next,
-        IReadOnlyDictionary<object, int> keyedNextIndices,
-        IReadOnlyList<bool> claimedNextIndices)
+    private static int FindNextKeylessIndex(
+        VirtualNode previous,
+        IReadOnlyList<VirtualNode> nextValues,
+        IReadOnlyList<bool> claimed)
     {
-        object? key = current.Component.Key;
-        if (key is not null)
+        for (int index = 0; index < nextValues.Count; index++)
         {
-            return keyedNextIndices.TryGetValue(key, out int index)
-                && !claimedNextIndices[index]
-                && IsSameComponentType(current.Component, next[index])
-                    ? index
-                    : -1;
-        }
-
-        for (int index = 0; index < next.Count; index++)
-        {
-            if (!claimedNextIndices[index]
-                && next[index].Key is null
-                && IsSameComponentType(current.Component, next[index]))
+            if (!claimed[index]
+                && nextValues[index].Key is null
+                && IsSameNodeType(previous, nextValues[index]))
             {
                 return index;
             }
@@ -2065,7 +877,6 @@ public sealed partial class Renderer<TNode>
         int[] predecessors = new int[source.Count];
         int[] result = new int[source.Count];
         int resultLength = 0;
-
         for (int index = 0; index < source.Count; index++)
         {
             int value = source[index];
@@ -2078,7 +889,7 @@ public sealed partial class Renderer<TNode>
             int high = resultLength;
             while (low < high)
             {
-                int middle = (low + high) / 2;
+                int middle = (low + high) >> 1;
                 if (source[result[middle]] < value)
                 {
                     low = middle + 1;
@@ -2098,12 +909,7 @@ public sealed partial class Renderer<TNode>
         }
 
         int[] sequence = new int[resultLength];
-        if (resultLength == 0)
-        {
-            return sequence;
-        }
-
-        int cursor = result[resultLength - 1];
+        int cursor = resultLength == 0 ? -1 : result[resultLength - 1];
         for (int index = resultLength - 1; index >= 0; index--)
         {
             sequence[index] = cursor;
@@ -2113,1132 +919,232 @@ public sealed partial class Renderer<TNode>
         return sequence;
     }
 
-    private List<MountedRenderNode<TNode>> MountChildren(
+    private bool TryPatchBlockChildren(
         MountedTree<TNode> tree,
-        IReadOnlyList<IComponent> children,
-        TNode container,
-        TNode? anchor,
-        string? elementNamespace,
-        ComponentContext? owner)
+        MountedNode<TNode> block,
+        CompositeVirtualNode previous,
+        CompositeVirtualNode next,
+        TNode fallbackContainer)
     {
-        List<MountedRenderNode<TNode>> mounted = new(children.Count);
-        for (int index = 0; index < children.Count; index++)
-        {
-            mounted.Add(
-                Mount(
-                    tree,
-                    children[index],
-                    container,
-                    anchor,
-                    elementNamespace,
-                    owner));
-        }
-
-        return mounted;
-    }
-
-    private void Move(
-        MountedRenderNode<TNode> mounted,
-        TNode container,
-        TNode? anchor)
-    {
-        switch (mounted)
-        {
-            case MountedTemplateNode<TNode> template:
-                Move(template.Subtree, container, anchor);
-                break;
-            case MountedTeleportNode<TNode> teleport:
-                _options.Insert(teleport.StartAnchor, container, anchor);
-                if (RequireTeleport(teleport.Component).IsDisabled)
-                {
-                    for (int index = 0; index < teleport.Children.Count; index++)
-                    {
-                        Move(teleport.Children[index], container, anchor);
-                    }
-                }
-
-                _options.Insert(teleport.EndAnchor, container, anchor);
-                break;
-            case MountedFragmentNode<TNode> fragment:
-                _options.Insert(fragment.StartAnchor, container, anchor);
-                for (int index = 0; index < fragment.Children.Count; index++)
-                {
-                    Move(fragment.Children[index], container, anchor);
-                }
-
-                _options.Insert(fragment.EndAnchor, container, anchor);
-                break;
-            case MountedStaticNode<TNode> staticNode:
-                MoveRange(
-                    staticNode.FirstHostNode,
-                    staticNode.LastHostNode,
-                    container,
-                    anchor);
-                break;
-            default:
-                _options.Insert(mounted.FirstHostNode, container, anchor);
-                break;
-        }
-    }
-
-    private void MoveRange(
-        TNode first,
-        TNode last,
-        TNode container,
-        TNode? anchor)
-    {
-        TNode current = first;
-        while (!NodeComparer.Equals(current, last))
-        {
-            TNode? next = _options.NextSibling(current);
-            _options.Insert(current, container, anchor);
-            current = RequireHostNode(next, "A mounted host range ended before its last node.");
-        }
-
-        _options.Insert(last, container, anchor);
-    }
-
-    private void RemoveElement(MountedElementNode<TNode> mounted)
-    {
-        TransitionHooks? transition = mounted.Transition;
-        if (transition is null || transition.Persisted)
-        {
-            _options.Remove(mounted.HostNode);
-            return;
-        }
-
-        object element = mounted.HostNode;
-        void Remove() => _options.Remove(mounted.HostNode);
-        void Leave() => transition.Leave(element, Remove);
-        if (transition.DelayLeave is { } delayLeave)
-        {
-            delayLeave(element, Remove, Leave);
-        }
-        else
-        {
-            Leave();
-        }
-    }
-
-    private void MountAttributes(
-        TNode element,
-        string elementTag,
-        IComponentAttributeCollection attributes,
-        string? elementNamespace)
-    {
-        for (int index = 0; index < attributes.Count; index++)
-        {
-            IComponentAttribute attribute = attributes[index];
-            if (!string.Equals(attribute.Name, "value", StringComparison.Ordinal)
-                && !IsComponentNodeLifecycleName(attribute.Name))
-            {
-                _options.PatchAttribute(
-                    element,
-                    elementTag,
-                    attribute.Name,
-                    previousValue: null,
-                    attribute.Value,
-                    elementNamespace);
-            }
-        }
-
-        if (attributes.TryGetValue("value", out object? value))
-        {
-            _options.PatchAttribute(
-                element,
-                elementTag,
-                "value",
-                previousValue: null,
-                value,
-                elementNamespace);
-        }
-    }
-
-    private void PatchAttributes(
-        TNode element,
-        string elementTag,
-        IComponentAttributeCollection current,
-        IComponentAttributeCollection next,
-        string? elementNamespace)
-    {
-        if (ReferenceEquals(current, next))
-        {
-            return;
-        }
-
-        for (int index = 0; index < current.Count; index++)
-        {
-            IComponentAttribute attribute = current[index];
-            if (!IsComponentNodeLifecycleName(attribute.Name)
-                && !next.TryGetValue(attribute.Name, out _))
-            {
-                _options.PatchAttribute(
-                    element,
-                    elementTag,
-                    attribute.Name,
-                    attribute.Value,
-                    nextValue: null,
-                    elementNamespace);
-            }
-        }
-
-        for (int index = 0; index < next.Count; index++)
-        {
-            IComponentAttribute attribute = next[index];
-            if (IsComponentNodeLifecycleName(attribute.Name))
-            {
-                continue;
-            }
-
-            current.TryGetValue(attribute.Name, out object? previousValue);
-            if (!Equals(previousValue, attribute.Value)
-                || string.Equals(attribute.Name, "value", StringComparison.Ordinal))
-            {
-                _options.PatchAttribute(
-                    element,
-                    elementTag,
-                    attribute.Name,
-                    previousValue,
-                    attribute.Value,
-                    elementNamespace);
-            }
-        }
-    }
-
-    private void PatchOptimizedAttributes(
-        TNode element,
-        string elementTag,
-        IComponentAttributeCollection current,
-        IComponentAttributeCollection next,
-        ComponentOptimization optimization,
-        string? elementNamespace)
-    {
-        PatchFlags patchFlags = optimization.PatchFlags;
-        if ((int)patchFlags <= 0)
-        {
-            return;
-        }
-
-        if ((patchFlags & PatchFlags.FullProps) != 0)
-        {
-            PatchAttributes(
-                element,
-                elementTag,
-                current,
-                next,
-                elementNamespace);
-            return;
-        }
-
-        if ((patchFlags & PatchFlags.Class) != 0)
-        {
-            PatchAttribute(
-                element,
-                elementTag,
-                "class",
-                current,
-                next,
-                elementNamespace);
-        }
-
-        if ((patchFlags & PatchFlags.Style) != 0)
-        {
-            PatchAttribute(
-                element,
-                elementTag,
-                "style",
-                current,
-                next,
-                elementNamespace);
-        }
-
-        if ((patchFlags & PatchFlags.Props) != 0
-            && optimization.DynamicProperties is not null)
-        {
-            for (int index = 0; index < optimization.DynamicProperties.Count; index++)
-            {
-                PatchAttribute(
-                    element,
-                    elementTag,
-                    optimization.DynamicProperties[index],
-                    current,
-                    next,
-                    elementNamespace);
-            }
-        }
-    }
-
-    private void PatchAttribute(
-        TNode element,
-        string elementTag,
-        string attributeName,
-        IComponentAttributeCollection current,
-        IComponentAttributeCollection next,
-        string? elementNamespace)
-    {
-        if (IsComponentNodeLifecycleName(attributeName))
-        {
-            return;
-        }
-
-        current.TryGetValue(attributeName, out object? previousValue);
-        next.TryGetValue(attributeName, out object? nextValue);
-        if (!Equals(previousValue, nextValue)
-            || string.Equals(attributeName, "value", StringComparison.Ordinal))
-        {
-            _options.PatchAttribute(
-                element,
-                elementTag,
-                attributeName,
-                previousValue,
-                nextValue,
-                elementNamespace);
-        }
-    }
-
-    private void Unmount(
-        MountedTree<TNode> tree,
-        MountedRenderNode<TNode> mounted,
-        bool removeHostNodes,
-        bool optimized = false)
-    {
-        UnmountVisitCount++;
-        ComponentOptimization optimization =
-            mounted.Component.Optimization;
-        if (optimization.PatchFlags == PatchFlags.Bail)
-        {
-            optimized = false;
-        }
-
-        tree.Components.Remove(mounted.Component);
-        mounted.IsUnmounted = true;
-        ClearReference(tree, mounted);
-        IComponent unmountedComponent = mounted.Component;
-        InvokeComponentNodeLifecycleHook(
-            tree,
-            mounted.Owner,
-            unmountedComponent,
-            previousComponent: null,
-            "onVnodeBeforeUnmount");
-        bool queuedUnmountedHook = false;
-
-        switch (mounted)
-        {
-            case MountedTemplateNode<TNode> template:
-                if (template.SuspenseState is not null)
-                {
-                    UnmountSuspense(
-                        tree,
-                        template,
-                        removeHostNodes);
-                    break;
-                }
-
-                template.RenderJob.IsDisposed = true;
-                template.MountedJob.IsDisposed = true;
-                template.UpdatedJob.IsDisposed = true;
-                Scheduler.InvalidateJob(template.RenderJob);
-                template.Instance.Unmount(
-                    () =>
-                    {
-                        if (template.KeepAliveState is { } keepAliveState)
-                        {
-                            UnmountKeepAlive(
-                                tree,
-                                keepAliveState,
-                                template.Subtree,
-                                removeHostNodes);
-                        }
-                        else
-                        {
-                            Unmount(
-                                tree,
-                                template.Subtree,
-                                removeHostNodes);
-                        }
-                    });
-                break;
-            case MountedTeleportNode<TNode> teleport:
-                if (teleport.PendingMountJob is { } pendingMount)
-                {
-                    pendingMount.IsDisposed = true;
-                    teleport.PendingMountJob = null;
-                }
-
-                bool removeTeleportedChildren =
-                    removeHostNodes
-                    || !RequireTeleport(teleport.Component).IsDisabled;
-                for (int index = 0; index < teleport.Children.Count; index++)
-                {
-                    Unmount(
-                        tree,
-                        teleport.Children[index],
-                        removeTeleportedChildren,
-                        optimized: teleport.Children[index]
-                            .Component
-                            .Optimization
-                            .DynamicChildren is not null);
-                }
-
-                if (teleport.HasTarget)
-                {
-                    _options.Remove(teleport.TargetAnchor!);
-                }
-
-                if (removeHostNodes)
-                {
-                    RemoveRange(
-                        teleport.StartAnchor,
-                        teleport.EndAnchor);
-                }
-
-                break;
-            case MountedElementNode<TNode> element:
-                IElementComponent elementComponent =
-                    RequireElement(element.Component);
-                InvokeDirectiveHooks(
-                    tree,
-                    element.HostNode,
-                    element.DirectiveBindings,
-                    elementComponent,
-                    previousComponent: null,
-                    DirectiveHookKind.BeforeUnmount);
-                if (!TryUnmountBlockChildren(
-                    tree,
-                    elementComponent,
-                    element.Children,
-                    isFragment: false))
-                {
-                    if (!optimized || optimization.HasOnce)
-                    {
-                        UnmountChildren(tree, element.Children);
-                    }
-                    else
-                    {
-                        ReleaseSkippedMountedChildren(
-                            tree,
-                            element.Children);
-                    }
-                }
-
-                if (removeHostNodes)
-                {
-                    RemoveElement(element);
-                }
-
-                QueueComponentNodeLifecycleHook(
-                    tree,
-                    mounted.Owner,
-                    mounted: null,
-                    unmountedComponent,
-                    previousComponent: null,
-                    "onVnodeUnmounted");
-                queuedUnmountedHook = true;
-                if (element.DirectiveBindings.Count > 0)
-                {
-                    Scheduler.QueuePostFlushCallback(
-                        new SchedulerJob(
-                            () =>
-                            {
-                                InvokeDirectiveHooks(
-                                    tree,
-                                    element.HostNode,
-                                    element.DirectiveBindings,
-                                    elementComponent,
-                                    previousComponent: null,
-                                    DirectiveHookKind.Unmounted);
-                                QueueHostCommit();
-                            })
-                        {
-                            Name = "directive unmounted lifecycle",
-                        });
-                }
-
-                break;
-            case MountedFragmentNode<TNode> fragment:
-                IFragmentComponent fragmentComponent =
-                    RequireFragment(fragment.Component);
-                if (!TryUnmountBlockChildren(
-                    tree,
-                    fragmentComponent,
-                    fragment.Children,
-                    isFragment: true))
-                {
-                    PatchFlags patchFlags =
-                        optimization.PatchFlags;
-                    bool mustWalkFragment =
-                        (int)patchFlags > 0
-                        && (patchFlags
-                            & (PatchFlags.KeyedFragment
-                                | PatchFlags.UnkeyedFragment))
-                            != 0;
-                    if (!optimized
-                        || optimization.HasOnce
-                        || mustWalkFragment)
-                    {
-                        UnmountChildren(tree, fragment.Children);
-                    }
-                    else
-                    {
-                        ReleaseSkippedMountedChildren(
-                            tree,
-                            fragment.Children);
-                    }
-                }
-
-                if (removeHostNodes)
-                {
-                    RemoveRange(fragment.StartAnchor, fragment.EndAnchor);
-                }
-
-                break;
-            case MountedStaticNode<TNode> staticNode:
-                if (removeHostNodes)
-                {
-                    RemoveRange(staticNode.FirstHostNode, staticNode.LastHostNode);
-                }
-
-                break;
-            default:
-                if (removeHostNodes)
-                {
-                    _options.Remove(mounted.FirstHostNode);
-                }
-
-                break;
-        }
-
-        if (!queuedUnmountedHook)
-        {
-            QueueComponentNodeLifecycleHook(
-                tree,
-                mounted.Owner,
-                mounted: null,
-                unmountedComponent,
-                previousComponent: null,
-                "onVnodeUnmounted");
-        }
-    }
-
-    private void UnmountChildren(
-        MountedTree<TNode> tree,
-        IReadOnlyList<MountedRenderNode<TNode>> children,
-        bool optimized = false)
-    {
-        for (int index = 0; index < children.Count; index++)
-        {
-            Unmount(
-                tree,
-                children[index],
-                removeHostNodes: false,
-                optimized);
-        }
-    }
-
-    private bool TryUnmountBlockChildren(
-        MountedTree<TNode> tree,
-        IComponent component,
-        IReadOnlyList<MountedRenderNode<TNode>> mountedChildren,
-        bool isFragment)
-    {
-        ComponentOptimization optimization =
-            component.Optimization;
-        IReadOnlyList<IComponent>? dynamicChildren =
-            optimization.DynamicChildren;
-        PatchFlags patchFlags = optimization.PatchFlags;
-        if (dynamicChildren is null
-            || optimization.HasOnce
-            || (isFragment
-                && ((int)patchFlags <= 0
-                    || (patchFlags & PatchFlags.StableFragment) == 0)))
+        IReadOnlyList<VirtualNode>? previousDynamic = previous.RenderPlan.DynamicChildren;
+        IReadOnlyList<VirtualNode>? nextDynamic = next.RenderPlan.DynamicChildren;
+        if (previousDynamic is null
+            || nextDynamic is null
+            || previousDynamic.Count != nextDynamic.Count
+            || block.BlockChildren is not { } currentDynamic
+            || currentDynamic.Count != previousDynamic.Count)
         {
             return false;
         }
 
-        for (int index = 0;
-            index < dynamicChildren.Count;
-            index++)
+        for (int index = 0; index < previousDynamic.Count; index++)
         {
-            if (tree.Components.TryGetValue(
-                dynamicChildren[index],
-                out MountedRenderNode<TNode>? child)
-                && !child.IsUnmounted)
+            MountedNode<TNode> current = currentDynamic[index];
+            if (current.IsUnmounted
+                || !ReferenceEquals(current.Value, previousDynamic[index]))
             {
-                Unmount(
-                    tree,
-                    child,
-                    removeHostNodes: false,
-                    optimized: true);
+                return false;
             }
         }
 
-        ReleaseSkippedMountedChildren(tree, mountedChildren);
+        var nextMounted = new List<MountedNode<TNode>>(nextDynamic.Count);
+        for (int index = 0; index < previousDynamic.Count; index++)
+        {
+            MountedNode<TNode> current = currentDynamic[index];
+            TNode parent = HostParentOrFallback(current.FirstHostNode, fallbackContainer);
+            MountedNode<TNode> replacement = Patch(
+                tree,
+                current,
+                nextDynamic[index],
+                parent,
+                GetNextHostNode(current),
+                current.Owner);
+            if (!ReferenceEquals(current, replacement))
+            {
+                ReplaceMountedNodeReference(block, current, replacement);
+            }
+
+            nextMounted.Add(replacement);
+        }
+
+        block.BlockChildren = nextMounted;
         return true;
     }
 
-    private void ReleaseSkippedMountedChildren(
-        MountedTree<TNode> tree,
-        IReadOnlyList<MountedRenderNode<TNode>> children)
+    private static bool ReplaceMountedNodeReference(
+        MountedNode<TNode> parent,
+        MountedNode<TNode> current,
+        MountedNode<TNode> replacement)
+    {
+        switch (parent)
+        {
+            case MountedComponent<TNode> component:
+                if (ReferenceEquals(component.Subtree, current))
+                {
+                    component.Subtree = replacement;
+                    return true;
+                }
+
+                return ReplaceMountedNodeReference(component.Subtree, current, replacement);
+            case MountedElement<TNode> element:
+                return ReplaceMountedNodeReference(element.Children, current, replacement);
+            case MountedRange<TNode> range:
+                return ReplaceMountedNodeReference(range.Children, current, replacement);
+            case MountedTeleport<TNode> teleport:
+                return ReplaceMountedNodeReference(teleport.Children, current, replacement);
+            case MountedKeepAlive<TNode> keepAlive:
+                return keepAlive.ReplaceReference(current, replacement);
+            case MountedSuspense<TNode> suspense:
+                if (ReferenceEquals(suspense.ActiveBranch, current))
+                {
+                    suspense.ActiveBranch = replacement;
+                    return true;
+                }
+
+                return ReplaceMountedNodeReference(
+                    suspense.ActiveBranch,
+                    current,
+                    replacement);
+            case MountedTransition<TNode> transition:
+                if (ReferenceEquals(transition.Child, current))
+                {
+                    transition.Child = replacement;
+                    return true;
+                }
+
+                return ReplaceMountedNodeReference(transition.Child, current, replacement);
+            default:
+                return false;
+        }
+    }
+
+    private static bool ReplaceMountedNodeReference(
+        List<MountedNode<TNode>> children,
+        MountedNode<TNode> current,
+        MountedNode<TNode> replacement)
     {
         for (int index = 0; index < children.Count; index++)
         {
-            ReleaseSkippedMountedNode(tree, children[index]);
-        }
-    }
-
-    private void ReleaseSkippedMountedNode(
-        MountedTree<TNode> tree,
-        MountedRenderNode<TNode> mounted)
-    {
-        if (mounted.IsUnmounted)
-        {
-            return;
-        }
-
-        if (RequiresUnmountVisit(mounted))
-        {
-            Unmount(
-                tree,
-                mounted,
-                removeHostNodes: false,
-                optimized: true);
-            return;
-        }
-
-        if (tree.Components.TryGetValue(
-            mounted.Component,
-            out MountedRenderNode<TNode>? registered)
-            && ReferenceEquals(registered, mounted))
-        {
-            tree.Components.Remove(mounted.Component);
-        }
-
-        mounted.IsUnmounted = true;
-        if (mounted.ReferenceJob is { } referenceJob)
-        {
-            referenceJob.IsDisposed = true;
-            Scheduler.InvalidateJob(referenceJob);
-        }
-
-        switch (mounted)
-        {
-            case MountedElementNode<TNode> element:
-                ReleaseSkippedMountedChildren(
-                    tree,
-                    element.Children);
-                break;
-            case MountedFragmentNode<TNode> fragment:
-                ReleaseSkippedMountedChildren(
-                    tree,
-                    fragment.Children);
-                break;
-        }
-    }
-
-    private static bool RequiresUnmountVisit(
-        MountedRenderNode<TNode> mounted)
-    {
-        if (mounted is MountedTemplateNode<TNode>
-            or MountedTeleportNode<TNode>)
-        {
-            return true;
-        }
-
-        if (mounted.Component.Reference is not null
-            || HasComponentNodeLifecycleHook(
-                mounted.Component,
-                "onVnodeBeforeUnmount")
-            || HasComponentNodeLifecycleHook(
-                mounted.Component,
-                "onVnodeUnmounted"))
-        {
-            return true;
-        }
-
-        return mounted is MountedElementNode<TNode> element
-            && (element.DirectiveBindings.Count > 0
-                || element.Transition is not null);
-    }
-
-    private void RemoveRange(TNode first, TNode last)
-    {
-        TNode current = first;
-        while (!NodeComparer.Equals(current, last))
-        {
-            TNode? next = _options.NextSibling(current);
-            _options.Remove(current);
-            current = RequireHostNode(next, "A mounted host range ended before its last node.");
-        }
-
-        _options.Remove(last);
-    }
-
-    private TNode? GetNextHostNode(MountedRenderNode<TNode> mounted)
-    {
-        return _options.NextSibling(mounted.LastHostNode);
-    }
-
-    private TNode HostParentOrFallback(TNode node, TNode fallback)
-    {
-        TNode? parent = _options.ParentNode(node);
-        return HasHostNode(parent) ? parent! : fallback;
-    }
-
-    private void QueueHostCommit()
-    {
-        Scheduler.QueueHostCommit(_options.Commit);
-    }
-
-    private void UpdateReference(
-        MountedTree<TNode> tree,
-        MountedRenderNode<TNode> mounted,
-        IComponentReference? previousReference,
-        IComponentReference? nextReference,
-        object? value)
-    {
-        if (Equals(previousReference, nextReference))
-        {
-            return;
-        }
-
-        if (mounted.ReferenceJob is not null)
-        {
-            mounted.ReferenceJob.IsDisposed = true;
-        }
-
-        if (previousReference is not null)
-        {
-            InvokeReference(
-                tree,
-                mounted.Owner,
-                previousReference,
-                value: null);
-        }
-
-        if (nextReference is null)
-        {
-            mounted.ReferenceJob = null;
-            return;
-        }
-
-        SchedulerJob job = new(
-            () =>
+            if (ReferenceEquals(children[index], current))
             {
-                if (!mounted.IsUnmounted
-                    && Equals(
-                        mounted.Component.Reference,
-                        nextReference))
-                {
-                    InvokeReference(
-                        tree,
-                        mounted.Owner,
-                        nextReference,
-                        value);
-                }
-            })
-        {
-            Identifier = -1,
-            Name = "template reference assignment",
-        };
-        mounted.ReferenceJob = job;
-        Scheduler.QueuePostFlushCallback(job);
-    }
-
-    private static void ClearReference(
-        MountedTree<TNode> tree,
-        MountedRenderNode<TNode> mounted)
-    {
-        if (mounted.ReferenceJob is not null)
-        {
-            mounted.ReferenceJob.IsDisposed = true;
-            mounted.ReferenceJob = null;
-        }
-
-        if (mounted is MountedTemplateNode<TNode>
-            {
-                Instance.Template: IComponentRootBehaviorForwarder,
-            })
-        {
-            return;
-        }
-
-        if (mounted.Component.Reference is { } reference)
-        {
-            InvokeReference(
-                tree,
-                mounted.Owner,
-                reference,
-                value: null);
-        }
-    }
-
-    private static void InvokeReference(
-        MountedTree<TNode> tree,
-        ComponentContext? owner,
-        IComponentReference reference,
-        object? value)
-    {
-        try
-        {
-            if (owner is null)
-            {
-                reference.Set(value);
+                children[index] = replacement;
+                return true;
             }
-            else
-            {
-                owner.Run(() => reference.Set(value));
-            }
-        }
-        catch (Exception exception)
-        {
-            if (owner is not null)
-            {
-                ComponentErrorHandling.Handle(
-                    exception,
-                    owner,
-                    "template reference callback");
-            }
-            else if (tree.Application?.ErrorHandler is { } errorHandler)
-            {
-                errorHandler(
-                    exception,
-                    null,
-                    "template reference callback");
-            }
-            else
-            {
-                throw;
-            }
-        }
-    }
 
-    private static object? ComponentReferenceValue(
-        ComponentContext context)
-    {
-        return context.HasExposed
-            ? context.Exposed
-            : context;
-    }
-
-    private static bool HasHostNode(TNode? node)
-    {
-        return node is not null
-            && !NodeComparer.Equals(node, default!);
-    }
-
-    private bool TryResolveTeleportTarget(
-        object target,
-        out TNode targetContainer)
-    {
-        if (target is TNode typedTarget && HasHostNode(typedTarget))
-        {
-            targetContainer = typedTarget;
-            return true;
-        }
-
-        Func<object, TNode?>? resolver = _options.ResolveTeleportTarget;
-        if (resolver is not null)
-        {
-            TNode? resolved = resolver(target);
-            if (HasHostNode(resolved))
+            if (ReplaceMountedNodeReference(children[index], current, replacement))
             {
-                targetContainer = resolved!;
                 return true;
             }
         }
 
-        targetContainer = default!;
         return false;
     }
 
-    private static void WarnUnresolvedTeleportTarget(
-        MountedTree<TNode> tree,
-        object target)
+    private static void CarryForwardStaticChildren(
+        IReadOnlyList<VirtualNode> previousValues,
+        IReadOnlyList<VirtualNode> nextValues,
+        IReadOnlyList<MountedNode<TNode>> mountedChildren)
     {
-        tree.Application?.WarnHandler?.Invoke(
-            $"Failed to resolve teleport target \"{target}\".");
-    }
-
-    private static TNode RequireHostNode(TNode? node, string message)
-    {
-        if (!HasHostNode(node))
-        {
-            throw new InvalidOperationException(message);
-        }
-
-        return node!;
-    }
-
-    private static void Register(
-        MountedTree<TNode> tree,
-        IComponent component,
-        MountedRenderNode<TNode> mounted)
-    {
-        tree.Components[component] = mounted;
-    }
-
-    private static void ReplaceRegistration(
-        MountedTree<TNode> tree,
-        MountedRenderNode<TNode> mounted,
-        IComponent next)
-    {
-        IComponent current = mounted.Component;
-        if (tree.Components.TryGetValue(current, out MountedRenderNode<TNode>? registered)
-            && ReferenceEquals(registered, mounted))
-        {
-            tree.Components.Remove(current);
-        }
-
-        mounted.Component = next;
-        tree.Components[next] = mounted;
-    }
-
-    private static bool IsSameComponentType(IComponent current, IComponent next)
-    {
-        if (current.Kind != next.Kind || !Equals(current.Key, next.Key))
-        {
-            return false;
-        }
-
-        return current.Kind switch
-        {
-            ComponentKind.Element => string.Equals(
-                RequireElement(current).Tag,
-                RequireElement(next).Tag,
-                StringComparison.Ordinal),
-            ComponentKind.Template => SameTemplateIdentity(
-                RequireTemplate(current),
-                RequireTemplate(next)),
-            ComponentKind.Static => string.Equals(
-                RequireStatic(current).Content,
-                RequireStatic(next).Content,
-                StringComparison.Ordinal),
-            _ => true,
-        };
-    }
-
-    private static bool SameTemplateIdentity(
-        ITemplateComponent current,
-        ITemplateComponent next)
-    {
-        if (current.TemplateType is not null || next.TemplateType is not null)
-        {
-            return current.TemplateType == next.TemplateType;
-        }
-
-        return string.Equals(
-            current.TemplateName,
-            next.TemplateName,
-            StringComparison.Ordinal);
-    }
-
-    private static bool IsComponentNodeLifecycleName(string name)
-    {
-        return name.StartsWith("onVnode", StringComparison.Ordinal);
-    }
-
-    private static ComponentNodeLifecycleHook? GetComponentNodeLifecycleHook(
-        IComponent component,
-        string name)
-    {
-        object? value = component switch
-        {
-            IElementComponent element
-                when element.Attributes.TryGetValue(name, out object? hook) =>
-                    hook,
-            ITemplateComponent template
-                when template.Arguments.Contains(name) =>
-                    template.Arguments[name],
-            _ => null,
-        };
-        return value switch
-        {
-            null => null,
-            ComponentNodeLifecycleHook hook => hook,
-            Action<IComponent, IComponent?> action =>
-                new ComponentNodeLifecycleHook(action),
-            _ => throw new NotSupportedException(
-                $"Component node lifecycle property \"{name}\" must be a "
-                + $"{nameof(ComponentNodeLifecycleHook)}."),
-        };
-    }
-
-    private static bool HasComponentNodeLifecycleHook(
-        IComponent component,
-        string name)
-    {
-        return component switch
-        {
-            IElementComponent element =>
-                element.Attributes.TryGetValue(name, out object? hook)
-                && hook is not null,
-            ITemplateComponent template =>
-                template.Arguments.Contains(name)
-                && template.Arguments[name] is not null,
-            _ => false,
-        };
-    }
-
-    private static void InvokePendingTemplateNodeBeforeUpdateHook(
-        MountedTree<TNode> tree,
-        MountedTemplateNode<TNode>? mounted)
-    {
-        if (mounted?.PendingNodeLifecycleComponent is not { } next)
+        if (previousValues.Count != nextValues.Count
+            || mountedChildren.Count != nextValues.Count)
         {
             return;
         }
 
-        ITemplateComponent? previous =
-            mounted.PreviousNodeLifecycleComponent;
-        mounted.PendingNodeLifecycleComponent = null;
-        mounted.PreviousNodeLifecycleComponent = null;
-        InvokeComponentNodeLifecycleHook(
-            tree,
-            mounted.Owner,
-            next,
-            previous,
-            "onVnodeBeforeUpdate");
+        for (int index = 0; index < nextValues.Count; index++)
+        {
+            VirtualNode previous = previousValues[index];
+            VirtualNode next = nextValues[index];
+            MountedNode<TNode> mounted = mountedChildren[index];
+            if (ReferenceEquals(mounted.Value, next))
+            {
+                continue;
+            }
+
+            if (!ReferenceEquals(mounted.Value, previous)
+                || !IsSameNodeType(previous, next))
+            {
+                continue;
+            }
+
+            mounted.Value = next;
+            switch (previous, next, mounted)
+            {
+                case (ElementNode previousElement, ElementNode nextElement,
+                    MountedElement<TNode> element):
+                    CarryForwardStaticChildren(
+                        previousElement.Children,
+                        nextElement.Children,
+                        element.Children);
+                    break;
+                case (FragmentNode previousFragment, FragmentNode nextFragment,
+                    MountedRange<TNode> fragment):
+                    CarryForwardStaticChildren(
+                        previousFragment.Children,
+                        nextFragment.Children,
+                        fragment.Children);
+                    break;
+                case (TeleportNode previousTeleport, TeleportNode nextTeleport,
+                    MountedTeleport<TNode> teleport):
+                    CarryForwardStaticChildren(
+                        previousTeleport.Children,
+                        nextTeleport.Children,
+                        teleport.Children);
+                    break;
+            }
+
+            RefreshBlockChildren(mounted);
+        }
     }
 
-    private static void InvokeComponentNodeLifecycleHook(
+    private List<DirectiveBinding> ResolveDirectiveBindings(
         MountedTree<TNode> tree,
-        ComponentContext? owner,
-        IComponent component,
-        IComponent? previousComponent,
-        string name)
-    {
-        try
-        {
-            ComponentNodeLifecycleHook? hook =
-                GetComponentNodeLifecycleHook(component, name);
-            if (hook is null)
-            {
-                return;
-            }
-
-            if (owner is null)
-            {
-                hook(component, previousComponent);
-            }
-            else
-            {
-                owner.Run(() => hook(component, previousComponent));
-            }
-        }
-        catch (Exception exception)
-        {
-            if (owner is not null)
-            {
-                ComponentErrorHandling.Handle(
-                    exception,
-                    owner,
-                    $"component node lifecycle hook \"{name}\"");
-            }
-            else if (tree.Application?.ErrorHandler is { } errorHandler)
-            {
-                errorHandler(
-                    exception,
-                    null,
-                    $"component node lifecycle hook \"{name}\"");
-            }
-            else
-            {
-                throw;
-            }
-        }
-    }
-
-    private static void QueueComponentNodeLifecycleHook(
-        MountedTree<TNode> tree,
-        ComponentContext? owner,
-        MountedRenderNode<TNode>? mounted,
-        IComponent component,
-        IComponent? previousComponent,
-        string name)
-    {
-        if (!HasComponentNodeLifecycleHook(component, name))
-        {
-            return;
-        }
-
-        Scheduler.QueuePostFlushCallback(
-            new SchedulerJob(
-                () =>
-                {
-                    if (mounted is null || !mounted.IsUnmounted)
-                    {
-                        InvokeComponentNodeLifecycleHook(
-                            tree,
-                            owner,
-                            component,
-                            previousComponent,
-                            name);
-                    }
-                })
-            {
-                Name = $"component node {name} lifecycle",
-            });
-    }
-
-    private static string? ElementNamespace(string tag, string? parentNamespace)
-    {
-        if (string.Equals(tag, "svg", StringComparison.Ordinal))
-        {
-            return "svg";
-        }
-
-        if (string.Equals(tag, "math", StringComparison.Ordinal))
-        {
-            return "mathml";
-        }
-
-        return parentNamespace;
-    }
-
-    private static string? ChildrenNamespace(string tag, string? elementNamespace)
-    {
-        return string.Equals(elementNamespace, "svg", StringComparison.Ordinal)
-            && string.Equals(tag, "foreignObject", StringComparison.Ordinal)
-                ? null
-                : elementNamespace;
-    }
-
-    private static List<DirectiveBinding> ResolveDirectiveBindings(
-        MountedTree<TNode> tree,
-        IReadOnlyList<IComponentDirectiveBinding> bindings,
-        ComponentContext? owner,
+        IReadOnlyList<DirectiveInvocation> invocations,
+        RuntimeComponentContext? owner,
         IReadOnlyList<DirectiveBinding>? previousBindings = null)
     {
-        if (bindings.Count == 0)
+        if (invocations.Count == 0)
         {
             return [];
         }
 
-        IDirectiveResolver? resolver = tree.Application?.Directives;
-        if (resolver is null)
+        if (tree.Application is null)
         {
-            if (tree.Application is null)
+            throw new InvalidOperationException(
+                "Directive-bearing nodes require an application context and directive resolver.");
+        }
+
+        if (tree.Application.Directives is null)
+        {
+            tree.Application.WarnHandler?.Invoke(
+                "Directive-bearing nodes were rendered without an application directive resolver.");
+            return [];
+        }
+
+        List<DirectiveBinding> resolved = new(invocations.Count);
+        bool[] matchedPrevious = new bool[previousBindings?.Count ?? 0];
+        for (int invocationIndex = 0; invocationIndex < invocations.Count; invocationIndex++)
+        {
+            DirectiveInvocation invocation = invocations[invocationIndex];
+            IDirective? directive;
+            try
             {
-                throw new InvalidOperationException(
-                    "Directive-bearing components require an application context and directive "
-                    + "resolver.");
+                directive = tree.Application.Directives.Resolve(invocation.DirectiveType);
+            }
+            catch (Exception exception)
+            {
+                RouteRendererError(
+                    tree,
+                    owner,
+                    exception,
+                    "directive resolution");
+                continue;
             }
 
-            tree.Application.WarnHandler?.Invoke(
-                "Directive-bearing components were rendered without an application directive "
-                + "resolver.");
-            return [];
-        }
-
-        List<DirectiveBinding> resolved = new(bindings.Count);
-        for (int index = 0; index < bindings.Count; index++)
-        {
-            IComponentDirectiveBinding binding = bindings[index];
-            IDirective? directive = resolver.Resolve(binding.DirectiveName);
             if (directive is null)
             {
-                tree.Application?.WarnHandler?.Invoke(
-                    $"Failed to resolve directive \"{binding.DirectiveName}\".");
+                tree.Application.WarnHandler?.Invoke(
+                    $"Directive type '{invocation.DirectiveType}' is not registered.");
                 continue;
             }
 
@@ -3249,13 +1155,12 @@ public sealed partial class Renderer<TNode>
                     previousIndex < previousBindings.Count;
                     previousIndex++)
                 {
-                    DirectiveBinding previous = previousBindings[previousIndex];
-                    if (string.Equals(
-                        previous.DirectiveName,
-                        binding.DirectiveName,
-                        StringComparison.OrdinalIgnoreCase))
+                    if (!matchedPrevious[previousIndex]
+                        && previousBindings[previousIndex].DirectiveType
+                            == invocation.DirectiveType)
                     {
-                        previousValue = previous.Value;
+                        matchedPrevious[previousIndex] = true;
+                        previousValue = previousBindings[previousIndex].Value;
                         break;
                     }
                 }
@@ -3263,81 +1168,128 @@ public sealed partial class Renderer<TNode>
 
             resolved.Add(
                 new DirectiveBinding(
-                    binding.DirectiveName,
+                    invocation.DirectiveType,
                     directive,
                     owner,
-                    binding.Value,
-                    previousValue,
-                    binding.Argument,
-                    binding.Modifiers));
+                    invocation.Value,
+                    previousValue));
         }
 
         return resolved;
     }
 
     private static void BindDirectiveHostElements(
-        MountedElementNode<TNode> mounted,
+        MountedElement<TNode> mounted,
         IReadOnlyList<DirectiveBinding> bindings)
     {
         for (int index = 0; index < bindings.Count; index++)
         {
             bindings[index].BindHostElements(
-                tag => GetDirectiveHostElements(mounted.Children, tag));
+                localName => GetDirectiveHostElements(mounted, localName));
         }
     }
 
-    private static void BindDirectiveTransitions(
-        IReadOnlyList<DirectiveBinding> bindings,
-        TransitionHooks? transition)
+    private void BindActiveTransition(
+        MountedTree<TNode> tree,
+        TNode element,
+        IReadOnlyList<DirectiveBinding> bindings)
     {
+        TransitionMountContext<TNode>? active = _activeTransitionMount;
+        if (active is null || active.IsClaimed)
+        {
+            return;
+        }
+
+        active.IsClaimed = true;
+        active.Element = element;
+        for (TransitionMountContext<TNode>? ancestor = active.Parent;
+            ancestor is not null && !ancestor.IsClaimed;
+            ancestor = ancestor.Parent)
+        {
+            ancestor.IsClaimed = true;
+            ancestor.Element = element;
+            ancestor.Suppress();
+        }
+
+        ComponentTransition transition = active.Controller.ComponentTransition;
         for (int index = 0; index < bindings.Count; index++)
         {
             bindings[index].BindTransition(transition);
         }
+
+        if (!active.IsSuppressed
+            && active.ShouldEnter
+            && !active.IsHydrating
+            && !active.Controller.Properties.Persisted
+            && !active.BeforeEnterInvoked)
+        {
+            active.BeforeEnterInvoked = active.Controller.BeforeEnter(element);
+        }
+
+        _ = tree;
     }
 
     private static IReadOnlyList<DirectiveHostElement> GetDirectiveHostElements(
-        IReadOnlyList<MountedRenderNode<TNode>> children,
-        string tag)
+        MountedElement<TNode> mounted,
+        string localName)
     {
         List<DirectiveHostElement> elements = [];
-        for (int index = 0; index < children.Count; index++)
+        for (int index = 0; index < mounted.Children.Count; index++)
         {
-            AddDirectiveHostElements(children[index], tag, elements);
+            CollectDirectiveHostElements(mounted.Children[index], localName, elements);
         }
 
-        return elements;
+        return elements.AsReadOnly();
     }
 
-    private static void AddDirectiveHostElements(
-        MountedRenderNode<TNode> mounted,
-        string tag,
+    private static void CollectDirectiveHostElements(
+        MountedNode<TNode> mounted,
+        string localName,
         List<DirectiveHostElement> elements)
     {
         switch (mounted)
         {
-            case MountedElementNode<TNode> element:
-                IElementComponent component = RequireElement(element.Component);
-                if (string.Equals(component.Tag, tag, StringComparison.OrdinalIgnoreCase))
+            case MountedElement<TNode> element:
+                ElementNode elementValue = (ElementNode)element.Value;
+                if (string.Equals(
+                    elementValue.Name.LocalName,
+                    localName,
+                    StringComparison.Ordinal))
                 {
-                    elements.Add(new DirectiveHostElement(component, element.HostNode));
+                    elements.Add(new DirectiveHostElement(elementValue, element.HostNode));
                 }
 
                 for (int index = 0; index < element.Children.Count; index++)
                 {
-                    AddDirectiveHostElements(element.Children[index], tag, elements);
+                    CollectDirectiveHostElements(element.Children[index], localName, elements);
                 }
 
                 break;
-            case MountedTemplateNode<TNode> template:
-                AddDirectiveHostElements(template.Subtree, tag, elements);
+            case MountedComponent<TNode> component:
+                CollectDirectiveHostElements(component.Subtree, localName, elements);
                 break;
-            case MountedFragmentNode<TNode> fragment:
-                for (int index = 0; index < fragment.Children.Count; index++)
+            case MountedRange<TNode> range:
+                for (int index = 0; index < range.Children.Count; index++)
                 {
-                    AddDirectiveHostElements(fragment.Children[index], tag, elements);
+                    CollectDirectiveHostElements(range.Children[index], localName, elements);
                 }
 
+                break;
+            case MountedTeleport<TNode> teleport:
+                for (int index = 0; index < teleport.Children.Count; index++)
+                {
+                    CollectDirectiveHostElements(teleport.Children[index], localName, elements);
+                }
+
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                CollectDirectiveHostElements(keepAlive.Active, localName, elements);
+                break;
+            case MountedSuspense<TNode> suspense:
+                CollectDirectiveHostElements(suspense.ActiveBranch, localName, elements);
+                break;
+            case MountedTransition<TNode> transition:
+                CollectDirectiveHostElements(transition.Child, localName, elements);
                 break;
         }
     }
@@ -3346,8 +1298,8 @@ public sealed partial class Renderer<TNode>
         MountedTree<TNode> tree,
         TNode element,
         IReadOnlyList<DirectiveBinding> bindings,
-        IElementComponent component,
-        IElementComponent? previousComponent,
+        ElementNode value,
+        ElementNode? previousValue,
         DirectiveHookKind hookKind)
     {
         for (int index = 0; index < bindings.Count; index++)
@@ -3372,87 +1324,1015 @@ public sealed partial class Renderer<TNode>
 
             try
             {
-                hook(element, binding, component, previousComponent);
-            }
-            catch (Exception exception)
-            {
-                string diagnosticInformation =
-                    $"{hookKind} directive lifecycle hook";
-                if (binding.Context is ComponentContext owner)
+                if (binding.Context is RuntimeComponentContext context)
                 {
-                    ComponentErrorHandling.Handle(
-                        exception,
-                        owner,
-                        diagnosticInformation);
-                }
-                else if (tree.Application?.ErrorHandler is { } errorHandler)
-                {
-                    errorHandler(
-                        exception,
-                        binding.Context,
-                        diagnosticInformation);
+                    context.Run(() => hook(element, binding, value, previousValue));
                 }
                 else
                 {
-                    throw;
+                    hook(element, binding, value, previousValue);
+                }
+            }
+            catch (Exception exception)
+            {
+                RouteRendererError(
+                    tree,
+                    binding.Context as RuntimeComponentContext,
+                    exception,
+                    $"{hookKind} directive lifecycle hook");
+            }
+        }
+    }
+
+    private void QueueDirectiveHooks(
+        MountedTree<TNode> tree,
+        MountedElement<TNode> mounted,
+        ElementNode value,
+        ElementNode? previousValue,
+        DirectiveHookKind hookKind,
+        bool invokeAfterUnmount = false)
+    {
+        if (mounted.DirectiveBindings.Count == 0)
+        {
+            return;
+        }
+
+        List<DirectiveBinding> bindings = mounted.DirectiveBindings;
+        Scheduler.QueuePostFlushCallback(
+            new SchedulerJob(
+                () =>
+                {
+                    if (!invokeAfterUnmount && mounted.IsUnmounted)
+                    {
+                        return;
+                    }
+
+                    InvokeDirectiveHooks(
+                        tree,
+                        mounted.HostNode,
+                        bindings,
+                        value,
+                        previousValue,
+                        hookKind);
+                    QueueHostCommit();
+                })
+            {
+                Name = $"directive {hookKind} lifecycle",
+            });
+    }
+
+    private static bool HasVirtualNodeLifecycleHook(ElementNode value, string name)
+    {
+        for (int index = 0; index < value.Bindings.Count; index++)
+        {
+            ElementBinding binding = value.Bindings[index];
+            if (string.Equals(binding.Name.LocalName, name, StringComparison.Ordinal)
+                && binding.Value is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static VirtualNodeLifecycleHook? GetVirtualNodeLifecycleHook(
+        ElementNode value,
+        string name)
+    {
+        for (int index = 0; index < value.Bindings.Count; index++)
+        {
+            ElementBinding binding = value.Bindings[index];
+            if (!string.Equals(binding.Name.LocalName, name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return binding.Value switch
+            {
+                null => null,
+                VirtualNodeLifecycleHook hook => hook,
+                Action<VirtualNode, VirtualNode?> action =>
+                    new VirtualNodeLifecycleHook(action),
+                Action<ElementNode, ElementNode?> action =>
+                    (current, previous) => action(
+                        (ElementNode)current,
+                        (ElementNode?)previous),
+                _ => throw new NotSupportedException(
+                    $"Virtual-node lifecycle binding '{name}' must contain a "
+                        + $"{nameof(VirtualNodeLifecycleHook)}."),
+            };
+        }
+
+        return null;
+    }
+
+    private static void InvokeVirtualNodeLifecycleHook(
+        MountedTree<TNode> tree,
+        RuntimeComponentContext? owner,
+        ElementNode value,
+        ElementNode? previousValue,
+        string name)
+    {
+        try
+        {
+            VirtualNodeLifecycleHook? hook = GetVirtualNodeLifecycleHook(value, name);
+            if (hook is null)
+            {
+                return;
+            }
+
+            if (owner is null)
+            {
+                hook(value, previousValue);
+            }
+            else
+            {
+                owner.Run(() => hook(value, previousValue));
+            }
+        }
+        catch (Exception exception)
+        {
+            RouteRendererError(
+                tree,
+                owner,
+                exception,
+                $"virtual-node lifecycle hook '{name}'");
+        }
+    }
+
+    private static void QueueVirtualNodeLifecycleHook(
+        MountedTree<TNode> tree,
+        RuntimeComponentContext? owner,
+        MountedNode<TNode>? mounted,
+        ElementNode value,
+        ElementNode? previousValue,
+        string name)
+    {
+        if (!HasVirtualNodeLifecycleHook(value, name))
+        {
+            return;
+        }
+
+        Scheduler.QueuePostFlushCallback(
+            new SchedulerJob(
+                () =>
+                {
+                    if (mounted is null || !mounted.IsUnmounted)
+                    {
+                        InvokeVirtualNodeLifecycleHook(
+                            tree,
+                            owner,
+                            value,
+                            previousValue,
+                            name);
+                    }
+                })
+            {
+                Name = $"virtual node {name} lifecycle",
+            });
+    }
+
+    private static void RouteRendererError(
+        MountedTree<TNode> tree,
+        RuntimeComponentContext? owner,
+        Exception exception,
+        string diagnosticInformation)
+    {
+        if (owner is not null)
+        {
+            owner.RouteError(exception, diagnosticInformation);
+        }
+        else if (tree.Application?.ErrorHandler is { } errorHandler)
+        {
+            errorHandler(exception, null, diagnosticInformation);
+        }
+        else
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+    }
+
+    private void MountAttributes(TNode element, IReadOnlyList<ElementBinding> bindings)
+    {
+        for (int index = 0; index < bindings.Count; index++)
+        {
+            ElementBinding binding = bindings[index];
+            if (!IsValueBinding(binding) && !IsNodeLifecycleBinding(binding))
+            {
+                _options.PatchAttribute(element, null, binding);
+            }
+        }
+
+        for (int index = 0; index < bindings.Count; index++)
+        {
+            ElementBinding binding = bindings[index];
+            if (IsValueBinding(binding))
+            {
+                _options.PatchAttribute(element, null, binding);
+            }
+        }
+    }
+
+    private void PatchElementAttributes(
+        TNode element,
+        ElementNode previous,
+        ElementNode next)
+    {
+        PatchFlags flags = next.RenderPlan.PatchFlags;
+        if ((int)flags <= 0)
+        {
+            return;
+        }
+
+        if ((flags & PatchFlags.FullProperties) != 0)
+        {
+            PatchAttributes(element, previous.Bindings, next.Bindings);
+            return;
+        }
+
+        if ((flags & PatchFlags.Class) != 0)
+        {
+            PatchNamedBinding(element, previous.Bindings, next.Bindings, "class");
+        }
+
+        if ((flags & PatchFlags.Style) != 0)
+        {
+            PatchNamedBinding(element, previous.Bindings, next.Bindings, "style");
+        }
+
+        if ((flags & PatchFlags.Properties) != 0)
+        {
+            IReadOnlyList<int>? indices = next.RenderPlan.DynamicBindingIndices;
+            if (indices is null)
+            {
+                PatchAttributes(element, previous.Bindings, next.Bindings);
+                return;
+            }
+
+            for (int index = 0; index < indices.Count; index++)
+            {
+                int bindingIndex = indices[index];
+                ElementBinding? previousBinding = bindingIndex < previous.Bindings.Count
+                    ? previous.Bindings[bindingIndex]
+                    : null;
+                ElementBinding? nextBinding = bindingIndex < next.Bindings.Count
+                    ? next.Bindings[bindingIndex]
+                    : null;
+                PatchBindingDifference(element, previousBinding, nextBinding);
+            }
+        }
+    }
+
+    private void PatchAttributes(
+        TNode element,
+        IReadOnlyList<ElementBinding> previous,
+        IReadOnlyList<ElementBinding> next)
+    {
+        bool[] matchedPrevious = new bool[previous.Count];
+        for (int nextIndex = 0; nextIndex < next.Count; nextIndex++)
+        {
+            ElementBinding nextBinding = next[nextIndex];
+            int previousIndex = FindBinding(previous, nextBinding);
+            ElementBinding? previousBinding = previousIndex >= 0
+                ? previous[previousIndex]
+                : null;
+            if (previousIndex >= 0)
+            {
+                matchedPrevious[previousIndex] = true;
+            }
+
+            PatchBindingDifference(element, previousBinding, nextBinding);
+        }
+
+        for (int previousIndex = 0; previousIndex < previous.Count; previousIndex++)
+        {
+            if (!matchedPrevious[previousIndex])
+            {
+                ElementBinding previousBinding = previous[previousIndex];
+                if (!IsNodeLifecycleBinding(previousBinding))
+                {
+                    _options.PatchAttribute(element, previousBinding, null);
                 }
             }
         }
     }
 
-    private static IElementComponent RequireElement(IComponent component)
+    private void PatchNamedBinding(
+        TNode element,
+        IReadOnlyList<ElementBinding> previous,
+        IReadOnlyList<ElementBinding> next,
+        string localName)
     {
-        return component as IElementComponent
-            ?? throw InvalidSpecialization(component, nameof(IElementComponent));
+        ElementBinding? previousBinding = FindBinding(previous, localName);
+        ElementBinding? nextBinding = FindBinding(next, localName);
+        PatchBindingDifference(element, previousBinding, nextBinding);
     }
 
-    private static ITemplateComponent RequireTemplate(IComponent component)
+    private void PatchBindingDifference(
+        TNode element,
+        ElementBinding? previous,
+        ElementBinding? next)
     {
-        return component as ITemplateComponent
-            ?? throw InvalidSpecialization(component, nameof(ITemplateComponent));
+        if ((previous is not null && IsNodeLifecycleBinding(previous))
+            || (next is not null && IsNodeLifecycleBinding(next)))
+        {
+            return;
+        }
+
+        if (previous is not null
+            && next is not null
+            && previous.Kind == next.Kind
+            && previous.Name == next.Name
+            && !IsValueBinding(next)
+            && Equals(previous.Value, next.Value))
+        {
+            return;
+        }
+
+        if (previous is not null
+            && next is not null
+            && (previous.Kind != next.Kind || previous.Name != next.Name))
+        {
+            _options.PatchAttribute(element, previous, null);
+            _options.PatchAttribute(element, null, next);
+            return;
+        }
+
+        if (previous is not null || next is not null)
+        {
+            _options.PatchAttribute(element, previous, next);
+        }
     }
 
-    private static ITextComponent RequireText(IComponent component)
+    private static bool IsValueBinding(ElementBinding binding) =>
+        string.Equals(binding.Name.LocalName, "value", StringComparison.Ordinal);
+
+    private static bool IsNodeLifecycleBinding(ElementBinding binding) =>
+        binding.Name.LocalName.StartsWith("onVnode", StringComparison.Ordinal);
+
+    private static int FindBinding(
+        IReadOnlyList<ElementBinding> bindings,
+        ElementBinding value)
     {
-        return component as ITextComponent
-            ?? throw InvalidSpecialization(component, nameof(ITextComponent));
+        for (int index = 0; index < bindings.Count; index++)
+        {
+            if (bindings[index].Kind == value.Kind
+                && bindings[index].Name == value.Name)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
-    private static ICommentComponent RequireComment(IComponent component)
+    private static ElementBinding? FindBinding(
+        IReadOnlyList<ElementBinding> bindings,
+        string localName)
     {
-        return component as ICommentComponent
-            ?? throw InvalidSpecialization(component, nameof(ICommentComponent));
+        for (int index = 0; index < bindings.Count; index++)
+        {
+            if (string.Equals(
+                bindings[index].Name.LocalName,
+                localName,
+                StringComparison.Ordinal))
+            {
+                return bindings[index];
+            }
+        }
+
+        return null;
     }
 
-    private static IStaticComponent RequireStatic(IComponent component)
+    private void Move(MountedNode<TNode> mounted, TNode container, TNode? anchor)
     {
-        return component as IStaticComponent
-            ?? throw InvalidSpecialization(component, nameof(IStaticComponent));
+        switch (mounted)
+        {
+            case MountedComponent<TNode> component:
+                Move(component.Subtree, container, anchor);
+                break;
+            case MountedElement<TNode> element:
+                _options.Insert(element.HostNode, container, anchor);
+                break;
+            case MountedLeaf<TNode> leaf:
+                _options.Insert(leaf.HostNode, container, anchor);
+                break;
+            case MountedStatic<TNode> staticContent:
+                MoveRange(staticContent.First, staticContent.Last, container, anchor);
+                break;
+            case MountedRange<TNode> range:
+                MoveRange(range.StartAnchor, range.EndAnchor, container, anchor);
+                break;
+            case MountedTeleport<TNode> teleport:
+                MoveRange(teleport.StartAnchor, teleport.EndAnchor, container, anchor);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                MoveRange(keepAlive.StartAnchor, keepAlive.EndAnchor, container, anchor);
+                break;
+            case MountedSuspense<TNode> suspense:
+                MoveRange(suspense.StartAnchor, suspense.EndAnchor, container, anchor);
+                break;
+            case MountedTransition<TNode> transition:
+                Move(transition.Child, container, anchor);
+                break;
+        }
     }
 
-    private static IFragmentComponent RequireFragment(IComponent component)
+    private void MoveRange(TNode first, TNode last, TNode container, TNode? anchor)
     {
-        return component as IFragmentComponent
-            ?? throw InvalidSpecialization(component, nameof(IFragmentComponent));
+        TNode current = first;
+        while (true)
+        {
+            bool isLast = NodeComparer.Equals(current, last);
+            TNode? next = isLast ? default : _options.NextSibling(current);
+            _options.Insert(current, container, anchor);
+            if (isLast)
+            {
+                break;
+            }
+
+            current = RequireHostNode(next, "range sibling");
+        }
     }
 
-    private static ITeleportComponent RequireTeleport(IComponent component)
+    private void Unmount(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted,
+        bool removeHostNodes)
     {
-        return component as ITeleportComponent
-            ?? throw InvalidSpecialization(component, nameof(ITeleportComponent));
+        if (mounted.IsUnmounted)
+        {
+            return;
+        }
+
+        UnmountVisitCount++;
+        ClearReference(tree, mounted);
+        switch (mounted)
+        {
+            case MountedComponent<TNode> component:
+                UnmountComponent(tree, component, removeHostNodes);
+                break;
+            case MountedElement<TNode> element:
+                ElementNode elementValue = (ElementNode)element.Value;
+                InvokeVirtualNodeLifecycleHook(
+                    tree,
+                    element.Owner,
+                    elementValue,
+                    previousValue: null,
+                    "onVnodeBeforeUnmount");
+                InvokeDirectiveHooks(
+                    tree,
+                    element.HostNode,
+                    element.DirectiveBindings,
+                    elementValue,
+                    previousValue: null,
+                    DirectiveHookKind.BeforeUnmount);
+                UnmountOwnedChildren(
+                    tree,
+                    element,
+                    element.Children,
+                    elementValue.RenderPlan,
+                    removeChildrenHostNodes: false);
+                if (removeHostNodes)
+                {
+                    _options.Remove(element.HostNode);
+                }
+
+                QueueVirtualNodeLifecycleHook(
+                    tree,
+                    element.Owner,
+                    mounted: null,
+                    elementValue,
+                    previousValue: null,
+                    "onVnodeUnmounted");
+                QueueDirectiveHooks(
+                    tree,
+                    element,
+                    elementValue,
+                    previousValue: null,
+                    DirectiveHookKind.Unmounted,
+                    invokeAfterUnmount: true);
+
+                break;
+            case MountedLeaf<TNode> leaf:
+                if (removeHostNodes)
+                {
+                    _options.Remove(leaf.HostNode);
+                }
+
+                break;
+            case MountedStatic<TNode> staticContent:
+                if (removeHostNodes)
+                {
+                    RemoveRange(staticContent.First, staticContent.Last);
+                }
+
+                break;
+            case MountedRange<TNode> range:
+                UnmountOwnedChildren(
+                    tree,
+                    range,
+                    range.Children,
+                    ((FragmentNode)range.Value).RenderPlan,
+                    removeChildrenHostNodes: false);
+                if (removeHostNodes)
+                {
+                    RemoveRange(range.StartAnchor, range.EndAnchor);
+                }
+
+                break;
+            case MountedTeleport<TNode> teleport:
+                UnmountTeleport(tree, teleport, removeHostNodes);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                UnmountKeepAlive(tree, keepAlive, removeHostNodes);
+                break;
+            case MountedSuspense<TNode> suspense:
+                UnmountSuspense(tree, suspense, removeHostNodes);
+                break;
+            case MountedTransition<TNode> transition:
+                UnmountTransition(tree, transition, removeHostNodes);
+                break;
+        }
+
+        Unregister(tree, mounted);
+        mounted.IsUnmounted = true;
     }
 
-    private static InvalidOperationException InvalidSpecialization(
-        IComponent component,
-        string contract)
+    private void Remove(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted)
     {
-        return new InvalidOperationException(
-            $"A {component.Kind} component must implement {contract}.");
+        if (mounted.IsUnmounted)
+        {
+            return;
+        }
+
+        if (mounted is MountedTransition<TNode> transition
+            && TryDeferTransitionUnmount(tree, transition))
+        {
+            UnmountVisitCount++;
+            return;
+        }
+
+        Unmount(tree, mounted, removeHostNodes: true);
     }
 
-    private static NotSupportedException Unsupported(string componentKind)
+    private void UnmountOwnedChildren(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> parent,
+        IReadOnlyList<MountedNode<TNode>> children,
+        RenderPlan plan,
+        bool removeChildrenHostNodes)
     {
-        return new NotSupportedException(
-            $"{componentKind} components are not supported by the primitive renderer foundation.");
+        if (!TryUnmountBlockChildren(
+            tree,
+            parent,
+            children,
+            plan,
+            removeChildrenHostNodes))
+        {
+            UnmountChildren(tree, children, removeChildrenHostNodes);
+        }
+    }
+
+    private bool TryUnmountBlockChildren(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> parent,
+        IReadOnlyList<MountedNode<TNode>> children,
+        RenderPlan plan,
+        bool removeHostNodes)
+    {
+        if (plan.PatchFlags == PatchFlags.Bail
+            || (int)plan.PatchFlags <= 0
+            || plan.DynamicChildren is null
+            || parent.BlockChildren is not { } dynamicChildren
+            || dynamicChildren.Count != plan.DynamicChildren.Count
+            || (parent.Value is FragmentNode
+                && (plan.PatchFlags & PatchFlags.StableFragment) == 0))
+        {
+            return false;
+        }
+
+        for (int index = 0; index < dynamicChildren.Count; index++)
+        {
+            if (dynamicChildren[index].IsUnmounted
+                || !ReferenceEquals(
+                    dynamicChildren[index].Value,
+                    plan.DynamicChildren[index]))
+            {
+                return false;
+            }
+        }
+
+        HashSet<MountedNode<TNode>> visited = new(ReferenceEqualityComparer.Instance);
+        for (int index = 0; index < dynamicChildren.Count; index++)
+        {
+            MountedNode<TNode> dynamicMounted = dynamicChildren[index];
+            if (visited.Add(dynamicMounted))
+            {
+                Unmount(tree, dynamicMounted, removeHostNodes);
+            }
+        }
+
+        ReleaseSkippedChildren(tree, children, visited);
+        parent.BlockChildren = null;
+        return true;
+    }
+
+    private void ReleaseSkippedChildren(
+        MountedTree<TNode> tree,
+        IReadOnlyList<MountedNode<TNode>> children,
+        HashSet<MountedNode<TNode>> visited)
+    {
+        for (int index = 0; index < children.Count; index++)
+        {
+            MountedNode<TNode> child = children[index];
+            if (visited.Contains(child))
+            {
+                continue;
+            }
+
+            if (RequiresUnmountVisit(child))
+            {
+                Unmount(tree, child, removeHostNodes: false);
+            }
+            else
+            {
+                ReleaseSkippedNode(tree, child, visited);
+            }
+        }
+    }
+
+    private void ReleaseSkippedNode(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted,
+        HashSet<MountedNode<TNode>> visited)
+    {
+        if (visited.Contains(mounted))
+        {
+            return;
+        }
+
+        ClearReference(tree, mounted);
+        switch (mounted)
+        {
+            case MountedElement<TNode> element:
+                for (int index = 0; index < element.Children.Count; index++)
+                {
+                    ReleaseOrUnmountSkippedNode(tree, element.Children[index], visited);
+                }
+
+                break;
+            case MountedRange<TNode> range:
+                for (int index = 0; index < range.Children.Count; index++)
+                {
+                    ReleaseOrUnmountSkippedNode(tree, range.Children[index], visited);
+                }
+
+                break;
+        }
+
+        Unregister(tree, mounted);
+        mounted.IsUnmounted = true;
+    }
+
+    private void ReleaseOrUnmountSkippedNode(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted,
+        HashSet<MountedNode<TNode>> visited)
+    {
+        if (visited.Contains(mounted))
+        {
+            return;
+        }
+
+        if (RequiresUnmountVisit(mounted))
+        {
+            Unmount(tree, mounted, removeHostNodes: false);
+        }
+        else
+        {
+            ReleaseSkippedNode(tree, mounted, visited);
+        }
+    }
+
+    private static bool RequiresUnmountVisit(MountedNode<TNode> mounted)
+    {
+        if (mounted.Value.MountReference is not null)
+        {
+            return true;
+        }
+
+        return mounted is MountedComponent<TNode>
+            or MountedTeleport<TNode>
+            or MountedKeepAlive<TNode>
+            or MountedSuspense<TNode>
+            or MountedTransition<TNode>
+            || mounted is MountedElement<TNode> element
+                && (element.DirectiveBindings.Count > 0
+                    || HasVirtualNodeLifecycleHook(
+                        (ElementNode)element.Value,
+                        "onVnodeBeforeUnmount")
+                    || HasVirtualNodeLifecycleHook(
+                        (ElementNode)element.Value,
+                        "onVnodeUnmounted"));
+    }
+
+    private void UnmountChildren(
+        MountedTree<TNode> tree,
+        IReadOnlyList<MountedNode<TNode>> children,
+        bool removeHostNodes)
+    {
+        for (int index = 0; index < children.Count; index++)
+        {
+            Unmount(tree, children[index], removeHostNodes);
+        }
+    }
+
+    private void RemoveRange(TNode first, TNode last)
+    {
+        TNode current = first;
+        while (true)
+        {
+            bool isLast = NodeComparer.Equals(current, last);
+            TNode? next = isLast ? default : _options.NextSibling(current);
+            _options.Remove(current);
+            if (isLast)
+            {
+                break;
+            }
+
+            current = RequireHostNode(next, "range sibling");
+        }
+    }
+
+    private TNode? GetNextHostNode(MountedNode<TNode> mounted) =>
+        _options.NextSibling(mounted.LastHostNode);
+
+    private TNode HostParentOrFallback(TNode node, TNode fallback) =>
+        HasHostNode(_options.ParentNode(node)) ? _options.ParentNode(node)! : fallback;
+
+    private void QueueHostCommit() => Scheduler.QueueHostCommit(_options.Commit);
+
+    private void UpdateReference(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted,
+        MountReference? previous,
+        MountReference? next)
+    {
+        if (mounted is MountedComponent<TNode>
+            {
+                Instance: AsynchronousComponentWrapper,
+            })
+        {
+            return;
+        }
+
+        if (ReferenceEquals(previous, next))
+        {
+            return;
+        }
+
+        if (previous is not null)
+        {
+            InvokeReference(tree, mounted.Owner, previous, null);
+        }
+
+        if (next is not null)
+        {
+            InvokeReference(tree, mounted.Owner, next, ReferenceValue(mounted));
+        }
+    }
+
+    private void ClearReference(MountedTree<TNode> tree, MountedNode<TNode> mounted)
+    {
+        if (mounted is MountedComponent<TNode>
+            {
+                Instance: AsynchronousComponentWrapper,
+            })
+        {
+            return;
+        }
+
+        if (mounted.Value.MountReference is { } reference)
+        {
+            InvokeReference(tree, mounted.Owner, reference, null);
+        }
+    }
+
+    private static void InvokeReference(
+        MountedTree<TNode> tree,
+        RuntimeComponentContext? owner,
+        MountReference reference,
+        object? value)
+    {
+        try
+        {
+            if (owner is null)
+            {
+                reference(value);
+            }
+            else
+            {
+                owner.Run(() => reference(value));
+            }
+        }
+        catch (Exception exception)
+        {
+            if (owner is not null)
+            {
+                owner.RouteError(exception, "mount-reference callback");
+            }
+            else if (tree.Application?.ErrorHandler is { } errorHandler)
+            {
+                errorHandler(exception, null, "mount-reference callback");
+            }
+            else
+            {
+                throw;
+            }
+        }
+    }
+
+    private static object? ReferenceValue(MountedNode<TNode> mounted)
+    {
+        return mounted switch
+        {
+            MountedComponent<TNode> component when component.Context.HasExposedValue =>
+                component.Context.ExposedValue,
+            MountedComponent<TNode> component => component.Instance,
+            MountedElement<TNode> element => element.HostNode,
+            MountedLeaf<TNode> leaf => leaf.HostNode,
+            _ => mounted.FirstHostNode,
+        };
+    }
+
+    private static bool IsSameNodeType(VirtualNode current, VirtualNode next)
+    {
+        if (current.GetType() != next.GetType() || !Equals(current.Key, next.Key))
+        {
+            return false;
+        }
+
+        return (current, next) switch
+        {
+            (ElementNode currentElement, ElementNode nextElement) =>
+                currentElement.Name == nextElement.Name,
+            (ComponentNode currentComponent, ComponentNode nextComponent) =>
+                Equals(currentComponent.Component, nextComponent.Component),
+            (StaticNode currentStatic, StaticNode nextStatic) =>
+                currentStatic.Format == nextStatic.Format
+                && string.Equals(
+                    currentStatic.Content,
+                    nextStatic.Content,
+                    StringComparison.Ordinal),
+            _ => true,
+        };
+    }
+
+    private static void Register(
+        MountedTree<TNode> tree,
+        VirtualNode value,
+        MountedNode<TNode> mounted)
+    {
+        _ = tree;
+        if (!ReferenceEquals(value, mounted.Value))
+        {
+            throw new InvalidOperationException(
+                "A mounted occurrence must register its own immutable description.");
+        }
+
+        RefreshBlockChildren(mounted);
+    }
+
+    private static void ReplaceValue(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted,
+        VirtualNode next)
+    {
+        _ = tree;
+        mounted.Value = next;
+        RefreshBlockChildren(mounted);
+    }
+
+    private static void Unregister(MountedTree<TNode> tree, MountedNode<TNode> mounted)
+    {
+        _ = tree;
+        mounted.BlockChildren = null;
+    }
+
+    private static void RefreshBlockChildren(MountedNode<TNode> mounted)
+    {
+        if (mounted.Value is not CompositeVirtualNode composite
+            || composite.RenderPlan.DynamicChildren is not { } dynamicValues
+            || OwnedChildren(mounted) is not { } children)
+        {
+            mounted.BlockChildren = null;
+            return;
+        }
+
+        if (dynamicValues.Count == 0)
+        {
+            mounted.BlockChildren = [];
+            return;
+        }
+
+        var occurrences = new Dictionary<VirtualNode, Queue<MountedNode<TNode>>>(
+            ReferenceEqualityComparer.Instance);
+        for (int index = 0; index < children.Count; index++)
+        {
+            CollectBlockOccurrences(children[index], occurrences);
+        }
+
+        var dynamicCounts = new Dictionary<VirtualNode, int>(
+            ReferenceEqualityComparer.Instance);
+        for (int index = 0; index < dynamicValues.Count; index++)
+        {
+            VirtualNode dynamicValue = dynamicValues[index];
+            dynamicCounts.TryGetValue(dynamicValue, out int count);
+            dynamicCounts[dynamicValue] = count + 1;
+        }
+
+        foreach ((VirtualNode dynamicValue, int count) in dynamicCounts)
+        {
+            if (!occurrences.TryGetValue(
+                    dynamicValue,
+                    out Queue<MountedNode<TNode>>? candidates)
+                || candidates.Count != count)
+            {
+                // [RND-BLOCK-4] Description identity cannot identify which occurrences are
+                // dynamic when the same description also occurs outside the tracked list.
+                mounted.BlockChildren = null;
+                return;
+            }
+        }
+
+        var blockChildren = new List<MountedNode<TNode>>(dynamicValues.Count);
+        for (int index = 0; index < dynamicValues.Count; index++)
+        {
+            if (!occurrences.TryGetValue(
+                    dynamicValues[index],
+                    out Queue<MountedNode<TNode>>? candidates)
+                || candidates.Count == 0)
+            {
+                mounted.BlockChildren = null;
+                return;
+            }
+
+            blockChildren.Add(candidates.Dequeue());
+        }
+
+        mounted.BlockChildren = blockChildren;
+    }
+
+    private static IReadOnlyList<MountedNode<TNode>>? OwnedChildren(
+        MountedNode<TNode> mounted) =>
+        mounted switch
+        {
+            MountedElement<TNode> element => element.Children,
+            MountedRange<TNode> range when range.Value is FragmentNode => range.Children,
+            MountedTeleport<TNode> teleport => teleport.Children,
+            _ => null,
+        };
+
+    private static void CollectBlockOccurrences(
+        MountedNode<TNode> mounted,
+        Dictionary<VirtualNode, Queue<MountedNode<TNode>>> occurrences)
+    {
+        if (!mounted.Value.RenderPlan.IsBlock
+            && OwnedChildren(mounted) is { } children)
+        {
+            for (int index = 0; index < children.Count; index++)
+            {
+                CollectBlockOccurrences(children[index], occurrences);
+            }
+        }
+
+        if (!occurrences.TryGetValue(
+                mounted.Value,
+                out Queue<MountedNode<TNode>>? candidates))
+        {
+            candidates = new Queue<MountedNode<TNode>>();
+            occurrences.Add(mounted.Value, candidates);
+        }
+
+        candidates.Enqueue(mounted);
+    }
+
+    private static bool HasHostNode(TNode? node) =>
+        node is not null && !NodeComparer.Equals(node, default!);
+
+    private static TNode RequireHostNode(TNode? node, string parameterName)
+    {
+        if (!HasHostNode(node))
+        {
+            throw new ArgumentException(
+                "The default host-node value is reserved for no node.",
+                parameterName);
+        }
+
+        return node!;
     }
 }

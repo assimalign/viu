@@ -107,7 +107,7 @@ internal static class TransformSlotOutlet
                 new SyntaxList<PropertyNode>(nonNameProperties.ToArray()),
                 isComponent: false,
                 isDynamicComponent: false);
-            slotProps = built.Props;
+            slotProps = built.Properties;
 
             if (built.Directives.Count > 0)
             {

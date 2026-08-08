@@ -58,10 +58,9 @@ internal static class ReactiveSourceEmitter
 
         var bodyIndent = indent + 1;
         EmitProperties(builder, model, bodyIndent);
-        EmitRawAccess(builder, bodyIndent);
         EmitDependencyLookup(builder, model, bodyIndent);
         EmitTraversal(builder, model, bodyIndent);
-        EmitReadonlyMarker(builder, model, bodyIndent);
+        EmitReadOnlyMarker(builder, model, bodyIndent);
         EmitReferences(builder, model, bodyIndent);
         EmitRawView(builder, model, bodyIndent);
 
@@ -116,11 +115,11 @@ internal static class ReactiveSourceEmitter
             builder.Append(property.SetterModifier).Append("set\n");
             AppendIndent(builder, indent + 1);
             builder.Append("{\n");
-            if (model.Readonly)
+            if (model.ReadOnly)
             {
                 AppendIndent(builder, indent + 2);
                 builder.Append("global::System.Diagnostics.Debug.WriteLine(\"[Viu warn] Set operation on key \\\"")
-                    .Append(property.Name).Append("\\\" failed: target is readonly.\");\n");
+                    .Append(property.Name).Append("\\\" failed: target is read-only.\");\n");
             }
             else
             {
@@ -142,12 +141,6 @@ internal static class ReactiveSourceEmitter
             AppendIndent(builder, indent);
             builder.Append("}\n\n");
         }
-    }
-
-    private static void EmitRawAccess(StringBuilder builder, int indent)
-    {
-        AppendIndent(builder, indent);
-        builder.Append("object ").Append(ReactiveObjectType).Append(".ToRaw() => this;\n\n");
     }
 
     private static void EmitDependencyLookup(StringBuilder builder, in ReactiveClassModel model, int indent)
@@ -203,15 +196,15 @@ internal static class ReactiveSourceEmitter
         builder.Append("}\n");
     }
 
-    private static void EmitReadonlyMarker(StringBuilder builder, in ReactiveClassModel model, int indent)
+    private static void EmitReadOnlyMarker(StringBuilder builder, in ReactiveClassModel model, int indent)
     {
-        if (!model.Readonly)
+        if (!model.ReadOnly)
         {
             // A mutable reactive object uses the default IReactiveObject.IsReadOnly => false.
             return;
         }
 
-        // The readonly marker Reactive.IsReadonly() observes: a readonly variant overrides the
+        // The readonly marker Reactive.IsReadOnly() observes: a readonly variant overrides the
         // IReactiveObject default-interface member to report true. It is emitted as a compiled
         // member rather than carried in run-time state because there is no proxy to hold a flag.
         builder.Append('\n');
@@ -278,11 +271,11 @@ internal static class ReactiveSourceEmitter
 
         var sourceType = model.TypeName + model.TypeParameterList;
 
-        // The untracked escape hatch Reactive.ToRaw() surfaces: a view straight over the raw value
+        // The untracked escape hatch ToRawValues() surfaces a view straight over the raw value
         // fields, where reads do not track and writes do not trigger. Bulk work that would otherwise
         // notify once per assignment goes through it. Emitted for readonly variants too — a readonly
         // variant restricts the reactive surface, not access to the underlying mutable target, so
-        // ToRaw() on one still yields a writable view. As a nested type it reaches the private
+        // ToRawValues() on one still yields a writable view. As a nested type it reaches the private
         // backing fields without reflection.
         builder.Append('\n');
         AppendIndent(builder, indent);

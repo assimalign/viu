@@ -198,7 +198,7 @@ public class LanguageServerCodeActionTests
                     responseIdentifier.GetString() == identifier)
             .RootElement;
 
-    private sealed class QuickfixLanguageService : IViuLanguageService
+    private sealed class QuickfixLanguageService : ILanguageService
     {
         public void OpenDocument(string documentUri, string text, int? version)
         {

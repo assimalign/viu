@@ -4,33 +4,29 @@ using System.Collections.Generic;
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Tests;
 
 namespace Assimalign.Viu.Core.Tests;
 
 public sealed class DirectiveRendererTests
 {
     [Fact]
-    public void Render_DirectiveBinding_InvokesEveryPhaseWithPreviousValue()
+    public void Render_Directive_InvokesEveryPhaseWithPreviousValue()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
         List<string> phases = [];
         Directive directive = RecordingDirective(phases);
-        IElementComponent initial = DirectedElement(1);
-        IApplicationContext application = CreateApplication(
-            initial,
-            directive);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
+        ElementNode initial = DirectedElement(1);
+        ApplicationContext application = CreateApplication(initial, directive);
 
-        renderer.Render(initial, host.Root, application);
-        pump.RunUntilIdle();
-        renderer.Render(DirectedElement(2), host.Root);
-        pump.RunUntilIdle();
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+        renderer.Render(DirectedElement(2), host.Container);
+        host.RunScheduledFlushes();
+        renderer.Render(null, host.Container);
+        host.RunScheduledFlushes();
 
         phases.ShouldBe(
         [
@@ -45,227 +41,216 @@ public sealed class DirectiveRendererTests
     }
 
     [Fact]
-    public void Render_DirectiveOnTemplateRequest_TransfersToRenderedElementRoot()
+    public void Render_NodeLifecycleBindings_InvokesRendererPhasesAndNeverHostPatches()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
         List<string> phases = [];
-        Directive directive = RecordingDirective(phases);
-        RootTemplate template = new();
-        ITemplateComponent root = DirectedTemplate(10);
-        ComponentFactory components = new(
+
+        renderer.Render(LifecycleElement("first", phases), host.Container);
+        host.RunScheduledFlushes();
+        host.ResetOperationCounts();
+        renderer.Render(LifecycleElement("second", phases), host.Container);
+        host.RunScheduledFlushes();
+        renderer.Render(null, host.Container);
+        host.RunScheduledFlushes();
+
+        phases.ShouldBe(
         [
-            new ComponentRegistration(
-                typeof(RootTemplate),
-                () => template),
+            "before-mount:first:null",
+            "mounted:first:null",
+            "before-update:second:first",
+            "updated:second:first",
+            "before-unmount:second:null",
+            "unmounted:second:null",
         ]);
-        IApplicationContext application = new ApplicationContext(
-            root,
-            components,
-            new EmptyServiceProvider(),
-            directives: Registry(directive));
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
-
-        renderer.Render(root, host.Root, application);
-        pump.RunUntilIdle();
-        renderer.Render(DirectedTemplate(20), host.Root);
-        pump.RunUntilIdle();
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
-
-        phases.ShouldContain("mounted:10:null");
-        phases.ShouldContain("updated:20:10");
-        phases.ShouldContain("unmounted:20:10");
+        host.BindingPatchCount.ShouldBe(0);
     }
 
     [Fact]
     public void Render_DirectiveHookFault_RoutesToApplicationErrorHandler()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        Directive directive = new()
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        Exception? observed = null;
+        string? diagnosticInformation = null;
+        var directive = new Directive
         {
             Mounted = static (_, _, _, _) =>
                 throw new InvalidOperationException("directive failed"),
         };
-        IElementComponent root = DirectedElement(1);
-        Exception? observed = null;
-        string? diagnostic = null;
-        IApplicationContext application = CreateApplication(
+        ElementNode root = DirectedElement(1);
+        ApplicationContext application = CreateApplication(
             root,
             directive,
-            new ApplicationOptions
+            (exception, _, information) =>
             {
-                ErrorHandler = (exception, _, information) =>
-                {
-                    observed = exception;
-                    diagnostic = information;
-                },
+                observed = exception;
+                diagnosticInformation = information;
             });
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
 
-        renderer.Render(root, host.Root, application);
-        pump.RunUntilIdle();
+        renderer.Render(root, host.Container, application);
+        host.RunScheduledFlushes();
 
-        observed.ShouldNotBeNull();
-        observed.Message.ShouldBe("directive failed");
-        diagnostic.ShouldBe("Mounted directive lifecycle hook");
+        observed.ShouldNotBeNull().Message.ShouldBe("directive failed");
+        diagnosticInformation.ShouldBe("Mounted directive lifecycle hook");
     }
 
     [Fact]
-    public void Render_DirectiveBinding_ExposesMountedDescendantElementsInDocumentOrder()
+    public void Render_DirectiveMountedHook_SeesDescendantElementsInTreeOrder()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        int createdCount = -1;
-        int beforeMountCount = -1;
-        IReadOnlyList<DirectiveHostElement>? mountedElements = null;
-        Directive directive = new()
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        IReadOnlyList<DirectiveHostElement>? descendants = null;
+        var directive = new Directive
         {
             Created = (_, binding, _, _) =>
-                createdCount = binding.GetDescendantElements("option").Count,
+                binding.GetDescendantElements("option").ShouldBeEmpty(),
             BeforeMount = (_, binding, _, _) =>
-                beforeMountCount = binding.GetDescendantElements("option").Count,
+                binding.GetDescendantElements("option").ShouldBeEmpty(),
             Mounted = (_, binding, _, _) =>
-                mountedElements = binding.GetDescendantElements("option"),
+                descendants = binding.GetDescendantElements("option"),
         };
-        IElementComponent root = ComponentTree.Element(
-            "select",
+        ElementNode root = new(
+            new QualifiedName("select"),
             children:
             [
-                ComponentTree.Element("option"),
-                ComponentTree.Fragment(
+                new ElementNode(new QualifiedName("option")),
+                new FragmentNode(
                 [
-                    ComponentTree.Element("option"),
+                    new ElementNode(new QualifiedName("option")),
                 ]),
-                ComponentTree.Template<OptionTemplate>(),
             ],
             directives:
             [
-                new ComponentDirectiveBinding("record"),
+                new DirectiveInvocation(typeof(RecordingDirectiveToken)),
             ]);
-        ComponentFactory components = new(
-        [
-            new ComponentRegistration(
-                typeof(OptionTemplate),
-                static () => new OptionTemplate()),
-        ]);
-        IApplicationContext application = new ApplicationContext(
-            root,
-            components,
-            new EmptyServiceProvider(),
-            directives: Registry(directive));
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
 
-        renderer.Render(root, host.Root, application);
-        pump.RunUntilIdle();
+        renderer.Render(root, host.Container, CreateApplication(root, directive));
+        host.RunScheduledFlushes();
 
-        createdCount.ShouldBe(0);
-        beforeMountCount.ShouldBe(0);
-        mountedElements.ShouldNotBeNull();
-        mountedElements.Count.ShouldBe(3);
-        for (int index = 0; index < mountedElements.Count; index++)
+        descendants.ShouldNotBeNull().Count.ShouldBe(2);
+        descendants[0].Value.Name.LocalName.ShouldBe("option");
+        descendants[1].Value.Name.LocalName.ShouldBe("option");
+    }
+
+    [Fact]
+    public void Hydrate_Directive_AdoptsElementAndAttachesLifecycle()
+    {
+        Scheduler.Reset();
+        Queue<Action> scheduledFlushes = [];
+        using IDisposable registration = Scheduler.UseFlushDispatcher(
+            scheduledFlushes.Enqueue);
+        try
         {
-            mountedElements[index].Component.Tag.ShouldBe("option");
-            mountedElements[index].Element
-                .ShouldBeOfType<FakeHostNode>()
-                .Content
-                .ShouldBe("option");
+            HydrationWalkerFakeHost host = new();
+            HydrationWalkerHostNode serverElement = host.CreateServerElement("section");
+            host.AppendServerChild(host.Root, serverElement);
+            List<string> phases = [];
+            var directive = new Directive
+            {
+                Created = (_, _, _, _) => phases.Add("created"),
+                BeforeMount = (_, _, _, _) => phases.Add("before-mount"),
+                Mounted = (_, _, _, _) => phases.Add("mounted"),
+            };
+            ElementNode root = new(
+                new QualifiedName("section"),
+                directives:
+                [
+                    new DirectiveInvocation(typeof(RecordingDirectiveToken)),
+                ]);
+            Renderer<HydrationWalkerHostNode> renderer =
+                RendererFactory.CreateRenderer(host.Options);
+
+            renderer.Hydrate(root, host.Root, CreateApplication(root, directive));
+            while (scheduledFlushes.Count > 0)
+            {
+                scheduledFlushes.Dequeue()();
+            }
+
+            host.Root.Children.ShouldHaveSingleItem().ShouldBeSameAs(serverElement);
+            host.ClientCreationCount.ShouldBe(0);
+            phases.ShouldBe(["created", "before-mount", "mounted"]);
+        }
+        finally
+        {
+            Scheduler.Reset();
         }
     }
 
-    private static IElementComponent DirectedElement(int value)
-    {
-        return ComponentTree.Element(
-            "div",
+    private static ElementNode DirectedElement(int value) =>
+        new(
+            new QualifiedName("root"),
             directives:
             [
-                new ComponentDirectiveBinding("record", value),
+                new DirectiveInvocation(typeof(RecordingDirectiveToken), value),
             ]);
-    }
 
-    private static ITemplateComponent DirectedTemplate(int value)
+    private static ElementNode LifecycleElement(string value, List<string> phases)
     {
-        return ComponentTree.Template<RootTemplate>(
-            directives:
+        ElementBinding Hook(string name, string phase) =>
+            ElementBinding.Property(
+                name,
+                new VirtualNodeLifecycleHook(
+                    (current, previous) => phases.Add(
+                        $"{phase}:{Text(current)}:{Text(previous)}")));
+
+        return new ElementNode(
+            new QualifiedName("root"),
+            bindings:
             [
-                new ComponentDirectiveBinding("record", value),
-            ]);
+                Hook("onVnodeBeforeMount", "before-mount"),
+                Hook("onVnodeMounted", "mounted"),
+                Hook("onVnodeBeforeUpdate", "before-update"),
+                Hook("onVnodeUpdated", "updated"),
+                Hook("onVnodeBeforeUnmount", "before-unmount"),
+                Hook("onVnodeUnmounted", "unmounted"),
+            ],
+            children: [new TextNode(value)]);
     }
 
-    private static Directive RecordingDirective(List<string> phases)
-    {
-        return new Directive
+    private static string Text(VirtualNode? value) =>
+        value is ElementNode { Children.Count: > 0 } element
+            && element.Children[0] is TextNode text
+                ? text.Text
+                : "null";
+
+    private static Directive RecordingDirective(List<string> phases) =>
+        new()
         {
-            Created = (_, binding, _, _) =>
-                phases.Add(Describe("created", binding)),
+            Created = (_, binding, _, _) => phases.Add(Describe("created", binding)),
             BeforeMount = (_, binding, _, _) =>
                 phases.Add(Describe("before-mount", binding)),
-            Mounted = (_, binding, _, _) =>
-                phases.Add(Describe("mounted", binding)),
+            Mounted = (_, binding, _, _) => phases.Add(Describe("mounted", binding)),
             BeforeUpdate = (_, binding, _, _) =>
                 phases.Add(Describe("before-update", binding)),
-            Updated = (_, binding, _, _) =>
-                phases.Add(Describe("updated", binding)),
+            Updated = (_, binding, _, _) => phases.Add(Describe("updated", binding)),
             BeforeUnmount = (_, binding, _, _) =>
                 phases.Add(Describe("before-unmount", binding)),
-            Unmounted = (_, binding, _, _) =>
-                phases.Add(Describe("unmounted", binding)),
+            Unmounted = (_, binding, _, _) => phases.Add(Describe("unmounted", binding)),
         };
-    }
 
-    private static string Describe(
-        string phase,
-        DirectiveBinding binding)
-    {
-        return $"{phase}:{binding.Value}:{binding.PreviousValue ?? "null"}";
-    }
+    private static string Describe(string phase, DirectiveBinding binding) =>
+        $"{phase}:{binding.Value}:{binding.PreviousValue ?? "null"}";
 
-    private static IApplicationContext CreateApplication(
-        IComponent root,
+    private static ApplicationContext CreateApplication(
+        VirtualNode root,
         IDirective directive,
-        ApplicationOptions? options = null)
-    {
-        return new ApplicationContext(
-            root,
-            new ComponentFactory(Array.Empty<ComponentRegistration>()),
-            new EmptyServiceProvider(),
-            directives: Registry(directive),
-            options: options);
-    }
+        Action<Exception, ComponentContext?, string>? errorHandler = null) =>
+        new(
+            new ApplicationOptions
+            {
+                RootComponent = root,
+                Directives = new DirectiveRegistry(
+                [
+                    new KeyValuePair<Type, IDirective>(
+                        typeof(RecordingDirectiveToken),
+                        directive),
+                ]),
+                ErrorHandler = errorHandler,
+            });
 
-    private static DirectiveRegistry Registry(IDirective directive)
+    private sealed class RecordingDirectiveToken
     {
-        return new DirectiveRegistry(
-        [
-            new KeyValuePair<string, IDirective>("record", directive),
-        ]);
-    }
-
-    private sealed class RootTemplate : IComponentTemplate
-    {
-        public ComponentRenderer Setup(IComponentContext context)
-        {
-            return static () => ComponentTree.Element("main");
-        }
-    }
-
-    private sealed class OptionTemplate : IComponentTemplate
-    {
-        public ComponentRenderer Setup(IComponentContext context)
-        {
-            return static () => ComponentTree.Element("option");
-        }
-    }
-
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType)
-        {
-            return null;
-        }
     }
 }

@@ -35,7 +35,7 @@ dotnet CLI with no installer and no admin rights.
 | Piece | Mechanism |
 | --- | --- |
 | WASM browser app model | `Sdk.props`/`Sdk.targets` chain `Microsoft.NET.Sdk.WebAssembly` |
-| The framework libraries (`Assimalign.Viu.Shared`, `.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
+| The framework libraries (`Assimalign.Viu.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
 | The `[Reactive]` and `.viu`/`.vue` source generators | Shipped inside the `Assimalign.Viu.App.Ref` targeting pack at `analyzers/dotnet/cs/` and listed as `<File Type="Analyzer">` in its `data/FrameworkList.xml` |
 | `.viu` and tag-based `.vue` single-file component compilation | The generator's AdditionalFiles/CompilerVisibleProperty wiring in [Targets/Assimalign.Viu.Generators.Syntax.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props) and [.targets](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.targets) — the single authoritative copy, packed into the SDK's `Targets/` and also imported directly by in-repo projects. `.vue` scripts require explicit `lang="csharp"`; JavaScript is never executed |
 | `.viu`/`.vue` component-style CSS bundling | The `ViuBundleCss` MSBuild task (+ parser closure) in the SDK package's `Tasks/`, driven by the packed `Assimalign.Viu.Sdk.Css.Bundling.targets`. The bundle registers as a **content-fingerprinted** static web asset ([V01.01.12.12.03]) |
@@ -49,7 +49,7 @@ The framework reference resolves to two NuGet packages (the
 
 | Package | Contents | When restored |
 | --- | --- | --- |
-| `Assimalign.Viu.App.Ref` | `ref/net10.0/` reference assemblies, `data/FrameworkList.xml`, `analyzers/dotnet/cs/` generators | Compile time |
+| `Assimalign.Viu.App.Ref` | `ref/net10.0/` reference assemblies, `data/FrameworkList.xml`, `data/PackageOverrides.txt` for standalone-package conflict resolution, `analyzers/dotnet/cs/` generators | Compile time |
 | `Assimalign.Viu.App.Runtime.browser-wasm` | `runtimes/browser-wasm/lib/net10.0/` implementation assemblies, `data/RuntimeList.xml` | App build/publish |
 
 Opt out / pin independently:

@@ -1,4 +1,4 @@
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -18,7 +18,7 @@ public class BlockTreeEmissionTests
     public void SingleRootElement_OpensBlockWithTrackingEnabled()
     {
         var result = TransformTestHelpers.Transform("<div></div>");
-        var codegen = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var codegen = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
 
         codegen.IsBlock.ShouldBeTrue();
         codegen.DisableTracking.ShouldBeFalse();
@@ -30,7 +30,7 @@ public class BlockTreeEmissionTests
     public void SingleRootComponent_OpensBlockViaCreateBlock()
     {
         var result = TransformTestHelpers.Transform("<Comp></Comp>");
-        var codegen = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var codegen = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
 
         codegen.IsBlock.ShouldBeTrue();
         codegen.IsComponent.ShouldBeTrue();
@@ -46,23 +46,23 @@ public class BlockTreeEmissionTests
         // Only block roots open blocks; a nested dynamic element stays a plain (element) vnode carrying its
         // patch flag, to be collected into the parent block's dynamicChildren at runtime.
         var result = TransformTestHelpers.Transform("<div><span :id=\"x\"></span></div>");
-        var root = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var root = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         var children = root.Children.ShouldBeOfType<SyntaxList<TemplateChildNode>>();
 
-        var span = result.GetCodegenNode(children[0]).ShouldBeOfType<VNodeCall>();
+        var span = result.GetCodegenNode(children[0]).ShouldBeOfType<VirtualNodeCall>();
         span.IsBlock.ShouldBeFalse();
-        span.ShouldHavePatchFlag(PatchFlags.Props);
-        span.DynamicProps.ShouldBe("[\"id\"]");
+        span.ShouldHavePatchFlag(PatchFlags.Properties);
+        span.DynamicProperties.ShouldBe("[\"id\"]");
     }
 
     [Fact]
     public void FullyStaticSubtree_HasNeitherBlockNorFlagBelowTheRoot()
     {
         var result = TransformTestHelpers.Transform("<div><span></span></div>");
-        var root = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var root = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         var children = root.Children.ShouldBeOfType<SyntaxList<TemplateChildNode>>();
 
-        var span = result.GetCodegenNode(children[0]).ShouldBeOfType<VNodeCall>();
+        var span = result.GetCodegenNode(children[0]).ShouldBeOfType<VirtualNodeCall>();
         span.IsBlock.ShouldBeFalse();
         span.PatchFlag.ShouldBeNull();
     }
@@ -75,10 +75,10 @@ public class BlockTreeEmissionTests
         // transformElement.ts forces a block for svg/foreignObject/math because their namespace boundary breaks
         // the flat dynamicChildren assumption of the enclosing block.
         var result = TransformTestHelpers.Transform("<div><svg></svg></div>");
-        var root = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var root = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
         var children = root.Children.ShouldBeOfType<SyntaxList<TemplateChildNode>>();
 
-        var svg = result.GetCodegenNode(children[0]).ShouldBeOfType<VNodeCall>();
+        var svg = result.GetCodegenNode(children[0]).ShouldBeOfType<VirtualNodeCall>();
         svg.IsBlock.ShouldBeTrue();
     }
 
@@ -88,7 +88,7 @@ public class BlockTreeEmissionTests
     public void MultiRoot_EmitsStableFragmentBlock()
     {
         var result = TransformTestHelpers.Transform("<div></div><span></span>");
-        var codegen = result.RootCodegen().ShouldBeOfType<VNodeCall>();
+        var codegen = result.RootCodegen().ShouldBeOfType<VirtualNodeCall>();
 
         codegen.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         codegen.IsBlock.ShouldBeTrue();
@@ -105,10 +105,10 @@ public class BlockTreeEmissionTests
         var ifNode = result.SingleChild().ShouldBeOfType<IfNode>();
 
         var conditional = result.GetCodegenNode(ifNode).ShouldBeOfType<ConditionalExpression>();
-        var branchBlock = conditional.Consequent.ShouldBeOfType<VNodeCall>();
+        var branchBlock = conditional.Consequent.ShouldBeOfType<VirtualNodeCall>();
         branchBlock.IsBlock.ShouldBeTrue();
         branchBlock.DisableTracking.ShouldBeFalse();
-        branchBlock.Props.ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("0");
+        branchBlock.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("0");
     }
 
     // ---- v-for: a fragment block whose tracking is disabled when the source is dynamic ----
@@ -118,7 +118,7 @@ public class BlockTreeEmissionTests
     {
         var result = TransformTestHelpers.Transform("<div v-for=\"i in list\">{{ i }}</div>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
-        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>();
+        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>();
 
         fragment.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         fragment.IsBlock.ShouldBeTrue();
@@ -133,11 +133,11 @@ public class BlockTreeEmissionTests
         // vFor.spec.ts: the per-item vnode is forced into a block so each item roots its own dynamicChildren.
         var result = TransformTestHelpers.Transform("<div v-for=\"i in list\">{{ i }}</div>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
-        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>();
+        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>();
 
         var renderList = fragment.Children.ShouldBeOfType<CallExpression>();
         var iterator = renderList.Arguments[1].ShouldBeOfType<FunctionExpression>();
-        var itemBlock = iterator.Returns.ShouldBeOfType<VNodeCall>();
+        var itemBlock = iterator.Returns.ShouldBeOfType<VirtualNodeCall>();
         itemBlock.Tag.ShouldBe("\"div\"");
         itemBlock.IsBlock.ShouldBeTrue();
         itemBlock.ShouldHavePatchFlag(PatchFlags.Text);
@@ -149,7 +149,7 @@ public class BlockTreeEmissionTests
         var result = TransformTestHelpers.Transform("<div v-for=\"i in list\" :key=\"i.id\"></div>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
 
-        result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>().ShouldHavePatchFlag(PatchFlags.KeyedFragment);
+        result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>().ShouldHavePatchFlag(PatchFlags.KeyedFragment);
     }
 
     [Fact]
@@ -159,11 +159,11 @@ public class BlockTreeEmissionTests
         // fixed child order => STABLE_FRAGMENT.
         var result = TransformTestHelpers.Transform("<template v-for=\"i in list\"><div></div><p></p></template>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
-        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>();
+        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>();
 
         fragment.ShouldHavePatchFlag(PatchFlags.UnkeyedFragment);
         var iterator = fragment.Children.ShouldBeOfType<CallExpression>().Arguments[1].ShouldBeOfType<FunctionExpression>();
-        var wrapper = iterator.Returns.ShouldBeOfType<VNodeCall>();
+        var wrapper = iterator.Returns.ShouldBeOfType<VirtualNodeCall>();
         wrapper.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         wrapper.IsBlock.ShouldBeTrue();
         wrapper.ShouldHavePatchFlag(PatchFlags.StableFragment);
@@ -176,13 +176,13 @@ public class BlockTreeEmissionTests
     {
         var result = TransformTestHelpers.Transform("<div v-for=\"i in list\"><span v-if=\"i.ok\"></span></div>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
-        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>();
+        var fragment = result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>();
 
         fragment.ShouldHavePatchFlag(PatchFlags.UnkeyedFragment);
         fragment.DisableTracking.ShouldBeTrue();
 
         var iterator = fragment.Children.ShouldBeOfType<CallExpression>().Arguments[1].ShouldBeOfType<FunctionExpression>();
-        var itemBlock = iterator.Returns.ShouldBeOfType<VNodeCall>();
+        var itemBlock = iterator.Returns.ShouldBeOfType<VirtualNodeCall>();
         itemBlock.Tag.ShouldBe("\"div\"");
         itemBlock.IsBlock.ShouldBeTrue();
 
@@ -191,7 +191,7 @@ public class BlockTreeEmissionTests
         var innerIf = itemChildren[0].ShouldBeOfType<IfNode>();
         var conditional = result.GetCodegenNode(innerIf).ShouldBeOfType<ConditionalExpression>();
         conditional.Test.StaticContent().ShouldBe("i.ok");
-        conditional.Consequent.ShouldBeOfType<VNodeCall>().IsBlock.ShouldBeTrue();
+        conditional.Consequent.ShouldBeOfType<VirtualNodeCall>().IsBlock.ShouldBeTrue();
     }
 
     [Fact]
@@ -203,11 +203,11 @@ public class BlockTreeEmissionTests
         var ifNode = result.SingleChild().ShouldBeOfType<IfNode>();
 
         var conditional = result.GetCodegenNode(ifNode).ShouldBeOfType<ConditionalExpression>();
-        var branchBlock = conditional.Consequent.ShouldBeOfType<VNodeCall>();
+        var branchBlock = conditional.Consequent.ShouldBeOfType<VirtualNodeCall>();
         branchBlock.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         branchBlock.IsBlock.ShouldBeTrue();
         branchBlock.DisableTracking.ShouldBeTrue();
         branchBlock.ShouldHavePatchFlag(PatchFlags.UnkeyedFragment);
-        branchBlock.Props.ShouldBeOfType<ObjectExpression>().Property("key").Value.StaticContent().ShouldBe("0");
+        branchBlock.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("key").Value.StaticContent().ShouldBe("0");
     }
 }

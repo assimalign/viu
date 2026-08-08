@@ -4,14 +4,13 @@ using Xunit;
 namespace Assimalign.Viu.Reactivity.Tests;
 
 // These [Reactive]/[ShallowReactive] partial classes are implemented by the
-// Assimalign.Viu.Generators.Reactivity source generator (wired into this test project via
-// ViuAnalyzerReference). The tests below consume the generated output to pin track/trigger
-// semantics end to end: reactivity is emitted at build time, never intercepted at runtime
-// ([RCT-6]).
+// Assimalign.Viu.Generators.Reactivity source generator (wired into this test project through
+// ViuAnalyzerReference). The tests consume generated output to pin track/trigger semantics end to
+// end: reactivity is emitted at build time, never intercepted at runtime ([RCT-6]).
 
 /// <summary>A deep reactive object used by the generated-object behavioral tests.</summary>
 [Reactive]
-public partial class ReactivePerson
+internal partial class ReactivePerson
 {
     /// <summary>The person's name.</summary>
     public partial string Name { get; set; }
@@ -22,7 +21,7 @@ public partial class ReactivePerson
 
 /// <summary>A deep reactive object that composes a nested reactive object.</summary>
 [Reactive]
-public partial class ReactiveOrder
+internal partial class ReactiveOrder
 {
     /// <summary>The nested reactive customer.</summary>
     public partial ReactivePerson Customer { get; set; }
@@ -33,7 +32,7 @@ public partial class ReactiveOrder
 
 /// <summary>A shallow reactive object: only root-level property replacement is deep-traversed.</summary>
 [ShallowReactive]
-public partial class ShallowBox
+internal partial class ShallowBox
 {
     /// <summary>The nested reactive content (tracked as a slot, not recursed by deep watch).</summary>
     public partial ReactivePerson Content { get; set; }
@@ -72,13 +71,11 @@ public sealed class GeneratedReactiveObjectTests
     }
 
     [Fact]
-    public void ReactiveObject_ExposesRawAndPerPropertyDependency()
+    public void ReactiveObject_ExposesPerPropertyDependency()
     {
         var person = new ReactivePerson { Name = "Ada" };
         var reactive = (IReactiveObject)person;
 
-        // No identity-swapping wrapper: the instance is its own raw (documented divergence from reactive()).
-        reactive.ToRaw().ShouldBeSameAs(person);
         reactive.GetDependency("Name").ShouldNotBeNull();
         reactive.GetDependency("Age").ShouldNotBeNull();
         reactive.GetDependency("DoesNotExist").ShouldBeNull();

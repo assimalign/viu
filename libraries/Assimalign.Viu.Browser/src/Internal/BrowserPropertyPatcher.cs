@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
@@ -41,6 +43,62 @@ internal static class BrowserPropertyPatcher
     {
         "draggable", "spellcheck", "translate",
     };
+
+    /// <summary>Applies one explicit adopted element-binding difference.</summary>
+    internal static void Patch(
+        BrowserPropertyLeafOperations leafOperations,
+        int element,
+        QualifiedName elementName,
+        ElementBinding? previousBinding,
+        ElementBinding? nextBinding)
+    {
+        if (previousBinding is not null
+            && nextBinding is not null
+            && (previousBinding.Kind != nextBinding.Kind
+                || previousBinding.Name != nextBinding.Name))
+        {
+            Patch(leafOperations, element, elementName, previousBinding, null);
+            Patch(leafOperations, element, elementName, null, nextBinding);
+            return;
+        }
+
+        ElementBinding? binding = nextBinding ?? previousBinding;
+        if (binding is null)
+        {
+            return;
+        }
+
+        object? previousValue = previousBinding?.Value;
+        object? nextValue = nextBinding?.Value;
+        string name = binding.Name.ToString();
+        string? elementNamespace = BrowserNamespacePolicy.Resolve(elementName);
+        switch (binding.Kind)
+        {
+            case ElementBindingKind.Event:
+                leafOperations.SetEventListener(element, name, nextValue as Delegate);
+                break;
+            case ElementBindingKind.Property:
+                if (string.Equals(name, "class", StringComparison.Ordinal))
+                {
+                    PatchClass(leafOperations, element, nextValue, elementNamespace);
+                }
+                else if (string.Equals(name, "style", StringComparison.Ordinal))
+                {
+                    PatchStyle(leafOperations, element, previousValue, nextValue);
+                }
+                else
+                {
+                    PatchDomProperty(leafOperations, element, name, nextValue);
+                }
+
+                break;
+            case ElementBindingKind.Attribute:
+                PatchAttribute(leafOperations, element, name, nextValue, elementNamespace);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown element-binding kind: {binding.Kind}.");
+        }
+    }
 
     /// <summary>Lands one prop change on <paramref name="element"/> through the leaf ops.</summary>
     /// <param name="leafOperations">The platform leaf appliers.</param>

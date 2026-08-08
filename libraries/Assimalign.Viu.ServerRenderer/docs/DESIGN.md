@@ -1,148 +1,62 @@
-# Assimalign.Viu.ServerRenderer — design
+# Assimalign.Viu.ServerRenderer design
 
-Server rendering emits HTML for the same unified component tree the client renderers patch, on a
-plain .NET host with no DOM or interop dependency. The normative statement of what it emits is
-[`docs/SPECIFICATION.md` §11](../../../docs/SPECIFICATION.md#11-server-rendering-and-hydration);
-this document records why the area is shaped the way it is.
+## One-shot host model
 
-## One component tree for client and server
+ServerRenderer is a serializer over Components' existing `VirtualNode` algebra. It does not define a
+parallel server node model or depend on Core's persistent mounted renderer. `ServerRenderApplication`
+is immutable per-render composition and deliberately does not participate in browser application
+middleware (`[SSR-2]`, `[SSR-3]`).
 
-ServerRenderer consumes `IComponent`; it does not maintain a second virtual-node model.
-`ComponentTreeSerializer` dispatches by `ComponentKind`:
+A component subtree is obtained only through
+`ComponentHost.RenderAsync(ComponentRenderRequest)`. The returned `IComponentRenderScope` keeps the
+authored instance, context, reactive scope, and parent relationship alive while serialization reads
+`scope.Tree`. Nested component requests use that still-live scope as their parent. Disposal cancels
+the lifetime, stops its scope, and disposes the authored instance without invoking client mount or
+unmount hooks (`[SSR-4]`, `[SSR-5]`, `[SSR-10]`).
 
-- elements serialize their immutable attributes and children;
-- text is escaped;
-- comments are sanitized;
-- static content is written verbatim;
-- fragments emit hydration anchors;
-- teleports emit origin anchors and buffer target content;
-- template requests activate an `IComponentTemplate` and serialize its rendered subtree.
+This lease is the complete runtime seam. ServerRenderer does not downcast `ComponentContext`, reach
+internal mounted state, probe hidden capabilities, or require friend access (`[CMP-33]`).
 
-This runtime walk is the reference behavior for a future compiler-informed string-concatenation
-path. Compiler optimizations may skip portions of the walk, but must produce byte-identical HTML —
-compiled server rendering is an optimization of this walk, never a second semantics.
+## Serialization
 
-## Core owns component semantics
+The serializer exhaustively dispatches all ten `VirtualNodeKind` values. Elements apply the escaping,
+attribute-name safety, boolean-attribute, casing, class/style, child-override, and raw-HTML rules in
+`[SSR-6]`. Static HTML is emitted only from compiler-trusted `StaticNode` values; static Extensible
+Markup Language payloads are rejected because they require a different serializer.
 
-The server renderer does not duplicate component context, argument resolution, attribute fallthrough,
-effect-scope ownership, task observation, or error propagation. Core grants ServerRenderer internal
-access to `MountedComponent` (`InternalsVisibleTo`) precisely so that one component pipeline serves
-both hosts; duplicating it in the server area is what would let the two drift.
+`RenderToStringAsync` accumulates one result. `RenderToStreamAsync` writes to the caller's
+`TextWriter` and flushes after a completed component subtree, so the destination controls
+backpressure. The renderer borrows the writer and never closes or disposes it (`[SSR-1]`).
 
-For each `ITemplateComponent`, `ServerComponentRenderer`:
+Ordinary client lifecycle hooks do not run. Core awaits every `OnServerPrefetch` callback before the
+first render, and cancellation interrupts that wait. Suspense serializes its resolved default branch;
+KeepAlive and Transition serialize their lazy content without client-only behavior.
 
-1. activates a fresh template through `IApplicationContext.Components`;
-2. creates the shared live `IComponentContext` and reactive effect scope;
-3. runs synchronous `Setup`;
-4. awaits every `OnServerPrefetch` callback;
-5. invokes the returned `ComponentRenderer` once;
-6. serializes the resulting `IComponent` subtree;
-7. stops the temporary scope, cancels the component-lifetime token, and disposes the mount-owned
-   template.
+## Hydration protocol and teleports
 
-Client-only before-mount, mounted, update, and unmount callbacks do not run during SSR. Render
-cancellation interrupts the prefetch wait and cancels the component-lifetime token during cleanup.
-Errors use the same ancestor `OnErrorCaptured` chain and terminal application error handler as client
-renderers.
+Core's `HydrationMarkers` is the only source of fragment and teleport marker text. ServerRenderer
+consumes those values directly so server output and client hydration cannot drift
+(`[SSR-MARKERS-1]` through `[SSR-MARKERS-3]`).
 
-## Application composition
+An enabled teleport emits origin anchors and buffers its children plus the target anchor. A disabled
+teleport renders children at the origin and contributes only the target anchor. `SsrContext` owns
+those per-render buffers and a free-form state handoff bag; the serializer does not interpret the
+state values (`[SSR-7]`).
 
-`ServerRenderApplication` is a plain composition object because server rendering has no persistent
-mounted host lifetime. It does not own a `Renderer<TNode>` or host container, does not implement
-`IApplication`, and carries the same immutable `IApplicationContext` that component execution reads.
+## Composition, ownership, and AOT
 
-`ServerApplicationBuilder` is therefore standalone rather than an `IApplicationBuilder`: that
-interface builds a runnable host, while this builder produces `ServerRenderApplication`. The builder
-has one composition operation, `ConfigureApplication(Action<ApplicationOptions>)`. `Build()` validates
-the required root and snapshots the current root, resolvers, optional state and directives, and
-diagnostics into a new `ApplicationContext`; later option mutations cannot change that context. The
-low-level `ServerRenderApplication(IApplicationContext)` constructor remains available when a host has
-already assembled an immutable context.
+The application supplies a component factory, nullable services, state registry, directives, and
+diagnostics through `IApplicationContext`. ServerRenderer borrows all of them, and a host should use
+one application per request when those dependencies are request-scoped (`[CMP-9]`, `[SSR-9]`). No
+Viu library references a web framework; a web adapter is downstream and maps its request, response,
+services, abort token, and state separately (`[SSR-8]`).
 
-The application receives three independent, borrowed composition services:
+Component activation is explicit and registration-based. Serialization dispatches known node kinds
+and binding forms without runtime type discovery, reflection-based serialization, emitted code, or
+dynamic activation (`[EXE-4]`).
 
-- `IComponentFactory` activates templates;
-- `IServiceProvider` resolves application services;
-- `IStateStoreRegistry` optionally supplies application state.
+## Non-goals
 
-ServerRenderer does not own or dispose any of them. It does not implement component-tree
-provide/inject. Applications that need hierarchical dependency behavior can choose an appropriate
-service provider or component factory at their own composition boundary.
-
-Top-level application middleware surrounds one live hosted application, so server rendering
-deliberately bypasses it. A future interception surface, if required, would be a per-render contract
-carrying the `SsrContext`, output, and cancellation token; D5 explicitly defers that separate design.
-Because a server-render application may carry request-scoped services or state, server hosts should
-create one composition object per request.
-
-## Async and streaming model
-
-Ordering is expressed as a single async recursion rather than as a tree of nested string, buffer,
-and promise segments unrolled after the fact: a child template's server-prefetch tasks are awaited
-inline before its subtree serializes. One recursion means the emission order *is* the tree order, so
-no separate unroll pass can reorder output.
-
-`SsrWriter` is the one character sink for a render. String mode accumulates in one `StringBuilder`.
-Streaming mode drains that buffer at completed-template boundaries and awaits `TextWriter.FlushAsync`,
-so the destination controls backpressure.
-
-Teleport content is the intentional exception: enabled teleport children belong to another target and
-must be buffered in `SsrContext` until the full render resolves target output. Teleport buffer states
-share the same application, cancellation token, and component-identifier sequence as the main tree.
-
-## Escaping and attributes
-
-`ServerRender.EscapeHtml` escapes `"`, `&`, `'`, `<`, and `>` — a deliberate superset of the WHATWG
-minimal set, so one routine is correct for both text and attribute values and no caller has to
-choose. `EscapeHtmlComment` repeatedly removes comment terminators. Attribute serialization:
-
-- skips renderer metadata, event listeners, forced properties, and element child overrides;
-- normalizes class and style values;
-- renders HTML boolean attributes by presence;
-- preserves SVG/custom-element casing;
-- drops unsafe dynamic attribute names instead of attempting to escape the name.
-
-`innerHTML` is the explicit raw-HTML path. `textContent` and a textarea's `value` are escaped and
-suppress normal child serialization.
-
-## Hydration marker contract
-
-These exact strings are a cross-package contract; changing one is a breaking change to the
-hydration protocol, because markup already served by a deployed application would stop hydrating
-([`[SSR-MARKERS-1]`](../../../docs/SPECIFICATION.md#112-the-hydration-marker-protocol)):
-
-| Component tree value | Main output |
-|---|---|
-| Text | escaped text |
-| Comment | `<!--content-->`; empty content is `<!---->` |
-| Static | raw content |
-| Element | `<tag attributes>children</tag>` |
-| Void element | `<tag attributes>` |
-| Fragment | `<!--[-->children<!--]-->` |
-| Template | rendered subtree, with no template wrapper |
-| Enabled teleport | `<!--teleport start--><!--teleport end-->` |
-| Disabled teleport | `<!--teleport start-->children<!--teleport end-->` |
-
-An enabled teleport target buffer receives its children followed by
-`<!--teleport anchor-->`. A disabled teleport renders children in place and contributes only the
-target anchor. A missing or non-string target emits the origin anchors and skips the target content.
-
-These markers are consumed today by Core's host-neutral `Renderer<TNode>.Hydrate` implementation
-through a host-supplied `HydrationNodeReader<TNode>`. The ServerRenderer suite pins that contract
-end to end by rendering real HTML, parsing it into Testing's in-memory host tree, and hydrating it
-with both:
-
-- `TestHydrationReader`, which reads the live tree; and
-- `FrozenTestHydrationReader`, which captures an immutable pre-walk equivalent to Browser's batched
-  DOM snapshot.
-
-The round trips cover fragments, activated template roots followed by reactive client updates, and
-Teleport origin/target ranges. Frozen-reader mismatch coverage also verifies that a server-emitted
-fragment range is collected before mutation and removed exactly once.
-
-## Deferred work
-
-- compiler-informed server render generation;
-- server-framework adapters and byte-oriented `PipeWriter` integration;
-- static-site generation;
-- directive-specific server properties and built-in Suspense/KeepAlive behavior.
+ServerRenderer does not own request scopes, web responses, browser application lifetime, DOM
+hydration, client directives, transition timing, persistent mounted state, or dependency disposal.
+Scoped style stamping is absent while scoped CSS is deferred (`[STY-1]`).

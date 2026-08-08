@@ -288,7 +288,7 @@ public sealed class SingleFileComponentUsageValidationTests
     // A minimal stand-in for the shipping Assimalign.Viu.Components surface plus a packaged component
     // that uses it, compiled to metadata. Keeping it synthetic keeps this generator test project free of
     // a runtime-library reference while exercising the exact symbol shapes the catalog reader looks for:
-    // the assembly name it filters on, the interface, and the attribute.
+    // the assembly name it filters on, the adopted component/base contracts, and the attribute.
     private static IReadOnlyList<MetadataReference> CompilePackagedComponent()
     {
         var components = Emit(
@@ -296,7 +296,21 @@ public sealed class SingleFileComponentUsageValidationTests
             """
             namespace Assimalign.Viu.Components
             {
-                public interface IComponentTemplate { }
+                public sealed class ComponentContext { }
+
+                public sealed class ComponentRenderFrame { }
+
+                public delegate object ComponentRenderer(ComponentRenderFrame frame);
+
+                public interface IComponent
+                {
+                    ComponentRenderer Setup(ComponentContext context);
+                }
+
+                public abstract class ComponentBase
+                {
+                    protected ComponentContext Context { get; set; }
+                }
 
                 [System.AttributeUsage(System.AttributeTargets.Property)]
                 public sealed class ParameterAttribute : System.Attribute
@@ -315,8 +329,17 @@ public sealed class SingleFileComponentUsageValidationTests
             """
             namespace Widgets
             {
-                public sealed class PackagedCard : Assimalign.Viu.Components.IComponentTemplate
+                public sealed class PackagedCard :
+                    Assimalign.Viu.Components.ComponentBase,
+                    Assimalign.Viu.Components.IComponent
                 {
+                    public Assimalign.Viu.Components.ComponentRenderer Setup(
+                        Assimalign.Viu.Components.ComponentContext context)
+                    {
+                        Context = context;
+                        return frame => null;
+                    }
+
                     [Assimalign.Viu.Components.Parameter(IsRequired = true)]
                     public string Title { get; set; }
 

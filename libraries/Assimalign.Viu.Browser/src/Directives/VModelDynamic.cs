@@ -1,25 +1,20 @@
 using System;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// The <c>v-model</c> directive for elements whose concrete model directive is selected from the
-/// current element tag and input type at runtime.
-/// </summary>
+/// <summary>Selects Browser model behavior from the current element name and input type.</summary>
 /// <remarks>
-/// Used where the compiler cannot prove which model directive applies — a dynamic <c>:type</c>, or a
-/// <c>&lt;component :is&gt;</c> that resolves to an element tag. Each hook re-resolves the concrete
-/// directive from the element's current tag and type and forwards to it, so a control that changes
-/// type between renders is torn down and re-bound with the right semantics rather than keeping the
-/// first one it happened to match.
+/// Generated code uses this qualified public token only when the concrete native control cannot
+/// be proven at compile time. Each lifecycle phase re-resolves the current immutable element.
+/// File inputs fail because browsers prohibit programmatic two-way value binding. Specified by
+/// <c>[SFC-CG-6]</c> and <c>[SFC-CG-7]</c>.
 /// </remarks>
 public sealed class VModelDynamic : IDirective
 {
-    /// <summary>The shared directive instance the compiler references.</summary>
-    public static readonly VModelDynamic Instance = new();
+    /// <summary>Gets the reusable Browser dynamic-model directive.</summary>
+    public static VModelDynamic Instance { get; } = new();
 
     private VModelDynamic()
     {
@@ -43,72 +38,94 @@ public sealed class VModelDynamic : IDirective
     private static void OnCreated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        Resolve(component).Created?.Invoke(
-            element,
-            binding,
-            component,
-            previousComponent);
+        IDirective directive = Resolve(value);
+        directive.Created?.Invoke(element, binding, value, previousValue);
+        BrowserDirectiveOperations.Require()
+            .GetState(BrowserModelDirective.Handle(element))
+            .DynamicDirective = directive;
     }
 
     private static void OnMounted(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        Resolve(component).Mounted?.Invoke(
-            element,
-            binding,
-            component,
-            previousComponent);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        BrowserModelState state = operations.GetState(BrowserModelDirective.Handle(element));
+        IDirective directive = state.DynamicDirective ?? Resolve(value);
+        directive.Mounted?.Invoke(element, binding, value, previousValue);
+        operations.GetState(BrowserModelDirective.Handle(element)).DynamicDirective = directive;
     }
 
     private static void OnBeforeUpdate(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        Resolve(component).BeforeUpdate?.Invoke(
-            element,
-            binding,
-            component,
-            previousComponent);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        BrowserModelState state = operations.GetState(handle);
+        IDirective nextDirective = Resolve(value);
+        IDirective currentDirective = state.DynamicDirective
+            ?? (previousValue is null ? nextDirective : Resolve(previousValue));
+        if (ReferenceEquals(currentDirective, nextDirective))
+        {
+            nextDirective.BeforeUpdate?.Invoke(element, binding, value, previousValue);
+            operations.GetState(handle).DynamicDirective = nextDirective;
+            return;
+        }
+
+        currentDirective.BeforeUnmount?.Invoke(element, binding, value, previousValue);
+        BrowserModelDirective.ClearModelListeners(operations, handle);
+        nextDirective.Created?.Invoke(element, binding, value, previousValue);
+        BrowserModelState nextState = operations.GetState(handle);
+        nextState.DynamicDirective = nextDirective;
+        nextState.DynamicMountPending = true;
     }
 
     private static void OnUpdated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        Resolve(component).Updated?.Invoke(
-            element,
-            binding,
-            component,
-            previousComponent);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        BrowserModelState state = operations.GetState(handle);
+        IDirective directive = state.DynamicDirective ?? Resolve(value);
+        if (state.DynamicMountPending)
+        {
+            state.DynamicMountPending = false;
+            directive.Mounted?.Invoke(element, binding, value, previousValue);
+            operations.GetState(handle).DynamicDirective = directive;
+            return;
+        }
+
+        directive.Updated?.Invoke(element, binding, value, previousValue);
     }
 
     private static void OnBeforeUnmount(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        Resolve(component).BeforeUnmount?.Invoke(
-            element,
-            binding,
-            component,
-            previousComponent);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        IDirective directive = operations.GetState(handle).DynamicDirective ?? Resolve(value);
+        directive.BeforeUnmount?.Invoke(element, binding, value, previousValue);
+        BrowserModelDirective.ClearModelListeners(operations, handle);
     }
 
-    private static IDirective Resolve(IElementComponent component)
+    private static IDirective Resolve(ElementNode value)
     {
         if (string.Equals(
-            component.Tag,
+            value.Name.LocalName,
             "select",
             StringComparison.OrdinalIgnoreCase))
         {
@@ -116,19 +133,28 @@ public sealed class VModelDynamic : IDirective
         }
 
         if (string.Equals(
-            component.Tag,
+            value.Name.LocalName,
             "textarea",
             StringComparison.OrdinalIgnoreCase))
         {
             return VModelText.Instance;
         }
 
-        return BrowserModelDirective.FormatValue(
-            BrowserModelDirective.Property(component, "type")) switch
+        string inputType = BrowserModelDirective.FormatValue(
+            BrowserModelDirective.Property(value, "type"));
+        if (string.Equals(inputType, "file", StringComparison.OrdinalIgnoreCase))
         {
-            "checkbox" => VModelCheckbox.Instance,
-            "radio" => VModelRadio.Instance,
-            _ => VModelText.Instance,
-        };
+            throw new InvalidOperationException(
+                "v-model cannot be used on a file input; consume its change event instead.");
+        }
+
+        if (string.Equals(inputType, "checkbox", StringComparison.OrdinalIgnoreCase))
+        {
+            return VModelCheckbox.Instance;
+        }
+
+        return string.Equals(inputType, "radio", StringComparison.OrdinalIgnoreCase)
+            ? VModelRadio.Instance
+            : VModelText.Instance;
     }
 }

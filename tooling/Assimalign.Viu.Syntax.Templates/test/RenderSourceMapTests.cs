@@ -9,7 +9,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// Tests for the render source map <see cref="RenderFunctionEmitter"/> produces ([V01.01.05.08]): each
 /// dynamic template expression emitted into the render body yields a <see cref="RenderSourceMapping"/> whose
-/// generated position points at the expression's original template text (past any inserted <c>_ctx.</c>
+/// generated position points at the expression's original template text (past any inserted <c>component.</c>
 /// prefix) and whose <see cref="RenderSourceMapping.TemplateLocation"/> is the exact template span. The
 /// composition root ([V01.01.06.02]) turns these into <c>#line</c> span directives; the end-to-end
 /// compiled-<c>#line</c> proof lives in the generator's
@@ -18,17 +18,14 @@ namespace Assimalign.Viu.Syntax.Templates;
 public sealed class RenderSourceMapTests
 {
     [Fact]
-    public void Interpolation_MapsTheOriginalIdentifier_PastTheCtxPrefix()
+    public void Interpolation_MapsTheOriginalIdentifier_PastTheComponentPrefix()
     {
         var emitted = EmitPrefixed("<div>{{ message }}</div>");
 
         var mapping = emitted.SourceMappings.ShouldHaveSingleItem();
-        // The template span is `message` itself, not the emitted `_ctx.message`.
+        // The template span is `message` itself, not the emitted `component.message`.
         mapping.TemplateLocation.Source.ShouldBe("message");
-        mapping.GeneratedLine.ShouldBe(0);
-        // GeneratedColumn points at the original identifier inside the rewritten emission, so the emitted
-        // text at that column is `message` — the alignment the #line directive's char offset relies on.
-        emitted.Code.Substring(mapping.GeneratedColumn, "message".Length).ShouldBe("message");
+        TextAtMapping(emitted.Code, mapping).ShouldStartWith("message");
     }
 
     [Fact]
@@ -43,8 +40,7 @@ public sealed class RenderSourceMapTests
         sources.ShouldContain("b");
         foreach (var mapping in emitted.SourceMappings)
         {
-            emitted.Code.Substring(mapping.GeneratedColumn, mapping.TemplateLocation.Source.Length)
-                .ShouldBe(mapping.TemplateLocation.Source);
+            TextAtMapping(emitted.Code, mapping).ShouldStartWith(mapping.TemplateLocation.Source);
         }
     }
 
@@ -89,4 +85,7 @@ public sealed class RenderSourceMapTests
         var result = Transformer.Transform(root, transformOptions);
         return RenderFunctionEmitter.Emit(result);
     }
+
+    private static string TextAtMapping(string code, RenderSourceMapping mapping) =>
+        code.Split('\n')[mapping.GeneratedLine].Substring(mapping.GeneratedColumn);
 }

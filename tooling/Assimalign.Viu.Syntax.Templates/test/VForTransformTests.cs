@@ -1,4 +1,4 @@
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -59,7 +59,7 @@ public class VForTransformTests
         var result = TransformTestHelpers.Transform("<div v-for=\"item in list\"></div>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
 
-        var codegen = result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>();
+        var codegen = result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>();
         codegen.Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
         codegen.IsBlock.ShouldBeTrue();
         codegen.DisableTracking.ShouldBeTrue();
@@ -79,7 +79,7 @@ public class VForTransformTests
         var result = TransformTestHelpers.Transform("<div v-for=\"item in list\" :key=\"item.id\"></div>");
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
 
-        result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>().ShouldHavePatchFlag(PatchFlags.KeyedFragment);
+        result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>().ShouldHavePatchFlag(PatchFlags.KeyedFragment);
     }
 
     [Fact]
@@ -89,10 +89,10 @@ public class VForTransformTests
         var forNode = result.SingleChild().ShouldBeOfType<ForNode>();
         forNode.Children.Count.ShouldBe(2);
 
-        var codegen = result.GetCodegenNode(forNode).ShouldBeOfType<VNodeCall>();
+        var codegen = result.GetCodegenNode(forNode).ShouldBeOfType<VirtualNodeCall>();
         var renderList = codegen.Children.ShouldBeOfType<CallExpression>();
         var iterator = renderList.Arguments[1].ShouldBeOfType<FunctionExpression>();
-        iterator.Returns.ShouldBeOfType<VNodeCall>().Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
+        iterator.Returns.ShouldBeOfType<VirtualNodeCall>().Tag.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("Fragment");
     }
 
     [Fact]

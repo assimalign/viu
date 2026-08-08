@@ -15,26 +15,23 @@ private sealed class UserPanelAsynchronousIdentity
 }
 
 AsynchronousComponentDefinition userPanel =
-    AsynchronousComponents.DefineAsynchronousComponent<UserPanelAsynchronousIdentity>(
+    AsynchronousComponents.Define<UserPanelAsynchronousIdentity>(
         async cancellationToken =>
         {
             await moduleLoader.LoadUserPanelAsync(cancellationToken);
             return AsynchronousComponentTarget.From<UserPanel>();
         });
 
-IComponentFactory components = new ComponentFactory(
-[
-    userPanel.Registration,
-    new ComponentRegistration(
-        typeof(UserPanel),
-        static () => new UserPanel()),
-]);
+ComponentFactory components = new();
+components.Register(userPanel.Registration);
+components.Register(userPanelRegistration);
 
-ITemplateComponent request = userPanel.CreateComponent(
-    new ComponentArguments(
-    [
-        new KeyValuePair<string, object?>("userId", userId),
-    ]));
+ComponentNode request = userPanel.CreateComponent(
+    new ComponentInvocation(
+        arguments: new Dictionary<string, object?>
+        {
+            ["userId"] = userId,
+        }));
 ```
 
 The wrapper identity is supplied explicitly through `typeof(...)`. The loader returns the registered
@@ -81,7 +78,7 @@ object selection = showEditor
     ? typeof(EditorComponent)
     : DynamicComponents.Named("read-only-view");
 
-return DynamicComponents.DynamicComponent(
+return DynamicComponents.Create(
     selection,
     arguments: new ComponentArguments(
     [
@@ -92,7 +89,7 @@ return DynamicComponents.DynamicComponent(
 A plain string always means an element tag:
 
 ```csharp
-DynamicComponents.DynamicComponent("section");
+DynamicComponents.Create("section");
 ```
 
 This is a deliberate consequence of the approved `IComponentFactory` contract. The factory can

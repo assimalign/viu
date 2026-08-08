@@ -1,9 +1,7 @@
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// An in-memory comment node. Comments are load-bearing in a rendered tree: they are the anchors
-/// and hydration markers the renderer inserts, so a test host must model them as real nodes.
-/// </summary>
+/// <summary>Represents an in-memory comment, including structural hydration markers.</summary>
+/// <remarks>Specified by <c>[SSR-MARKERS-1]</c>, <c>[HYD-1]</c>, and <c>[CONF-3]</c>.</remarks>
 public sealed class TestComment : TestNode
 {
     internal TestComment(string text)
@@ -11,6 +9,6 @@ public sealed class TestComment : TestNode
         Text = text;
     }
 
-    /// <summary>The comment content.</summary>
+    /// <summary>Gets the current comment data without comment delimiters.</summary>
     public string Text { get; internal set; }
 }

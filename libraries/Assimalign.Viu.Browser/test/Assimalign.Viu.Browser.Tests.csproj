@@ -4,14 +4,6 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The DOM compiled-render proof ([V01.01.04.09]) nests its own project under test/ so the generator's
-         transitive Assimalign.Viu.Syntax.Templates reference (which links copies of Shared's
-         PatchFlags/SlotFlags) never enters THIS project's compile closure and collide with Shared.dll.
-         Keep its sources out of this project's implicit globs. -->
-    <Compile Remove="Assimalign.Viu.Browser.CompiledRenderTests/**" />
-    <None Remove="Assimalign.Viu.Browser.CompiledRenderTests/**" />
-  </ItemGroup>
-  <ItemGroup>
     <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
     <ViuPackageReference Include="xunit" />
     <ViuPackageReference Include="xunit.runner.visualstudio" />
@@ -19,10 +11,5 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Browser" />
-    <ViuProjectReference Include="Assimalign.Viu.Components" />
-    <ViuProjectReference Include="Assimalign.Viu.Core" />
-    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
-    <ViuProjectReference Include="Assimalign.Viu.Shared" />
-    <ViuProjectReference Include="Assimalign.Viu.Testing" />
   </ItemGroup>
 </Project>

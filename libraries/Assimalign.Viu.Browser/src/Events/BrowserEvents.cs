@@ -2,20 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The event-handler modifier and key guards a compiled <c>@event.modifier</c> binding wraps its
-/// handler in. Guards run before the wrapped
-/// handler: a failed guard skips it entirely. <c>.stop</c>/<c>.prevent</c> record intents on
-/// the <see cref="BrowserEvent"/>, which the bridge applies to the live JS event when the
-/// synchronous dispatch returns.
+/// Provides the qualified event-modifier and key-guard API used by generated browser bindings.
 /// </summary>
+/// <remarks>
+/// Guards run before the wrapped handler. Failed guards skip the handler, while <c>stop</c> and
+/// <c>prevent</c> record response intents on the event. The overload set target-types the inline,
+/// method-group, parameterless, and task-returning handler shapes accepted by unchanged template
+/// authoring. Specified by <c>[SFC-CG-2]</c> and <c>[V01.01.15.02]</c>.
+/// </remarks>
 public static class BrowserEvents
 {
-    // Aliases whose hyphenated event.key form differs from the alias a template author writes.
     private static readonly Dictionary<string, string> KeyAliases = new(StringComparer.Ordinal)
     {
         ["esc"] = "escape",
@@ -27,40 +28,51 @@ public static class BrowserEvents
         ["delete"] = "backspace",
     };
 
-    /// <summary>
-    /// Wraps <paramref name="handler"/> with the event modifiers:
-    /// <c>stop</c>, <c>prevent</c>, <c>self</c>, system modifiers
-    /// (<c>ctrl</c>/<c>shift</c>/<c>alt</c>/<c>meta</c>), mouse-button guards
-    /// (<c>left</c>/<c>middle</c>/<c>right</c>), and <c>exact</c>.
-    /// </summary>
+    /// <summary>Wraps a value-returning event handler with the named event modifiers.</summary>
+    /// <param name="handler">The handler whose return value is discarded.</param>
+    /// <param name="modifiers">The unprefixed modifier names in source order.</param>
+    /// <returns>An event handler that applies every modifier before invoking the handler.</returns>
+    public static Action<BrowserEvent> WithModifiers(
+        Func<BrowserEvent, object?> handler,
+        params string[] modifiers)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithModifiers(
+            browserEvent =>
+            {
+                _ = handler(browserEvent);
+            },
+            modifiers);
+    }
+
+    /// <summary>Wraps a synchronous event handler with the named event modifiers.</summary>
     /// <param name="handler">The handler to guard.</param>
-    /// <param name="modifiers">The modifier names, unprefixed (e.g. <c>"stop"</c>, <c>"ctrl"</c>).</param>
-    /// <returns>The guarded handler.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="handler"/> or <paramref name="modifiers"/> is null.</exception>
-    public static Action<BrowserEvent> WithModifiers(Action<BrowserEvent> handler, params string[] modifiers)
+    /// <param name="modifiers">The unprefixed modifier names in source order.</param>
+    /// <returns>An event handler that applies every modifier before invoking the handler.</returns>
+    public static Action<BrowserEvent> WithModifiers(
+        Action<BrowserEvent> handler,
+        params string[] modifiers)
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(modifiers);
         return browserEvent =>
         {
-            foreach (var modifier in modifiers)
+            foreach (string modifier in modifiers)
             {
                 if (!PassesModifierGuard(browserEvent, modifier, modifiers))
                 {
                     return;
                 }
             }
+
             handler(browserEvent);
         };
     }
 
-    /// <summary>
-    /// Wraps a task-returning handler with the event modifiers while preserving the returned task,
-    /// so browser dispatch can still observe a fault.
-    /// </summary>
+    /// <summary>Wraps a task-returning event handler with the named event modifiers.</summary>
     /// <param name="handler">The task-returning handler to guard.</param>
-    /// <param name="modifiers">The modifier names, unprefixed.</param>
-    /// <returns>The guarded task-returning handler.</returns>
+    /// <param name="modifiers">The unprefixed modifier names in source order.</param>
+    /// <returns>A guarded handler that preserves the task returned by the wrapped handler.</returns>
     public static Func<BrowserEvent, Task> WithModifiers(
         Func<BrowserEvent, Task> handler,
         params string[] modifiers)
@@ -81,60 +93,137 @@ public static class BrowserEvents
         };
     }
 
-    /// <summary>
-    /// Wraps <paramref name="handler"/> to run only for the named keys, matching the key aliases
-    /// (<c>enter</c>, <c>tab</c>, <c>delete</c>, <c>esc</c>, <c>space</c>, <c>up</c>, <c>down</c>,
-    /// <c>left</c>, <c>right</c>) against the hyphenated <c>event.key</c>.
-    /// </summary>
-    /// <param name="handler">The handler to guard.</param>
-    /// <param name="keys">The key names.</param>
-    /// <returns>The guarded handler.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="handler"/> or <paramref name="keys"/> is null.</exception>
-    public static Action<BrowserEvent> WithKeys(Action<BrowserEvent> handler, params string[] keys)
+    /// <summary>Wraps a value-returning parameterless handler with event modifiers.</summary>
+    /// <param name="handler">The handler whose return value is discarded.</param>
+    /// <param name="modifiers">The unprefixed modifier names in source order.</param>
+    /// <returns>An event handler that applies every modifier before invoking the handler.</returns>
+    public static Action<BrowserEvent> WithModifiers(
+        Func<object?> handler,
+        params string[] modifiers)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        ArgumentNullException.ThrowIfNull(keys);
-        return browserEvent =>
-        {
-            if (browserEvent.Key.Length == 0)
+        return WithModifiers(
+            _ =>
             {
-                return;
-            }
-            var eventKey = StyleAndClassNormalization.Hyphenate(browserEvent.Key).ToLowerInvariant();
-            foreach (var key in keys)
-            {
-                if (string.Equals(key, eventKey, StringComparison.Ordinal)
-                    || (KeyAliases.TryGetValue(key, out var alias)
-                        && string.Equals(alias, eventKey, StringComparison.Ordinal)))
-                {
-                    handler(browserEvent);
-                    return;
-                }
-            }
-        };
+                handler();
+            },
+            modifiers);
     }
 
-    /// <summary>
-    /// Wraps a task-returning handler with the key guards while preserving the returned task.
-    /// </summary>
+    /// <summary>Wraps a synchronous parameterless handler with event modifiers.</summary>
+    /// <param name="handler">The handler to guard.</param>
+    /// <param name="modifiers">The unprefixed modifier names in source order.</param>
+    /// <returns>An event handler that applies every modifier before invoking the handler.</returns>
+    public static Action<BrowserEvent> WithModifiers(
+        Action handler,
+        params string[] modifiers)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithModifiers(_ => handler(), modifiers);
+    }
+
+    /// <summary>Wraps a task-returning parameterless handler with event modifiers.</summary>
     /// <param name="handler">The task-returning handler to guard.</param>
-    /// <param name="keys">The key names.</param>
-    /// <returns>The key-guarded task-returning handler.</returns>
-    public static Func<BrowserEvent, Task> WithKeys(
-        Func<BrowserEvent, Task> handler,
+    /// <param name="modifiers">The unprefixed modifier names in source order.</param>
+    /// <returns>A guarded handler that preserves the task returned by the wrapped handler.</returns>
+    public static Func<BrowserEvent, Task> WithModifiers(
+        Func<Task> handler,
+        params string[] modifiers)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithModifiers(_ => handler(), modifiers);
+    }
+
+    /// <summary>Wraps a value-returning event handler with the named key guards.</summary>
+    /// <param name="handler">The handler whose return value is discarded.</param>
+    /// <param name="keys">The lower-hyphenated key names or supported aliases.</param>
+    /// <returns>An event handler that invokes the wrapped handler only for a matching key.</returns>
+    public static Action<BrowserEvent> WithKeys(
+        Func<BrowserEvent, object?> handler,
+        params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithKeys(
+            browserEvent =>
+            {
+                _ = handler(browserEvent);
+            },
+            keys);
+    }
+
+    /// <summary>Wraps a synchronous event handler with the named key guards.</summary>
+    /// <param name="handler">The handler to guard.</param>
+    /// <param name="keys">The lower-hyphenated key names or supported aliases.</param>
+    /// <returns>An event handler that invokes the wrapped handler only for a matching key.</returns>
+    public static Action<BrowserEvent> WithKeys(
+        Action<BrowserEvent> handler,
         params string[] keys)
     {
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(keys);
         return browserEvent =>
         {
-            if (!MatchesKey(browserEvent, keys))
+            if (MatchesKey(browserEvent, keys))
             {
-                return Task.CompletedTask;
+                handler(browserEvent);
             }
-
-            return handler(browserEvent);
         };
+    }
+
+    /// <summary>Wraps a task-returning event handler with the named key guards.</summary>
+    /// <param name="handler">The task-returning handler to guard.</param>
+    /// <param name="keys">The lower-hyphenated key names or supported aliases.</param>
+    /// <returns>A guarded handler that preserves the task returned by the wrapped handler.</returns>
+    public static Func<BrowserEvent, Task> WithKeys(
+        Func<BrowserEvent, Task> handler,
+        params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(keys);
+        return browserEvent => MatchesKey(browserEvent, keys)
+            ? handler(browserEvent)
+            : Task.CompletedTask;
+    }
+
+    /// <summary>Wraps a value-returning parameterless handler with key guards.</summary>
+    /// <param name="handler">The handler whose return value is discarded.</param>
+    /// <param name="keys">The lower-hyphenated key names or supported aliases.</param>
+    /// <returns>An event handler that invokes the wrapped handler only for a matching key.</returns>
+    public static Action<BrowserEvent> WithKeys(
+        Func<object?> handler,
+        params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithKeys(
+            _ =>
+            {
+                handler();
+            },
+            keys);
+    }
+
+    /// <summary>Wraps a synchronous parameterless handler with key guards.</summary>
+    /// <param name="handler">The handler to guard.</param>
+    /// <param name="keys">The lower-hyphenated key names or supported aliases.</param>
+    /// <returns>An event handler that invokes the wrapped handler only for a matching key.</returns>
+    public static Action<BrowserEvent> WithKeys(
+        Action handler,
+        params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithKeys(_ => handler(), keys);
+    }
+
+    /// <summary>Wraps a task-returning parameterless handler with key guards.</summary>
+    /// <param name="handler">The task-returning handler to guard.</param>
+    /// <param name="keys">The lower-hyphenated key names or supported aliases.</param>
+    /// <returns>A guarded handler that preserves the task returned by the wrapped handler.</returns>
+    public static Func<BrowserEvent, Task> WithKeys(
+        Func<Task> handler,
+        params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return WithKeys(_ => handler(), keys);
     }
 
     private static bool MatchesKey(BrowserEvent browserEvent, string[] keys)
@@ -144,8 +233,7 @@ public static class BrowserEvents
             return false;
         }
 
-        string eventKey =
-            StyleAndClassNormalization.Hyphenate(browserEvent.Key).ToLowerInvariant();
+        string eventKey = NameNormalization.Hyphenate(browserEvent.Key).ToLowerInvariant();
         foreach (string key in keys)
         {
             if (string.Equals(key, eventKey, StringComparison.Ordinal)
@@ -159,9 +247,11 @@ public static class BrowserEvents
         return false;
     }
 
-    private static bool PassesModifierGuard(BrowserEvent browserEvent, string modifier, string[] allModifiers)
+    private static bool PassesModifierGuard(
+        BrowserEvent browserEvent,
+        string modifier,
+        string[] allModifiers)
     {
-        // One guard per modifier name; an unknown modifier passes rather than silently blocking.
         switch (modifier)
         {
             case "stop":
@@ -195,9 +285,8 @@ public static class BrowserEvents
 
     private static bool MatchesExactly(BrowserEvent browserEvent, string[] modifiers)
     {
-        // .exact: every PRESSED system modifier must be listed on the handler.
-        var required = BrowserEventModifiers.None;
-        foreach (var modifier in modifiers)
+        BrowserEventModifiers required = BrowserEventModifiers.None;
+        foreach (string modifier in modifiers)
         {
             required |= modifier switch
             {
@@ -208,6 +297,7 @@ public static class BrowserEvents
                 _ => BrowserEventModifiers.None,
             };
         }
+
         return browserEvent.Modifiers == required;
     }
 }

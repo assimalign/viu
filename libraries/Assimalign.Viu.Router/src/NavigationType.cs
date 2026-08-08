@@ -6,6 +6,7 @@ namespace Assimalign.Viu.Router;
 /// comes from a browser back/forward (a <c>popstate</c>) or the memory equivalent driven by
 /// <see cref="IRouterHistory.Go"/>.
 /// </summary>
+/// <remarks>Specified by <c>[RTR-3]</c>.</remarks>
 public enum NavigationType
 {
     /// <summary>A browser back/forward, or the memory equivalent of one.</summary>

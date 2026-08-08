@@ -75,6 +75,12 @@ internal sealed class DomTransitionOperations
     public required Action<int> ClearMoveStyles { get; init; }
 
     /// <summary>
+    /// Reads an element's live parent handle. Buffered hosts commit pending writes before the read,
+    /// so a transition probe never observes stale placement.
+    /// </summary>
+    public required Func<int, int> ParentNode { get; init; }
+
+    /// <summary>
     /// Whether an element gains a CSS transform transition when the move class is applied: clone the
     /// element without its live transition classes, add the move class, and read the resulting
     /// transition info. Probing a clone is what keeps the live element's in-flight transition

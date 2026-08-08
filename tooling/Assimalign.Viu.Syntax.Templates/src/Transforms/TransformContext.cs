@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -45,8 +45,8 @@ public sealed class TransformContext
         BindingMetadata = options.BindingMetadata ?? BindingMetadata.Empty;
         CssModules = options.CssModules ?? CssModuleAccessors.Empty;
         BindingRewriteMode = options.BindingRewriteMode;
-        InSSR = options.InSSR;
-        Ssr = options.Ssr;
+        IsNestedServerRendering = options.IsNestedServerRendering;
+        IsServerRendering = options.IsServerRendering;
         Slotted = options.Slotted;
         ScopeId = options.ScopeId;
         onError = options.OnError;
@@ -97,10 +97,10 @@ public sealed class TransformContext
     public BindingRewriteMode BindingRewriteMode { get; }
 
     /// <summary>Whether this is a nested SSR slot compilation.</summary>
-    public bool InSSR { get; }
+    public bool IsNestedServerRendering { get; }
 
     /// <summary>Whether compilation targets SSR.</summary>
-    public bool Ssr { get; }
+    public bool IsServerRendering { get; }
 
     /// <summary>Whether component slots inherit the parent scope id.</summary>
     public bool Slotted { get; }
@@ -230,8 +230,12 @@ public sealed class TransformContext
         }
     }
 
-    /// <summary>Registers and returns the <c>_name</c> reference string for <paramref name="helper"/>.</summary>
-    /// <param name="helper">The runtime helper.</param>
+    /// <summary>
+    /// Registers <paramref name="helper"/> and returns its underscore-prefixed intermediate marker.
+    /// The frame render writer consumes the marker and emits the corresponding direct API expression;
+    /// it is never retained as a consumer runtime lookup.
+    /// </summary>
+    /// <param name="helper">The symbolic transform operation.</param>
     public string HelperString(RuntimeHelper helper) => "_" + Helper(helper).Name;
 
     /// <summary>Registers a resolved component name.</summary>
@@ -308,11 +312,11 @@ public sealed class TransformContext
 
     /// <summary>Wraps <paramref name="expression"/> in a cache slot.</summary>
     /// <param name="expression">The expression to cache.</param>
-    /// <param name="isVNode">Whether the cached value is a vnode.</param>
+    /// <param name="isVirtualNode">Whether the cached value is a virtual node.</param>
     /// <param name="inVOnce">Whether the cache is produced inside a <c>v-once</c>.</param>
-    public CacheExpression Cache(TemplateSyntaxNode expression, bool isVNode = false, bool inVOnce = false)
+    public CacheExpression Cache(TemplateSyntaxNode expression, bool isVirtualNode = false, bool inVOnce = false)
     {
-        var cacheExpression = Ir.CacheExpression(cached.Count, expression, isVNode, inVOnce);
+        var cacheExpression = Ir.CacheExpression(cached.Count, expression, isVirtualNode, inVOnce);
         cached.Add(cacheExpression);
         return cacheExpression;
     }
@@ -323,18 +327,18 @@ public sealed class TransformContext
     /// <summary>Reserves an empty cache slot, incrementing the count.</summary>
     public void AppendEmptyCacheSlot() => cached.Add(null);
 
-    // ---- vnode-call construction ----
+    // ---- virtual-node-call construction ----
 
     /// <summary>
-    /// Builds a <see cref="VNodeCall"/> and registers the block/render-node helpers it needs, so a caller
+    /// Builds a <see cref="VirtualNodeCall"/> and registers the block/render-node helpers it needs, so a caller
     /// can never construct one that references a helper the emitter did not import.
     /// </summary>
-    public VNodeCall CreateVNodeCall(
+    public VirtualNodeCall CreateVirtualNodeCall(
         object tag,
-        TemplateSyntaxNode? props,
+        TemplateSyntaxNode? properties,
         object? children,
         PatchFlags? patchFlag,
-        object? dynamicProps,
+        object? dynamicProperties,
         ArrayExpression? directiveArguments,
         bool isBlock,
         bool disableTracking,
@@ -344,11 +348,11 @@ public sealed class TransformContext
         if (isBlock)
         {
             Helper(HelperNames.OpenBlock);
-            Helper(GetVNodeBlockHelper(InSSR, isComponent));
+            Helper(GetVirtualNodeBlockHelper(IsNestedServerRendering, isComponent));
         }
         else
         {
-            Helper(GetVNodeHelper(InSSR, isComponent));
+            Helper(GetVirtualNodeHelper(IsNestedServerRendering, isComponent));
         }
 
         if (directiveArguments is not null)
@@ -356,13 +360,13 @@ public sealed class TransformContext
             Helper(HelperNames.WithDirectives);
         }
 
-        return new VNodeCall
+        return new VirtualNodeCall
         {
             Tag = tag,
-            Props = props,
+            Properties = properties,
             Children = children,
             PatchFlag = patchFlag,
-            DynamicProps = dynamicProps,
+            DynamicProperties = dynamicProperties,
             Directives = directiveArguments,
             IsBlock = isBlock,
             DisableTracking = disableTracking,
@@ -371,13 +375,13 @@ public sealed class TransformContext
         };
     }
 
-    /// <summary>The vnode-creation helper for the given SSR/component flags.</summary>
-    public static RuntimeHelper GetVNodeHelper(bool ssr, bool isComponent)
-        => ssr || isComponent ? HelperNames.CreateVNode : HelperNames.CreateElementVNode;
+    /// <summary>The virtual-node-creation helper for the given server-rendering and component flags.</summary>
+    public static RuntimeHelper GetVirtualNodeHelper(bool isServerRendering, bool isComponent)
+        => isServerRendering || isComponent ? HelperNames.CreateVNode : HelperNames.CreateElementVNode;
 
-    /// <summary>The block-vnode-creation helper for the given SSR/component flags.</summary>
-    public static RuntimeHelper GetVNodeBlockHelper(bool ssr, bool isComponent)
-        => ssr || isComponent ? HelperNames.CreateBlock : HelperNames.CreateElementBlock;
+    /// <summary>The block-virtual-node-creation helper for the given server-rendering and component flags.</summary>
+    public static RuntimeHelper GetVirtualNodeBlockHelper(bool isServerRendering, bool isComponent)
+        => isServerRendering || isComponent ? HelperNames.CreateBlock : HelperNames.CreateElementBlock;
 
     // ---- per-node code-generation side tables (immutable AST cannot carry a codegenNode) ----
 

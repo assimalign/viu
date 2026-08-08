@@ -1,6 +1,9 @@
 namespace Assimalign.Viu.Reactivity;
 
-/// <summary>Creates reactive effect scopes without exposing the engine's concrete implementation.</summary>
+/// <summary>
+/// Creates reactive effect scopes without exposing the engine's concrete implementation.
+/// Specified by <c>[RCT-10]</c>.
+/// </summary>
 public interface IReactiveEffectScopeFactory
 {
     /// <summary>Creates a reactive effect scope.</summary>

@@ -49,6 +49,22 @@ namespace Assimalign.Viu.LanguageService;
 /// </remarks>
 internal sealed class ScriptSemanticEngine
 {
+    private const string AdoptedComponentBaseMetadataName =
+        "Assimalign.Viu.Components.ComponentBase";
+    private const string LegacyComponentBaseMetadataName =
+        "Assimalign.Viu.Components.ComponentTemplateBase";
+    private const string LegacyComponentBaseCompatibilityFilePath =
+        "Viu.LanguageService.ComponentBase.Compatibility.g.cs";
+    private const string LegacyComponentBaseCompatibilitySource =
+        "#nullable enable\n" +
+        "\n" +
+        "namespace Assimalign.Viu.Components;\n" +
+        "\n" +
+        "// Semantic-only bridge for projects whose references have not reached the component-model swap.\n" +
+        "internal abstract class ComponentBase : ComponentTemplateBase\n" +
+        "{\n" +
+        "}\n";
+
     private static CSharpParseOptions CreateParseOptions(LanguageProjectContext context)
         => new CSharpParseOptions(LanguageVersion.Preview)
             .WithPreprocessorSymbols(context.PreprocessorSymbols);
@@ -378,9 +394,9 @@ internal sealed class ScriptSemanticEngine
     {
         if (target is null)
         {
-            return FilterEditorBrowsableSymbols(
+            return FilterCompletionSymbols(
                 semanticModel.LookupSymbols(position),
-                semanticModel.Compilation);
+                semanticModel);
         }
 
         var symbolInfo = semanticModel.GetSymbolInfo(target, cancellationToken);
@@ -408,20 +424,20 @@ internal sealed class ScriptSemanticEngine
 
         if (targetSymbol is INamespaceSymbol namespaceSymbol)
         {
-            return FilterEditorBrowsableSymbols(
+            return FilterCompletionSymbols(
                 semanticModel.LookupSymbols(position, namespaceSymbol)
                     .Where(symbol => symbol.Kind is SymbolKind.NamedType or SymbolKind.Namespace),
-                semanticModel.Compilation);
+                semanticModel);
         }
 
         if (targetSymbol is ITypeSymbol typeReference)
         {
             // The target names a type (Reactive., String.): static members and nested types.
-            return FilterEditorBrowsableSymbols(
+            return FilterCompletionSymbols(
                 semanticModel.LookupStaticMembers(position, typeReference)
                     .Where(symbol => symbol.Kind is SymbolKind.Field or SymbolKind.Property
                         or SymbolKind.Method or SymbolKind.Event or SymbolKind.NamedType),
-                semanticModel.Compilation);
+                semanticModel);
         }
 
         var expressionType = semanticModel.GetTypeInfo(target, cancellationToken).Type;
@@ -444,33 +460,58 @@ internal sealed class ScriptSemanticEngine
             return null;
         }
 
-        return FilterEditorBrowsableSymbols(
+        return FilterCompletionSymbols(
             semanticModel
                 .LookupSymbols(position, expressionType, includeReducedExtensionMethods: true)
                 .Where(symbol => symbol.Kind is SymbolKind.Field or SymbolKind.Property
                     or SymbolKind.Method or SymbolKind.Event)
                 .Where(symbol => !symbol.IsStatic ||
                     symbol is IMethodSymbol { MethodKind: MethodKind.ReducedExtension }),
-            semanticModel.Compilation);
+            semanticModel);
     }
 
     // The referenced Microsoft.CodeAnalysis.CSharp 5.3.0 surface exposes no public
-    // ISymbol.IsEditorBrowsable API. LookupSymbols therefore needs this metadata-level filter so
-    // the compiler-only seam stays out of .viu completion ([V01.01.14.02]).
-    private static IReadOnlyList<ISymbol> FilterEditorBrowsableSymbols(
+    // ISymbol.IsEditorBrowsable API. LookupSymbols therefore needs this metadata-level filter.
+    // Declarations in the current generated tree without a #line mapping are compiler scaffold,
+    // while authored script declarations retain their mapped source location ([SFC-CG-1]).
+    private static IReadOnlyList<ISymbol> FilterCompletionSymbols(
         IEnumerable<ISymbol> symbols,
-        Compilation compilation)
+        SemanticModel semanticModel)
     {
-        var editorBrowsableAttribute = compilation.GetTypeByMetadataName(
+        var editorBrowsableAttribute = semanticModel.Compilation.GetTypeByMetadataName(
             "System.ComponentModel.EditorBrowsableAttribute");
         if (editorBrowsableAttribute is null)
         {
-            return symbols.ToArray();
+            return symbols
+                .Where(symbol => !IsCurrentGeneratedScaffoldSymbol(
+                    symbol,
+                    semanticModel.SyntaxTree))
+                .ToArray();
         }
 
         return symbols
+            .Where(symbol => !IsCurrentGeneratedScaffoldSymbol(
+                symbol,
+                semanticModel.SyntaxTree))
             .Where(symbol => !IsEditorBrowsableNever(symbol, editorBrowsableAttribute))
             .ToArray();
+    }
+
+    private static bool IsCurrentGeneratedScaffoldSymbol(
+        ISymbol symbol,
+        SyntaxTree currentTree)
+    {
+        foreach (Location location in symbol.Locations)
+        {
+            if (location.IsInSource
+                && ReferenceEquals(location.SourceTree, currentTree)
+                && !location.GetMappedLineSpan().HasMappedPath)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsEditorBrowsableNever(
@@ -666,11 +707,34 @@ internal sealed class ScriptSemanticEngine
             trees.Values.Select(tree => tree.Tree),
             references,
             CompilationOptions);
+        compilation = AddLegacyComponentBaseCompatibilityIfRequired(
+            compilation,
+            context,
+            cancellationToken);
         return new ProjectCompilationState(
             context.CacheStamp,
             environmentSignature,
             trees,
             compilation);
+    }
+
+    private static CSharpCompilation AddLegacyComponentBaseCompatibilityIfRequired(
+        CSharpCompilation compilation,
+        LanguageProjectContext context,
+        CancellationToken cancellationToken)
+    {
+        if (compilation.GetTypeByMetadataName(AdoptedComponentBaseMetadataName) is not null
+            || compilation.GetTypeByMetadataName(LegacyComponentBaseMetadataName) is null)
+        {
+            return compilation;
+        }
+
+        SyntaxTree compatibilityTree = CSharpSyntaxTree.ParseText(
+            LegacyComponentBaseCompatibilitySource,
+            CreateParseOptions(context),
+            LegacyComponentBaseCompatibilityFilePath,
+            cancellationToken: cancellationToken);
+        return compilation.AddSyntaxTrees(compatibilityTree);
     }
 
     private static IReadOnlyList<MetadataReference> CreateReferences(

@@ -16,7 +16,10 @@ public sealed class InteropCountResult
     /// <summary>The scenario id this result belongs to.</summary>
     public string Name { get; init; } = "";
 
-    /// <summary>Every node operation the measured step logged — the interop-crossing proxy.</summary>
+    /// <summary>
+    /// Every node mutation the measured step logged — the interop-crossing proxy. The renderer's
+    /// commit marker is a measurement boundary, not a node mutation, and is excluded.
+    /// </summary>
     public int TotalOperationCount { get; init; }
 
     /// <summary>The structural operations (inserts plus removes).</summary>
@@ -36,9 +39,6 @@ public sealed class InteropCountResult
 
     /// <summary>Single-attribute patches.</summary>
     public int PatchAttributeCount { get; init; }
-
-    /// <summary>Scoped-style identifier stamps.</summary>
-    public int SetScopeIdentifierCount { get; init; }
 
     /// <summary>Node insertions.</summary>
     public int InsertCount { get; init; }
@@ -60,14 +60,14 @@ public sealed class InteropCountResult
         return new InteropCountResult
         {
             Name = name,
-            TotalOperationCount = log.Operations.Count,
+            TotalOperationCount =
+                log.Operations.Count - log.Count(TestNodeOperationType.Commit),
             StructuralOperationCount = log.StructuralOperationCount,
             CreateElementCount = log.Count(TestNodeOperationType.CreateElement),
             CreateTextCount = log.Count(TestNodeOperationType.CreateText),
             CreateCommentCount = log.Count(TestNodeOperationType.CreateComment),
             SetTextCount = log.Count(TestNodeOperationType.SetText),
             PatchAttributeCount = log.Count(TestNodeOperationType.PatchAttribute),
-            SetScopeIdentifierCount = log.Count(TestNodeOperationType.SetScopeIdentifier),
             InsertCount = log.Count(TestNodeOperationType.Insert),
             RemoveCount = log.Count(TestNodeOperationType.Remove),
             InsertStaticContentCount = log.Count(TestNodeOperationType.InsertStaticContent),

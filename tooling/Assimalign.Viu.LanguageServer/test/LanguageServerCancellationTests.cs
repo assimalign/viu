@@ -213,7 +213,7 @@ public class LanguageServerCancellationTests
     /// A service whose completion blocks until its token cancels. The bounded wait turns a lost
     /// cancellation into a fast assertion failure (a successful empty reply) instead of a hang.
     /// </summary>
-    private sealed class BlockingCompletionLanguageService : IViuLanguageService
+    private sealed class BlockingCompletionLanguageService : ILanguageService
     {
         public void OpenDocument(string documentUri, string text, int? version)
         {
@@ -275,7 +275,7 @@ public class LanguageServerCancellationTests
     /// A service whose completion reports how many document changes it observed at call time,
     /// proving a dispatched request sees every notification read before it.
     /// </summary>
-    private sealed class ChangeCountingLanguageService : IViuLanguageService
+    private sealed class ChangeCountingLanguageService : ILanguageService
     {
         private int changeCount;
 
@@ -350,7 +350,7 @@ public class LanguageServerCancellationTests
     /// regression to serial dispatch times the first request out after ten seconds and surfaces as
     /// a -32603 reply — a clear failure rather than a hung test.
     /// </summary>
-    private sealed class RendezvousLanguageService : IViuLanguageService
+    private sealed class RendezvousLanguageService : ILanguageService
     {
         private readonly CountdownEvent bothRequestsStarted;
 

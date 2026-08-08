@@ -1,0 +1,9 @@
+<template>
+<article>{{ RecordRender() }}<slot /></article>
+</template>
+
+@script {
+public int RenderCount { get; private set; }
+
+private string RecordRender() => (RenderCount++, string.Empty).Item2;
+}

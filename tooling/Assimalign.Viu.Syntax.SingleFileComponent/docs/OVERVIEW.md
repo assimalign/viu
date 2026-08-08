@@ -11,7 +11,7 @@ libraries. Area: `V01.01.06`. Specified by `[SFC-3]`–`[SFC-5]` and `[VUE-1]`�
 
 Downstream, the source generator turns a template-bearing `.viu` or `.vue` file into a **mountable
 component** — the compiled render function, merged C# script, compiled styles, and the
-`IComponentTemplate` bridge ([V01.01.06.07], [V01.01.06.09]). Both ordinary and setup `.vue` scripts
+generated `IComponent` implementation ([V01.01.06.07], [V01.01.06.09]). Both ordinary and setup `.vue` scripts
 must explicitly use `lang="csharp"`; each is merged as C# partial-class members with an exact source
 map, while JavaScript and the JavaScript compiler macros the `.vue` format permits are never
 executed (`[VUE-4]`). Applications register

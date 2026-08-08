@@ -45,8 +45,9 @@ incomplete unit. Update the State table in the same commit as any unit's progres
 >    policy.** Component-tree `Provide`/`Inject` with a typed `InjectionKey<T>` does not exist in the
 >    tree. Viu deliberately has **no hierarchical component-tree dependency API**
 >    ([`[CMP-24]`](SPECIFICATION.md#48-no-component-tree-provideinject)): dependencies arrive through
->    parameters and slots, `IComponentContext.Services`, State definitions, or
->    `IComponentContext.Components`. Reversing that needs a superseding decision, not an edit here.
+>    parameters and slots, the component context's nullable `Services`, or State definitions. The
+>    former context-owned component-factory member is gone. Reversing that needs a superseding
+>    decision, not an edit here.
 >
 > The `.vue` single-file-component compatibility parser is **unaffected** and is a shipping product
 > feature ([V01.01.06.09], #250), specified in

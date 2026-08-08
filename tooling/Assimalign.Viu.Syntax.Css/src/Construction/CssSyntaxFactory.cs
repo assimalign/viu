@@ -170,6 +170,12 @@ public static class CssSyntaxFactory
     /// <param name="declarations">The rule's declarations, in the order they should serialize.</param>
     /// <returns>The constructed qualified rule.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="selectors"/>, <paramref name="declarations"/>, or any declaration is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="selectors"/> contains an externally derived selector-part variant that cannot be rendered.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="selectors"/> contains an unsupported <see cref="CssCombinatorKind"/> value.
+    /// </exception>
     public static CssQualifiedRuleNode QualifiedRule(CssSelectorListNode selectors, IReadOnlyList<CssDeclarationNode> declarations)
     {
         if (selectors is null)
@@ -195,6 +201,12 @@ public static class CssSyntaxFactory
     /// <param name="declarations">The rule's declarations, in the order they should serialize.</param>
     /// <returns>The constructed qualified rule.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="selector"/>, <paramref name="declarations"/>, or any declaration is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="selector"/> contains an externally derived selector-part variant that cannot be rendered.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="selector"/> contains an unsupported <see cref="CssCombinatorKind"/> value.
+    /// </exception>
     public static CssQualifiedRuleNode QualifiedRule(CssComplexSelectorNode selector, IReadOnlyList<CssDeclarationNode> declarations)
     {
         if (selector is null)

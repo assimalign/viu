@@ -21,5 +21,5 @@ public sealed record CallExpression : TemplateSyntaxNode
     public required SyntaxList<object> Arguments { get; init; }
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsCallExpression;
+    public override NodeType NodeType => NodeType.CallExpression;
 }

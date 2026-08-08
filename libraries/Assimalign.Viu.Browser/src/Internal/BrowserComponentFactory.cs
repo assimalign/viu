@@ -1,79 +1,66 @@
 using System;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// Resolves browser and Core built-ins before delegating application component requests.
+/// Resolves Browser transition components before delegating to the borrowed application factory.
 /// </summary>
-/// <remarks>
-/// This wrapper is intentionally only an <see cref="IComponentFactory"/>. It neither implements
-/// <see cref="IServiceProvider"/> nor performs service resolution.
-/// </remarks>
 internal sealed class BrowserComponentFactory : IComponentFactory
 {
-    private static readonly ComponentActivator TransitionActivator =
-        Transition.Registration.Activator;
-    private static readonly ComponentActivator TransitionGroupActivator =
-        TransitionGroup.Registration.Activator;
-    private static readonly ComponentActivator BaseTransitionActivator =
-        BaseTransition.Registration.Activator;
-
     private readonly IComponentFactory _applicationComponents;
 
-    internal BrowserComponentFactory(
-        IComponentFactory applicationComponents)
+    internal BrowserComponentFactory(IComponentFactory applicationComponents)
     {
         ArgumentNullException.ThrowIfNull(applicationComponents);
         _applicationComponents = applicationComponents;
     }
 
     /// <inheritdoc/>
-    public IComponentTemplate Create(Type componentType)
+    public ComponentRegistration Resolve(ComponentReference reference)
     {
-        ArgumentNullException.ThrowIfNull(componentType);
-        if (componentType == typeof(Transition))
-        {
-            return TransitionActivator();
-        }
-
-        if (componentType == typeof(TransitionGroup))
-        {
-            return TransitionGroupActivator();
-        }
-
-        if (componentType == typeof(BaseTransition))
-        {
-            return BaseTransitionActivator();
-        }
-
-        return _applicationComponents.Create(componentType);
+        return TryResolve(reference, out ComponentRegistration? registration)
+            ? registration!
+            : throw new InvalidOperationException(
+                "The component reference is not registered; runtime constructor discovery is not supported.");
     }
 
     /// <inheritdoc/>
-    public IComponentTemplate Create(string name)
+    public bool TryResolve(
+        ComponentReference reference,
+        out ComponentRegistration? registration)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        if (string.Equals(name, "Transition", StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(reference);
+        if (Matches(reference, typeof(Transition), "Transition"))
         {
-            return TransitionActivator();
+            registration = Transition.Registration;
+            return true;
         }
 
-        if (string.Equals(
-            name,
-            "TransitionGroup",
-            StringComparison.Ordinal))
+        if (Matches(reference, typeof(TransitionGroup), "TransitionGroup"))
         {
-            return TransitionGroupActivator();
+            registration = TransitionGroup.Registration;
+            return true;
         }
 
-        if (string.Equals(name, "BaseTransition", StringComparison.Ordinal))
+        return _applicationComponents.TryResolve(reference, out registration);
+    }
+
+    private static bool Matches(
+        ComponentReference reference,
+        Type componentType,
+        string registeredName)
+    {
+        if (reference.Kind == ComponentReferenceKind.Type)
         {
-            return BaseTransitionActivator();
+            return reference.ComponentType == componentType;
         }
 
-        return _applicationComponents.Create(name);
+        return reference.Kind == ComponentReferenceKind.RegisteredName
+            && string.Equals(
+                NameNormalization.Pascalize(reference.RegisteredName!),
+                registeredName,
+                StringComparison.Ordinal);
     }
 }

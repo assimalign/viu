@@ -6,17 +6,17 @@ using System.Text;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The .NET writer half of the interop command buffer ([V01.01.04.05]): buffered node-ops encode
+/// The .NET writer half of the interop command buffer ([V01.01.04.05]): buffered host operations encode
 /// each DOM mutation as an opcode + operands into one growable, reused <see cref="byte"/> array, and
-/// a single interop call hands the whole frame to the JS applier (<c>viu-dom.js</c>'s
-/// <c>applyCommandBuffer</c>) per scheduler flush — collapsing hundreds of boundary crossings into
-/// one ([RND-IO-1]). The prior art is Blazor's <c>RenderBatch</c>. The
-/// design is behaviorally invisible: buffered and direct modes produce identical DOM.
+/// a single interop call hands the whole frame to the JavaScript applier (<c>viu-dom.js</c>'s
+/// <c>applyCommandBuffer</c>) per scheduler flush, collapsing hundreds of boundary crossings into
+/// one. The frame is Viu's sole production Browser mutation path. Specified by
+/// <c>[RND-IO-1]</c> and <c>[EXE-13]</c>.
 /// <para>
 /// <b>Handles are pre-allocated on the .NET side.</b> A buffered <c>createElement/Text/Comment</c>
 /// cannot return the JS handle (the call is one-way), so <see cref="AllocateHandle"/> draws the id
 /// from this counter and the op carries "create X AS handle N"; the JS applier registers the new
-/// node under N into the same registry the direct path uses. The counter survives across flushes and
+/// node under N in the live bridge registry. The counter survives across flushes and
 /// is carried in every frame header so the JS side keeps its own foreign-node allocator ahead of it.
 /// </para>
 /// <para>
@@ -141,7 +141,7 @@ internal sealed class DomCommandBuffer
         return _position;
     }
 
-    // --- op writers (one per buffered bridge op; operand order mirrors the JS applier) ------------
+    // --- op writers (one per buffered bridge op; operand order matches the JavaScript applier) ----
 
     internal void WriteCreateElement(int handle, string tag, string? elementNamespace)
     {

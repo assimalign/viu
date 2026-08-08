@@ -11,7 +11,8 @@ namespace Assimalign.Viu.Reactivity;
 /// by a scope (<c>[RCT-11]</c>): a computed created inside a scope keeps serving fresh
 /// values after <see cref="Stop()"/>; its cleanup is automatic, driven by the subscriber count
 /// (losing the last subscriber soft-detaches it from its sources). Nested scopes register with
-/// (and stop with) their parent unless created detached. The ambient <see cref="Current"/> scope
+/// (and stop with) their parent unless created detached. The ambient
+/// <see cref="Reactive.CurrentScope"/> scope
 /// is a plain static field: NOT thread-safe by design, per the single-threaded JS event-loop
 /// model.
 /// </summary>
@@ -22,6 +23,7 @@ public sealed class EffectScope : IReactiveEffectScope
     private readonly bool _detached;
     private readonly List<ReactiveEffect> _effects = new();
     private readonly List<Action> _cleanups = new();
+    private readonly List<IDisposable> _resources = new();
     private List<EffectScope>? _scopes;
     private EffectScope? _parent;
     private int _index;
@@ -33,7 +35,7 @@ public sealed class EffectScope : IReactiveEffectScope
     /// registers as a child of the current scope and will be stopped with it.
     /// </summary>
     /// <param name="detached">When true, the scope does not attach to the current scope.</param>
-    public EffectScope(bool detached = false)
+    internal EffectScope(bool detached = false)
     {
         _detached = detached;
         _parent = _current;
@@ -45,10 +47,27 @@ public sealed class EffectScope : IReactiveEffectScope
     }
 
     /// <summary>The ambient scope that new effects and computeds register with, if any.</summary>
-    public static EffectScope? Current => _current;
+    internal static EffectScope? Current => _current;
 
     /// <summary>Whether the scope has not been stopped.</summary>
     public bool IsActive => _active;
+
+    /// <summary>Gets whether this scope has completed its idempotent teardown.</summary>
+    public bool IsStopped => !_active;
+
+    /// <summary>
+    /// Adds an independently disposable resource to this scope. Resources are disposed in reverse
+    /// registration order when the scope stops, after its effects and before its cleanup callbacks.
+    /// </summary>
+    /// <param name="resource">The resource whose lifetime is bounded by this scope.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="resource"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The scope has already stopped.</exception>
+    public void Own(IDisposable resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ObjectDisposedException.ThrowIf(!_active, this);
+        _resources.Add(resource);
+    }
 
     /// <summary>
     /// Runs <paramref name="action"/> with this scope as the current scope, restoring the previous
@@ -190,6 +209,18 @@ public sealed class EffectScope : IReactiveEffectScope
             }
         }
         _effects.Clear();
+        for (var index = _resources.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                _resources[index].Dispose();
+            }
+            catch (Exception exception)
+            {
+                error ??= ExceptionDispatchInfo.Capture(exception);
+            }
+        }
+        _resources.Clear();
         foreach (var cleanup in _cleanups)
         {
             try

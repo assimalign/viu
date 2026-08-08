@@ -52,29 +52,29 @@ public enum NodeType
     // ---- code-generation node types: the minimal expression subset the emitter needs ----
 
     /// <summary>A render-node construction call.</summary>
-    VNodeCall = 13,
+    VirtualNodeCall = 13,
 
     /// <summary>A call expression.</summary>
-    JsCallExpression = 14,
+    CallExpression = 14,
 
     /// <summary>An object literal.</summary>
-    JsObjectExpression = 15,
+    ObjectExpression = 15,
 
     /// <summary>An object property.</summary>
-    JsProperty = 16,
+    ObjectProperty = 16,
 
     /// <summary>An array literal.</summary>
-    JsArrayExpression = 17,
+    ArrayExpression = 17,
 
     /// <summary>A function expression.</summary>
-    JsFunctionExpression = 18,
+    FunctionExpression = 18,
 
     /// <summary>A conditional (ternary) expression.</summary>
-    JsConditionalExpression = 19,
+    ConditionalExpression = 19,
 
     /// <summary>A cache-slot expression for <c>v-once</c>/cached handlers.</summary>
-    JsCacheExpression = 20,
+    CacheExpression = 20,
 
     /// <summary>A block statement, the body of a memoized <c>v-for</c> loop.</summary>
-    JsBlockStatement = 21,
+    BlockStatement = 21,
 }

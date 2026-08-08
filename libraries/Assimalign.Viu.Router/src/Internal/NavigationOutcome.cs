@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Router;
 /// </summary>
 internal readonly struct NavigationOutcome
 {
-    private NavigationOutcome(NavigationOutcomeKind kind, NavigationGuardResult? redirect)
+    private NavigationOutcome(NavigationOutcomeKind kind, NavigationRedirectTarget? redirect)
     {
         Kind = kind;
         Redirect = redirect;
@@ -16,7 +16,7 @@ internal readonly struct NavigationOutcome
 
     public NavigationOutcomeKind Kind { get; }
 
-    public NavigationGuardResult? Redirect { get; }
+    public NavigationRedirectTarget? Redirect { get; }
 
     public bool IsAllow => Kind == NavigationOutcomeKind.Allow;
 
@@ -26,6 +26,6 @@ internal readonly struct NavigationOutcome
 
     public static NavigationOutcome Cancel { get; } = new(NavigationOutcomeKind.Cancel, null);
 
-    public static NavigationOutcome Redirecting(NavigationGuardResult redirect)
+    public static NavigationOutcome Redirecting(NavigationRedirectTarget redirect)
         => new(NavigationOutcomeKind.Redirect, redirect);
 }

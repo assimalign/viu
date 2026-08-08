@@ -5,4 +5,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// closed over exactly <see cref="AttributeNode"/> and <see cref="DirectiveNode"/>, so a transform can
 /// switch on the two cases exhaustively.
 /// </summary>
-public abstract record PropertyNode : TemplateSyntaxNode;
+public abstract record PropertyNode : TemplateSyntaxNode
+{
+    private protected PropertyNode()
+    {
+    }
+}

@@ -9,6 +9,7 @@ namespace Assimalign.Viu.Router;
 /// — non-strict (a trailing slash is tolerated) and case-insensitive — because either distinction
 /// turns a working URL into a 404 for a user who typed it, so a route table opts into strictness
 /// deliberately.
+/// Specified by <c>[RTR-1]</c>.
 /// </remarks>
 public sealed class PathMatchingOptions
 {
@@ -20,11 +21,11 @@ public sealed class PathMatchingOptions
     /// <c>/users/</c> are distinct). When <see langword="false"/> (the default), a trailing slash is
     /// tolerated.
     /// </summary>
-    public bool Strict { get; init; }
+    public bool TrailingSlashSensitive { get; init; }
 
     /// <summary>
     /// When <see langword="true"/>, matching is case-sensitive. When <see langword="false"/> (the
     /// default), matching ignores case.
     /// </summary>
-    public bool Sensitive { get; init; }
+    public bool CaseSensitive { get; init; }
 }

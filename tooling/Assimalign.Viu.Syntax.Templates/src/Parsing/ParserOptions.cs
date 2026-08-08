@@ -82,7 +82,7 @@ public sealed class ParserOptions
     private static ElementNamespace InferHtmlNamespace(string tag, ElementNode? parent, ElementNamespace rootNamespace)
     {
         var inferredNamespace = parent is not null ? parent.Namespace : rootNamespace;
-        if (parent is not null && inferredNamespace == ElementNamespace.MathML)
+        if (parent is not null && inferredNamespace == ElementNamespace.MathMl)
         {
             if (parent.Tag == "annotation-xml")
             {
@@ -121,7 +121,7 @@ public sealed class ParserOptions
 
             if (tag == "math")
             {
-                return ElementNamespace.MathML;
+                return ElementNamespace.MathMl;
             }
         }
 

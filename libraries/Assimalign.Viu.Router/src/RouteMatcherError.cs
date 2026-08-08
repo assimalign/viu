@@ -6,6 +6,7 @@ namespace Assimalign.Viu.Router;
 /// location is being resolved). The code is the stable part of the contract; the exception's message
 /// text is diagnostic and may be reworded.
 /// </summary>
+/// <remarks>Specified by <c>[RTR-1]</c>.</remarks>
 public enum RouteMatcherError
 {
     /// <summary>

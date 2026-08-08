@@ -10,6 +10,7 @@
         Branches on the $(ViuFrameworkKind) property the consumer csproj sets:
 
             Ref     -> produce ref/<tfm>/<dll> + data/FrameworkList.xml
+                       + data/PackageOverrides.txt
                        + analyzers/dotnet/cs/<generator closure>
             Runtime -> produce runtimes/<rid>/lib/<tfm>/<dll> + data/RuntimeList.xml
 
@@ -31,7 +32,7 @@
         <_ViuRuntimeProjectDir>$(ViuRepositoryDirectory)frameworks\$(ViuFrameworkName).Runtime\src\</_ViuRuntimeProjectDir>
 
         <!--
-            _ViuFrameworkSourceDir and the two manifest paths are computed
+            _ViuFrameworkSourceDir and the manifest paths are computed
             inside ViuCollectFrameworkPack below, NOT at file scope:
             $(OutputPath) / $(IntermediateOutputPath) are defined by
             Microsoft.NET.Sdk.targets, which imports AFTER this file.
@@ -197,6 +198,7 @@
 
             <!-- Forward slashes for cross-platform safety (Linux CI). -->
             <_ViuFrameworkListPath>$(IntermediateOutputPath)data/FrameworkList.xml</_ViuFrameworkListPath>
+            <_ViuPackageOverridesPath>$(IntermediateOutputPath)data/PackageOverrides.txt</_ViuPackageOverridesPath>
             <_ViuRuntimeListPath>$(IntermediateOutputPath)data/RuntimeList.xml</_ViuRuntimeListPath>
         </PropertyGroup>
 
@@ -261,6 +263,27 @@
             RootElementName="FileList"
             OutputPath="$(_ViuFrameworkListPath)" />
 
+        <!--
+            ResolveTargetingPackAssets reads PackageOverrides.txt from the
+            targeting pack and uses each package|version entry to make the
+            framework copy authoritative over the matching standalone
+            package's lib/ assets. PackageVersion is deliberate: unlike the
+            numeric FrameworkList assembly version, the conflict contract is
+            a NuGet version and must retain preview/release-candidate labels.
+            Runtime packs do not participate in targeting-pack conflict
+            resolution and therefore must not carry this file. Specified by
+            [PKG-2] and [V01.01.14].
+        -->
+        <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref'">
+            <_ViuFrameworkPackageOverrideLine Include="@(ViuFrameworkPackageOverride->'%(Identity)|$(PackageVersion)')" />
+        </ItemGroup>
+        <WriteLinesToFile Condition="'$(ViuFrameworkKind)' == 'Ref'"
+                          File="$(_ViuPackageOverridesPath)"
+                          Lines="@(_ViuFrameworkPackageOverrideLine)"
+                          Overwrite="true"
+                          WriteOnlyWhenDifferent="true"
+                          Encoding="UTF-8" />
+
         <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Ref'">
             <TfmSpecificPackageFile Include="@(_ViuExpectedAssembly)">
                 <PackagePath>ref/$(TargetFrameworkLatest)/%(Filename)%(Extension)</PackagePath>
@@ -270,6 +293,9 @@
             </TfmSpecificPackageFile>
             <TfmSpecificPackageFile Include="$(_ViuFrameworkListPath)">
                 <PackagePath>data/FrameworkList.xml</PackagePath>
+            </TfmSpecificPackageFile>
+            <TfmSpecificPackageFile Include="$(_ViuPackageOverridesPath)">
+                <PackagePath>data/PackageOverrides.txt</PackagePath>
             </TfmSpecificPackageFile>
         </ItemGroup>
 

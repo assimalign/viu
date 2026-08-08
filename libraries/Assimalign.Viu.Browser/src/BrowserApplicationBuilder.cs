@@ -16,36 +16,12 @@ namespace Assimalign.Viu.Browser;
 [SupportedOSPlatform("browser")]
 public sealed class BrowserApplicationBuilder : IApplicationBuilder
 {
-    private readonly ApplicationOptions _options = new()
-    {
-        Directives = BrowserDirectiveResolver.Instance,
-    };
-    private readonly bool _useCommandBuffer;
-    private readonly bool _hydrate;
-    private readonly string _mountTargetSelector;
+    private readonly ApplicationOptions _options = new();
+    private readonly BrowserApplicationOptions _browserOptions = new();
 
-    /// <summary>Creates a browser application builder targeting <c>#app</c>.</summary>
-    /// <param name="useCommandBuffer">
-    /// Whether host mutations should be serialized into one command frame per explicit render
-    /// boundary.
-    /// </param>
-    public BrowserApplicationBuilder(bool useCommandBuffer = false)
-        : this(
-            useCommandBuffer,
-            hydrate: false,
-            BrowserApplication.DefaultMountTargetSelector)
+    /// <summary>Creates a command-buffered browser application builder targeting <c>#app</c>.</summary>
+    public BrowserApplicationBuilder()
     {
-    }
-
-    internal BrowserApplicationBuilder(
-        bool useCommandBuffer,
-        bool hydrate,
-        string mountTargetSelector = BrowserApplication.DefaultMountTargetSelector)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(mountTargetSelector);
-        _useCommandBuffer = useCommandBuffer;
-        _hydrate = hydrate;
-        _mountTargetSelector = mountTargetSelector;
     }
 
     /// <summary>Configures composition and diagnostics that are frozen by each build.</summary>
@@ -59,31 +35,45 @@ public sealed class BrowserApplicationBuilder : IApplicationBuilder
         return this;
     }
 
+    /// <summary>Configures Browser mount targeting and hydration behavior.</summary>
+    /// <param name="configure">The Browser-options action applied before build.</param>
+    /// <returns>This builder.</returns>
+    public BrowserApplicationBuilder ConfigureBrowser(
+        Action<BrowserApplicationOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(_browserOptions);
+        return this;
+    }
+
     /// <summary>Builds the configured browser application.</summary>
     /// <returns>The browser application.</returns>
     public BrowserApplication Build()
     {
-        IComponent rootComponent = _options.RootComponent
+        ArgumentException.ThrowIfNullOrEmpty(
+            _browserOptions.MountTargetSelector);
+        VirtualNode rootComponent = _options.RootComponent
             ?? throw new InvalidOperationException(
                 "Configure ApplicationOptions.RootComponent before building the application.");
         IComponentFactory components = _options.Components
             ?? throw new InvalidOperationException(
-                "ApplicationOptions.Components cannot be null.");
-        IServiceProvider services = _options.Services
-            ?? throw new InvalidOperationException(
-                "ApplicationOptions.Services cannot be null.");
-        ApplicationContext context = new(
-            rootComponent,
-            new BrowserComponentFactory(components),
-            services,
-            _options.State,
-            _options.Directives,
-            _options);
+                "Configure ApplicationOptions.Components with a component resolver.");
+        var applicationOptions = new ApplicationOptions
+        {
+            RootComponent = rootComponent,
+            Components = new BrowserComponentFactory(components),
+            Services = _options.Services,
+            State = _options.State,
+            Directives = _options.Directives ?? BrowserDirectiveResolver.Instance,
+            ErrorHandler = _options.ErrorHandler,
+            WarnHandler = _options.WarnHandler,
+            EventObserver = _options.EventObserver,
+        };
+        ApplicationContext context = new(applicationOptions);
         return BrowserApplication.Create(
             context,
-            _useCommandBuffer,
-            _hydrate,
-            _mountTargetSelector);
+            _browserOptions.Hydrate,
+            _browserOptions.MountTargetSelector);
     }
 
     IApplicationBuilder IApplicationBuilder.ConfigureApplication(

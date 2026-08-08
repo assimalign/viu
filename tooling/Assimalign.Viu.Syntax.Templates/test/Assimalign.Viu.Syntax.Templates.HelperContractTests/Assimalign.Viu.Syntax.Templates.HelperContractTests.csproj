@@ -11,7 +11,5 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Syntax.Templates" />
-    <ViuProjectReference Include="Assimalign.Viu.Core" />
-    <ViuProjectReference Include="Assimalign.Viu.Browser" />
   </ItemGroup>
 </Project>

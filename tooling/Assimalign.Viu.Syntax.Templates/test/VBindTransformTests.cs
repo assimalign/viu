@@ -1,4 +1,4 @@
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -15,8 +15,8 @@ public class VBindTransformTests
     {
         var result = TransformTestHelpers.Transform("<div :id=\"x\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("id").Value.ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("x");
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("id").Value.ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("x");
     }
 
     [Fact]
@@ -24,9 +24,9 @@ public class VBindTransformTests
     {
         var result = TransformTestHelpers.Transform("<div :class=\"cls\"></div>");
 
-        var codegen = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var codegen = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         codegen.ShouldHavePatchFlag(PatchFlags.Class);
-        var classValue = codegen.Props.ShouldBeOfType<ObjectExpression>().Property("class").Value.ShouldBeOfType<CallExpression>();
+        var classValue = codegen.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("class").Value.ShouldBeOfType<CallExpression>();
         classValue.Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("normalizeClass");
     }
 
@@ -35,28 +35,28 @@ public class VBindTransformTests
     {
         var result = TransformTestHelpers.Transform("<div :style=\"sty\"></div>");
 
-        var codegen = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var codegen = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         codegen.ShouldHavePatchFlag(PatchFlags.Style);
-        codegen.Props.ShouldBeOfType<ObjectExpression>().Property("style").Value.ShouldBeOfType<CallExpression>()
+        codegen.Properties.ShouldBeOfType<ObjectExpression>().ObjectProperty("style").Value.ShouldBeOfType<CallExpression>()
             .Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("normalizeStyle");
     }
 
     [Fact]
-    public void VBind_CollectsDynamicPropNamesAndFlagsProps()
+    public void VBind_CollectsDynamicPropertyNamesAndFlagsProperties()
     {
         var result = TransformTestHelpers.Transform("<div :foo=\"x\"></div>");
 
-        var codegen = result.CodegenNode.ShouldBeOfType<VNodeCall>();
-        codegen.ShouldHavePatchFlag(PatchFlags.Props);
-        codegen.DynamicProps.ShouldBe("[\"foo\"]");
+        var codegen = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
+        codegen.ShouldHavePatchFlag(PatchFlags.Properties);
+        codegen.DynamicProperties.ShouldBe("[\"foo\"]");
     }
 
     [Fact]
-    public void VBind_DynamicArgument_EscalatesToFullProps()
+    public void VBind_DynamicArgument_EscalatesToFullProperties()
     {
         var result = TransformTestHelpers.Transform("<div :[key]=\"x\"></div>");
 
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().ShouldHavePatchFlag(PatchFlags.FullProps);
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().ShouldHavePatchFlag(PatchFlags.FullProperties);
     }
 
     [Fact]
@@ -64,8 +64,8 @@ public class VBindTransformTests
     {
         var result = TransformTestHelpers.Transform("<div :id.prop=\"x\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property(".id").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty(".id").ShouldNotBeNull();
     }
 
     [Fact]
@@ -73,18 +73,18 @@ public class VBindTransformTests
     {
         var result = TransformTestHelpers.Transform("<div :view-box.camel=\"x\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("viewBox").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("viewBox").ShouldNotBeNull();
     }
 
     [Fact]
-    public void VBind_ObjectSpread_MergesProps()
+    public void VBind_ObjectSpread_MergesProperties()
     {
         // v-bind without argument (v-bind="obj") merges via mergeProps and escalates to FULL_PROPS.
         var result = TransformTestHelpers.Transform("<div v-bind=\"obj\" id=\"a\"></div>");
 
-        var codegen = result.CodegenNode.ShouldBeOfType<VNodeCall>();
-        codegen.ShouldHavePatchFlag(PatchFlags.FullProps);
-        codegen.Props.ShouldBeOfType<CallExpression>().Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("mergeProps");
+        var codegen = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
+        codegen.ShouldHavePatchFlag(PatchFlags.FullProperties);
+        codegen.Properties.ShouldBeOfType<CallExpression>().Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("mergeProps");
     }
 }

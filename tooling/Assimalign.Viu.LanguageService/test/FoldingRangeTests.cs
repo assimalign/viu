@@ -33,7 +33,7 @@ public class FoldingRangeTests
             "@script {\n" +
             "    public int Count;\n" +
             "}\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -46,7 +46,7 @@ public class FoldingRangeTests
     [Fact]
     public void GetFoldingRanges_SingleLineBlock_ReturnsNoRange()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "<template><div /></template>\n", 1);
 
         service.GetFoldingRanges(DocumentUri).ShouldBeEmpty();
@@ -71,7 +71,7 @@ public class FoldingRangeTests
             "@script {\n" +                      // 10
             "    public int Count;\n" +          // 11
             "}\n";                               // 12
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -96,7 +96,7 @@ public class FoldingRangeTests
             "        two\n" +     // 5
             "    </div>\n" +      // 6
             "</template>\n";      // 7
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -115,7 +115,7 @@ public class FoldingRangeTests
             "<template>\n" +                        // 0
             "    <div><span>text</span></div>\n" +  // 1
             "</template>\n";                        // 2
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -134,7 +134,7 @@ public class FoldingRangeTests
             "    <slot\n" +                // 1
             "        name=\"badge\" />\n" + // 2
             "</template>\n";               // 3
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -155,7 +155,7 @@ public class FoldingRangeTests
             "        </template>\n" +            // 4
             "    </MyCard>\n" +                  // 5
             "</template>\n";                     // 6
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -177,7 +177,7 @@ public class FoldingRangeTests
             "        text\n" +    // 2
             "    </div>\n" +      // 3
             "}\n";                // 4
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -198,7 +198,7 @@ public class FoldingRangeTests
             "        <p>Hello</p>\n" +        // 2
             "    </div>\n" +                  // 3
             "</template>\n";                  // 4
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(VueDocumentUri);
@@ -219,7 +219,7 @@ public class FoldingRangeTests
             "    <div>\n" +       // 1
             "        text\n" +    // 2
             "</template>\n";      // 3
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -240,7 +240,7 @@ public class FoldingRangeTests
             "            <h1>Title</h1>\n" + // 3
             "    </article>\n" +             // 4
             "</template>\n";                 // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -266,7 +266,7 @@ public class FoldingRangeTests
             "        two\n" +       // 3
             "    </div>\n" +        // 4
             "</template>\n";        // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -287,7 +287,7 @@ public class FoldingRangeTests
             "        text\n" +    // 2
             "    </div>\n" +      // 3
             "</template>\n";      // 4
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var first = service.GetFoldingRanges(DocumentUri);
@@ -323,7 +323,7 @@ public class FoldingRangeTests
             "        Count++;\n" +               // 8
             "    }\n" +                          // 9
             "}\n";                               // 10
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -351,7 +351,7 @@ public class FoldingRangeTests
             "        return Total * 2;\n" +          // 7
             "    }\n" +                              // 8
             "}\n";                                   // 9
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -378,7 +378,7 @@ public class FoldingRangeTests
             "        set => count = value;\n" +         // 7
             "    }\n" +                                 // 8
             "}\n";                                      // 9
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -402,7 +402,7 @@ public class FoldingRangeTests
             "        \"second\",\n" +                        // 4
             "    ];\n" +                                     // 5
             "}\n";                                           // 6
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -424,7 +424,7 @@ public class FoldingRangeTests
             "        Name = \"card\",\n" +                      // 3
             "    };\n" +                                        // 4
             "}\n";                                              // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -446,7 +446,7 @@ public class FoldingRangeTests
             "        Count++;\n" +                             // 3
             "    };\n" +                                       // 4
             "}\n";                                             // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -473,7 +473,7 @@ public class FoldingRangeTests
             "        Inner();\n" +             // 8
             "    }\n" +                        // 9
             "}\n";                             // 10
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -495,7 +495,7 @@ public class FoldingRangeTests
             "        public int Count;\n" +          // 3
             "    }\n" +                              // 4
             "}\n";                                   // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -516,7 +516,7 @@ public class FoldingRangeTests
             "    private int count;\n" +        // 2
             "    #endregion\n" +                // 3
             "}\n";                              // 4
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -535,7 +535,7 @@ public class FoldingRangeTests
             "@script {\n" +                                    // 0
             "    public void Increment() { Count++; }\n" +     // 1
             "}\n";                                             // 2
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -561,7 +561,7 @@ public class FoldingRangeTests
             "    {\n" +                        // 7
             "        Count++;\n" +             // 8
             "}\n";                             // 9
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -589,7 +589,7 @@ public class FoldingRangeTests
             "        Count++;\n" +             // 5
             "    }\n" +                        // 6
             "}\n";                             // 7
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -615,7 +615,7 @@ public class FoldingRangeTests
             "    Count++;\n" +                 // 6
             "}\n" +                            // 7
             "</script>\n";                     // 8
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(VueDocumentUri);
@@ -638,7 +638,7 @@ public class FoldingRangeTests
             "{\n" +                            // 2
             "    Count++;\n" +                 // 3
             "}</script>\n";                    // 4
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(VueDocumentUri);
@@ -661,7 +661,7 @@ public class FoldingRangeTests
             "    Count++;\n" +                 // 3
             "}\n" +                            // 4
             "</script>\n";                     // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(VueDocumentUri);
@@ -691,7 +691,7 @@ public class FoldingRangeTests
             "        Count++;\n" +               // 8
             "    }\n" +                          // 9
             "}\n";                               // 10
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var ranges = service.GetFoldingRanges(DocumentUri);
@@ -715,7 +715,7 @@ public class FoldingRangeTests
             "        Count++;\n" +             // 3
             "    }\n" +                        // 4
             "}\n";                             // 5
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var first = service.GetFoldingRanges(DocumentUri);

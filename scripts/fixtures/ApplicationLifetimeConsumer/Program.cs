@@ -6,21 +6,23 @@ using Assimalign.Viu.Browser.Router;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Router;
 
-ComponentFactory components = new(
-[
+ComponentReference appReference = ComponentReference.ForType(typeof(App));
+ComponentFactory components = new();
+components.Register(
     new ComponentRegistration(
-        typeof(App),
-        static () => new App()),
-]);
+        appReference,
+        new ComponentContract(renderCacheSize: 0, displayName: nameof(App)),
+        static _ => new App()));
 EmptyServiceProvider services = new();
+using IRouterHistory history = RouterHistory.CreateWebHash();
 using Router router = new(
-    RouterHistory.CreateWebHash(),
+    history,
     [new RouteRecord("/")]);
 
 await new BrowserApplicationBuilder()
     .ConfigureApplication(options =>
     {
-        options.RootComponent = ComponentTree.Template<App>();
+        options.RootComponent = new ComponentNode(appReference);
         options.Components = components;
         options.Services = services;
         options.ErrorHandler = RecordError;
@@ -31,7 +33,7 @@ await new BrowserApplicationBuilder()
 
 static void RecordError(
     Exception exception,
-    IComponentContext? context,
+    ComponentContext? context,
     string source)
 {
     _ = exception;
@@ -39,12 +41,16 @@ static void RecordError(
     _ = source;
 }
 
-internal sealed class App : IComponentTemplate
+internal sealed class App : IComponent
 {
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return static () => ComponentTree.Element("main");
+        return static (ComponentRenderFrame frame) =>
+        {
+            ArgumentNullException.ThrowIfNull(frame);
+            return new ElementNode(new QualifiedName("main"));
+        };
     }
 }
 

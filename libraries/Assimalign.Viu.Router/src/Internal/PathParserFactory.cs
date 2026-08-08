@@ -19,13 +19,13 @@ internal static class PathParserFactory
 
     /// <summary>Compiles tokenized segments into a <see cref="PathParser"/>.</summary>
     /// <param name="segments">The segments produced by <see cref="PathTokenizer.Tokenize"/>.</param>
-    /// <param name="options">Strict / case-sensitive matching options.</param>
+    /// <param name="options">The trailing-slash and case-sensitivity matching options.</param>
     /// <exception cref="RouteMatcherException">A custom parameter pattern was not a valid regular expression.</exception>
     public static PathParser Compile(List<List<PathToken>> segments, PathMatchingOptions options)
     {
         // The top-level matcher always anchors both ends, so a pattern can never match a prefix.
-        var strict = options.Strict;
-        var sensitive = options.Sensitive;
+        var isTrailingSlashSensitive = options.TrailingSlashSensitive;
+        var isCaseSensitive = options.CaseSensitive;
 
         var score = new List<double[]>();
         var pattern = new StringBuilder("^");
@@ -42,7 +42,7 @@ internal static class PathParserFactory
             if (segment.Count == 0)
             {
                 segmentScores.Add(PathScore.Root);
-                if (strict)
+                if (isTrailingSlashSensitive)
                 {
                     pattern.Append('/');
                 }
@@ -51,7 +51,7 @@ internal static class PathParserFactory
             for (var tokenIndex = 0; tokenIndex < segment.Count; tokenIndex++)
             {
                 var token = segment[tokenIndex];
-                var subSegmentScore = PathScore.Segment + (sensitive ? PathScore.BonusCaseSensitive : 0);
+                var subSegmentScore = PathScore.Segment + (isCaseSensitive ? PathScore.BonusCaseSensitive : 0);
 
                 if (token.Kind == PathTokenKind.Static)
                 {
@@ -115,14 +115,14 @@ internal static class PathParserFactory
             score.Add(segmentScores.ToArray());
         }
 
-        // The strict bonus lands only on the last sub-segment of the last segment.
-        if (strict && score.Count > 0)
+        // The trailing-slash-sensitivity bonus lands only on the last sub-segment of the last segment.
+        if (isTrailingSlashSensitive && score.Count > 0)
         {
             var lastSegment = score[^1];
-            lastSegment[^1] += PathScore.BonusStrict;
+            lastSegment[^1] += PathScore.BonusTrailingSlashSensitive;
         }
 
-        if (!strict)
+        if (!isTrailingSlashSensitive)
         {
             pattern.Append("/?");
         }
@@ -130,7 +130,8 @@ internal static class PathParserFactory
         // The top-level matcher is anchored at the end.
         pattern.Append('$');
 
-        var regexOptions = RegexOptions.CultureInvariant | (sensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
+        var regexOptions = RegexOptions.CultureInvariant |
+            (isCaseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase);
         var regularExpression = new Regex(pattern.ToString(), regexOptions);
 
         return new PathParser(regularExpression, score.ToArray(), keys.ToArray(), storedSegments);
