@@ -26,7 +26,6 @@ public sealed class BrowserEventsTests
         invocationCount.ShouldBe(0);
         bubbledEvent.PropagationStopped.ShouldBeTrue();
         bubbledEvent.DefaultPrevented.ShouldBeTrue();
-        bubbledEvent.ToResponseFlags().ShouldBe(3);
     }
 
     [Fact]
@@ -158,11 +157,9 @@ public sealed class BrowserEventsTests
         BrowserEvent browserEvent = CreateEvent(defaultPrevented: true);
 
         browserEvent.DefaultPrevented.ShouldBeTrue();
-        browserEvent.ToResponseFlags().ShouldBe(0);
-
         browserEvent.PreventDefault();
 
-        browserEvent.ToResponseFlags().ShouldBe(2);
+        browserEvent.DefaultPrevented.ShouldBeTrue();
     }
 
     private static BrowserEvent CreateEvent(

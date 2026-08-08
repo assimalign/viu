@@ -19,6 +19,7 @@ Targets follow the adopted disposition in
 | State-to-Components bridge interface and its context cast | `StateStoreDefinition<TStore>.Use(ComponentContext)` via `Services` + ambient registry | State | Conventions attach through the context's seams and never earn a member or a cast. |
 | Core template built-ins | Structural control nodes carrying `ComponentInvocation` + internal Core executors | Components / Core | Separates declarative structure (with lazy slots) from mounted algorithms. |
 | Transition forwarding wrappers | `TransitionNode` | Components | Avoids copying every virtual-node interface member. |
+| Foundation host adapter | `RendererOptions<TNode>` | Core / hosts | The renderer options object is the complete host contract; Browser and Testing provide production option sets without bridge interfaces. |
 | ServerRenderer friend access | `ComponentHost.RenderAsync` → `IComponentRenderScope` | Core | Exposes the complete one-shot operation rather than mounted machinery. |
 | Testing friend access | `MountedComponentView<TNode>` | Core | Publishes exact cold-path inspection data with stable per-mount view identity. |
 | Compiler style-scope identity | — deferred | — | Scoped CSS is deferred; no style-scope state exists anywhere in the model. |

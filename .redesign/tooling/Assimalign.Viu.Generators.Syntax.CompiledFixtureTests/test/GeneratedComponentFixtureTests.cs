@@ -22,6 +22,36 @@ namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 public sealed class GeneratedComponentFixtureTests
 {
     [Fact]
+    public void GeneratedComponent_MountsThroughBrowserCommandHost_InOneCommandFrame()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        ComponentNode root = new(ComponentReference.ForName("TargetedTextProbe"));
+        ApplicationContext application = CreateApplication(root, factory);
+        List<int> frameLengths = [];
+        var host = new BrowserRendererHost(
+            (_, length) =>
+            {
+                frameLengths.Add(length);
+                return [];
+            });
+        const int container = 1000;
+        host.ObserveForeignHandle(container);
+        Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Render(root, container, application);
+
+        frameLengths.ShouldHaveSingleItem().ShouldBeGreaterThan(0);
+        host.InteropCallCount.ShouldBe(1);
+        renderer.GetMountedComponentViews(container)
+            .ShouldHaveSingleItem()
+            .Instance.GetType().Name.ShouldBe("TargetedTextProbe");
+
+        renderer.Render(null, container, application);
+        host.InteropCallCount.ShouldBe(2);
+    }
+
+    [Fact]
     public void ShippingFixtures_MountBindFallThroughAndEmitThroughTheAdoptedModel()
     {
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;

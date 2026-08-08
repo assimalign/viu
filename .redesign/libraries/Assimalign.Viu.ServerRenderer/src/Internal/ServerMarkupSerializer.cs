@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Net;
-using System.Threading;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 
 using Assimalign.Viu;
@@ -11,164 +8,218 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.ServerRenderer;
 
-internal sealed class ServerMarkupSerializer
+/// <summary>Serializes every value in the closed virtual-node algebra.</summary>
+internal static class ServerMarkupSerializer
 {
     private static readonly IReadOnlyDictionary<string, object?> EmptySlotArguments =
-        new Dictionary<string, object?>();
+        new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
 
-    private readonly ComponentHost _componentHost;
-
-    internal ServerMarkupSerializer(ComponentHost componentHost)
-    {
-        _componentHost = componentHost;
-    }
-
-    internal async ValueTask WriteAsync(
+    internal static async Task RenderAsync(
+        SsrRenderState state,
         VirtualNode? node,
-        TextWriter writer,
-        IComponentRenderScope? parent,
-        CancellationToken cancellationToken)
+        IComponentRenderScope? parent)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(state);
+        state.CancellationToken.ThrowIfCancellationRequested();
 
-        switch (node)
+        if (node is null)
         {
-            case null:
-                return;
-            case TextNode text:
-                await WriteTextAsync(
-                    writer,
-                    WebUtility.HtmlEncode(text.Text),
-                    cancellationToken).ConfigureAwait(false);
-                return;
-            case CommentNode comment:
-                await WriteTextAsync(writer, "<!--", cancellationToken).ConfigureAwait(false);
-                await WriteTextAsync(
-                    writer,
-                    comment.Text.Replace("--", "- -", StringComparison.Ordinal),
-                    cancellationToken).ConfigureAwait(false);
-                await WriteTextAsync(writer, "-->", cancellationToken).ConfigureAwait(false);
-                return;
-            case StaticNode staticNode:
-                if (staticNode.Format != MarkupFormat.Html)
-                {
-                    throw new NotSupportedException(
-                        "The HTML server renderer cannot consume a non-HTML static payload.");
-                }
+            return;
+        }
 
-                await WriteTextAsync(writer, staticNode.Content, cancellationToken).ConfigureAwait(false);
-                return;
-            case ElementNode element:
-                await WriteElementAsync(element, writer, parent, cancellationToken).ConfigureAwait(false);
-                return;
-            case FragmentNode fragment:
-                foreach (var child in fragment.Children)
-                {
-                    await WriteAsync(child, writer, parent, cancellationToken).ConfigureAwait(false);
-                }
-
-                return;
-            case ComponentNode component:
-                await using (var scope = await _componentHost.RenderAsync(
-                    new ComponentRenderRequest(component, parent),
-                    cancellationToken).ConfigureAwait(false))
-                {
-                    await WriteAsync(
-                        scope.Tree,
-                        writer,
-                        scope,
-                        cancellationToken).ConfigureAwait(false);
-                }
-
-                return;
-            case TeleportNode teleport:
-                foreach (var child in teleport.Children)
-                {
-                    await WriteAsync(child, writer, parent, cancellationToken).ConfigureAwait(false);
-                }
-
-                return;
-            case KeepAliveNode keepAlive:
-                await WriteDefaultSlotAsync(
-                    keepAlive.Invocation, writer, parent, cancellationToken).ConfigureAwait(false);
-                return;
-            case SuspenseNode suspense:
-                await WriteDefaultSlotAsync(
-                    suspense.Invocation, writer, parent, cancellationToken).ConfigureAwait(false);
-                return;
-            case TransitionNode transition:
-                await WriteDefaultSlotAsync(
-                    transition.Invocation, writer, parent, cancellationToken).ConfigureAwait(false);
-                return;
+        switch (node.Kind)
+        {
+            case VirtualNodeKind.Element:
+                await RenderElementAsync(state, (ElementNode)node, parent).ConfigureAwait(false);
+                break;
+            case VirtualNodeKind.Text:
+                state.Push(ServerRender.EscapeHtml(((TextNode)node).Text));
+                break;
+            case VirtualNodeKind.Comment:
+                state.Push(ServerRender.SsrRenderComment(((CommentNode)node).Text));
+                break;
+            case VirtualNodeKind.Static:
+                RenderStatic(state, (StaticNode)node);
+                break;
+            case VirtualNodeKind.Fragment:
+                await RenderFragmentAsync(state, (FragmentNode)node, parent).ConfigureAwait(false);
+                break;
+            case VirtualNodeKind.Component:
+                await RenderComponentAsync(state, (ComponentNode)node, parent).ConfigureAwait(false);
+                break;
+            case VirtualNodeKind.Teleport:
+                await RenderTeleportAsync(state, (TeleportNode)node, parent).ConfigureAwait(false);
+                break;
+            case VirtualNodeKind.KeepAlive:
+                await RenderDefaultSlotAsync(
+                    state,
+                    ((KeepAliveNode)node).Invocation,
+                    parent).ConfigureAwait(false);
+                break;
+            case VirtualNodeKind.Suspense:
+                await RenderDefaultSlotAsync(
+                    state,
+                    ((SuspenseNode)node).Invocation,
+                    parent).ConfigureAwait(false);
+                break;
+            case VirtualNodeKind.Transition:
+                await RenderDefaultSlotAsync(
+                    state,
+                    ((TransitionNode)node).Invocation,
+                    parent).ConfigureAwait(false);
+                break;
             default:
-                throw new NotSupportedException(
-                    $"The server renderer does not recognize virtual node kind '{node.Kind}'.");
+                throw new InvalidOperationException(
+                    $"Unknown virtual node kind: {node.Kind}.");
         }
     }
 
-    private async ValueTask WriteDefaultSlotAsync(
-        ComponentInvocation invocation,
-        TextWriter writer,
-        IComponentRenderScope? parent,
-        CancellationToken cancellationToken)
+    internal static async Task RenderChildrenAsync(
+        SsrRenderState state,
+        IReadOnlyList<VirtualNode> children,
+        IComponentRenderScope? parent)
     {
-        if (invocation.Slots.TryGetValue("default", out var slot))
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(children);
+
+        for (int index = 0; index < children.Count; index++)
         {
-            await WriteAsync(
-                slot(EmptySlotArguments),
-                writer,
-                parent,
-                cancellationToken).ConfigureAwait(false);
+            await RenderAsync(state, children[index], parent).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask WriteElementAsync(
+    private static async Task RenderElementAsync(
+        SsrRenderState state,
         ElementNode element,
-        TextWriter writer,
-        IComponentRenderScope? parent,
-        CancellationToken cancellationToken)
+        IComponentRenderScope? parent)
     {
-        var name = element.Name.ToString();
-        await WriteTextAsync(writer, "<", cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(writer, name, cancellationToken).ConfigureAwait(false);
+        string name = element.Name.ToString();
+        state.Push("<");
+        state.Push(name);
+        state.Push(ServerRender.SsrRenderAttrs(element.Bindings, element.Name));
 
-        foreach (var binding in element.Bindings)
+        if (HtmlSerializationRules.IsVoidElement(element.Name))
         {
-            if (binding.Kind != ElementBindingKind.Attribute)
-            {
-                continue;
-            }
-
-            await WriteTextAsync(writer, " ", cancellationToken).ConfigureAwait(false);
-            await WriteTextAsync(writer, binding.Name.ToString(), cancellationToken).ConfigureAwait(false);
-            if (binding.Value is not null)
-            {
-                await WriteTextAsync(writer, "=\"", cancellationToken).ConfigureAwait(false);
-                await WriteTextAsync(
-                    writer,
-                    WebUtility.HtmlEncode(
-                        Convert.ToString(binding.Value, CultureInfo.InvariantCulture)
-                            ?? string.Empty)
-                        ?? string.Empty,
-                    cancellationToken).ConfigureAwait(false);
-                await WriteTextAsync(writer, "\"", cancellationToken).ConfigureAwait(false);
-            }
+            state.Push(">");
+            return;
         }
 
-        await WriteTextAsync(writer, ">", cancellationToken).ConfigureAwait(false);
-        foreach (var child in element.Children)
+        state.Push(">");
+        if (TryGetChildOverride(element, "innerHTML", out object? innerHtml)
+            && innerHtml is not null)
         {
-            await WriteAsync(child, writer, parent, cancellationToken).ConfigureAwait(false);
+            state.Push(DisplayStringFormatter.ToDisplayString(innerHtml));
+        }
+        else if (TryGetChildOverride(element, "textContent", out object? textContent)
+            && textContent is not null)
+        {
+            state.Push(ServerRender.EscapeHtml(DisplayStringFormatter.ToDisplayString(textContent)));
+        }
+        else if (string.Equals(
+                element.Name.LocalName,
+                "textarea",
+                StringComparison.OrdinalIgnoreCase)
+            && TryGetChildOverride(element, "value", out object? value)
+            && value is not null)
+        {
+            state.Push(ServerRender.EscapeHtml(DisplayStringFormatter.ToDisplayString(value)));
+        }
+        else
+        {
+            await RenderChildrenAsync(state, element.Children, parent).ConfigureAwait(false);
         }
 
-        await WriteTextAsync(writer, "</", cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(writer, name, cancellationToken).ConfigureAwait(false);
-        await WriteTextAsync(writer, ">", cancellationToken).ConfigureAwait(false);
+        state.Push("</");
+        state.Push(name);
+        state.Push(">");
     }
 
-    private static ValueTask WriteTextAsync(
-        TextWriter writer,
-        string text,
-        CancellationToken cancellationToken) =>
-        new(writer.WriteAsync(text.AsMemory(), cancellationToken));
+    private static async Task RenderFragmentAsync(
+        SsrRenderState state,
+        FragmentNode fragment,
+        IComponentRenderScope? parent)
+    {
+        state.Push(HydrationMarkers.FragmentStart);
+        await RenderChildrenAsync(state, fragment.Children, parent).ConfigureAwait(false);
+        state.Push(HydrationMarkers.FragmentEnd);
+    }
+
+    private static async Task RenderComponentAsync(
+        SsrRenderState state,
+        ComponentNode component,
+        IComponentRenderScope? parent)
+    {
+        await using IComponentRenderScope scope = await state.ComponentHost.RenderAsync(
+            new ComponentRenderRequest(component, parent),
+            state.CancellationToken).ConfigureAwait(false);
+
+        if (scope.Tree is null)
+        {
+            state.Push(HydrationMarkers.EmptyComment);
+        }
+        else
+        {
+            await RenderAsync(state, scope.Tree, scope).ConfigureAwait(false);
+        }
+
+        // A complete component subtree is the streaming boundary required by [SSR-1].
+        await state.FlushAsync().ConfigureAwait(false);
+    }
+
+    private static Task RenderTeleportAsync(
+        SsrRenderState state,
+        TeleportNode teleport,
+        IComponentRenderScope? parent) =>
+        ServerRender.SsrRenderTeleportAsync(
+            state,
+            contentState => RenderChildrenAsync(contentState, teleport.Children, parent),
+            teleport.TargetIdentifier,
+            teleport.IsDisabled);
+
+    private static Task RenderDefaultSlotAsync(
+        SsrRenderState state,
+        ComponentInvocation invocation,
+        IComponentRenderScope? parent)
+    {
+        if (!invocation.Slots.TryGetValue("default", out ComponentSlot? slot))
+        {
+            return Task.CompletedTask;
+        }
+
+        return RenderAsync(state, slot(EmptySlotArguments), parent);
+    }
+
+    private static void RenderStatic(SsrRenderState state, StaticNode node)
+    {
+        if (node.Format != MarkupFormat.Html)
+        {
+            throw new NotSupportedException(
+                "The HTML server renderer cannot consume a non-HTML static payload.");
+        }
+
+        state.Push(node.Content);
+    }
+
+    private static bool TryGetChildOverride(
+        ElementNode element,
+        string localName,
+        out object? value)
+    {
+        for (int index = element.Bindings.Count - 1; index >= 0; index--)
+        {
+            ElementBinding binding = element.Bindings[index];
+            if (binding.Kind != ElementBindingKind.Event
+                && string.Equals(
+                    binding.Name.LocalName,
+                    localName,
+                    StringComparison.Ordinal))
+            {
+                value = binding.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
 }

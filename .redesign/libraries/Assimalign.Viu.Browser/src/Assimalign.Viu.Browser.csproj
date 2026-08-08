@@ -2,9 +2,12 @@
   <PropertyGroup>
     <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Required by the [JSImport] interop source generator (SYSLIB1074). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Components" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
   </ItemGroup>
 </Project>

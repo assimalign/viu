@@ -1,13 +1,28 @@
 # Assimalign.Viu.ServerRenderer
 
-ServerRenderer is an HTML serialization host over the generic Components tree. Component execution
-goes through `ComponentHost.RenderAsync` and the public `IComponentRenderScope`; the serializer
-walks `scope.Tree`, passes the scope as the parent of nested component operations, and disposes
-it. It never creates or aborts Core's internal mounted components.
+ServerRenderer is Viu's host-neutral WHATWG HTML serialization host. Its public entry points accept
+either an immutable `ServerRenderApplication` or a primitive `VirtualNode` tree and render to a
+string or a caller-owned `TextWriter`. Streaming flushes at completed component-subtree boundaries,
+so the destination controls backpressure without imposing a web-framework dependency.
 
-Built-in control nodes serialize through their invocation's lazy default slot. With scoped CSS
-deferred, the serializer reads no style-scope state and emits no scope attributes.
+The serializer dispatches all ten `VirtualNodeKind` values. Component nodes execute only through
+`ComponentHost.RenderAsync`; it holds the returned `IComponentRenderScope` while consuming
+`scope.Tree`, passes that active scope as the parent of nested requests, and disposes the scope after
+the subtree and its streaming boundary complete. This is the complete one-shot host seam: there is
+no friend access, mounted-engine access, context downcast, or capability probe.
 
-The package owns HTML escaping, element/attribute validity, void and boolean semantics, hydration
-markers, and teleport buffers in the full implementation. A future XML serializer would be a
-different host package over the same qualified tree.
+Serialization owns the HTML-specific rules required by `[SSR-6]`: the five-character escape set,
+repeated comment-terminator removal, void and boolean elements, safe dynamic attribute names,
+class/style normalization, property/event exclusion, child overrides, and SVG/custom-element casing.
+Qualified names remain explicit. Static Extensible Markup Language payloads are rejected because
+they require a different host serializer.
+
+`HydrationMarkers` is the sole marker vocabulary. Fragments emit its range markers; enabled
+teleports leave origin anchors and buffer children plus a target anchor; disabled teleports render
+children in place and contribute only their target anchor. `SsrContext` exposes the resolved target
+buffers and a renderer-uninterpreted state handoff bag. Suspense serializes only its resolved default
+branch; KeepAlive and Transition serialize their lazy default slots without client-only behavior.
+
+Scoped CSS remains deferred for this wave, so ServerRenderer performs no scope-identifier attribute
+pass. Application services, factories, directives, state registries, and diagnostics are borrowed
+from `IApplicationContext` and are never disposed by this package.

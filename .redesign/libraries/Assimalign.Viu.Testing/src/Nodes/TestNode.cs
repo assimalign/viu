@@ -1,19 +1,22 @@
-using System;
-
 namespace Assimalign.Viu.Testing;
 
-/// <summary>Represents one DOM-free host node used by the testing renderer.</summary>
-/// <remarks>Specified by <c>[RND-HOST-3]</c> and <c>[CONF-3]</c>.</remarks>
-public sealed class TestNode
+/// <summary>
+/// Represents the base of the in-memory host tree driven by the production renderer contract.
+/// The node model is deliberately single-threaded, matching Viu's JavaScript event-loop model.
+/// </summary>
+/// <remarks>Specified by <c>[EXE-1]</c>, <c>[RND-HOST-3]</c>, and <c>[CONF-3]</c>.</remarks>
+public abstract class TestNode
 {
-    /// <summary>Initializes a test node.</summary>
-    /// <param name="description">The non-empty diagnostic description.</param>
-    public TestNode(string description)
+    private static int _nextIdentifier;
+
+    private protected TestNode()
     {
-        ArgumentException.ThrowIfNullOrEmpty(description);
-        Description = description;
+        Identifier = checked(++_nextIdentifier);
     }
 
-    /// <summary>Gets the diagnostic description.</summary>
-    public string Description { get; }
+    /// <summary>Gets the process-unique identifier used for diagnostics and operation correlation.</summary>
+    public int Identifier { get; }
+
+    /// <summary>Gets the parent element, or null while the node is detached.</summary>
+    public TestElement? Parent { get; internal set; }
 }

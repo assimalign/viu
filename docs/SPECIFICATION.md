@@ -1369,19 +1369,23 @@ member name (`$style.a-b` → `$style.a_b`), the same name the emitter writes as
 
 ### 10.3 `v-bind()` in CSS
 
-`[STY-6]` `v-bind()` in a style block compiles to `CssVariables.UseCssVariables(context, getter)`
-emitted from the generated setup path, taking an **explicit `ComponentContext`** so ownership is
-unambiguous.
+`[STY-6]` **Deferred with the scoped-CSS feature until the `[V01.01.15]` arc completes.**
+`v-bind()` in a style block compiles to a `CssVariables` binding emitted from the generated setup
+path with an explicit `ComponentContext` owner. During the deferral the compiler emits no CSS
+variable application, and the Browser host retains the designed single-element
+`CssVariables.Bind` directive as the primitive the restored feature builds on.
 
-`[STY-7]` After mount, a post-flush watcher tracks the getter's reactive dependencies and applies
-each hashed custom property to **every current outermost host element** reported by `ComponentHost`
-— fragment roots included. The updated hook reapplies when a component changes its element or
-fragment roots; before unmount the component stops the watcher.
+`[STY-7]` **Deferred with `[STY-6]`.** When restored: after mount, a post-flush watcher tracks the
+getter's reactive dependencies and applies each hashed custom property to every current outermost
+host element — fragment roots included — reapplying on root-set changes and stopping before
+unmount. Restoration requires the component-root host-range seam recorded in
+`docs/COMPONENT-MODEL-PLAN.md`; introducing that seam is part of the restoration work item, not
+the migration arc.
 
-`[STY-8]` **A `v-bind()` change updates the host without re-rendering the component.** On a buffered
-host the properties are written into the command frame and the owning context queues its
-renderer-specific commit, so the change reaches the host before `NextTick` even though no render
-occurred.
+`[STY-8]` **Deferred with `[STY-6]`.** When restored: a `v-bind()` change updates the host without
+re-rendering the component — on a buffered host the properties are written into the command frame
+and the owning context queues its renderer-specific commit, reaching the host before `NextTick`
+with no render.
 
 ### 10.4 Viu Utilities
 

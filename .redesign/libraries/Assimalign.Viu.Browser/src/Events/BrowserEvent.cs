@@ -17,7 +17,23 @@ public sealed class BrowserEvent
     private readonly bool _defaultPreventedOnArrival;
     private bool _preventDefaultRequested;
 
-    internal BrowserEvent(
+    /// <summary>Initializes one browser event payload with mutable response intents.</summary>
+    /// <param name="eventName">The DOM event type.</param>
+    /// <param name="timeStamp">The page-relative timestamp in milliseconds.</param>
+    /// <param name="key">The keyboard key value, or an empty string.</param>
+    /// <param name="code">The keyboard code value, or an empty string.</param>
+    /// <param name="modifiers">The captured system-modifier flags.</param>
+    /// <param name="button">The mouse button, or negative one.</param>
+    /// <param name="buttons">The pressed mouse-button bitmask.</param>
+    /// <param name="clientX">The pointer viewport X coordinate.</param>
+    /// <param name="clientY">The pointer viewport Y coordinate.</param>
+    /// <param name="detail">The user-interface event detail.</param>
+    /// <param name="isSelfTarget">Whether target and current target are identical.</param>
+    /// <param name="targetValue">The captured control value.</param>
+    /// <param name="targetChecked">The captured checked state.</param>
+    /// <param name="selectedValues">The captured multiple-selection values.</param>
+    /// <param name="defaultPrevented">Whether default handling was already prevented.</param>
+    public BrowserEvent(
         string eventName,
         double timeStamp,
         string key,
