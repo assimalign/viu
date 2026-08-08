@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 using Shouldly;
@@ -14,6 +15,10 @@ namespace Assimalign.Viu.Browser.Tests;
 // Pins the per-render flush budget specified by [RND-HOST-4], [RND-IO-1], and [SCH-10..11].
 public sealed class BrowserRendererHostTests
 {
+    private const int ContainerHandle = 100;
+    private const int TeleportTargetHandle = 200;
+    private const string TeleportTargetSelector = "#overlay";
+
     [Fact]
     public void Render_SynchronousFlush_AppliesOneNonemptyCommandFrame()
     {
@@ -122,6 +127,107 @@ public sealed class BrowserRendererHostTests
         }
     }
 
+    [Fact]
+    public void Render_BlockTransitionSynchronousLeaveMountsComponentWithKeepAliveAndRemainsPatchable()
+    {
+        Scheduler.Reset();
+        Queue<Action> scheduledFlushes = [];
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(
+            scheduledFlushes.Enqueue);
+        try
+        {
+            var host = new BrowserRendererHost((_, _) => []);
+            host.ObserveForeignHandle(ContainerHandle);
+            Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+            ComponentFactory components = CreateStorageComponentFactory(
+                includeDeferredTeleport: false);
+            ElementNode initial = TransitionBlock(OutgoingElement());
+            ApplicationContext application = CreateApplication(initial, components);
+            renderer.Render(initial, ContainerHandle, application);
+            RunScheduledFlushes(scheduledFlushes);
+
+            renderer.Render(
+                TransitionBlock(IncomingComponent()),
+                ContainerHandle);
+            RunScheduledFlushes(scheduledFlushes);
+
+            MountedComponentView<int> incoming = renderer
+                .GetMountedComponentViews(ContainerHandle)
+                .Single(view => view.Instance is IncomingStorageComponent);
+            renderer.GetMountedComponentViews(ContainerHandle)
+                .ShouldContain(view => view.Instance is StorageLeafComponent);
+
+            Should.NotThrow(
+                () => renderer.Render(
+                    TransitionBlock(ReplacementElement()),
+                    ContainerHandle));
+            RunScheduledFlushes(scheduledFlushes);
+            incoming.IsMounted.ShouldBeFalse();
+            Should.NotThrow(() => renderer.Render(null, ContainerHandle));
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
+    [Fact]
+    public void Render_BlockTransitionIncomingComponentWithDeferredTeleportRemainsPatchable()
+    {
+        Scheduler.Reset();
+        Queue<Action> scheduledFlushes = [];
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(
+            scheduledFlushes.Enqueue);
+        try
+        {
+            int teleportResolutionCount = 0;
+            var operations = new BufferedBrowserNodeOperations(
+                (_, _) => [],
+                selector =>
+                {
+                    selector.ShouldBe(TeleportTargetSelector);
+                    teleportResolutionCount++;
+                    return TeleportTargetHandle;
+                },
+                static _ => 0,
+                static _ => 0,
+                insertStaticContent: null);
+            operations.ObserveForeignHandle(ContainerHandle);
+            operations.ObserveForeignHandle(TeleportTargetHandle);
+            Renderer<int> renderer = RendererFactory.CreateRenderer(operations.Create());
+            ComponentFactory components = CreateStorageComponentFactory(
+                includeDeferredTeleport: true);
+            ElementNode initial = TransitionBlock(OutgoingElement());
+            ApplicationContext application = CreateApplication(initial, components);
+            renderer.Render(initial, ContainerHandle, application);
+            RunScheduledFlushes(scheduledFlushes);
+
+            renderer.Render(
+                TransitionBlock(IncomingComponent()),
+                ContainerHandle);
+            RunScheduledFlushes(scheduledFlushes);
+
+            teleportResolutionCount.ShouldBe(1);
+            MountedComponentView<int> incoming = renderer
+                .GetMountedComponentViews(ContainerHandle)
+                .Single(view => view.Instance is IncomingStorageComponent);
+            renderer.GetMountedComponentViews(ContainerHandle)
+                .ShouldContain(view => view.Instance is StorageLeafComponent);
+
+            Should.NotThrow(
+                () => renderer.Render(
+                    TransitionBlock(ReplacementElement()),
+                    ContainerHandle));
+            RunScheduledFlushes(scheduledFlushes);
+            incoming.IsMounted.ShouldBeFalse();
+            Should.NotThrow(() => renderer.Render(null, ContainerHandle));
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
     [Theory]
     [InlineData("div", null, null)]
     [InlineData("svg", null, "svg")]
@@ -129,6 +235,7 @@ public sealed class BrowserRendererHostTests
     [InlineData("foreignObject", null, "svg")]
     [InlineData("math", null, "mathml")]
     [InlineData("mi", "http://www.w3.org/1998/Math/MathML", "mathml")]
+    [InlineData("storage", "urn:assimalign:viu:internal", null)]
     public void CreateElement_QualifiedName_EncodesHostOwnedNamespace(
         string localName,
         string? namespaceName,
@@ -200,5 +307,145 @@ public sealed class BrowserRendererHostTests
             frame.AsSpan(cursor, sizeof(int)));
         cursor += sizeof(int);
         return value;
+    }
+
+    private static ComponentFactory CreateStorageComponentFactory(
+        bool includeDeferredTeleport)
+    {
+        var components = new ComponentFactory();
+        components.Register(
+            new ComponentRegistration(
+                ComponentReference.ForType(typeof(IncomingStorageComponent)),
+                new ComponentContract(),
+                _ => new IncomingStorageComponent(includeDeferredTeleport)));
+        components.Register(
+            new ComponentRegistration(
+                ComponentReference.ForType(typeof(StorageLeafComponent)),
+                new ComponentContract(),
+                static _ => new StorageLeafComponent()));
+        return components;
+    }
+
+    private static ApplicationContext CreateApplication(
+        VirtualNode root,
+        ComponentFactory components) =>
+        new(
+            new ApplicationOptions
+            {
+                RootComponent = root,
+                Components = components,
+            });
+
+    private static ElementNode TransitionBlock(VirtualNode child)
+    {
+        TransitionNode transition = SynchronousOutgoingThenIncoming(child);
+        return new ElementNode(
+            new QualifiedName("block-root"),
+            children: [transition],
+            renderPlan: new RenderPlan(
+                PatchFlags.NeedPatch,
+                dynamicChildren: [transition]));
+    }
+
+    private static TransitionNode SynchronousOutgoingThenIncoming(VirtualNode child)
+    {
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [TransitionProperties.ResolvedArgument] = new TransitionProperties
+            {
+                Mode = "out-in",
+                OnEnter = static (_, complete) => complete(),
+                OnLeave = static (_, complete) => complete(),
+            },
+        };
+        var slots = new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+        {
+            ["default"] = _ => child,
+        };
+        return new TransitionNode(new ComponentInvocation(arguments, slots));
+    }
+
+    private static ElementNode OutgoingElement() =>
+        new(
+            new QualifiedName("section"),
+            children: [new TextNode("outgoing")],
+            key: "outgoing");
+
+    private static ComponentNode IncomingComponent() =>
+        new(
+            ComponentReference.ForType(typeof(IncomingStorageComponent)),
+            key: "incoming");
+
+    private static ElementNode ReplacementElement() =>
+        new(
+            new QualifiedName("section"),
+            children: [new TextNode("replacement")],
+            key: "replacement");
+
+    private static void RunScheduledFlushes(Queue<Action> scheduledFlushes)
+    {
+        while (scheduledFlushes.Count > 0)
+        {
+            scheduledFlushes.Dequeue()();
+        }
+    }
+
+    private sealed class IncomingStorageComponent : IComponent
+    {
+        private readonly bool _includeDeferredTeleport;
+
+        internal IncomingStorageComponent(bool includeDeferredTeleport)
+        {
+            _includeDeferredTeleport = includeDeferredTeleport;
+        }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            List<VirtualNode> children = [];
+            if (_includeDeferredTeleport)
+            {
+                children.Add(
+                    new TeleportNode(
+                        TeleportTargetSelector,
+                        [
+                            new ElementNode(
+                                new QualifiedName("aside"),
+                                children: [new TextNode("teleported")]),
+                        ],
+                        isDeferred: true));
+            }
+
+            children.Add(
+                new ElementNode(
+                    new QualifiedName("p"),
+                    children: [new TextNode("incoming component")]));
+            children.Add(StorageKeepAlive());
+            return _ => new ElementNode(
+                new QualifiedName("article"),
+                children: children);
+        }
+    }
+
+    private sealed class StorageLeafComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return static _ => new ElementNode(
+                new QualifiedName("span"),
+                children: [new TextNode("kept alive")]);
+        }
+    }
+
+    private static KeepAliveNode StorageKeepAlive()
+    {
+        var slots = new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+        {
+            ["default"] = _ => new ComponentNode(
+                ComponentReference.ForType(typeof(StorageLeafComponent)),
+                key: "storage-leaf"),
+        };
+        return new KeepAliveNode(new ComponentInvocation(slots: slots));
     }
 }

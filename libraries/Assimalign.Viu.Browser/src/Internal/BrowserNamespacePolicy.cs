@@ -14,6 +14,7 @@ internal static class BrowserNamespacePolicy
     internal const string MathMl = "mathml";
 
     private const string HtmlNamespaceName = "http://www.w3.org/1999/xhtml";
+    private const string ViuInternalNamespaceName = "urn:assimalign:viu:internal";
     private const string SvgNamespaceName = "http://www.w3.org/2000/svg";
     private const string MathMlNamespaceName = "http://www.w3.org/1998/Math/MathML";
 
@@ -33,6 +34,16 @@ internal static class BrowserNamespacePolicy
         }
 
         if (string.Equals(name.NamespaceName, HtmlNamespaceName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        // Core's KeepAlive and Suspense storage is detached renderer infrastructure. The
+        // browser materializes that exact pseudo-namespace as an ordinary detached HTML node.
+        if (string.Equals(
+                name.NamespaceName,
+                ViuInternalNamespaceName,
+                StringComparison.Ordinal))
         {
             return null;
         }

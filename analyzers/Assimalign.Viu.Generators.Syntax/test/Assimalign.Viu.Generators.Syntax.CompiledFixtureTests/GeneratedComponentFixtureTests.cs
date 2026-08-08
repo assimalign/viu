@@ -341,6 +341,75 @@ public sealed class GeneratedComponentFixtureTests
     }
 
     [Fact]
+    public async Task RouterOutlet_NavigationIntoGeneratedTransitionKeepAliveView_MountsThroughBrowserHost()
+    {
+        // [RND-HOST-1]/[RND-BLOCK-5] This is the packaged-showcase shape: a generated
+        // out-in route transition synchronously mounts a generated view whose subtree owns
+        // another transition and KeepAlive. The Browser host must accept every renderer-owned
+        // node created during that re-entrant mount.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        RegisterRouterView(factory);
+        ComponentNode firstRoute = new(ComponentReference.ForName("RouterFirstView"));
+        ComponentNode builtInsRoute = new(ComponentReference.ForName("RouterBuiltInsView"));
+        using var router = new ViuRouter(
+            RouterHistory.CreateMemory(),
+            [
+                new RouteRecord("/first", component: firstRoute),
+                new RouteRecord("/built-ins", component: builtInsRoute),
+            ]);
+        (await router.PushAsync("/first")).ShouldBeNull();
+        ComponentNode root = new(ComponentReference.ForName("RouterOutletShell"));
+        ApplicationContext application = CreateApplication(
+            root,
+            factory,
+            new RouterServiceProvider(router));
+        Queue<Action> scheduledFlushes = [];
+        Scheduler.Reset();
+        using IDisposable schedulerRegistration =
+            Scheduler.UseFlushDispatcher(scheduledFlushes.Enqueue);
+        var host = new BrowserRendererHost((_, _) => []);
+        const int container = 1000;
+        host.ObserveForeignHandle(container);
+        Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+
+        try
+        {
+            renderer.Render(root, container, application);
+            RunScheduledFlushes(scheduledFlushes);
+            MountedComponentView<int> firstMounted = renderer
+                .GetMountedComponentViews(container)
+                .Single(view => string.Equals(
+                    view.Instance.GetType().Name,
+                    "RouterFirstView",
+                    StringComparison.Ordinal));
+
+            (await router.PushAsync("/built-ins")).ShouldBeNull();
+            RunScheduledFlushes(scheduledFlushes);
+
+            firstMounted.IsMounted.ShouldBeFalse();
+            string[] mountedNames = renderer.GetMountedComponentViews(container)
+                .Select(view => view.Instance.GetType().Name)
+                .ToArray();
+            mountedNames.ShouldContain("RouterBuiltInsView");
+            mountedNames.ShouldContain("TargetedTextProbe");
+            string generated = fixtures.GeneratedSources
+                .Single(pair => pair.Key.EndsWith(
+                    "RouterBuiltInsView.SingleFileComponent.g.cs",
+                    StringComparison.Ordinal))
+                .Value;
+            generated.ShouldContain("TransitionNode");
+            generated.ShouldContain("KeepAliveNode");
+
+            renderer.Render(null, container, application);
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
+    [Fact]
     public void PatchProbe_PreservesIfForKeyedMovesAndMemoSemantics()
     {
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
@@ -609,5 +678,13 @@ public sealed class GeneratedComponentFixtureTests
 
         public object? GetService(Type serviceType) =>
             serviceType == typeof(ViuRouter) ? _router : null;
+    }
+
+    private static void RunScheduledFlushes(Queue<Action> scheduledFlushes)
+    {
+        while (scheduledFlushes.Count > 0)
+        {
+            scheduledFlushes.Dequeue()();
+        }
     }
 }

@@ -1,0 +1,16 @@
+<template>
+<section class="compiled-built-ins-route">
+  <Transition mode="out-in">
+    <article :key="ActiveBranch" class="compiled-nested-transition">
+      <span>nested transition content</span>
+    </article>
+  </Transition>
+  <KeepAlive max="1">
+    <TargetedTextProbe :key="ActiveBranch" />
+  </KeepAlive>
+</section>
+</template>
+
+@script {
+public string ActiveBranch => "motion";
+}
