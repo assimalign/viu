@@ -6,7 +6,7 @@ using System.Text;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The .NET writer half of the interop command buffer ([V01.01.04.05]): buffered node-ops encode
+/// The .NET writer half of the interop command buffer ([V01.01.04.05]): buffered host operations encode
 /// each DOM mutation as an opcode + operands into one growable, reused <see cref="byte"/> array, and
 /// a single interop call hands the whole frame to the JavaScript applier (<c>viu-dom.js</c>'s
 /// <c>applyCommandBuffer</c>) per scheduler flush, collapsing hundreds of boundary crossings into

@@ -5,7 +5,7 @@ namespace Assimalign.Viu.Browser;
 /// <summary>
 /// Bridges a dispatched <see cref="BrowserEvent"/> into a renderer-agnostic
 /// <see cref="Action{T}"/> of <see cref="object"/> event handler — the shape a component that
-/// renders through the node-ops abstraction (rather than the DOM directly) attaches, so its
+/// renders through the host-operation abstraction (rather than the DOM directly) attaches, so its
 /// handler receives a platform-free payload instead of the <see cref="BrowserEvent"/>. The
 /// in-memory Testing renderer invokes these handlers with a synthesized payload directly; in the
 /// browser a host installs an invoker on <see cref="BrowserObjectEvents"/> that converts the

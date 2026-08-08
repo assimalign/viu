@@ -1,27 +1,22 @@
-# Current-to-target type map
+# Adopted type map
 
-Targets follow the adopted disposition in
-[`../../docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §2/§2a.
+| Earlier responsibility | Adopted concept | Owner |
+|---|---|---|
+| Immutable render value | `VirtualNode` and sealed variants | Components |
+| Authored behavior | `IComponent.Setup(ComponentContext)` | Components |
+| Raw parent inputs | `ComponentInvocation` on `ComponentNode` | Components |
+| Resolved mounted inputs | `ComponentBindings` on `ComponentContext` | Components |
+| AOT-safe activation | `ComponentRegistration` and `IComponentFactory` | Components |
+| Per-mount render cache/block assembly | `ComponentRenderFrame` | Components |
+| Mounted execution and inspection | internal engine plus `MountedComponentView<TNode>` | Core |
+| Host mutation contract | `RendererOptions<TNode>` | Core and each host |
+| Server component execution | `ComponentHost.RenderAsync` lease | Core |
+| Route target | `VirtualNode` with optional component arguments | Router |
+| Nested route outlet | `RouterView` registration with explicit depth | Router |
+| Navigation anchor | `RouterLink` registration and `ElementNode` | Router |
+| Browser click integration | `UseRouter` application middleware | Browser.Router |
+| Shared miscellaneous values | domain-owned flags, names, styles, and host data | owning libraries |
 
-| Current concept | Target concept | Owner | Reason |
-|---|---|---|---|
-| `IComponent` tree description | `VirtualNode` | Components | Reserves "component" for authored behavior and closes the render vocabulary. |
-| Per-kind component interfaces | Sealed `VirtualNode` variants | Components | Makes kind/shape mismatches unrepresentable. |
-| Retired template-node interface | `ComponentNode` | Components | Names the value as an immutable invocation in the tree. |
-| Template request arguments and slots | `ComponentInvocation` | Components | Explicitly identifies raw parent-created inputs. |
-| `IComponentTemplate` | `IComponent` | Components | The authored contract stays in the component model, one instance per mount. |
-| Template metadata properties | `ComponentContract` + `ComponentRegistration` | Components | Separates static declaration from the live instance; the runtime reads the contract before activation. |
-| Retired component-context interface | public abstract `ComponentContext` + internal `RuntimeComponentContext` | Components / Core | The authoring surface is model vocabulary; the single implementation is engine-internal. |
-| Context arguments/slots/attributes | `ComponentBindings` + pure static `Resolve` | Components | Names resolved parameters, slots, and fallthrough; the transformation is unit-testable without a runtime. |
-| Component registry / definition resolver | `IComponentFactory` / `ComponentFactory` | Components | Registration-backed resolution is model vocabulary; no runtime constructor discovery. |
-| Public hot-reload metadata interface on generated types | `ComponentHotReload` registration contract | Core | Makes the public seam an explicit generated-code application binary interface. |
-| Static render-helper class, ambient block sentinel, and underscore name-binding | `ComponentRenderFrame` parameter on `ComponentRenderer` | Components | The per-mount frame owns the render cache and block assembly; no ambient state and no public static helper class remain — the only name-bound generated-code application binary interfaces left are hot reload through `ComponentHotReload` and Browser's directive vocabulary. |
-| State-to-Components bridge interface and its context cast | `StateStoreDefinition<TStore>.Use(ComponentContext)` via `Services` + ambient registry | State | Conventions attach through the context's seams and never earn a member or a cast. |
-| Core template built-ins | Structural control nodes carrying `ComponentInvocation` + internal Core executors | Components / Core | Separates declarative structure (with lazy slots) from mounted algorithms. |
-| Transition forwarding wrappers | `TransitionNode` | Components | Avoids copying every virtual-node interface member. |
-| Foundation host adapter | `RendererOptions<TNode>` | Core / hosts | The renderer options object is the complete host contract; Browser and Testing provide production option sets without bridge interfaces. |
-| ServerRenderer friend access | `ComponentHost.RenderAsync` → `IComponentRenderScope` | Core | Exposes the complete one-shot operation rather than mounted machinery. |
-| Testing friend access | `MountedComponentView<TNode>` | Core | Publishes exact cold-path inspection data with stable per-mount view identity. |
-| Compiler style-scope identity | — deferred | — | Scoped CSS is deferred; no style-scope state exists anywhere in the model. |
-| `Assimalign.Viu.Shared` | Domain-owned types or deletion | — | Removes the miscellaneous ownership bucket; flag enums and name normalization land in Components. |
-| Tooling friend contracts | Public projection request/result facade | tooling | Shares stable operations while keeping compiler intermediates internal. |
+The staged compiler fixture calls the public `ComponentRegistration.Define` and generated
+registration entry point in one application. It is an integration canary, not a second compiler
+implementation.

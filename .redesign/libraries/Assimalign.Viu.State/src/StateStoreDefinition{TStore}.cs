@@ -34,7 +34,7 @@ public sealed class StateStoreDefinition<TStore>
     public string Key { get; }
 
     /// <summary>
-    /// Gets the diagnostic identifier retained by the scaffold contract. It is identical to
+    /// Gets the stable diagnostic identifier for this definition. It is identical to
     /// <see cref="Key"/> and is never used for reflection-backed activation. Specified by
     /// <c>[STA-1]</c>.
     /// </summary>

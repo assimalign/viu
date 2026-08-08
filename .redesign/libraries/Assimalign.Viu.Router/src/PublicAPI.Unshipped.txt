@@ -1,0 +1,3 @@
+#nullable enable
+*REMOVED*Assimalign.Viu.Router.Router.ReadyAsync() -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+Assimalign.Viu.Router.Router.ReadyAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!

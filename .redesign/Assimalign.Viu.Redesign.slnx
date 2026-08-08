@@ -11,6 +11,12 @@
   <Folder Name="/libraries/Assimalign.Viu.Reactivity/test/">
     <Project Path="libraries/Assimalign.Viu.Reactivity/test/Assimalign.Viu.Reactivity.Tests.csproj" />
   </Folder>
+  <Folder Name="/libraries/Assimalign.Viu.Router/src/">
+    <Project Path="libraries/Assimalign.Viu.Router/src/Assimalign.Viu.Router.csproj" />
+  </Folder>
+  <Folder Name="/libraries/Assimalign.Viu.Router/test/">
+    <Project Path="libraries/Assimalign.Viu.Router/test/Assimalign.Viu.Router.Tests.csproj" />
+  </Folder>
   <Folder Name="/libraries/Assimalign.Viu.State/src/">
     <Project Path="libraries/Assimalign.Viu.State/src/Assimalign.Viu.State.csproj" />
   </Folder>
@@ -29,6 +35,12 @@
   <Folder Name="/libraries/Assimalign.Viu.Browser/test/">
     <Project Path="libraries/Assimalign.Viu.Browser/test/Assimalign.Viu.Browser.Tests.csproj" />
   </Folder>
+  <Folder Name="/libraries/Assimalign.Viu.Browser.Router/src/">
+    <Project Path="libraries/Assimalign.Viu.Browser.Router/src/Assimalign.Viu.Browser.Router.csproj" />
+  </Folder>
+  <Folder Name="/libraries/Assimalign.Viu.Browser.Router/test/">
+    <Project Path="libraries/Assimalign.Viu.Browser.Router/test/Assimalign.Viu.Browser.Router.Tests.csproj" />
+  </Folder>
   <Folder Name="/libraries/Assimalign.Viu.ServerRenderer/src/">
     <Project Path="libraries/Assimalign.Viu.ServerRenderer/src/Assimalign.Viu.ServerRenderer.csproj" />
   </Folder>
@@ -40,12 +52,6 @@
   </Folder>
   <Folder Name="/libraries/Assimalign.Viu.Testing/test/">
     <Project Path="libraries/Assimalign.Viu.Testing/test/Assimalign.Viu.Testing.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tooling/Assimalign.Viu.Compiler.SingleFileComponent/src/">
-    <Project Path="tooling/Assimalign.Viu.Compiler.SingleFileComponent/src/Assimalign.Viu.Compiler.SingleFileComponent.csproj" />
-  </Folder>
-  <Folder Name="/tooling/Assimalign.Viu.Compiler.SingleFileComponent/test/">
-    <Project Path="tooling/Assimalign.Viu.Compiler.SingleFileComponent/test/Assimalign.Viu.Compiler.SingleFileComponent.Tests.csproj" />
   </Folder>
   <Folder Name="/tooling/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests/test/">
     <Project Path="tooling/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests/test/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests.csproj" />

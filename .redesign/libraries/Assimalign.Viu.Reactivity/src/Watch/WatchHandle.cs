@@ -11,41 +11,24 @@ namespace Assimalign.Viu.Reactivity;
 /// </summary>
 public sealed class WatchHandle : IDisposable
 {
-    private readonly Watcher? _watcher;
-    private bool _isStandaloneActive = true;
-
-    /// <summary>
-    /// Creates a standalone handle with no watcher attached. This preserves the scaffold contract
-    /// for hosts that need an independently controlled lifetime token; production watches return
-    /// handles attached to their internal watcher.
-    /// </summary>
-    public WatchHandle()
-    {
-    }
+    private readonly Watcher _watcher;
 
     internal WatchHandle(Watcher watcher) => _watcher = watcher;
 
     /// <summary>Whether the watcher is still running.</summary>
-    public bool IsActive => _watcher?.IsActive ?? _isStandaloneActive;
+    public bool IsActive => _watcher.IsActive;
 
     /// <summary>Stops the watcher, unlinking its dependencies and running the pending cleanup. Idempotent.</summary>
     public void Stop()
     {
-        if (_watcher is null)
-        {
-            _isStandaloneActive = false;
-        }
-        else
-        {
-            _watcher.Stop();
-        }
+        _watcher.Stop();
     }
 
     /// <summary>Defers callbacks until <see cref="Resume"/>; a change while paused delivers one trailing callback.</summary>
-    public void Pause() => _watcher?.Pause();
+    public void Pause() => _watcher.Pause();
 
     /// <summary>Resumes callback delivery paused by <see cref="Pause"/>.</summary>
-    public void Resume() => _watcher?.Resume();
+    public void Resume() => _watcher.Resume();
 
     /// <summary>Stops the watcher; equivalent to <see cref="Stop"/> for <c>using</c> support.</summary>
     public void Dispose() => Stop();

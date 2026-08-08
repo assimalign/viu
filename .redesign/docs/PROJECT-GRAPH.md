@@ -1,44 +1,44 @@
 # Project graph
 
-Adopted charter:
-[`../../docs/COMPONENT-MODEL-PLAN.md`](../../docs/COMPONENT-MODEL-PLAN.md) §2. Vocabulary lives low,
-composition lives high, conventions attach through seams.
+Arrows point from a consumer to its production dependencies.
 
 ```mermaid
-flowchart TD
-    Reactivity["Assimalign.Viu.Reactivity\nchange tracking (leaf)"]
-    Components["Assimalign.Viu.Components\nvirtual-node algebra + authored component contract"]
-    State["Assimalign.Viu.State\nstore convention (attaches via Services/ambient)"]
-    Core["Assimalign.Viu.Core\nApplication Model: engine + operations"]
-    Browser["Assimalign.Viu.Browser\nDOM host policy"]
-    Server["Assimalign.Viu.ServerRenderer\nHTML serialization host"]
-    Testing["Assimalign.Viu.Testing\nmounted-view consumer"]
-    Tooling["Compiler.SingleFileComponent\npublic projection facade"]
-
-    Reactivity --> Components
-    Reactivity --> State
-    Components --> State
-    Components --> Core
-    Reactivity --> Core
-    Core --> Browser
-    Core --> Server
-    Core --> Testing
+flowchart LR
+    Reactivity --> BCL[Base class library]
+    Components --> Reactivity
+    State --> Components
+    State --> Reactivity
+    Router --> Components
+    Router --> Reactivity
+    Core --> Components
+    Core --> Reactivity
+    Core --> State
+    Browser --> Components
+    Browser --> Core
+    Browser --> Reactivity
+    BrowserRouter[Browser.Router] --> Browser
+    BrowserRouter --> Core
+    BrowserRouter --> Router
+    ServerRenderer --> Components
+    ServerRenderer --> Core
+    Testing --> Components
+    Testing --> Core
 ```
 
-## Dependency rules
+## Rules
 
-| Project | May reference | Must not know |
+| Project | Production references | Boundary |
 |---|---|---|
-| Reactivity | Base class library | Components, State, Core, hosts |
-| Components | Reactivity | State, Core, hosts — change tracking is intrinsic to the model; conventions are not |
-| State | Reactivity, Components | Core, hosts — it attaches Router-style through `Services` and the ambient registry, never a cast or bridge interface |
-| Core | Components, Reactivity | Browser and server policy (the shipping composition root may additionally reference State as composition sugar; the contract model does not need the edge) |
-| Browser | Components, Core | Core internals |
-| ServerRenderer | Components, Core | Core internals and browser DOM handles |
-| Testing | Components, Core | Mounted engine implementation types |
-| Compiler.SingleFileComponent | Syntax and compiler implementation projects in the real graph | Runtime internals and Roslyn types in its public result |
+| Reactivity | none | Change tracking cannot depend on component or host policy. |
+| Components | Reactivity | Owns vocabulary, never mounted execution or a convention. |
+| State | Components, Reactivity | Attaches through services/ambient lifetime, never Core. |
+| Router | Components, Reactivity | Owns route policy and history; never Core or Browser. |
+| Core | Components, Reactivity, State | Owns application and renderer composition, never a host. |
+| Browser | Components, Core, Reactivity | Owns DOM policy and browser scheduling. |
+| Browser.Router | Browser, Core, Router | Owns only Browser application integration. |
+| ServerRenderer | Components, Core | Owns HTML serialization, never browser handles. |
+| Testing | Components, Core | Owns an in-memory host, never mounted internals. |
 
-Hosts reference Core (and transitively Components); no host is a compile-time friend of Core.
-`Assimalign.Viu.Shared` is absent. Every former Shared concept moves to a domain owner (the frozen
-flag enums and `NameNormalization` land in Components) or is deleted; a miscellaneous abstraction
-package is not part of the target graph.
+Router's two source references are intentionally exact: Components and Reactivity. The byte-frozen
+history module loads exports from `Assimalign.Viu.Router`; moving that interop to Browser.Router
+would change the published asset contract (`[RTR-3]`, `[RTR-7]`).

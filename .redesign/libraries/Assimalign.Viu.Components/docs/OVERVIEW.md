@@ -32,7 +32,7 @@ surface never exposes an enum-keyed callback registry.
 A `ComponentRenderer` receives its mount's `ComponentRenderFrame` — the per-mount render cache
 and block assembly — so there is no ambient render-helper state and no public static helper
 class; compiled output binds through the frame parameter, never through statics imported by name.
-The frame supports nested/disabled block tracking, fixed cache slots, stable handler caching, and
+The frame supports nested/disabled block tracking, compiler-sized cache slots, stable handler caching, and
 memo dependency snapshots; cached static subtrees retain identity for one mount ([SFC-OPT-1]).
 Code-first components are `ComponentRegistration.Define(name, contract, setup)` wrapping a
 `ComponentSetup` delegate (composition-only per

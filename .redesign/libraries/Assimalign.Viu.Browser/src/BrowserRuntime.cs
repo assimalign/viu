@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Browser;
 /// <summary>
 /// The browser entry point of Viu: the host that binds Core's host-neutral renderer to the real
 /// DOM. Loads the bridge module this package ships as a static web asset, then hands out renderers
-/// whose node-ops drive the DOM over int-handle interop. Single-threaded by design (browser main
+/// whose host operations drive the DOM over int-handle interop. Single-threaded by design (browser main
 /// thread only); not thread-safe.
 /// <para>
 /// Normal app bootstrap does <b>not</b> call this type: build an application with

@@ -1,0 +1,21 @@
+<Project>
+    <!--
+        WasmAppHost serves the consuming application's source wwwroot. Flow the Router
+        package's browser-history bridge into that tree under the standard static-web-asset
+        URL used by RouterHistory's lazy browser-bridge initialization.
+    -->
+    <Target Name="ViuFlowRouterWebAssets"
+            BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
+            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
+        <ItemGroup>
+            <_ViuRouterWebAsset Include="$(MSBuildThisFileDirectory)..\assets\Assimalign.Viu.Router\**\*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuRouterWebAsset)"
+              DestinationFiles="@(_ViuRouterWebAsset->'$(MSBuildProjectDirectory)\wwwroot\_content\Assimalign.Viu.Router\%(RecursiveDir)%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true"
+              Condition="'@(_ViuRouterWebAsset)' != ''" />
+        <ItemGroup>
+            <_ViuRouterWebAsset Remove="@(_ViuRouterWebAsset)" />
+        </ItemGroup>
+    </Target>
+</Project>

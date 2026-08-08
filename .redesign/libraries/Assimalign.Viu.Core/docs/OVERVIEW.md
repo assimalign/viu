@@ -2,7 +2,7 @@
 
 Core is the host-neutral Application Model and mounted rendering engine. Components owns the
 immutable `VirtualNode` vocabulary; Core activates authored components, maintains their mounted
-counterparts, schedules updates, executes structural built-ins, and translates tree changes into
+instances, schedules updates, executes structural built-ins, and translates tree changes into
 the operations supplied by a host. Core contains no browser handles or interop [RND-HOST-1] through
 [RND-HOST-4].
 
@@ -30,8 +30,9 @@ shared load while every mount retains its own wrapper and target activation [BLT
 ## Component lifetime and application composition
 
 Persistent renderer mounts and one-shot server rendering share the same activation core. One
-`ComponentRenderFrame` with 64 cache slots is retained per activation until compiler emission gains
-the cache-size channel. `ComponentHost.RenderAsync(ComponentRenderRequest)` returns an
+`ComponentRenderFrame`, sized from the component's compiler contract, is retained per activation;
+only compatibility contracts without cache metadata receive the legacy capacity.
+`ComponentHost.RenderAsync(ComponentRenderRequest)` returns an
 `IComponentRenderScope` after setup, awaited server prefetch, and one render. Disposing that lease
 aborts the lifetime without client hooks; nested requests use the still-live parent context [SSR-4],
 [SSR-5], and [SSR-10].

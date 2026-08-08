@@ -78,6 +78,7 @@ internal sealed class CompiledFixtureAssembly
             "InteractionProbe.viu",
             "SlotChild.viu",
             "SlotOwner.viu",
+            "MixedAuthoring.viu",
             "VueProbe.vue",
         ];
         var additionalFiles = ImmutableArray.CreateBuilder<AdditionalText>(fixtureNames.Length);

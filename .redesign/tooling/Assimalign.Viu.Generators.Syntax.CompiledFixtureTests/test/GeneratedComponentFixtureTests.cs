@@ -10,6 +10,7 @@ using Xunit;
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 
@@ -21,6 +22,47 @@ namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 /// </summary>
 public sealed class GeneratedComponentFixtureTests
 {
+    [Fact]
+    public void CompiledRoot_AndCodeFirstDefinition_ComposeAndUpdateInOneApplication()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        IReactiveReference<string>? message = null;
+        ComponentRegistration codeFirst = ComponentRegistration.Define(
+            "CodeFirstChild",
+            new ComponentContract(renderCacheSize: 0, displayName: "CodeFirstChild"),
+            _ =>
+            {
+                message = Reactive.Reference("code-first");
+                return _ => new ElementNode(
+                    new QualifiedName("strong"),
+                    children: [new TextNode(message.Value)]);
+            });
+        factory.Register(codeFirst);
+        ComponentNode root = new(ComponentReference.ForName("MixedAuthoring"));
+        ApplicationContext application = CreateApplication(root, factory);
+        using CompiledFixtureHost host = new();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+
+        renderer.Render(root, host.Container, application);
+        host.RunScheduledFlushes();
+        host.Container.DescendantText.ShouldBe("code-first");
+
+        message.ShouldNotBeNull();
+        message.Value = "composed";
+        host.RunScheduledFlushes();
+
+        host.Container.DescendantText.ShouldBe("composed");
+        host.TextChangeCount.ShouldBe(1);
+        renderer.GetMountedComponentViews(host.Container)
+            .Select(view => view.Request.Component.RegisteredName)
+            .ShouldContain("MixedAuthoring");
+        renderer.GetMountedComponentViews(host.Container)
+            .Select(view => view.Request.Component.RegisteredName)
+            .ShouldContain("CodeFirstChild");
+        renderer.Render(null, host.Container);
+    }
+
     [Fact]
     public void GeneratedComponent_MountsThroughBrowserCommandHost_InOneCommandFrame()
     {

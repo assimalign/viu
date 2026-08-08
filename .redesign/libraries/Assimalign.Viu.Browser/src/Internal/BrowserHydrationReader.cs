@@ -13,7 +13,7 @@ namespace Assimalign.Viu.Browser;
 /// client-side walk crosses the interop boundary once per hydration root rather than a marshaled call
 /// per <c>firstChild</c>/<c>nextSibling</c>/<c>getAttribute</c> (the JS-interop cost discipline the
 /// SSR area requires — see this package's <c>docs/DESIGN.md</c>). Node handles in the snapshot are the
-/// same int handles the write-side node-ops use, so an adopted node's <see cref="int"/> flows straight
+/// same int handles the write-side host operations use, so an adopted node's <see cref="int"/> flows straight
 /// into <c>patchProp</c>/<c>insert</c>/<c>remove</c>. The "no node" sentinel is <c>0</c> (the bridge's
 /// reserved handle), matching <see cref="RendererOptions{TNode}"/>'s <c>default</c> convention.
 /// </summary>
