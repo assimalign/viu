@@ -49,16 +49,18 @@ internal sealed class DeferredBrowserRouterHistory :
     public RouterHistoryState State => GetHistory().State;
 
     /// <inheritdoc/>
-    public void Push(string location, RouterHistoryState? data = null)
-        => GetHistory().Push(location, data);
+    public void Push(string location, RouterHistoryEntryOptions options = default)
+        => GetHistory().Push(location, options);
 
     /// <inheritdoc/>
-    public void Replace(string location, RouterHistoryState? data = null)
-        => GetHistory().Replace(location, data);
+    public void Replace(string location, RouterHistoryEntryOptions options = default)
+        => GetHistory().Replace(location, options);
 
     /// <inheritdoc/>
-    public void Go(int delta, bool triggerListeners = true)
-        => GetHistory().Go(delta, triggerListeners);
+    public void Go(
+        int delta,
+        RouterHistoryNavigationOptions options = RouterHistoryNavigationOptions.None)
+        => GetHistory().Go(delta, options);
 
     /// <inheritdoc/>
     public Action Listen(NavigationCallback callback)

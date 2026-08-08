@@ -92,7 +92,7 @@ public class RenderFunctionEmitterTests
         string dynamicCode = EmitPrefixed("<component :is=\"viewName\"></component>").Code;
         string teleportCode = EmitPrefixed("<Teleport to=\"body\"><div>{{ tip }}</div></Teleport>").Code;
 
-        dynamicCode.ShouldContain("global::Assimalign.Viu.DynamicComponents.DynamicComponent(");
+        dynamicCode.ShouldContain("global::Assimalign.Viu.DynamicComponents.Create(");
         dynamicCode.ShouldContain("component.viewName");
         teleportCode.ShouldContain("new global::Assimalign.Viu.Components.TeleportNode(");
         teleportCode.ShouldContain("targetIdentifier");
@@ -194,7 +194,7 @@ public class RenderFunctionEmitterTests
     {
         string code = EmitPrefixed("<input v-model.trim.number=\"name\" />").Code;
 
-        code.ShouldContain("new global::Assimalign.Viu.Browser.ViuModelBinding(");
+        code.ShouldContain("new global::Assimalign.Viu.Browser.ModelBinding(");
         code.ShouldContain("component.name");
         code.ShouldContain("new string[] { \"trim\", \"number\" }");
         code.ShouldContain("DirectiveInvocation(typeof(global::Assimalign.Viu.Browser.VModelText)");

@@ -313,7 +313,7 @@ internal sealed class FrameRenderCodeWriter
         Push(nodeName);
         Push(" = ");
         Push(CoreNamespace);
-        Push(".DynamicComponents.DynamicComponent(");
+        Push(".DynamicComponents.Create(");
         AppendExpression(tag.Value);
         Push(", invocation: ");
         Push(componentInvocation.InvocationName);

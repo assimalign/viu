@@ -166,18 +166,18 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new viu-app` works from NuGet |
 | **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.viu` editor support | Docs site built by Viu itself |
 
-### Active component-model arc
+### Completed component-model and API-hardening arcs
 
 `[V01.01.15]` ([epic #313](https://github.com/assimalign/viu/issues/313);
 [plan of record](COMPONENT-MODEL-PLAN.md)) replaces the outgoing component representation with the
 adopted four-lifetime model: immutable `VirtualNode` descriptions, static registration identity and
 contract, activated authored `IComponent` instances, and Core-owned mounted bookkeeping. It also
 establishes frame-based render emission and the designed host, service/reactive, generated-code, and
-application-composition seams. The arc places `[V01.01.14]` API hardening at a **full stop** until
-the component-model swap lands, so hardening decisions and baselines do not record the outgoing
-surface. After the swap, [#316](https://github.com/assimalign/viu/issues/316) first re-evaluates the
-remaining `[V01.01.14]` work against the adopted surface; public-API baselines are then regenerated,
-and the arc resumes from the first approved incomplete unit in wave order.
+application-composition seams. The swap is complete. [#316](https://github.com/assimalign/viu/issues/316)
+then reevaluated and closed the remaining `[V01.01.14]` API-hardening work against the adopted
+surface, including final PublicAPI baselines and contract gates. The D6 SDK/framework platform split
+remains an accepted decision but is deliberately deferred until the first non-browser host exists;
+it is not unfinished work in either completed arc.
 
 ## The planned backlog
 

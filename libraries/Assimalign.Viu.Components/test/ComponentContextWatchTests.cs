@@ -79,7 +79,7 @@ public sealed class ComponentContextWatchTests
 
     private sealed class StubComponentContext : ComponentContext, IDisposable
     {
-        private readonly EffectScope _scope = new();
+        private readonly EffectScope _scope = Reactive.EffectScope();
 
         internal StubComponentContext(IReactiveWatchScheduler? watchScheduler = null)
         {

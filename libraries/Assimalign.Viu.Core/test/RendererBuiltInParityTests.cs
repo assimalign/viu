@@ -821,7 +821,7 @@ public sealed class RendererBuiltInParityTests
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<SuspenseWrapperIdentityComponent>(
+            AsynchronousComponents.Define<SuspenseWrapperIdentityComponent>(
                 _ => load.Task);
         ComponentFactory components = new();
         components.Register(definition.Registration);

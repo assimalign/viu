@@ -12,41 +12,35 @@ public sealed class RouterLinkClickEvent
 {
     /// <summary>Creates a click event.</summary>
     /// <param name="button">The pressed mouse button (0 = primary/left, 1 = middle, 2 = secondary/right).</param>
-    /// <param name="controlKey">Whether the Control key was held.</param>
-    /// <param name="shiftKey">Whether the Shift key was held.</param>
-    /// <param name="altKey">Whether the Alt (Option) key was held.</param>
-    /// <param name="metaKey">Whether the Meta (Command/Windows) key was held.</param>
+    /// <param name="modifiers">The system-modifier keys held for the click.</param>
     public RouterLinkClickEvent(
         int button = 0,
-        bool controlKey = false,
-        bool shiftKey = false,
-        bool altKey = false,
-        bool metaKey = false)
+        RouterLinkModifiers modifiers = RouterLinkModifiers.None)
     {
         Button = button;
-        ControlKey = controlKey;
-        ShiftKey = shiftKey;
-        AltKey = altKey;
-        MetaKey = metaKey;
+        Modifiers = modifiers;
     }
 
     /// <summary>The pressed mouse button — 0 is the primary (left) button that triggers navigation.</summary>
     public int Button { get; }
 
     /// <summary>Whether the Control key was held (a system modifier suppresses interception).</summary>
-    public bool ControlKey { get; }
+    public bool ControlKey => (Modifiers & RouterLinkModifiers.Control) != 0;
 
     /// <summary>Whether the Shift key was held (a system modifier suppresses interception).</summary>
-    public bool ShiftKey { get; }
+    public bool ShiftKey => (Modifiers & RouterLinkModifiers.Shift) != 0;
 
     /// <summary>Whether the Alt (Option) key was held (a system modifier suppresses interception).</summary>
-    public bool AltKey { get; }
+    public bool AltKey => (Modifiers & RouterLinkModifiers.Alt) != 0;
 
     /// <summary>Whether the Meta (Command/Windows) key was held (a system modifier suppresses interception).</summary>
-    public bool MetaKey { get; }
+    public bool MetaKey => (Modifiers & RouterLinkModifiers.Meta) != 0;
+
+    /// <summary>Gets the combined set of system-modifier keys held for the click.</summary>
+    public RouterLinkModifiers Modifiers { get; }
 
     /// <summary>Whether any system modifier (Control/Shift/Alt/Meta) was held.</summary>
-    public bool HasSystemModifier => ControlKey || ShiftKey || AltKey || MetaKey;
+    public bool HasSystemModifier => Modifiers != RouterLinkModifiers.None;
 
     /// <summary>
     /// Whether <see cref="PreventDefault"/> has been called — a link never intercepts an

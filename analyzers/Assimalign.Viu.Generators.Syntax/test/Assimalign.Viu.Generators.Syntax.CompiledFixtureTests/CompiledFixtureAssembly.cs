@@ -174,7 +174,7 @@ internal sealed class CompiledFixtureAssembly
         paths.Add(typeof(ComponentBase).Assembly.Location);
         paths.Add(typeof(Renderer<>).Assembly.Location);
         paths.Add(typeof(Reactive).Assembly.Location);
-        paths.Add(typeof(ViuModelBinding).Assembly.Location);
+        paths.Add(typeof(ModelBinding).Assembly.Location);
         return paths
             .Select(path => MetadataReference.CreateFromFile(path))
             .ToArray();

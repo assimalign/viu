@@ -16,17 +16,20 @@ public sealed class TestRenderer
     private readonly List<TestElement> _queryRoots = [];
 
     /// <summary>Initializes an in-memory renderer.</summary>
-    /// <param name="snapshotSemantics">Whether hydration uses an immutable host-tree snapshot.</param>
-    /// <param name="strictRemoval">Whether duplicate host removals throw.</param>
-    public TestRenderer(bool snapshotSemantics = false, bool strictRemoval = false)
+    /// <param name="options">Named test-host behavior, or <see langword="null"/> for live hydration and ordinary removal.</param>
+    public TestRenderer(TestRendererOptions? options = null)
     {
+        options ??= new TestRendererOptions();
         OperationLog = new TestNodeOperationLog();
         Renderer = RendererFactory.CreateRenderer(
             TestNodeOperations.Create(
                 OperationLog,
                 _queryRoots,
-                strictRemoval || snapshotSemantics,
-                snapshotSemantics));
+                new TestRendererOptions
+                {
+                    SnapshotSemantics = options.SnapshotSemantics,
+                    StrictRemoval = options.StrictRemoval || options.SnapshotSemantics,
+                }));
     }
 
     /// <summary>Gets the host-neutral production renderer.</summary>

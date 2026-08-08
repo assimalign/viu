@@ -420,26 +420,25 @@ public sealed partial class Renderer<TNode>
 
         MountedComponent<TNode>? mounted = null;
         VirtualNode? initialTree = null;
-        ReactiveEffect renderEffect = activation.Scope.Run(
-            () => new ReactiveEffect(
-                () =>
-                {
-                    VirtualNode normalized = NormalizeComponentRoot(
-                        activation,
-                        activation.Render());
-                    if (mounted is null)
-                    {
-                        initialTree = normalized;
-                    }
-                    else
-                    {
-                        mounted.PendingTree = normalized;
-                    }
-                }));
-
+        ReactiveEffect? renderEffect = null;
         try
         {
-            renderEffect.Run();
+            renderEffect = activation.Scope.Run(
+                () => Reactive.Effect(
+                    () =>
+                    {
+                        VirtualNode normalized = NormalizeComponentRoot(
+                            activation,
+                            activation.Render());
+                        if (mounted is null)
+                        {
+                            initialTree = normalized;
+                        }
+                        else
+                        {
+                            mounted.PendingTree = normalized;
+                        }
+                    }));
             activation.Context.Run(activation.Lifecycle.InvokeBeforeMount);
             (MountedNode<TNode> subtree, TNode? next) = HydrateNode(
                 tree,
@@ -478,7 +477,7 @@ public sealed partial class Renderer<TNode>
         }
         catch
         {
-            renderEffect.Stop();
+            renderEffect?.Stop();
             activation.Release();
             throw;
         }

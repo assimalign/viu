@@ -219,7 +219,7 @@ ambient helper surface (`[SFC-CG-2]`).
   owning node's `RenderPlan`; statement order supplies sequencing directly.
 - Elements, text, comments, static content, fragments, component requests, teleports, and structural
   built-ins construct the corresponding sealed `VirtualNode` variant. A dynamic selector calls
-  `DynamicComponents.DynamicComponent` and still returns a node from the same closed algebra.
+`DynamicComponents.Create` and still returns a node from the same closed algebra.
 - Element properties become immutable `ElementBinding` collections. Component inputs become a
   `ComponentInvocation` containing argument, slot, listener, and directive collections; slot laziness
   is preserved by emitted `ComponentSlot` closures.
@@ -247,7 +247,7 @@ What code generation requires of each DOM member, mapped to the runtime machiner
 
 - VShow and the VModel directive tokens lower to `DirectiveInvocation(typeof(VShow), value)` and the
   corresponding qualified Browser directive type. Native `v-model` values are emitted as
-  `new ViuModelBinding(exp, value => { exp = value; })`, carrying the current value and reflection-free
+  `new ModelBinding(exp, value => { exp = value; })`, carrying the current value and reflection-free
   write-back action together inside the invocation.
 - `BrowserEvents.WithModifiers(...)` / `BrowserEvents.WithKeys(...)` are the qualified `v-on`
   modifier/key guard calls. Each returns the dispatchable `Action<BrowserEvent>` understood by the event

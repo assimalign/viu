@@ -11,7 +11,8 @@ namespace Assimalign.Viu.Reactivity;
 /// by a scope (<c>[RCT-11]</c>): a computed created inside a scope keeps serving fresh
 /// values after <see cref="Stop()"/>; its cleanup is automatic, driven by the subscriber count
 /// (losing the last subscriber soft-detaches it from its sources). Nested scopes register with
-/// (and stop with) their parent unless created detached. The ambient <see cref="Current"/> scope
+/// (and stop with) their parent unless created detached. The ambient
+/// <see cref="Reactive.CurrentScope"/> scope
 /// is a plain static field: NOT thread-safe by design, per the single-threaded JS event-loop
 /// model.
 /// </summary>
@@ -34,7 +35,7 @@ public sealed class EffectScope : IReactiveEffectScope
     /// registers as a child of the current scope and will be stopped with it.
     /// </summary>
     /// <param name="detached">When true, the scope does not attach to the current scope.</param>
-    public EffectScope(bool detached = false)
+    internal EffectScope(bool detached = false)
     {
         _detached = detached;
         _parent = _current;
@@ -46,7 +47,7 @@ public sealed class EffectScope : IReactiveEffectScope
     }
 
     /// <summary>The ambient scope that new effects and computeds register with, if any.</summary>
-    public static EffectScope? Current => _current;
+    internal static EffectScope? Current => _current;
 
     /// <summary>Whether the scope has not been stopped.</summary>
     public bool IsActive => _active;

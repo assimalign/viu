@@ -20,7 +20,7 @@ public sealed class CustomReference<T> : ReactiveValue<T>
     /// <summary>Creates a custom reference from the given factory.</summary>
     /// <param name="factory">Receives track/trigger delegates and returns the getter/setter pair.</param>
     /// <exception cref="ArgumentNullException">The factory, or a member of the pair it returned, is null.</exception>
-    public CustomReference(CustomReferenceFactory<T> factory)
+    internal CustomReference(CustomReferenceFactory<T> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
         var (get, set) = factory(_dependency.Track, _dependency.Trigger);

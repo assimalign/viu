@@ -386,25 +386,20 @@ public abstract class StateStore<TState>
             _scheduledDuringMutation = false;
         }
 
-        Reactive.StartBatch();
         try
         {
-            mutator(State);
+            using (Reactive.Batch())
+            {
+                mutator(State);
+            }
         }
         finally
         {
-            try
+            if (_stateWatch is not null
+                && !_scheduledDuringMutation
+                && !_hasPendingNotification)
             {
-                Reactive.EndBatch();
-            }
-            finally
-            {
-                if (_stateWatch is not null
-                    && !_scheduledDuringMutation
-                    && !_hasPendingNotification)
-                {
-                    _pendingKind = StateStorePatchKind.Direct;
-                }
+                _pendingKind = StateStorePatchKind.Direct;
             }
         }
     }

@@ -16,7 +16,7 @@ internal static class RouterComponentsTestSupport
         Router router,
         params TrackingComponent[] components)
     {
-        return ViuTest.Mount(RouterView.Registration, OptionsFor(router, components));
+        return ComponentTest.Mount(RouterView.Registration, OptionsFor(router, components));
     }
 
     public static ComponentWrapper MountLink(
@@ -27,7 +27,7 @@ internal static class RouterComponentsTestSupport
         ComponentMountOptions options = OptionsFor(router);
         options.Arguments = arguments;
         options.Slots = slots;
-        return ViuTest.Mount(RouterLink.Registration, options);
+        return ComponentTest.Mount(RouterLink.Registration, options);
     }
 
     public static ComponentMountOptions OptionsFor(

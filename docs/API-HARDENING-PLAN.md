@@ -1,8 +1,8 @@
 # API surface hardening plan — [V01.01.14]
 
-**Status: ACTIVE. Waves 1 and 2A are merged; the `[V01.01.15]` component-model arc has
-landed; and Phase B is complete for every requirement whose public shape is determined.
-The remaining design-dependent rows are explicitly blocked rather than guessed.**
+**Status: COMPLETE. The `[V01.01.15]` component-model arc has landed, every approved
+API-hardening requirement is terminal, and D6 platform segmentation is deliberately deferred until
+the first non-browser host exists.**
 
 This document is the session-independent source of truth for the API-hardening arc. The state table
 uses stable theme identifiers; its status, not the original wave number, determines what remains.
@@ -44,17 +44,21 @@ Router <- Browser.Router
 | D3/D3a | Delete Syntax.JavaScript; retain Syntax.Html but do not publish it until its runtime dependency/TFM shape is settled. | 2026-08-05 | The retained parser is not yet a restorable runtime package. |
 | D4 | Track the arc through its area epic and this plan; create detailed feature items immediately before execution. | 2026-08-05 | Avoids speculative issue bodies drifting from the live surface. |
 | D5/D5a | Replace application plugins with build-time composition plus lifetime middleware; expose host start/stop and keep mounting host-specific. | 2026-08-05/06 | This is the landed application-lifetime model. |
-| D6 | Segment the SDK and framework by platform. | 2026-08-06 | The current SDK/framework remain browser-coupled; the exact base/browser topology is intentionally undecided. |
+| D6 | Segment the SDK and framework by platform. | 2026-08-06 | The current SDK/framework remain browser-coupled; segmentation remains the intended direction when a second host supplies a real topology to validate. |
 | D7 | Do not add `Assimalign.Viu.Hosting` here; that boundary belongs to Cohesion. | 2026-08-06 | Prevents two competing host-authoring abstractions. |
 | D8 | `InternalsVisibleTo` is for an assembly's own unit tests only, never for production cross-library sharing. | 2026-08-06 | Assembly boundaries must remain real for runtime and tooling code alike. |
 | D9 | Adopt the frame-based component model recorded by [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md). | 2026-08-07 | The migration deleted the old helper ABI and superseded T05's old Core seam proposals. |
-| D10 | Reevaluate every unfinished hardening row against the landed component model; execute only requirements whose public shape is already determined, and mark the rest `BLOCKED-NEEDS-DECISION`. | 2026-08-08 | Hardening must describe and test the product that exists now. It must not preserve deleted findings or invent replacement APIs merely to close rows. |
+| D10 | Reevaluate every unfinished hardening row against the landed component model; execute only requirements whose public shape is already determined, and hold explicit design questions for a maintainer decision. | 2026-08-08 | Hardening must describe and test the product that exists now. It must not preserve deleted findings or invent replacement APIs merely to close rows. |
+| D11-A | Replace raw public batching pairs with `Reactive.Batch()`, whose idempotent disposable closes exactly one nesting level. | 2026-08-08 | Construction makes an unmatched end impossible, `using` restores effect delivery during exception unwind, and nested batches flush only when the outermost scope is disposed. |
+| D11-B | Keep `RendererOptions<TNode>` as a delegate bag. | 2026-08-08 | `[RND-HOST-1]` makes it the complete host contract; direct delegates suit the renderer hot path; and the seam let Browser remove friend access during the component-model migration with zero new hooks. |
+| D11-C | Replace router/history/click Boolean clusters, opaque guard results, and Testing Boolean ordering with named option, flag, and result types. | 2026-08-08 | Listener suppression and click modifiers are independent bits; entry scroll state is not; guard callers need an outcome plus typed redirect/failure payload; and one Testing options record removes conflicting Boolean order. |
+| D11-D | No public type repeats a Viu/namespace identity; direct-rename the four listed facades, expose reactive construction through `Reactive`, retain one scope accessor, and de-stutter asynchronous/dynamic facade members. | 2026-08-08 | D1 permits plain renames, one sanctioned facade removes duplicate discovery paths, and generated `.viu`/`.vue` authoring behavior remains unchanged. |
+| D11-E | Defer the D6-A SDK split until a second host platform exists. | 2026-08-08 | A base plus Browser SDK with exactly one real consumer would be speculative, untestable against another host, and likely redesigned when that host arrives. The trigger is the first non-browser host, not another hardening wave. |
+| D11-F | Defer the D6-B framework split until a second host platform exists. | 2026-08-08 | A base plus Browser framework with exactly one real consumer would be speculative, untestable against another host, and likely redesigned when that host arrives. The trigger is the first non-browser host, not another hardening wave. |
 
 ## State
 
-Every row is terminal (`DONE`, `DROPPED`, `SUPERSEDED`) or explicitly
-`BLOCKED-NEEDS-DECISION`. Split rows separate completed work from design questions so that a
-blocked choice cannot hide unrelated work.
+Every row is terminal: `DONE`, `DONE-BY-DECISION`, `DROPPED`, `SUPERSEDED`, or `DEFERRED`.
 
 | Theme | Rescoped outcome after D10 | Status |
 |---|---|---|
@@ -64,23 +68,23 @@ blocked choice cannot hide unrelated work.
 | T04 | Accidental runtime exposure was internalized or deleted in the merged waves. | **DONE** |
 | T05 | All six old Core decisions were delivered differently or made moot by D9; see the explicit disposition below. | **SUPERSEDED** |
 | T06 | Hosting namespace/library split is out of repository scope under D7. | **DROPPED** |
-| T07 | Deleted targets are gone, but remaining facade/prefix and constructor changes require choosing replacement public names and factory boundaries. | **BLOCKED-NEEDS-DECISION** |
+| T07 | Public front doors are `ComponentTest`, `ModelBinding`, `ILanguageService`, and `LanguageServices`; one reactive-scope accessor remains; reactive constructors covered by `Reactive` are non-public; and asynchronous/dynamic facade members are de-stuttered without changing authored `.viu`/`.vue` input. | **DONE** |
 | T08 | Mechanically determined whole-word and Boolean-clarity renames are complete across runtime, generators, syntax, SSR, tests, docs, and baselines. | **DONE** |
 | G3 | The plain three-value classification is now `SlotStability`; linked source paths and numeric values `1`, `2`, and `3` are preserved. | **DONE** |
 | T09-A | `TestElement` exposes read-only live views backed by privately owned mutable collections. | **DONE** |
 | T09-B | Both `RouterGuards.Register` overloads reject depths outside the matched route range. | **DONE** |
-| T09-C | Raw `Reactive.StartBatch`/`EndBatch` can leave effects suppressed after an unmatched call. | **BLOCKED-NEEDS-DECISION** |
-| T10 | Typed patch metadata and slot stability landed, but `RendererOptions<TNode>` still exposes a convention-dependent `Action`/`Func` delegate bag. | **BLOCKED-NEEDS-DECISION** |
+| T09-C | `Reactive.Batch()` returns an idempotent disposable; exception unwind resumes delivery and only outermost disposal flushes nested batches. The allocation-free raw pair remains internal for the dependency engine. | **DONE** |
+| T10 | `RendererOptions<TNode>` deliberately remains the complete direct-delegate host contract under D11-B. | **DONE-BY-DECISION** |
 | T11 | Async naming, cancellation propagation, and terminal disposable lifetime conventions are complete on Router, Scheduler, router history, ReactiveEffect, and Testing wrappers. | **DONE** |
 | G4 | `RouteLocation` and `RouteParameters` now provide matching null-safe equality operators. | **DONE** |
 | G5 | Covariant `IReactiveReadOnlyReference<T>` now exposes Router's current route without a mutable reference contract. | **DONE** |
 | T12 | Surviving parser bases have assembly-closed construction; CSS writers and rewriters explicitly handle supported nodes and reject unsupported variants. | **DONE** |
 | T14-A | Generic identity and raw-object conversion surface is removed; observably different collection conversions remain. | **DONE** |
-| T14-B | Router history Boolean/state controls, the RouterLink click Boolean cluster, opaque navigation results, and TestRenderer Boolean ordering need replacement-contract choices. `BrowserRuntime.CreateRenderer` is an owning lease and stays. | **BLOCKED-NEEDS-DECISION** |
+| T14-B | Router history uses flags for listener suppression and a value option for entry data; RouterLink exposes modifier flags; guard results expose an outcome and typed payload; and Testing shares one options record. `BrowserRuntime.CreateRenderer` remains an owning lease. | **DONE** |
 | T17 | Non-subscribing fresh reads and side-effect-free debugger displays are implemented and pinned with dependency run-count tests. | **DONE** |
 | G1 | The Ref pack emits the exact standalone/framework overlap through `data/PackageOverrides.txt`; Runtime excludes it, and an isolated packaged SDK consumer passes build, trimming, AOT, and conflict-resolution evidence checks. | **DONE** |
-| D6-A | The SDK remains browser-based; its base/browser split depends on an unresolved import and payload-ownership design. | **BLOCKED-NEEDS-DECISION** |
-| D6-B | The framework still includes Browser and pins `browser-wasm`; its base/browser reference/runtime topology is unresolved. | **BLOCKED-NEEDS-DECISION** |
+| D6-A | The SDK segmentation decision stands; implementation waits for the first non-browser host so two real hosts determine and test payload ownership. It is not an arc completion criterion. | **DEFERRED** |
+| D6-B | The framework segmentation decision stands; implementation waits for the first non-browser host so two real hosts determine and test targeting/runtime topology. It is not an arc completion criterion. | **DEFERRED** |
 
 ## T05 final disposition
 
@@ -144,24 +148,23 @@ the six decisions remains pending:
   intentional additions/removals in `PublicAPI.Unshipped.txt`. RS0016, RS0017, and RS0037 must be
   clean under warning-as-error.
 
-## Questions that block public-shape invention
+## D11 closure outcomes
 
-- **T07:** Which replacement vocabulary should be adopted for `ViuTest`, `ViuModelBinding`,
-  `IViuLanguageService`/`ViuLanguageServices`, duplicate reactive scope access, public reactive
-  constructors, and stuttering asynchronous/dynamic component facades? One coherent naming/factory
-  decision is required before changing them.
-- **T09-C:** Should raw batching remain, be replaced by a disposable scope, or be wrapped in a
-  callback API that guarantees unwind after exceptions?
-- **T10:** Should renderer host operations become named delegates, a host-operations interface, or
-  intentionally remain a delegate bag?
-- **T14-B:** What public value types replace router history's Boolean/state controls,
-  `RouterLinkClickEvent`'s four Booleans, and the opaque navigation result? Should TestRenderer's
-  Boolean order be changed or replaced with options?
-- **D6-A:** Does `Assimalign.Viu.Sdk.Browser` import/depend on a thin base SDK or carry a self-contained
-  SDK payload, and which CSS/static-asset/watch tasks belong to each?
-- **D6-B:** Is `Assimalign.Viu.App` targeting-only or does it own a host-neutral runtime pack; does the
-  Browser framework re-export/reference it; and does ServerRenderer remain opt-in or become another
-  framework segment?
+- **T07:** public names are `ComponentTest`, `ModelBinding`, `ILanguageService`, and
+  `LanguageServices`. `Reactive.CurrentScope` is the one scope accessor; reference, computed,
+  effect, and scope construction goes through `Reactive`. `AsynchronousComponents.Define` and
+  `DynamicComponents.Resolve`/`Create` remove member stutter while leaving the compiler's authored
+  `.viu`/`.vue` vocabulary intact.
+- **T09-C:** `Reactive.Batch()` is the only public batching entry. Its disposable is idempotent and
+  owns one nesting level; internal engine notification retains an allocation-free raw pair.
+- **T10:** the renderer host contract remains a deliberate delegate bag under D11-B; no code shape
+  changes were made.
+- **T14-B:** `RouterHistoryNavigationOptions` carries listener suppression,
+  `RouterHistoryEntryOptions` carries entry scroll input, `RouterLinkModifiers` carries modifier
+  keys, `NavigationGuardResult` exposes its outcome and typed payload, and `TestRendererOptions`
+  configures both Testing entry points.
+- **D6-A / D6-B:** neither deferred platform split is part of this arc's completion criteria. The
+  first non-browser host reopens both decisions with two real host contracts available for tests.
 
 ## Findings refuted or superseded — do not re-propose
 
@@ -173,19 +176,19 @@ the six decisions remains pending:
   `KeepAliveNode`. `[BLT-6]` protects KeepAlive's weak-input decoding (string filters and string or
   integer maximum; invalid/nonpositive maximum is unbounded). `[BLT-11]` protects lazy Suspense
   slots.
-- `RouterLinkClickEvent` is still a required public bridge between `RouterLink`, Browser.Router DOM
-  handling, and component-test triggering. Preserve it under `[RTR-1]` and `[RTR-7]` unless T14-B
-  receives a replacement-contract decision.
+- `RouterLinkClickEvent` remains the required public bridge between `RouterLink`, Browser.Router DOM
+  handling, and component-test triggering. D11-C keeps the type and replaces its constructor's four
+  Boolean modifiers with `RouterLinkModifiers` under `[RTR-1]` and `[RTR-7]`.
 - Browser `CreateRenderer` is not dead surface: it returns an owning disposable renderer lease.
 - Syntax.Html is intentionally retained but unpublished under D3a; `.vue` single-file-component
   parsing is a shipping compatibility feature and must not be removed.
 
-## Phase-B completion and gates
+## Arc completion and gates
 
 The work completed in the required order: mechanical/naming changes, behavior/contract changes,
-package-overrides integration and external packaged-consumer proof, then PublicAPI baselines. The
-final warning-as-error solution build, no-build solution tests, PublicAPI analyzer checks, and D8
-scan are recorded in `.hardening/REPORT-item3.md`.
+package-overrides integration and external packaged-consumer proof, D11 closure, then PublicAPI
+baselines. The final warning-as-error solution build, no-build solution tests, PublicAPI analyzer,
+compiled-fixture, repository-state, and D8 scans are recorded in `.hardening/REPORT-item3.md`.
 
 D8 is checked after every group: every `InternalsVisibleTo` target must be the owning library's test
 assembly. No production or cross-library grant is acceptable.

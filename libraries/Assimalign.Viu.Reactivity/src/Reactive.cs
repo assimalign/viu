@@ -89,6 +89,10 @@ public static class Reactive
     public static EffectScope EffectScope(bool detached = false) => new(detached);
 
     /// <summary>The ambient scope new effects register with, or null when none is active.</summary>
+    /// <remarks>
+    /// This is the single public scope accessor so construction and inspection remain discoverable
+    /// through the sanctioned reactivity facade. Specified by <c>[RCT-5]</c>.
+    /// </remarks>
     public static EffectScope? CurrentScope => global::Assimalign.Viu.Reactivity.EffectScope.Current;
 
     /// <summary>
@@ -141,14 +145,15 @@ public static class Reactive
     public static void ResetTracking() => ReactivityState.ResetTracking();
 
     /// <summary>
-    /// Opens a batch: triggers are queued and coalesced until the matching <see cref="EndBatch"/>,
-    /// so multiple writes produce at most one run per effect.
+    /// Opens a batch whose queued triggers are coalesced until the returned scope is disposed.
+    /// Nested scopes flush only when the outermost scope is disposed.
     /// </summary>
-    public static void StartBatch() => ReactivityState.StartBatch();
-
-    /// <summary>Closes the innermost batch, flushing queued effects when it is the outermost one.</summary>
-    /// <exception cref="InvalidOperationException">There is no open batch to close.</exception>
-    public static void EndBatch() => ReactivityState.EndBatch();
+    /// <returns>
+    /// An idempotent scope that closes exactly one batch level. The disposable shape ensures that a
+    /// <c>using</c> statement restores effect delivery when its body exits through an exception.
+    /// </returns>
+    /// <remarks>Specified by <c>[RCT-5]</c>.</remarks>
+    public static IDisposable Batch() => new BatchScope();
 
     /// <summary>
     /// Watches a reference and invokes <paramref name="callback"/> with the new and previous values

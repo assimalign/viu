@@ -1,6 +1,9 @@
 #nullable enable
 *REMOVED*Assimalign.Viu.Router.IRouteEnterGuard.BeforeRouteEnter(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationGuardResult!>!
 *REMOVED*Assimalign.Viu.Router.IRouterHistory.Destroy() -> void
+*REMOVED*Assimalign.Viu.Router.IRouterHistory.Go(int delta, bool triggerListeners = true) -> void
+*REMOVED*Assimalign.Viu.Router.IRouterHistory.Push(string! location, Assimalign.Viu.Router.RouterHistoryState? data = null) -> void
+*REMOVED*Assimalign.Viu.Router.IRouterHistory.Replace(string! location, Assimalign.Viu.Router.RouterHistoryState? data = null) -> void
 *REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Sensitive.get -> bool
 *REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Sensitive.init -> void
 *REMOVED*Assimalign.Viu.Router.PathMatchingOptions.Strict.get -> bool
@@ -8,8 +11,26 @@
 *REMOVED*Assimalign.Viu.Router.Router.CurrentRoute.get -> Assimalign.Viu.Reactivity.IReactiveReference<Assimalign.Viu.Router.RouteLocation!>!
 *REMOVED*Assimalign.Viu.Router.Router.Push(string! location) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
 *REMOVED*Assimalign.Viu.Router.Router.Replace(string! location) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+*REMOVED*Assimalign.Viu.Router.RouterLinkClickEvent.RouterLinkClickEvent(int button = 0, bool controlKey = false, bool shiftKey = false, bool altKey = false, bool metaKey = false) -> void
 Assimalign.Viu.Router.IRouteEnterGuard.BeforeRouteEnterAsync(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationGuardResult!>!
 Assimalign.Viu.Router.IRouterHistory.Dispose() -> void
+Assimalign.Viu.Router.IRouterHistory.Go(int delta, Assimalign.Viu.Router.RouterHistoryNavigationOptions options = Assimalign.Viu.Router.RouterHistoryNavigationOptions.None) -> void
+Assimalign.Viu.Router.IRouterHistory.Push(string! location, Assimalign.Viu.Router.RouterHistoryEntryOptions options = default(Assimalign.Viu.Router.RouterHistoryEntryOptions)) -> void
+Assimalign.Viu.Router.IRouterHistory.Replace(string! location, Assimalign.Viu.Router.RouterHistoryEntryOptions options = default(Assimalign.Viu.Router.RouterHistoryEntryOptions)) -> void
+Assimalign.Viu.Router.NavigationGuardOutcomeKind
+Assimalign.Viu.Router.NavigationGuardOutcomeKind.Allowed = 0 -> Assimalign.Viu.Router.NavigationGuardOutcomeKind
+Assimalign.Viu.Router.NavigationGuardOutcomeKind.Failed = 1 -> Assimalign.Viu.Router.NavigationGuardOutcomeKind
+Assimalign.Viu.Router.NavigationGuardOutcomeKind.Redirected = 2 -> Assimalign.Viu.Router.NavigationGuardOutcomeKind
+Assimalign.Viu.Router.NavigationGuardResult.FailureReason.get -> Assimalign.Viu.Router.NavigationFailureType?
+Assimalign.Viu.Router.NavigationGuardResult.OutcomeKind.get -> Assimalign.Viu.Router.NavigationGuardOutcomeKind
+Assimalign.Viu.Router.NavigationGuardResult.RedirectTarget.get -> Assimalign.Viu.Router.NavigationRedirectTarget?
+Assimalign.Viu.Router.NavigationRedirectTarget
+Assimalign.Viu.Router.NavigationRedirectTarget.Kind.get -> Assimalign.Viu.Router.NavigationRedirectTargetKind
+Assimalign.Viu.Router.NavigationRedirectTarget.Parameters.get -> Assimalign.Viu.Router.RouteParameters!
+Assimalign.Viu.Router.NavigationRedirectTarget.Value.get -> string!
+Assimalign.Viu.Router.NavigationRedirectTargetKind
+Assimalign.Viu.Router.NavigationRedirectTargetKind.Location = 0 -> Assimalign.Viu.Router.NavigationRedirectTargetKind
+Assimalign.Viu.Router.NavigationRedirectTargetKind.NamedRoute = 1 -> Assimalign.Viu.Router.NavigationRedirectTargetKind
 Assimalign.Viu.Router.PathMatchingOptions.CaseSensitive.get -> bool
 Assimalign.Viu.Router.PathMatchingOptions.CaseSensitive.init -> void
 Assimalign.Viu.Router.PathMatchingOptions.TrailingSlashSensitive.get -> bool
@@ -17,7 +38,28 @@ Assimalign.Viu.Router.PathMatchingOptions.TrailingSlashSensitive.init -> void
 Assimalign.Viu.Router.Router.CurrentRoute.get -> Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<Assimalign.Viu.Router.RouteLocation!>!
 Assimalign.Viu.Router.Router.PushAsync(string! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
 Assimalign.Viu.Router.Router.ReplaceAsync(string! location, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+Assimalign.Viu.Router.RouterHistoryEntryOptions
+Assimalign.Viu.Router.RouterHistoryEntryOptions.Equals(Assimalign.Viu.Router.RouterHistoryEntryOptions other) -> bool
+Assimalign.Viu.Router.RouterHistoryEntryOptions.RouterHistoryEntryOptions() -> void
+Assimalign.Viu.Router.RouterHistoryEntryOptions.Scroll.get -> Assimalign.Viu.Router.ScrollPosition?
+Assimalign.Viu.Router.RouterHistoryEntryOptions.Scroll.init -> void
+Assimalign.Viu.Router.RouterHistoryNavigationOptions
+Assimalign.Viu.Router.RouterHistoryNavigationOptions.None = 0 -> Assimalign.Viu.Router.RouterHistoryNavigationOptions
+Assimalign.Viu.Router.RouterHistoryNavigationOptions.SuppressListeners = 1 -> Assimalign.Viu.Router.RouterHistoryNavigationOptions
+Assimalign.Viu.Router.RouterLinkClickEvent.Modifiers.get -> Assimalign.Viu.Router.RouterLinkModifiers
+Assimalign.Viu.Router.RouterLinkClickEvent.RouterLinkClickEvent(int button = 0, Assimalign.Viu.Router.RouterLinkModifiers modifiers = Assimalign.Viu.Router.RouterLinkModifiers.None) -> void
+Assimalign.Viu.Router.RouterLinkModifiers
+Assimalign.Viu.Router.RouterLinkModifiers.Alt = 4 -> Assimalign.Viu.Router.RouterLinkModifiers
+Assimalign.Viu.Router.RouterLinkModifiers.Control = 1 -> Assimalign.Viu.Router.RouterLinkModifiers
+Assimalign.Viu.Router.RouterLinkModifiers.Meta = 8 -> Assimalign.Viu.Router.RouterLinkModifiers
+Assimalign.Viu.Router.RouterLinkModifiers.None = 0 -> Assimalign.Viu.Router.RouterLinkModifiers
+Assimalign.Viu.Router.RouterLinkModifiers.Shift = 2 -> Assimalign.Viu.Router.RouterLinkModifiers
+override Assimalign.Viu.Router.RouterHistoryEntryOptions.GetHashCode() -> int
 static Assimalign.Viu.Router.RouteLocation.operator !=(Assimalign.Viu.Router.RouteLocation? left, Assimalign.Viu.Router.RouteLocation? right) -> bool
 static Assimalign.Viu.Router.RouteLocation.operator ==(Assimalign.Viu.Router.RouteLocation? left, Assimalign.Viu.Router.RouteLocation? right) -> bool
 static Assimalign.Viu.Router.RouteParameters.operator !=(Assimalign.Viu.Router.RouteParameters? left, Assimalign.Viu.Router.RouteParameters? right) -> bool
 static Assimalign.Viu.Router.RouteParameters.operator ==(Assimalign.Viu.Router.RouteParameters? left, Assimalign.Viu.Router.RouteParameters? right) -> bool
+static Assimalign.Viu.Router.RouterHistoryEntryOptions.operator !=(Assimalign.Viu.Router.RouterHistoryEntryOptions left, Assimalign.Viu.Router.RouterHistoryEntryOptions right) -> bool
+static Assimalign.Viu.Router.RouterHistoryEntryOptions.operator ==(Assimalign.Viu.Router.RouterHistoryEntryOptions left, Assimalign.Viu.Router.RouterHistoryEntryOptions right) -> bool
+~override Assimalign.Viu.Router.RouterHistoryEntryOptions.Equals(object obj) -> bool
+~override Assimalign.Viu.Router.RouterHistoryEntryOptions.ToString() -> string

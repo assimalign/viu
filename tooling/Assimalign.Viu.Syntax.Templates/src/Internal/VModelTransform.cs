@@ -194,7 +194,7 @@ internal static class VModelTransform
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
     /// <param name="modifiers">The compile-time modifier names carried by the typed binding.</param>
-    /// <returns>The generated <c>ViuModelBinding</c> construction.</returns>
+    /// <returns>The generated <c>ModelBinding</c> construction.</returns>
     internal static CompoundExpressionNode CreateNativeBinding(
         ExpressionNode expression,
         IReadOnlyList<SimpleExpressionNode> modifiers)
@@ -202,7 +202,7 @@ internal static class VModelTransform
         if (modifiers.Count == 0)
         {
             return Ir.CompoundExpression(
-                "new global::Assimalign.Viu.Browser.ViuModelBinding(",
+                "new global::Assimalign.Viu.Browser.ModelBinding(",
                 expression,
                 ", ",
                 CreateAssignmentAction(expression),
@@ -211,7 +211,7 @@ internal static class VModelTransform
 
         var parts = new List<object>
         {
-            "new global::Assimalign.Viu.Browser.ViuModelBinding(",
+            "new global::Assimalign.Viu.Browser.ModelBinding(",
             expression,
             ", ",
             CreateAssignmentAction(expression),

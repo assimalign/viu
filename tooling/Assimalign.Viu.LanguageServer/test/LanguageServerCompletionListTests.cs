@@ -85,7 +85,7 @@ public class LanguageServerCompletionListTests
     private static string Frame(string payload)
         => $"Content-Length: {Encoding.UTF8.GetByteCount(payload)}\r\n\r\n{payload}";
 
-    private sealed class FixedCountLanguageService : IViuLanguageService
+    private sealed class FixedCountLanguageService : ILanguageService
     {
         private readonly int itemCount;
 

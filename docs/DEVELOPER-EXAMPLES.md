@@ -587,15 +587,10 @@ ReactiveEffect effect = Reactive.Effect(
         Console.WriteLine($"{count.Value} -> {doubled.Value}");
     });
 
-Reactive.StartBatch();
-try
+using (Reactive.Batch())
 {
     count.Value = 2;
     count.Value = 3;
-}
-finally
-{
-    Reactive.EndBatch();
 }
 
 effect.Stop();

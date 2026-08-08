@@ -546,7 +546,9 @@ API boundaries. First-party references therefore derive from `ReactiveValue<T>` 
 `[RCT-3]` The reference primitives are `Reference<T>`, `ShallowReference<T>`, `CustomReference<T>`,
 and `Computed<T>`. `Computed<T>` plays a dual role in the dependency graph — it is both a value
 others subscribe to and a subscriber to its own sources — and realizes the subscriber half by
-**composition** over an internal sealed subscriber rather than by multiple inheritance.
+**composition** over an internal sealed subscriber rather than by multiple inheritance. Their
+constructors, plus `ReactiveEffect` and `EffectScope` construction, are non-public; `Reactive` is
+the sanctioned creation facade.
 
 `[RCT-4]` An external `IReactiveReference<T>` implementation is responsible for tracking its own
 reads and triggering on changed writes; the interface cannot enforce correct tracking.
@@ -558,14 +560,18 @@ dependency access (forced triggering, graph inspection) additionally require
 
 `[RCT-5]` `Reactive` is the static facade: `Reference`, `ShallowReference`, `CustomReference`,
 `Computed`; `Effect`; `EffectScope`, `CurrentScope`, `OnScopeDispose`; `Watch`, `WatchEffect`;
-`TriggerReference`; `PauseTracking`, `ResetTracking`, `StartBatch`, `EndBatch`; and the inspection
+`TriggerReference`; `PauseTracking`, `ResetTracking`, `Batch`; and the inspection
 and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadOnly`, collection-specific
 `ToRaw`, and `MarkRaw`. Generic identity conversion and raw-object conversion are not part of the
 surface; generated objects instead expose a typed `ToRawValues()` view over their backing values.
 `ReactiveValue<T>.Peek()` returns a fresh value without subscribing the ambient caller, while a
 stale computed still refreshes and tracks its own sources. Tracking state is restored if the read
 throws. `ReactiveEffect` implements `IDisposable`; `Dispose()` is exactly the idempotent `Stop()`
-operation.
+operation. `Reactive.CurrentScope` is the only public ambient-scope accessor. `Reactive.Batch()`
+returns an idempotent disposable that closes exactly the one nesting level it opened: inner
+disposal never flushes while an outer batch remains, outermost disposal flushes queued effects,
+and exception unwind through `using` restores effect delivery. The allocation-free raw start/end
+pair is internal to the dependency engine.
 
 ### 5.3 There is no proxy
 
@@ -1013,12 +1019,13 @@ effects run when the detached branch mounts. See [§17](#17-non-goals-and-curren
 
 `[BLT-14]` Asynchronous component definitions retain **explicit registration resolution and
 delegate activation**, deduplicate concurrent loads for the same definition, and integrate with
-server prefetch and Suspense.
+server prefetch and Suspense. `AsynchronousComponents.Define(...)` is the public definition facade.
 
 `[BLT-15]` Dynamic structure is explicit. A dynamic element constructs an `ElementNode` with a
 `QualifiedName`; a dynamic registered component constructs a `ComponentNode` with
 `ComponentReference.ForName(name)`. The renderer MUST NOT guess whether a plain string is a tag or a
-registration.
+registration. `DynamicComponents.Resolve(...)` normalizes a selector and
+`DynamicComponents.Create(...)` creates its closed-algebra node.
 
 *Authority: `libraries/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
 `libraries/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
@@ -1186,10 +1193,10 @@ coerces it numerically.
 
 Because Viu has no `this`-proxy and no reflection, a native `v-model` cannot recover its setter from
 the `onUpdate:modelValue` prop the way a component `v-model` does. The `DirectiveInvocation` value
-therefore carries a `ViuModelBinding` holding **both** the current value and the generated write-back delegate; the
-`onUpdate:modelValue` prop is still emitted for uniformity but is inert on a native element, which
-the DOM patcher skips rather than binding as a listener. The `modelValue` prop is not emitted at all
-on a native element.
+therefore carries a `ModelBinding` holding **both** the current value and the generated write-back
+delegate; the `onUpdate:modelValue` prop is still emitted for uniformity but is inert on a native
+element, which the DOM patcher skips rather than binding as a listener. The `modelValue` prop is not
+emitted at all on a native element.
 
 `[SFC-8]` **Source mapping.** Each expression-bearing render line carries a C# `#line` **span**
 directive — `#line (line,column)-(line,column) offset "file"` — anchored to that line's leftmost
@@ -1493,7 +1500,9 @@ markers of [SSR-MARKERS-1] through a host-supplied `HydrationNodeReader<TNode>`.
 `[HYD-2]` **Hydration is a client-host responsibility.** Browser supplies a reader over one batched
 host-tree snapshot per root or teleport target, so every structural, kind, text, and attribute read
 after that stays in managed memory. Testing supplies a live-tree reader and an immutable-snapshot
-reader. ServerRenderer itself stays free of host-node types.
+reader. `TestRendererOptions.SnapshotSemantics` selects between them; the same non-positional options
+record also carries strict-removal validation wherever Testing creates renderer operations.
+ServerRenderer itself stays free of host-node types.
 
 `[HYD-3]` `Hydrate` throws `NotSupportedException` when the host supplies no
 `CreateHydrationReader`, and `InvalidOperationException` when the container already holds a mounted
@@ -1562,6 +1571,9 @@ reverse-order application cleanup [APP-4], [APP-5]. History state marshals as a 
 primitives-only** payload. Every history is an idempotent, terminal `IDisposable`: after disposal
 all other members throw `ObjectDisposedException`. A Router borrows its history; the owner disposes
 the Router first and then the history, making environment-listener ownership explicit.
+`RouterHistoryNavigationOptions` is a flags value whose `SuppressListeners` bit controls `Go`;
+`RouterHistoryEntryOptions` is a readonly value carrying the non-bitwise scroll input to `Push` and
+`Replace`. `RouterHistoryState.Replaced` remains an observed output fact, never an operation switch.
 
 `[RTR-4]` `RouterView` and `RouterLink` resolve `Router` from nullable
 `ComponentContext.Services`.
@@ -1569,12 +1581,17 @@ the Router first and then the history, making environment-listener ownership exp
 passes the next depth explicitly, because Viu has no hierarchical component dependency API [CMP-24].
 An in-component guard depth outside the current matched route chain throws
 `ArgumentOutOfRangeException`; registration never silently drops a guard because its explicit depth
-is invalid.
+is invalid. `RouterLinkClickEvent` carries system keys as one `RouterLinkModifiers` flags value;
+its individual key properties are computed projections retained for click-contract and test
+inspection.
 
 `[RTR-5]` **Guards return their decision; they do not call a continuation.** A `NavigationGuard`
 returns a `NavigationGuardResult` — `Allow`, `Abort`, or a redirect — from an awaitable,
 cancellable signature. An exhaustive result type lets the compiler check that every path decides,
-and lets the pipeline guarantee a guard decides exactly once.
+and lets the pipeline guarantee a guard decides exactly once. The result exposes a
+`NavigationGuardOutcomeKind` plus exactly the applicable payload: a failed outcome carries its
+`NavigationFailureType`, while a redirected outcome carries a `NavigationRedirectTarget`
+discriminated as a location or named route. Callers never infer the outcome from a string or null.
 
 `[RTR-6]` A navigation that does not complete yields a `NavigationFailure` typed `Aborted`,
 `Cancelled`, or `Duplicated`, returned from cancellable `PushAsync`/`ReplaceAsync` and passed to
@@ -1586,7 +1603,8 @@ cap throws `NavigationRedirectException`.
 
 `[RTR-7]` **Boundary.** `Assimalign.Viu.Router` references Components and Reactivity but **not Core
 and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` is the
-click-dispatch bridge, and the browser history edge is gated by `[SupportedOSPlatform("browser")]`.
+click-dispatch bridge that maps browser modifier flags onto `RouterLinkModifiers`, and the browser
+history edge is gated by `[SupportedOSPlatform("browser")]`.
 
 `[RTR-8]` **Limit.** Lazy route components and scroll behavior are not implemented
 ([V01.01.08.05]); every route component resolves eagerly. See [§17](#17-non-goals-and-current-limits).
@@ -1742,7 +1760,9 @@ it move together.
 `TestElement` exposes read-only live views of its properties, listeners, and ordered children, so
 tests can inspect host state without mutating renderer-owned storage. `ComponentWrapper` and
 `ElementWrapper` name event/value operations `TriggerAsync` and `SetValueAsync`; their returned task
-completes only after the deterministic scheduler has drained.
+completes only after the deterministic scheduler has drained. `TestRenderer` and
+`TestNodeOperations.Create` both accept the same `TestRendererOptions` record, so snapshot and
+strict-removal behavior cannot depend on positional Boolean order.
 
 `[CONF-4]` For reactivity and caching semantics a test MUST assert **run counts** (effect runs,
 getter invocations), not only final values: caching and dependency-tracking bugs hide behind

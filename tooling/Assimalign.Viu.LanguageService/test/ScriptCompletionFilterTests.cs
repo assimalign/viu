@@ -67,7 +67,7 @@ public class ScriptCompletionFilterTests
         string scriptLine)
     {
         var source = $"@script {{\n{scriptLine}\n}}\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
         return service.GetCompletions(
             DocumentUri,

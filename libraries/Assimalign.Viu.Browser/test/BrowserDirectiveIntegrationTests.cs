@@ -20,7 +20,7 @@ public sealed class BrowserDirectiveIntegrationTests
         object? assigned = null;
         DirectiveInvocation directive = new(
             typeof(VModelText),
-            new ViuModelBinding("initial text", value => assigned = value, ["trim"]));
+            new ModelBinding("initial text", value => assigned = value, ["trim"]));
         ElementNode input = new(
             new QualifiedName("input"),
             directives: [directive]);
@@ -43,7 +43,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelText),
-                    new ViuModelBinding(
+                    new ModelBinding(
                         string.Empty,
                         value => assigned = value,
                         ["trim", "number"])),
@@ -77,7 +77,7 @@ public sealed class BrowserDirectiveIntegrationTests
     {
         DirectiveInvocation directive = new(
             typeof(VModelCheckbox),
-            new ViuModelBinding(new object?[] { 1 }, _ => { }));
+            new ModelBinding(new object?[] { 1 }, _ => { }));
         ElementNode input = new(
             new QualifiedName("input"),
             bindings:
@@ -110,7 +110,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelCheckbox),
-                    new ViuModelBinding("unchecked", value => assigned = value)),
+                    new ModelBinding("unchecked", value => assigned = value)),
             ],
             mountReference: value => elementHandle = value is int handle ? handle : 0);
 
@@ -138,7 +138,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelRadio),
-                    new ViuModelBinding("chosen", _ => { })),
+                    new ModelBinding("chosen", _ => { })),
             ]);
 
         string frameText = RenderAndReadFrames(input);
@@ -163,7 +163,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelRadio),
-                    new ViuModelBinding(null, value => assigned = value)),
+                    new ModelBinding(null, value => assigned = value)),
             ],
             mountReference: value => elementHandle = value is int handle ? handle : 0);
 
@@ -191,7 +191,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelRadio),
-                    new ViuModelBinding("chosen", _ => { })),
+                    new ModelBinding("chosen", _ => { })),
             ]);
 
         string updateFrameText = RenderUpdateAndReadFrames(
@@ -223,7 +223,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelCheckbox),
-                    new ViuModelBinding("chosen", _ => { })),
+                    new ModelBinding("chosen", _ => { })),
             ]);
 
         string updateFrameText = RenderUpdateAndReadFrames(
@@ -251,7 +251,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelSelect),
-                    new ViuModelBinding("second", _ => { })),
+                    new ModelBinding("second", _ => { })),
             ]);
 
         string frameText = RenderAndReadFrames(select);
@@ -277,7 +277,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelSelect),
-                    new ViuModelBinding(null, value => assigned = value)),
+                    new ModelBinding(null, value => assigned = value)),
             ],
             mountReference: value => elementHandle = value is int handle ? handle : 0);
 
@@ -328,7 +328,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelDynamic),
-                    new ViuModelBinding(null, _ => { })),
+                    new ModelBinding(null, _ => { })),
             ]);
         Scheduler.Reset();
         Action? scheduledFlush = null;
@@ -367,7 +367,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelDynamic),
-                    new ViuModelBinding("editing", _ => { })),
+                    new ModelBinding("editing", _ => { })),
             ]);
         ElementNode CheckboxInput() => new(
             new QualifiedName("input"),
@@ -380,7 +380,7 @@ public sealed class BrowserDirectiveIntegrationTests
             [
                 new DirectiveInvocation(
                     typeof(VModelDynamic),
-                    new ViuModelBinding(new object?[] { "editing" }, _ => { })),
+                    new ModelBinding(new object?[] { "editing" }, _ => { })),
             ]);
         Scheduler.Reset();
         Action? scheduledFlush = null;

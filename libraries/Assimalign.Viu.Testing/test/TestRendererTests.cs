@@ -88,7 +88,11 @@ public sealed class TestRendererTests
         Scheduler.Reset();
         TestElement container = TestServerMarkup.Parse("<main data-id=server>hello</main>");
         TestElement serverElement = (TestElement)container.Children.ShouldHaveSingleItem();
-        TestRenderer renderer = new(snapshotSemantics: true);
+        TestRenderer renderer = new(
+            new TestRendererOptions
+            {
+                SnapshotSemantics = true,
+            });
         ElementNode client = new(
             new QualifiedName("main"),
             bindings:
@@ -127,7 +131,7 @@ public sealed class TestRendererTests
 
     private sealed class ReactiveTextComponent : IComponent
     {
-        internal Reference<int> Value { get; } = new(0);
+        internal Reference<int> Value { get; } = Reactive.Reference(0);
 
         public ComponentRenderer Setup(ComponentContext context)
         {

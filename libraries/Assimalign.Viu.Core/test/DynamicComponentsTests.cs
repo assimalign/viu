@@ -18,7 +18,7 @@ public sealed class DynamicComponentsTests
         TextNode child = new("content");
         RenderPlan renderPlan = new(PatchFlags.Text);
 
-        ElementNode element = DynamicComponents.DynamicComponent(
+        ElementNode element = DynamicComponents.Create(
             "article",
             bindings: [binding],
             children: [child],
@@ -39,19 +39,19 @@ public sealed class DynamicComponentsTests
             arguments: new Dictionary<string, object?> { ["value"] = 42 });
         ComponentReference reference = ComponentReference.ForType(typeof(TargetComponent));
         AsynchronousComponentDefinition asynchronousDefinition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 _ => Task.FromResult(AsynchronousComponentTarget.From<TargetComponent>()));
 
-        ComponentNode typeNode = DynamicComponents.DynamicComponent(
+        ComponentNode typeNode = DynamicComponents.Create(
             typeof(TargetComponent),
             invocation).ShouldBeOfType<ComponentNode>();
-        ComponentNode referenceNode = DynamicComponents.DynamicComponent(
+        ComponentNode referenceNode = DynamicComponents.Create(
             reference,
             invocation).ShouldBeOfType<ComponentNode>();
-        ComponentNode nameNode = DynamicComponents.DynamicComponent(
+        ComponentNode nameNode = DynamicComponents.Create(
             DynamicComponents.Named("registered-target"),
             invocation).ShouldBeOfType<ComponentNode>();
-        ComponentNode asynchronousNode = DynamicComponents.DynamicComponent(
+        ComponentNode asynchronousNode = DynamicComponents.Create(
             asynchronousDefinition,
             invocation).ShouldBeOfType<ComponentNode>();
 
@@ -70,11 +70,11 @@ public sealed class DynamicComponentsTests
     {
         TextNode existing = new("existing");
 
-        DynamicComponents.DynamicComponent(existing).ShouldBeSameAs(existing);
-        DynamicComponents.DynamicComponent(new object())
+        DynamicComponents.Create(existing).ShouldBeSameAs(existing);
+        DynamicComponents.Create(new object())
             .ShouldBeOfType<CommentNode>()
             .Text.ShouldBeEmpty();
-        DynamicComponents.DynamicComponent(null)
+        DynamicComponents.Create(null)
             .ShouldBeOfType<CommentNode>()
             .Text.ShouldBeEmpty();
     }

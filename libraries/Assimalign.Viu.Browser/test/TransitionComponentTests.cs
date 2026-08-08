@@ -230,7 +230,7 @@ public sealed class TransitionComponentTests
 
     private sealed class StubComponentContext : ComponentContext, IDisposable
     {
-        private readonly EffectScope _scope = new();
+        private readonly EffectScope _scope = Reactive.EffectScope();
 
         internal StubComponentContext(ComponentBindings bindings)
         {

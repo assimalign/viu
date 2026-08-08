@@ -267,7 +267,7 @@ public sealed class GeneratedComponentFixtureTests
         emissions.ShouldHaveSingleItem().ShouldBe(["Configured"]);
 
         CompiledFixtureNode input = host.FindElements("input").ShouldHaveSingleItem();
-        ViuModelBinding model = input.ModelBinding
+        ModelBinding model = input.ModelBinding
             ?? throw new InvalidOperationException(
                 "The test directive did not observe the native v-model carrier.");
         model.Value.ShouldBe("initial");

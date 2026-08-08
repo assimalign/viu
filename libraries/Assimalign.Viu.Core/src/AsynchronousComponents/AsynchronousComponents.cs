@@ -16,12 +16,12 @@ public static class AsynchronousComponents
     /// <param name="loader">The target-identity loader.</param>
     /// <param name="name">The optional explicit registration name.</param>
     /// <returns>The reusable asynchronous definition.</returns>
-    public static AsynchronousComponentDefinition DefineAsynchronousComponent<TComponent>(
+    public static AsynchronousComponentDefinition Define<TComponent>(
         AsynchronousComponentLoader loader,
         string? name = null)
         where TComponent : class, IComponent
     {
-        return DefineAsynchronousComponent(typeof(TComponent), loader, name);
+        return Define(typeof(TComponent), loader, name);
     }
 
     /// <summary>Defines an asynchronous component under an authored wrapper type.</summary>
@@ -29,12 +29,12 @@ public static class AsynchronousComponents
     /// <param name="options">The loading, failure, timing, and retry policy.</param>
     /// <param name="name">The optional explicit registration name.</param>
     /// <returns>The reusable asynchronous definition.</returns>
-    public static AsynchronousComponentDefinition DefineAsynchronousComponent<TComponent>(
+    public static AsynchronousComponentDefinition Define<TComponent>(
         AsynchronousComponentOptions options,
         string? name = null)
         where TComponent : class, IComponent
     {
-        return DefineAsynchronousComponent(typeof(TComponent), options, name);
+        return Define(typeof(TComponent), options, name);
     }
 
     /// <summary>Defines an asynchronous component from an authored wrapper type and loader.</summary>
@@ -42,13 +42,13 @@ public static class AsynchronousComponents
     /// <param name="loader">The target-identity loader.</param>
     /// <param name="name">The optional explicit registration name.</param>
     /// <returns>The reusable asynchronous definition.</returns>
-    public static AsynchronousComponentDefinition DefineAsynchronousComponent(
+    public static AsynchronousComponentDefinition Define(
         Type componentType,
         AsynchronousComponentLoader loader,
         string? name = null)
     {
         ArgumentNullException.ThrowIfNull(loader);
-        return DefineAsynchronousComponent(
+        return Define(
             componentType,
             new AsynchronousComponentOptions { Loader = loader },
             name);
@@ -59,7 +59,7 @@ public static class AsynchronousComponents
     /// <param name="options">The loading, failure, timing, and retry policy.</param>
     /// <param name="name">The optional explicit registration name.</param>
     /// <returns>The reusable asynchronous definition.</returns>
-    public static AsynchronousComponentDefinition DefineAsynchronousComponent(
+    public static AsynchronousComponentDefinition Define(
         Type componentType,
         AsynchronousComponentOptions options,
         string? name = null)

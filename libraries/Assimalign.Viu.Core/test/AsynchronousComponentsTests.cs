@@ -18,7 +18,7 @@ public sealed class AsynchronousComponentsTests
     public void Definition_ExplicitRegistration_ActivatesFreshWrappersWithoutReflection()
     {
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 _ => Task.FromResult(AsynchronousComponentTarget.From<TargetComponent>()),
                 "deferred-target");
 
@@ -39,7 +39,7 @@ public sealed class AsynchronousComponentsTests
         TaskCompletionSource<AsynchronousComponentTarget> loaderCompletion = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 _ =>
                 {
                     loadRuns++;
@@ -83,7 +83,7 @@ public sealed class AsynchronousComponentsTests
         List<object?> firstValues = [];
         List<object?> secondValues = [];
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 _ => Task.FromResult(
                     AsynchronousComponentTarget.From<ExposingTargetComponent>()));
         var components = new ComponentFactory();
@@ -125,7 +125,7 @@ public sealed class AsynchronousComponentsTests
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 new AsynchronousComponentOptions
                 {
                     Loader = _ => load.Task,
@@ -165,7 +165,7 @@ public sealed class AsynchronousComponentsTests
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 new AsynchronousComponentOptions
                 {
                     Loader = _ => load.Task,
@@ -224,7 +224,7 @@ public sealed class AsynchronousComponentsTests
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 new AsynchronousComponentOptions
                 {
                     Loader = _ => load.Task,
@@ -266,7 +266,7 @@ public sealed class AsynchronousComponentsTests
         using var host = new RendererParityHost();
         int handledErrors = 0;
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 new AsynchronousComponentOptions
                 {
                     Loader = _ => Task.FromException<AsynchronousComponentTarget>(
@@ -296,7 +296,7 @@ public sealed class AsynchronousComponentsTests
         using var host = new RendererParityHost();
         List<Exception> handled = [];
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 _ => Task.FromException<AsynchronousComponentTarget>(
                     new InvalidOperationException("unhandled-load")));
         ComponentNode request = definition.CreateComponent();
@@ -324,7 +324,7 @@ public sealed class AsynchronousComponentsTests
         int loaderRuns = 0;
         List<int> attempts = [];
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 new AsynchronousComponentOptions
                 {
                     Loader = _ =>
@@ -363,7 +363,7 @@ public sealed class AsynchronousComponentsTests
         using var host = new RendererParityHost();
         int loaderRuns = 0;
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 new AsynchronousComponentOptions
                 {
                     Loader = _ =>
@@ -394,7 +394,7 @@ public sealed class AsynchronousComponentsTests
         int loaderRuns = 0;
         int cancellations = 0;
         AsynchronousComponentDefinition definition =
-            AsynchronousComponents.DefineAsynchronousComponent<WrapperIdentityComponent>(
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
                 async cancellationToken =>
                 {
                     Interlocked.Increment(ref loaderRuns);

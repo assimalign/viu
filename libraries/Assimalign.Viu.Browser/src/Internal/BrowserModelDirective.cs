@@ -25,11 +25,11 @@ internal static class BrowserModelDirective
         : throw new InvalidOperationException(
             "A Browser model or show directive requires an integer browser-node handle.");
 
-    public static ViuModelBinding? Carrier(DirectiveBinding binding) =>
-        binding.Value as ViuModelBinding;
+    public static ModelBinding? Carrier(DirectiveBinding binding) =>
+        binding.Value as ModelBinding;
 
     public static object? ModelValue(object? binding) =>
-        (binding as ViuModelBinding)?.Value;
+        (binding as ModelBinding)?.Value;
 
     public static bool HasModifier(DirectiveBinding binding, string name)
     {

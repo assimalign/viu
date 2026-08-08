@@ -17,7 +17,7 @@ public sealed class ComponentWrapperTests
     [Fact]
     public void Mount_SuppliedInstance_QueriesRenderedHostRange()
     {
-        using ComponentWrapper wrapper = ViuTest.Mount(new RootComponent());
+        using ComponentWrapper wrapper = ComponentTest.Mount(new RootComponent());
 
         wrapper.Exists().ShouldBeTrue();
         wrapper.Instance.ShouldBeOfType<RootComponent>();
@@ -43,7 +43,7 @@ public sealed class ComponentWrapperTests
         {
             Components = descendants,
         };
-        using ComponentWrapper root = ViuTest.Mount(
+        using ComponentWrapper root = ComponentTest.Mount(
             new ParentComponent(childReference),
             options);
 
@@ -60,7 +60,7 @@ public sealed class ComponentWrapperTests
     public void ChildWrapper_RootUnmount_StableViewIdentityReportsNotMounted()
     {
         ComponentFactory descendants = CreateChildFactory(out ComponentReference childReference);
-        using ComponentWrapper root = ViuTest.Mount(
+        using ComponentWrapper root = ComponentTest.Mount(
             new ParentComponent(childReference),
             new ComponentMountOptions { Components = descendants });
         ComponentWrapper child = root.GetComponent<ChildComponent>();
@@ -93,7 +93,7 @@ public sealed class ComponentWrapperTests
                 displayName: "EmittingRoot",
                 events: new[] { new ComponentEvent("root-ready") }),
         };
-        using ComponentWrapper root = ViuTest.Mount(
+        using ComponentWrapper root = ComponentTest.Mount(
             new EmittingRootComponent(childReference),
             options);
         ComponentWrapper child = root.GetComponent<EmittingChildComponent>();
@@ -125,7 +125,7 @@ public sealed class ComponentWrapperTests
             },
         };
 
-        using ComponentWrapper wrapper = ViuTest.Mount(new ObservedComponent(), options);
+        using ComponentWrapper wrapper = ComponentTest.Mount(new ObservedComponent(), options);
 
         configuredObservations.ShouldBe(1);
         wrapper.Emitted("ready").Count.ShouldBe(1);
@@ -138,7 +138,7 @@ public sealed class ComponentWrapperTests
         ComponentMountOptions options = new();
         options.Stub<ChildComponent>();
 
-        using ComponentWrapper wrapper = ViuTest.Mount(
+        using ComponentWrapper wrapper = ComponentTest.Mount(
             new ParentComponent(childReference),
             options);
 
@@ -149,7 +149,7 @@ public sealed class ComponentWrapperTests
     [Fact]
     public async Task TriggerAsync_ReactiveListener_DrainsDeterministicScheduler()
     {
-        using ComponentWrapper wrapper = ViuTest.Mount(new InteractiveComponent());
+        using ComponentWrapper wrapper = ComponentTest.Mount(new InteractiveComponent());
         wrapper.Text().ShouldBe("0");
 
         await wrapper.TriggerAsync("click");
@@ -160,7 +160,7 @@ public sealed class ComponentWrapperTests
     [Fact]
     public async Task SetValueAsync_ComponentAndElementWrappers_DispatchInputAndDrainScheduler()
     {
-        using ComponentWrapper wrapper = ViuTest.Mount(new InputComponent());
+        using ComponentWrapper wrapper = ComponentTest.Mount(new InputComponent());
 
         await wrapper.SetValueAsync("component");
         wrapper.Text().ShouldBe("component");
@@ -184,7 +184,7 @@ public sealed class ComponentWrapperTests
             },
         };
 
-        using ComponentWrapper wrapper = ViuTest.Mount(new ParameterComponent(), options);
+        using ComponentWrapper wrapper = ComponentTest.Mount(new ParameterComponent(), options);
 
         wrapper.Text().ShouldBe("configured");
     }
@@ -295,7 +295,7 @@ public sealed class ComponentWrapperTests
 
     private sealed class InteractiveComponent : IComponent
     {
-        private readonly Reference<int> _count = new(0);
+        private readonly Reference<int> _count = Reactive.Reference(0);
 
         public ComponentRenderer Setup(ComponentContext context)
         {
@@ -312,7 +312,7 @@ public sealed class ComponentWrapperTests
 
     private sealed class InputComponent : IComponent
     {
-        private readonly Reference<object?> _value = new(string.Empty);
+        private readonly Reference<object?> _value = Reactive.Reference<object?>(string.Empty);
 
         public ComponentRenderer Setup(ComponentContext context)
         {

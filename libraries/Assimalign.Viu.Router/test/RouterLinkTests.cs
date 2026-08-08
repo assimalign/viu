@@ -136,7 +136,7 @@ public class RouterLinkTests
         var router = LinkRouter();
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
-        var click = new RouterLinkClickEvent(controlKey: true);
+        var click = new RouterLinkClickEvent(modifiers: RouterLinkModifiers.Control);
         await wrapper.TriggerAsync("click", click);
 
         router.CurrentRoute.Value.Path.ShouldBe("/");

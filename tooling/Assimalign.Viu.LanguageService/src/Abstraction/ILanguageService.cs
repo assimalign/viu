@@ -13,7 +13,7 @@ namespace Assimalign.Viu.LanguageService;
 /// issued (monotonic reads) — the accepted Language Server Protocol idiom, which clients compensate
 /// for with document versions and request cancellation.
 /// </remarks>
-public interface IViuLanguageService
+public interface ILanguageService
 {
     /// <summary>Opens or replaces a document in the language-service workspace.</summary>
     /// <param name="documentUri">The document URI used by the editor.</param>

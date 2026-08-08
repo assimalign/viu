@@ -51,26 +51,25 @@ public interface IRouterHistory : IDisposable
     /// position counter (<c>history.pushState</c> in web mode).
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
-    /// <param name="data">Optional extra state to merge onto the new entry, or <see langword="null"/>.</param>
-    void Push(string location, RouterHistoryState? data = null);
+    /// <param name="options">Optional caller-provided entry values. History-owned state is computed internally.</param>
+    void Push(string location, RouterHistoryEntryOptions options = default);
 
     /// <summary>
     /// Replaces the current entry with one for <paramref name="location"/>, preserving the position
     /// counter (<c>history.replaceState</c> in web mode).
     /// </summary>
     /// <param name="location">The base-stripped location to navigate to.</param>
-    /// <param name="data">Optional extra state to merge onto the entry, or <see langword="null"/>.</param>
-    void Replace(string location, RouterHistoryState? data = null);
+    /// <param name="options">Optional caller-provided entry values. History-owned state is computed internally.</param>
+    void Replace(string location, RouterHistoryEntryOptions options = default);
 
     /// <summary>
     /// Moves through history by <paramref name="delta"/> entries (negative is backward;
-    /// <c>history.go</c> in web mode). When <paramref name="triggerListeners"/> is
-    /// <see langword="false"/>, the resulting navigation does not notify listeners — used by the
-    /// router to reposition history silently.
+    /// <c>history.go</c> in web mode). <see cref="RouterHistoryNavigationOptions.SuppressListeners"/>
+    /// repositions history silently without notifying listeners.
     /// </summary>
     /// <param name="delta">The signed number of entries to move.</param>
-    /// <param name="triggerListeners">Whether the resulting navigation notifies listeners.</param>
-    void Go(int delta, bool triggerListeners = true);
+    /// <param name="options">Options controlling the movement; the default notifies listeners.</param>
+    void Go(int delta, RouterHistoryNavigationOptions options = RouterHistoryNavigationOptions.None);
 
     /// <summary>
     /// Registers a listener for browser-initiated navigations (back/forward, memory

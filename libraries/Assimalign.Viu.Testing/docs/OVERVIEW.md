@@ -8,7 +8,7 @@ plain CoreCLR test host with no DOM, browser, WASM toolchain, or JavaScript inte
 
 ## Public surface
 
-- `ViuTest` mounts an immutable `VirtualNode`, an exact caller-supplied `IComponent`, or an explicit
+- `ComponentTest` mounts an immutable `VirtualNode`, an exact caller-supplied `IComponent`, or an explicit
   `ComponentRegistration`. `ComponentMountOptions` supplies the root invocation, descendant
   resolver and stubs, services, state, directives, and application diagnostics.
 - `ComponentWrapper` and `ElementWrapper` query markup and text, locate elements and authored
@@ -23,7 +23,7 @@ plain CoreCLR test host with no DOM, browser, WASM toolchain, or JavaScript inte
   `TestHydrationReader` reads the live tree; `FrozenTestHydrationReader` captures an immutable
   pre-walk matching a one-read browser snapshot.
 - `TestSchedulerPump` installs through `Scheduler.UseFlushDispatcher` and restores through its
-  returned lease. `ViuTest` also uses `Scheduler.Reset` at mount boundaries.
+  returned lease. `ComponentTest` also uses `Scheduler.Reset` at mount boundaries.
 
 ## Public-seam boundary
 

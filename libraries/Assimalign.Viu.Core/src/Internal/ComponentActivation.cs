@@ -236,8 +236,8 @@ internal sealed class ComponentActivation
         IComponent instance = registration.Activator(options.Services)
             ?? throw new InvalidOperationException("A component activator returned null.");
         EffectScope scope = parent is null
-            ? new EffectScope(detached: true)
-            : parent.Scope.Run(() => new EffectScope());
+            ? Reactive.EffectScope(detached: true)
+            : parent.Scope.Run(() => Reactive.EffectScope());
         ComponentLifecycle lifecycle = new();
         RuntimeComponentContext context = new(
             registration.Contract,

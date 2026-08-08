@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Testing;
 /// view, and event-observer seams. Specified by <c>[APP-2]</c>, <c>[RND-6]</c>, seam S2, seam S3,
 /// seam S5, and <c>[CONF-3]</c>.
 /// </remarks>
-public static class ViuTest
+public static class ComponentTest
 {
     /// <summary>Mounts an immutable virtual tree.</summary>
     /// <param name="node">The root tree.</param>

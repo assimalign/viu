@@ -195,7 +195,7 @@ public class RouterViewTests
     [Fact]
     public void RouterView_RendersNothing_WhenRouterServiceIsMissing()
     {
-        using var wrapper = Assimalign.Viu.Testing.ViuTest.Mount(
+        using var wrapper = Assimalign.Viu.Testing.ComponentTest.Mount(
             RouterView.Registration);
 
         wrapper.Find("div").ShouldBeNull();

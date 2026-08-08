@@ -20,7 +20,7 @@ public sealed class Reference<T> : ReactiveValue<T>
 
     /// <summary>Creates a reference holding <paramref name="value"/>.</summary>
     /// <param name="value">The initial value.</param>
-    public Reference(T value)
+    internal Reference(T value)
     {
         _value = value;
     }

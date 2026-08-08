@@ -561,7 +561,7 @@ public class LanguageServerHostTests
     private static string Frame(string payload)
         => $"Content-Length: {Encoding.UTF8.GetByteCount(payload)}\r\n\r\n{payload}";
 
-    private sealed class CompletionLanguageService : IViuLanguageService
+    private sealed class CompletionLanguageService : ILanguageService
     {
         public void OpenDocument(string documentUri, string text, int? version)
         {
@@ -629,7 +629,7 @@ public class LanguageServerHostTests
             => Array.Empty<LanguageCodeAction>();
     }
 
-    private sealed class RecordingLanguageService : IViuLanguageService
+    private sealed class RecordingLanguageService : ILanguageService
     {
         internal int OpenCount { get; private set; }
 

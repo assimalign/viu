@@ -132,7 +132,12 @@ public sealed class TestNodeOperationsTests
     public void Remove_StrictModeDuplicateRemoval_Throws()
     {
         TestNodeOperationLog log = new();
-        RendererOptions<TestNode> options = TestNodeOperations.Create(log, strictRemoval: true);
+        RendererOptions<TestNode> options = TestNodeOperations.Create(
+            log,
+            options: new TestRendererOptions
+            {
+                StrictRemoval = true,
+            });
         TestElement parent = (TestElement)options.CreateElement(new QualifiedName("root"));
         TestNode child = options.CreateText("child");
         options.Insert(child, parent, null);

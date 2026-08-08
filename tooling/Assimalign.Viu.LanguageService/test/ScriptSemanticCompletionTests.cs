@@ -219,12 +219,12 @@ public class ScriptSemanticCompletionTests
         service.ResolveCompletionDocumentation(DocumentUri, "Count").ShouldBeNull();
     }
 
-    private static IViuLanguageService CreateService(
+    private static ILanguageService CreateService(
         string source,
         LanguageProjectContext? context,
         string? contextDocumentUri = null)
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         if (context is not null)
         {
             ((IScriptSemanticLanguageService)service).ConfigureProjectContext(

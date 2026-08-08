@@ -37,7 +37,7 @@ public class RouterServiceIntegrationTests
         ComponentMountOptions options = OptionsFor(router, view);
         options.Services = services;
 
-        using var wrapper = ViuTest.Mount(RouterView.Registration, options);
+        using var wrapper = ComponentTest.Mount(RouterView.Registration, options);
 
         wrapper.Html().ShouldBe("<div class=\"service\">service</div>");
         services.Requests.ShouldContain(typeof(Router));

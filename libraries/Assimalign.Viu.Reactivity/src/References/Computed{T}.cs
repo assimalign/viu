@@ -37,7 +37,7 @@ public sealed class Computed<T> : ReactiveValue<T>
     /// <param name="getter">The derivation function (not invoked until the first read).</param>
     /// <param name="setter">Optional setter making the computed writable.</param>
     /// <exception cref="ArgumentNullException"><paramref name="getter"/> is null.</exception>
-    public Computed(Func<T> getter, Action<T>? setter = null)
+    internal Computed(Func<T> getter, Action<T>? setter = null)
     {
         ArgumentNullException.ThrowIfNull(getter);
         _getter = getter;
@@ -196,4 +196,3 @@ public sealed class Computed<T> : ReactiveValue<T>
         }
     }
 }
-

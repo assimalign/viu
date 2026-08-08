@@ -41,7 +41,7 @@ internal sealed class CompiledFixtureNode
     internal Dictionary<string, object?> Bindings { get; } =
         new(StringComparer.Ordinal);
 
-    internal ViuModelBinding? ModelBinding { get; set; }
+    internal ModelBinding? ModelBinding { get; set; }
 
     internal string DescendantText
     {
@@ -269,8 +269,8 @@ internal sealed class CompiledFixtureModelDirective : IDirective
         _ = value;
         _ = previousValue;
         ((CompiledFixtureNode)element).ModelBinding =
-            binding.Value as ViuModelBinding
+            binding.Value as ModelBinding
             ?? throw new InvalidOperationException(
-                "The generated v-model directive did not carry ViuModelBinding.");
+                "The generated v-model directive did not carry ModelBinding.");
     }
 }

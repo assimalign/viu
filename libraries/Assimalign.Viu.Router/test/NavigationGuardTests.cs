@@ -23,6 +23,35 @@ public class NavigationGuardTests
     private static NavigationGuard Allow() => (_, _, _) => Task.FromResult(NavigationGuardResult.Allow);
 
     [Fact]
+    public void NavigationGuardResult_FactoriesExposeDiscriminatedOutcomes()
+    {
+        NavigationGuardResult.Allow.OutcomeKind.ShouldBe(NavigationGuardOutcomeKind.Allowed);
+        NavigationGuardResult.Allow.FailureReason.ShouldBeNull();
+        NavigationGuardResult.Allow.RedirectTarget.ShouldBeNull();
+
+        NavigationGuardResult.Abort.OutcomeKind.ShouldBe(NavigationGuardOutcomeKind.Failed);
+        NavigationGuardResult.Abort.FailureReason.ShouldBe(NavigationFailureType.Aborted);
+        NavigationGuardResult.Abort.RedirectTarget.ShouldBeNull();
+
+        NavigationGuardResult location = NavigationGuardResult.RedirectTo("/next");
+        NavigationRedirectTarget locationTarget = location.RedirectTarget.ShouldNotBeNull();
+        location.OutcomeKind.ShouldBe(NavigationGuardOutcomeKind.Redirected);
+        location.FailureReason.ShouldBeNull();
+        locationTarget.Kind.ShouldBe(NavigationRedirectTargetKind.Location);
+        locationTarget.Value.ShouldBe("/next");
+        locationTarget.Parameters.ShouldBeSameAs(RouteParameters.Empty);
+
+        RouteParameters parameters = RouteParameters.Empty.With("id", "42");
+        NavigationGuardResult named = NavigationGuardResult.RedirectToName("user", parameters);
+        NavigationRedirectTarget namedTarget = named.RedirectTarget.ShouldNotBeNull();
+        named.OutcomeKind.ShouldBe(NavigationGuardOutcomeKind.Redirected);
+        named.FailureReason.ShouldBeNull();
+        namedTarget.Kind.ShouldBe(NavigationRedirectTargetKind.NamedRoute);
+        namedTarget.Value.ShouldBe("user");
+        namedTarget.Parameters.ShouldBeSameAs(parameters);
+    }
+
+    [Fact]
     public async Task PushAsync_RunsGlobalBeforeEach_AndConfirmsOnAllow()
     {
         var log = new List<string>();

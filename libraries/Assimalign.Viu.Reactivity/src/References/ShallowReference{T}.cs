@@ -23,7 +23,7 @@ public sealed class ShallowReference<T> : ReactiveValue<T>
 
     /// <summary>Creates a shallow reference holding <paramref name="value"/>.</summary>
     /// <param name="value">The initial value.</param>
-    public ShallowReference(T value)
+    internal ShallowReference(T value)
     {
         _value = value;
     }

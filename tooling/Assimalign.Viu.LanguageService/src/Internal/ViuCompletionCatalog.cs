@@ -312,8 +312,7 @@ internal static class ViuCompletionCatalog
         Method("Watch", "WatchHandle Watch(...)", "Observes a reactive source.", "06"),
         Method("WatchEffect", "WatchHandle WatchEffect(Action effect)", "Runs an automatically tracked watcher.", "07"),
         Method("OnScopeDispose", "void OnScopeDispose(Action callback)", "Registers cleanup with the active scope.", "08"),
-        Method("StartBatch", "void StartBatch()", "Begins batched reactive notification.", "09"),
-        Method("EndBatch", "void EndBatch()", "Completes batched reactive notification.", "10"),
+        Method("Batch", "IDisposable Batch()", "Opens an exception-safe reactive notification batch.", "09"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> StyleProperties { get; } =

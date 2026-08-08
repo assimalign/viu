@@ -39,27 +39,26 @@ public sealed partial class Renderer<TNode>
             _activeSuspenseBoundary);
 
         MountedComponent<TNode>? mounted = null;
-        ReactiveEffect renderEffect = activation.Scope.Run(
-            () => new ReactiveEffect(
-                () =>
-                {
-                    VirtualNode? rendered = activation.Render();
-                    VirtualNode normalized = NormalizeComponentRoot(
-                        activation,
-                        rendered);
-                    if (mounted is not null)
-                    {
-                        mounted.PendingTree = normalized;
-                    }
-                    else
-                    {
-                        _pendingInitialComponentTree = normalized;
-                    }
-                }));
-
+        ReactiveEffect? renderEffect = null;
         try
         {
-            renderEffect.Run();
+            renderEffect = activation.Scope.Run(
+                () => Reactive.Effect(
+                    () =>
+                    {
+                        VirtualNode? rendered = activation.Render();
+                        VirtualNode normalized = NormalizeComponentRoot(
+                            activation,
+                            rendered);
+                        if (mounted is not null)
+                        {
+                            mounted.PendingTree = normalized;
+                        }
+                        else
+                        {
+                            _pendingInitialComponentTree = normalized;
+                        }
+                    }));
             VirtualNode initialTree = _pendingInitialComponentTree
                 ?? new CommentNode(string.Empty);
             _pendingInitialComponentTree = null;
@@ -105,7 +104,7 @@ public sealed partial class Renderer<TNode>
         catch
         {
             _pendingInitialComponentTree = null;
-            renderEffect.Stop();
+            renderEffect?.Stop();
             activation.Release();
             throw;
         }

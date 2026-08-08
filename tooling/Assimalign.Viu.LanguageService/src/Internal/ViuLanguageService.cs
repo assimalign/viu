@@ -11,7 +11,7 @@ using Assimalign.Viu.UtilityCss;
 namespace Assimalign.Viu.LanguageService;
 
 internal sealed class ViuLanguageService :
-    IViuLanguageService,
+    ILanguageService,
     IUtilityCssLanguageService,
     IScriptSemanticLanguageService
 {

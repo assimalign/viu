@@ -24,7 +24,7 @@ public sealed class ReactiveEffect : Subscriber, IDisposable
     /// </summary>
     /// <param name="function">The reactive function to track.</param>
     /// <exception cref="ArgumentNullException"><paramref name="function"/> is null.</exception>
-    public ReactiveEffect(Action function)
+    internal ReactiveEffect(Action function)
     {
         ArgumentNullException.ThrowIfNull(function);
         _function = function;

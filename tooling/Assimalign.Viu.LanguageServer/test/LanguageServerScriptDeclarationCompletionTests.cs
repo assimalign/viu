@@ -38,7 +38,7 @@ public class LanguageServerScriptDeclarationCompletionTests
 
         await using var input = new MemoryStream(inputBytes);
         await using var output = new MemoryStream();
-        var host = new LanguageServerHost(ViuLanguageServices.Create());
+        var host = new LanguageServerHost(LanguageServices.Create());
 
         await host.RunAsync(input, output);
 

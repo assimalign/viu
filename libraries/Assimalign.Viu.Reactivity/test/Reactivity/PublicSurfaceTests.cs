@@ -16,6 +16,42 @@ namespace Assimalign.Viu.Reactivity.Tests;
 public sealed class PublicSurfaceTests
 {
     [Fact]
+    public void ReactiveFactoryProducts_AreNotPubliclyConstructible()
+    {
+        // [RCT-5] makes Reactive the single public construction facade for these products.
+        typeof(Reference<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("Reference<T> must be created through Reactive.");
+        typeof(ShallowReference<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("ShallowReference<T> must be created through Reactive.");
+        typeof(CustomReference<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("CustomReference<T> must be created through Reactive.");
+        typeof(Computed<>)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("Computed<T> must be created through Reactive.");
+        typeof(ReactiveEffect)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("ReactiveEffect must be created through Reactive.");
+        typeof(EffectScope)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+            .ShouldBeEmpty("EffectScope must be created through Reactive.");
+    }
+
+    [Fact]
+    public void CurrentScope_IsExposedOnlyThroughTheReactiveFacade()
+    {
+        // [RCT-5] exposes ambient scope lookup once, through the same Reactive facade.
+        typeof(EffectScope)
+            .GetProperty(nameof(EffectScope.Current), BindingFlags.Public | BindingFlags.Static)
+            .ShouldBeNull();
+        typeof(Reactive)
+            .GetProperty(nameof(Reactive.CurrentScope), BindingFlags.Public | BindingFlags.Static)
+            .ShouldNotBeNull();
+    }
+
+    [Fact]
     public void SubscriberLink_IsPublicSealedButNotPubliclyConstructible()
     {
         typeof(SubscriberLink).IsPublic.ShouldBeTrue();

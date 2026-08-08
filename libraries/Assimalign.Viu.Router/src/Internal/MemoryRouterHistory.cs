@@ -61,29 +61,31 @@ internal sealed class MemoryRouterHistory : IRouterHistory
     }
 
     /// <inheritdoc/>
-    public void Push(string location, RouterHistoryState? data = null)
+    public void Push(string location, RouterHistoryEntryOptions options = default)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
-        var newState = RouterHistoryStateBuilder.BuildForPush(State, location, data?.Scroll);
+        var newState = RouterHistoryStateBuilder.BuildForPush(State, location, options.Scroll);
         SetLocation(location, newState);
     }
 
     /// <inheritdoc/>
-    public void Replace(string location, RouterHistoryState? data = null)
+    public void Replace(string location, RouterHistoryEntryOptions options = default)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         // Drop the current entry and step back, then re-add at the same index through SetLocation,
         // which truncates any forward entries — a replace must not leave a stale forward branch.
-        var newState = RouterHistoryStateBuilder.BuildForReplace(State, location, data?.Scroll);
+        var newState = RouterHistoryStateBuilder.BuildForReplace(State, location, options.Scroll);
         queue.RemoveAt(position);
         position--;
         SetLocation(location, newState);
     }
 
     /// <inheritdoc/>
-    public void Go(int delta, bool triggerListeners = true)
+    public void Go(
+        int delta,
+        RouterHistoryNavigationOptions options = RouterHistoryNavigationOptions.None)
     {
         ThrowIfDisposed();
         var from = Location;
@@ -91,7 +93,7 @@ internal sealed class MemoryRouterHistory : IRouterHistory
         // so only a strictly negative delta counts as "back".
         var direction = delta < 0 ? NavigationDirection.Back : NavigationDirection.Forward;
         position = Math.Max(0, Math.Min(position + delta, queue.Count - 1));
-        if (triggerListeners)
+        if ((options & RouterHistoryNavigationOptions.SuppressListeners) == 0)
         {
             NotifyListeners(Location, from, direction, delta);
         }

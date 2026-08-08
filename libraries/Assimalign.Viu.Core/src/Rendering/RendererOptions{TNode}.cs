@@ -11,9 +11,17 @@ namespace Assimalign.Viu;
 /// The opaque host-node type. Value-handle hosts reserve its default value for no node.
 /// </typeparam>
 /// <remarks>
+/// <para>
 /// Core carries no platform handles or markup namespace policy. The host interprets each
 /// <see cref="QualifiedName"/> and may buffer work until <see cref="Commit"/>. Specified by
 /// <c>[RND-HOST-1]</c> through <c>[RND-HOST-4]</c>.
+/// </para>
+/// <para>
+/// The delegate collection is deliberate: <c>[RND-HOST-1]</c> defines this type as the complete
+/// host contract, direct delegate invocation avoids interface dispatch on the renderer hot path,
+/// and this seam let Browser remove cross-assembly friend access during the component-model
+/// migration without adding host hooks.
+/// </para>
 /// </remarks>
 public sealed class RendererOptions<TNode>
     where TNode : notnull

@@ -1,3 +1,13 @@
 #nullable enable
+*REMOVED*Assimalign.Viu.Browser.ViuModelBinding
+*REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyList<string!>!
+*REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Setter.get -> System.Action<object?>!
+*REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Value.get -> object?
+*REMOVED*Assimalign.Viu.Browser.ViuModelBinding.ViuModelBinding(object? value, System.Action<object?>! setter, System.Collections.Generic.IReadOnlyList<string!>? modifiers = null) -> void
 *REMOVED*static Assimalign.Viu.Browser.BrowserRuntime.GetRegistryDiagnostics() -> (int JsNodes, int JsListenerMaps, int DotnetListeners)
+Assimalign.Viu.Browser.ModelBinding
+Assimalign.Viu.Browser.ModelBinding.ModelBinding(object? value, System.Action<object?>! setter, System.Collections.Generic.IReadOnlyList<string!>? modifiers = null) -> void
+Assimalign.Viu.Browser.ModelBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Assimalign.Viu.Browser.ModelBinding.Setter.get -> System.Action<object?>!
+Assimalign.Viu.Browser.ModelBinding.Value.get -> object?
 static Assimalign.Viu.Browser.BrowserRuntime.GetRegistryDiagnostics() -> (int JavaScriptNodes, int JavaScriptListenerMaps, int ManagedListeners)

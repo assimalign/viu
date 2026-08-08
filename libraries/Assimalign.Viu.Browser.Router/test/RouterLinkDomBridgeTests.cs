@@ -37,10 +37,14 @@ public class RouterLinkDomBridgeTests
     [Fact]
     public void Invoke_MapsEachSystemModifier()
     {
-        Bridge(Click(modifiers: BrowserEventModifiers.Control)).ControlKey.ShouldBeTrue();
+        RouterLinkClickEvent control = Bridge(Click(modifiers: BrowserEventModifiers.Control));
+        control.Modifiers.ShouldBe(RouterLinkModifiers.Control);
+        control.ControlKey.ShouldBeTrue();
         Bridge(Click(modifiers: BrowserEventModifiers.Shift)).ShiftKey.ShouldBeTrue();
         Bridge(Click(modifiers: BrowserEventModifiers.Alt)).AltKey.ShouldBeTrue();
         Bridge(Click(modifiers: BrowserEventModifiers.Meta)).MetaKey.ShouldBeTrue();
+        Bridge(Click(modifiers: BrowserEventModifiers.Control | BrowserEventModifiers.Meta))
+            .Modifiers.ShouldBe(RouterLinkModifiers.Control | RouterLinkModifiers.Meta);
         Bridge(Click()).HasSystemModifier.ShouldBeFalse();
     }
 
@@ -290,7 +294,7 @@ public class RouterLinkDomBridgeTests
                 ["default"] = _ => new TextNode("link"),
             },
         };
-        return ViuTest.Mount(RouterLink.Registration, options);
+        return ComponentTest.Mount(RouterLink.Registration, options);
     }
 
     private sealed class RouterServiceProvider : IServiceProvider

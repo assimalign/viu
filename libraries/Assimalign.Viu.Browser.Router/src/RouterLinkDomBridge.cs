@@ -81,13 +81,27 @@ public static class RouterLinkDomBridge
     // defaultPrevented value the DOM reported.
     private static RouterLinkClickEvent CreateClickEvent(BrowserEvent browserEvent, bool arrivedPrevented)
     {
-        var modifiers = browserEvent.Modifiers;
+        BrowserEventModifiers browserModifiers = browserEvent.Modifiers;
+        RouterLinkModifiers modifiers = RouterLinkModifiers.None;
+        if ((browserModifiers & BrowserEventModifiers.Control) != 0)
+        {
+            modifiers |= RouterLinkModifiers.Control;
+        }
+        if ((browserModifiers & BrowserEventModifiers.Shift) != 0)
+        {
+            modifiers |= RouterLinkModifiers.Shift;
+        }
+        if ((browserModifiers & BrowserEventModifiers.Alt) != 0)
+        {
+            modifiers |= RouterLinkModifiers.Alt;
+        }
+        if ((browserModifiers & BrowserEventModifiers.Meta) != 0)
+        {
+            modifiers |= RouterLinkModifiers.Meta;
+        }
         var click = new RouterLinkClickEvent(
             browserEvent.Button,
-            (modifiers & BrowserEventModifiers.Control) != 0,
-            (modifiers & BrowserEventModifiers.Shift) != 0,
-            (modifiers & BrowserEventModifiers.Alt) != 0,
-            (modifiers & BrowserEventModifiers.Meta) != 0);
+            modifiers);
         if (arrivedPrevented)
         {
             click.PreventDefault();

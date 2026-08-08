@@ -131,7 +131,7 @@ exactly four designed seams — and nothing else:
 1. **The host contract** (`RendererOptions<TNode>`, `[RND-HOST-1]` "the complete host contract;
    Core has no host handles") plus the public operations (render lease, mounted views) → how
    *platforms* attach (§4a).
-2. **`context.Services` + the ambient reactive scope** (`EffectScope.Current`; `Setup` runs inside
+2. **`context.Services` + the ambient reactive scope** (`Reactive.CurrentScope`; `Setup` runs inside
    the component's scope) → how *conventions* attach. Router proved it; State now follows it:
    `Use(context)` becomes `context.Services?.GetService(typeof(IStateStoreRegistry)) ?? ambient`,
    and Core — as composition root — wires `ApplicationOptions.State` into the application provider.

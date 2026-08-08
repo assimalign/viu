@@ -216,11 +216,12 @@ public sealed class EffectTests
             },
             scheduler: () => invalidations++);
 
-        Reactive.StartBatch();
-        a.Value = 10;
-        b.Value = 20;
-        a.Value = 11;
-        Reactive.EndBatch();
+        using (Reactive.Batch())
+        {
+            a.Value = 10;
+            b.Value = 20;
+            a.Value = 11;
+        }
 
         invalidations.ShouldBe(1);
     }

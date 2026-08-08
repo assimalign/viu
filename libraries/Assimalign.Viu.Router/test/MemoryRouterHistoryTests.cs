@@ -56,15 +56,12 @@ public class MemoryRouterHistoryTests
     public void Push_WithScrollSeed_RoundTripsTheFlatHistoryState()
     {
         IRouterHistory history = CreateHistory();
-        RouterHistoryState data = new(
-            Back: "ignored",
-            Current: "ignored",
-            Forward: "ignored",
-            Replaced: true,
-            Position: 99,
-            Scroll: new ScrollPosition(12.5, 34));
+        RouterHistoryEntryOptions options = new()
+        {
+            Scroll = new ScrollPosition(12.5, 34),
+        };
 
-        history.Push("/scrolled", data);
+        history.Push("/scrolled", options);
 
         history.State.Current.ShouldBe("/scrolled");
         history.State.Position.ShouldBe(1);
@@ -142,14 +139,14 @@ public class MemoryRouterHistoryTests
     }
 
     [Fact]
-    public void Go_WithTriggerListenersFalse_DoesNotNotify()
+    public void Go_WithSuppressListeners_DoesNotNotify()
     {
         var history = CreateHistory();
         history.Push("/a");
         var notifications = 0;
         history.Listen((to, from, information) => notifications++);
 
-        history.Go(-1, triggerListeners: false);
+        history.Go(-1, RouterHistoryNavigationOptions.SuppressListeners);
 
         history.Location.ShouldBe("/");   // still moved
         notifications.ShouldBe(0);        // but silently

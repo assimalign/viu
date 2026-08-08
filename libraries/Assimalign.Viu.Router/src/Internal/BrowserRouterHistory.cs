@@ -85,35 +85,37 @@ internal sealed class BrowserRouterHistory : IRouterHistory
     }
 
     /// <inheritdoc/>
-    public void Push(string location, RouterHistoryState? data = null)
+    public void Push(string location, RouterHistoryEntryOptions options = default)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         // Rewrite the leaving entry to point forward at `location` (the interop fills its live scroll
         // anchor), then push the new entry — both in a single interop crossing.
         var amendedCurrent = currentState with { Forward = location, Scroll = null };
-        var newState = RouterHistoryStateBuilder.BuildForPush(currentState, location, data?.Scroll);
+        var newState = RouterHistoryStateBuilder.BuildForPush(currentState, location, options.Scroll);
         interop.Push(BuildUrl(currentLocation), amendedCurrent, BuildUrl(location), newState);
         currentState = newState;
         currentLocation = location;
     }
 
     /// <inheritdoc/>
-    public void Replace(string location, RouterHistoryState? data = null)
+    public void Replace(string location, RouterHistoryEntryOptions options = default)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
-        var newState = RouterHistoryStateBuilder.BuildForReplace(currentState, location, data?.Scroll);
+        var newState = RouterHistoryStateBuilder.BuildForReplace(currentState, location, options.Scroll);
         interop.Replace(BuildUrl(location), newState);
         currentState = newState;
         currentLocation = location;
     }
 
     /// <inheritdoc/>
-    public void Go(int delta, bool triggerListeners = true)
+    public void Go(
+        int delta,
+        RouterHistoryNavigationOptions options = RouterHistoryNavigationOptions.None)
     {
         ThrowIfDisposed();
-        if (!triggerListeners)
+        if ((options & RouterHistoryNavigationOptions.SuppressListeners) != 0)
         {
             // Swallow the popstate this Go() will provoke, so a silent reposition is invisible.
             pausedLocation = currentLocation;
@@ -167,7 +169,7 @@ internal sealed class BrowserRouterHistory : IRouterHistory
             currentState = arrivedState;
             if (pausedLocation is not null && string.Equals(pausedLocation, from, StringComparison.Ordinal))
             {
-                // A silent go(delta, triggerListeners: false) — state is reconciled, listeners are not.
+                // A silent go(delta, SuppressListeners) — state is reconciled, listeners are not.
                 pausedLocation = null;
                 return;
             }

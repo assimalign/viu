@@ -23,7 +23,7 @@ public static class DynamicComponents
     /// definition, existing node, or null.
     /// </param>
     /// <returns>The unchanged supported selector, or null for an empty or unsupported value.</returns>
-    public static object? ResolveDynamicComponent(object? source)
+    public static object? Resolve(object? source)
     {
         return source switch
         {
@@ -49,7 +49,7 @@ public static class DynamicComponents
     /// <param name="mountReference">The optional mounted-value receiver.</param>
     /// <param name="renderPlan">The compiler patch information.</param>
     /// <returns>A component, element, existing node, or empty comment placeholder.</returns>
-    public static VirtualNode DynamicComponent(
+    public static VirtualNode Create(
         object? source,
         ComponentInvocation? invocation = null,
         IEnumerable<ElementBinding>? bindings = null,
@@ -59,7 +59,7 @@ public static class DynamicComponents
         MountReference? mountReference = null,
         RenderPlan? renderPlan = null)
     {
-        object? resolved = ResolveDynamicComponent(source);
+        object? resolved = Resolve(source);
         return resolved switch
         {
             AsynchronousComponentDefinition definition => definition.CreateComponent(

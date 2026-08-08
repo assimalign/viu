@@ -22,7 +22,7 @@ internal sealed class BrowserModelState
 
     /// <summary>
     /// The model setter to invoke on element input, refreshed each render from the binding's
-    /// <see cref="ViuModelBinding.Setter"/> so a stale closure is never called.
+    /// <see cref="ModelBinding.Setter"/> so a stale closure is never called.
     /// </summary>
     public Action<object?>? Assign { get; set; }
 

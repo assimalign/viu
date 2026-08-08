@@ -556,12 +556,15 @@ public sealed class Router : IDisposable
             {
                 return NavigationOutcome.Cancel;
             }
-            switch (result.Action)
+            switch (result.OutcomeKind)
             {
-                case NavigationGuardAction.Abort:
+                case NavigationGuardOutcomeKind.Failed:
                     return NavigationOutcome.Abort;
-                case NavigationGuardAction.Redirect:
-                    return NavigationOutcome.Redirecting(result);
+                case NavigationGuardOutcomeKind.Redirected:
+                    return NavigationOutcome.Redirecting(
+                        result.RedirectTarget
+                        ?? throw new InvalidOperationException(
+                            "A redirected guard result must carry a redirect target."));
                 default:
                     continue;
             }
@@ -642,10 +645,15 @@ public sealed class Router : IDisposable
 
     private static IReadOnlyList<T> Snapshot<T>(List<T> list) => list.Count == 0 ? Array.Empty<T>() : [.. list];
 
-    private RouteLocation ResolveRedirectTarget(NavigationGuardResult redirect)
-        => redirect.RedirectName is { } name
-            ? _matcher.ResolveNamed(name, redirect.RedirectParameters ?? RouteParameters.Empty)
-            : _matcher.Resolve(redirect.RedirectLocation!);
+    private RouteLocation ResolveRedirectTarget(NavigationRedirectTarget redirect)
+        => redirect.Kind switch
+        {
+            NavigationRedirectTargetKind.Location => _matcher.Resolve(redirect.Value),
+            NavigationRedirectTargetKind.NamedRoute =>
+                _matcher.ResolveNamed(redirect.Value, redirect.Parameters),
+            _ => throw new InvalidOperationException(
+                $"Unsupported redirect target kind '{redirect.Kind}'."),
+        };
 
     // Commits a confirmed navigation: write history (push/replace) for an application navigation, then
     // set CurrentRoute (one shallow-reference trigger). A pop leaves history alone — the URL already
@@ -840,7 +848,9 @@ public sealed class Router : IDisposable
     {
         if (information.Delta != 0)
         {
-            _history.Go(-information.Delta, triggerListeners: false);
+            _history.Go(
+                -information.Delta,
+                RouterHistoryNavigationOptions.SuppressListeners);
         }
     }
 }

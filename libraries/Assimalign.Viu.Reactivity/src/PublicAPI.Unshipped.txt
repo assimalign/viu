@@ -1,11 +1,20 @@
 #nullable enable
+*REMOVED*Assimalign.Viu.Reactivity.Computed<T>.Computed(System.Func<T>! getter, System.Action<T>? setter = null) -> void
+*REMOVED*Assimalign.Viu.Reactivity.CustomReference<T>.CustomReference(Assimalign.Viu.Reactivity.CustomReferenceFactory<T>! factory) -> void
+*REMOVED*Assimalign.Viu.Reactivity.EffectScope.EffectScope(bool detached = false) -> void
 *REMOVED*Assimalign.Viu.Reactivity.IReactiveObject.ToRaw() -> object!
+*REMOVED*Assimalign.Viu.Reactivity.ReactiveEffect.ReactiveEffect(System.Action! function) -> void
 *REMOVED*Assimalign.Viu.Reactivity.ReactiveAttribute.Readonly.get -> bool
 *REMOVED*Assimalign.Viu.Reactivity.ReactiveAttribute.Readonly.set -> void
+*REMOVED*Assimalign.Viu.Reactivity.Reference<T>.Reference(T value) -> void
 *REMOVED*Assimalign.Viu.Reactivity.ShallowReactiveAttribute.Readonly.get -> bool
 *REMOVED*Assimalign.Viu.Reactivity.ShallowReactiveAttribute.Readonly.set -> void
+*REMOVED*Assimalign.Viu.Reactivity.ShallowReference<T>.ShallowReference(T value) -> void
 *REMOVED*Assimalign.Viu.Reactivity.WatchFlushMode.Sync = 0 -> Assimalign.Viu.Reactivity.WatchFlushMode
+*REMOVED*static Assimalign.Viu.Reactivity.EffectScope.Current.get -> Assimalign.Viu.Reactivity.EffectScope?
+*REMOVED*static Assimalign.Viu.Reactivity.Reactive.EndBatch() -> void
 *REMOVED*static Assimalign.Viu.Reactivity.Reactive.IsReadonly(object? value) -> bool
+*REMOVED*static Assimalign.Viu.Reactivity.Reactive.StartBatch() -> void
 *REMOVED*static Assimalign.Viu.Reactivity.Reactive.ToRaw<T>(T value) -> T
 Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<T>
 Assimalign.Viu.Reactivity.IReactiveReadOnlyReference<T>.Value.get -> T
@@ -16,4 +25,5 @@ Assimalign.Viu.Reactivity.ReactiveValue<T>.Peek() -> T
 Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ReadOnly.get -> bool
 Assimalign.Viu.Reactivity.ShallowReactiveAttribute.ReadOnly.set -> void
 Assimalign.Viu.Reactivity.WatchFlushMode.Synchronous = 0 -> Assimalign.Viu.Reactivity.WatchFlushMode
+static Assimalign.Viu.Reactivity.Reactive.Batch() -> System.IDisposable!
 static Assimalign.Viu.Reactivity.Reactive.IsReadOnly(object? value) -> bool

@@ -9,7 +9,7 @@ namespace Assimalign.Viu.LanguageService.Tests;
 
 /// <summary>
 /// Pins the deferred completion-documentation contract: utility completion items ship without
-/// documentation bodies, and <see cref="IViuLanguageService.ResolveCompletionDocumentation"/>
+/// documentation bodies, and <see cref="ILanguageService.ResolveCompletionDocumentation"/>
 /// recomputes the body on demand through the same path hover uses.
 /// </summary>
 public class CompletionResolveTests
@@ -23,7 +23,7 @@ public class CompletionResolveTests
         var source = $"<template>\n{templateLine}\n</template>\n";
         var candidateEnd =
             templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -37,7 +37,7 @@ public class CompletionResolveTests
     [Fact]
     public void ResolveCompletionDocumentation_BuiltInUtilityCandidate_ReturnsCssBlockDocumentation()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
 
         var documentation = service.ResolveCompletionDocumentation(DocumentUri, "gap-4");
 
@@ -48,7 +48,7 @@ public class CompletionResolveTests
     [Fact]
     public void ResolveCompletionDocumentation_ProjectUtilityCandidate_UsesConfiguredStylesheet()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.ShouldBeAssignableTo<IUtilityCssLanguageService>()
             .ConfigureUtilityStylesheet(
                 DocumentUri,
@@ -69,7 +69,7 @@ public class CompletionResolveTests
     [Fact]
     public void ResolveCompletionDocumentation_UnknownLabel_ReturnsNull()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
 
         // Catalog labels resolve nothing (their one-line documentation ships inline), and garbage
         // resolves nothing.

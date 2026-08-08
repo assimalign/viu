@@ -93,9 +93,9 @@ public class ScriptLifecycleCatalogTests
     private static System.Collections.Generic.IReadOnlyList<LanguageCompletionItem> Complete()
         => OpenService(ComponentSource).GetCompletions(DocumentUri, new LanguagePosition(1, 4));
 
-    private static IViuLanguageService OpenService(string source)
+    private static ILanguageService OpenService(string source)
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
         return service;
     }

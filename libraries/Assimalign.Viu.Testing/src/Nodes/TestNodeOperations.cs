@@ -16,17 +16,16 @@ public static class TestNodeOperations
     /// <summary>Creates a complete test-host renderer option set.</summary>
     /// <param name="operationLog">The operation log receiving all host writes and commits.</param>
     /// <param name="queryRoots">Optional roots used for teleport selector resolution.</param>
-    /// <param name="strictRemoval">Whether removing the same node twice throws.</param>
-    /// <param name="snapshotSemantics">Whether hydration reads an immutable pre-walk.</param>
+    /// <param name="options">Named host behavior, or <see langword="null"/> for live hydration and ordinary removal.</param>
     /// <returns>The complete renderer option set.</returns>
     public static RendererOptions<TestNode> Create(
         TestNodeOperationLog operationLog,
         IReadOnlyList<TestElement>? queryRoots = null,
-        bool strictRemoval = false,
-        bool snapshotSemantics = false)
+        TestRendererOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(operationLog);
-        HashSet<TestNode>? removedNodes = strictRemoval
+        options ??= new TestRendererOptions();
+        HashSet<TestNode>? removedNodes = options.StrictRemoval
             ? new HashSet<TestNode>(ReferenceEqualityComparer.Instance)
             : null;
 
@@ -175,7 +174,7 @@ public static class TestNodeOperations
                         Text: content));
                 return (staticNode, staticNode);
             },
-            CreateHydrationReader = snapshotSemantics
+            CreateHydrationReader = options.SnapshotSemantics
                 ? root => new FrozenTestHydrationReader(root)
                 : _ => TestHydrationReader.Instance,
         };

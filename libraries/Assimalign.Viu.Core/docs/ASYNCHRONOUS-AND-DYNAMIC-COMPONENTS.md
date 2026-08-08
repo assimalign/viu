@@ -15,7 +15,7 @@ private sealed class UserPanelAsynchronousIdentity
 }
 
 AsynchronousComponentDefinition userPanel =
-    AsynchronousComponents.DefineAsynchronousComponent<UserPanelAsynchronousIdentity>(
+    AsynchronousComponents.Define<UserPanelAsynchronousIdentity>(
         async cancellationToken =>
         {
             await moduleLoader.LoadUserPanelAsync(cancellationToken);
@@ -78,7 +78,7 @@ object selection = showEditor
     ? typeof(EditorComponent)
     : DynamicComponents.Named("read-only-view");
 
-return DynamicComponents.DynamicComponent(
+return DynamicComponents.Create(
     selection,
     arguments: new ComponentArguments(
     [
@@ -89,7 +89,7 @@ return DynamicComponents.DynamicComponent(
 A plain string always means an element tag:
 
 ```csharp
-DynamicComponents.DynamicComponent("section");
+DynamicComponents.Create("section");
 ```
 
 This is a deliberate consequence of the approved `IComponentFactory` contract. The factory can

@@ -11,13 +11,13 @@ namespace Assimalign.Viu.Browser;
 /// The setter is explicit so Browser never discovers an authored member by reflection. Modifier
 /// names are copied at construction and preserve source order. Specified by <c>[SFC-CG-7]</c>.
 /// </remarks>
-public sealed class ViuModelBinding
+public sealed class ModelBinding
 {
     /// <summary>Initializes one immutable native-control model carrier.</summary>
     /// <param name="value">The model value observed for the current render.</param>
     /// <param name="setter">The generated assignment delegate.</param>
     /// <param name="modifiers">The optional modifier names in source order.</param>
-    public ViuModelBinding(
+    public ModelBinding(
         object? value,
         Action<object?> setter,
         IReadOnlyList<string>? modifiers = null)

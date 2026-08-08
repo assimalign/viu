@@ -151,7 +151,7 @@ public sealed class RendererSuspenseParityTests
     private static AsynchronousComponentDefinition Define<TWrapper>(
         TaskCompletionSource<AsynchronousComponentTarget> load)
         where TWrapper : class, IComponent =>
-        AsynchronousComponents.DefineAsynchronousComponent<TWrapper>(_ => load.Task);
+        AsynchronousComponents.Define<TWrapper>(_ => load.Task);
 
     private static ComponentNode Request(
         AsynchronousComponentDefinition definition,

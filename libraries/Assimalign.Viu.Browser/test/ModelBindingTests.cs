@@ -7,14 +7,14 @@ using Xunit;
 namespace Assimalign.Viu.Browser.Tests;
 
 // Pins the reflection-free native-control model carrier specified by [SFC-CG-7].
-public sealed class ViuModelBindingTests
+public sealed class ModelBindingTests
 {
     [Fact]
     public void Constructor_CopiesModifierNamesAndRetainsExplicitSetter()
     {
         object? assigned = null;
         List<string> modifiers = ["trim", "number"];
-        var binding = new ViuModelBinding(
+        var binding = new ModelBinding(
             "initial",
             value => assigned = value,
             modifiers);
@@ -30,8 +30,8 @@ public sealed class ViuModelBindingTests
     public void Constructor_NullSetterOrEmptyModifier_Throws()
     {
         Should.Throw<ArgumentNullException>(
-            () => new ViuModelBinding(null, null!));
+            () => new ModelBinding(null, null!));
         Should.Throw<ArgumentException>(
-            () => new ViuModelBinding(null, _ => { }, [string.Empty]));
+            () => new ModelBinding(null, _ => { }, [string.Empty]));
     }
 }
