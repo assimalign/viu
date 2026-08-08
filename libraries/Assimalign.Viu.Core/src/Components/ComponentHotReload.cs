@@ -2,113 +2,142 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 
-using Assimalign.Viu.Components;
-
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Compiler-generated code only; not part of the supported Viu API.
-/// Applies compiler-generated component metadata updates to mounted development-time components.
+/// Provides the hidden compiler/runtime registration and update application binary interface for
+/// component Hot Reload.
 /// </summary>
 /// <remarks>
-/// A generated assembly metadata-update handler forwards its updated type set to
-/// <see cref="ApplyUpdates"/> after the runtime applies a Hot Reload delta. Compiler-generated marker
-/// types identify the changed block without reflection. Style-only changes do no component work
-/// because the Viu CSS worker owns stylesheet replacement. Managed template and script changes tear
-/// down each affected component ownership unit and remount it at the same host position so .NET 10
-/// browser WebAssembly executes the updated generated code instead of an already transformed stale
-/// call site. <see cref="ScriptUpdateRequiresReset"/> gives the host advance notice of script resets
-/// so it can supersede that component-local reset with a full application reload.
-///
-/// This ambient registry follows Viu's single-threaded browser event-loop model and is not
-/// thread-safe.
-///
-/// This is the runtime half of [V01.01.06.05]:
-/// https://github.com/assimalign/viu/issues/61.
+/// Generated marker types are compared by identity; Core performs no metadata inspection or
+/// reflective activation. The ambient registry follows Viu's single-threaded host event-loop
+/// model and is not thread-safe. Specified by <c>[SFC-CG-2]</c> and <c>[SFC-CG-4]</c>.
 /// </remarks>
-[System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
+[EditorBrowsable(EditorBrowsableState.Never)]
 public static class ComponentHotReload
 {
-    private static readonly Dictionary<Type, List<ComponentHotReloadRegistration>>
-        _registrations = [];
+    private static readonly Dictionary<Type, ComponentHotReloadMetadata> Metadata = [];
+    private static readonly Dictionary<Type, List<ComponentHotReloadUpdateRegistration>>
+        UpdateHandlers = [];
 
     /// <summary>
-    /// Compiler-generated code only; not part of the supported Viu API.
-    /// Occurs once per updated component type immediately before Core resets its mounted instances
-    /// for a script-block change.
+    /// Occurs once per affected component type before mounted instances process a script reset.
     /// </summary>
     /// <remarks>
-    /// Core deliberately tears down the previous component scope instead of rerunning setup against
-    /// existing state, which would retain effects and lifecycle resources created by the previous
-    /// script. A browser host may handle this event to perform a full application reload instead.
+    /// A host may use this advance notice to replace component-local resets with an application
+    /// reload. Application code must not use this development-only event.
     /// </remarks>
-    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static event ComponentScriptUpdateResetHandler? ScriptUpdateRequiresReset;
 
-    /// <summary>
-    /// Compiler-generated code only; not part of the supported Viu API.
-    /// Applies updated component method bodies to the corresponding mounted component instances.
-    /// </summary>
+    /// <summary>Registers generated marker identities for one component type.</summary>
+    /// <param name="componentType">The generated component type.</param>
+    /// <param name="identifier">The stable generated source identifier.</param>
+    /// <param name="templateMarker">The generated template-block marker type.</param>
+    /// <param name="scriptMarker">The generated script-block marker type.</param>
+    /// <param name="styleMarker">The generated style-block marker type.</param>
+    /// <remarks>
+    /// Generated module initializers call this method when development metadata emission is
+    /// enabled. Re-registration atomically replaces the marker set for the same type, allowing a
+    /// later generated delta to refresh the registration without duplicate entries.
+    /// </remarks>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static void Register(
+        Type componentType,
+        string identifier,
+        Type templateMarker,
+        Type scriptMarker,
+        Type styleMarker)
+    {
+        ComponentHotReloadMetadata metadata = new(
+            componentType,
+            identifier,
+            templateMarker,
+            scriptMarker,
+            styleMarker);
+        Metadata[componentType] = metadata;
+    }
+
+    /// <summary>Classifies updated marker types for one registered component.</summary>
+    /// <param name="componentType">The registered component type.</param>
     /// <param name="updatedTypes">
-    /// The types supplied by <c>MetadataUpdateHandler.UpdateApplication</c>, or null when the
-    /// runtime does not identify the changed types and every registered component must be checked.
+    /// The runtime-supplied updated types, or null when every registration must conservatively
+    /// reset.
     /// </param>
-    [System.ComponentModel.EditorBrowsable(EditorBrowsableState.Never)]
+    /// <returns>The highest-precedence registered change.</returns>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static ComponentHotReloadChangeKind Classify(
+        Type componentType,
+        Type[]? updatedTypes)
+    {
+        ArgumentNullException.ThrowIfNull(componentType);
+        if (!Metadata.TryGetValue(componentType, out ComponentHotReloadMetadata? metadata))
+        {
+            return ComponentHotReloadChangeKind.None;
+        }
+
+        return metadata.Classify(CreateUpdatedTypeSet(updatedTypes));
+    }
+
+    /// <summary>Applies one runtime Hot Reload update to registered mounted components.</summary>
+    /// <param name="updatedTypes">
+    /// The runtime-supplied updated types, or null when every registered component must reset.
+    /// </param>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static void ApplyUpdates(Type[]? updatedTypes)
     {
-        if (_registrations.Count == 0)
+        if (Metadata.Count == 0)
         {
             return;
         }
 
-        HashSet<Type>? updatedTypeSet = null;
-        if (updatedTypes is not null)
+        IReadOnlySet<Type>? updatedTypeSet = CreateUpdatedTypeSet(updatedTypes);
+        ComponentHotReloadMetadata[] snapshot = [.. Metadata.Values];
+        foreach (ComponentHotReloadMetadata metadata in snapshot)
         {
-            updatedTypeSet = [];
-            for (int index = 0; index < updatedTypes.Length; index++)
+            ComponentHotReloadChangeKind change = metadata.Classify(updatedTypeSet);
+            if (change is ComponentHotReloadChangeKind.None
+                or ComponentHotReloadChangeKind.StyleOnly)
             {
-                Type? updatedType = updatedTypes[index];
-                if (updatedType is not null)
-                {
-                    updatedTypeSet.Add(updatedType);
-                }
+                continue;
             }
-        }
 
-        Type[] registeredTypes = new Type[_registrations.Count];
-        _registrations.Keys.CopyTo(registeredTypes, 0);
-        for (int index = 0; index < registeredTypes.Length; index++)
-        {
-            ApplyUpdate(registeredTypes[index], updatedTypeSet);
+            if (change == ComponentHotReloadChangeKind.ScriptReset)
+            {
+                ScriptUpdateRequiresReset?.Invoke(
+                    metadata.ComponentIdentifier,
+                    metadata.ComponentType);
+            }
+
+            NotifyUpdateHandlers(metadata.ComponentType, change);
         }
     }
 
-    internal static IDisposable Register(
+    internal static IDisposable RegisterMountedComponent(
         Type componentType,
-        IComponentHotReloadMetadata metadata,
-        Action resetComponentUpdate)
+        Action<ComponentHotReloadChangeKind> handler)
     {
-        ComponentHotReloadRegistration registration = new(
+        ArgumentNullException.ThrowIfNull(componentType);
+        ArgumentNullException.ThrowIfNull(handler);
+        ComponentHotReloadUpdateRegistration registration = new(componentType, handler);
+        if (!UpdateHandlers.TryGetValue(
             componentType,
-            metadata,
-            resetComponentUpdate);
-        if (!_registrations.TryGetValue(
-            componentType,
-            out List<ComponentHotReloadRegistration>? registrations))
+            out List<ComponentHotReloadUpdateRegistration>? registrations))
         {
             registrations = [];
-            _registrations.Add(componentType, registrations);
+            UpdateHandlers.Add(componentType, registrations);
         }
 
         registrations.Add(registration);
         return registration;
     }
 
-    internal static void Unregister(ComponentHotReloadRegistration registration)
+    internal static void UnregisterUpdateHandler(
+        ComponentHotReloadUpdateRegistration registration)
     {
-        if (!_registrations.TryGetValue(
+        if (!UpdateHandlers.TryGetValue(
             registration.ComponentType,
-            out List<ComponentHotReloadRegistration>? registrations))
+            out List<ComponentHotReloadUpdateRegistration>? registrations))
         {
             return;
         }
@@ -116,66 +145,44 @@ public static class ComponentHotReload
         registrations.Remove(registration);
         if (registrations.Count == 0)
         {
-            _registrations.Remove(registration.ComponentType);
+            UpdateHandlers.Remove(registration.ComponentType);
         }
     }
 
-    internal static void Reset()
+    private static HashSet<Type>? CreateUpdatedTypeSet(Type[]? updatedTypes)
     {
-        _registrations.Clear();
-        ScriptUpdateRequiresReset = null;
+        if (updatedTypes is null)
+        {
+            return null;
+        }
+
+        HashSet<Type> result = [];
+        foreach (Type? updatedType in updatedTypes)
+        {
+            if (updatedType is not null)
+            {
+                result.Add(updatedType);
+            }
+        }
+
+        return result;
     }
 
-    private static void ApplyUpdate(
+    private static void NotifyUpdateHandlers(
         Type componentType,
-        IReadOnlySet<Type>? updatedTypes)
+        ComponentHotReloadChangeKind change)
     {
-        if (!_registrations.TryGetValue(
+        if (!UpdateHandlers.TryGetValue(
             componentType,
-            out List<ComponentHotReloadRegistration>? registrations))
+            out List<ComponentHotReloadUpdateRegistration>? registrations))
         {
             return;
         }
 
-        ComponentHotReloadRegistration[] snapshot = registrations.ToArray();
-        bool templateUpdateRequiresReset = false;
-        string? componentIdentifier = null;
-        bool scriptUpdateRequiresReset = false;
-
-        for (int index = 0; index < snapshot.Length; index++)
+        ComponentHotReloadUpdateRegistration[] snapshot = [.. registrations];
+        foreach (ComponentHotReloadUpdateRegistration registration in snapshot)
         {
-            ComponentHotReloadRegistration registration = snapshot[index];
-            ComponentHotReloadChangeKind change = registration.Classify(updatedTypes);
-            componentIdentifier ??= registration.ComponentIdentifier;
-            if (change == ComponentHotReloadChangeKind.ScriptReset)
-            {
-                scriptUpdateRequiresReset = true;
-            }
-            else if (change == ComponentHotReloadChangeKind.Template)
-            {
-                templateUpdateRequiresReset = true;
-            }
-        }
-
-        if (scriptUpdateRequiresReset)
-        {
-            ScriptUpdateRequiresReset?.Invoke(
-                componentIdentifier!,
-                componentType);
-            for (int index = 0; index < snapshot.Length; index++)
-            {
-                snapshot[index].ResetComponentUpdate();
-            }
-
-            return;
-        }
-
-        if (templateUpdateRequiresReset)
-        {
-            for (int index = 0; index < snapshot.Length; index++)
-            {
-                snapshot[index].ResetComponentUpdate();
-            }
+            registration.Invoke(change);
         }
     }
 }

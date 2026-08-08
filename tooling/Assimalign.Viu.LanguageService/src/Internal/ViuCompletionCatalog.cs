@@ -151,7 +151,7 @@ internal static class ViuCompletionCatalog
 
     internal static IReadOnlyList<LanguageCompletionItem> ScriptGeneral { get; } =
     [
-        Text("Context", LanguageCompletionItemKind.Property, "IComponentContext", "The generated component's current setup context.", "01"),
+        Text("Context", LanguageCompletionItemKind.Property, "ComponentContext", "The generated component's current setup context.", "01"),
         Text("Reactive", LanguageCompletionItemKind.Class, "Reactive API", "The Viu reactivity facade.", "02"),
         Snippet(
             "reactive reference",
@@ -227,7 +227,7 @@ internal static class ViuCompletionCatalog
             "runs after the component is unmounted"),
         Lifecycle(
             "OnErrorCaptured",
-            "Func<Exception, IComponentContext?, string, bool>",
+            "Func<Exception, ComponentContext?, string, bool>",
             "captures an error from a descendant, returning false to stop propagation"),
         Lifecycle(
             "OnServerPrefetch",
@@ -290,14 +290,16 @@ internal static class ViuCompletionCatalog
 
     internal static IReadOnlyList<LanguageCompletionItem> ContextMembers { get; } =
     [
-        Member("Arguments", "IComponentArguments", "Gets arguments declared and supplied by the parent.", "01"),
-        Member("Slots", "IReadOnlyDictionary<string, ComponentSlot>", "Gets the current named slots.", "02"),
-        Member("Attributes", "IComponentAttributeCollection", "Gets undeclared fallthrough attributes.", "03"),
-        Member("Components", "IComponentFactory", "Gets the application-selected component resolver.", "04"),
-        Member("Services", "IServiceProvider", "Gets the application service resolver.", "05"),
-        Member("Lifecycle", "IComponentLifecycle", "Gets lifecycle registration and component cancellation.", "06"),
-        Method("Emit", "void Emit(string eventName, params object?[] arguments)", "Emits a component event to the parent.", "07"),
+        Member("Bindings", "ComponentBindings", "Gets the contract-resolved parent invocation.", "01"),
+        Member("Services", "IServiceProvider?", "Gets the application service resolver.", "02"),
+        Member("Lifecycle", "ComponentLifecycle", "Gets lifecycle registration and component cancellation.", "03"),
+        Member("Scope", "IReactiveEffectScope", "Gets the reactive scope that owns this component.", "04"),
+        Member("WatchScheduler", "IReactiveWatchScheduler?", "Gets the component watch scheduler.", "05"),
+        Member("Parent", "ComponentContext?", "Gets the parent component context.", "06"),
+        Method("Emit", "void Emit(string name, params object?[] arguments)", "Emits a component event to the parent.", "07"),
         Method("Expose", "void Expose(object? value)", "Selects the public template-reference surface.", "08"),
+        Method("Warn", "void Warn(string message)", "Routes a development warning through the application.", "09"),
+        Method("Watch", "WatchHandle Watch<TValue>(Func<TValue> getter, Action<TValue, TValue> callback)", "Watches a getter within this component's reactive scope.", "10"),
     ];
 
     internal static IReadOnlyList<LanguageCompletionItem> ReactiveMembers { get; } =

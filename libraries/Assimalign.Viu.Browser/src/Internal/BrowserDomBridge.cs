@@ -345,6 +345,19 @@ internal static partial class BrowserDomBridge
         }
     }
 
+    /// <summary>Requests a full document reload after a component script update.</summary>
+    internal static void ReloadPage()
+    {
+        try
+        {
+            Imports.ReloadPage();
+        }
+        catch (JSException exception)
+        {
+            throw Translate("reloadPage", 0, exception);
+        }
+    }
+
     // --- transitions ([V01.01.04.07]) -----------------------------------------------------------
     // classList add/remove, the double-rAF next frame, the forced reflow, transition-end detection,
     // and the FLIP getBoundingClientRect/transform ops. The rAF/listener scheduling stays JS-side and
@@ -510,6 +523,9 @@ internal static partial class BrowserDomBridge
 
     private static partial class Imports
     {
+        [JSImport("globalThis.location.reload")]
+        internal static partial void ReloadPage();
+
         [JSImport("dom.querySelector", ModuleName)]
         internal static partial int QuerySelector(string selector);
 
@@ -617,7 +633,7 @@ internal static partial class BrowserDomBridge
             [JSMarshalAs<JSType.Function>] Action resolve);
 
         // Batched FLIP snapshot read ([V01.01.04.07.03]): the handle array crosses in one call and the
-        // flat [left, top, ...] result returns in one call, mirroring the history bridge's readSnapshot
+        // flat [left, top, ...] result returns in one call, matching the history bridge's readSnapshot
         // flat-primitives pattern — N children cost one crossing, not N.
         [JSImport("dom.measurePositions", ModuleName)]
         [return: JSMarshalAs<JSType.Array<JSType.Number>>]

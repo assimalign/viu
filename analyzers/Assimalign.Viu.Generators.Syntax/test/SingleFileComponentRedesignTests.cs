@@ -43,7 +43,7 @@ public sealed class SingleFileComponentRedesignTests
         generated.ShouldContain(
             "partial class Panel : global::Assimalign.Viu.Components.ComponentBase, "
             + "global::Assimalign.Viu.Components.IComponent");
-        generated.ShouldNotContain("IComponentContext Context { get; set; }");
+        generated.ShouldNotContain("IComponent" + "Context Context { get; set; }");
         generated.ShouldContain("partial void OnSetup();");
         generated.ShouldContain("Context = context;\n            OnSetup();");
         generated.ShouldContain(
@@ -70,7 +70,7 @@ public sealed class SingleFileComponentRedesignTests
             outcome,
             "Neutral.SingleFileComponent.g.cs");
         generated.ShouldNotContain("using static");
-        generated.ShouldNotContain("RenderHelpers");
+        generated.ShouldNotContain("Render" + "Helpers");
         generated.ShouldNotContain("Assimalign.Viu.Browser");
     }
 

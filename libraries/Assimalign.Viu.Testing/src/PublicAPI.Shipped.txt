@@ -1,27 +1,33 @@
 #nullable enable
 Assimalign.Viu.Testing.ComponentMountOptions
-Assimalign.Viu.Testing.ComponentMountOptions.Arguments.get -> Assimalign.Viu.Components.IComponentArguments?
+Assimalign.Viu.Testing.ComponentMountOptions.Arguments.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>?
 Assimalign.Viu.Testing.ComponentMountOptions.Arguments.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.ComponentMountOptions() -> void
 Assimalign.Viu.Testing.ComponentMountOptions.Components.get -> Assimalign.Viu.Components.IComponentFactory?
 Assimalign.Viu.Testing.ComponentMountOptions.Components.set -> void
-Assimalign.Viu.Testing.ComponentMountOptions.ConfigureApplication.get -> System.Action<Assimalign.Viu.IApplicationContext!>?
+Assimalign.Viu.Testing.ComponentMountOptions.ConfigureApplication.get -> System.Action<Assimalign.Viu.ApplicationOptions!>?
 Assimalign.Viu.Testing.ComponentMountOptions.ConfigureApplication.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.Directives.get -> Assimalign.Viu.IDirectiveResolver?
 Assimalign.Viu.Testing.ComponentMountOptions.Directives.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.Listeners.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>?
 Assimalign.Viu.Testing.ComponentMountOptions.Listeners.set -> void
+Assimalign.Viu.Testing.ComponentMountOptions.RootContract.get -> Assimalign.Viu.Components.ComponentContract?
+Assimalign.Viu.Testing.ComponentMountOptions.RootContract.set -> void
+Assimalign.Viu.Testing.ComponentMountOptions.RootDirectives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.DirectiveInvocation!>?
+Assimalign.Viu.Testing.ComponentMountOptions.RootDirectives.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.Services.get -> System.IServiceProvider?
 Assimalign.Viu.Testing.ComponentMountOptions.Services.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.Slots.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>?
 Assimalign.Viu.Testing.ComponentMountOptions.Slots.set -> void
+Assimalign.Viu.Testing.ComponentMountOptions.SlotStability.get -> Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Testing.ComponentMountOptions.SlotStability.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.State.get -> Assimalign.Viu.State.IStateStoreRegistry?
 Assimalign.Viu.Testing.ComponentMountOptions.State.set -> void
 Assimalign.Viu.Testing.ComponentMountOptions.Stub<TComponent>(Assimalign.Viu.Components.ComponentActivator? activator = null) -> Assimalign.Viu.Testing.ComponentMountOptions!
 Assimalign.Viu.Testing.ComponentMountOptions.Stubs.get -> System.Collections.Generic.Dictionary<System.Type!, Assimalign.Viu.Components.ComponentActivator?>!
 Assimalign.Viu.Testing.ComponentWrapper
-Assimalign.Viu.Testing.ComponentWrapper.Component.get -> Assimalign.Viu.Components.IComponent!
-Assimalign.Viu.Testing.ComponentWrapper.Context.get -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.Testing.ComponentWrapper.Component.get -> Assimalign.Viu.Components.VirtualNode!
+Assimalign.Viu.Testing.ComponentWrapper.Context.get -> Assimalign.Viu.Components.ComponentContext?
 Assimalign.Viu.Testing.ComponentWrapper.Dispose() -> void
 Assimalign.Viu.Testing.ComponentWrapper.Emitted() -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<object?>!>!>!
 Assimalign.Viu.Testing.ComponentWrapper.Emitted(string! eventName) -> System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<object?>!>!
@@ -33,7 +39,7 @@ Assimalign.Viu.Testing.ComponentWrapper.FlushAsync() -> System.Threading.Tasks.T
 Assimalign.Viu.Testing.ComponentWrapper.Get(string! selector) -> Assimalign.Viu.Testing.ElementWrapper!
 Assimalign.Viu.Testing.ComponentWrapper.GetComponent<TComponent>() -> Assimalign.Viu.Testing.ComponentWrapper!
 Assimalign.Viu.Testing.ComponentWrapper.Html() -> string!
-Assimalign.Viu.Testing.ComponentWrapper.Instance.get -> Assimalign.Viu.Components.IComponentTemplate?
+Assimalign.Viu.Testing.ComponentWrapper.Instance.get -> Assimalign.Viu.Components.IComponent?
 Assimalign.Viu.Testing.ComponentWrapper.NextTickAsync() -> System.Threading.Tasks.Task!
 Assimalign.Viu.Testing.ComponentWrapper.SetValue(object? value) -> System.Threading.Tasks.Task!
 Assimalign.Viu.Testing.ComponentWrapper.Text() -> string!
@@ -57,6 +63,7 @@ Assimalign.Viu.Testing.TestComment.Text.get -> string!
 Assimalign.Viu.Testing.TestElement
 Assimalign.Viu.Testing.TestElement.Children.get -> System.Collections.Generic.List<Assimalign.Viu.Testing.TestNode!>!
 Assimalign.Viu.Testing.TestElement.EventListeners.get -> System.Collections.Generic.Dictionary<string!, System.Delegate!>!
+Assimalign.Viu.Testing.TestElement.Name.get -> Assimalign.Viu.Components.QualifiedName
 Assimalign.Viu.Testing.TestElement.Namespace.get -> string?
 Assimalign.Viu.Testing.TestElement.Properties.get -> System.Collections.Generic.Dictionary<string!, object?>!
 Assimalign.Viu.Testing.TestElement.Tag.get -> string!
@@ -95,22 +102,22 @@ Assimalign.Viu.Testing.TestNodeOperationLog.StructuralOperationCount.get -> int
 Assimalign.Viu.Testing.TestNodeOperationLog.TestNodeOperationLog() -> void
 Assimalign.Viu.Testing.TestNodeOperations
 Assimalign.Viu.Testing.TestNodeOperationType
+Assimalign.Viu.Testing.TestNodeOperationType.Commit = 8 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.CreateComment = 2 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.CreateElement = 0 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.CreateText = 1 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.Insert = 4 -> Assimalign.Viu.Testing.TestNodeOperationType
-Assimalign.Viu.Testing.TestNodeOperationType.InsertStaticContent = 8 -> Assimalign.Viu.Testing.TestNodeOperationType
+Assimalign.Viu.Testing.TestNodeOperationType.InsertStaticContent = 7 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.PatchAttribute = 6 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.Remove = 5 -> Assimalign.Viu.Testing.TestNodeOperationType
-Assimalign.Viu.Testing.TestNodeOperationType.SetScopeIdentifier = 7 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeOperationType.SetText = 3 -> Assimalign.Viu.Testing.TestNodeOperationType
 Assimalign.Viu.Testing.TestNodeSerializer
 Assimalign.Viu.Testing.TestRenderer
 Assimalign.Viu.Testing.TestRenderer.CreateContainer(string! tag = "root") -> Assimalign.Viu.Testing.TestElement!
-Assimalign.Viu.Testing.TestRenderer.Hydrate(Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Testing.TestElement! container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.Testing.TestRenderer.Hydrate(Assimalign.Viu.Components.VirtualNode! node, Assimalign.Viu.Testing.TestElement! container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.ComponentContext?
 Assimalign.Viu.Testing.TestRenderer.OperationLog.get -> Assimalign.Viu.Testing.TestNodeOperationLog!
 Assimalign.Viu.Testing.TestRenderer.RegisterQueryRoot(Assimalign.Viu.Testing.TestElement! root) -> void
-Assimalign.Viu.Testing.TestRenderer.Render(Assimalign.Viu.Components.IComponent? component, Assimalign.Viu.Testing.TestElement! container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.Testing.TestRenderer.Render(Assimalign.Viu.Components.VirtualNode? node, Assimalign.Viu.Testing.TestElement! container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.ComponentContext?
 Assimalign.Viu.Testing.TestRenderer.Renderer.get -> Assimalign.Viu.Renderer<Assimalign.Viu.Testing.TestNode!>!
 Assimalign.Viu.Testing.TestRenderer.TestRenderer(bool snapshotSemantics = false, bool strictRemoval = false) -> void
 Assimalign.Viu.Testing.TestSchedulerPump
@@ -142,12 +149,12 @@ static Assimalign.Viu.Testing.TestEventDispatcher.TriggerAsync(Assimalign.Viu.Te
 static Assimalign.Viu.Testing.TestHydrationReader.Instance.get -> Assimalign.Viu.Testing.TestHydrationReader!
 static Assimalign.Viu.Testing.TestNodeOperation.operator !=(Assimalign.Viu.Testing.TestNodeOperation left, Assimalign.Viu.Testing.TestNodeOperation right) -> bool
 static Assimalign.Viu.Testing.TestNodeOperation.operator ==(Assimalign.Viu.Testing.TestNodeOperation left, Assimalign.Viu.Testing.TestNodeOperation right) -> bool
-static Assimalign.Viu.Testing.TestNodeOperations.Create(Assimalign.Viu.Testing.TestNodeOperationLog! log, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Testing.TestElement!>? queryRoots = null, bool strictRemoval = false, bool snapshotSemantics = false) -> Assimalign.Viu.RendererOptions<Assimalign.Viu.Testing.TestNode!>!
+static Assimalign.Viu.Testing.TestNodeOperations.Create(Assimalign.Viu.Testing.TestNodeOperationLog! operationLog, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Testing.TestElement!>? queryRoots = null, bool strictRemoval = false, bool snapshotSemantics = false) -> Assimalign.Viu.RendererOptions<Assimalign.Viu.Testing.TestNode!>!
 static Assimalign.Viu.Testing.TestNodeSerializer.Serialize(Assimalign.Viu.Testing.TestNode! node, int indent = 0) -> string!
 static Assimalign.Viu.Testing.TestSchedulerPump.Install() -> Assimalign.Viu.Testing.TestSchedulerPump!
 static Assimalign.Viu.Testing.TestServerMarkup.Parse(string! markup, string! containerTag = "root") -> Assimalign.Viu.Testing.TestElement!
-static Assimalign.Viu.Testing.ViuTest.Mount(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.Testing.ComponentWrapper!
-static Assimalign.Viu.Testing.ViuTest.Mount(Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Testing.ComponentMountOptions! options) -> Assimalign.Viu.Testing.ComponentWrapper!
-static Assimalign.Viu.Testing.ViuTest.Mount(Assimalign.Viu.Components.IComponentTemplate! template, Assimalign.Viu.Testing.ComponentMountOptions? options = null) -> Assimalign.Viu.Testing.ComponentWrapper!
+static Assimalign.Viu.Testing.ViuTest.Mount(Assimalign.Viu.Components.ComponentRegistration! registration, Assimalign.Viu.Testing.ComponentMountOptions? options = null) -> Assimalign.Viu.Testing.ComponentWrapper!
+static Assimalign.Viu.Testing.ViuTest.Mount(Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Testing.ComponentMountOptions? options = null) -> Assimalign.Viu.Testing.ComponentWrapper!
+static Assimalign.Viu.Testing.ViuTest.Mount(Assimalign.Viu.Components.VirtualNode! node, Assimalign.Viu.Testing.ComponentMountOptions? options = null) -> Assimalign.Viu.Testing.ComponentWrapper!
 ~override Assimalign.Viu.Testing.TestNodeOperation.Equals(object obj) -> bool
 ~override Assimalign.Viu.Testing.TestNodeOperation.ToString() -> string

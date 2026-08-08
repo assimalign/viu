@@ -6,29 +6,19 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// A ready-to-use in-memory renderer for DOM-free component-tree tests.
-/// </summary>
+/// <summary>Provides a ready-to-use renderer over the DOM-free in-memory host.</summary>
 /// <remarks>
-/// A complete host implementation of the renderer's node-ops contract over an in-memory node tree,
-/// so component behavior is testable on a plain CoreCLR host with no DOM and no browser. Every host
-/// operation is recorded in <see cref="OperationLog"/>, which makes the <em>number</em> of host calls
-/// assertable — the property the interop budget depends on ([RND-IO-1]).
+/// The renderer uses only <see cref="RendererOptions{TNode}"/> and records every write and commit.
+/// Specified by <c>[RND-HOST-1]</c> through <c>[RND-HOST-4]</c> and <c>[CONF-3]</c>.
 /// </remarks>
 public sealed class TestRenderer
 {
     private readonly List<TestElement> _queryRoots = [];
 
-    /// <summary>Creates an in-memory renderer.</summary>
-    /// <param name="snapshotSemantics">
-    /// Whether hydration uses an immutable pre-walk matching a batched browser snapshot.
-    /// </param>
-    /// <param name="strictRemoval">
-    /// Whether duplicate host removals throw. Snapshot mode always enables this check.
-    /// </param>
-    public TestRenderer(
-        bool snapshotSemantics = false,
-        bool strictRemoval = false)
+    /// <summary>Initializes an in-memory renderer.</summary>
+    /// <param name="snapshotSemantics">Whether hydration uses an immutable host-tree snapshot.</param>
+    /// <param name="strictRemoval">Whether duplicate host removals throw.</param>
+    public TestRenderer(bool snapshotSemantics = false, bool strictRemoval = false)
     {
         OperationLog = new TestNodeOperationLog();
         Renderer = RendererFactory.CreateRenderer(
@@ -39,24 +29,23 @@ public sealed class TestRenderer
                 snapshotSemantics));
     }
 
-    /// <summary>Gets the underlying host-neutral renderer.</summary>
+    /// <summary>Gets the host-neutral production renderer.</summary>
     public Renderer<TestNode> Renderer { get; }
 
-    /// <summary>Gets the recorded host operations.</summary>
+    /// <summary>Gets the recorded host operations and commit boundaries.</summary>
     public TestNodeOperationLog OperationLog { get; }
 
-    /// <summary>Creates a detached render container without recording a host operation.</summary>
-    /// <param name="tag">The diagnostic container tag.</param>
-    /// <returns>The container.</returns>
+    /// <summary>Creates a detached container without logging a renderer operation.</summary>
+    /// <param name="tag">The diagnostic local tag name.</param>
+    /// <returns>The detached container.</returns>
     public TestElement CreateContainer(string tag = "root")
     {
-        return new TestElement(tag, elementNamespace: null);
+        ArgumentException.ThrowIfNullOrEmpty(tag);
+        return new TestElement(new QualifiedName(tag));
     }
 
-    /// <summary>
-    /// Registers a root and its subtree for Teleport target selector queries.
-    /// </summary>
-    /// <param name="root">The query root.</param>
+    /// <summary>Registers a root and its descendants for teleport selector resolution.</summary>
+    /// <param name="root">The selector query root.</param>
     public void RegisterQueryRoot(TestElement root)
     {
         ArgumentNullException.ThrowIfNull(root);
@@ -66,40 +55,34 @@ public sealed class TestRenderer
         }
     }
 
-    /// <summary>Renders an immutable component tree, or unmounts when null.</summary>
-    /// <param name="component">The component tree.</param>
+    /// <summary>Renders a fresh immutable tree, or unmounts when the tree is null.</summary>
+    /// <param name="node">The next immutable root.</param>
     /// <param name="container">The render container.</param>
-    /// <param name="application">
-    /// The application context used by templates and directives, or null for a primitive-only
-    /// tree.
-    /// </param>
-    /// <returns>The root template context, or null when the root is not a template.</returns>
-    public IComponentContext? Render(
-        IComponent? component,
+    /// <param name="application">The optional application composition for authored components.</param>
+    /// <returns>The root component context when the root is authored, otherwise null.</returns>
+    public ComponentContext? Render(
+        VirtualNode? node,
         TestElement container,
         IApplicationContext? application = null)
     {
         ArgumentNullException.ThrowIfNull(container);
         RegisterQueryRoot(container);
-        return Renderer.Render(component, container, application);
+        return Renderer.Render(node, container, application);
     }
 
-    /// <summary>Hydrates a component tree over existing server-rendered host nodes.</summary>
-    /// <param name="component">The client component tree.</param>
+    /// <summary>Hydrates an immutable client tree over existing server host nodes.</summary>
+    /// <param name="node">The client root.</param>
     /// <param name="container">The server-populated container.</param>
-    /// <param name="application">
-    /// The application context used by templates, directives, and warnings, or null for a
-    /// primitive-only tree.
-    /// </param>
-    /// <returns>The root template context, or null when the root is not a template.</returns>
-    public IComponentContext? Hydrate(
-        IComponent component,
+    /// <param name="application">The optional application composition for authored components.</param>
+    /// <returns>The root component context when the root is authored, otherwise null.</returns>
+    public ComponentContext? Hydrate(
+        VirtualNode node,
         TestElement container,
         IApplicationContext? application = null)
     {
-        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(container);
         RegisterQueryRoot(container);
-        return Renderer.Hydrate(component, container, application);
+        return Renderer.Hydrate(node, container, application);
     }
 }

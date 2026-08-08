@@ -134,7 +134,7 @@
 
 <div class="wrap">
   <header class="prose">
-    <p class="eyebrow">Assimalign.Viu · component-model redesign</p>
+    <p class="eyebrow">Assimalign.Viu · shipping component model</p>
     <h1>How the pieces execute</h1>
     <p class="dek">
       Four figures, in execution order: who owns each type, what happens when the renderer meets a
@@ -143,15 +143,14 @@
     </p>
 
     <div class="status">
-      <span class="label">Status — adopted component-model standard; migration swap pending</span>
+      <span class="label">Status — shipping component-model standard</span>
       <p>
-        This page describes the <strong>adopted standard</strong> for the
-        <code>[V01.01.15]</code> component-model arc. Its implementation swap lands on
-        <code>feature/V01.01.15-component-model</code>; the <code>.redesign/</code> scaffold fixes the
-        exact type shapes used during that migration.
+        This page describes the <strong>shipping standard</strong> delivered by the
+        <code>[V01.01.15]</code> component-model arc. The types and execution paths shown here are
+        implemented by the runtime libraries under <code>libraries/</code>.
       </p>
       <p>
-        Rationale, the assembly-seam analysis, and the migration trains live in the
+        Rationale, the assembly-seam analysis, and the completed migration record live in the
         <a href="COMPONENT-MODEL-PLAN.md"><code>COMPONENT-MODEL-PLAN.md</code></a> plan of record.
         Normative semantics remain <a href="SPECIFICATION.md"><code>SPECIFICATION.md</code></a>;
         clause ids are cited below where this design preserves or extends a specified behavior.
@@ -533,15 +532,15 @@
 
   <footer>
     <p>
-      Types shown follow the adopted scaffold under
-      <code>.redesign/libraries/Assimalign.Viu.Components/src</code>. The governing migration sequence
-      and its verification gates are in the
+      Types shown follow the shipping implementation under
+      <code>libraries/Assimalign.Viu.Components/src</code>. The completed migration sequence and its
+      verification gates are recorded in the
       <a href="COMPONENT-MODEL-PLAN.md"><code>COMPONENT-MODEL-PLAN.md</code></a> plan of record.
     </p>
     <p>
       Application code in the samples (<code>count.Value</code>, <code>store.Total</code>) is
-      illustrative; every framework type named on this page exists in the staging tree. Scoped CSS is
-      deferred until the arc completes, so no style-scope state appears anywhere above.
+      illustrative; every framework type named on this page exists in the shipping tree. Scoped CSS
+      remains deferred by the current specification, so no style-scope state appears anywhere above.
     </p>
   </footer>
 </div>

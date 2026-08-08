@@ -8,36 +8,36 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Wraps a component tree rendered into the in-memory host.
-/// </summary>
+/// <summary>Queries and interacts with a virtual tree or one mounted authored component.</summary>
 /// <remarks>
-/// Root and child-template queries, host interactions, and per-template emitted-event capture use
-/// Core's read-only mounted-template inspection seams.
+/// Authored queries use stable <see cref="MountedComponentView{TNode}"/> identity, public instance
+/// and context values, and current first-to-last host ranges. Specified by <c>[RND-6]</c>, seam S5
+/// in the component-model plan, and <c>[CONF-3]</c>.
 /// </remarks>
 public sealed class ComponentWrapper : IDisposable
 {
-    private readonly MountedTemplateNode<TestNode>? _mountedTemplate;
+    private readonly MountedComponentView<TestNode>? _mountedView;
     private readonly EmittedEvents _emitted;
     private readonly ScheduledFlush _flush;
     private readonly Renderer<TestNode> _renderer;
     private readonly TestElement _container;
     private readonly bool _ownsMount;
+    private bool _isDisposed;
     private bool _isMounted = true;
 
     internal ComponentWrapper(
-        IComponent component,
-        MountedTemplateNode<TestNode>? mountedTemplate,
+        VirtualNode node,
+        MountedComponentView<TestNode>? mountedView,
         EmittedEvents emitted,
         ScheduledFlush flush,
         Renderer<TestNode> renderer,
         TestElement container,
         bool ownsMount)
     {
-        Component = component;
-        _mountedTemplate = mountedTemplate;
-        Instance = mountedTemplate?.Instance.Template;
-        Context = mountedTemplate?.Instance.Context;
+        Component = node;
+        _mountedView = mountedView;
+        Instance = mountedView?.Instance;
+        Context = mountedView?.Context;
         _emitted = emitted;
         _flush = flush;
         _renderer = renderer;
@@ -45,24 +45,29 @@ public sealed class ComponentWrapper : IDisposable
         _ownsMount = ownsMount;
     }
 
-    /// <summary>Gets the immutable component request wrapped by this instance.</summary>
-    public IComponent Component { get; }
+    /// <summary>Gets the immutable virtual node that established this wrapper.</summary>
+    public VirtualNode Component { get; }
 
-    /// <summary>Gets the mounted template instance, or null for a primitive tree wrapper.</summary>
-    public IComponentTemplate? Instance { get; }
+    /// <summary>Gets the mounted authored instance, or null for a primitive tree wrapper.</summary>
+    public IComponent? Instance { get; }
 
-    /// <summary>Gets the mounted template context, or null for a primitive tree wrapper.</summary>
-    public IComponentContext? Context { get; }
+    /// <summary>Gets the mounted authored context, or null for a primitive tree wrapper.</summary>
+    public ComponentContext? Context { get; }
 
-    /// <summary>Gets whether the wrapped tree remains mounted.</summary>
+    /// <summary>Gets whether this wrapper's exact mount remains present.</summary>
+    /// <returns>Whether stable view identity is still found in the renderer snapshot.</returns>
     public bool Exists()
     {
-        return _ownsMount
-            ? _isMounted
-            : IsMounted(_mountedTemplate);
+        if (!_isMounted)
+        {
+            return false;
+        }
+
+        return _mountedView is null || IsMounted(_mountedView);
     }
 
-    /// <summary>Serializes every top-level host node.</summary>
+    /// <summary>Serializes every host node in this wrapper's current inclusive range.</summary>
+    /// <returns>The diagnostic markup.</returns>
     public string Html()
     {
         StringBuilder builder = new();
@@ -75,7 +80,8 @@ public sealed class ComponentWrapper : IDisposable
         return builder.ToString();
     }
 
-    /// <summary>Gets the concatenated text content of the rendered host tree.</summary>
+    /// <summary>Gets concatenated text content in this wrapper's current host range.</summary>
+    /// <returns>The text content.</returns>
     public string Text()
     {
         StringBuilder builder = new();
@@ -90,12 +96,11 @@ public sealed class ComponentWrapper : IDisposable
 
     /// <summary>Finds the first rendered element matching a supported selector.</summary>
     /// <param name="selector">A tag, identifier, class, or attribute selector.</param>
-    /// <returns>The element wrapper, or null.</returns>
+    /// <returns>The matching wrapper, or null.</returns>
     public ElementWrapper? Find(string selector)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
-        List<TestElement> candidates =
-            TestQuery.DescendantElementsOf(HostNodes());
+        List<TestElement> candidates = TestQuery.DescendantElementsOf(HostNodes());
         for (int index = 0; index < candidates.Count; index++)
         {
             if (TestQuery.Matches(candidates[index], selector))
@@ -109,23 +114,20 @@ public sealed class ComponentWrapper : IDisposable
 
     /// <summary>Gets the first rendered element matching a supported selector.</summary>
     /// <param name="selector">A tag, identifier, class, or attribute selector.</param>
-    /// <returns>The element wrapper.</returns>
-    public ElementWrapper Get(string selector)
-    {
-        return Find(selector)
-            ?? throw new InvalidOperationException(
-                $"Unable to find element matching selector: {selector}");
-    }
+    /// <returns>The matching wrapper.</returns>
+    public ElementWrapper Get(string selector) =>
+        Find(selector)
+        ?? throw new InvalidOperationException(
+            $"Unable to find an element matching selector '{selector}'.");
 
-    /// <summary>Finds every rendered element matching a supported selector.</summary>
+    /// <summary>Finds every rendered element matching a supported selector in host order.</summary>
     /// <param name="selector">A tag, identifier, class, or attribute selector.</param>
     /// <returns>The matching wrappers.</returns>
     public IReadOnlyList<ElementWrapper> FindAll(string selector)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
         List<ElementWrapper> matches = [];
-        List<TestElement> candidates =
-            TestQuery.DescendantElementsOf(HostNodes());
+        List<TestElement> candidates = TestQuery.DescendantElementsOf(HostNodes());
         for (int index = 0; index < candidates.Count; index++)
         {
             if (TestQuery.Matches(candidates[index], selector))
@@ -137,23 +139,23 @@ public sealed class ComponentWrapper : IDisposable
         return matches;
     }
 
-    /// <summary>Finds the first mounted descendant template of the requested type.</summary>
-    /// <typeparam name="TComponent">The authored template type.</typeparam>
-    /// <returns>The child wrapper, or null when no matching descendant is mounted.</returns>
+    /// <summary>Finds the first mounted descendant authored component of a requested type.</summary>
+    /// <typeparam name="TComponent">The authored instance type.</typeparam>
+    /// <returns>The descendant wrapper, or null.</returns>
     public ComponentWrapper? FindComponent<TComponent>()
-        where TComponent : class, IComponentTemplate
+        where TComponent : class, IComponent
     {
-        IReadOnlyList<MountedTemplateNode<TestNode>> templates =
-            _renderer.GetMountedTemplates(_container);
-        for (int index = 0; index < templates.Count; index++)
+        IReadOnlyList<MountedComponentView<TestNode>> views =
+            _renderer.GetMountedComponentViews(_container);
+        for (int index = 0; index < views.Count; index++)
         {
-            MountedTemplateNode<TestNode> candidate = templates[index];
-            if (!ReferenceEquals(candidate, _mountedTemplate)
-                && candidate.Instance.Template is TComponent
+            MountedComponentView<TestNode> candidate = views[index];
+            if (!ReferenceEquals(candidate, _mountedView)
+                && candidate.Instance is TComponent
                 && IsDescendant(candidate))
             {
                 return new ComponentWrapper(
-                    candidate.Component,
+                    candidate.Request,
                     candidate,
                     _emitted,
                     _flush,
@@ -166,80 +168,65 @@ public sealed class ComponentWrapper : IDisposable
         return null;
     }
 
-    /// <summary>Gets the first mounted descendant template of the requested type.</summary>
-    /// <typeparam name="TComponent">The authored template type.</typeparam>
-    /// <returns>The matching child wrapper.</returns>
-    /// <exception cref="InvalidOperationException">No matching descendant is mounted.</exception>
+    /// <summary>Gets the first mounted descendant authored component of a requested type.</summary>
+    /// <typeparam name="TComponent">The authored instance type.</typeparam>
+    /// <returns>The matching descendant wrapper.</returns>
     public ComponentWrapper GetComponent<TComponent>()
-        where TComponent : class, IComponentTemplate
-    {
-        return FindComponent<TComponent>()
-            ?? throw new InvalidOperationException(
-                $"Unable to find a mounted {typeof(TComponent).Name} component.");
-    }
+        where TComponent : class, IComponent =>
+        FindComponent<TComponent>()
+        ?? throw new InvalidOperationException(
+            $"Unable to find a mounted '{typeof(TComponent).Name}' component.");
 
-    /// <summary>Gets this template's captured event occurrences by name.</summary>
+    /// <summary>Gets captured event occurrences from this exact component context.</summary>
     /// <param name="eventName">The emitted event name.</param>
-    /// <returns>The ordered occurrences.</returns>
+    /// <returns>Ordered immutable argument snapshots.</returns>
     public IReadOnlyList<IReadOnlyList<object?>> Emitted(string eventName)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
         return _emitted.Occurrences(Context, eventName);
     }
 
-    /// <summary>Gets every event captured from this template.</summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyList<object?>>> Emitted()
-    {
-        return _emitted.All(Context);
-    }
+    /// <summary>Gets every captured event from this exact component context.</summary>
+    /// <returns>Events keyed by name.</returns>
+    public IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyList<object?>>> Emitted() =>
+        _emitted.All(Context);
 
-    /// <summary>Triggers an event on the first rendered element and awaits its task and scheduler flush.</summary>
-    /// <param name="eventName">The event name.</param>
+    /// <summary>Triggers an event on the first rendered element and drains the scheduler.</summary>
+    /// <param name="eventName">The event binding's local name.</param>
     /// <param name="payload">The optional event payload.</param>
+    /// <returns>A task completing after the flush chain.</returns>
     public async Task Trigger(string eventName, object? payload = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
         TestElement element = RootElement()
             ?? throw new InvalidOperationException(
-                "The component tree has no root element to trigger.");
-        await TestEventDispatcher.TriggerAsync(
-            element,
-            eventName,
-            payload).ConfigureAwait(false);
+                "The wrapped host range has no element to trigger.");
+        await TestEventDispatcher.TriggerAsync(element, eventName, payload).ConfigureAwait(false);
         await _flush.RunAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Sets the first rendered element's value and dispatches an input event.</summary>
-    /// <param name="value">The new value.</param>
+    /// <summary>Sets the first rendered element's value, dispatches input, and drains the scheduler.</summary>
+    /// <param name="value">The new host value.</param>
+    /// <returns>A task completing after the flush chain.</returns>
     public async Task SetValue(object? value)
     {
         TestElement element = RootElement()
             ?? throw new InvalidOperationException(
-                "The component tree has no root element to set.");
+                "The wrapped host range has no element to update.");
         element.Properties["value"] = value;
-        await TestEventDispatcher.TriggerAsync(
-            element,
-            "input",
-            value).ConfigureAwait(false);
+        await TestEventDispatcher.TriggerAsync(element, "input", value).ConfigureAwait(false);
         await _flush.RunAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Runs and awaits the deterministic scheduler until idle.</summary>
-    public Task NextTickAsync()
-    {
-        return _flush.RunAsync();
-    }
+    /// <summary>Drains the deterministic scheduler through the current next-tick boundary.</summary>
+    /// <returns>A task completing after the flush chain.</returns>
+    public Task NextTickAsync() => _flush.RunAsync();
 
-    /// <summary>Runs and awaits every currently pending scheduler flush.</summary>
-    public Task FlushAsync()
-    {
-        return _flush.RunAsync();
-    }
+    /// <summary>Drains every currently captured scheduler continuation.</summary>
+    /// <returns>A task completing after the flush chain.</returns>
+    public Task FlushAsync() => _flush.RunAsync();
 
-    /// <summary>
-    /// Unmounts the application tree when this is the root wrapper. Child wrappers borrow the
-    /// root lifecycle and leave it unchanged.
-    /// </summary>
+    /// <summary>Unmounts the root tree; descendant wrappers borrow and cannot end that lifetime.</summary>
     public void Unmount()
     {
         if (!_ownsMount || !_isMounted)
@@ -251,26 +238,29 @@ public sealed class ComponentWrapper : IDisposable
         _isMounted = false;
     }
 
-    /// <summary>
-    /// Releases the root mount and restores the prior scheduler dispatcher. Disposing a child
-    /// wrapper is a no-op.
-    /// </summary>
+    /// <summary>Unmounts an owned root and restores the preceding scheduler dispatcher.</summary>
     public void Dispose()
     {
-        if (!_ownsMount)
+        if (!_ownsMount || _isDisposed)
         {
             return;
         }
 
-        Unmount();
-        _flush.Dispose();
-        Scheduler.Reset();
+        try
+        {
+            Unmount();
+        }
+        finally
+        {
+            _flush.Dispose();
+            Scheduler.Reset();
+            _isDisposed = true;
+        }
     }
 
     private TestElement? RootElement()
     {
-        List<TestElement> elements =
-            TestQuery.DescendantElementsOf(HostNodes());
+        List<TestElement> elements = TestQuery.DescendantElementsOf(HostNodes());
         return elements.Count > 0 ? elements[0] : null;
     }
 
@@ -281,19 +271,19 @@ public sealed class ComponentWrapper : IDisposable
             return [];
         }
 
-        return _mountedTemplate is null
+        return _mountedView is null
             ? TestQuery.HostNodes(_container)
-            : TestQuery.HostNodes(_mountedTemplate);
+            : TestQuery.HostNodes(_mountedView);
     }
 
-    private bool IsDescendant(MountedTemplateNode<TestNode> candidate)
+    private bool IsDescendant(MountedComponentView<TestNode> candidate)
     {
         if (Context is null)
         {
             return true;
         }
 
-        ComponentContext? ancestor = candidate.Instance.Context.Parent;
+        ComponentContext? ancestor = candidate.Context.Parent;
         while (ancestor is not null)
         {
             if (ReferenceEquals(ancestor, Context))
@@ -307,18 +297,13 @@ public sealed class ComponentWrapper : IDisposable
         return false;
     }
 
-    private bool IsMounted(MountedTemplateNode<TestNode>? template)
+    private bool IsMounted(MountedComponentView<TestNode> view)
     {
-        if (template is null)
+        IReadOnlyList<MountedComponentView<TestNode>> views =
+            _renderer.GetMountedComponentViews(_container);
+        for (int index = 0; index < views.Count; index++)
         {
-            return false;
-        }
-
-        IReadOnlyList<MountedTemplateNode<TestNode>> templates =
-            _renderer.GetMountedTemplates(_container);
-        for (int index = 0; index < templates.Count; index++)
-        {
-            if (ReferenceEquals(templates[index], template))
+            if (ReferenceEquals(views[index], view))
             {
                 return true;
             }

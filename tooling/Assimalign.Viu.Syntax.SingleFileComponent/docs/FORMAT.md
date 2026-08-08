@@ -51,7 +51,7 @@ The template markup is parsed later by the template compiler (`Assimalign.Viu.Sy
 
 A `.viu` with a template block compiles to a **mountable component**: the source generator emits the
 compiled render function ([V01.01.05.05]), merges the `@script` C# into the partial class ([V01.01.06.03]),
-and — as of [V01.01.06.07] — generates the `IComponentTemplate` bridge (metadata plus a `Setup` that
+and — as of [V01.01.06.07] — generates the `IComponent` implementation (registration plus a `Setup` that
 allocates the render cache, wires slots, applies any `v-bind()` CSS custom properties, and returns the
 render delegate). A template-bearing `.viu` is registered with the application-selected
 `IComponentFactory` and requested through `ComponentTree.Template<TComponent>()`, including when

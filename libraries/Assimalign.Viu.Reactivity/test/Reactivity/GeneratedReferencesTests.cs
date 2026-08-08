@@ -3,14 +3,13 @@ using Xunit;
 
 namespace Assimalign.Viu.Reactivity.Tests;
 
-// The generated ToReferences() bundle (ReactiveValue<T> refs) and the IReactiveObject.IsReadOnly
-// readonly flag are emitted by the Assimalign.Viu.Generators.Reactivity source generator (wired into this
-// test project). These tests
-// consume the real generated output rather than a hand-written stand-in.
+// The generated ToReferences() bundle and IReactiveObject.IsReadOnly flag are emitted by the
+// Assimalign.Viu.Generators.Reactivity source generator wired into this test project. These tests
+// consume the generated output rather than a hand-written stand-in.
 
 /// <summary>A read-only reactive object: reads still track, writes warn and do nothing.</summary>
 [Reactive(Readonly = true)]
-public partial class ReadonlyProfile
+internal partial class ReadonlyProfile
 {
     /// <summary>The profile handle (read-only after construction).</summary>
     public partial string Handle { get; set; }
@@ -28,7 +27,7 @@ public sealed class GeneratedReferencesTests
         references.Name.Value.ShouldBe("Ada");
         references.Age.Value.ShouldBe(30);
 
-        // Object -> ref: a reader of the ref re-runs when the object property changes.
+        // Object -> reference: a reader of the reference re-runs when the object property changes.
         var runs = 0;
         string? seen = null;
         Reactive.Effect(() =>
@@ -43,7 +42,7 @@ public sealed class GeneratedReferencesTests
         runs.ShouldBe(2);
         seen.ShouldBe("Grace");
 
-        // Ref -> object: writing the ref mutates the object and triggers its dependency.
+        // Reference -> object: writing the reference mutates the object and triggers its dependency.
         references.Name.Value = "Hopper";
         person.Name.ShouldBe("Hopper");
         runs.ShouldBe(3);

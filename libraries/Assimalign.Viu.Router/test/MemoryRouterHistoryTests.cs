@@ -52,6 +52,25 @@ public class MemoryRouterHistoryTests
     }
 
     [Fact]
+    public void Push_WithScrollSeed_RoundTripsTheFlatHistoryState()
+    {
+        IRouterHistory history = CreateHistory();
+        RouterHistoryState data = new(
+            Back: "ignored",
+            Current: "ignored",
+            Forward: "ignored",
+            Replaced: true,
+            Position: 99,
+            Scroll: new ScrollPosition(12.5, 34));
+
+        history.Push("/scrolled", data);
+
+        history.State.Current.ShouldBe("/scrolled");
+        history.State.Position.ShouldBe(1);
+        history.State.Scroll.ShouldBe(new ScrollPosition(12.5, 34));
+    }
+
+    [Fact]
     public void GoBack_MovesToPreviousEntryAndNotifiesWithBackDirection()
     {
         var history = CreateHistory();

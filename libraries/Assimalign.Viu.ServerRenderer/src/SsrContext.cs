@@ -5,70 +5,55 @@ using System.Text;
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// The per-render server context. One instance is threaded through a single
-/// <see cref="ServerRenderer.RenderToStringAsync(ServerRenderApplication, SsrContext?, System.Threading.CancellationToken)"/>
-/// (or streaming) call and carries the two things the surrounding document assembly needs after the
-/// component tree serializes: the <see cref="Teleports"/> map (content that was rendered out of tree
-/// position) and a free-form <see cref="State"/> bag for application handoff (e.g. serialized store
-/// state the client picks up). A context belongs to exactly one render — reusing one across
-/// concurrent renders would cross request state, defeating the per-request discipline the area
-/// requires. Not thread-safe (single-threaded JS event-loop model).
+/// Carries per-render teleport output and free-form state handed from server application code to
+/// the surrounding document host.
 /// </summary>
+/// <remarks>
+/// One instance belongs to one render and is not thread-safe. The renderer never interprets or
+/// serializes <see cref="State"/> itself. Specified by <c>[SSR-7]</c>,
+/// <c>[SSR-MARKERS-2]</c>, and <c>[HYD-6]</c>.
+/// </remarks>
 public sealed class SsrContext
 {
     private readonly Dictionary<string, string> _teleports = new(StringComparer.Ordinal);
     private Dictionary<string, StringBuilder>? _teleportBuffers;
 
     /// <summary>
-    /// The teleported content, keyed by the target selector the <c>&lt;Teleport&gt;</c>'s <c>to</c> prop
-    /// named. Populated when the render completes: each entry is the fully serialized HTML for one
-    /// target, ready for the host to splice into the target element. Empty when the tree contains no
-    /// teleports. Each entry ends with the <c>&lt;!--teleport anchor--&gt;</c> marker the Viu hydration
-    /// walker matches on ([V01.01.07.03]), so splicing an entry verbatim is what makes the target range
-    /// hydratable. Specified by <c>[SSR-MARKERS-2]</c> and <c>[HYD-6]</c>.
+    /// Gets fully serialized out-of-tree content by target identifier after rendering completes.
     /// </summary>
+    /// <remarks>
+    /// Each contribution ends in <see cref="HydrationMarkers.TeleportAnchor"/> and must be spliced
+    /// verbatim before hydration. Specified by <c>[SSR-MARKERS-2]</c> and <c>[HYD-6]</c>.
+    /// </remarks>
     public IReadOnlyDictionary<string, string> Teleports => _teleports;
 
-    /// <summary>
-    /// A free-form state bag for the render, deliberately unschematized.
-    /// Application code and helpers stash per-request data here — most importantly the serialized state
-    /// the client rehydrates — without the renderer prescribing a shape. Never used by the renderer's
-    /// own HTML output.
-    /// </summary>
-    public IDictionary<string, object?> State { get; } = new Dictionary<string, object?>(StringComparer.Ordinal);
+    /// <summary>Gets the deliberately unschematized per-render state handoff bag.</summary>
+    /// <remarks>The renderer leaves values untouched as required by <c>[SSR-7]</c>.</remarks>
+    public IDictionary<string, object?> State { get; } =
+        new Dictionary<string, object?>(StringComparer.Ordinal);
 
-    /// <summary>
-    /// Appends <paramref name="content"/> to the buffer for <paramref name="target"/>. Multiple
-    /// teleports naming the same target accumulate in tree order; the buffer is resolved to a
-    /// <see cref="Teleports"/> entry by <see cref="ResolveTeleports"/> when the render completes.
-    /// </summary>
-    /// <param name="target">The target selector from the teleport's <c>to</c> prop.</param>
-    /// <param name="content">The serialized teleport content (children plus the anchor marker).</param>
     internal void AppendTeleport(string target, string content)
     {
         _teleportBuffers ??= new Dictionary<string, StringBuilder>(StringComparer.Ordinal);
-        if (!_teleportBuffers.TryGetValue(target, out var builder))
+        if (!_teleportBuffers.TryGetValue(target, out StringBuilder? builder))
         {
             builder = new StringBuilder();
             _teleportBuffers[target] = builder;
         }
+
         builder.Append(content);
     }
 
-    /// <summary>
-    /// Freezes the accumulated teleport buffers into the public <see cref="Teleports"/> map. Called
-    /// once, after the whole component tree has serialized, so a teleport that appears anywhere in the
-    /// tree is captured.
-    /// </summary>
     internal void ResolveTeleports()
     {
         if (_teleportBuffers is null)
         {
             return;
         }
-        foreach (var (target, builder) in _teleportBuffers)
+
+        foreach (KeyValuePair<string, StringBuilder> entry in _teleportBuffers)
         {
-            _teleports[target] = builder.ToString();
+            _teleports[entry.Key] = entry.Value.ToString();
         }
     }
 }

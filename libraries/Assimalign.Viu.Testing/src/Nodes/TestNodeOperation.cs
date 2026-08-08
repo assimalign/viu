@@ -1,20 +1,15 @@
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// One recorded node operation: the operation type, its target, and its arguments. A struct so
-/// logging stays allocation-light and does not distort the patch-efficiency numbers it exists to
-/// measure.
-/// </summary>
+/// <summary>Describes one recorded operation performed by the in-memory host.</summary>
 /// <param name="Type">The operation kind.</param>
-/// <param name="TargetNode">The node the operation created or acted on.</param>
-/// <param name="ParentNode">The parent for insert/remove operations, when known.</param>
-/// <param name="AnchorNode">The insert-before anchor, or null when appending.</param>
-/// <param name="PropertyName">
-/// The attribute or scope-identifier name for the applicable operation.
-/// </param>
-/// <param name="PreviousValue">The prior value for <see cref="TestNodeOperationType.PatchAttribute"/>.</param>
-/// <param name="NextValue">The new value for <see cref="TestNodeOperationType.PatchAttribute"/>.</param>
-/// <param name="Text">The text payload for create/set-text/static operations.</param>
+/// <param name="TargetNode">The created or affected node.</param>
+/// <param name="ParentNode">The structural parent when applicable.</param>
+/// <param name="AnchorNode">The insertion anchor when applicable.</param>
+/// <param name="PropertyName">The binding name when applicable.</param>
+/// <param name="PreviousValue">The prior binding value.</param>
+/// <param name="NextValue">The next binding value.</param>
+/// <param name="Text">The character-data or static-markup payload.</param>
+/// <remarks>Specified by <c>[RND-HOST-1]</c>, <c>[RND-HOST-4]</c>, and <c>[CONF-3]</c>.</remarks>
 public readonly record struct TestNodeOperation(
     TestNodeOperationType Type,
     TestNode? TargetNode = null,

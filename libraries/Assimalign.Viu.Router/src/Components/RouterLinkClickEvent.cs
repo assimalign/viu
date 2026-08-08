@@ -7,6 +7,7 @@ namespace Assimalign.Viu.Router;
 /// this from the native event, and tests construct it directly. The link navigates only for an
 /// unmodified primary-button click that has not already been prevented.
 /// </summary>
+/// <remarks>Specified by <c>[RTR-4]</c> and <c>[RTR-7]</c>.</remarks>
 public sealed class RouterLinkClickEvent
 {
     /// <summary>Creates a click event.</summary>

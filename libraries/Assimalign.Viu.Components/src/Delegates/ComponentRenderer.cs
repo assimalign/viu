@@ -1,6 +1,10 @@
 namespace Assimalign.Viu.Components;
 
-/// <summary>Produces one template component's current rendered subtree.</summary>
-/// <returns>The rendered subtree, or null for an empty placeholder.</returns>
-public delegate IComponent? ComponentRenderer();
-
+/// <summary>
+/// Produces a fresh immutable subtree description for one mounted instance; invoked by the
+/// instance's reactive render effect with the mount's rendering surface.
+/// </summary>
+/// <remarks>Specified by <c>[CMP-8]</c> and <c>[RND-3]</c>.</remarks>
+/// <param name="frame">The per-mount cache and block-assembly surface.</param>
+/// <returns>The rendered subtree, or null to render nothing.</returns>
+public delegate VirtualNode? ComponentRenderer(ComponentRenderFrame frame);

@@ -5,13 +5,8 @@ using System.Threading.Tasks;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// A wrapper around one rendered element: it queries the element's subtree with a small selector
-/// vocabulary and dispatches events through the in-memory test adapter. The awaitable
-/// <see cref="Trigger"/>/<see cref="SetValue"/> complete only after the scheduler flush, so
-/// assertions observe post-update state without a manual next-tick — the single most common source
-/// of flaky component tests.
-/// </summary>
+/// <summary>Queries and interacts with one rendered in-memory element.</summary>
+/// <remarks>Specified by <c>[CONF-3]</c> and the scheduler contract <c>[SCH-9]</c>.</remarks>
 public sealed class ElementWrapper
 {
     private readonly TestElement _element;
@@ -23,96 +18,97 @@ public sealed class ElementWrapper
         _flush = flush;
     }
 
-    /// <summary>The underlying in-memory element.</summary>
+    /// <summary>Gets the underlying in-memory element.</summary>
     public TestElement Element => _element;
 
-    /// <summary>Whether the wrapped element exists (always true for a found wrapper).</summary>
-    public bool Exists() => true;
+    /// <summary>Gets whether the element remains attached to its mounted host tree.</summary>
+    public bool Exists() => _element.Parent is not null;
 
-    /// <summary>The element's serialized HTML-like markup, for snapshot-style assertions.</summary>
+    /// <summary>Serializes this element and its descendants into diagnostic markup.</summary>
+    /// <returns>The diagnostic markup.</returns>
     public string Html() => TestNodeSerializer.Serialize(_element);
 
-    /// <summary>The element's text content, concatenated across every descendant text node.</summary>
+    /// <summary>Gets concatenated descendant text content.</summary>
+    /// <returns>The text content.</returns>
     public string Text()
     {
-        var builder = new StringBuilder();
+        StringBuilder builder = new();
         TestQuery.AppendText(_element, builder);
         return builder.ToString();
     }
 
-    /// <summary>The value of an attribute or property, or null when the element has none.</summary>
-    /// <param name="name">The attribute name.</param>
+    /// <summary>Gets an attribute or property value, or null when absent.</summary>
+    /// <param name="name">The binding name.</param>
+    /// <returns>The current value.</returns>
     public object? Attribute(string name)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
-        return _element.Properties.TryGetValue(name, out var value) ? value : null;
+        return _element.Properties.TryGetValue(name, out object? value) ? value : null;
     }
 
-    /// <summary>The first descendant matching <paramref name="selector"/>, or null when none does.</summary>
-    /// <param name="selector">A tag, <c>#id</c>, <c>.class</c>, or <c>[attr=value]</c> selector.</param>
+    /// <summary>Finds the first descendant matching a supported selector.</summary>
+    /// <param name="selector">A tag, identifier, class, or attribute selector.</param>
+    /// <returns>The matching wrapper, or null.</returns>
     public ElementWrapper? Find(string selector)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
-        foreach (var candidate in TestQuery.DescendantElementsOf(_element))
+        List<TestElement> candidates = TestQuery.DescendantElementsOf(_element);
+        for (int index = 0; index < candidates.Count; index++)
         {
-            if (TestQuery.Matches(candidate, selector))
+            if (TestQuery.Matches(candidates[index], selector))
             {
-                return new ElementWrapper(candidate, _flush);
+                return new ElementWrapper(candidates[index], _flush);
             }
         }
+
         return null;
     }
 
-    /// <summary>The first descendant matching <paramref name="selector"/>; throws when none does.</summary>
-    /// <param name="selector">A tag, <c>#id</c>, <c>.class</c>, or <c>[attr=value]</c> selector.</param>
-    /// <exception cref="InvalidOperationException">No descendant matches.</exception>
-    public ElementWrapper Get(string selector)
-        => Find(selector) ?? throw new InvalidOperationException($"Unable to find element matching selector: {selector}");
+    /// <summary>Gets the first descendant matching a supported selector.</summary>
+    /// <param name="selector">A tag, identifier, class, or attribute selector.</param>
+    /// <returns>The matching wrapper.</returns>
+    public ElementWrapper Get(string selector) =>
+        Find(selector)
+        ?? throw new InvalidOperationException(
+            $"Unable to find an element matching selector '{selector}'.");
 
-    /// <summary>Every descendant matching <paramref name="selector"/>, in document order.</summary>
-    /// <param name="selector">A tag, <c>#id</c>, <c>.class</c>, or <c>[attr=value]</c> selector.</param>
+    /// <summary>Finds every descendant matching a supported selector in host order.</summary>
+    /// <param name="selector">A tag, identifier, class, or attribute selector.</param>
+    /// <returns>The matching wrappers.</returns>
     public IReadOnlyList<ElementWrapper> FindAll(string selector)
     {
         ArgumentException.ThrowIfNullOrEmpty(selector);
-        var matches = new List<ElementWrapper>();
-        foreach (var candidate in TestQuery.DescendantElementsOf(_element))
+        List<ElementWrapper> matches = [];
+        List<TestElement> candidates = TestQuery.DescendantElementsOf(_element);
+        for (int index = 0; index < candidates.Count; index++)
         {
-            if (TestQuery.Matches(candidate, selector))
+            if (TestQuery.Matches(candidates[index], selector))
             {
-                matches.Add(new ElementWrapper(candidate, _flush));
+                matches.Add(new ElementWrapper(candidates[index], _flush));
             }
         }
+
         return matches;
     }
 
-    /// <summary>
-    /// Dispatches <paramref name="eventName"/> on the element and awaits the scheduler flush, so
-    /// assertions after the returned task observe post-update state.
-    /// </summary>
-    /// <param name="eventName">The event name (e.g. <c>"click"</c>).</param>
-    /// <param name="payload">The payload passed to payload-accepting listeners.</param>
+    /// <summary>Dispatches a host event and drains the deterministic scheduler.</summary>
+    /// <param name="eventName">The event binding's local name.</param>
+    /// <param name="payload">The optional event payload.</param>
+    /// <returns>A task completing after the flush chain.</returns>
     public async Task Trigger(string eventName, object? payload = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
-        await TestEventDispatcher.TriggerAsync(
-            _element,
-            eventName,
-            payload).ConfigureAwait(false);
+        await TestEventDispatcher.TriggerAsync(_element, eventName, payload).ConfigureAwait(false);
         await _flush.RunAsync().ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Sets the element's <c>value</c> and dispatches an <c>input</c> event, then awaits the
-    /// scheduler flush — the pairing an input-like element and a <c>v-model</c> binding expect.
-    /// </summary>
-    /// <param name="value">The new value.</param>
+    /// <summary>Sets the host value property, dispatches input, and drains the scheduler.</summary>
+    /// <param name="value">The new host value.</param>
+    /// <returns>A task completing after the flush chain.</returns>
     public async Task SetValue(object? value)
     {
         _element.Properties["value"] = value;
-        await TestEventDispatcher.TriggerAsync(
-            _element,
-            "input",
-            value).ConfigureAwait(false);
+        await TestEventDispatcher.TriggerAsync(_element, "input", value).ConfigureAwait(false);
         await _flush.RunAsync().ConfigureAwait(false);
     }
 }

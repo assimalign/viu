@@ -4,7 +4,8 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
 
-/// <summary>Creates the component tree shown for an asynchronous-component failure.</summary>
+/// <summary>Creates the tree shown for an asynchronous-component load failure.</summary>
+/// <remarks>Specified by <c>[BLT-14]</c>.</remarks>
 /// <param name="error">The loader or timeout failure.</param>
-/// <returns>A fresh render-tree value for the failure.</returns>
-public delegate IComponent AsynchronousComponentErrorRenderer(Exception error);
+/// <returns>A fresh immutable failure tree.</returns>
+public delegate VirtualNode? AsynchronousComponentErrorRenderer(Exception error);

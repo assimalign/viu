@@ -1,5 +1,9 @@
 #nullable enable
+Assimalign.Viu.Browser.Router.ApplicationRouterExtensions
+Assimalign.Viu.Browser.Router.ApplicationRouterExtensions.extension(Assimalign.Viu.IApplication!)
+Assimalign.Viu.Browser.Router.ApplicationRouterExtensions.extension(Assimalign.Viu.IApplication!).UseRouter(Assimalign.Viu.Router.Router! router) -> Assimalign.Viu.IApplication!
 Assimalign.Viu.Browser.Router.RouterLinkDomBridge
+static Assimalign.Viu.Browser.Router.ApplicationRouterExtensions.UseRouter(this Assimalign.Viu.IApplication! application, Assimalign.Viu.Router.Router! router) -> Assimalign.Viu.IApplication!
 static Assimalign.Viu.Browser.Router.RouterLinkDomBridge.Install() -> void
 static Assimalign.Viu.Browser.Router.RouterLinkDomBridge.Invoke(System.Action<object?>! handler, Assimalign.Viu.Browser.BrowserEvent! browserEvent) -> void
 static Assimalign.Viu.Browser.Router.RouterLinkDomBridge.Uninstall() -> void

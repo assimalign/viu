@@ -1,37 +1,26 @@
 # Assimalign.Viu.State
 
-`Assimalign.Viu.State` is Viu's Pinia-shaped, platform-neutral application-state package. It
-replaces `Assimalign.Viu.Store`; there is no second Store package or compatibility implementation
-inside the redesign.
+State is a state-management **convention** layered on the component model. It references
+Reactivity and Components, and owns reusable store definitions, explicit registry lifetimes,
+detached registry roots, attached per-store effect scopes, and optional service/watch composition.
 
-The package supports two authoring styles:
+A lightweight store may be any object returned by an AOT-safe `StateStoreActivator<TStore>`.
+`StateStore<TState>` is the optional richer base for `Patch`, `Reset`, `Subscribe`, and `OnAction`
+over a source-generated reactive state object. The live state object is never replaced, and object
+copying uses an explicit typed delegate rather than runtime member enumeration ([STA-1], [STA-5],
+[STA-6]).
 
-- A lightweight setup store may be any object returned by
-  `StateStoreDefinition<TStateStore>`. References, computeds, effects, and methods stay ordinary
-  Reactivity APIs.
-- `StateStore<TState>` is the optional richer member model for developers who need `Patch`,
-  `Reset`, `Subscribe`, and `OnAction` over a source-generated `[Reactive]` state object.
+A mounted component obtains a store through `StateStoreDefinition<TStore>.Use(ComponentContext)`,
+which resolves the registry through `context.Services`, then the ambient
+`StateStores.ActiveRegistry`, and otherwise throws — the same seam every convention uses. There is
+no component capability interface, no context cast, and no privileged context member; adding this
+convention modified nothing in Components or Core ([STA-4], [CMP-33]).
 
-`StateStoreRegistry` owns one detached reactive root scope. Each initialized store receives an
-attached child scope created while that root is current. This keeps state independent from the
-component scope that first resolves it while allowing registry disposal to stop the entire state
-subsystem. A definition creates exactly one instance per registry, and a different definition
-claiming an existing key raises `DuplicateStateStoreKeyException`.
+Each registry indexes entries with an ordinal store key. Reusing the same definition returns the
+same instance; a second definition claiming that key raises `DuplicateStateStoreKeyException`.
+The registry creates one detached root effect scope, creates each store scope as its child, and
+restores the ambient setup context even when setup fails. Removing a definition ends only its store
+lifetime; disposing the registry ends every store lifetime and clears the ambient registry when it
+points to that registry ([STA-2], [STA-3]).
 
-State receives `IComponentFactory` and `IServiceProvider` independently through `IStateContext`.
-The factory remains only a component resolver; State does not assume it implements
-`IServiceProvider`. The context also exposes an optional `IReactiveWatchScheduler`:
-
-- Core supplies its application scheduler so direct writes in one application turn deduplicate
-  into one pre-flush subscription notification.
-- A null scheduler deliberately selects standalone Reactivity's synchronous behavior. A grouped
-  `Patch` still produces one notification because the reactive mutations run in one batch.
-
-`IStateStoreContext` is the State-owned capability Core's concrete component context implements.
-It lets `definition.Use(componentContext)` locate the application's registry without making
-Components reference State or requiring the service provider to duplicate the registry.
-
-State depends only on Components and Reactivity. Construction, state copying, action observation,
-and resolution use typed delegates; there is no reflection-based activation or dynamic code.
-
-See [DESIGN.md](DESIGN.md) for the lifetime, subscription, and compatibility decisions.
+See [DESIGN.md](DESIGN.md) for lifetime, scheduler, and AOT boundaries.

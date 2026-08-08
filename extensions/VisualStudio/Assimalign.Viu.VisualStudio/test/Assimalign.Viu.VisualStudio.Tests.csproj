@@ -44,7 +44,7 @@
     <Compile Include="..\src\ViuLanguageServerConfiguration.cs" Link="ViuLanguageServerConfiguration.cs" />
     <!-- The same frozen-path link the extension takes, so the void-element table the auto-closing
          tests exercise is the repository's authoritative one and not a test fixture. -->
-    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs"
+    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs"
              Link="Internal\DomKnowledgeData.cs" />
   </ItemGroup>
 </Project>

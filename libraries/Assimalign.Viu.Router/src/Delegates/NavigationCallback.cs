@@ -10,4 +10,5 @@ namespace Assimalign.Viu.Router;
 /// <param name="to">The location navigated to (base already stripped).</param>
 /// <param name="from">The location navigated from.</param>
 /// <param name="information">The navigation type, direction, and signed distance.</param>
+/// <remarks>Specified by <c>[RTR-3]</c>.</remarks>
 public delegate void NavigationCallback(string to, string from, NavigationInformation information);

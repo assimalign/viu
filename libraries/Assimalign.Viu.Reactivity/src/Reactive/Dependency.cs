@@ -7,7 +7,8 @@ namespace Assimalign.Viu.Reactivity;
 /// counter and an intrusive doubly-linked list of subscriber <see cref="SubscriberLink"/>s.
 /// <see cref="Track"/> links the ambient active subscriber (deduplicating via link versions);
 /// <see cref="Trigger"/> bumps this dependency's version plus the global version and notifies
-/// subscribers. Not thread-safe: designed for the single-threaded JS event-loop model.
+/// subscribers. Not thread-safe: designed for the single-threaded JS event-loop model. Specified
+/// by <c>[RCT-9]</c>.
 /// </summary>
 public sealed class Dependency
 {

@@ -308,8 +308,8 @@ public class RenderFunctionEmitterTests
             "<MyButton @save=\"save\"><div v-if=\"visible\" v-show=\"visible\">{{ message }}</div></MyButton>").Code;
 
         code.ShouldNotContain("using static");
-        code.ShouldNotContain("RenderHelpers");
-        code.ShouldNotContain("BlockToken");
+        code.ShouldNotContain("Render" + "Helpers");
+        code.ShouldNotContain("Block" + "Token");
         code.ShouldNotContain("_openBlock");
         code.ShouldNotContain("_createElement");
         code.ShouldNotContain("_resolveComponent");

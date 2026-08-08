@@ -9,8 +9,10 @@ internal sealed class MountedTree<TNode>
 {
     internal IApplicationContext? Application;
 
-    internal MountedRenderNode<TNode>? Root;
+    internal MountedNode<TNode>? Root;
 
-    internal Dictionary<IComponent, MountedRenderNode<TNode>> Components { get; } =
+    internal Dictionary<VirtualNode, MountedNode<TNode>> Nodes { get; } =
         new(ReferenceEqualityComparer.Instance);
+
+    internal List<MountedTransition<TNode>> PendingTransitionRemovals { get; } = [];
 }

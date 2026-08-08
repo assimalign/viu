@@ -1,33 +1,39 @@
-using System;
 using System.Collections.Generic;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The typed event arguments a Viu handler receives — the fields of the underlying DOM event
-/// (<see href="https://www.w3.org/TR/uievents/">W3C UI Events</see>) that the modifier and key
-/// guards need, extracted JS-side and marshaled in the single dispatch call ([V01.01.04.03]): no
-/// per-field <c>JSObject</c> property reads and no proxy retained per event. Which fields exist is
-/// therefore a deliberate, closed set — adding one costs marshaling on every dispatch.
-/// <see cref="StopPropagation"/>/<see cref="PreventDefault"/> record intents the bridge applies
-/// to the live JS event when the synchronous dispatch returns.
-/// <para>
-/// <see cref="TargetValue"/>, <see cref="TargetChecked"/>, and <see cref="SelectedValues"/> carry
-/// the form-control state <c>v-model</c> ([V01.01.04.06]) reads, so the directive never issues a
-/// follow-up interop read per event (the issue's interop-boundary requirement).
-/// </para>
+/// Carries the browser event fields needed by generated handlers, event guards, and native-control
+/// model directives in one host dispatch value.
 /// </summary>
+/// <remarks>
+/// The Browser host extracts this closed field set before crossing the JavaScript interop boundary.
+/// <see cref="StopPropagation"/> and <see cref="PreventDefault"/> record response intents that the
+/// host applies to the live event after synchronous dispatch. Specified by <c>[SFC-CG-2]</c> and
+/// <c>[V01.01.04.03]</c>.
+/// </remarks>
 public sealed class BrowserEvent
 {
-    // The live DOM event's arrival-time preventDefault state, kept apart from a handler's own
-    // PreventDefault request: the browser already applied the arrival one, so only handler-requested
-    // prevention re-crosses the boundary in the response flags. A guard still observes the combined
-    // state through DefaultPrevented, matching the DOM's event.defaultPrevented (a router link's
-    // activation guard bails on it).
     private readonly bool _defaultPreventedOnArrival;
     private bool _preventDefaultRequested;
 
-    internal BrowserEvent(
+    /// <summary>Initializes one browser event payload with mutable response intents.</summary>
+    /// <param name="eventName">The DOM event type.</param>
+    /// <param name="timeStamp">The page-relative timestamp in milliseconds.</param>
+    /// <param name="key">The keyboard key value, or an empty string.</param>
+    /// <param name="code">The keyboard code value, or an empty string.</param>
+    /// <param name="modifiers">The captured system-modifier flags.</param>
+    /// <param name="button">The mouse button, or negative one.</param>
+    /// <param name="buttons">The pressed mouse-button bitmask.</param>
+    /// <param name="clientX">The pointer viewport X coordinate.</param>
+    /// <param name="clientY">The pointer viewport Y coordinate.</param>
+    /// <param name="detail">The user-interface event detail.</param>
+    /// <param name="isSelfTarget">Whether target and current target are identical.</param>
+    /// <param name="targetValue">The captured control value.</param>
+    /// <param name="targetChecked">The captured checked state.</param>
+    /// <param name="selectedValues">The captured multiple-selection values.</param>
+    /// <param name="defaultPrevented">Whether default handling was already prevented.</param>
+    public BrowserEvent(
         string eventName,
         double timeStamp,
         string key,
@@ -61,81 +67,67 @@ public sealed class BrowserEvent
         _defaultPreventedOnArrival = defaultPrevented;
     }
 
-    /// <summary>The DOM event type (e.g. <c>"click"</c>, <c>"keydown"</c>).</summary>
+    /// <summary>Gets the DOM event type, such as <c>click</c> or <c>keydown</c>.</summary>
     public string EventName { get; }
 
-    /// <summary>The event's <c>timeStamp</c> (milliseconds relative to the page's time origin).</summary>
+    /// <summary>Gets the event timestamp in milliseconds relative to the page time origin.</summary>
     public double TimeStamp { get; }
 
-    /// <summary>The keyboard <c>key</c> value, or empty for non-keyboard events.</summary>
+    /// <summary>Gets the keyboard key value, or an empty string for a non-keyboard event.</summary>
     public string Key { get; }
 
-    /// <summary>The keyboard <c>code</c> value, or empty for non-keyboard events.</summary>
+    /// <summary>Gets the keyboard code value, or an empty string when it is unavailable.</summary>
     public string Code { get; }
 
-    /// <summary>The system-modifier state at dispatch.</summary>
+    /// <summary>Gets the system-modifier state captured at dispatch.</summary>
     public BrowserEventModifiers Modifiers { get; }
 
-    /// <summary>The mouse <c>button</c> (0 left, 1 middle, 2 right), or -1 for non-mouse events.</summary>
+    /// <summary>Gets the mouse button, or <c>-1</c> for a non-mouse event.</summary>
     public int Button { get; }
 
-    /// <summary>The mouse <c>buttons</c> bitmask at dispatch.</summary>
+    /// <summary>Gets the pressed mouse-button bitmask captured at dispatch.</summary>
     public int Buttons { get; }
 
-    /// <summary>The pointer's viewport X coordinate, or 0 for non-pointer events.</summary>
+    /// <summary>Gets the pointer viewport X coordinate, or zero when it is unavailable.</summary>
     public double ClientX { get; }
 
-    /// <summary>The pointer's viewport Y coordinate, or 0 for non-pointer events.</summary>
+    /// <summary>Gets the pointer viewport Y coordinate, or zero when it is unavailable.</summary>
     public double ClientY { get; }
 
-    /// <summary>The UI event <c>detail</c> value (e.g. click count).</summary>
+    /// <summary>Gets the user-interface event detail value, such as a click count.</summary>
     public int Detail { get; }
 
     /// <summary>
-    /// Whether <c>event.target === event.currentTarget</c> (evaluated JS-side) — the
-    /// <c>.self</c> modifier's guard.
+    /// Gets whether the event target and current target were the same at dispatch.
     /// </summary>
     public bool IsSelfTarget { get; }
 
-    /// <summary>The target element's <c>value</c> at dispatch, when it has one (inputs, selects).</summary>
+    /// <summary>Gets the target control value captured at dispatch, when one exists.</summary>
     public string? TargetValue { get; }
 
-    /// <summary>The target element's <c>checked</c> state at dispatch, when it has one.</summary>
+    /// <summary>Gets the target control checked state captured at dispatch.</summary>
     public bool TargetChecked { get; }
 
     /// <summary>
-    /// The values of the selected <c>&lt;option&gt;</c>s when the target is a <c>&lt;select
-    /// multiple&gt;</c>, or null for every other event.
-    /// Carried so <c>VModelSelect</c> maps a multi-select change to its bound list or set without a
-    /// follow-up interop read.
+    /// Gets the selected option values for a multiple-selection control, or null for other events.
     /// </summary>
     public IReadOnlyList<string>? SelectedValues { get; }
 
-    /// <summary>Whether <see cref="StopPropagation"/> was requested.</summary>
+    /// <summary>Gets whether a handler requested propagation to stop.</summary>
     public bool PropagationStopped { get; private set; }
 
     /// <summary>
-    /// Whether the browser default is prevented — true if the live event already arrived prevented
-    /// (an earlier listener called <c>preventDefault</c>) or a handler has since called
-    /// <see cref="PreventDefault"/>. This is the DOM's <c>event.defaultPrevented</c>; a host event
-    /// bridge reads it so a router link never intercepts an already-prevented click.
+    /// Gets whether the browser default had already been prevented or a handler requested
+    /// prevention during this dispatch.
     /// </summary>
     public bool DefaultPrevented => _defaultPreventedOnArrival || _preventDefaultRequested;
 
-    /// <summary>
-    /// Requests <c>stopPropagation()</c> on the live event when this synchronous dispatch
-    /// returns; the <c>.stop</c> event modifier calls this.
-    /// </summary>
+    /// <summary>Requests that the host stop propagation on the live browser event.</summary>
     public void StopPropagation() => PropagationStopped = true;
 
-    /// <summary>
-    /// Requests <c>preventDefault()</c> on the live event when this synchronous dispatch
-    /// returns; the <c>.prevent</c> event modifier calls this.
-    /// </summary>
+    /// <summary>Requests that the host prevent the default action on the live browser event.</summary>
     public void PreventDefault() => _preventDefaultRequested = true;
 
-    // Only handler-requested prevention re-crosses the boundary: an event that arrived prevented was
-    // already suppressed by the browser, so re-signaling it would be redundant.
-    internal int ToResponseFlags()
-        => (PropagationStopped ? 1 : 0) | (_preventDefaultRequested ? 2 : 0);
+    internal int ToResponseFlags() =>
+        (PropagationStopped ? 1 : 0) | (_preventDefaultRequested ? 2 : 0);
 }

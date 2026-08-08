@@ -11,7 +11,7 @@ namespace Assimalign.Viu.Reactivity.Tests;
 public sealed class WatchTests
 {
     [Fact]
-    public void Watch_Ref_FiresWithNewAndOldValue_NotImmediately()
+    public void Watch_Reference_FiresWithNewAndOldValue_NotImmediately()
     {
         var source = Reactive.Reference(1);
         var runs = 0;
@@ -30,7 +30,7 @@ public sealed class WatchTests
         lastNew.ShouldBe(2);
         lastOld.ShouldBe(1);
 
-        // Equal value never reaches the watcher (the ref itself does not trigger).
+        // Equal value never reaches the watcher (the reference itself does not trigger).
         source.Value = 2;
         runs.ShouldBe(1);
     }
@@ -291,4 +291,3 @@ internal sealed class RecordingWatchScheduler : IReactiveWatchScheduler
         }
     }
 }
-

@@ -201,8 +201,8 @@
          The restore pass is also NOT parallel. Every entry project's restore walks and
          writes the assets for its WHOLE ProjectReference closure itself, outside MSBuild's
          per-project scheduling, so MSBuild cannot dedupe the overlap the way it dedupes a
-         build: run the fan-out entries concurrently and the shared nodes (Assimalign.Viu.Shared
-         sits in nearly every closure) get restored several times at once, racing on the same
+         build: run the fan-out entries concurrently and common dependency nodes get restored
+         several times at once, racing on the same
          obj\ files - "Cannot create a file when that file already exists" out of
          NuGet.targets on a clean checkout. Sequential restore costs a few seconds because
          each already-restored closure no-ops through obj\project.nuget.cache. The Pack pass

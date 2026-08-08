@@ -5,7 +5,7 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-internal sealed class StubComponent : IComponentTemplate
+internal sealed class StubComponent : IComponent
 {
     private readonly string _tag;
 
@@ -14,28 +14,21 @@ internal sealed class StubComponent : IComponentTemplate
         _tag = tag;
     }
 
-    public string? Name => _tag;
-
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
-        return () => ComponentTree.Element(_tag);
+        ArgumentNullException.ThrowIfNull(context);
+        return _ => new ElementNode(new QualifiedName(_tag));
     }
 
-    internal static StubComponent For(IComponentTemplate template)
+    internal static StubComponent For(Type componentType)
     {
-        ArgumentNullException.ThrowIfNull(template);
-        return new StubComponent(ToStubTag(template.Name));
+        ArgumentNullException.ThrowIfNull(componentType);
+        return new StubComponent(ToStubTag(componentType.Name));
     }
 
-    internal static StubComponent For(Type templateType)
+    private static string ToStubTag(string name)
     {
-        ArgumentNullException.ThrowIfNull(templateType);
-        return new StubComponent(ToStubTag(templateType.Name));
-    }
-
-    private static string ToStubTag(string? name)
-    {
-        if (string.IsNullOrEmpty(name))
+        if (name.Length == 0)
         {
             return "anonymous-stub";
         }

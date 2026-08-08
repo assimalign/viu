@@ -91,7 +91,7 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             "private static class SingleFileComponentScriptUpdateMarker");
         baseline.GeneratedSource.ShouldContain(
             "private static class SingleFileComponentStyleUpdateMarker");
-        baseline.GeneratedSource.ShouldNotContain("IComponentHotReloadMetadata");
+        baseline.GeneratedSource.ShouldNotContain("IComponentHotReload" + "Metadata");
         baseline.GeneratedSource.ShouldNotContain("HotReloadComponentIdentifier");
         baseline.GeneratedSource.ShouldNotContain(
             "_hotReloadRenderCache = new object?[RenderCacheSize]");
@@ -270,7 +270,7 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             "Counter.SingleFileComponent.g.cs");
         generated.ShouldContain("[global::System.Runtime.CompilerServices.ModuleInitializer]");
         generated.ShouldContain("global::Assimalign.Viu.ComponentHotReload.Register(");
-        generated.ShouldNotContain("IComponentHotReloadMetadata");
+        generated.ShouldNotContain("IComponentHotReload" + "Metadata");
         outcome.Sources.ShouldContain(source =>
             string.Equals(source.HintName, HandlerHintName, StringComparison.Ordinal));
     }

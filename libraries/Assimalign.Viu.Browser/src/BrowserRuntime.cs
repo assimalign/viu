@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Browser;
 /// <summary>
 /// The browser entry point of Viu: the host that binds Core's host-neutral renderer to the real
 /// DOM. Loads the bridge module this package ships as a static web asset, then hands out renderers
-/// whose node-ops drive the DOM over int-handle interop. Single-threaded by design (browser main
+/// whose host operations drive the DOM over int-handle interop. Single-threaded by design (browser main
 /// thread only); not thread-safe.
 /// <para>
 /// Normal app bootstrap does <b>not</b> call this type: build an application with
@@ -55,13 +55,19 @@ public static class BrowserRuntime
     internal static bool IsBridgeInitialized => _initialization is { IsCompletedSuccessfully: true };
 
     /// <summary>
-    /// Creates a renderer over the browser node-ops. The bridge must already be initialized.
+    /// Creates an explicitly disposable renderer lease over the Browser command-frame host. The
+    /// bridge must already be initialized. Dispose the lease before activating another Browser
+    /// application or renderer.
     /// </summary>
     /// <exception cref="InvalidOperationException">The bridge has not been initialized (call <see cref="InitializeAsync"/>).</exception>
-    public static Renderer<int> CreateRenderer()
+    public static BrowserRendererLease CreateRenderer()
     {
         EnsureBridgeInitialized();
-        return RendererFactory.CreateRenderer(BrowserNodeOperations.Create());
+        BufferedBrowserNodeOperations operations =
+            BufferedBrowserNodeOperations.CreateProduction();
+        Renderer<int> renderer = RendererFactory.CreateRenderer(operations.Create());
+        IDisposable activation = operations.Activate();
+        return new BrowserRendererLease(renderer, activation);
     }
 
     /// <summary>Clears a container's content in one interop call, releasing registered child handles.</summary>

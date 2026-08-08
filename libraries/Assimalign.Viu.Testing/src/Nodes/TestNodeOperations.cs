@@ -2,54 +2,50 @@ using System;
 using System.Collections.Generic;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Builds the host operations used by <see cref="Renderer{TNode}"/> over the in-memory test tree.
-/// Every operation mutates the tree and is recorded in a <see cref="TestNodeOperationLog"/>.
-/// </summary>
+/// <summary>Builds the production renderer contract over an in-memory host tree.</summary>
+/// <remarks>
+/// Every operation mutates the tree and records the same cold-path observation for assertions.
+/// Specified by <c>[RND-HOST-1]</c> through <c>[RND-HOST-4]</c> and <c>[HYD-2]</c>.
+/// </remarks>
 public static class TestNodeOperations
 {
-    /// <summary>Creates the host-operation set.</summary>
-    /// <param name="log">The operation log.</param>
-    /// <param name="queryRoots">
-    /// Roots searched when Core resolves a string Teleport target.
-    /// </param>
-    /// <param name="strictRemoval">
-    /// Whether removing the same host node twice throws, matching handle-based host behavior.
-    /// </param>
-    /// <param name="snapshotSemantics">
-    /// Whether hydration reads an immutable pre-walk rather than the live test tree.
-    /// </param>
-    /// <returns>The renderer options.</returns>
+    /// <summary>Creates a complete test-host renderer option set.</summary>
+    /// <param name="operationLog">The operation log receiving all host writes and commits.</param>
+    /// <param name="queryRoots">Optional roots used for teleport selector resolution.</param>
+    /// <param name="strictRemoval">Whether removing the same node twice throws.</param>
+    /// <param name="snapshotSemantics">Whether hydration reads an immutable pre-walk.</param>
+    /// <returns>The complete renderer option set.</returns>
     public static RendererOptions<TestNode> Create(
-        TestNodeOperationLog log,
+        TestNodeOperationLog operationLog,
         IReadOnlyList<TestElement>? queryRoots = null,
         bool strictRemoval = false,
         bool snapshotSemantics = false)
     {
-        ArgumentNullException.ThrowIfNull(log);
+        ArgumentNullException.ThrowIfNull(operationLog);
         HashSet<TestNode>? removedNodes = strictRemoval
             ? new HashSet<TestNode>(ReferenceEqualityComparer.Instance)
             : null;
 
         return new RendererOptions<TestNode>
         {
-            CreateElement = (tag, elementNamespace) =>
+            CreateElement = name =>
             {
-                TestElement element = new(tag, elementNamespace);
-                log.Add(
+                TestElement element = new(name);
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.CreateElement,
                         element,
-                        Text: tag));
+                        Text: name.ToString()));
                 return element;
             },
             CreateText = text =>
             {
                 TestText textNode = new(text);
-                log.Add(
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.CreateText,
                         textNode,
@@ -59,7 +55,7 @@ public static class TestNodeOperations
             CreateComment = text =>
             {
                 TestComment comment = new(text);
-                log.Add(
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.CreateComment,
                         comment,
@@ -78,10 +74,10 @@ public static class TestNodeOperations
                         break;
                     default:
                         throw new InvalidOperationException(
-                            "Only text and comment nodes carry mutable text.");
+                            "Only text and comment nodes carry mutable character data.");
                 }
 
-                log.Add(
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.SetText,
                         node,
@@ -89,22 +85,25 @@ public static class TestNodeOperations
             },
             Insert = (child, parent, anchor) =>
             {
-                TestElement parentElement = (TestElement)parent;
-                Detach(child);
-                int insertIndex = anchor is null
-                    ? -1
-                    : parentElement.Children.IndexOf(anchor);
-                if (insertIndex < 0)
+                TestElement parentElement = RequireElement(parent, "insert parent");
+                if (anchor is not null && !ReferenceEquals(anchor.Parent, parentElement))
                 {
-                    parentElement.Children.Add(child);
-                }
-                else
-                {
-                    parentElement.Children.Insert(insertIndex, child);
+                    throw new InvalidOperationException(
+                        "An insertion anchor must belong to the destination parent.");
                 }
 
+                if (ReferenceEquals(child, anchor))
+                {
+                    return;
+                }
+
+                Detach(child);
+                int insertIndex = anchor is null
+                    ? parentElement.Children.Count
+                    : parentElement.Children.IndexOf(anchor);
+                parentElement.Children.Insert(insertIndex, child);
                 child.Parent = parentElement;
-                log.Add(
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.Insert,
                         child,
@@ -121,103 +120,53 @@ public static class TestNodeOperations
 
                 TestElement? parent = child.Parent;
                 Detach(child);
-                log.Add(
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.Remove,
                         child,
                         parent));
             },
-            ParentNode = node => node.Parent,
-            NextSibling = node =>
+            ParentNode = static node => node.Parent,
+            NextSibling = static node => NextSibling(node),
+            PatchAttribute = (node, previousBinding, nextBinding) =>
             {
-                if (node.Parent is null)
-                {
-                    return null;
-                }
-
-                List<TestNode> siblings = node.Parent.Children;
-                int index = siblings.IndexOf(node);
-                return index >= 0 && index + 1 < siblings.Count
-                    ? siblings[index + 1]
-                    : null;
-            },
-            PatchAttribute = (
-                node,
-                _,
-                attributeName,
-                previousValue,
-                nextValue,
-                _) =>
-            {
-                TestElement element = (TestElement)node;
-                if (nextValue is null)
-                {
-                    element.Properties.Remove(attributeName);
-                }
-                else
-                {
-                    element.Properties[attributeName] = nextValue;
-                }
-
-                if (TestEventNames.IsListener(attributeName))
-                {
-                    string eventName = attributeName[2..].ToLowerInvariant();
-                    if (nextValue is Delegate listener)
-                    {
-                        element.EventListeners[eventName] = listener;
-                    }
-                    else
-                    {
-                        element.EventListeners.Remove(eventName);
-                    }
-                }
-
-                log.Add(
+                TestElement element = RequireElement(node, "binding target");
+                PatchBinding(element, previousBinding, nextBinding);
+                ElementBinding binding = nextBinding ?? previousBinding
+                    ?? throw new InvalidOperationException(
+                        "A binding patch must carry a previous or next binding.");
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.PatchAttribute,
                         node,
-                        PropertyName: attributeName,
-                        PreviousValue: previousValue,
-                        NextValue: nextValue));
+                        PropertyName: binding.Name.ToString(),
+                        PreviousValue: previousBinding?.Value,
+                        NextValue: nextBinding?.Value));
             },
             ResolveTeleportTarget = queryRoots is null
                 ? null
-                : target => ResolveTarget(queryRoots, target),
-            SetScopeIdentifier = (node, scopeIdentifier) =>
+                : selector => ResolveTarget(queryRoots, selector),
+            Commit = () => operationLog.Add(
+                new TestNodeOperation(TestNodeOperationType.Commit)),
+            InsertStaticContent = (format, content, parent, anchor) =>
             {
-                TestElement element = (TestElement)node;
-                element.Properties[scopeIdentifier] = string.Empty;
-                log.Add(
-                    new TestNodeOperation(
-                        TestNodeOperationType.SetScopeIdentifier,
-                        node,
-                        PropertyName: scopeIdentifier,
-                        NextValue: string.Empty));
-            },
-            CreateHydrationReader = snapshotSemantics
-                ? root => new FrozenTestHydrationReader(root)
-                : _ => TestHydrationReader.Instance,
-            InsertStaticContent = (content, parent, anchor, _) =>
-            {
+                _ = format;
+                TestElement parentElement = RequireElement(parent, "static-content parent");
                 TestText staticNode = new(content)
                 {
                     IsStaticContent = true,
                 };
-                TestElement parentElement = (TestElement)parent;
                 int insertIndex = anchor is null
-                    ? -1
+                    ? parentElement.Children.Count
                     : parentElement.Children.IndexOf(anchor);
                 if (insertIndex < 0)
                 {
-                    parentElement.Children.Add(staticNode);
-                }
-                else
-                {
-                    parentElement.Children.Insert(insertIndex, staticNode);
+                    insertIndex = parentElement.Children.Count;
                 }
 
+                parentElement.Children.Insert(insertIndex, staticNode);
                 staticNode.Parent = parentElement;
-                log.Add(
+                operationLog.Add(
                     new TestNodeOperation(
                         TestNodeOperationType.InsertStaticContent,
                         staticNode,
@@ -226,18 +175,66 @@ public static class TestNodeOperations
                         Text: content));
                 return (staticNode, staticNode);
             },
+            CreateHydrationReader = snapshotSemantics
+                ? root => new FrozenTestHydrationReader(root)
+                : _ => TestHydrationReader.Instance,
         };
+    }
+
+    private static void PatchBinding(
+        TestElement element,
+        ElementBinding? previousBinding,
+        ElementBinding? nextBinding)
+    {
+        if (previousBinding is not null)
+        {
+            string previousName = previousBinding.Name.ToString();
+            if (nextBinding is null
+                || nextBinding.Name != previousBinding.Name
+                || nextBinding.Kind != previousBinding.Kind)
+            {
+                element.Properties.Remove(previousName);
+                if (previousBinding.Kind == ElementBindingKind.Event)
+                {
+                    element.EventListeners.Remove(previousBinding.Name.LocalName);
+                }
+            }
+        }
+
+        if (nextBinding is null)
+        {
+            return;
+        }
+
+        string nextName = nextBinding.Name.ToString();
+        if (nextBinding.Value is null)
+        {
+            element.Properties.Remove(nextName);
+        }
+        else
+        {
+            element.Properties[nextName] = nextBinding.Value;
+        }
+
+        if (nextBinding.Kind != ElementBindingKind.Event)
+        {
+            return;
+        }
+
+        if (nextBinding.Value is Delegate listener)
+        {
+            element.EventListeners[nextBinding.Name.LocalName] = listener;
+        }
+        else
+        {
+            element.EventListeners.Remove(nextBinding.Name.LocalName);
+        }
     }
 
     private static TestNode? ResolveTarget(
         IReadOnlyList<TestElement> roots,
-        object target)
+        string selector)
     {
-        if (target is not string selector)
-        {
-            return null;
-        }
-
         for (int rootIndex = 0; rootIndex < roots.Count; rootIndex++)
         {
             TestElement root = roots[rootIndex];
@@ -246,15 +243,12 @@ public static class TestNodeOperations
                 return root;
             }
 
-            List<TestElement> descendants =
-                TestQuery.DescendantElementsOf(root);
-            for (int elementIndex = 0;
-                elementIndex < descendants.Count;
-                elementIndex++)
+            List<TestElement> descendants = TestQuery.DescendantElementsOf(root);
+            for (int index = 0; index < descendants.Count; index++)
             {
-                if (TestQuery.Matches(descendants[elementIndex], selector))
+                if (TestQuery.Matches(descendants[index], selector))
                 {
-                    return descendants[elementIndex];
+                    return descendants[index];
                 }
             }
         }
@@ -262,12 +256,32 @@ public static class TestNodeOperations
         return null;
     }
 
+    private static TestElement RequireElement(TestNode node, string role) =>
+        node as TestElement
+        ?? throw new InvalidOperationException($"The {role} must be a TestElement.");
+
+    private static TestNode? NextSibling(TestNode node)
+    {
+        TestElement? parent = node.Parent;
+        if (parent is null)
+        {
+            return null;
+        }
+
+        int index = parent.Children.IndexOf(node);
+        return index >= 0 && index + 1 < parent.Children.Count
+            ? parent.Children[index + 1]
+            : null;
+    }
+
     private static void Detach(TestNode node)
     {
-        if (node.Parent is not null)
+        if (node.Parent is not TestElement parent)
         {
-            node.Parent.Children.Remove(node);
-            node.Parent = null;
+            return;
         }
+
+        parent.Children.Remove(node);
+        node.Parent = null;
     }
 }

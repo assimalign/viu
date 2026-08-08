@@ -1,114 +1,69 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Components;
 
 /// <summary>
-/// The default component factory. It dispatches component activation through explicit delegates.
+/// The default registration-backed component factory. Unsealed so a composition root can layer
+/// an explicit resolution policy; every override must remain reflection-free.
 /// </summary>
 /// <remarks>
-/// Activators may close over any application-owned resolver. The factory does not own or dispose
-/// values captured by activators. A registered name is resolved by trying the raw name, then its
-/// camel-case spelling, then the Pascal-case spelling of that, so a <c>my-widget</c> request
-/// resolves a <c>myWidget</c> or <c>MyWidget</c> registration; lookup is ordinal throughout.
-/// Specified by <c>[CMP-6]</c>. The factory is not thread-safe.
+/// Registered-name lookup tries the exact name, its camel-case form, and then the Pascal-case
+/// form of that value. Lookup is ordinal and registrations that are equivalent only after
+/// normalization remain distinct, so exact matches retain precedence. The factory is not
+/// thread-safe. Specified by <c>[CMP-4]</c> and <c>[CMP-6]</c>.
 /// </remarks>
-public sealed class ComponentFactory : IComponentFactory
+public class ComponentFactory : IComponentFactory
 {
-    private readonly Dictionary<Type, ComponentActivator> _componentsByType = new();
-    private readonly Dictionary<string, ComponentActivator> _componentsByName =
-        new(StringComparer.Ordinal);
+    private readonly Dictionary<ComponentReference, ComponentRegistration> _registrations = [];
 
-    /// <summary>Creates a factory over explicit component registrations.</summary>
-    /// <param name="registrations">The component activation registrations.</param>
-    public ComponentFactory(IEnumerable<ComponentRegistration> registrations)
+    /// <summary>Registers a component, throwing on a duplicate reference.</summary>
+    /// <param name="registration">The explicit registration.</param>
+    public void Register(ComponentRegistration registration)
     {
-        ArgumentNullException.ThrowIfNull(registrations);
-
-        foreach (ComponentRegistration registration in registrations)
-        {
-            if (!_componentsByType.TryAdd(registration.ComponentType, registration.Activator))
-            {
-                throw new ArgumentException(
-                    $"Component type \"{registration.ComponentType}\" is registered more than once.",
-                    nameof(registrations));
-            }
-
-            if (registration.Name is not null
-                && !_componentsByName.TryAdd(registration.Name, registration.Activator))
-            {
-                throw new ArgumentException(
-                    $"Component name \"{registration.Name}\" is registered more than once.",
-                    nameof(registrations));
-            }
-        }
+        ArgumentNullException.ThrowIfNull(registration);
+        _registrations.Add(registration.Reference, registration);
     }
 
     /// <inheritdoc/>
-    public IComponentTemplate Create(Type componentType)
+    public virtual ComponentRegistration Resolve(ComponentReference reference)
     {
-        ArgumentNullException.ThrowIfNull(componentType);
-        if (!_componentsByType.TryGetValue(componentType, out ComponentActivator? activator))
-        {
-            throw new InvalidOperationException(
-                $"Component type \"{componentType}\" is not registered. Register an explicit "
-                + "ComponentActivator; runtime constructor discovery is not supported.");
-        }
-
-        return activator();
+        return TryResolve(reference, out ComponentRegistration? registration)
+            ? registration!
+            : throw new InvalidOperationException(
+                "The component reference is not registered; runtime constructor discovery is not supported.");
     }
 
     /// <inheritdoc/>
-    public IComponentTemplate Create(string name)
+    public virtual bool TryResolve(ComponentReference reference, out ComponentRegistration? registration)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        if (!TryResolveName(name, out ComponentActivator? activator))
-        {
-            throw new InvalidOperationException($"Component name \"{name}\" is not registered.");
-        }
-
-        return activator();
-    }
-
-    /// <summary>Creates a fresh template from its explicitly registered generic type.</summary>
-    /// <typeparam name="TComponent">The registered component template type.</typeparam>
-    /// <returns>A new component template for one mount.</returns>
-    public TComponent Create<TComponent>()
-        where TComponent : class, IComponentTemplate
-    {
-        return (TComponent)Create(typeof(TComponent));
-    }
-
-    private bool TryResolveName(
-        string name,
-        [NotNullWhen(true)] out ComponentActivator? activator)
-    {
-        if (_componentsByName.TryGetValue(name, out activator))
+        ArgumentNullException.ThrowIfNull(reference);
+        if (_registrations.TryGetValue(reference, out registration))
         {
             return true;
         }
 
+        if (reference.Kind != ComponentReferenceKind.RegisteredName)
+        {
+            return false;
+        }
+
+        string name = reference.RegisteredName!;
         string camelizedName = NameNormalization.Camelize(name);
-        if (!string.Equals(camelizedName, name, StringComparison.Ordinal)
-            && _componentsByName.TryGetValue(camelizedName, out activator))
+        if (camelizedName.Length > 0
+            && !string.Equals(camelizedName, name, StringComparison.Ordinal)
+            && _registrations.TryGetValue(
+                ComponentReference.ForName(camelizedName),
+                out registration))
         {
             return true;
         }
 
-        string pascalizedName = NameNormalization.Capitalize(camelizedName);
-        if (!string.Equals(
-                pascalizedName,
-                camelizedName,
-                StringComparison.Ordinal)
-            && _componentsByName.TryGetValue(pascalizedName, out activator))
-        {
-            return true;
-        }
-
-        activator = null;
-        return false;
+        string pascalizedName = NameNormalization.Pascalize(camelizedName);
+        return pascalizedName.Length > 0
+            && !string.Equals(pascalizedName, camelizedName, StringComparison.Ordinal)
+            && _registrations.TryGetValue(
+                ComponentReference.ForName(pascalizedName),
+                out registration);
     }
 }

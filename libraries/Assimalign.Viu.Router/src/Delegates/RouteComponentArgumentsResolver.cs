@@ -1,4 +1,4 @@
-using Assimalign.Viu.Components;
+using System.Collections.Generic;
 
 namespace Assimalign.Viu.Router;
 
@@ -10,4 +10,6 @@ namespace Assimalign.Viu.Router;
 /// </summary>
 /// <param name="route">The resolved location whose component is being rendered.</param>
 /// <returns>The arguments for the component, or <see langword="null"/> for none.</returns>
-public delegate IComponentArguments? RouteComponentArgumentsResolver(RouteLocation route);
+/// <remarks>Specified by <c>[RTR-4]</c>.</remarks>
+public delegate IReadOnlyDictionary<string, object?>? RouteComponentArgumentsResolver(
+    RouteLocation route);

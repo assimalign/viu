@@ -100,10 +100,11 @@ HTML serialization, the Language Server Protocol — name and link that target. 
 - Folders are **physical only** — they never appear in a namespace. Create a folder only when it will contain files.
 - Linked shared-source paths are frozen. Syntax siblings and the compiler/UtilityCss projects link
   Syntax shims through `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`;
-  `Assimalign.Viu.Syntax.Templates` links Shared sources through
-  `..\..\..\libraries\Assimalign.Viu.Shared\src\<File>`; and the Visual Studio project uses
+  `Assimalign.Viu.Syntax.Templates` links flag sources from
+  `..\..\..\libraries\Assimalign.Viu.Components\src\` and DOM data from
+  `..\..\..\libraries\Assimalign.Viu.ServerRenderer\src\Internal\`; the Visual Studio project uses
   `$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs` plus the
-  Shared `DomKnowledgeData.cs` path under `$(ViuRepositoryDirectory)libraries\`. Moving an owner or
+  the ServerRenderer `DomKnowledgeData.cs` path under `$(ViuRepositoryDirectory)libraries\`. Moving an owner or
   consumer requires updating every linking csproj in the same change.
 
 ### Files and types
@@ -185,7 +186,7 @@ belongs in `build/`, never duplicated in individual csprojs** — this is the mo
 Never write a raw `<ProjectReference Include="..\..\...csproj" />` or `<PackageReference>` in a library,
 test, or example csproj. Use the by-name item groups the build system resolves:
 
-- **`<ViuProjectReference Include="Assimalign.Viu.Shared" />`** — public project reference (flows as a
+- **`<ViuProjectReference Include="Assimalign.Viu.Components" />`** — public project reference (flows as a
   `.nupkg` dependency). Resolved by assembly name across the indexed repository roots, including
   `libraries/` and `tooling/`.
 - **`<ViuPrivateProjectReference Include="..." />`** — private reference (`PrivateAssets=all`; does not
@@ -217,7 +218,7 @@ Shipping library (`src/`):
   </PropertyGroup>
   <!-- optional -->
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.Shared" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
   </ItemGroup>
 </Project>
 ```

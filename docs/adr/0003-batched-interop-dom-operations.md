@@ -3,7 +3,7 @@
 - **Status:** Accepted (decision stands; framing annotated 2026-08-02 — see the note below)
 - **Date:** 2026-07-19 (foundational C#/WASM premise; formally recorded under [V01.01.13.01], #98)
 - **Scope:** `Assimalign.Viu.RuntimeDom`, `Assimalign.Viu.RuntimeCore` (renderer, scheduler, block
-  tree), `Assimalign.Viu.Shared` (the flag vocabulary), and the compiler's static-optimization
+  tree), `Assimalign.Viu.Components` (the flag vocabulary), and the compiler's static-optimization
   passes.
 
 > **Superseded framing (2026-08-02).** On 2026-08-02 the user directed that **Viu is a standalone
@@ -45,7 +45,7 @@ crossings as possible and keep each one cheap.**
 - Static content is stringified aggressively and inserted via `innerHTML` (`insertStaticContent`),
   collapsing many node ops into one.
 - The compiler and runtime share the `PatchFlags`/`ShapeFlags`/`SlotFlags` bitmask vocabulary (in
-  `Assimalign.Viu.Shared`); the renderer patches only what the flags mark dynamic, and the block
+  `Assimalign.Viu.Components`); the renderer patches only what the flags mark dynamic, and the block
   tree flattens dynamic nodes so patching skips the static structure.
 - JS-side handles and event listeners are always cleaned up deterministically (two-sided release).
 

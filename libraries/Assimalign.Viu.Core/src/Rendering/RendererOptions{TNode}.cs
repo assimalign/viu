@@ -1,77 +1,59 @@
 using System;
 
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Supplies every platform operation used by <see cref="Renderer{TNode}"/>.
+/// Supplies the complete set of host operations used by <see cref="Renderer{TNode}"/>.
 /// </summary>
-/// <remarks>
-/// This is the whole host abstraction: the complete set of primitives a host must supply for
-/// <see cref="Renderer{TNode}"/> to drive it (<c>[RND-HOST-1]</c>). Core never performs browser or WebView2 work
-/// directly. A host package supplies these delegates and may batch their effects at its own
-/// commit boundary. The renderer is single-threaded and trimming safe.
-/// </remarks>
 /// <typeparam name="TNode">
-/// The platform node type. Hosts using a value-type handle reserve its default value for
-/// “no node.”
+/// The opaque host-node type. Value-handle hosts reserve its default value for no node.
 /// </typeparam>
+/// <remarks>
+/// Core carries no platform handles or markup namespace policy. The host interprets each
+/// <see cref="QualifiedName"/> and may buffer work until <see cref="Commit"/>. Specified by
+/// <c>[RND-HOST-1]</c> through <c>[RND-HOST-4]</c>.
+/// </remarks>
 public sealed class RendererOptions<TNode>
     where TNode : notnull
 {
-    /// <summary>Inserts or moves a child before an anchor, appending when the anchor is absent.</summary>
+    /// <summary>Gets the operation that inserts or moves a child before an optional anchor.</summary>
     public required Action<TNode, TNode, TNode?> Insert { get; init; }
 
-    /// <summary>Removes a node from its host parent.</summary>
+    /// <summary>Gets the operation that removes a host node.</summary>
     public required Action<TNode> Remove { get; init; }
 
-    /// <summary>Creates an element for a tag and optional platform namespace.</summary>
-    public required Func<string, string?, TNode> CreateElement { get; init; }
+    /// <summary>Gets the operation that creates an element from its complete qualified name.</summary>
+    public required Func<QualifiedName, TNode> CreateElement { get; init; }
 
-    /// <summary>Creates a text node.</summary>
+    /// <summary>Gets the operation that creates a text node.</summary>
     public required Func<string, TNode> CreateText { get; init; }
 
-    /// <summary>Creates a comment node.</summary>
+    /// <summary>Gets the operation that creates a comment node.</summary>
     public required Func<string, TNode> CreateComment { get; init; }
 
-    /// <summary>Changes the content of an existing text node.</summary>
+    /// <summary>Gets the operation that changes character data on an existing text node.</summary>
     public required Action<TNode, string> SetText { get; init; }
 
-    /// <summary>Returns a node's host parent, or default when it has none.</summary>
+    /// <summary>Gets the operation that returns a node's parent, or default when detached.</summary>
     public required Func<TNode, TNode?> ParentNode { get; init; }
 
-    /// <summary>Returns a node's next host sibling, or default at the end.</summary>
+    /// <summary>Gets the operation that returns a node's next sibling, or default at the end.</summary>
     public required Func<TNode, TNode?> NextSibling { get; init; }
 
-    /// <summary>Applies one immutable attribute-snapshot difference.</summary>
+    /// <summary>Gets the operation that applies one immutable binding difference.</summary>
     public required PatchAttributeDelegate<TNode> PatchAttribute { get; init; }
 
-    /// <summary>
-    /// Optionally stamps a compiler-produced scoped-style identifier on an element.
-    /// </summary>
-    public Action<TNode, string>? SetScopeIdentifier { get; init; }
+    /// <summary>Gets the optional host target resolver used by teleport nodes.</summary>
+    public Func<string, TNode?>? ResolveTeleportTarget { get; init; }
 
-    /// <summary>
-    /// Optionally resolves a teleport target descriptor, such as a CSS selector, to a host
-    /// container. A target already assignable to <typeparamref name="TNode"/> is used directly.
-    /// </summary>
-    public Func<object, TNode?>? ResolveTeleportTarget { get; init; }
-
-    /// <summary>
-    /// Optionally commits host mutations accumulated by a buffered adapter. Core invokes it before
-    /// post-render callbacks and again when those callbacks enqueue additional host work.
-    /// </summary>
+    /// <summary>Gets the optional buffered-host commit operation.</summary>
     public Action? Commit { get; init; }
 
-    /// <summary>
-    /// Optionally inserts a static-content span. Rendering
-    /// <see cref="Assimalign.Viu.Components.IStaticComponent"/> requires this operation.
-    /// </summary>
+    /// <summary>Gets the optional one-shot static-content insertion operation.</summary>
     public InsertStaticContentDelegate<TNode>? InsertStaticContent { get; init; }
 
-    /// <summary>
-    /// Optionally creates a read-only view over an existing server-rendered subtree. Hydration
-    /// requires this operation. A browser or WebView2 host should return a reader backed by one
-    /// batched subtree snapshot.
-    /// </summary>
+    /// <summary>Gets the optional existing-subtree reader factory used for hydration.</summary>
     public Func<TNode, HydrationNodeReader<TNode>>? CreateHydrationReader { get; init; }
 }

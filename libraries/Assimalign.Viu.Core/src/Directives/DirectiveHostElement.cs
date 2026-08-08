@@ -4,24 +4,21 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Pairs an immutable element component with the host element mounted for that render value.
-/// </summary>
+/// <summary>Pairs an immutable element node with its mounted host element.</summary>
+/// <remarks>Specified by <c>[CMP-7]</c> and <c>[HYD-4]</c>.</remarks>
 public sealed class DirectiveHostElement
 {
-    internal DirectiveHostElement(
-        IElementComponent component,
-        object element)
+    internal DirectiveHostElement(ElementNode value, object element)
     {
-        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(element);
-        Component = component;
+        Value = value;
         Element = element;
     }
 
-    /// <summary>Gets the immutable element component.</summary>
-    public IElementComponent Component { get; }
+    /// <summary>Gets the immutable element node.</summary>
+    public ElementNode Value { get; }
 
-    /// <summary>Gets the boxed host element.</summary>
+    /// <summary>Gets the boxed mounted host element.</summary>
     public object Element { get; }
 }

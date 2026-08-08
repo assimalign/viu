@@ -68,7 +68,7 @@ taking `Browser` and its `browser-wasm` runtime pin.
 | D6 | **Segment the SDK and the shared framework by platform.** `Assimalign.Viu.Sdk` and `Assimalign.Viu.App` become platform-agnostic; `Assimalign.Viu.Sdk.Browser` and `Assimalign.Viu.App.Browser` carry everything browser-specific. Direction set by Chase. Full design in the section below. | 2026-08-06 | Today there is exactly one SDK and one framework, and both are browser-only by construction: `sdks/Assimalign.Viu.Sdk/Sdk/Sdk.props:8` opens with `<Import Sdk="Microsoft.NET.Sdk.WebAssembly" …>` under the comment *"A Viu app is a WASM browser app, so the chain starts at Microsoft.NET.Sdk.WebAssembly"*, and the single `Assimalign.Viu.App` framework bundles `Browser` with the host-agnostic libraries. So authoring a platform-agnostic Viu component library means taking the WebAssembly SDK and a `browser-wasm` runtime pin for code that renders nothing. The split gives that author a first-class path, and gives every future host (SSR, WebView) a shape to slot into rather than a fork. |
 | D7 | **`Assimalign.Viu.Hosting` (T06) is not implemented in this repository.** The host-authoring/app-authoring namespace split moves to the Cohesion project. | 2026-08-06 | Direction set by Chase. The finding stands and is worth keeping recorded — the `Assimalign.Viu` front door mixes app-authoring API with host-adapter plumbing — but the segmentation is being solved in Cohesion rather than duplicated here. D5 also already removed much of what T06 targeted: mounting moved into Browser and the generic Core application abstraction was deleted. T06 stays in the state table as **Will not do (see D7)** so a future session does not re-derive it as an open opportunity. |
 | D8 | **`InternalsVisibleTo` is for unit tests only, everywhere.** It is not a mechanism for sharing internals between libraries — including between two build-time-only libraries. Grants live in `src/Properties/AssemblyInfo.cs`. Recorded as a standing rule in `.claude/rules/general-rules.md`. | 2026-08-06 | Direction set by Chase. A cross-library grant makes the assembly boundary a fiction: two assemblies that need each other's internals are either one assembly, or have an API that was never designed. This reverses the premise of T05 as originally scoped, which planned to internalize ~120 types and add grants — see the T05 note below for what it becomes. Being non-shipping is not an exemption: a build-time assembly's surface is invisible to app developers, but the boundary still exists for maintainers. Eight cross-library grants exist today and are in scope to remove. |
-| D9 | **The component-model redesign is adopted.** [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md) is the plan of record, and this arc is at a full stop until its swap lands. | 2026-08-07 | Supersedes T05 Core decisions 4–6 by replacing or re-timing them into `[V01.01.15]`; supersedes the refuted-findings protections for `RenderHelpers._withHandler` and underscore helper names because frame-based emission removes that ABI; and re-times PublicAPI baseline regeneration until after the swap. Feature #316 performs the full post-swap reevaluation before this arc resumes. |
+| D9 | **The component-model redesign is adopted and implemented.** [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md) is its plan and completion record. | 2026-08-07 | Supersedes T05 Core decisions 4–6 through `[V01.01.15]`; supersedes protections for the former static render-helper ABI because frame-based emission removes that ABI; and places PublicAPI baseline regeneration after the completed swap. Feature #316 performs the post-swap reevaluation before this arc resumes. |
 
 ## State
 
@@ -204,7 +204,7 @@ paths; component creation runs once per mount, so this is a deliberate, document
 |---|---|---|
 | `ApplicationOptions.Services` | `IServiceProvider` = `EmptyServiceProvider.Instance` | `IServiceProvider?` = `null` |
 | `IApplicationContext.Services` | `IServiceProvider` | `IServiceProvider?` |
-| `IComponentContext.Services` | `IServiceProvider` | `IServiceProvider?` |
+| Component context `Services` | `IServiceProvider` | `IServiceProvider?` |
 
 `BrowserApplicationBuilder`'s "Services cannot be null" guard goes with them — it exists only to defend
 the non-null fiction. Verified safe for code generation: the single-file-component emitter never touches
@@ -219,25 +219,17 @@ writes a factory that does that.
 The `[APP-1]` lifecycle enum. A host legitimately observes which state an application is in, and
 `IApplicationContext.IsRunning` already exposes a coarser view of the same fact.
 
-#### 3. `ComponentContext` — **not** promoted; two members added to `IComponentContext`
+#### 3. Historical proposal for the mounted context — superseded by D9
 
-545 lines, but consumers reach past `IComponentContext` for exactly two things:
+The audit found that consumers reached past the former mounted-context contract for exactly two
+things:
 
-- `ScopeIdentifier` — `ComponentTreeSerializer.cs:97`, stamping the scoped-CSS attribute
+- the scoped-style identifier used by `ComponentTreeSerializer.cs`, stamping the scoped-CSS attribute;
 - `Parent` — `ComponentWrapper.cs:296`, walking ancestors to resolve a query
 
-```csharp
-public interface IComponentContext
-{
-    // … existing members …
-    string? ScopeIdentifier { get; }
-    IComponentContext? Parent { get; }
-}
-```
-
-Neither leaks anything new: `ScopeIdentifier` is already public on `IComponentTemplate`, and a context
-having a parent is an ordinary thing to model. `ComponentContext` stays `internal`; the consumers'
-signatures change to `IComponentContext?`.
+The original proposal added both to the then-public interface while keeping its runtime
+implementation internal. D9 superseded that shape: the shipping public abstract
+`ComponentContext` carries `Parent`, while scoped-style identity remains deferred.
 
 #### 4. `MountedComponent` — **not** promoted; a render scope replaces it
 
@@ -258,15 +250,15 @@ The mount must stay alive while the caller serializes the subtree, so a fire-and
 public interface IComponentRenderScope : IAsyncDisposable
 {
     IComponent Tree { get; }
-    IComponentContext Context { get; }
+    ComponentContext Context { get; }
 }
 
 public static class ComponentHost   // existing public static class
 {
     public static ValueTask<IComponentRenderScope> RenderAsync(
         IApplicationContext application,
-        ITemplateComponent request,
-        IComponentContext? parent,
+        ComponentNode request,
+        ComponentContext? parent,
         int componentIdentifier,
         CancellationToken cancellationToken = default);
 }
@@ -285,7 +277,7 @@ Used only by `Testing`, which needs precisely three facts per mounted template: 
 ```csharp
 public interface IMountedTemplateView<TNode>
 {
-    IComponentContext Context { get; }
+    ComponentContext Context { get; }
     TNode FirstHostNode { get; }
     TNode LastHostNode { get; }
 }
@@ -441,7 +433,7 @@ public interface IApplicationContext
     IServiceProvider Services { get; }
     IStateStoreRegistry? State { get; }
     IDirectiveResolver? Directives { get; }
-    Action<Exception, IComponentContext?, string>? ErrorHandler { get; }
+    Action<Exception, ComponentContext?, string>? ErrorHandler { get; }
     Action<string>? WarnHandler { get; }
 }
 
@@ -617,7 +609,7 @@ own test coverage.
 The adversarial verification pass killed three attractive-looking recommendations. They are recorded
 here so a future session does not rediscover and act on them:
 
-1. **Do not delete `RenderHelpers._withHandler(Delegate)`.** C# has no implicit delegate-to-delegate
+1. **Do not delete the former static helper's handler-cache overload in the old architecture.** C# has no implicit delegate-to-delegate
    conversion, so an expression already typed as one of the five shapes
    `CreateComponentEventListener` supports binds *only* the `Delegate` overload. Deleting it makes
    `@click="SomeComponentEventHandlerField"` a compile error for all five.
@@ -636,9 +628,9 @@ Also **not** plumbing despite appearances, per the specification: `ApplicationWa
 
 Both examples that opened this arc were real problems, but neither had the obvious fix.
 
-**`RenderHelpers._openBlock` and the underscore surface.** The underscore prefix is **load-bearing**,
+**The former static block helper and underscore surface.** The underscore prefix was **load-bearing**,
 not a style lapse, and these members cannot become `internal`. The single-file-component emitter
-writes `using static global::Assimalign.Viu.RenderHelpers;` into the *same compilation unit* as the
+wrote a static import for that helper into the *same compilation unit* as the
 author's `@script` members, so they bind unqualified in user code — PascalCase spellings (`Fragment`,
 `Capitalize`, `RenderList`) would be shadowed by any same-named user member. `[SFC-CG-2]` makes the
 by-name binding normative, and `[SFC-CG-6]`/`[SFC-CG-7]` name individual members. Renaming is also a

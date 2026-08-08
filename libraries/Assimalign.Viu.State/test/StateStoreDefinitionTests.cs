@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
-
-using Assimalign.Viu.Components;
 
 using Shouldly;
 using Xunit;
+
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.State.Tests;
 
@@ -16,7 +16,7 @@ public sealed class StateStoreDefinitionTests : IDisposable
     }
 
     [Fact]
-    public void Define_ContextAwareSetup_CarriesKeyAndRunsOncePerRegistry()
+    public void Define_ContextAwareSetup_CarriesMetadataAndRunsOncePerRegistry()
     {
         int setupRuns = 0;
         StateStoreDefinition<CounterStore> definition =
@@ -31,10 +31,13 @@ public sealed class StateStoreDefinitionTests : IDisposable
         using StateStoreRegistry registry =
             StateStoreTestSupport.CreateRegistry();
 
+        // [STA-1], [STA-2] Definitions are reusable metadata; mutable instances are registry-owned.
         CounterStore first = definition.Use(registry);
         CounterStore second = definition.Use(registry);
 
         definition.Key.ShouldBe("counter");
+        definition.Identifier.ShouldBe("counter");
+        definition.Setup.ShouldNotBeNull();
         first.ShouldBeSameAs(second);
         setupRuns.ShouldBe(1);
     }
@@ -69,6 +72,7 @@ public sealed class StateStoreDefinitionTests : IDisposable
         using StateStoreRegistry secondRegistry =
             StateStoreTestSupport.CreateRegistry();
 
+        // [STA-2] Definition metadata is shared while each registry owns its own mutable instance.
         CounterStore first = definition.Use(firstRegistry);
         CounterStore second = definition.Use(secondRegistry);
         first.Increment();
@@ -79,7 +83,7 @@ public sealed class StateStoreDefinitionTests : IDisposable
     }
 
     [Fact]
-    public void Use_UsesActiveRegistryOutsideAComponent()
+    public void Use_UsesActiveRegistryOutsideComponentSetup()
     {
         StateStoreDefinition<CounterStore> definition =
             StateStores.Define("counter", static () => new CounterStore());
@@ -87,6 +91,7 @@ public sealed class StateStoreDefinitionTests : IDisposable
             StateStoreTestSupport.CreateRegistry();
         StateStores.SetActiveRegistry(registry);
 
+        // [STA-4] Argument-less resolution uses only the explicitly selected ambient registry.
         CounterStore store = definition.Use();
 
         store.ShouldBeSameAs(definition.Use(registry));
@@ -106,48 +111,69 @@ public sealed class StateStoreDefinitionTests : IDisposable
     }
 
     [Fact]
-    public void Use_ComponentStateCapability_UsesItsRegistryWithoutRecordingOwner()
-    {
-        StateStoreDefinition<OwnerStateStore> definition = new(
-            "owner",
-            context => new OwnerStateStore(context.Owner));
-        using StateStoreRegistry registry =
-            StateStoreTestSupport.CreateRegistry();
-        TestComponentContext componentContext = new(registry);
-
-        OwnerStateStore stateStore = definition.Use(componentContext);
-
-        stateStore.Owner.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Use_ExplicitScopedRegistry_CanRecordComponentOwner()
-    {
-        StateStoreDefinition<OwnerStateStore> definition = new(
-            "owner",
-            context => new OwnerStateStore(context.Owner));
-        using StateStoreRegistry registry =
-            StateStoreTestSupport.CreateRegistry();
-        TestComponentContext componentContext = new(registry);
-
-        OwnerStateStore stateStore =
-            definition.Use(registry, componentContext);
-
-        stateStore.Owner.ShouldBeSameAs(componentContext);
-    }
-
-    [Fact]
-    public void Use_ComponentWithoutStateCapability_Throws()
+    public void Use_ComponentServices_ResolvesConfiguredRegistry()
     {
         StateStoreDefinition<CounterStore> definition =
             StateStores.Define("counter", static () => new CounterStore());
-        ComponentContextWithoutState context = new();
+        using StateStoreRegistry registry =
+            StateStoreTestSupport.CreateRegistry();
+        RegistryServiceProvider services = new(registry);
+        TestComponentContext context = new(services);
+
+        // [STA-4], [CMP-33] State attaches through Services without a component capability protocol.
+        CounterStore store = definition.Use(context);
+
+        store.ShouldBeSameAs(definition.Use(registry));
+    }
+
+    [Fact]
+    public void Use_ComponentServices_PrecedesAmbientRegistry()
+    {
+        StateStoreDefinition<CounterStore> definition =
+            StateStores.Define("counter", static () => new CounterStore());
+        using StateStoreRegistry configuredRegistry =
+            StateStoreTestSupport.CreateRegistry();
+        using StateStoreRegistry ambientRegistry =
+            StateStoreTestSupport.CreateRegistry();
+        StateStores.SetActiveRegistry(ambientRegistry);
+        TestComponentContext context = new(
+            new RegistryServiceProvider(configuredRegistry));
+
+        CounterStore store = definition.Use(context);
+
+        store.ShouldBeSameAs(definition.Use(configuredRegistry));
+        ambientRegistry.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Use_ComponentWithoutConfiguredService_FallsBackToAmbientRegistry()
+    {
+        StateStoreDefinition<CounterStore> definition =
+            StateStores.Define("counter", static () => new CounterStore());
+        using StateStoreRegistry registry =
+            StateStoreTestSupport.CreateRegistry();
+        StateStores.SetActiveRegistry(registry);
+        TestComponentContext context = new(services: null);
+
+        CounterStore store = definition.Use(context);
+
+        store.ShouldBeSameAs(definition.Use(registry));
+    }
+
+    [Fact]
+    public void Use_ComponentWithoutReachableRegistry_ThrowsDescriptiveError()
+    {
+        StateStores.SetActiveRegistry(null);
+        StateStoreDefinition<CounterStore> definition =
+            StateStores.Define("counter", static () => new CounterStore());
+        TestComponentContext context = new(services: null);
 
         InvalidOperationException exception =
             Should.Throw<InvalidOperationException>(
                 () => definition.Use(context));
 
-        exception.Message.ShouldContain("Configure State");
+        exception.Message.ShouldContain("counter");
+        exception.Message.ShouldContain("application services");
     }
 
     [Fact]
@@ -171,49 +197,56 @@ public sealed class StateStoreDefinitionTests : IDisposable
                 (Func<CounterStore>)null!));
     }
 
-    private sealed class OwnerStateStore
+    private sealed class RegistryServiceProvider : IServiceProvider
     {
-        internal OwnerStateStore(IComponentContext? owner)
+        private readonly IStateStoreRegistry _registry;
+
+        internal RegistryServiceProvider(IStateStoreRegistry registry)
         {
-            Owner = owner;
+            _registry = registry;
         }
 
-        internal IComponentContext? Owner { get; }
+        public object? GetService(Type serviceType)
+            => serviceType == typeof(IStateStoreRegistry)
+                ? _registry
+                : null;
     }
 
-    private sealed class TestComponentContext :
-        ComponentContextWithoutState,
-        IStateStoreContext
+    private sealed class TestComponentContext : ComponentContext
     {
-        internal TestComponentContext(IStateStoreRegistry registry)
+        internal TestComponentContext(IServiceProvider? services)
         {
-            State = registry;
+            Services = services;
         }
 
-        public IStateStoreRegistry? State { get; }
-    }
-
-    private class ComponentContextWithoutState : IComponentContext
-    {
-        public IComponentArguments Arguments { get; } =
-            new ComponentArguments();
-
-        public IReadOnlyDictionary<string, ComponentSlot> Slots { get; } =
-            new Dictionary<string, ComponentSlot>();
-
-        public IComponentAttributeCollection Attributes { get; } =
-            new ComponentAttributes();
-
-        public IComponentFactory Components =>
-            StateStoreTestSupport.Components;
-
-        public IServiceProvider Services =>
-            StateStoreTestSupport.Services;
-
-        public IComponentLifecycle Lifecycle =>
+        public override ComponentBindings Bindings =>
             throw new NotSupportedException();
 
-        public void Emit(string eventName, params object?[] arguments)
+        public override ComponentLifecycle Lifecycle =>
+            throw new NotSupportedException();
+
+        public override ComponentContext? Parent => null;
+
+        public override IServiceProvider? Services { get; }
+
+        public override IReactiveEffectScope Scope =>
+            throw new NotSupportedException();
+
+        public override IReactiveWatchScheduler? WatchScheduler => null;
+
+        public override void Emit(string name, params object?[] arguments)
+        {
+        }
+
+        public override void Expose(object? value)
+        {
+        }
+
+        public override void Warn(string message)
+        {
+        }
+
+        protected override void OnWatchError(Exception exception)
         {
         }
     }

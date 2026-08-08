@@ -117,11 +117,6 @@ contradicts a higher one is wrong and MUST be corrected.
 `[DOC-2]` A specification clause MUST be traceable to code or to a normative delegate document. A
 claim that cannot be traced does not belong in the body.
 
-> **Document status — owner-authorized `[DOC-1]` deviation.** This specification describes the
-> adopted `[V01.01.15]` component-model standard whose implementation lands on branch
-> `feature/V01.01.15-component-model`. This temporary note is removed when the migration swap is
-> complete.
-
 ---
 
 ## 3. Execution model and hard constraints
@@ -193,8 +188,8 @@ them back, and .NET purges its listener delegates in the same call.
 `docs/adr/0003-batched-interop-dom-operations.md`;
 `libraries/Assimalign.Viu.Browser/docs/ADR-0001-interop-marshaling.md`;
 `libraries/Assimalign.Viu.Core/src/Scheduling/Scheduler.cs`;
-`.redesign/libraries/Assimalign.Viu.Components/src/Activation/ComponentFactory.cs`;
-`.redesign/libraries/Assimalign.Viu.Components/src/Components/ComponentRegistration.cs`.*
+`libraries/Assimalign.Viu.Components/src/Activation/ComponentFactory.cs`;
+`libraries/Assimalign.Viu.Components/src/Components/ComponentRegistration.cs`.*
 
 ---
 
@@ -521,10 +516,10 @@ reserved: generated glue MUST leave an authored member authoritative at its call
 context form remains available. A different signature is an ordinary overload. A collision therefore
 degrades to the behavior the component would have had without the root convenience.
 
-*Authority: `.redesign/libraries/Assimalign.Viu.Components/src/Abstraction/{IComponent,IComponentFactory}.cs`;
-`.redesign/libraries/Assimalign.Viu.Components/src/{ComponentContext,ComponentRenderFrame}.cs`;
-`.redesign/libraries/Assimalign.Viu.Components/src/{Components,Tree,BuiltIns,Activation,Delegates,Optimization}/*.cs`;
-`.redesign/libraries/Assimalign.Viu.Core/src/{Rendering,Internal,Abstraction}/*.cs`;
+*Authority: `libraries/Assimalign.Viu.Components/src/Abstraction/{IComponent,IComponentFactory}.cs`;
+`libraries/Assimalign.Viu.Components/src/{ComponentContext,ComponentRenderFrame}.cs`;
+`libraries/Assimalign.Viu.Components/src/{Components,Tree,BuiltIns,Activation,Delegates,Optimization}/*.cs`;
+`libraries/Assimalign.Viu.Core/src/{Rendering,Internal,Abstraction}/*.cs`;
 `libraries/Assimalign.Viu.Core/src/Abstraction/{IApplication,IApplicationBuilder,IApplicationContext}.cs`;
 `libraries/Assimalign.Viu.Core/src/Delegates/{ApplicationDelegate,ApplicationMiddleware}.cs`;
 `libraries/Assimalign.Viu.Core/src/Application/{ApplicationContext,ApplicationOptions}.cs`;
@@ -675,10 +670,7 @@ compiled output to Core, defaults to `Stable`, and is consumed by the component-
 `[RND-FLAGS-6]` `PatchFlags.cs` and `SlotFlags.cs` are `<Compile Include>`-linked into the
 `netstandard2.0` generator projects. **Their file paths are frozen**; moving them requires updating
 every linking csproj in the same change. The authoritative paths are
-`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotFlags.cs}`. During the `[V01.01.15]`
-migration only, the linking projects reference the staged copies under
-`.redesign/libraries/Assimalign.Viu.Components/src/` (marked `TODO(swap)` at each link site); the
-swap wave restores the authoritative paths and removes this transitional sentence.
+`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotFlags.cs}`.
 
 ### 6.3 The block tree
 
@@ -707,7 +699,7 @@ single most consequential error a producer of this metadata can make.
 `[RND-BLOCK-3]` **Superseded emission form.** Generated render code uses statement-form calls against
 its per-mount `ComponentRenderFrame`: `OpenBlock()`, `Track(VirtualNode)`, then `CloseBlock()` to
 obtain the immutable direct-descendant snapshot attached to the block root's `RenderPlan`.
-`BlockToken` and expression-sequencing helpers do not exist in this contract. `RenderPlan` copies
+A separate expression-sequencing token and its helper family do not exist in this contract. `RenderPlan` copies
 its list inputs into read-only snapshots, so attached metadata cannot be mutated.
 
 `[RND-BLOCK-4]` **Block patching is attempted only when the old and new block shapes agree.** The
@@ -932,7 +924,7 @@ collide.
 `libraries/Assimalign.Viu.Components/src/{PatchFlags,ShapeFlags,SlotFlags}.cs`;
 `libraries/Assimalign.Viu.Components/src/Optimization/RenderPlan.cs`;
 `libraries/Assimalign.Viu.Browser/docs/{DESIGN.md,ADR-0001-interop-marshaling.md}`;
-`.redesign/libraries/Assimalign.Viu.Components/src/{VirtualNode,ComponentRenderFrame}.cs`;
+`libraries/Assimalign.Viu.Components/src/{VirtualNode,ComponentRenderFrame}.cs`;
 `docs/COMPONENT-MODEL-PLAN.md` §§2, 9.*
 
 ---
@@ -1021,7 +1013,7 @@ server prefetch and Suspense.
 `ComponentReference.ForName(name)`. The renderer MUST NOT guess whether a plain string is a tag or a
 registration.
 
-*Authority: `.redesign/libraries/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
+*Authority: `libraries/Assimalign.Viu.Components/src/{BuiltIns,Tree}/*.cs`;
 `libraries/Assimalign.Viu.Core/src/{KeepAlive,Suspense,Transitions,AsynchronousComponents,DynamicComponents}/`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.KeepAlive.cs,Renderer.Suspense.cs,Renderer.Hydration.cs}`;
 `libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Transitions;
@@ -1526,7 +1518,7 @@ scope; Core uses that scope's still-valid `Context` as the nested component's pa
 
 *Authority: `libraries/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
-`.redesign/libraries/Assimalign.Viu.Core/src/{Abstraction/IComponentRenderScope.cs,Rendering/ComponentHost.cs,Rendering/ComponentRenderRequest.cs}`;
+`libraries/Assimalign.Viu.Core/src/{Abstraction/IComponentRenderScope.cs,Rendering/ComponentHost.cs,Rendering/ComponentRenderRequest.cs}`;
 `libraries/Assimalign.Viu.Browser/docs/DESIGN.md` §Hydration;
 `libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md`;
 `docs/COMPONENT-MODEL-PLAN.md` §8.2.*

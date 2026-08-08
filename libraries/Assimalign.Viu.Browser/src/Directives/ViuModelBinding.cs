@@ -1,40 +1,53 @@
 using System;
+using System.Collections.Generic;
 
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The bound value a <c>v-model</c> directive carries — a snapshot of the current model value paired
-/// with the setter that writes it back. Viu has no <c>this</c>-proxy and no reflection, so a
-/// directive cannot recover the write-back path from a magically named property on the render node;
-/// the value and its setter are passed explicitly instead. The
-/// <c>v-model</c> transform ([V01.01.05.03], specified by <c>[SFC-CG-7]</c>) emits, per render,
-/// <c>new object?[] { _vModelText, new ViuModelBinding(model, value =&gt; model = value) }</c> inside
-/// the generated <c>withDirectives</c> tuple. Core resolves the directive marker through the
-/// application directive resolver. The getter is the value already read into <see cref="Value"/>
-/// and the setter is the write-back delegate. Both are plain values/delegates, never reflection
-/// over component members (AOT/trimming contract).
-/// <para>
-/// A directive reads <see cref="Value"/> to reflect the model onto the element, calls
-/// <see cref="Setter"/> to commit a user edit, and compares against the previous binding's
-/// <see cref="Value"/> to decide whether anything changed.
-/// </para>
+/// Carries the current native-control model value, its compiler-produced write-back delegate,
+/// and the immutable modifier names to a Browser directive token.
 /// </summary>
+/// <remarks>
+/// The setter is explicit so Browser never discovers an authored member by reflection. Modifier
+/// names are copied at construction and preserve source order. Specified by <c>[SFC-CG-7]</c>.
+/// </remarks>
 public sealed class ViuModelBinding
 {
-    /// <summary>Creates a binding carrying the current model <paramref name="value"/> and its <paramref name="setter"/>.</summary>
-    /// <param name="value">The current model value this render.</param>
-    /// <param name="setter">The write-back delegate invoked on element input.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="setter"/> is null.</exception>
-    public ViuModelBinding(object? value, Action<object?> setter)
+    /// <summary>Initializes one immutable native-control model carrier.</summary>
+    /// <param name="value">The model value observed for the current render.</param>
+    /// <param name="setter">The generated assignment delegate.</param>
+    /// <param name="modifiers">The optional modifier names in source order.</param>
+    public ViuModelBinding(
+        object? value,
+        Action<object?> setter,
+        IReadOnlyList<string>? modifiers = null)
     {
         ArgumentNullException.ThrowIfNull(setter);
         Value = value;
         Setter = setter;
+        if (modifiers is null || modifiers.Count == 0)
+        {
+            Modifiers = Array.Empty<string>();
+            return;
+        }
+
+        string[] snapshot = new string[modifiers.Count];
+        for (int index = 0; index < modifiers.Count; index++)
+        {
+            string modifier = modifiers[index];
+            ArgumentException.ThrowIfNullOrEmpty(modifier);
+            snapshot[index] = modifier;
+        }
+
+        Modifiers = Array.AsReadOnly(snapshot);
     }
 
-    /// <summary>The current model value this render.</summary>
+    /// <summary>Gets the model value observed for the current render.</summary>
     public object? Value { get; }
 
-    /// <summary>The setter that writes a new value back to the model.</summary>
+    /// <summary>Gets the generated reflection-free assignment delegate.</summary>
     public Action<object?> Setter { get; }
+
+    /// <summary>Gets the immutable modifier names in source order.</summary>
+    public IReadOnlyList<string> Modifiers { get; }
 }

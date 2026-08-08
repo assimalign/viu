@@ -5,16 +5,21 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.State;
 
 /// <summary>
-/// Defines an AOT-safe setup-style state store and resolves one instance per state registry.
+/// Defines AOT-safe setup metadata that resolves to one mutable store instance per registry.
+/// Specified by <c>[STA-1]</c> through <c>[STA-4]</c>.
 /// </summary>
-/// <typeparam name="TStore">The state store type.</typeparam>
+/// <typeparam name="TStore">The store type.</typeparam>
 public sealed class StateStoreDefinition<TStore>
     where TStore : class
 {
-    /// <summary>Creates a state store definition.</summary>
-    /// <param name="key">The application-unique store key.</param>
-    /// <param name="setup">The explicit store setup delegate.</param>
-    public StateStoreDefinition(string key, StateStoreSetup<TStore> setup)
+    /// <summary>
+    /// Creates reusable metadata for a state store. The delegate is invoked directly inside the
+    /// registry-owned child scope; the key is diagnostic and collision metadata, not a runtime
+    /// activation token. Specified by <c>[STA-1]</c>.
+    /// </summary>
+    /// <param name="key">The non-empty application-unique state-store key.</param>
+    /// <param name="setup">The explicit AOT-safe store setup delegate.</param>
+    public StateStoreDefinition(string key, StateStoreActivator<TStore> setup)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(setup);
@@ -22,62 +27,44 @@ public sealed class StateStoreDefinition<TStore>
         Setup = setup;
     }
 
-    /// <summary>Gets the application-unique store key.</summary>
+    /// <summary>
+    /// Gets the application-unique store key used for ordinal collision detection. Specified by
+    /// <c>[STA-1]</c> and <c>[STA-2]</c>.
+    /// </summary>
     public string Key { get; }
 
-    /// <summary>Gets the explicit AOT-safe setup delegate.</summary>
-    public StateStoreSetup<TStore> Setup { get; }
+    /// <summary>
+    /// Gets the stable diagnostic identifier for this definition. It is identical to
+    /// <see cref="Key"/> and is never used for reflection-backed activation. Specified by
+    /// <c>[STA-1]</c>.
+    /// </summary>
+    public string Identifier => Key;
 
     /// <summary>
-    /// Resolves the state store from an explicit registry, creating it on first use.
+    /// Gets the explicit AOT-safe setup delegate invoked inside the registry-owned child scope.
+    /// Specified by <c>[STA-1]</c>.
     /// </summary>
-    /// <param name="registry">The registry that owns the instance.</param>
-    /// <param name="owner">The optional component owner for an explicitly scoped registry.</param>
-    /// <returns>The registry-scoped state store instance.</returns>
-    public TStore Use(
-        IStateStoreRegistry registry,
-        IComponentContext? owner = null)
+    public StateStoreActivator<TStore> Setup { get; }
+
+    /// <summary>
+    /// Gets the registry-owned store for this definition, creating it on first use. Different
+    /// registries always own different instances. Specified by <c>[STA-2]</c>.
+    /// </summary>
+    /// <param name="registry">The explicit registry owner.</param>
+    /// <returns>The existing or newly materialized store.</returns>
+    public TStore Use(IStateStoreRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        return registry.GetOrCreate(this, owner);
-    }
-
-    /// <summary>
-    /// Resolves the state store from a component context carrying
-    /// <see cref="IStateStoreContext"/>.
-    /// </summary>
-    /// <remarks>
-    /// The component is used only to locate the application registry and is not recorded as the
-    /// owner of an application-global store. For an explicitly isolated feature registry, call
-    /// <see cref="Use(IStateStoreRegistry,IComponentContext)"/> and pass the owner deliberately.
-    /// </remarks>
-    /// <param name="context">The current component context.</param>
-    /// <returns>The application-scoped state store instance.</returns>
-    /// <exception cref="InvalidOperationException">
-    /// The component context does not expose a configured state registry.
-    /// </exception>
-    public TStore Use(IComponentContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        if (context is not IStateStoreContext { State: { } registry })
-        {
-            throw new InvalidOperationException(
-                $"No state registry is available to resolve state store \"{Key}\". "
-                + "Configure State on the application or pass an explicit registry.");
-        }
-
         return registry.GetOrCreate(this);
     }
 
     /// <summary>
-    /// Resolves the state store from <see cref="StateStores.ActiveRegistry"/>.
+    /// Gets the store from <see cref="StateStores.ActiveRegistry"/>. This ambient form is intended
+    /// for single-application browser bootstrap and tests; request-oriented hosts should pass an
+    /// explicit registry. Specified by <c>[STA-4]</c>.
     /// </summary>
-    /// <remarks>
-    /// This ambient form is intended for browser bootstrap and tests. Server and multi-request
-    /// hosts should pass the request-owned registry explicitly.
-    /// </remarks>
-    /// <returns>The active registry's state store instance.</returns>
-    /// <exception cref="InvalidOperationException">No active registry is configured.</exception>
+    /// <returns>The active registry's existing or newly materialized store.</returns>
+    /// <exception cref="InvalidOperationException">No ambient registry is active.</exception>
     public TStore Use()
     {
         IStateStoreRegistry registry = StateStores.ActiveRegistry
@@ -87,9 +74,41 @@ public sealed class StateStoreDefinition<TStore>
         return registry.GetOrCreate(this);
     }
 
-    /// <summary>Stops and forgets this state store in an explicit registry.</summary>
-    /// <param name="registry">The registry holding the state store.</param>
-    /// <returns>True when the initialized state store existed and was removed.</returns>
+    /// <summary>
+    /// Gets the store for one mounted component by resolving the registry through the context's
+    /// application services, then the ambient active registry. The component is neither type-tested
+    /// nor retained, so application-global setup cannot depend on mount order. Specified by
+    /// <c>[STA-3]</c>, <c>[STA-4]</c>, and <c>[CMP-33]</c>.
+    /// </summary>
+    /// <param name="context">The mounted component's authoring surface.</param>
+    /// <returns>The existing or newly materialized store.</returns>
+    public TStore Use(ComponentContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        object? service = context.Services?.GetService(typeof(IStateStoreRegistry));
+        IStateStoreRegistry? registry = service switch
+        {
+            IStateStoreRegistry configuredRegistry => configuredRegistry,
+            _ => StateStores.ActiveRegistry,
+        };
+
+        if (registry is null)
+        {
+            throw new InvalidOperationException(
+                $"No state registry is available to resolve state store \"{Key}\". Register "
+                + "IStateStoreRegistry in the application services, make a registry active, or "
+                + "pass one explicitly.");
+        }
+
+        return registry.GetOrCreate(this);
+    }
+
+    /// <summary>
+    /// Stops and forgets this definition's store in an explicit registry. Specified by
+    /// <c>[STA-2]</c>.
+    /// </summary>
+    /// <param name="registry">The registry that may own the store.</param>
+    /// <returns><see langword="true"/> when a materialized store was removed.</returns>
     public bool Dispose(IStateStoreRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);

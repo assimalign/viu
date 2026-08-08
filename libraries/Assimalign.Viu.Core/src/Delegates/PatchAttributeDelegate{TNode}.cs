@@ -1,19 +1,17 @@
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Applies one immutable component-attribute change to a platform element.
+/// Applies one immutable element-binding difference to a host element.
 /// </summary>
-/// <typeparam name="TNode">The platform node type.</typeparam>
-/// <param name="element">The platform element.</param>
-/// <param name="elementTag">The element tag already known by the renderer.</param>
-/// <param name="attributeName">The attribute, property, or event-binding name.</param>
-/// <param name="previousValue">The previous value, or null when mounting.</param>
-/// <param name="nextValue">The next value, or null when removing.</param>
-/// <param name="elementNamespace">The current platform namespace.</param>
+/// <typeparam name="TNode">The opaque host-node type.</typeparam>
+/// <param name="element">The host element receiving the difference.</param>
+/// <param name="previousBinding">The prior binding, or null while mounting.</param>
+/// <param name="nextBinding">The next binding, or null while removing.</param>
+/// <remarks>Specified by <c>[RND-HOST-1]</c> and <c>[RND-PATCH-5]</c>.</remarks>
 public delegate void PatchAttributeDelegate<TNode>(
     TNode element,
-    string elementTag,
-    string attributeName,
-    object? previousValue,
-    object? nextValue,
-    string? elementNamespace);
+    ElementBinding? previousBinding,
+    ElementBinding? nextBinding)
+    where TNode : notnull;

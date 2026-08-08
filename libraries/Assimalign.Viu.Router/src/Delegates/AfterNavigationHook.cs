@@ -10,4 +10,5 @@ namespace Assimalign.Viu.Router;
 /// <param name="to">The location that was navigated to.</param>
 /// <param name="from">The location that was navigated away from.</param>
 /// <param name="failure">The failure that aborted, cancelled, or duplicated the navigation, or <see langword="null"/> on success.</param>
+/// <remarks>Specified by <c>[RTR-6]</c>.</remarks>
 public delegate void AfterNavigationHook(RouteLocation to, RouteLocation from, NavigationFailure? failure);

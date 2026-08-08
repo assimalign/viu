@@ -66,12 +66,12 @@ public sealed class EffectTests
         outerRuns.ShouldBe(1);
         innerRuns.ShouldBe(1);
 
-        // Inner dep must not leak into the outer effect.
+        // The inner dependency must not leak into the outer effect.
         innerRef.Value = 11;
         outerRuns.ShouldBe(1);
         innerRuns.ShouldBe(2);
 
-        // Outer dep read after the inner effect was created still belongs to the outer effect.
+        // The outer dependency read after the inner effect was created still belongs to the outer effect.
         outerRef.Value = 2;
         outerRuns.ShouldBe(2);
         innerRuns.ShouldBe(3); // outer re-run created a second inner effect

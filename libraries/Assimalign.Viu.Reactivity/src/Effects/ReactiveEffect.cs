@@ -6,10 +6,11 @@ namespace Assimalign.Viu.Reactivity;
 /// <summary>
 /// The subscriber primitive underneath render effects and watchers — Viu's
 /// <c>ReactiveEffect</c>. <see cref="Run"/> executes the function with this effect installed as
-/// the ambient active subscriber, re-collecting dependencies with version-based cleanup (deps not
+/// the ambient active subscriber, re-collecting dependencies with version-based cleanup (dependencies not
 /// read in the latest run are unlinked). When a tracked dependency triggers, the effect either
 /// invokes its <see cref="Scheduler"/> (exactly once per batch) or re-runs synchronously.
-/// Not thread-safe: designed for the single-threaded JS event-loop model.
+/// Not thread-safe: designed for the single-threaded JS event-loop model. Specified by
+/// <c>[RCT-2]</c>, <c>[RCT-9]</c>, and <c>[RCT-10]</c>.
 /// </summary>
 public sealed class ReactiveEffect : Subscriber
 {
@@ -182,4 +183,3 @@ public sealed class ReactiveEffect : Subscriber
         return false;
     }
 }
-

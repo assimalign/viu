@@ -18,7 +18,7 @@ public static class Reactive
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
-    /// <returns>The new ref.</returns>
+    /// <returns>The new reference.</returns>
     public static Reference<T> Reference<T>(T value) => new(value);
 
     /// <summary>
@@ -28,7 +28,7 @@ public static class Reactive
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
-    /// <returns>The new shallow ref.</returns>
+    /// <returns>The new shallow reference.</returns>
     public static ShallowReference<T> ShallowReference<T>(T value) => new(value);
 
     /// <summary>
@@ -38,7 +38,7 @@ public static class Reactive
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="factory">Receives track/trigger delegates and returns the getter/setter pair.</param>
-    /// <returns>The new custom ref.</returns>
+    /// <returns>The new custom reference.</returns>
     public static CustomReference<T> CustomReference<T>(CustomReferenceFactory<T> factory) => new(factory);
 
     /// <summary>
@@ -118,7 +118,7 @@ public static class Reactive
     /// cached value is unchanged, because a forced trigger asserts that the value's meaning
     /// changed even when its identity did not.
     /// </summary>
-    /// <param name="reference">The ref to force-trigger.</param>
+    /// <param name="reference">The reference to force-trigger.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
     public static void TriggerReference(IReactiveTrackedReference reference)
     {
@@ -153,7 +153,7 @@ public static class Reactive
     /// a nested reactive change also fires the callback.
     /// </summary>
     /// <typeparam name="T">The watched value type.</typeparam>
-    /// <param name="source">The ref to watch.</param>
+    /// <param name="source">The reference to watch.</param>
     /// <param name="callback">Receives <c>(newValue, oldValue, onCleanup)</c>.</param>
     /// <param name="options">Immediate/once/deep/flush options.</param>
     /// <returns>A handle to stop or pause the watcher.</returns>
@@ -235,7 +235,7 @@ public static class Reactive
     /// Watches several references at once; the callback receives arrays of the new and previous
     /// values, with each source's own previous value preserved at its index.
     /// </summary>
-    /// <param name="sources">The refs to watch.</param>
+    /// <param name="sources">The references to watch.</param>
     /// <param name="callback">Receives <c>(newValues, oldValues, onCleanup)</c>.</param>
     /// <param name="options">Immediate/once/deep/flush options.</param>
     /// <returns>A handle to stop or pause the watcher.</returns>
@@ -339,7 +339,7 @@ public static class Reactive
     /// <see cref="ToRef{T}(Func{T}, Action{T})"/>/<c>ToReferences()</c> projection.
     /// </summary>
     /// <param name="value">The value to test.</param>
-    /// <returns><see langword="true"/> when <paramref name="value"/> is a ref.</returns>
+    /// <returns><see langword="true"/> when <paramref name="value"/> is a reference.</returns>
     public static bool IsRef(object? value) => value is IReactiveReference;
 
     /// <summary>
@@ -373,8 +373,8 @@ public static class Reactive
     /// <see cref="IReactiveReference{T}"/> without boxing <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="reference">The ref to unwrap.</param>
-    /// <returns>The ref's current value (a tracked read).</returns>
+    /// <param name="reference">The reference to unwrap.</param>
+    /// <returns>The reference's current value (a tracked read).</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
     public static T Unref<T>(ReactiveValue<T> reference)
     {
@@ -447,9 +447,9 @@ public static class Reactive
     /// reference comes from a generated object's <c>ToReferences()</c> instead.
     /// </summary>
     /// <typeparam name="T">The projected value type.</typeparam>
-    /// <param name="getter">Invoked on read; its reactive reads become the ref's dependencies.</param>
-    /// <param name="setter">Invoked on write, or <see langword="null"/> for a read-only ref.</param>
-    /// <returns>A ref backed by the delegates.</returns>
+    /// <param name="getter">Invoked on read; its reactive reads become the reference's dependencies.</param>
+    /// <param name="setter">Invoked on write, or <see langword="null"/> for a read-only reference.</param>
+    /// <returns>A reference backed by the delegates.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="getter"/> is null.</exception>
     public static ReactiveValue<T> ToRef<T>(Func<T> getter, Action<T>? setter = null)
     {

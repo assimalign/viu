@@ -1,119 +1,50 @@
 # Assimalign.Viu.Testing — design
 
-Why the testing package is shaped the way it is. What it is: see [OVERVIEW.md](OVERVIEW.md). The
-host abstraction this package implements is specified in
-[§6.7 of the Viu Specification](../../../docs/SPECIFICATION.md#67-host-abstraction).
+## One renderer, another host
 
-## A second platform for the one renderer
+Testing supplies the same closed host contract as every production adapter:
+`TestNodeOperations.Create` returns `RendererOptions<TestNode>`. Core remains the sole owner of
+mounting, patching, built-in execution, hydration, and unmounting. The in-memory tree changes only
+the host operations beneath that renderer, so tests exercise the real engine without a DOM
+(`[RND-HOST-1]`, `[RND-HOST-3]`, `[CONF-3]`).
 
-`Assimalign.Viu.Core`'s renderer is platform-agnostic: it drives whatever
-`RendererOptions<TNode>` it is given (see
-[`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../Assimalign.Viu.Core/docs/OVERVIEW.md)).
-`TestNodeOperations.Create(log, teleportTargetRoots?)` supplies node-ops over a plain in-memory tree
-(`TestElement`/`TestText`/`TestComment`), so component behavior is exercised through the *same*
-mount/hydrate/patch/unmount pipeline the browser uses — just with no DOM and no interop. That
-sameness is the whole point: a component tested here behaves as it will in the browser because
-nothing about the renderer changed, only the node primitives underneath it.
+Each host write and each `Commit` enters `TestNodeOperationLog`. The log therefore separates final
+tree assertions from operation-budget assertions. In particular, tests pin one commit for a
+coalesced reactive flush through the per-renderer commit seam (`[RND-HOST-4]`, `[RND-IO-1]`).
 
-`RegisterQueryRoot` retains detached roots for `RendererOptions.ResolveTeleportTarget`. A string
-target searches each registered root and its descendants with the same tag, identifier, class, and
-attribute selector subset used by wrapper queries. Render containers are registered automatically;
-detached targets are explicit. Direct `TestNode` targets bypass lookup through Core's generic target
-path.
+## Mounted components remain engine-owned
 
-## The op log is the assertion surface
+Wrappers retain only Core's public, read-only `MountedComponentView<TestNode>`. Core guarantees one
+stable view object for the life of a mount (`[RND-6]`). A child query filters `Instance` by authored
+type and verifies ancestry through `Context.Parent`. Host queries reconstruct the inclusive range
+between the view's current `FirstHostNode` and `LastHostNode`. `Exists` reacquires the current view
+snapshot and uses reference identity, so an unmounted or remounted authored instance cannot be
+mistaken for the original mount.
 
-Every node operation the renderer issues lands in `TestNodeOperationLog` as a `TestNodeOperation`.
-Tests assert *what the renderer did* — which inserts, removes, and text writes happened, in order —
-not only the final tree, which is what makes the interop budget (`[RND-IO-1]`) assertable without a
-browser. `TestNodeSerializer` renders
-the tree to a string for snapshot-style assertions. Container creation is intentionally **not**
-logged, so the log isolates the renderer's own work.
+Emitted-event capture is keyed by public `ComponentContext` identity and composed with any observer
+the caller configured through `ApplicationOptions.EventObserver`. No parent listener is replaced,
+and root and descendant event histories remain separate (component-model seams S3 and S5).
 
-## Hydration has live and frozen readers
+## Deterministic scheduling
 
-`TestServerMarkup.Parse` creates the host tree a browser would normally produce by parsing server
-HTML. `TestHydrationReader` walks that tree live. This is the simplest host implementation and
-supports adoption of elements, text, fragment marker ranges, template subtrees, and registered
-Teleport targets. Event attributes still cross the host boundary during hydration so an adopted
-element becomes interactive.
+`TestSchedulerPump` installs `Scheduler.UseFlushDispatcher` and owns the returned restoration lease.
+`ViuTest` resets ambient scheduler state before a mount and after disposal. Wrapper interactions
+await event handlers, capture `Scheduler.NextTick`, drain every queued continuation, and then await
+the tick. Tests observe post-flush state without wall-clock delays or a test-framework
+`SynchronizationContext` (component-model seam S2, `[SCH-9]`).
 
-`FrozenTestHydrationReader` captures the complete container or Teleport-target subtree when Core
-asks for a reader. `new TestRenderer(snapshotSemantics: true)` selects it and also enables strict
-duplicate-removal checks. The frozen topology deliberately remains readable after host mutations,
-matching a browser or WebView2 adapter that obtains one batched interop snapshot before walking it.
-Range-recovery tests therefore catch algorithms that remove an opening marker before collecting
-the fragment or Teleport range that follows it.
+## Hydration fidelity
 
-Both readers feed Core's host-neutral hydration walker; Testing does not contain a second
-component reconciliation algorithm. A hydrated reactive template owns the adopted nodes and later
-updates them through the ordinary patch path.
+`TestServerMarkup` parses the focused HTML vocabulary ServerRenderer produces and recognizes marker
+tokens only through Core's public `HydrationMarkers` constants (`[SSR-MARKERS-3]`). Entity decoding
+models browser-visible text and attribute values. `TestHydrationReader` exposes live topology;
+`FrozenTestHydrationReader` captures a complete immutable pre-walk so recovery remains readable
+after host mutations, matching the browser's one-snapshot read budget (`[HYD-2]`, `[RND-IO-1]`).
 
-## Template mounts use the application contracts
+## Non-goals
 
-Both `ViuTest.Mount` paths can create a real `ApplicationContext`. The authored-template overload
-also creates its root template request. The internal test factory returns the exact caller-supplied
-root instance once and delegates every other activation to the optional application-selected
-`IComponentFactory`. A tree mount uses the same factory without a special root, allowing an
-otherwise primitive root to contain template children. This keeps activation explicit and AOT-safe
-while allowing assertions against a supplied root instance.
-Type-keyed test stubs are resolved before the delegated child factory. Each explicit stub activator
-creates a fresh template; a null activator creates a recognizable placeholder element.
-
-The application borrows `ComponentMountOptions.Services`, `State`, and child component factory.
-Testing does not dispose those application-owned objects. Core still owns the template returned for
-the root mount and disposes it after unmount when it implements `IDisposable`.
-
-Component dependencies use `IComponentContext.Services`; the removed component-tree provide/inject
-model is intentionally absent. Arguments, slots, parent event listeners, error/warning handlers,
-the state-registry bridge, and the directive resolver therefore travel through the same public
-contracts a platform application uses. The test host also stamps template scope identifiers onto
-its element attributes, so scoped-style ownership is visible in serialized output and the operation
-log.
-
-## Child wrappers use read-only mounted-template inspection
-
-Core keeps renderer ownership internal while granting this testing assembly friend access to a
-depth-first, read-only mounted-template snapshot. `FindComponent` filters that snapshot to
-descendants of the current wrapper, then scopes host queries and serialization to the selected
-template's first-to-last host range. Child wrappers borrow the root wrapper's renderer and scheduler;
-disposing or unmounting a child wrapper does not tear down the application root.
-
-## Emitted-event capture uses component identity
-
-The concrete `ApplicationContext` exposes a friend-only event observer invoked before ordinary
-parent-listener dispatch. Testing records by the emitting `IComponentContext`, so:
-
-- setup-time and later emits are captured;
-- declared and undeclared event names are captured;
-- root and child wrapper histories remain separate;
-- supplied synchronous and asynchronous parent listeners remain unchanged, with Core retaining
-  error and task observation.
-
-## Determinism is owned by the mount
-
-`ViuTest.Mount` takes ownership of the scheduler lifecycle for the mount: it resets the `Scheduler`
-and installs a `TestSchedulerPump` so flushes are captured and async update helpers are
-reproducible, with no reliance on an ambient `SynchronizationContext`. The returned `ComponentWrapper`
-is `IDisposable`; disposing it (a `using`) unmounts and returns the scheduler to baseline, so one
-test cannot leak reactive subscriptions or queued jobs into the next.
-
-`Trigger` and `SetValue` first await a task-returning host event handler, then drain the scheduler.
-Lifecycle and component-event tasks are observed by Core rather than awaited as phase barriers, so
-tests that control those tasks should complete them and then call `NextTickAsync` or `FlushAsync`.
-
-## Platform decisions
-
-- **No simulated DOM.** The platform here is a plain in-memory node tree rather than a headless DOM
-  implementation, keeping the whole harness dependency-light and AOT-clean.
-- **The root template instance is caller-supplied.** Child templates still use the configured
-  `IComponentFactory`; neither path uses reflection activation.
-- **Mounted child traversal is testing-only.** Applications still do not receive mutable mounted
-  renderer state; the friend seam exists only so wrappers can provide test-utility queries.
-- **Snapshot hydration is selectable.** The ordinary test renderer uses a live tree; tests that need
-  to model a batched browser/WebView2 read opt into the frozen reader explicitly.
-
-## Non-goals (sequenced work)
-
-- The end-to-end browser test harness — [V01.01.11.03].
-- The performance benchmark suite — [V01.01.11.04].
+- Browser event propagation, layout, accessibility-tree, and CSS-engine simulation.
+- General-purpose or error-recovering HTML parsing beyond ServerRenderer output.
+- Mutable access to Core's mounted engine hierarchy.
+- Ownership of caller-supplied services, state registries, factories, directives, or component
+  registrations (`[APP-6]`, `[CMP-9]`).

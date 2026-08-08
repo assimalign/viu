@@ -23,8 +23,8 @@ nupkgs, Roslyn `AnalyzerReleases.*.md` release-tracking files, and
 | Document | What it holds |
 | --- | --- |
 | [`SPECIFICATION.md`](SPECIFICATION.md) | **Normative.** What Viu is and what it guarantees, in numbered clauses with stable ids (`[RND-BLOCK-2]`, `[SCH-4]`, …). The highest authority for Viu's semantics. |
-| [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md) | The plan of record for the `[V01.01.15]` component-model arc: adopted layer charter, designed seams, type disposition, migration trains, and completion gates. |
-| [`COMPONENT-MODEL-EXECUTION.html`](COMPONENT-MODEL-EXECUTION.html) | A visual walkthrough of the component model in execution — type ownership, first mount, invocation resolution, and the reactive update loop, in four diagrams. Describes the **adopted but not yet implemented** redesign staged under `.redesign/`; open it in a browser. |
+| [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md) | The plan and completion record for the shipping `[V01.01.15]` component model: adopted layer charter, designed seams, type disposition, migration trains, and gates. |
+| [`COMPONENT-MODEL-EXECUTION.html`](COMPONENT-MODEL-EXECUTION.html) | A visual walkthrough of the shipping component model in execution — type ownership, first mount, invocation resolution, and the reactive update loop, in four diagrams; open it in a browser. |
 | [`PLAN.md`](PLAN.md) | The delivery narrative — wave strategy, the WBS map, and the founding design decisions. Describes *when*, not *what*. |
 | [`adr/`](adr/) | The append-only log of repo-wide, cross-cutting architecture decisions (see [`adr/README.md`](adr/README.md)). |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Documentation conventions: where each kind of document lives, what belongs in it, and when it must be updated. |

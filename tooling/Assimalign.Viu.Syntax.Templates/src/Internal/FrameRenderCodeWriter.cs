@@ -535,7 +535,7 @@ internal sealed class FrameRenderCodeWriter
         expression.Append(patchFlags.ToString(CultureInfo.InvariantCulture));
         expression.Append(")");
         expression.Append(" /* ");
-        expression.Append(PatchFlagNames(patchFlags));
+        expression.Append(PatchFlagNames.Format((PatchFlags)patchFlags));
         expression.Append(" */, ");
         expression.Append(dynamicBindingIndices);
         if (node.IsBlock)
@@ -2391,46 +2391,6 @@ internal sealed class FrameRenderCodeWriter
 
         builder.Append(text, copyStart, text.Length - copyStart);
         return builder.ToString();
-    }
-
-    private static string PatchFlagNames(int value)
-    {
-        if (value == 0)
-        {
-            return "NONE";
-        }
-
-        if (value < 0)
-        {
-            return value == -1 ? "CACHED" : "BAIL";
-        }
-
-        var names = new List<string>();
-        AppendFlagName(names, value, 1, "TEXT");
-        AppendFlagName(names, value, 1 << 1, "CLASS");
-        AppendFlagName(names, value, 1 << 2, "STYLE");
-        AppendFlagName(names, value, 1 << 3, "PROPS");
-        AppendFlagName(names, value, 1 << 4, "FULL_PROPS");
-        AppendFlagName(names, value, 1 << 5, "NEED_HYDRATION");
-        AppendFlagName(names, value, 1 << 6, "STABLE_FRAGMENT");
-        AppendFlagName(names, value, 1 << 7, "KEYED_FRAGMENT");
-        AppendFlagName(names, value, 1 << 8, "UNKEYED_FRAGMENT");
-        AppendFlagName(names, value, 1 << 9, "NEED_PATCH");
-        AppendFlagName(names, value, 1 << 10, "DYNAMIC_SLOTS");
-        AppendFlagName(names, value, 1 << 11, "DEV_ROOT_FRAGMENT");
-        return string.Join(", ", names);
-    }
-
-    private static void AppendFlagName(
-        List<string> names,
-        int value,
-        int flag,
-        string name)
-    {
-        if ((value & flag) != 0)
-        {
-            names.Add(name);
-        }
     }
 
     private string MaterializeExpression(string prefix, CodeExpression expression)

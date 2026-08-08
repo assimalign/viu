@@ -12,7 +12,7 @@ using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 namespace Assimalign.Viu.Router.Tests;
 
 // Pins the full navigation resolution order and lifecycle-bound in-component guards. The redesigned
-// API passes IComponentContext and outlet depth explicitly; no ambient component or injection lookup
+// API passes ComponentContext and outlet depth explicitly; no ambient component or injection lookup
 // participates in registration.
 public class NavigationOrderingTests
 {
@@ -123,10 +123,10 @@ public class NavigationOrderingTests
         int leaveRuns = 0;
         var view = new TrackingComponent(
             "shared",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "shared")),
-                [ComponentTree.Text("shared")]),
+                [Text("shared")]),
             setup: context => RouterGuards.OnBeforeRouteLeave(
                 context,
                 (_, _, _) =>
@@ -142,7 +142,7 @@ public class NavigationOrderingTests
             ]);
         await router.Push("/a");
         using var wrapper = MountView(router, view);
-        IComponentContext? firstContext = view.Context;
+        ComponentContext? firstContext = view.Context;
 
         await router.Push("/b");
         await wrapper.NextTickAsync();
@@ -162,11 +162,11 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             "layout",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "layout")),
                 [
-                    ComponentTree.Template<RouterView>(
+                    Component<RouterView>(
                         Arguments(("depth", 1))),
                 ]),
             setup: context => RouterGuards.OnBeforeRouteUpdate(
@@ -185,10 +185,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             label,
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", label)),
-                [ComponentTree.Text(label)]),
+                [Text(label)]),
             setup: context => RouterGuards.OnBeforeRouteLeave(
                 context,
                 (_, _, _) =>
@@ -205,10 +205,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             label,
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", label)),
-                [ComponentTree.Text(label)]),
+                [Text(label)]),
             setup: context => context.Lifecycle.OnMounted(
                 () => log.Add("mounted")));
     }
@@ -217,10 +217,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             "a",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "a")),
-                [ComponentTree.Text("a")]),
+                [Text("a")]),
             setup: context => RouterGuards.OnBeforeRouteLeave(
                 context,
                 (_, _, _) => Task.FromResult(NavigationGuardResult.Abort)));
@@ -231,10 +231,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             "user",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "user")),
-                [ComponentTree.Text("user")]),
+                [Text("user")]),
             setup: context => RouterGuards.OnBeforeRouteUpdate(
                 context,
                 (to, _, _) =>

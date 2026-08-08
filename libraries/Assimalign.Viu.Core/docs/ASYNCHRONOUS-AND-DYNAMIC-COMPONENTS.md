@@ -22,19 +22,16 @@ AsynchronousComponentDefinition userPanel =
             return AsynchronousComponentTarget.From<UserPanel>();
         });
 
-IComponentFactory components = new ComponentFactory(
-[
-    userPanel.Registration,
-    new ComponentRegistration(
-        typeof(UserPanel),
-        static () => new UserPanel()),
-]);
+ComponentFactory components = new();
+components.Register(userPanel.Registration);
+components.Register(userPanelRegistration);
 
-ITemplateComponent request = userPanel.CreateComponent(
-    new ComponentArguments(
-    [
-        new KeyValuePair<string, object?>("userId", userId),
-    ]));
+ComponentNode request = userPanel.CreateComponent(
+    new ComponentInvocation(
+        arguments: new Dictionary<string, object?>
+        {
+            ["userId"] = userId,
+        }));
 ```
 
 The wrapper identity is supplied explicitly through `typeof(...)`. The loader returns the registered

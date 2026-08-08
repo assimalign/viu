@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection;
 
 using Shouldly;
 using Xunit;
@@ -109,9 +108,9 @@ public class RouteMatcherResolveTests
         // references the unified Components contract and standalone Reactivity library, but not
         // runtime Core. The matcher and memory-history code still uses neither reference, so it
         // stays runnable in a plain .NET host; the forbidden
-        // coupling is now the browser DOM adapter (Assimalign.Viu.Browser), because the components
-        // must render through the injected node-ops abstraction to work against the in-memory test
-        // renderer and the SSR renderer, never the DOM directly. The framework's
+        // coupling is now the browser DOM adapter (Assimalign.Viu.Browser), because components
+        // emit host-neutral virtual nodes for the Testing and SSR renderers, never DOM operations
+        // directly. The framework's
         // System.Runtime.InteropServices.JavaScript reference from the [V01.01.08.02] browser history
         // edge stays allowed (gated by [SupportedOSPlatform("browser")]).
         var referenced = typeof(RouterView).Assembly

@@ -41,7 +41,7 @@ record only the July 2026 scoping history:
 
 | Area (WBS) | Viu library | Initial July 2026 scope (historical) |
 | --- | --- | --- |
-| Shared (`V01.01.01`) | `Assimalign.Viu.Shared` | `@vue/shared` — PatchFlags/ShapeFlags/SlotFlags, normalization, DOM tables |
+| Common primitives (`V01.01.01`) | Dissolved into owning libraries ([V01.01.15]) | Flags in Components, normalization in Core/Browser, DOM tables in ServerRenderer |
 | Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` → merged into `Assimalign.Viu.Core` ([V01.01.12.21]) | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
 | RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` → renamed `Assimalign.Viu.Core`, root namespace `Assimalign.Viu` ([V01.01.12.21]) | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
 | RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` → renamed `Assimalign.Viu.Browser` ([V01.01.12.22]) | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |

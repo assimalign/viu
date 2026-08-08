@@ -5,85 +5,59 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Applies test stubs, optionally supplies one caller-owned root template, then delegates all
-/// remaining activation to the application-selected factory.
-/// </summary>
 internal sealed class TestComponentFactory : IComponentFactory
 {
-    private readonly IComponentTemplate? _root;
-    private readonly Type? _rootType;
-    private readonly IComponentFactory? _components;
-    private readonly IReadOnlyDictionary<Type, ComponentActivator?> _stubs;
-    private bool _rootCreated;
+    private readonly IComponentFactory _components;
+    private readonly ComponentRegistration? _root;
+    private readonly Dictionary<ComponentReference, ComponentRegistration> _stubs = [];
+    private bool _rootResolved;
 
     internal TestComponentFactory(
-        IComponentFactory? components,
+        ComponentRegistration? root,
+        IComponentFactory components,
         IReadOnlyDictionary<Type, ComponentActivator?> stubs)
     {
-        ArgumentNullException.ThrowIfNull(stubs);
-        _components = components;
-        _stubs = stubs;
-    }
-
-    internal TestComponentFactory(
-        IComponentTemplate root,
-        IComponentFactory? components,
-        IReadOnlyDictionary<Type, ComponentActivator?> stubs)
-    {
-        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(components);
         ArgumentNullException.ThrowIfNull(stubs);
         _root = root;
-        _rootType = root.GetType();
         _components = components;
-        _stubs = stubs;
+        foreach (KeyValuePair<Type, ComponentActivator?> stub in stubs)
+        {
+            ComponentReference reference = ComponentReference.ForType(stub.Key);
+            ComponentActivator activator = stub.Value
+                ?? (_ => StubComponent.For(stub.Key));
+            _stubs.Add(
+                reference,
+                new ComponentRegistration(
+                    reference,
+                    new ComponentContract(displayName: $"{stub.Key.Name} test stub"),
+                    activator));
+        }
     }
 
-    /// <inheritdoc/>
-    public IComponentTemplate Create(Type componentType)
+    public ComponentRegistration Resolve(ComponentReference reference)
     {
-        ArgumentNullException.ThrowIfNull(componentType);
-        if (!_rootCreated && componentType == _rootType)
-        {
-            _rootCreated = true;
-            return _root!;
-        }
-
-        if (_stubs.TryGetValue(
-            componentType,
-            out ComponentActivator? stubActivator))
-        {
-            if (stubActivator is null)
-            {
-                return StubComponent.For(componentType);
-            }
-
-            return stubActivator()
-                ?? throw new InvalidOperationException(
-                    $"The stub activator for \"{componentType}\" returned null.");
-        }
-
-        if (_components is not null)
-        {
-            return _components.Create(componentType);
-        }
-
-        throw new InvalidOperationException(
-            $"Component type \"{componentType}\" is not registered for this test mount. "
-            + "Supply ComponentMountOptions.Components for child component activation.");
+        return TryResolve(reference, out ComponentRegistration? registration)
+            ? registration!
+            : throw new InvalidOperationException(
+                $"Component reference '{reference}' is not registered for this test mount.");
     }
 
-    /// <inheritdoc/>
-    public IComponentTemplate Create(string name)
+    public bool TryResolve(
+        ComponentReference reference,
+        out ComponentRegistration? registration)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
-        if (_components is not null)
+        ArgumentNullException.ThrowIfNull(reference);
+        if (!_rootResolved
+            && _root is not null
+            && _root.Reference == reference)
         {
-            return _components.Create(name);
+            _rootResolved = true;
+            registration = _root;
+            return true;
         }
 
-        throw new InvalidOperationException(
-            $"Component name \"{name}\" is not registered for this test mount. "
-            + "Supply ComponentMountOptions.Components for child component activation.");
+        return _stubs.TryGetValue(reference, out registration)
+            || _components.TryResolve(reference, out registration);
     }
 }

@@ -5,9 +5,8 @@ using Xunit;
 
 namespace Assimalign.Viu.Reactivity.Tests;
 
-// Reactive collection tracking granularity — Viu's list/dictionary/set
-// (packages/reactivity/src/collectionHandlers.ts, arrayInstrumentations.ts). Run counts are pinned:
-// per-key granularity means an effect re-runs only for the entry it actually read.
+// Reactive collection tracking granularity under [RCT-6]. Run counts are pinned: per-key
+// granularity means an effect re-runs only for the entry it actually read.
 public sealed class ReactiveCollectionTests
 {
     [Fact]
@@ -92,7 +91,7 @@ public sealed class ReactiveCollectionTests
         enumerationRuns.ShouldBe(1);
 
         // Assigning an existing index triggers that index and iteration (so
-        // enumerating effects observe the replacement) but not the length dep.
+        // enumerating effects observe the replacement) but not the length dependency.
         list[1] = 20;
         lengthRuns.ShouldBe(1);
         indexRuns.ShouldBe(2);
@@ -184,7 +183,7 @@ public sealed class ReactiveCollectionTests
         runs.ShouldBe(1);
 
         // Assigning an existing key triggers entry iteration (Values and enumeration observe
-        // values, and size shares that dep), so an entry-iteration effect re-runs.
+        // values, and size shares that dependency), so an entry-iteration effect re-runs.
         dictionary["a"] = 2;
         runs.ShouldBe(2);
 
@@ -327,4 +326,3 @@ public sealed class ReactiveCollectionTests
         count.ShouldBe(3);
     }
 }
-

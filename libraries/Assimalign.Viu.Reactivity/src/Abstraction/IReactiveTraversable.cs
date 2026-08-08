@@ -1,6 +1,9 @@
 namespace Assimalign.Viu.Reactivity;
 
-/// <summary>Exposes nested reactive members to deep-watch traversal without reflection.</summary>
+/// <summary>
+/// Exposes nested reactive members to deep-watch traversal without reflection. Specified by
+/// <c>[RCT-6]</c> and <c>[RCT-7]</c>.
+/// </summary>
 public interface IReactiveTraversable
 {
     /// <summary>

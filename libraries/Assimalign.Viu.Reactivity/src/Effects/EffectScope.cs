@@ -22,6 +22,7 @@ public sealed class EffectScope : IReactiveEffectScope
     private readonly bool _detached;
     private readonly List<ReactiveEffect> _effects = new();
     private readonly List<Action> _cleanups = new();
+    private readonly List<IDisposable> _resources = new();
     private List<EffectScope>? _scopes;
     private EffectScope? _parent;
     private int _index;
@@ -49,6 +50,23 @@ public sealed class EffectScope : IReactiveEffectScope
 
     /// <summary>Whether the scope has not been stopped.</summary>
     public bool IsActive => _active;
+
+    /// <summary>Gets whether this scope has completed its idempotent teardown.</summary>
+    public bool IsStopped => !_active;
+
+    /// <summary>
+    /// Adds an independently disposable resource to this scope. Resources are disposed in reverse
+    /// registration order when the scope stops, after its effects and before its cleanup callbacks.
+    /// </summary>
+    /// <param name="resource">The resource whose lifetime is bounded by this scope.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="resource"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The scope has already stopped.</exception>
+    public void Own(IDisposable resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ObjectDisposedException.ThrowIf(!_active, this);
+        _resources.Add(resource);
+    }
 
     /// <summary>
     /// Runs <paramref name="action"/> with this scope as the current scope, restoring the previous
@@ -190,6 +208,18 @@ public sealed class EffectScope : IReactiveEffectScope
             }
         }
         _effects.Clear();
+        for (var index = _resources.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                _resources[index].Dispose();
+            }
+            catch (Exception exception)
+            {
+                error ??= ExceptionDispatchInfo.Capture(exception);
+            }
+        }
+        _resources.Clear();
         foreach (var cleanup in _cleanups)
         {
             try

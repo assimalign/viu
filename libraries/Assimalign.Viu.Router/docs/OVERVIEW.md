@@ -1,248 +1,61 @@
-# Assimalign.Viu.Router — overview
+# Assimalign.Viu.Router
 
-The client router for Viu: a route table, history integration, two built-in components, and an
-awaitable guard pipeline. Specified by [§12 of the Viu Specification](../../../docs/SPECIFICATION.md#12-routing).
-Four features have landed:
+Router is Viu's navigation package. Its matcher and navigation model are host-free, and the assembly
+references only Components and Reactivity. It does not reference Core or Browser. This keeps route
+matching usable in a plain .NET process while allowing route output and navigation state to use
+Viu's immutable component and reactive contracts (`[RTR-1]`, `[RTR-7]`).
 
-- The **route table and matcher** (`[V01.01.08.01]`): the pure, DOM-free core that, given a set of
-  route records and a location (a path or a named target), resolves an immutable `RouteLocation`
-  with its parent-to-child matched chain and parsed parameters, plus the specificity ranking model
-  that makes resolution independent of route-table order.
-- **History integration** (`[V01.01.08.02]`): the `IRouterHistory` abstraction with three modes —
-  memory, web (HTML5 History API), and hash — behind the `RouterHistory` factory.
-- **`RouterView` / `RouterLink` components** (`[V01.01.08.03]`): the two built-in components plus the
-  reactive `Router` facade they consume. `RouterView` renders the matched record's component
-  at its nesting depth; `RouterLink` renders a navigation-intercepting anchor with active-class
-  matching.
-- **Navigation guards and async navigation flows** (`[V01.01.08.04]`): the awaitable, cancellable
-  guard pipeline behind `Router.Push`/`Replace` — global `BeforeEach`/`BeforeResolve`/`AfterEach`,
-  per-route `RouteRecord.BeforeEnter`, and the in-component before-leave/before-update
-  (`RouterGuards`) and before-enter (`IRouteEnterGuard`) guards — with redirects, cancellation of
-  superseded navigations, and `NavigationFailure` results.
+## Routes and matching
 
-**Lazy routes with scroll behavior** (`[V01.01.08.05]`) is the remaining Router feature (#69) and is
-not part of this package yet — every route component resolves eagerly today.
+`RouteRecord` associates a ranked path pattern with an immutable `VirtualNode`. `RouteMatcher`
+tokenizes and ranks records, resolves parameters, and produces value-equal `RouteLocation`
+snapshots. Static segments outrank dynamic segments, optional and repeated parameters retain their
+declared semantics, and matcher failures use the package's typed error surface (`[RTR-1]`,
+`[RTR-2]`).
 
-## What it contains
+`Router` coordinates matching, history, guards, and the shallow-reactive `CurrentRoute`. Guards
+return an allow, abort, or redirect result; they never receive a continuation. A navigation that is
+aborted, superseded, or duplicated returns a typed `NavigationFailure`, while unexpected faults flow
+to the configured error handler (`[RTR-5]`, `[RTR-6]`).
 
-Public surface (all under namespace `Assimalign.Viu.Router`):
+## History
 
-- **`RouteMatcher`** (entry point): the route table and matcher. Construct it from a set of
-  `RouteRecord`s (`new RouteMatcher(routes)`), then `Resolve(path)` for path resolution or
-  `ResolveNamed(name, parameters)` for named resolution. `AddRoute`, `HasNamedRoute`, and
-  `GetRoutes` round out the surface.
-- **`IRouteMatcher`** (`Abstraction/`): the resolve/add/query contract the later navigation pipeline
-  depends on, implemented by `RouteMatcher`.
-- **`RouteRecord`**: an immutable route definition — `Path`, optional `Name`, nested `Children`,
-  arbitrary `Meta`, and (for the components) the `Component` the route renders plus an optional
-  `ArgumentsResolver`. A reference type with identity semantics (the same instance appears in every
-  matched chain it participates in). The matcher ignores `Component`/`ArgumentsResolver` — they are
-  read only by the view components. The component may be any unified `IComponent`; an arguments
-  resolver is valid only for an `ITemplateComponent` request.
-- **`RouteLocation`**: the immutable resolution result — `Path`, `Name`, `Parameters`, the
-  parent-to-child `Matched` record chain, merged `Meta`, and `IsMatched`. Value equality so a
-  navigation layer can compare/snapshot cheaply.
-- **`RouteParameters`**: an immutable parameter set with typed, boxing-free, reflection-free
-  accessors — `GetString`/`TryGetString`, `GetInteger`/`TryGetInteger`, `GetStrings` (for
-  repeatable parameters) — plus immutable `With`/`WithMany` builders.
-- **`PathMatchingOptions`**: the `Strict` (trailing slash is significant) and `Sensitive`
-  (case-sensitive) matching toggles, defaulting to non-strict and case-insensitive.
-- **`RouteMatcherException`** + **`RouteMatcherError`**: the typed failure for invalid route
-  definitions (bad path, unclosed/invalid custom pattern, repeatable-not-alone) and resolution
-  failures (named route not found, missing required parameter, array for a non-repeatable
-  parameter).
+`RouterHistory` creates memory, web, and hash histories. Memory history is entirely managed. Web
+and hash histories initialize lazily through `Router.ReadyAsync`, marshal only flat primitive state,
+and consume the packaged `viu-history.js` module. The package owns that module and its
+`buildTransitive` target because the JavaScript exports call the Router assembly's generated
+`JSExport` dispatch surface (`[RTR-3]`).
 
-Internal (`Internal/`, exercised through `InternalsVisibleTo` tests): the path parser — `PathToken`
-/ `PathTokenKind` / `PathTokenizer` (the character-by-character tokenizer), `PathParserFactory` (the
-tokens-to-parser compiler), `PathParser` (the compiled regular expression + score + keys, with
-`TryParse`/`Stringify`), `PathScore` + `PathParserScoreComparer` (the ranking model),
-`PathParameterKey`, `RouteParameterValue`, `RouteRecordMatcher`, and `RegularExpressionPatterns`
-(the `[GeneratedRegex]` escape helper).
+The history state model records navigation position, direction, replacement, and optional scroll
+coordinates. It preserves captured state for a host to consume; automatic scroll restoration is not
+implemented (`[RTR-8]`).
 
-## History integration
+## Route components
 
-The history layer (all under namespace `Assimalign.Viu.Router`):
+`RouterView` and `RouterLink` are ordinary `IComponent` registrations. They resolve the current
+`Router` only through nullable `ComponentContext.Services`, so registration and service ownership
+remain with the caller's composition root (`[CMP-9]`, `[CMP-33]`, `[RTR-4]`).
 
-- **`IRouterHistory`** (`Abstraction/`): the history contract — `Base`, `Location`, `State`,
-  `Push`/`Replace`/`Go`, `Listen`, `CreateHref`, `Destroy`. Locations are the base-stripped path
-  the matcher resolves; the configured base is prepended on write and stripped on read.
-- **`RouterHistory`** (static facade): `CreateMemory`, `CreateWeb`, `CreateWebHash`, and the
-  browser-only `InitializeAsync`. Memory is pure and needs no initialization; web and hash defer
-  their History API bridge until `Router.ReadyAsync`, while `InitializeAsync` is an optional prewarm.
-- **`RouterHistoryState`**: the flat, primitives-only state carried on each entry — the adjacency
-  links (`Back`/`Current`/`Forward`), the `Replaced` flag, the monotonic `Position` counter, and an
-  optional `Scroll` anchor.
-- **`NavigationType`** / **`NavigationDirection`** / **`NavigationInformation`** / **`ScrollPosition`**:
-  the value types a history reports to its listeners (pop vs push, back/forward/unknown, the signed
-  delta) and the saved scroll offset.
-- **`NavigationCallback`** (`Delegates/`): the listener signature for browser-initiated navigation
-  (a `popstate`, or a memory `Go`).
+`RouterView` returns a matched non-component `VirtualNode` unchanged. For a matched
+`ComponentNode`, it creates a new non-activating mount request, merges route arguments over authored
+arguments, and preserves slots, listeners, directives, slot stability, mount reference, render plan,
+and component reference (`[CMP-7]`). The effective key combines route-record identity with the
+authored key: parameter-only navigation within one record can retain the mount, while navigation to
+a different record remounts even when both records use the same component.
 
-Internal (`Internal/`): `MemoryRouterHistory` (the pure, interop-free mode), `BrowserRouterHistory`
-(the DOM-free web/hash **policy** — base handling, state machine, listener bookkeeping — driving an
-injected `IBrowserHistoryInterop`), the pure helpers `HistoryPathNormalization` (base
-normalize/strip, href building, current-location derivation, hash base) and
-`RouterHistoryStateBuilder` (the push/replace/bootstrap state arithmetic), the batched-read
-`BrowserHistorySnapshot` + `BrowserHistorySnapshotMarshaller`, and the thin browser edge —
-`JavaScriptBrowserHistoryInterop` (`[JSImport]` bindings to `wwwroot/viu-history.js`) and
-`BrowserHistoryInteropDispatch` (the single `[JSExport]` the `popstate` listener calls back into,
-routed by subscription id).
-
-## Components and router
-
-The two built-in components and the reactive router facade they consume (`[V01.01.08.03]`, all under
-namespace `Assimalign.Viu.Router`):
-
-- **`Router`** (entry point): the reactive router facade — `CurrentRoute` (a shallow reactive
-  reference over the resolved location), `Resolve`/`ResolveNamed`, `CreateHref`, the global
-  `LinkActiveClass`/`LinkExactActiveClass` defaults, and the awaitable, guarded
-  `Push`/`Replace`/`Go`/`Back`/`Forward` navigation surface. Global guards register through
-  `BeforeEach`/`BeforeResolve`/`AfterEach`/`OnError` (each returning an unregister delegate). Built
-  over an `IRouterHistory` and a matcher (or a route set), it listens to the history so browser
-  back/forward drives `CurrentRoute` through the same guard pipeline.
-- **`RouterView`** (`Components/`): the route outlet. It resolves `Router` from
-  `IComponentContext.Services`, reads its explicit `depth` argument (default `0`), and renders
-  `route.matched[depth].Component` with that record's resolved arguments. A nested layout passes the
-  next depth explicitly because Viu has no hierarchical component dependency API. The reactive
-  current route it reads re-renders it on navigation.
-- **`RouterLink`** (`Components/`): the navigation anchor. It renders an `<a>` whose `href` resolves
-  through the `Router` (base included), applies the active / exact-active classes by matching its
-  target against the current route, and intercepts an unmodified primary-button click to navigate
-  client-side. Declared arguments: `to`, `replace`, `activeClass`, `exactActiveClass`.
-- **`RouteComponentArguments`** (`Components/`) + **`RouteComponentArgumentsResolver`** (`Delegates/`):
-  the per-route argument supply. `FromParameters()` forwards the resolved route parameters as
-  same-named arguments, `FromValues(...)` supplies a fixed argument set, and a hand-written resolver
-  reads the whole `RouteLocation`.
-- **`RouterLinkClickEvent`** (`Components/`): the DOM-free click info `RouterLink`'s guard reads
-  (button, system modifiers, `DefaultPrevented`) — a host's event bridge builds it from the native
-  `MouseEvent`; tests construct it directly.
-
-## Navigation guards
-
-The awaitable, cancellable navigation pipeline (`[V01.01.08.04]`, all under namespace
-`Assimalign.Viu.Router`):
-
-- **`NavigationGuard`** (`Delegates/`): the guard signature `Task<NavigationGuardResult> (to, from,
-  cancellationToken)`. A guard **returns** its decision rather than invoking a continuation, so an
-  exhaustive result type makes the compiler check that every path decides and lets the pipeline
-  guarantee a guard decides exactly once.
-- **`NavigationGuardResult`**: a guard's decision — the `Allow`/`Abort` singletons and
-  `RedirectTo(path)`/`RedirectToName(name, params)` for redirects.
-- **`NavigationFailure`** + **`NavigationFailureType`**: the result of a navigation that did not
-  complete (`Aborted`/`Cancelled`/`Duplicated`), returned from `Push`/`Replace` and passed to every
-  `AfterNavigationHook`.
-- **`AfterNavigationHook`** / **`NavigationErrorHandler`** (`Delegates/`): the `AfterEach` and
-  `OnError` signatures.
-- **`RouteRecord.BeforeEnter`**: the per-route enter guard, run only for a newly matched record.
-- **`RouterGuards`**: the `OnBeforeRouteLeave`/`OnBeforeRouteUpdate` composables, called during a route
-  component's `Setup` with its explicit `IComponentContext` and outlet depth, then bound to the
-  component's lifecycle, so a guard never outlives its instance.
-- **`IRouteEnterGuard`** (`Abstraction/`): supplied explicitly through
-  `RouteRecord.RouteEnterGuard` to contribute an in-component before-enter guard. No component is
-  activated and no reflection is used before the route is confirmed.
-- **`NavigationRedirectException`**: thrown when a guard-redirect chain exceeds the safety cap —
-  infinite-redirect detection, active in every configuration.
-
-## Using it
-
-```csharp
-using Assimalign.Viu.Router;
-
-var matcher = new RouteMatcher(
-[
-    new RouteRecord("/", name: "home"),
-    new RouteRecord("/users", name: "users", children:
-    [
-        new RouteRecord(":id", name: "user"),           // -> /users/:id
-    ]),
-    new RouteRecord("/:pathMatch(.*)*", name: "not-found"),
-]);
-
-RouteLocation location = matcher.Resolve("/users/42");
-// location.Name == "user"
-// location.Parameters.GetInteger("id") == 42
-// location.Matched == [users record, user record]   (parent-to-child)
-
-string path = matcher.ResolveNamed("user", RouteParameters.Empty.With("id", "42")).Path;
-// path == "/users/42"
-```
-
-```csharp
-// Memory history — pure, no browser, no initialization.
-IRouterHistory history = RouterHistory.CreateMemory();
-history.Push("/users/42");
-// history.Location == "/users/42", history.State.Position == 1
-
-// Web history — clean URLs over the History API (browser only). Bridge loading is lazy.
-IRouterHistory web = RouterHistory.CreateWeb("/app/");   // no initialization pre-call
-var webRouter = new Router(web, routes);
-await webRouter.ReadyAsync(cancellationToken);            // imports the bridge, then navigates
-web.Listen((to, from, information) => { /* resolve `to` through the matcher */ });
-```
-
-`RouterHistory.InitializeAsync(cancellationToken)` remains available as an optional prewarm when an
-application deliberately wants to overlap the module download with other startup work. It is never
-required before `CreateWeb` or `CreateWebHash`. Until `Router.ReadyAsync` completes, `Listen` and
-`Destroy` are the only valid synchronous members on a web/hash history; every other member throws the
-same actionable `InvalidOperationException`.
-
-```csharp
-using Assimalign.Viu.Components;
-using Assimalign.Viu.Router;
-
-// Wire routes to unified component-tree requests and build a router over a history.
-var router = new Router(RouterHistory.CreateMemory(),
-[
-    new RouteRecord(
-        "/users/:id",
-        component: ComponentTree.Template<UserView>(),
-        argumentsResolver: RouteComponentArguments.FromParameters()),   // params become arguments
-]);
-NavigationFailure? failure = await router.Push("/users/42");   // awaitable; null on success
-
-// Register Router in the IServiceProvider selected by the application, then assign that provider to
-// ApplicationOptions.Services. Router does not create or modify a container.
-// <RouterView/> now renders UserView with { id = "42" }; <RouterLink to="/users/42"/> is exact-active,
-// and a plain left-click on it calls router.Push instead of triggering a page load.
-```
-
-```csharp
-// Guards run in the pipeline's fixed order and either allow, abort, or redirect.
-Action removeAuthGuard = router.BeforeEach((to, from, cancellationToken) =>
-    Task.FromResult(to.Meta.ContainsKey("requiresAuth") && !IsSignedIn
-        ? NavigationGuardResult.RedirectTo("/login")
-        : NavigationGuardResult.Allow));
-
-router.AfterEach((to, from, failure) => { /* failure is null on success */ });
-router.OnError((error, to, from) => { /* an unexpected guard exception */ });
-
-// In a route component's Setup: pass the explicit context and outlet depth.
-RouterGuards.OnBeforeRouteLeave(
-    context,
-    (to, from, cancellationToken) =>
-        Task.FromResult(
-            hasUnsavedChanges
-                ? NavigationGuardResult.Abort
-                : NavigationGuardResult.Allow),
-    depth: 0);
-
-removeAuthGuard();   // registration handles unregister the guard
-```
+`RouterLink` renders a host-neutral anchor node and converts its click binding into a
+`RouterLinkClickEvent`. Modified, non-primary, already-prevented, and `target="_blank"` clicks are
+left to the host. Browser-specific event translation belongs to `Assimalign.Viu.Browser.Router`
+(`[RTR-4]`, `[RTR-7]`).
 
 ## Boundaries
 
-- **Matcher and history stay framework-free; the built-ins reference contracts only.** The matcher and
-  memory history run in a plain .NET test host, using no other Viu library. `[V01.01.08.03]` adds the
-  `RouterView`/`RouterLink` components, which consume the component model and reactivity, so the
-  assembly references `Assimalign.Viu.Components` and `Assimalign.Viu.Reactivity`, but not
-  `Assimalign.Viu.Core`. It still references **no browser DOM adapter** (`Assimalign.Viu.Browser`):
-  the built-ins produce platform-agnostic `IComponent` values that any host renderer can consume — the
-  in-memory test renderer and the server renderer alike — never the DOM directly (a boundary the test
-  suite asserts by reflection). `[V01.01.08.02]`'s browser history edge over the
-  framework's `System.Runtime.InteropServices.JavaScript` primitive stays gated by
-  `[SupportedOSPlatform("browser")]`.
-- Trimming- and NativeAOT-safe: no reflection-based serialization, no dynamic code generation. Path
-  patterns compile to interpreted regular expressions; the one compile-time-constant pattern uses
-  the `[GeneratedRegex]` source generator. History state marshals as a flat primitives-only payload.
-- Design rationale, the ranking model, and the WASM/AOT-driven design decisions:
-  [DESIGN.md](DESIGN.md).
+Router owns navigation policy, matching, guard ordering, route components, and history state. It
+does not mount component trees, patch a host, manage application lifetime, or interpret DOM events.
+Route nesting depth is an explicit `RouterView` argument because the component model has no ambient
+hierarchical dependency channel (`[CMP-24]`). Lazy route-component loading and automatic scroll
+behavior are current limits (`[RTR-8]`).
+
+All activation is registration-based and all browser interop is source-generated. The package uses
+no runtime constructor discovery, reflection serialization, emitted code, or dynamic activation
+path (`[CMP-6]`, `[EXE-4]`).

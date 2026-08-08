@@ -7,58 +7,55 @@ using Assimalign.Viu.State;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>Options for mounting a component tree or authored template in the in-memory host.</summary>
+/// <summary>Configures one DOM-free component or virtual-tree mount.</summary>
 /// <remarks>
-/// Root arguments, slots, and listeners apply when mounting a supplied
-/// <see cref="IComponentTemplate"/>. Application composition applies to both overloads.
+/// All composed dependencies remain caller-owned. Specified by <c>[APP-2]</c>, <c>[APP-6]</c>,
+/// <c>[CMP-9]</c>, and <c>[CONF-3]</c>.
 /// </remarks>
 public sealed class ComponentMountOptions
 {
-    /// <summary>Gets or sets the supplied root template's arguments.</summary>
-    public IComponentArguments? Arguments { get; set; }
+    /// <summary>Gets or sets raw arguments for an authored root component invocation.</summary>
+    public IReadOnlyDictionary<string, object?>? Arguments { get; set; }
 
-    /// <summary>Gets or sets the supplied root template's slots.</summary>
+    /// <summary>Gets or sets raw slots for an authored root component invocation.</summary>
     public IReadOnlyDictionary<string, ComponentSlot>? Slots { get; set; }
 
-    /// <summary>Gets or sets parent listeners supplied to the supplied root template request.</summary>
+    /// <summary>Gets or sets parent listeners for an authored root component invocation.</summary>
     public IReadOnlyDictionary<string, ComponentEventListener>? Listeners { get; set; }
 
-    /// <summary>Gets or sets the application-selected component factory.</summary>
+    /// <summary>Gets or sets directives attached to an authored root component invocation.</summary>
+    public IReadOnlyList<DirectiveInvocation>? RootDirectives { get; set; }
+
+    /// <summary>Gets or sets the root slot-set stability classification.</summary>
+    public SlotFlags SlotStability { get; set; } = SlotFlags.Stable;
+
+    /// <summary>Gets or sets the static contract used when mounting a supplied component instance.</summary>
+    public ComponentContract? RootContract { get; set; }
+
+    /// <summary>Gets or sets the application-selected component factory for descendant requests.</summary>
     public IComponentFactory? Components { get; set; }
 
-    /// <summary>
-    /// Gets child-template stubs keyed by requested template type. A null activator selects the
-    /// generated placeholder stub.
-    /// </summary>
+    /// <summary>Gets child-component stubs keyed by requested authored type.</summary>
     public Dictionary<Type, ComponentActivator?> Stubs { get; } = [];
 
-    /// <summary>Gets or sets the standard application service provider.</summary>
+    /// <summary>Gets or sets the caller-owned application service provider.</summary>
     public IServiceProvider? Services { get; set; }
 
-    /// <summary>Gets or sets the optional application state registry.</summary>
+    /// <summary>Gets or sets the caller-owned state registry.</summary>
     public IStateStoreRegistry? State { get; set; }
 
-    /// <summary>Gets or sets the optional application directive resolver.</summary>
+    /// <summary>Gets or sets the caller-owned directive resolver.</summary>
     public IDirectiveResolver? Directives { get; set; }
 
-    /// <summary>
-    /// Gets or sets an optional callback that configures diagnostics before the immutable
-    /// application context is created.
-    /// </summary>
+    /// <summary>Gets or sets optional application configuration applied before the mount is frozen.</summary>
     public Action<ApplicationOptions>? ConfigureApplication { get; set; }
 
-    /// <summary>
-    /// Replaces child requests for <typeparamref name="TComponent"/> with an optional explicit stub
-    /// activator.
-    /// </summary>
-    /// <typeparam name="TComponent">The child template type to replace.</typeparam>
-    /// <param name="activator">
-    /// A fresh-stub activator, or null to render an automatically named placeholder element.
-    /// </param>
-    /// <returns>These mount options.</returns>
-    public ComponentMountOptions Stub<TComponent>(
-        ComponentActivator? activator = null)
-        where TComponent : class, IComponentTemplate
+    /// <summary>Replaces descendant requests for a component type with a test stub.</summary>
+    /// <typeparam name="TComponent">The descendant authored type.</typeparam>
+    /// <param name="activator">A fresh-stub activator, or null for a generated placeholder.</param>
+    /// <returns>These options for fluent composition.</returns>
+    public ComponentMountOptions Stub<TComponent>(ComponentActivator? activator = null)
+        where TComponent : class, IComponent
     {
         Stubs[typeof(TComponent)] = activator;
         return this;

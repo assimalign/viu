@@ -1,4 +1,0 @@
-<Project>
-  <Import Project="build\Build.References.Projects.targets" />
-  <Import Project="..\Directory.Build.targets" />
-</Project>

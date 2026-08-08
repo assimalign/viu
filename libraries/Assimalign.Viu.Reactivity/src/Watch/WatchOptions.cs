@@ -3,7 +3,8 @@ namespace Assimalign.Viu.Reactivity;
 /// <summary>
 /// Options for <see cref="Reactive.Watch{T}(System.Func{T},WatchCallback{T},WatchOptions)"/> and
 /// <see cref="Reactive.WatchEffect(System.Action{OnCleanup},WatchOptions)"/>: deep traversal,
-/// immediate/once firing, and flush timing.
+/// immediate/once firing, and flush timing. Specified by <c>[RCT-5]</c>, <c>[RCT-7]</c>, and
+/// <c>[RCT-12]</c>.
 /// </summary>
 public sealed class WatchOptions
 {

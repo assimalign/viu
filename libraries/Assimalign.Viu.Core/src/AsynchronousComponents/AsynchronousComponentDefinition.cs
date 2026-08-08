@@ -9,14 +9,12 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Couples an asynchronous wrapper's explicit factory registration with render-tree requests for
-/// that registration.
+/// Couples an asynchronous wrapper's explicit registration with requests for that registration.
 /// </summary>
 /// <remarks>
-/// The definition owns shared loader state, but it does not own the application component factory
-/// or service provider. Concurrent mounts share one load, a successful target is cached, and every
-/// mount still receives a fresh factory-created wrapper and resolved template. This type is not
-/// thread-safe; Viu runs it on the host's single-threaded event loop.
+/// Concurrent mounts share one load and a successful target is cached, while activation still
+/// produces a fresh wrapper for every mount. This type is not thread-safe; Viu drives it on the
+/// host event loop. Specified by <c>[BLT-14]</c>.
 /// </remarks>
 public sealed class AsynchronousComponentDefinition
 {
@@ -30,56 +28,47 @@ public sealed class AsynchronousComponentDefinition
         AsynchronousComponentOptions options,
         string? name)
     {
+        ComponentReference typeReference = ComponentReference.ForType(componentType);
         ComponentType = componentType;
+        Reference = name is null
+            ? typeReference
+            : ComponentReference.ForName(name);
         _options = options;
         Registration = new ComponentRegistration(
-            componentType,
-            () => new AsynchronousComponentTemplate(this),
-            name);
+            Reference,
+            new ComponentContract(
+                displayName: "AsynchronousComponent",
+                flags: ComponentFlags.None),
+            _ => new AsynchronousComponentWrapper(this));
     }
 
-    /// <summary>Gets the stable type identity registered for this wrapper.</summary>
+    /// <summary>Gets the stable authored type identity associated with this wrapper.</summary>
     public Type ComponentType { get; }
 
-    /// <summary>
-    /// Gets the explicit registration to include in the application-owned component factory.
-    /// </summary>
-    /// <remarks>
-    /// The built-in factory consumes this value directly. A custom factory may map its type or
-    /// name to its activator without otherwise depending on the built-in factory.
-    /// </remarks>
+    /// <summary>Gets the reference carried by requests for this definition.</summary>
+    public ComponentReference Reference { get; }
+
+    /// <summary>Gets the explicit registration to add to the application component factory.</summary>
     public ComponentRegistration Registration { get; }
 
-    /// <summary>Creates an immutable request to mount this asynchronous component.</summary>
-    /// <param name="arguments">The arguments forwarded to the resolved template.</param>
-    /// <param name="slots">The slots forwarded to the resolved template.</param>
+    /// <summary>Creates an immutable node that requests this asynchronous component.</summary>
+    /// <param name="invocation">The arguments, slots, listeners, and directives to forward.</param>
     /// <param name="key">The optional sibling identity.</param>
-    /// <param name="optimization">The compiler-produced optimization metadata.</param>
-    /// <param name="listeners">The event listeners forwarded to the resolved template.</param>
-    /// <param name="directives">The root directives forwarded to the resolved template.</param>
-    /// <param name="reference">
-    /// The reference forwarded to the resolved template. It remains unset while a loading, error,
-    /// or empty presentation is active.
-    /// </param>
-    /// <returns>A template request resolved through the application component factory.</returns>
-    public ITemplateComponent CreateComponent(
-        IComponentArguments? arguments = null,
-        IReadOnlyDictionary<string, ComponentSlot>? slots = null,
+    /// <param name="mountReference">The optional exposed-value receiver.</param>
+    /// <param name="renderPlan">The compiler patch information.</param>
+    /// <returns>A component node resolved through <see cref="Registration"/>.</returns>
+    public ComponentNode CreateComponent(
+        ComponentInvocation? invocation = null,
         object? key = null,
-        ComponentOptimization? optimization = null,
-        IReadOnlyDictionary<string, ComponentEventListener>? listeners = null,
-        IReadOnlyList<IComponentDirectiveBinding>? directives = null,
-        IComponentReference? reference = null)
+        MountReference? mountReference = null,
+        RenderPlan? renderPlan = null)
     {
-        return new TemplateComponent(
-            ComponentType,
-            arguments,
-            slots,
+        return new ComponentNode(
+            Reference,
+            invocation,
             key,
-            optimization,
-            listeners,
-            directives,
-            reference);
+            mountReference,
+            renderPlan);
     }
 
     internal AsynchronousComponentOptions Options => _options;
@@ -88,12 +77,10 @@ public sealed class AsynchronousComponentDefinition
     {
         if (_hasResolvedTarget)
         {
-            return new AsynchronousComponentLoadLease(
-                Task.FromResult(_resolvedTarget));
+            return new AsynchronousComponentLoadLease(Task.FromResult(_resolvedTarget));
         }
 
-        AsynchronousComponentLoadState state = _pendingLoad
-            ?? StartLoad();
+        AsynchronousComponentLoadState state = _pendingLoad ?? StartLoad();
         state.ConsumerCount++;
         return new AsynchronousComponentLoadLease(
             state.PendingLoad,
@@ -141,7 +128,7 @@ public sealed class AsynchronousComponentDefinition
                 try
                 {
                     AsynchronousComponentTarget target =
-                        await _options.Loader(state.Cancellation.Token);
+                        await _options.Loader(state.Cancellation.Token).ConfigureAwait(false);
                     target.Validate();
                     if (ReferenceEquals(_pendingLoad, state))
                     {
@@ -161,7 +148,7 @@ public sealed class AsynchronousComponentDefinition
                     bool retry = await GetRetryDecisionAsync(
                         error,
                         attempts,
-                        state.Cancellation.Token);
+                        state.Cancellation.Token).ConfigureAwait(false);
                     if (!retry)
                     {
                         ExceptionDispatchInfo.Capture(error).Throw();
@@ -185,15 +172,15 @@ public sealed class AsynchronousComponentDefinition
         int attempts,
         CancellationToken cancellationToken)
     {
-        TaskCompletionSource<bool> completion = new();
-        using CancellationTokenRegistration registration =
-            cancellationToken.Register(
-                () => completion.TrySetCanceled(cancellationToken));
+        TaskCompletionSource<bool> completion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using CancellationTokenRegistration registration = cancellationToken.Register(
+            () => completion.TrySetCanceled(cancellationToken));
         _options.OnError!(
             error,
             () => completion.TrySetResult(true),
             () => completion.TrySetResult(false),
             attempts);
-        return await completion.Task;
+        return await completion.Task.ConfigureAwait(false);
     }
 }

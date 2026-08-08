@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 
 using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
@@ -12,7 +13,7 @@ namespace Assimalign.Viu.Browser;
 /// client-side walk crosses the interop boundary once per hydration root rather than a marshaled call
 /// per <c>firstChild</c>/<c>nextSibling</c>/<c>getAttribute</c> (the JS-interop cost discipline the
 /// SSR area requires — see this package's <c>docs/DESIGN.md</c>). Node handles in the snapshot are the
-/// same int handles the write-side node-ops use, so an adopted node's <see cref="int"/> flows straight
+/// same int handles the write-side host operations use, so an adopted node's <see cref="int"/> flows straight
 /// into <c>patchProp</c>/<c>insert</c>/<c>remove</c>. The "no node" sentinel is <c>0</c> (the bridge's
 /// reserved handle), matching <see cref="RendererOptions{TNode}"/>'s <c>default</c> convention.
 /// </summary>
@@ -34,6 +35,28 @@ internal sealed class BrowserHydrationReader : HydrationNodeReader<int>
     /// every adopted server node before mismatch recovery creates a client node.
     /// </summary>
     internal int MaximumHandle { get; }
+
+    /// <summary>
+    /// Copies adopted element identities into the write-side registry so later binding patches use
+    /// the same tag and namespace policy as newly created nodes.
+    /// </summary>
+    internal void CopyElementNamesTo(IDictionary<int, QualifiedName> elementNames)
+    {
+        ArgumentNullException.ThrowIfNull(elementNames);
+        Dictionary<int, string?> namespaces = [];
+        foreach (KeyValuePair<int, SnapshotNode> pair in _nodes)
+        {
+            if (pair.Value.Kind != HydrationNodeKind.Element)
+            {
+                continue;
+            }
+
+            string? elementNamespace = ResolveNamespace(pair.Key, namespaces);
+            elementNames[pair.Key] = new QualifiedName(
+                pair.Value.Tag.ToLowerInvariant(),
+                elementNamespace);
+        }
+    }
 
     /// <inheritdoc/>
     public override HydrationNodeKind Kind(int node)
@@ -113,6 +136,37 @@ internal sealed class BrowserHydrationReader : HydrationNodeReader<int>
             };
         }
         return nodes;
+    }
+
+    private string? ResolveNamespace(int handle, Dictionary<int, string?> namespaces)
+    {
+        if (namespaces.TryGetValue(handle, out string? resolved))
+        {
+            return resolved;
+        }
+
+        SnapshotNode node = _nodes[handle];
+        if (string.Equals(node.Tag, "svg", StringComparison.OrdinalIgnoreCase))
+        {
+            resolved = BrowserNamespacePolicy.Svg;
+        }
+        else if (string.Equals(node.Tag, "math", StringComparison.OrdinalIgnoreCase))
+        {
+            resolved = BrowserNamespacePolicy.MathMl;
+        }
+        else if (node.Parent != 0
+            && _nodes.TryGetValue(node.Parent, out SnapshotNode? parent)
+            && parent.Kind == HydrationNodeKind.Element)
+        {
+            string? parentNamespace = ResolveNamespace(node.Parent, namespaces);
+            resolved = parentNamespace == BrowserNamespacePolicy.Svg
+                && string.Equals(parent.Tag, "foreignObject", StringComparison.Ordinal)
+                    ? null
+                    : parentNamespace;
+        }
+
+        namespaces[handle] = resolved;
+        return resolved;
     }
 
     private static int ReadInt(string snapshot, ref int cursor)

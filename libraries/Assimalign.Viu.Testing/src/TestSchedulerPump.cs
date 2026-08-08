@@ -5,60 +5,54 @@ using Assimalign.Viu;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Captures the <see cref="Scheduler"/>'s scheduled flushes and runs them only when the test
-/// says so, making the microtask-like flush deterministic on a plain CoreCLR test host — the
-/// stand-in for "let the JS event loop run" that a real host provides. Installed via the scheduler's internal
-/// dispatcher seam rather than an ambient <see cref="System.Threading.SynchronizationContext"/>,
-/// so test-framework thread hops cannot strand a flush. Install in a <c>using</c> block;
-/// disposal restores the previous dispatcher. Not thread-safe by design.
-/// </summary>
+/// <summary>Captures scheduler continuations and executes them deterministically on demand.</summary>
+/// <remarks>
+/// Installation uses the public test-host lease and is single-threaded. Specified by seam S2 in
+/// the component-model plan and by <c>[SCH-1]</c> through <c>[SCH-12]</c>.
+/// </remarks>
 public sealed class TestSchedulerPump : IDisposable
 {
     private readonly Queue<Action> _pendingFlushes = [];
-    private readonly Action<Action>? _previousDispatcher;
+    private readonly IDisposable _registration;
     private bool _isDisposed;
 
     private TestSchedulerPump()
     {
-        _previousDispatcher = Scheduler.FlushDispatcher;
+        _registration = Scheduler.UseFlushDispatcher(_pendingFlushes.Enqueue);
     }
 
-    /// <summary>The number of captured flushes waiting to run.</summary>
+    /// <summary>Gets the number of captured flush continuations waiting to execute.</summary>
     public int PendingFlushCount => _pendingFlushes.Count;
 
-    /// <summary>Creates a pump and installs it as the scheduler's flush dispatcher.</summary>
-    public static TestSchedulerPump Install()
-    {
-        var pump = new TestSchedulerPump();
-        Scheduler.FlushDispatcher = pump._pendingFlushes.Enqueue;
-        return pump;
-    }
+    /// <summary>Installs a deterministic dispatcher and returns its restoration lease.</summary>
+    /// <returns>The installed scheduler pump.</returns>
+    public static TestSchedulerPump Install() => new();
 
-    /// <summary>
-    /// Runs captured flushes — including ones captured while draining — until none remain.
-    /// </summary>
-    /// <returns>The number of flushes run.</returns>
+    /// <summary>Runs captured continuations, including continuations captured while draining.</summary>
+    /// <returns>The number of continuations executed.</returns>
     public int RunUntilIdle()
     {
-        var executed = 0;
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        int executed = 0;
         while (_pendingFlushes.Count > 0)
         {
-            var flush = _pendingFlushes.Dequeue();
-            flush();
+            _pendingFlushes.Dequeue()();
             executed++;
         }
+
         return executed;
     }
 
-    /// <summary>Restores the previously installed dispatcher.</summary>
+    /// <summary>Restores the scheduler dispatcher that preceded this lease.</summary>
     public void Dispose()
     {
         if (_isDisposed)
         {
             return;
         }
+
+        _registration.Dispose();
+        _pendingFlushes.Clear();
         _isDisposed = true;
-        Scheduler.FlushDispatcher = _previousDispatcher;
     }
 }

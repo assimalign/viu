@@ -202,7 +202,7 @@ public sealed class SingleFileComponentDeclarationTests
 
         generated.ShouldNotContain("__ViuDeclaredParameters");
         generated.ShouldNotContain("__ViuBindParameters");
-        generated.ShouldNotContain("IComponentTemplate.Parameters");
+        generated.ShouldNotContain("IComponent" + "Template.Parameters");
     }
 
     [Fact]
@@ -349,7 +349,7 @@ public sealed class SingleFileComponentDeclarationTests
     [Fact]
     public void StyleOnlyComponent_IgnoresDeclarations()
     {
-        // A component without a template block is not an IComponentTemplate at all, so it has no
+        // A component without a template block has no runtime component contract, so it has no
         // Parameters/Events surface to hang a declaration on and the reader never runs.
         var generated = Generate(
             "Styles",

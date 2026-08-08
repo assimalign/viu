@@ -3,16 +3,12 @@ Assimalign.Viu.State.DuplicateStateStoreKeyException
 Assimalign.Viu.State.DuplicateStateStoreKeyException.DuplicateStateStoreKeyException(string! stateStoreKey) -> void
 Assimalign.Viu.State.DuplicateStateStoreKeyException.StateStoreKey.get -> string!
 Assimalign.Viu.State.IStateContext
-Assimalign.Viu.State.IStateContext.Components.get -> Assimalign.Viu.Components.IComponentFactory!
-Assimalign.Viu.State.IStateContext.Owner.get -> Assimalign.Viu.Components.IComponentContext?
 Assimalign.Viu.State.IStateContext.Scope.get -> Assimalign.Viu.Reactivity.IReactiveEffectScope!
-Assimalign.Viu.State.IStateContext.Services.get -> System.IServiceProvider!
+Assimalign.Viu.State.IStateContext.Services.get -> System.IServiceProvider?
 Assimalign.Viu.State.IStateContext.WatchScheduler.get -> Assimalign.Viu.Reactivity.IReactiveWatchScheduler?
-Assimalign.Viu.State.IStateStoreContext
-Assimalign.Viu.State.IStateStoreContext.State.get -> Assimalign.Viu.State.IStateStoreRegistry?
 Assimalign.Viu.State.IStateStoreRegistry
 Assimalign.Viu.State.IStateStoreRegistry.Count.get -> int
-Assimalign.Viu.State.IStateStoreRegistry.GetOrCreate<TStore>(Assimalign.Viu.State.StateStoreDefinition<TStore!>! definition, Assimalign.Viu.Components.IComponentContext? owner = null) -> TStore!
+Assimalign.Viu.State.IStateStoreRegistry.GetOrCreate<TStore>(Assimalign.Viu.State.StateStoreDefinition<TStore!>! definition) -> TStore!
 Assimalign.Viu.State.IStateStoreRegistry.IsDisposed.get -> bool
 Assimalign.Viu.State.IStateStoreRegistry.Remove<TStore>(Assimalign.Viu.State.StateStoreDefinition<TStore!>! definition) -> bool
 Assimalign.Viu.State.StateStore<TState>
@@ -37,14 +33,16 @@ Assimalign.Viu.State.StateStoreActionContext.After(System.Action<object?>! callb
 Assimalign.Viu.State.StateStoreActionContext.Name.get -> string!
 Assimalign.Viu.State.StateStoreActionContext.OnError(System.Action<System.Exception!>! callback) -> void
 Assimalign.Viu.State.StateStoreActionContext.StateStore.get -> object!
+Assimalign.Viu.State.StateStoreActivator<TStore>
 Assimalign.Viu.State.StateStoreDefinition<TStore>
 Assimalign.Viu.State.StateStoreDefinition<TStore>.Dispose(Assimalign.Viu.State.IStateStoreRegistry! registry) -> bool
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Identifier.get -> string!
 Assimalign.Viu.State.StateStoreDefinition<TStore>.Key.get -> string!
-Assimalign.Viu.State.StateStoreDefinition<TStore>.Setup.get -> Assimalign.Viu.State.StateStoreSetup<TStore!>!
-Assimalign.Viu.State.StateStoreDefinition<TStore>.StateStoreDefinition(string! key, Assimalign.Viu.State.StateStoreSetup<TStore!>! setup) -> void
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Setup.get -> Assimalign.Viu.State.StateStoreActivator<TStore!>!
+Assimalign.Viu.State.StateStoreDefinition<TStore>.StateStoreDefinition(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup) -> void
 Assimalign.Viu.State.StateStoreDefinition<TStore>.Use() -> TStore!
-Assimalign.Viu.State.StateStoreDefinition<TStore>.Use(Assimalign.Viu.Components.IComponentContext! context) -> TStore!
-Assimalign.Viu.State.StateStoreDefinition<TStore>.Use(Assimalign.Viu.State.IStateStoreRegistry! registry, Assimalign.Viu.Components.IComponentContext? owner = null) -> TStore!
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Use(Assimalign.Viu.Components.ComponentContext! context) -> TStore!
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Use(Assimalign.Viu.State.IStateStoreRegistry! registry) -> TStore!
 Assimalign.Viu.State.StateStoreMutation
 Assimalign.Viu.State.StateStoreMutation.Kind.get -> Assimalign.Viu.State.StateStorePatchKind
 Assimalign.Viu.State.StateStoreMutation.StateStoreKey.get -> string!
@@ -57,22 +55,23 @@ Assimalign.Viu.State.StateStorePatchKind.PatchObject = 2 -> Assimalign.Viu.State
 Assimalign.Viu.State.StateStoreRegistry
 Assimalign.Viu.State.StateStoreRegistry.Count.get -> int
 Assimalign.Viu.State.StateStoreRegistry.Dispose() -> void
-Assimalign.Viu.State.StateStoreRegistry.GetOrCreate<TStore>(Assimalign.Viu.State.StateStoreDefinition<TStore!>! definition, Assimalign.Viu.Components.IComponentContext? owner = null) -> TStore!
+Assimalign.Viu.State.StateStoreRegistry.GetOrCreate<TStore>(Assimalign.Viu.State.StateStoreDefinition<TStore!>! definition) -> TStore!
 Assimalign.Viu.State.StateStoreRegistry.IsDisposed.get -> bool
 Assimalign.Viu.State.StateStoreRegistry.Remove<TStore>(Assimalign.Viu.State.StateStoreDefinition<TStore!>! definition) -> bool
-Assimalign.Viu.State.StateStoreRegistry.StateStoreRegistry(Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.Reactivity.IReactiveEffectScopeFactory! scopes, Assimalign.Viu.Reactivity.IReactiveWatchScheduler? watchScheduler = null) -> void
+Assimalign.Viu.State.StateStoreRegistry.StateStoreRegistry(System.IServiceProvider? services, Assimalign.Viu.Reactivity.IReactiveEffectScopeFactory! effectScopes, Assimalign.Viu.Reactivity.IReactiveWatchScheduler? watchScheduler = null) -> void
 Assimalign.Viu.State.StateStores
-Assimalign.Viu.State.StateStoreSetup<TStore>
 Assimalign.Viu.State.StateStoreSubscription
 Assimalign.Viu.State.StateStoreSubscription.Dispose() -> void
 Assimalign.Viu.State.StateStoreSubscription.IsActive.get -> bool
 Assimalign.Viu.State.StateStoreSubscription.Stop() -> void
 Assimalign.Viu.State.StateStoreSubscriptionCallback<TState>
 static Assimalign.Viu.State.StateStores.ActiveRegistry.get -> Assimalign.Viu.State.IStateStoreRegistry?
-static Assimalign.Viu.State.StateStores.CreateRegistry(Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.Reactivity.IReactiveEffectScopeFactory! effectScopes, Assimalign.Viu.Reactivity.IReactiveWatchScheduler? watchScheduler = null) -> Assimalign.Viu.State.StateStoreRegistry!
-static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, Assimalign.Viu.State.StateStoreSetup<TStore!>! setup) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
+static Assimalign.Viu.State.StateStores.ActiveRegistry.set -> void
+static Assimalign.Viu.State.StateStores.CreateRegistry(Assimalign.Viu.Reactivity.IReactiveEffectScopeFactory! effectScopes, System.IServiceProvider? services = null, Assimalign.Viu.Reactivity.IReactiveWatchScheduler? watchScheduler = null) -> Assimalign.Viu.State.StateStoreRegistry!
+static Assimalign.Viu.State.StateStores.CreateRegistry(System.IServiceProvider? services = null, Assimalign.Viu.Reactivity.IReactiveWatchScheduler? watchScheduler = null) -> Assimalign.Viu.State.IStateStoreRegistry!
+static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
 static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, System.Func<TStore!>! setup) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
 static Assimalign.Viu.State.StateStores.SetActiveRegistry(Assimalign.Viu.State.IStateStoreRegistry? registry) -> void
 virtual Assimalign.Viu.State.StateStoreActionCallback.Invoke(Assimalign.Viu.State.StateStoreActionContext! context) -> void
-virtual Assimalign.Viu.State.StateStoreSetup<TStore>.Invoke(Assimalign.Viu.State.IStateContext! context) -> TStore!
+virtual Assimalign.Viu.State.StateStoreActivator<TStore>.Invoke(Assimalign.Viu.State.IStateContext! context) -> TStore!
 virtual Assimalign.Viu.State.StateStoreSubscriptionCallback<TState>.Invoke(Assimalign.Viu.State.StateStoreMutation mutation, TState! state) -> void

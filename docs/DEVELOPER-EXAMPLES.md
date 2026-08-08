@@ -1,9 +1,8 @@
 # Developer consumption examples
 
-These examples describe the adopted `[V01.01.15]` APIs whose exact contract shapes are scaffolded
-under `.redesign/` and whose implementation swap lands on
-`feature/V01.01.15-component-model`. They are written from the application developer's point of view
-and use the separated Components, Reactivity, State, Core, and Browser packages.
+These examples use the shipping `[V01.01.15]` APIs from the separated Components, Reactivity,
+State, Core, and Browser packages. They are written from the application developer's point of view;
+the examples therefore consume public contracts rather than runtime implementation details.
 
 ## 1. Mental model
 

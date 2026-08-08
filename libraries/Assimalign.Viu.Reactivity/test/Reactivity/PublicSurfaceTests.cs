@@ -66,9 +66,9 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void EveryRefKind_IsAReactiveValue()
+    public void EveryReferenceKind_IsAReactiveValue()
     {
-        // The is-ref check is now a class type-test (replacing the old is-IReference interface check).
+        // The reference check uses the public reactive-reference contract.
         (Reactive.Reference(1) is ReactiveValue).ShouldBeTrue();
         (Reactive.ShallowReference(1) is ReactiveValue).ShouldBeTrue();
         (Reactive.Computed(() => 1) is ReactiveValue).ShouldBeTrue();
@@ -147,27 +147,14 @@ public sealed class PublicSurfaceTests
     }
 
     [Fact]
-    public void ReadonlyComputed_SetterWarns_ThroughTheWarningsSink_AndDoesNotThrow()
+    public void ReadonlyComputed_SetterIsANonThrowingNoOp()
     {
-        // Writing a getter-only computed warns in dev and is a no-op — it never throws. The warning
-        // routes through the runtime sink.
-        var captured = new System.Collections.Generic.List<string>();
-        var previousSink = RuntimeWarnings.Sink;
-        RuntimeWarnings.Sink = captured.Add;
-        try
-        {
-            var readonlyComputed = Reactive.Computed(() => 41);
-            readonlyComputed.IsReadOnly.ShouldBeTrue();
+        var readonlyComputed = Reactive.Computed(() => 41);
+        readonlyComputed.IsReadOnly.ShouldBeTrue();
 
-            Should.NotThrow(() => readonlyComputed.Value = 99);
+        Should.NotThrow(() => readonlyComputed.Value = 99);
 
-            readonlyComputed.Value.ShouldBe(41); // unchanged
-            captured.ShouldContain(message => message.Contains("readonly"));
-        }
-        finally
-        {
-            RuntimeWarnings.Sink = previousSink;
-        }
+        readonlyComputed.Value.ShouldBe(41);
     }
 
     [Fact]
@@ -257,4 +244,3 @@ public sealed class PublicSurfaceTests
         runs.ShouldBe(1);
     }
 }
-

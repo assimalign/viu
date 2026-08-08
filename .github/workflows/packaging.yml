@@ -126,7 +126,6 @@ jobs:
             'Assimalign.Viu.Components',
             'Assimalign.Viu.Core',
             'Assimalign.Viu.Reactivity',
-            'Assimalign.Viu.Shared',
             'Assimalign.Viu.State'
           )
 

@@ -1,94 +1,67 @@
 using System;
-using System.Collections.Generic;
 
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Identifies the registered template produced by an asynchronous-component loader.
-/// </summary>
+/// <summary>Identifies the registration produced by an asynchronous-component loader.</summary>
 /// <remarks>
-/// A target deliberately carries only a factory lookup identity. It never carries an activated
-/// template and therefore cannot bypass <see cref="IComponentFactory"/>.
+/// The target carries only a <see cref="ComponentReference"/> and cannot bypass the application
+/// component factory. Specified by <c>[BLT-14]</c>.
 /// </remarks>
 public readonly struct AsynchronousComponentTarget
 {
-    /// <summary>Creates a type-identified target.</summary>
-    /// <param name="templateType">The type registered with the application component factory.</param>
-    public AsynchronousComponentTarget(Type templateType)
+    private readonly ComponentReference? _reference;
+
+    /// <summary>Creates a target for a registered component type.</summary>
+    /// <param name="componentType">The registered <see cref="IComponent"/> type.</param>
+    public AsynchronousComponentTarget(Type componentType)
     {
-        ArgumentNullException.ThrowIfNull(templateType);
-        TemplateType = templateType;
-        TemplateName = null;
+        _reference = ComponentReference.ForType(componentType);
     }
 
-    /// <summary>Creates a name-identified target.</summary>
-    /// <param name="templateName">The name registered with the application component factory.</param>
-    public AsynchronousComponentTarget(string templateName)
+    /// <summary>Creates a target for an explicitly registered component name.</summary>
+    /// <param name="componentName">The non-empty registration name.</param>
+    public AsynchronousComponentTarget(string componentName)
     {
-        ArgumentException.ThrowIfNullOrEmpty(templateName);
-        TemplateType = null;
-        TemplateName = templateName;
+        _reference = ComponentReference.ForName(componentName);
     }
 
-    /// <summary>Gets the registered type, or null for a named target.</summary>
-    public Type? TemplateType { get; }
-
-    /// <summary>Gets the registered name, or null for a type target.</summary>
-    public string? TemplateName { get; }
-
-    /// <summary>Creates a target for a registered template type.</summary>
-    /// <typeparam name="TTemplate">The registered component template type.</typeparam>
-    /// <returns>The type-identified target.</returns>
-    public static AsynchronousComponentTarget From<TTemplate>()
-        where TTemplate : class, IComponentTemplate
+    /// <summary>Creates a target from an already validated component reference.</summary>
+    /// <param name="reference">The explicit registration identity.</param>
+    public AsynchronousComponentTarget(ComponentReference reference)
     {
-        return new AsynchronousComponentTarget(typeof(TTemplate));
+        ArgumentNullException.ThrowIfNull(reference);
+        _reference = reference;
     }
 
-    internal ITemplateComponent CreateComponent(
-        IComponentArguments arguments,
-        IReadOnlyDictionary<string, ComponentSlot>? slots,
-        object? key,
-        IReadOnlyDictionary<string, ComponentEventListener>? listeners,
-        IReadOnlyList<IComponentDirectiveBinding>? directives,
-        IComponentReference? reference)
-    {
-        if (TemplateType is not null)
-        {
-            return new TemplateComponent(
-                TemplateType,
-                arguments,
-                slots,
-                key,
-                listeners: listeners,
-                directives: directives,
-                reference: reference);
-        }
-
-        if (TemplateName is not null)
-        {
-            return new TemplateComponent(
-                TemplateName,
-                arguments,
-                slots,
-                key,
-                listeners: listeners,
-                directives: directives,
-                reference: reference);
-        }
-
-        throw new InvalidOperationException(
+    /// <summary>Gets the explicit registration identity.</summary>
+    /// <exception cref="InvalidOperationException">The value is the default uninitialized target.</exception>
+    public ComponentReference Reference => _reference
+        ?? throw new InvalidOperationException(
             "An asynchronous component loader returned an uninitialized target.");
+
+    /// <summary>Creates a target for a registered authored component type.</summary>
+    /// <typeparam name="TComponent">The registered component type.</typeparam>
+    /// <returns>The type-identified target.</returns>
+    public static AsynchronousComponentTarget From<TComponent>()
+        where TComponent : class, IComponent
+    {
+        return new AsynchronousComponentTarget(typeof(TComponent));
+    }
+
+    internal ComponentNode CreateComponent(
+        ComponentInvocation invocation,
+        MountReference? mountReference)
+    {
+        return new ComponentNode(
+            Reference,
+            invocation,
+            mountReference: mountReference);
     }
 
     internal void Validate()
     {
-        if (TemplateType is null && TemplateName is null)
-        {
-            throw new InvalidOperationException(
-                "An asynchronous component loader returned an uninitialized target.");
-        }
+        _ = Reference;
     }
 }

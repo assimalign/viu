@@ -3,11 +3,12 @@ using System;
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The system-modifier state of a dispatched DOM event, extracted JS-side and marshaled as one
-/// integer (W3C UI Events <c>ctrlKey</c>/<c>shiftKey</c>/<c>altKey</c>/<c>metaKey</c>,
-/// https://www.w3.org/TR/uievents/). Consumed by <see cref="BrowserEvents"/>.<c>WithModifiers</c>'s
-/// system-modifier and <c>.exact</c> guards.
+/// Describes the system-modifier keys pressed when a browser event was dispatched.
 /// </summary>
+/// <remarks>
+/// Browser marshals these flags as one integer so modifier guards do not require per-field
+/// JavaScript interop. Specified by <c>[SFC-CG-2]</c> and <c>[V01.01.04.03]</c>.
+/// </remarks>
 [Flags]
 public enum BrowserEventModifiers
 {
@@ -20,9 +21,9 @@ public enum BrowserEventModifiers
     /// <summary>The Shift key was pressed.</summary>
     Shift = 1 << 1,
 
-    /// <summary>The Alt (Option) key was pressed.</summary>
+    /// <summary>The Alt or Option key was pressed.</summary>
     Alt = 1 << 2,
 
-    /// <summary>The Meta (Command/Windows) key was pressed.</summary>
+    /// <summary>The Meta, Command, or Windows key was pressed.</summary>
     Meta = 1 << 3,
 }

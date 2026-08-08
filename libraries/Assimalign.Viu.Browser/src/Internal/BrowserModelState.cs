@@ -14,6 +14,12 @@ namespace Assimalign.Viu.Browser;
 /// </summary>
 internal sealed class BrowserModelState
 {
+    /// <summary>The concrete directive currently owned by a dynamic model binding.</summary>
+    public IDirective? DynamicDirective { get; set; }
+
+    /// <summary>Whether a newly selected dynamic directive must run its mounted hook after patch.</summary>
+    public bool DynamicMountPending { get; set; }
+
     /// <summary>
     /// The model setter to invoke on element input, refreshed each render from the binding's
     /// <see cref="ViuModelBinding.Setter"/> so a stale closure is never called.

@@ -80,7 +80,7 @@ public class RouterViewTests
 
         wrapper.Html().ShouldBe(
             "<div class=\"layout\"><div class=\"profile\">profile</div></div>");
-        IComponentContext? layoutContext = layout.Context;
+        ComponentContext? layoutContext = layout.Context;
 
         _ = router.Push("/users/settings");
         await wrapper.NextTickAsync();
@@ -109,7 +109,7 @@ public class RouterViewTests
         using var wrapper = MountView(router, view);
 
         wrapper.Html().ShouldBe("<span class=\"value\">1</span>");
-        IComponentContext? context = view.Context;
+        ComponentContext? context = view.Context;
 
         _ = router.Push("/users/2");
         await wrapper.NextTickAsync();
@@ -196,7 +196,7 @@ public class RouterViewTests
     public void RouterView_RendersNothing_WhenRouterServiceIsMissing()
     {
         using var wrapper = Assimalign.Viu.Testing.ViuTest.Mount(
-            new RouterView());
+            RouterView.Registration);
 
         wrapper.Find("div").ShouldBeNull();
     }
@@ -207,7 +207,7 @@ public class RouterViewTests
         Should.Throw<System.ArgumentException>(
             () => new RouteRecord(
                 "/text",
-                component: ComponentTree.Text("text"),
+                component: Text("text"),
                 argumentsResolver:
                     RouteComponentArguments.FromValues(("value", "unused"))));
     }

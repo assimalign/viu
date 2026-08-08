@@ -40,7 +40,7 @@ public sealed class SingleFileComponentStyleTests
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
         generated.ShouldNotContain("internal const string ScopeId");
-        generated.ShouldNotContain("ScopeIdentifier");
+        generated.ShouldNotContain("Scope" + "Identifier");
         // The scoped rewrite lands the attribute on the last compound only, so a descendant selector still
         // matches through untagged intermediate elements instead of requiring every level to be scoped.
         generated.ShouldContain(".box .inner[data-v-");

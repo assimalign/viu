@@ -1,234 +1,191 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// Animates insertion, removal, and keyed reordering for a group of browser-rendered children.
-/// </summary>
+/// <summary>Animates keyed Browser children as they enter, leave, and change position.</summary>
 /// <remarks>
-/// Core supplies host-neutral keyed child snapshots and shared transition state; this component owns
-/// CSS transition resolution and the DOM-specific FLIP measurement and mutation sequence. Position
-/// reads are batched so each before/after pass crosses the browser interop boundary once. The
-/// component is intended for the browser's single-threaded event loop and is not thread-safe.
+/// Each keyed child receives the ordinary Browser transition behavior. An outer structural
+/// transition consumes Core's outgoing and incoming keyed-element snapshots to run a batched FLIP
+/// position pass without querying mounted renderer internals. Unkeyed non-text children produce a
+/// warning through <see cref="ComponentContext.Warn"/>. Specified by <c>[BLT-7]</c> through
+/// <c>[BLT-9]</c>.
 /// </remarks>
-public sealed class TransitionGroup : IComponentTemplate
+public sealed class TransitionGroup : IComponent
 {
-    private static readonly IReadOnlyList<IComponentParameter>
-        DeclaredParameters = CreateParameterDefinitions();
+    private static readonly IReadOnlyList<ComponentParameter> Parameters = CreateParameters();
+    private static readonly ComponentContract Contract = new(
+        displayName: "TransitionGroup",
+        flags: ComponentFlags.InheritFallthroughBindings,
+        parameters: Parameters);
 
     private TransitionGroup()
     {
     }
 
-    /// <inheritdoc/>
-    public string? Name => "TransitionGroup";
+    /// <summary>Gets the reflection-free component registration.</summary>
+    public static ComponentRegistration Registration { get; } = new(
+        ComponentReference.ForType(typeof(TransitionGroup)),
+        Contract,
+        static _ => new TransitionGroup());
 
     /// <inheritdoc/>
-    public IReadOnlyList<IComponentParameter>? Parameters =>
-        DeclaredParameters;
-
-    /// <summary>Gets the AOT-safe registration for the browser transition-group built-in.</summary>
-    public static ComponentRegistration Registration =>
-        new(
-            typeof(TransitionGroup),
-            static () => new TransitionGroup(),
-            "TransitionGroup");
-
-    /// <inheritdoc/>
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ComponentTransitionScope transitionScope = new(context);
-        Dictionary<object, TransitionRectangle> previousPositions = new();
-        Dictionary<int, Action> moveCallbacks = new();
-        DomTransitionClassNames classNames =
-            Transition.ResolveClassNames(context.Arguments);
-        DomTransitionClassNames previousClassNames = classNames;
-        IReadOnlyList<KeyedComponentHostElement<int>> previousChildren =
-            Array.Empty<KeyedComponentHostElement<int>>();
+        ComponentTransitionScope scope = new(context);
+        Dictionary<object, TransitionRectangle> previousPositions = [];
+        Dictionary<int, Action> moveCallbacks = [];
+        string measuredMoveClass = "v-move";
+        DomTransitionClassNames measuredClassNames = new(
+            "v-enter-from",
+            "v-enter-active",
+            "v-enter-to",
+            "v-enter-from",
+            "v-enter-active",
+            "v-enter-to",
+            "v-leave-from",
+            "v-leave-active",
+            "v-leave-to");
 
-        context.Lifecycle.OnBeforeUpdate(
-            () =>
-            {
-                previousClassNames = classNames;
-                previousChildren =
-                    RecordPreviousPositions(
-                        context,
-                        previousPositions);
-            });
-        context.Lifecycle.OnUpdated(
-            () => RunMoveTransition(
-                context,
-                transitionScope,
-                previousPositions,
-                previousChildren,
-                moveCallbacks,
-                previousClassNames));
-        context.Lifecycle.OnBeforeUnmount(
-            () => FinishMoveCallbacks(moveCallbacks));
+        context.Lifecycle.OnBeforeUnmount(() => FinishMoveCallbacks(moveCallbacks));
 
-        return () =>
+        return _ =>
         {
-            BaseTransitionProperties properties =
-                Transition.ResolveTransitionProperties(context.Arguments);
-            classNames =
-                Transition.ResolveClassNames(context.Arguments);
-            IReadOnlyList<IComponent> children =
-                ResolveChildren(context);
-            List<IComponent> transitionedChildren =
-                new(children.Count);
+            IReadOnlyDictionary<string, object?> arguments = context.Bindings.Parameters;
+            TransitionProperties childProperties =
+                Transition.ResolveTransitionProperties(arguments);
+            DomTransitionClassNames classNames = Transition.ResolveClassNames(arguments);
+            string moveClass = ResolveMoveClass(arguments);
+            IReadOnlyList<VirtualNode> children = ResolveChildren(context.Bindings.Slots);
+            List<VirtualNode> transitionedChildren = new(children.Count);
             for (int index = 0; index < children.Count; index++)
             {
-                IComponent child = children[index];
-                if (child.Key is not null)
+                VirtualNode child = children[index];
+                if (child.Key is { } key)
                 {
-                    transitionedChildren.Add(
-                        transitionScope.Attach(child, properties));
+                    transitionedChildren.Add(scope.Attach(child, childProperties, key));
                 }
                 else
                 {
-                    if (child is not ITextComponent
-                        && context is IComponentWarningContext warningContext)
+                    if (child is not TextNode)
                     {
-                        warningContext.Warn(
-                            "<TransitionGroup> children must be keyed.");
+                        context.Warn("<TransitionGroup> children must be keyed.");
                     }
 
                     transitionedChildren.Add(child);
                 }
             }
 
-            string? tag = ReadString(context.Arguments, "tag");
-            return string.IsNullOrEmpty(tag)
-                ? ComponentTree.Fragment(transitionedChildren)
-                : ComponentTree.Element(
-                    tag,
-                    children: transitionedChildren);
+            TransitionProperties observerProperties = new()
+            {
+                OnBeforeUpdate = outgoing => RecordPreviousPositions(
+                    scope,
+                    outgoing,
+                    previousPositions,
+                    moveCallbacks,
+                    classNames,
+                    moveClass,
+                    out measuredClassNames,
+                    out measuredMoveClass),
+                OnUpdated = incoming => RunMoveTransition(
+                    incoming,
+                    previousPositions,
+                    moveCallbacks,
+                    measuredClassNames,
+                    measuredMoveClass),
+            };
+            TransitionNode observer = scope.Attach(
+                new FragmentNode(transitionedChildren),
+                observerProperties);
+            return ReadString(arguments, "tag") is { Length: > 0 } tag
+                ? new ElementNode(new QualifiedName(tag), children: [observer])
+                : observer;
         };
     }
 
-    private static IReadOnlyList<KeyedComponentHostElement<int>>
-        RecordPreviousPositions(
-        IComponentContext context,
-        Dictionary<object, TransitionRectangle> previousPositions)
+    private static void RecordPreviousPositions(
+        ComponentTransitionScope scope,
+        IReadOnlyList<TransitionElementSnapshot> children,
+        Dictionary<object, TransitionRectangle> previousPositions,
+        Dictionary<int, Action> moveCallbacks,
+        DomTransitionClassNames classNames,
+        string moveClass,
+        out DomTransitionClassNames measuredClassNames,
+        out string measuredMoveClass)
     {
         previousPositions.Clear();
-        IReadOnlyList<KeyedComponentHostElement<int>> children =
-            ComponentHost.GetKeyedChildElements<int>(context);
+        measuredClassNames = classNames;
+        measuredMoveClass = moveClass;
         if (children.Count == 0)
         {
-            return children;
-        }
-
-        DomTransitionOperations operations =
-            DomTransitionOperations.Require();
-        TransitionRectangle[] positions =
-            operations.MeasurePositions(GetHandles(children));
-        int count = Math.Min(children.Count, positions.Length);
-        for (int index = 0; index < count; index++)
-        {
-            previousPositions[children[index].Key] =
-                positions[index];
-        }
-
-        return children;
-    }
-
-    private static void RunMoveTransition(
-        IComponentContext context,
-        ComponentTransitionScope transitionScope,
-        Dictionary<object, TransitionRectangle> previousPositions,
-        IReadOnlyList<KeyedComponentHostElement<int>> previousChildren,
-        Dictionary<int, Action> moveCallbacks,
-        DomTransitionClassNames previousClassNames)
-    {
-        if (previousPositions.Count == 0
-            || previousChildren.Count == 0)
-        {
             return;
         }
 
-        IReadOnlyList<KeyedComponentHostElement<int>> children =
-            ComponentHost.GetKeyedChildElements<int>(context);
-        IReadOnlyList<int> rootElements =
-            ComponentHost.GetRootElements<int>(context);
-        if (rootElements.Count == 0)
+        DomTransitionOperations operations = DomTransitionOperations.Require();
+        int[] handles = GetHandles(children);
+        for (int index = 0; index < handles.Length; index++)
         {
-            return;
-        }
-
-        DomTransitionOperations operations =
-            DomTransitionOperations.Require();
-        string? configuredMoveClass =
-            ReadString(context.Arguments, "moveClass");
-        string? configuredName =
-            ReadString(context.Arguments, "name");
-        string moveClass =
-            !string.IsNullOrEmpty(configuredMoveClass)
-                ? configuredMoveClass
-                : (!string.IsNullOrEmpty(configuredName)
-                    ? configuredName
-                    : "v")
-                + "-move";
-        if (!operations.HasCssTransform(
-            previousChildren[0].Element,
-            rootElements[0],
-            moveClass))
-        {
-            return;
-        }
-
-        for (int index = 0;
-            index < previousChildren.Count;
-            index++)
-        {
-            int element = previousChildren[index].Element;
-            if (moveCallbacks.TryGetValue(
-                element,
-                out Action? finishMove))
+            int element = handles[index];
+            if (moveCallbacks.TryGetValue(element, out Action? finishMove))
             {
                 finishMove();
             }
 
-            if (transitionScope.FinishPendingEnter(element))
+            if (scope.FinishPendingEnter(element))
             {
                 operations.EnterGenerations[element] =
-                    operations.EnterGenerations.GetValueOrDefault(element)
-                    + 1;
-                operations.RemoveTransitionClass(
-                    element,
-                    previousClassNames.EnterFrom);
-                operations.RemoveTransitionClass(
-                    element,
-                    previousClassNames.AppearFrom);
+                    operations.EnterGenerations.GetValueOrDefault(element) + 1;
+                operations.RemoveTransitionClass(element, classNames.EnterFrom);
+                operations.RemoveTransitionClass(element, classNames.AppearFrom);
             }
         }
 
-        if (children.Count == 0)
+        TransitionRectangle[] positions = operations.MeasurePositions(handles);
+        int count = Math.Min(children.Count, positions.Length);
+        for (int index = 0; index < count; index++)
+        {
+            previousPositions[children[index].Key] = positions[index];
+        }
+    }
+
+    private static void RunMoveTransition(
+        IReadOnlyList<TransitionElementSnapshot> children,
+        Dictionary<object, TransitionRectangle> previousPositions,
+        Dictionary<int, Action> moveCallbacks,
+        DomTransitionClassNames previousClassNames,
+        string moveClass)
+    {
+        if (children.Count == 0 || previousPositions.Count == 0)
         {
             return;
         }
 
-        TransitionRectangle[] currentPositions =
-            operations.MeasurePositions(GetHandles(children));
-        List<KeyedComponentHostElement<int>> moved = new();
-        int count = Math.Min(children.Count, currentPositions.Length);
+        DomTransitionOperations operations = DomTransitionOperations.Require();
+        int[] handles = GetHandles(children);
+        int transformProbe = handles[0];
+        int root = operations.ParentNode(transformProbe);
+        if (root == 0
+            || !operations.HasCssTransform(transformProbe, root, moveClass))
+        {
+            return;
+        }
+
+        TransitionRectangle[] positions = operations.MeasurePositions(handles);
+        List<int> moved = [];
+        int count = Math.Min(children.Count, positions.Length);
         for (int index = 0; index < count; index++)
         {
-            KeyedComponentHostElement<int> child = children[index];
             if (!previousPositions.TryGetValue(
-                child.Key,
+                children[index].Key,
                 out TransitionRectangle previousPosition))
             {
                 continue;
             }
 
-            TransitionRectangle currentPosition =
-                currentPositions[index];
+            TransitionRectangle currentPosition = positions[index];
             double horizontalDelta =
                 (previousPosition.Left - currentPosition.Left)
                 / NormalizeScale(currentPosition.HorizontalScale);
@@ -240,82 +197,77 @@ public sealed class TransitionGroup : IComponentTemplate
                 continue;
             }
 
-            operations.SetMoveTransform(
-                child.Element,
-                horizontalDelta,
-                verticalDelta);
-            moved.Add(child);
+            int element = handles[index];
+            operations.SetMoveTransform(element, horizontalDelta, verticalDelta);
+            moved.Add(element);
+        }
+
+        if (moved.Count == 0)
+        {
+            return;
         }
 
         operations.ForceReflow();
         for (int index = 0; index < moved.Count; index++)
         {
-            int element = moved[index].Element;
+            int element = moved[index];
+            operations.RemoveTransitionClass(element, previousClassNames.EnterFrom);
+            operations.RemoveTransitionClass(element, previousClassNames.AppearFrom);
             operations.AddTransitionClass(element, moveClass);
             operations.ClearMoveStyles(element);
         }
 
         for (int index = 0; index < moved.Count; index++)
         {
-            int element = moved[index].Element;
+            int element = moved[index];
             Action? finishMove = null;
             finishMove = () =>
             {
-                if (!moveCallbacks.TryGetValue(
-                    element,
-                    out Action? current)
+                if (!moveCallbacks.TryGetValue(element, out Action? current)
                     || !ReferenceEquals(current, finishMove))
                 {
                     return;
                 }
 
                 moveCallbacks.Remove(element);
-                operations.RemoveTransitionClass(
-                    element,
-                    moveClass);
+                operations.RemoveTransitionClass(element, moveClass);
             };
             moveCallbacks[element] = finishMove;
             operations.WhenMoveEnds(element, finishMove);
         }
     }
 
-    private static IReadOnlyList<IComponent> ResolveChildren(
-        IComponentContext context)
+    private static IReadOnlyList<VirtualNode> ResolveChildren(
+        IReadOnlyDictionary<string, ComponentSlot> slots)
     {
-        if (!context.Slots.TryGetValue(
-            "default",
-            out ComponentSlot? slot))
+        if (!slots.TryGetValue("default", out ComponentSlot? slot))
         {
-            return Array.Empty<IComponent>();
+            return Array.Empty<VirtualNode>();
         }
 
-        IComponent? rendered =
-            slot(new ComponentArguments());
+        VirtualNode? rendered = slot(new Dictionary<string, object?>());
         return rendered switch
         {
-            null => Array.Empty<IComponent>(),
-            IFragmentComponent fragment => fragment.Children,
+            null => Array.Empty<VirtualNode>(),
+            FragmentNode fragment => fragment.Children,
             _ => new[] { rendered },
         };
     }
 
-    private static int[] GetHandles(
-        IReadOnlyList<KeyedComponentHostElement<int>> children)
+    private static int[] GetHandles(IReadOnlyList<TransitionElementSnapshot> children)
     {
         int[] handles = new int[children.Count];
         for (int index = 0; index < children.Count; index++)
         {
-            handles[index] = children[index].Element;
+            handles[index] = BrowserModelDirective.Handle(children[index].Element);
         }
 
         return handles;
     }
 
-    private static void FinishMoveCallbacks(
-        Dictionary<int, Action> moveCallbacks)
+    private static void FinishMoveCallbacks(Dictionary<int, Action> moveCallbacks)
     {
-        Action[] callbacks =
-            new Action[moveCallbacks.Count];
+        Action[] callbacks = new Action[moveCallbacks.Count];
         moveCallbacks.Values.CopyTo(callbacks, 0);
         for (int index = 0; index < callbacks.Length; index++)
         {
@@ -323,25 +275,17 @@ public sealed class TransitionGroup : IComponentTemplate
         }
     }
 
-    private static IReadOnlyList<IComponentParameter>
-        CreateParameterDefinitions()
+    private static IReadOnlyList<ComponentParameter> CreateParameters()
     {
-        List<IComponentParameter> parameters =
-            new(Transition.ParameterDefinitions.Count + 1)
-            {
-                new ComponentParameter("tag"),
-                new ComponentParameter("moveClass"),
-            };
-        for (int index = 0;
-            index < Transition.ParameterDefinitions.Count;
-            index++)
+        List<ComponentParameter> parameters =
+        [
+            new("tag"),
+            new("moveClass"),
+        ];
+        for (int index = 0; index < Transition.ParameterDefinitions.Count; index++)
         {
-            IComponentParameter parameter =
-                Transition.ParameterDefinitions[index];
-            if (!string.Equals(
-                parameter.Name,
-                "mode",
-                StringComparison.Ordinal))
+            ComponentParameter parameter = Transition.ParameterDefinitions[index];
+            if (!string.Equals(parameter.Name, "mode", StringComparison.Ordinal))
             {
                 parameters.Add(parameter);
             }
@@ -350,18 +294,23 @@ public sealed class TransitionGroup : IComponentTemplate
         return parameters.AsReadOnly();
     }
 
-    private static string? ReadString(
-        IComponentArguments arguments,
-        string name)
+    private static string ResolveMoveClass(
+        IReadOnlyDictionary<string, object?> arguments)
     {
-        return arguments[name] as string;
+        string? configured = ReadString(arguments, "moveClass");
+        if (!string.IsNullOrEmpty(configured))
+        {
+            return configured;
+        }
+
+        return (ReadString(arguments, "name") ?? "v") + "-move";
     }
 
-    private static double NormalizeScale(double scale)
-    {
-        return double.IsFinite(scale)
-            && scale != 0
-            ? scale
-            : 1;
-    }
+    private static string? ReadString(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name) =>
+        arguments.TryGetValue(name, out object? value) ? value as string : null;
+
+    private static double NormalizeScale(double scale) =>
+        double.IsFinite(scale) && scale != 0 ? scale : 1;
 }

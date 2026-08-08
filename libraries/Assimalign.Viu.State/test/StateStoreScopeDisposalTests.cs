@@ -1,7 +1,7 @@
-using Assimalign.Viu.Reactivity;
-
 using Shouldly;
 using Xunit;
+
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.State.Tests;
 
@@ -18,6 +18,7 @@ public sealed class StateStoreScopeDisposalTests
         stateStore.Increment();
         stateStore.WatcherRuns.ShouldBe(1);
 
+        // [STA-2] Registry disposal stops effects created during store setup.
         registry.Dispose();
         stateStore.Increment();
 
@@ -25,7 +26,7 @@ public sealed class StateStoreScopeDisposalTests
     }
 
     [Fact]
-    public void DisposeDefinition_StopsItsScopeButLeavesOtherStateStoresLive()
+    public void DisposeDefinition_StopsItsScopeButLeavesOtherStoresLive()
     {
         using StateStoreRegistry registry =
             StateStoreTestSupport.CreateRegistry();
@@ -55,6 +56,7 @@ public sealed class StateStoreScopeDisposalTests
         CounterStore stateStore = null!;
         using EffectScope componentScope = Reactive.EffectScope();
 
+        // [STA-3] A caller's active component scope is never the store scope's parent.
         componentScope.Run(
             () => stateStore = definition.Use(registry));
         componentScope.Stop();
@@ -67,7 +69,7 @@ public sealed class StateStoreScopeDisposalTests
     }
 
     [Fact]
-    public void DisposeDefinition_RunsStateStoreScopeCleanup()
+    public void DisposeDefinition_RunsStoreScopeCleanup()
     {
         using StateStoreRegistry registry =
             StateStoreTestSupport.CreateRegistry();

@@ -16,9 +16,9 @@ internal static class RouterResolution
     /// </summary>
     /// <param name="context">The explicit mounted component context.</param>
     /// <returns>The active router, or null.</returns>
-    internal static Router? Resolve(IComponentContext context)
+    internal static Router? Resolve(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.Services.GetService(typeof(Router)) as Router;
+        return context.Services?.GetService(typeof(Router)) as Router;
     }
 }

@@ -11,6 +11,7 @@ namespace Assimalign.Viu.Router;
 /// The signed distance between positions (negative for backward, positive for forward, zero when
 /// unknown) — the basis for back/forward detection and scroll restoration.
 /// </param>
+/// <remarks>Specified by <c>[RTR-3]</c>.</remarks>
 public readonly record struct NavigationInformation(
     NavigationType Type,
     NavigationDirection Direction,

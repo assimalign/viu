@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Globalization;
 
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Testing.Benchmarks;
 
@@ -25,26 +24,31 @@ public static class RowTableBuilder
     /// <param name="rows">The rows to render.</param>
     /// <param name="selectedIdentifier">The selected row id, or null for none.</param>
     /// <param name="variant">Keyed+flagged output, or the keyless bypass.</param>
-    /// <returns>The table component.</returns>
-    public static IElementComponent Build(
+    /// <returns>The immutable table node.</returns>
+    public static VirtualNode Build(
         IReadOnlyList<BenchmarkRow> rows,
         int? selectedIdentifier,
         ScenarioVariant variant)
     {
-        var rowComponents = new IComponent[rows.Count];
+        var rowNodes = new VirtualNode[rows.Count];
         for (var index = 0; index < rows.Count; index++)
         {
-            rowComponents[index] = BuildRow(rows[index], selectedIdentifier, variant);
+            rowNodes[index] = BuildRow(rows[index], selectedIdentifier, variant);
         }
 
-        var body = ComponentTree.Element("tbody", children: rowComponents);
-        return ComponentTree.Element(
-            "table",
-            Attributes(("class", "table table-hover table-striped test-data")),
-            [body]);
+        ElementNode body = new(
+            new QualifiedName("tbody"),
+            children: rowNodes);
+        return new ElementNode(
+            new QualifiedName("table"),
+            bindings: Attributes(("class", "table table-hover table-striped test-data")),
+            children: [body]);
     }
 
-    private static IElementComponent BuildRow(BenchmarkRow row, int? selectedIdentifier, ScenarioVariant variant)
+    private static ElementNode BuildRow(
+        BenchmarkRow row,
+        int? selectedIdentifier,
+        ScenarioVariant variant)
     {
         var keyed = variant == ScenarioVariant.Optimized;
         var isSelected = selectedIdentifier == row.Identifier;
@@ -53,55 +57,66 @@ public static class RowTableBuilder
         // The label link is the one dynamic cell: in the optimized variant it carries PatchFlags.Text so
         // a label change is a single targeted set-text; the keyless variant leaves it a plain text
         // element (a direct text change still costs one set-text, but the row loses its diff key).
-        var labelLink = ComponentTree.Element(
-            "a",
-            Attributes(("class", "lbl")),
-            [ComponentTree.Text(row.Label)],
-            optimization: keyed ? new ComponentOptimization(PatchFlags.Text) : null);
+        ElementNode labelLink = new(
+            new QualifiedName("a"),
+            bindings: Attributes(("class", "lbl")),
+            children: [new TextNode(row.Label)],
+            renderPlan: keyed ? new RenderPlan(PatchFlags.Text) : null);
 
-        var cells = new IComponent[]
+        VirtualNode[] cells =
         {
-            ComponentTree.Element(
-                "td",
-                Attributes(("class", "col-md-1")),
-                [ComponentTree.Text(identifierText)]),
-            ComponentTree.Element("td", Attributes(("class", "col-md-4")), [labelLink]),
-            ComponentTree.Element(
-                "td",
-                Attributes(("class", "col-md-1")),
+            new ElementNode(
+                new QualifiedName("td"),
+                bindings: Attributes(("class", "col-md-1")),
+                children: [new TextNode(identifierText)]),
+            new ElementNode(
+                new QualifiedName("td"),
+                bindings: Attributes(("class", "col-md-4")),
+                children: [labelLink]),
+            new ElementNode(
+                new QualifiedName("td"),
+                bindings: Attributes(("class", "col-md-1")),
+                children:
                 [
-                    ComponentTree.Element(
-                        "a",
-                        Attributes(("class", "remove")),
+                    new ElementNode(
+                        new QualifiedName("a"),
+                        bindings: Attributes(("class", "remove")),
+                        children:
                         [
-                            ComponentTree.Element(
-                                "span",
-                                Attributes(("class", "glyphicon glyphicon-remove"), ("aria-hidden", "true"))),
+                            new ElementNode(
+                                new QualifiedName("span"),
+                                bindings: Attributes(
+                                    ("class", "glyphicon glyphicon-remove"),
+                                    ("aria-hidden", "true"))),
                         ]),
                 ]),
-            ComponentTree.Element("td", Attributes(("class", "col-md-6"))),
+            new ElementNode(
+                new QualifiedName("td"),
+                bindings: Attributes(("class", "col-md-6"))),
         };
 
         // No optimization flag on the row itself: a full attribute diff of an unchanged row emits no
         // operations, so the row's own crossings stay minimal without a block tree, while the keyed diff
         // (driven by the key parameter) still gets to move rows instead of rebuilding them. Selection
         // toggles the class only.
-        return ComponentTree.Element(
-            "tr",
-            isSelected ? Attributes(("class", "danger")) : null,
-            cells,
+        return new ElementNode(
+            new QualifiedName("tr"),
+            bindings: isSelected ? Attributes(("class", "danger")) : null,
+            children: cells,
             key: keyed ? row.Identifier : null);
     }
 
-    private static ComponentAttributes Attributes(
+    private static IReadOnlyList<ElementBinding> Attributes(
         params (string Name, object? Value)[] values)
     {
-        var attributes = new List<IComponentAttribute>(values.Length);
+        var attributes = new ElementBinding[values.Length];
         for (var index = 0; index < values.Length; index++)
         {
-            attributes.Add(new ComponentAttribute(values[index].Name, values[index].Value));
+            attributes[index] = ElementBinding.Attribute(
+                new QualifiedName(values[index].Name),
+                values[index].Value);
         }
 
-        return new ComponentAttributes(attributes);
+        return attributes;
     }
 }

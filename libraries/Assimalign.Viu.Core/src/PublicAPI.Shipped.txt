@@ -1,7 +1,4 @@
 #nullable enable
-abstract Assimalign.Viu.Application<TNode>.MountCore(TNode container) -> Assimalign.Viu.Components.IComponentContext?
-abstract Assimalign.Viu.Application<TNode>.UnmountCore() -> void
-abstract Assimalign.Viu.ApplicationBuilder.Build() -> Assimalign.Viu.IApplication!
 abstract Assimalign.Viu.HydrationNodeReader<TNode>.Attribute(TNode node, string! name) -> string?
 abstract Assimalign.Viu.HydrationNodeReader<TNode>.Data(TNode node) -> string!
 abstract Assimalign.Viu.HydrationNodeReader<TNode>.ElementTag(TNode node) -> string!
@@ -9,49 +6,68 @@ abstract Assimalign.Viu.HydrationNodeReader<TNode>.FirstChild(TNode node) -> TNo
 abstract Assimalign.Viu.HydrationNodeReader<TNode>.Kind(TNode node) -> Assimalign.Viu.HydrationNodeKind
 abstract Assimalign.Viu.HydrationNodeReader<TNode>.NextSibling(TNode node) -> TNode?
 abstract Assimalign.Viu.HydrationNodeReader<TNode>.ParentNode(TNode node) -> TNode?
-Assimalign.Viu.Application<TNode>
-Assimalign.Viu.Application<TNode>.Application(Assimalign.Viu.IApplicationContext! context) -> void
-Assimalign.Viu.Application<TNode>.Context.get -> Assimalign.Viu.IApplicationContext!
-Assimalign.Viu.Application<TNode>.Dispose() -> void
-Assimalign.Viu.Application<TNode>.DisposeAsync() -> System.Threading.Tasks.ValueTask
-Assimalign.Viu.Application<TNode>.IsMounted.get -> bool
-Assimalign.Viu.Application<TNode>.Mount(TNode container) -> Assimalign.Viu.Components.IComponentContext?
-Assimalign.Viu.Application<TNode>.MountAsync(TNode container, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.Components.IComponentContext?>
-Assimalign.Viu.Application<TNode>.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
-Assimalign.Viu.Application<TNode>.Unmount() -> void
-Assimalign.Viu.Application<TNode>.UnmountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-Assimalign.Viu.Application<TNode>.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplication!
-Assimalign.Viu.ApplicationBuilder
-Assimalign.Viu.ApplicationBuilder.ApplicationBuilder() -> void
-Assimalign.Viu.ApplicationBuilder.ApplyConfiguration(Assimalign.Viu.IApplication! application) -> void
-Assimalign.Viu.ApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.IApplicationContext!>! configure) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.ApplicationBuilder.CreateContext() -> Assimalign.Viu.IApplicationContext!
-Assimalign.Viu.ApplicationBuilder.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.ApplicationBuilder.UseComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.ApplicationBuilder.UseDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.ApplicationBuilder.UseRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.ApplicationBuilder.UseServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.ApplicationBuilder.UseStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.IApplicationBuilder!
 Assimalign.Viu.ApplicationContext
-Assimalign.Viu.ApplicationContext.ApplicationContext(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null, Assimalign.Viu.IDirectiveResolver? directives = null) -> void
+Assimalign.Viu.ApplicationContext.ApplicationContext(Assimalign.Viu.ApplicationOptions! options) -> void
 Assimalign.Viu.ApplicationContext.Components.get -> Assimalign.Viu.Components.IComponentFactory!
 Assimalign.Viu.ApplicationContext.Directives.get -> Assimalign.Viu.IDirectiveResolver?
-Assimalign.Viu.ApplicationContext.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.IComponentContext?, string!>?
-Assimalign.Viu.ApplicationContext.ErrorHandler.set -> void
-Assimalign.Viu.ApplicationContext.Performance.get -> bool
-Assimalign.Viu.ApplicationContext.Performance.set -> void
-Assimalign.Viu.ApplicationContext.RootComponent.get -> Assimalign.Viu.Components.IComponent!
-Assimalign.Viu.ApplicationContext.Services.get -> System.IServiceProvider!
+Assimalign.Viu.ApplicationContext.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.ComponentContext?, string!>?
+Assimalign.Viu.ApplicationContext.EventObserver.get -> System.Action<Assimalign.Viu.Components.ComponentContext!, string!, System.Collections.Generic.IReadOnlyList<object?>!>?
+Assimalign.Viu.ApplicationContext.IsRunning.get -> bool
+Assimalign.Viu.ApplicationContext.RootComponent.get -> Assimalign.Viu.Components.VirtualNode!
+Assimalign.Viu.ApplicationContext.Services.get -> System.IServiceProvider?
 Assimalign.Viu.ApplicationContext.State.get -> Assimalign.Viu.State.IStateStoreRegistry?
+Assimalign.Viu.ApplicationContext.Stopping.get -> System.Threading.CancellationToken
 Assimalign.Viu.ApplicationContext.WarnHandler.get -> System.Action<string!>?
-Assimalign.Viu.ApplicationContext.WarnHandler.set -> void
+Assimalign.Viu.ApplicationDelegate
+Assimalign.Viu.ApplicationExtensions
+Assimalign.Viu.ApplicationExtensions.extension(Assimalign.Viu.IApplication!)
+Assimalign.Viu.ApplicationExtensions.extension(Assimalign.Viu.IApplication!).RunAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.ApplicationLifetime
+Assimalign.Viu.ApplicationLifetime.ApplicationLifetime(Assimalign.Viu.ApplicationContext! context) -> void
+Assimalign.Viu.ApplicationLifetime.CompleteStopping() -> void
+Assimalign.Viu.ApplicationLifetime.Dispose() -> void
+Assimalign.Viu.ApplicationLifetime.Fail(System.Exception! exception, Assimalign.Viu.Components.ComponentContext? source = null) -> void
+Assimalign.Viu.ApplicationLifetime.HasFailed.get -> bool
+Assimalign.Viu.ApplicationLifetime.IsStoppingCancellation(System.OperationCanceledException! exception) -> bool
+Assimalign.Viu.ApplicationLifetime.RequestStopping() -> void
+Assimalign.Viu.ApplicationLifetime.SignalRunning() -> void
+Assimalign.Viu.ApplicationLifetime.StartExecution() -> void
+Assimalign.Viu.ApplicationLifetime.State.get -> Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationLifetime.Stopping.get -> System.Threading.CancellationToken
+Assimalign.Viu.ApplicationMiddleware
+Assimalign.Viu.ApplicationOptions
+Assimalign.Viu.ApplicationOptions.ApplicationOptions() -> void
+Assimalign.Viu.ApplicationOptions.Components.get -> Assimalign.Viu.Components.IComponentFactory!
+Assimalign.Viu.ApplicationOptions.Components.set -> void
+Assimalign.Viu.ApplicationOptions.Directives.get -> Assimalign.Viu.IDirectiveResolver?
+Assimalign.Viu.ApplicationOptions.Directives.set -> void
+Assimalign.Viu.ApplicationOptions.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.ComponentContext?, string!>?
+Assimalign.Viu.ApplicationOptions.ErrorHandler.set -> void
+Assimalign.Viu.ApplicationOptions.EventObserver.get -> System.Action<Assimalign.Viu.Components.ComponentContext!, string!, System.Collections.Generic.IReadOnlyList<object?>!>?
+Assimalign.Viu.ApplicationOptions.EventObserver.set -> void
+Assimalign.Viu.ApplicationOptions.RootComponent.get -> Assimalign.Viu.Components.VirtualNode?
+Assimalign.Viu.ApplicationOptions.RootComponent.set -> void
+Assimalign.Viu.ApplicationOptions.Services.get -> System.IServiceProvider?
+Assimalign.Viu.ApplicationOptions.Services.set -> void
+Assimalign.Viu.ApplicationOptions.State.get -> Assimalign.Viu.State.IStateStoreRegistry?
+Assimalign.Viu.ApplicationOptions.State.set -> void
+Assimalign.Viu.ApplicationOptions.WarnHandler.get -> System.Action<string!>?
+Assimalign.Viu.ApplicationOptions.WarnHandler.set -> void
+Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationState.Created = 0 -> Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationState.Failed = 5 -> Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationState.Running = 2 -> Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationState.Starting = 1 -> Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationState.Stopped = 4 -> Assimalign.Viu.ApplicationState
+Assimalign.Viu.ApplicationState.Stopping = 3 -> Assimalign.Viu.ApplicationState
 Assimalign.Viu.ApplicationWatchScheduler
 Assimalign.Viu.ApplicationWatchScheduler.ApplicationWatchScheduler() -> void
 Assimalign.Viu.ApplicationWatchScheduler.Schedule(Assimalign.Viu.Reactivity.WatchJob! job) -> void
 Assimalign.Viu.AsynchronousComponentDefinition
 Assimalign.Viu.AsynchronousComponentDefinition.ComponentType.get -> System.Type!
-Assimalign.Viu.AsynchronousComponentDefinition.CreateComponent(Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> Assimalign.Viu.Components.ITemplateComponent!
-Assimalign.Viu.AsynchronousComponentDefinition.Registration.get -> Assimalign.Viu.Components.ComponentRegistration
+Assimalign.Viu.AsynchronousComponentDefinition.CreateComponent(Assimalign.Viu.Components.ComponentInvocation? invocation = null, object? key = null, Assimalign.Viu.Components.MountReference? mountReference = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> Assimalign.Viu.Components.ComponentNode!
+Assimalign.Viu.AsynchronousComponentDefinition.Reference.get -> Assimalign.Viu.Components.ComponentReference!
+Assimalign.Viu.AsynchronousComponentDefinition.Registration.get -> Assimalign.Viu.Components.ComponentRegistration!
 Assimalign.Viu.AsynchronousComponentErrorHandler
 Assimalign.Viu.AsynchronousComponentErrorRenderer
 Assimalign.Viu.AsynchronousComponentLoader
@@ -74,53 +90,31 @@ Assimalign.Viu.AsynchronousComponentOptions.Timeout.init -> void
 Assimalign.Viu.AsynchronousComponents
 Assimalign.Viu.AsynchronousComponentTarget
 Assimalign.Viu.AsynchronousComponentTarget.AsynchronousComponentTarget() -> void
-Assimalign.Viu.AsynchronousComponentTarget.AsynchronousComponentTarget(string! templateName) -> void
-Assimalign.Viu.AsynchronousComponentTarget.AsynchronousComponentTarget(System.Type! templateType) -> void
-Assimalign.Viu.AsynchronousComponentTarget.TemplateName.get -> string?
-Assimalign.Viu.AsynchronousComponentTarget.TemplateType.get -> System.Type?
-Assimalign.Viu.BaseTransition
-Assimalign.Viu.BaseTransition.BaseTransition() -> void
-Assimalign.Viu.BaseTransition.Flags.get -> Assimalign.Viu.Components.ComponentFlags
-Assimalign.Viu.BaseTransition.Name.get -> string?
-Assimalign.Viu.BaseTransition.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
-Assimalign.Viu.BaseTransition.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
-Assimalign.Viu.BaseTransitionProperties
-Assimalign.Viu.BaseTransitionProperties.Appear.get -> bool
-Assimalign.Viu.BaseTransitionProperties.Appear.init -> void
-Assimalign.Viu.BaseTransitionProperties.BaseTransitionProperties() -> void
-Assimalign.Viu.BaseTransitionProperties.Mode.get -> string?
-Assimalign.Viu.BaseTransitionProperties.Mode.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnAfterAppear.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnAfterAppear.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnAfterEnter.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnAfterEnter.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnAfterLeave.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnAfterLeave.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnAppear.get -> Assimalign.Viu.TransitionEnterHook?
-Assimalign.Viu.BaseTransitionProperties.OnAppear.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnAppearCancelled.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnAppearCancelled.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnBeforeAppear.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnBeforeAppear.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnBeforeEnter.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnBeforeEnter.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnBeforeLeave.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnBeforeLeave.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnEnter.get -> Assimalign.Viu.TransitionEnterHook?
-Assimalign.Viu.BaseTransitionProperties.OnEnter.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnEnterCancelled.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnEnterCancelled.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnLeave.get -> Assimalign.Viu.TransitionEnterHook?
-Assimalign.Viu.BaseTransitionProperties.OnLeave.init -> void
-Assimalign.Viu.BaseTransitionProperties.OnLeaveCancelled.get -> System.Action<object!>?
-Assimalign.Viu.BaseTransitionProperties.OnLeaveCancelled.init -> void
-Assimalign.Viu.BaseTransitionProperties.Persisted.get -> bool
-Assimalign.Viu.BaseTransitionProperties.Persisted.init -> void
-Assimalign.Viu.BlockToken
-Assimalign.Viu.BlockToken.BlockToken() -> void
+Assimalign.Viu.AsynchronousComponentTarget.AsynchronousComponentTarget(Assimalign.Viu.Components.ComponentReference! reference) -> void
+Assimalign.Viu.AsynchronousComponentTarget.AsynchronousComponentTarget(string! componentName) -> void
+Assimalign.Viu.AsynchronousComponentTarget.AsynchronousComponentTarget(System.Type! componentType) -> void
+Assimalign.Viu.AsynchronousComponentTarget.Reference.get -> Assimalign.Viu.Components.ComponentReference!
 Assimalign.Viu.ComponentHost
+Assimalign.Viu.ComponentHost.ComponentHost(Assimalign.Viu.ComponentRuntimeOptions! options) -> void
+Assimalign.Viu.ComponentHost.RenderAsync(Assimalign.Viu.ComponentRenderRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.IComponentRenderScope!>
 Assimalign.Viu.ComponentHotReload
-Assimalign.Viu.ComponentNodeLifecycleHook
+Assimalign.Viu.ComponentHotReloadChangeKind
+Assimalign.Viu.ComponentHotReloadChangeKind.None = 0 -> Assimalign.Viu.ComponentHotReloadChangeKind
+Assimalign.Viu.ComponentHotReloadChangeKind.ScriptReset = 3 -> Assimalign.Viu.ComponentHotReloadChangeKind
+Assimalign.Viu.ComponentHotReloadChangeKind.StyleOnly = 1 -> Assimalign.Viu.ComponentHotReloadChangeKind
+Assimalign.Viu.ComponentHotReloadChangeKind.Template = 2 -> Assimalign.Viu.ComponentHotReloadChangeKind
+Assimalign.Viu.ComponentRenderRequest
+Assimalign.Viu.ComponentRenderRequest.Component.get -> Assimalign.Viu.Components.ComponentNode!
+Assimalign.Viu.ComponentRenderRequest.ComponentRenderRequest(Assimalign.Viu.Components.ComponentNode! component, Assimalign.Viu.IComponentRenderScope? parent = null) -> void
+Assimalign.Viu.ComponentRenderRequest.Parent.get -> Assimalign.Viu.IComponentRenderScope?
+Assimalign.Viu.ComponentRuntimeOptions
+Assimalign.Viu.ComponentRuntimeOptions.ComponentRuntimeOptions(Assimalign.Viu.Components.IComponentFactory! components, Assimalign.Viu.Reactivity.IReactiveWatchScheduler! watchScheduler, System.IServiceProvider? services = null, System.Action<System.Exception!, Assimalign.Viu.Components.ComponentContext?, string!>? errorHandler = null, System.Action<string!>? warnHandler = null, System.Action<Assimalign.Viu.Components.ComponentContext!, string!, System.Collections.Generic.IReadOnlyList<object?>!>? eventObserver = null) -> void
+Assimalign.Viu.ComponentRuntimeOptions.Components.get -> Assimalign.Viu.Components.IComponentFactory!
+Assimalign.Viu.ComponentRuntimeOptions.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.ComponentContext?, string!>?
+Assimalign.Viu.ComponentRuntimeOptions.EventObserver.get -> System.Action<Assimalign.Viu.Components.ComponentContext!, string!, System.Collections.Generic.IReadOnlyList<object?>!>?
+Assimalign.Viu.ComponentRuntimeOptions.Services.get -> System.IServiceProvider?
+Assimalign.Viu.ComponentRuntimeOptions.WarnHandler.get -> System.Action<string!>?
+Assimalign.Viu.ComponentRuntimeOptions.WatchScheduler.get -> Assimalign.Viu.Reactivity.IReactiveWatchScheduler!
 Assimalign.Viu.ComponentScriptUpdateResetHandler
 Assimalign.Viu.ComponentTransition
 Assimalign.Viu.ComponentTransition.BeforeEnter(object! element) -> void
@@ -128,8 +122,9 @@ Assimalign.Viu.ComponentTransition.Enter(object! element) -> void
 Assimalign.Viu.ComponentTransition.IsPersisted.get -> bool
 Assimalign.Viu.ComponentTransition.Leave(object! element, System.Action! remove) -> void
 Assimalign.Viu.ComponentTransitionScope
-Assimalign.Viu.ComponentTransitionScope.Attach(Assimalign.Viu.Components.IComponent! child, Assimalign.Viu.BaseTransitionProperties! properties) -> Assimalign.Viu.Components.IComponent!
-Assimalign.Viu.ComponentTransitionScope.ComponentTransitionScope(Assimalign.Viu.Components.IComponentContext! context) -> void
+Assimalign.Viu.ComponentTransitionScope.Attach(Assimalign.Viu.Components.ComponentSlot! child, Assimalign.Viu.TransitionProperties! properties, object? key = null) -> Assimalign.Viu.Components.TransitionNode!
+Assimalign.Viu.ComponentTransitionScope.Attach(Assimalign.Viu.Components.VirtualNode! child, Assimalign.Viu.TransitionProperties! properties, object? key = null) -> Assimalign.Viu.Components.TransitionNode!
+Assimalign.Viu.ComponentTransitionScope.ComponentTransitionScope(Assimalign.Viu.Components.ComponentContext! context) -> void
 Assimalign.Viu.ComponentTransitionScope.FinishPendingEnter(object! element) -> bool
 Assimalign.Viu.Directive
 Assimalign.Viu.Directive.<Clone>$() -> Assimalign.Viu.Directive!
@@ -150,27 +145,27 @@ Assimalign.Viu.Directive.Unmounted.init -> void
 Assimalign.Viu.Directive.Updated.get -> Assimalign.Viu.DirectiveHook?
 Assimalign.Viu.Directive.Updated.init -> void
 Assimalign.Viu.DirectiveBinding
-Assimalign.Viu.DirectiveBinding.Argument.get -> string?
-Assimalign.Viu.DirectiveBinding.Context.get -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.DirectiveBinding.Context.get -> Assimalign.Viu.Components.ComponentContext?
 Assimalign.Viu.DirectiveBinding.Directive.get -> Assimalign.Viu.IDirective!
-Assimalign.Viu.DirectiveBinding.DirectiveName.get -> string!
-Assimalign.Viu.DirectiveBinding.GetDescendantElements(string! tag) -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DirectiveHostElement!>!
-Assimalign.Viu.DirectiveBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, bool>!
+Assimalign.Viu.DirectiveBinding.DirectiveType.get -> System.Type!
+Assimalign.Viu.DirectiveBinding.GetDescendantElements(string! localName) -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DirectiveHostElement!>!
 Assimalign.Viu.DirectiveBinding.PreviousValue.get -> object?
 Assimalign.Viu.DirectiveBinding.Transition.get -> Assimalign.Viu.ComponentTransition?
 Assimalign.Viu.DirectiveBinding.Value.get -> object?
 Assimalign.Viu.DirectiveHook
 Assimalign.Viu.DirectiveHostElement
-Assimalign.Viu.DirectiveHostElement.Component.get -> Assimalign.Viu.Components.IElementComponent!
 Assimalign.Viu.DirectiveHostElement.Element.get -> object!
+Assimalign.Viu.DirectiveHostElement.Value.get -> Assimalign.Viu.Components.ElementNode!
 Assimalign.Viu.DirectiveRegistry
-Assimalign.Viu.DirectiveRegistry.DirectiveRegistry(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, Assimalign.Viu.IDirective!>>! directives) -> void
-Assimalign.Viu.DirectiveRegistry.Resolve(string! name) -> Assimalign.Viu.IDirective?
+Assimalign.Viu.DirectiveRegistry.DirectiveRegistry(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<System.Type!, Assimalign.Viu.IDirective!>>! directives) -> void
+Assimalign.Viu.DirectiveRegistry.Resolve(System.Type! directiveType) -> Assimalign.Viu.IDirective?
+Assimalign.Viu.DisplayStringFormatter
 Assimalign.Viu.DynamicComponentName
 Assimalign.Viu.DynamicComponentName.DynamicComponentName() -> void
 Assimalign.Viu.DynamicComponentName.DynamicComponentName(string! name) -> void
 Assimalign.Viu.DynamicComponentName.Name.get -> string!
 Assimalign.Viu.DynamicComponents
+Assimalign.Viu.HydrationMarkers
 Assimalign.Viu.HydrationNodeKind
 Assimalign.Viu.HydrationNodeKind.Comment = 2 -> Assimalign.Viu.HydrationNodeKind
 Assimalign.Viu.HydrationNodeKind.Element = 0 -> Assimalign.Viu.HydrationNodeKind
@@ -180,39 +175,26 @@ Assimalign.Viu.HydrationNodeReader<TNode>
 Assimalign.Viu.HydrationNodeReader<TNode>.HydrationNodeReader() -> void
 Assimalign.Viu.IApplication
 Assimalign.Viu.IApplication.Context.get -> Assimalign.Viu.IApplicationContext!
-Assimalign.Viu.IApplication.IsMounted.get -> bool
-Assimalign.Viu.IApplication.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
-Assimalign.Viu.IApplication.Unmount() -> void
-Assimalign.Viu.IApplication.UnmountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-Assimalign.Viu.IApplication.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplication!
-Assimalign.Viu.IApplication<TNode>
-Assimalign.Viu.IApplication<TNode>.Mount(TNode container) -> Assimalign.Viu.Components.IComponentContext?
-Assimalign.Viu.IApplication<TNode>.MountAsync(TNode container, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.Components.IComponentContext?>
+Assimalign.Viu.IApplication.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.IApplication.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.IApplication.Use(Assimalign.Viu.ApplicationMiddleware! middleware) -> Assimalign.Viu.IApplication!
 Assimalign.Viu.IApplicationBuilder
 Assimalign.Viu.IApplicationBuilder.Build() -> Assimalign.Viu.IApplication!
-Assimalign.Viu.IApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.IApplicationContext!>! configure) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.IApplicationBuilder.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.IApplicationBuilder.UseComponentFactory(Assimalign.Viu.Components.IComponentFactory! components) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.IApplicationBuilder.UseDirectiveResolver(Assimalign.Viu.IDirectiveResolver! directives) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.IApplicationBuilder.UseRootComponent(Assimalign.Viu.Components.IComponent! component) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.IApplicationBuilder.UseServiceProvider(System.IServiceProvider! services) -> Assimalign.Viu.IApplicationBuilder!
-Assimalign.Viu.IApplicationBuilder.UseStateRegistry(Assimalign.Viu.State.IStateStoreRegistry! state) -> Assimalign.Viu.IApplicationBuilder!
+Assimalign.Viu.IApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.IApplicationBuilder!
 Assimalign.Viu.IApplicationContext
 Assimalign.Viu.IApplicationContext.Components.get -> Assimalign.Viu.Components.IComponentFactory!
 Assimalign.Viu.IApplicationContext.Directives.get -> Assimalign.Viu.IDirectiveResolver?
-Assimalign.Viu.IApplicationContext.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.IComponentContext?, string!>?
-Assimalign.Viu.IApplicationContext.ErrorHandler.set -> void
-Assimalign.Viu.IApplicationContext.Performance.get -> bool
-Assimalign.Viu.IApplicationContext.Performance.set -> void
-Assimalign.Viu.IApplicationContext.RootComponent.get -> Assimalign.Viu.Components.IComponent!
-Assimalign.Viu.IApplicationContext.Services.get -> System.IServiceProvider!
+Assimalign.Viu.IApplicationContext.ErrorHandler.get -> System.Action<System.Exception!, Assimalign.Viu.Components.ComponentContext?, string!>?
+Assimalign.Viu.IApplicationContext.EventObserver.get -> System.Action<Assimalign.Viu.Components.ComponentContext!, string!, System.Collections.Generic.IReadOnlyList<object?>!>?
+Assimalign.Viu.IApplicationContext.IsRunning.get -> bool
+Assimalign.Viu.IApplicationContext.RootComponent.get -> Assimalign.Viu.Components.VirtualNode!
+Assimalign.Viu.IApplicationContext.Services.get -> System.IServiceProvider?
 Assimalign.Viu.IApplicationContext.State.get -> Assimalign.Viu.State.IStateStoreRegistry?
+Assimalign.Viu.IApplicationContext.Stopping.get -> System.Threading.CancellationToken
 Assimalign.Viu.IApplicationContext.WarnHandler.get -> System.Action<string!>?
-Assimalign.Viu.IApplicationContext.WarnHandler.set -> void
-Assimalign.Viu.IApplicationPlugin
-Assimalign.Viu.IApplicationPlugin.InstallAsync(Assimalign.Viu.IApplication! application, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-Assimalign.Viu.IComponentWarningContext
-Assimalign.Viu.IComponentWarningContext.Warn(string! message) -> void
+Assimalign.Viu.IComponentRenderScope
+Assimalign.Viu.IComponentRenderScope.Context.get -> Assimalign.Viu.Components.ComponentContext!
+Assimalign.Viu.IComponentRenderScope.Tree.get -> Assimalign.Viu.Components.VirtualNode?
 Assimalign.Viu.IDirective
 Assimalign.Viu.IDirective.BeforeMount.get -> Assimalign.Viu.DirectiveHook?
 Assimalign.Viu.IDirective.BeforeUnmount.get -> Assimalign.Viu.DirectiveHook?
@@ -222,32 +204,28 @@ Assimalign.Viu.IDirective.Mounted.get -> Assimalign.Viu.DirectiveHook?
 Assimalign.Viu.IDirective.Unmounted.get -> Assimalign.Viu.DirectiveHook?
 Assimalign.Viu.IDirective.Updated.get -> Assimalign.Viu.DirectiveHook?
 Assimalign.Viu.IDirectiveResolver
-Assimalign.Viu.IDirectiveResolver.Resolve(string! name) -> Assimalign.Viu.IDirective?
+Assimalign.Viu.IDirectiveResolver.Resolve(System.Type! directiveType) -> Assimalign.Viu.IDirective?
 Assimalign.Viu.InsertStaticContentDelegate<TNode>
-Assimalign.Viu.ISuspenseBoundary
-Assimalign.Viu.ISuspenseBoundary.RegisterAsynchronousDependency(Assimalign.Viu.Components.IComponentContext! component, System.Threading.Tasks.Task! pendingLoad) -> void
-Assimalign.Viu.KeepAlive
-Assimalign.Viu.KeepAlive.Flags.get -> Assimalign.Viu.Components.ComponentFlags
-Assimalign.Viu.KeepAlive.KeepAlive() -> void
-Assimalign.Viu.KeepAlive.Name.get -> string?
-Assimalign.Viu.KeepAlive.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
-Assimalign.Viu.KeepAlive.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
-Assimalign.Viu.KeyedComponentHostElement<TNode>
-Assimalign.Viu.KeyedComponentHostElement<TNode>.Component.get -> Assimalign.Viu.Components.IComponent!
-Assimalign.Viu.KeyedComponentHostElement<TNode>.Element.get -> TNode
-Assimalign.Viu.KeyedComponentHostElement<TNode>.Key.get -> object!
-Assimalign.Viu.KeyedComponentHostElement<TNode>.KeyedComponentHostElement(Assimalign.Viu.Components.IComponent! component, object! key, TNode element) -> void
+Assimalign.Viu.MountedComponentView<TNode>
+Assimalign.Viu.MountedComponentView<TNode>.Context.get -> Assimalign.Viu.Components.ComponentContext!
+Assimalign.Viu.MountedComponentView<TNode>.FirstHostNode.get -> TNode?
+Assimalign.Viu.MountedComponentView<TNode>.Instance.get -> Assimalign.Viu.Components.IComponent!
+Assimalign.Viu.MountedComponentView<TNode>.IsMounted.get -> bool
+Assimalign.Viu.MountedComponentView<TNode>.LastHostNode.get -> TNode?
+Assimalign.Viu.MountedComponentView<TNode>.Request.get -> Assimalign.Viu.Components.ComponentNode!
 Assimalign.Viu.PatchAttributeDelegate<TNode>
+Assimalign.Viu.PropertyNormalization
 Assimalign.Viu.Renderer<TNode>
-Assimalign.Viu.Renderer<TNode>.Hydrate(Assimalign.Viu.Components.IComponent! component, TNode container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.IComponentContext?
-Assimalign.Viu.Renderer<TNode>.Render(Assimalign.Viu.Components.IComponent? component, TNode container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.IComponentContext?
+Assimalign.Viu.Renderer<TNode>.GetMountedComponentViews(TNode container) -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.MountedComponentView<TNode>!>!
+Assimalign.Viu.Renderer<TNode>.Hydrate(Assimalign.Viu.Components.VirtualNode! value, TNode container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.ComponentContext?
+Assimalign.Viu.Renderer<TNode>.Render(Assimalign.Viu.Components.VirtualNode? value, TNode container, Assimalign.Viu.IApplicationContext? application = null) -> Assimalign.Viu.Components.ComponentContext?
 Assimalign.Viu.RendererFactory
 Assimalign.Viu.RendererOptions<TNode>
 Assimalign.Viu.RendererOptions<TNode>.Commit.get -> System.Action?
 Assimalign.Viu.RendererOptions<TNode>.Commit.init -> void
 Assimalign.Viu.RendererOptions<TNode>.CreateComment.get -> System.Func<string!, TNode>!
 Assimalign.Viu.RendererOptions<TNode>.CreateComment.init -> void
-Assimalign.Viu.RendererOptions<TNode>.CreateElement.get -> System.Func<string!, string?, TNode>!
+Assimalign.Viu.RendererOptions<TNode>.CreateElement.get -> System.Func<Assimalign.Viu.Components.QualifiedName, TNode>!
 Assimalign.Viu.RendererOptions<TNode>.CreateElement.init -> void
 Assimalign.Viu.RendererOptions<TNode>.CreateHydrationReader.get -> System.Func<TNode, Assimalign.Viu.HydrationNodeReader<TNode>!>?
 Assimalign.Viu.RendererOptions<TNode>.CreateHydrationReader.init -> void
@@ -266,13 +244,10 @@ Assimalign.Viu.RendererOptions<TNode>.PatchAttribute.init -> void
 Assimalign.Viu.RendererOptions<TNode>.Remove.get -> System.Action<TNode>!
 Assimalign.Viu.RendererOptions<TNode>.Remove.init -> void
 Assimalign.Viu.RendererOptions<TNode>.RendererOptions() -> void
-Assimalign.Viu.RendererOptions<TNode>.ResolveTeleportTarget.get -> System.Func<object!, TNode?>?
+Assimalign.Viu.RendererOptions<TNode>.ResolveTeleportTarget.get -> System.Func<string!, TNode?>?
 Assimalign.Viu.RendererOptions<TNode>.ResolveTeleportTarget.init -> void
-Assimalign.Viu.RendererOptions<TNode>.SetScopeIdentifier.get -> System.Action<TNode, string!>?
-Assimalign.Viu.RendererOptions<TNode>.SetScopeIdentifier.init -> void
 Assimalign.Viu.RendererOptions<TNode>.SetText.get -> System.Action<TNode, string!>!
 Assimalign.Viu.RendererOptions<TNode>.SetText.init -> void
-Assimalign.Viu.RenderHelpers
 Assimalign.Viu.Scheduler
 Assimalign.Viu.SchedulerJob
 Assimalign.Viu.SchedulerJob.AllowRecurse.get -> bool
@@ -286,94 +261,85 @@ Assimalign.Viu.SchedulerJob.IsPreFlush.init -> void
 Assimalign.Viu.SchedulerJob.Name.get -> string?
 Assimalign.Viu.SchedulerJob.Name.init -> void
 Assimalign.Viu.SchedulerJob.SchedulerJob(System.Action! callback) -> void
-Assimalign.Viu.Suspense
-Assimalign.Viu.Suspense.Dispose() -> void
-Assimalign.Viu.Suspense.Flags.get -> Assimalign.Viu.Components.ComponentFlags
-Assimalign.Viu.Suspense.Name.get -> string?
-Assimalign.Viu.Suspense.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
-Assimalign.Viu.Suspense.Suspense() -> void
-Assimalign.Viu.TemplateReference
-Assimalign.Viu.TemplateReference.Equals(Assimalign.Viu.TemplateReference? other) -> bool
-Assimalign.Viu.TemplateReference.Set(object? value) -> void
-Assimalign.Viu.TransitionDelayLeave
-Assimalign.Viu.TransitionEnterHook
-Assimalign.Viu.ViuWatch
-const Assimalign.Viu.BaseTransition.PropertiesArgument = "$baseTransition" -> string!
+Assimalign.Viu.StyleAndClassNormalization
+Assimalign.Viu.TransitionElementSnapshot
+Assimalign.Viu.TransitionElementSnapshot.Element.get -> object!
+Assimalign.Viu.TransitionElementSnapshot.Key.get -> object!
+Assimalign.Viu.TransitionElementSnapshot.TransitionElementSnapshot(object! key, object! element) -> void
+Assimalign.Viu.TransitionPhaseHook
+Assimalign.Viu.TransitionProperties
+Assimalign.Viu.TransitionProperties.Appear.get -> bool
+Assimalign.Viu.TransitionProperties.Appear.init -> void
+Assimalign.Viu.TransitionProperties.Mode.get -> string?
+Assimalign.Viu.TransitionProperties.Mode.init -> void
+Assimalign.Viu.TransitionProperties.OnAfterAppear.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnAfterAppear.init -> void
+Assimalign.Viu.TransitionProperties.OnAfterEnter.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnAfterEnter.init -> void
+Assimalign.Viu.TransitionProperties.OnAfterLeave.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnAfterLeave.init -> void
+Assimalign.Viu.TransitionProperties.OnAppear.get -> Assimalign.Viu.TransitionPhaseHook?
+Assimalign.Viu.TransitionProperties.OnAppear.init -> void
+Assimalign.Viu.TransitionProperties.OnAppearCancelled.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnAppearCancelled.init -> void
+Assimalign.Viu.TransitionProperties.OnBeforeAppear.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnBeforeAppear.init -> void
+Assimalign.Viu.TransitionProperties.OnBeforeEnter.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnBeforeEnter.init -> void
+Assimalign.Viu.TransitionProperties.OnBeforeLeave.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnBeforeLeave.init -> void
+Assimalign.Viu.TransitionProperties.OnBeforeUpdate.get -> System.Action<System.Collections.Generic.IReadOnlyList<Assimalign.Viu.TransitionElementSnapshot!>!>?
+Assimalign.Viu.TransitionProperties.OnBeforeUpdate.init -> void
+Assimalign.Viu.TransitionProperties.OnEnter.get -> Assimalign.Viu.TransitionPhaseHook?
+Assimalign.Viu.TransitionProperties.OnEnter.init -> void
+Assimalign.Viu.TransitionProperties.OnEnterCancelled.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnEnterCancelled.init -> void
+Assimalign.Viu.TransitionProperties.OnLeave.get -> Assimalign.Viu.TransitionPhaseHook?
+Assimalign.Viu.TransitionProperties.OnLeave.init -> void
+Assimalign.Viu.TransitionProperties.OnLeaveCancelled.get -> System.Action<object!>?
+Assimalign.Viu.TransitionProperties.OnLeaveCancelled.init -> void
+Assimalign.Viu.TransitionProperties.OnUpdated.get -> System.Action<System.Collections.Generic.IReadOnlyList<Assimalign.Viu.TransitionElementSnapshot!>!>?
+Assimalign.Viu.TransitionProperties.OnUpdated.init -> void
+Assimalign.Viu.TransitionProperties.Persisted.get -> bool
+Assimalign.Viu.TransitionProperties.Persisted.init -> void
+Assimalign.Viu.TransitionProperties.TransitionProperties() -> void
+Assimalign.Viu.VirtualNodeLifecycleHook
+const Assimalign.Viu.HydrationMarkers.EmptyComment = "<!---->" -> string!
+const Assimalign.Viu.HydrationMarkers.FragmentEnd = "<!--]-->" -> string!
+const Assimalign.Viu.HydrationMarkers.FragmentStart = "<!--[-->" -> string!
+const Assimalign.Viu.HydrationMarkers.TeleportAnchor = "<!--teleport anchor-->" -> string!
+const Assimalign.Viu.HydrationMarkers.TeleportEnd = "<!--teleport end-->" -> string!
+const Assimalign.Viu.HydrationMarkers.TeleportStart = "<!--teleport start-->" -> string!
+const Assimalign.Viu.TransitionProperties.ResolvedArgument = "$transition" -> string!
 override Assimalign.Viu.Directive.Equals(object? obj) -> bool
 override Assimalign.Viu.Directive.GetHashCode() -> int
 override Assimalign.Viu.Directive.ToString() -> string!
-override Assimalign.Viu.TemplateReference.Equals(object? obj) -> bool
-override Assimalign.Viu.TemplateReference.GetHashCode() -> int
+static Assimalign.Viu.ApplicationExtensions.RunAsync(this Assimalign.Viu.IApplication! application, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent(System.Type! componentType, Assimalign.Viu.AsynchronousComponentLoader! loader, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
 static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent(System.Type! componentType, Assimalign.Viu.AsynchronousComponentOptions! options, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
-static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent<TIdentity>(Assimalign.Viu.AsynchronousComponentLoader! loader, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
-static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent<TIdentity>(Assimalign.Viu.AsynchronousComponentOptions! options, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
-static Assimalign.Viu.AsynchronousComponentTarget.From<TTemplate>() -> Assimalign.Viu.AsynchronousComponentTarget
-static Assimalign.Viu.BaseTransition.Registration.get -> Assimalign.Viu.Components.ComponentRegistration
-static Assimalign.Viu.ComponentHost.GetKeyedChildElements<TNode>(Assimalign.Viu.Components.IComponentContext! context) -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.KeyedComponentHostElement<TNode>!>!
-static Assimalign.Viu.ComponentHost.GetRootElements<TNode>(Assimalign.Viu.Components.IComponentContext! context) -> System.Collections.Generic.IReadOnlyList<TNode>!
-static Assimalign.Viu.ComponentHost.QueueHostCommit(Assimalign.Viu.Components.IComponentContext! context) -> void
+static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent<TComponent>(Assimalign.Viu.AsynchronousComponentLoader! loader, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
+static Assimalign.Viu.AsynchronousComponents.DefineAsynchronousComponent<TComponent>(Assimalign.Viu.AsynchronousComponentOptions! options, string? name = null) -> Assimalign.Viu.AsynchronousComponentDefinition!
+static Assimalign.Viu.AsynchronousComponentTarget.From<TComponent>() -> Assimalign.Viu.AsynchronousComponentTarget
 static Assimalign.Viu.ComponentHotReload.ApplyUpdates(System.Type![]? updatedTypes) -> void
+static Assimalign.Viu.ComponentHotReload.Classify(System.Type! componentType, System.Type![]? updatedTypes) -> Assimalign.Viu.ComponentHotReloadChangeKind
+static Assimalign.Viu.ComponentHotReload.Register(System.Type! componentType, string! identifier, System.Type! templateMarker, System.Type! scriptMarker, System.Type! styleMarker) -> void
 static Assimalign.Viu.ComponentHotReload.ScriptUpdateRequiresReset -> Assimalign.Viu.ComponentScriptUpdateResetHandler?
 static Assimalign.Viu.Directive.FromFunction(Assimalign.Viu.DirectiveHook! hook) -> Assimalign.Viu.Directive!
 static Assimalign.Viu.Directive.operator !=(Assimalign.Viu.Directive? left, Assimalign.Viu.Directive? right) -> bool
 static Assimalign.Viu.Directive.operator ==(Assimalign.Viu.Directive? left, Assimalign.Viu.Directive? right) -> bool
-static Assimalign.Viu.DynamicComponents.DynamicComponent(object? source, Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, Assimalign.Viu.Components.IComponentAttributeCollection? attributes = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> Assimalign.Viu.Components.IComponent!
+static Assimalign.Viu.DisplayStringFormatter.FormatScalar(object! value) -> string!
+static Assimalign.Viu.DisplayStringFormatter.ToDisplayString(object? value) -> string!
+static Assimalign.Viu.DisplayStringFormatter.ToDisplayString<T>(System.Collections.Generic.ISet<T>! value) -> string!
+static Assimalign.Viu.DynamicComponents.DynamicComponent(object? source, Assimalign.Viu.Components.ComponentInvocation? invocation = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ElementBinding!>? bindings = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.VirtualNode!>? children = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, object? key = null, Assimalign.Viu.Components.MountReference? mountReference = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> Assimalign.Viu.Components.VirtualNode!
 static Assimalign.Viu.DynamicComponents.Named(string! name) -> Assimalign.Viu.DynamicComponentName
 static Assimalign.Viu.DynamicComponents.ResolveDynamicComponent(object? source) -> object?
-static Assimalign.Viu.KeepAlive.CreateComponent(object? include, object? exclude, object? maximum, Assimalign.Viu.Components.ComponentSlot! child, object? key = null) -> Assimalign.Viu.Components.ITemplateComponent!
-static Assimalign.Viu.KeepAlive.Registration.get -> Assimalign.Viu.Components.ComponentRegistration
+static Assimalign.Viu.PropertyNormalization.Merge(params object?[]! sources) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+static Assimalign.Viu.PropertyNormalization.Normalize(object? properties) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+static Assimalign.Viu.Renderer<TNode>.PatchVisitCount.get -> int
+static Assimalign.Viu.Renderer<TNode>.PatchVisitCount.set -> void
+static Assimalign.Viu.Renderer<TNode>.UnmountVisitCount.get -> int
+static Assimalign.Viu.Renderer<TNode>.UnmountVisitCount.set -> void
 static Assimalign.Viu.RendererFactory.CreateRenderer<TNode>(Assimalign.Viu.RendererOptions<TNode>! options) -> Assimalign.Viu.Renderer<TNode>!
-static Assimalign.Viu.RenderHelpers.NormalizeRoot(object? renderResult) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._camelize(string! value) -> string!
-static Assimalign.Viu.RenderHelpers._capitalize(string! value) -> string!
-static Assimalign.Viu.RenderHelpers._createBlock(Assimalign.Viu.BlockToken block, object? tag, object? properties = null, object? children = null, int patchFlag = 0, string![]? dynamicProperties = null) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._createCommentVNode(string? text = "", bool asBlock = false) -> Assimalign.Viu.Components.ICommentComponent!
-static Assimalign.Viu.RenderHelpers._createElementBlock(Assimalign.Viu.BlockToken block, object? tag, object? properties = null, object? children = null, int patchFlag = 0, string![]? dynamicProperties = null) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._createElementVNode(object? tag, object? properties = null, object? children = null, int patchFlag = 0, string![]? dynamicProperties = null) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._createModifiers(params (string! Name, bool Value)[]! entries) -> System.Collections.Generic.IReadOnlyDictionary<string!, bool>!
-static Assimalign.Viu.RenderHelpers._createProps(params (string! Name, object? Value)[]! entries) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
-static Assimalign.Viu.RenderHelpers._createSlots(object? slots, object?[]! dynamicSlots) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
-static Assimalign.Viu.RenderHelpers._createStaticVNode(string! content, int count) -> Assimalign.Viu.Components.IStaticComponent!
-static Assimalign.Viu.RenderHelpers._createTextVNode(object? text = null, int patchFlag = 0) -> Assimalign.Viu.Components.ITextComponent!
-static Assimalign.Viu.RenderHelpers._createVNode(object? tag, object? properties = null, object? children = null, int patchFlag = 0, string![]? dynamicProperties = null) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._guardReactiveProps(object? properties) -> object?
-static Assimalign.Viu.RenderHelpers._isMemoSame(object? cached, object?[]! dependencies) -> bool
-static Assimalign.Viu.RenderHelpers._isRef(object? value) -> bool
-static Assimalign.Viu.RenderHelpers._mergeProps(params object?[]! sources) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
-static Assimalign.Viu.RenderHelpers._normalizeClass(object? value) -> string!
-static Assimalign.Viu.RenderHelpers._normalizeProps(object? properties) -> object?
-static Assimalign.Viu.RenderHelpers._normalizeStyle(object? value) -> object?
-static Assimalign.Viu.RenderHelpers._openBlock(bool disableTracking = false) -> Assimalign.Viu.BlockToken
-static Assimalign.Viu.RenderHelpers._renderList<T, TResult>(System.Collections.Generic.IEnumerable<T>? source, System.Func<T, int, TResult>! render) -> TResult[]!
-static Assimalign.Viu.RenderHelpers._renderList<T, TResult>(System.Collections.Generic.IEnumerable<T>? source, System.Func<T, TResult>! render) -> TResult[]!
-static Assimalign.Viu.RenderHelpers._renderList<TKey, TValue, TResult>(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>? source, System.Func<TValue, TKey, int, TResult>! render) -> TResult[]!
-static Assimalign.Viu.RenderHelpers._renderList<TResult>(int count, System.Func<int, int, TResult>! render) -> TResult[]!
-static Assimalign.Viu.RenderHelpers._renderList<TResult>(int count, System.Func<int, TResult>! render) -> TResult[]!
-static Assimalign.Viu.RenderHelpers._renderSlot(System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots, string! name, object? properties = null, System.Func<object?[]?>? fallback = null) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._resolveComponent(string! name) -> object!
-static Assimalign.Viu.RenderHelpers._resolveDirective(string! name) -> object!
-static Assimalign.Viu.RenderHelpers._resolveDynamicComponent(object? value) -> object?
-static Assimalign.Viu.RenderHelpers._setBlockTracking(int value, bool inVOnce = false) -> Assimalign.Viu.BlockToken
-static Assimalign.Viu.RenderHelpers._setCache(int index, Assimalign.Viu.BlockToken tracking, object? value) -> object?
-static Assimalign.Viu.RenderHelpers._spreadCache(object? value) -> object?
-static Assimalign.Viu.RenderHelpers._toDisplayString(object? value) -> string!
-static Assimalign.Viu.RenderHelpers._toHandlerKey(object? value) -> string!
-static Assimalign.Viu.RenderHelpers._toHandlers(object? value) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
-static Assimalign.Viu.RenderHelpers._unref(object? value) -> object?
-static Assimalign.Viu.RenderHelpers._withCtx(System.Func<object?, object?[]?>! render) -> Assimalign.Viu.Components.ComponentSlot!
-static Assimalign.Viu.RenderHelpers._withCtx(System.Func<object?[]?>! render) -> Assimalign.Viu.Components.ComponentSlot!
-static Assimalign.Viu.RenderHelpers._withDirectives(Assimalign.Viu.Components.IComponent! component, object?[]! directives) -> Assimalign.Viu.Components.IComponent!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Action! handler) -> System.Action!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Action<object?>! handler) -> System.Action<object?>!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Delegate! handler) -> System.Delegate!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Func<object?, object?>! handler) -> System.Func<object?, object?>!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Func<object?, System.Threading.Tasks.Task!>! handler) -> System.Func<object?, System.Threading.Tasks.Task!>!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Func<object?>! handler) -> System.Func<object?>!
-static Assimalign.Viu.RenderHelpers._withHandler(System.Func<System.Threading.Tasks.Task!>! handler) -> System.Func<System.Threading.Tasks.Task!>!
-static Assimalign.Viu.RenderHelpers._withHandler<TEvent>(System.Action<TEvent>! handler) -> System.Action<object?>!
-static Assimalign.Viu.RenderHelpers._withHandler<TEvent>(System.Func<TEvent, System.Threading.Tasks.Task!>! handler) -> System.Func<object?, System.Threading.Tasks.Task!>!
-static Assimalign.Viu.RenderHelpers._withMemo(object?[]! dependencies, System.Func<object?>! render, object?[]! cache, int index) -> Assimalign.Viu.Components.IComponent!
 static Assimalign.Viu.Scheduler.FlushPostFlushCallbacks() -> void
 static Assimalign.Viu.Scheduler.FlushPreFlushCallbacks() -> void
 static Assimalign.Viu.Scheduler.IsFlushing.get -> bool
@@ -381,32 +347,21 @@ static Assimalign.Viu.Scheduler.IsFlushPending.get -> bool
 static Assimalign.Viu.Scheduler.NextTick() -> System.Threading.Tasks.Task!
 static Assimalign.Viu.Scheduler.QueueJob(Assimalign.Viu.SchedulerJob! job) -> void
 static Assimalign.Viu.Scheduler.QueuePostFlushCallback(Assimalign.Viu.SchedulerJob! callback) -> void
-static Assimalign.Viu.Suspense.CreateComponent(Assimalign.Viu.Components.ComponentSlot! defaultSlot, Assimalign.Viu.Components.ComponentSlot? fallbackSlot = null, object? key = null) -> Assimalign.Viu.Components.ITemplateComponent!
-static Assimalign.Viu.Suspense.Registration.get -> Assimalign.Viu.Components.ComponentRegistration
-static Assimalign.Viu.TemplateReference.FromCallback(System.Action<object?>! callback) -> Assimalign.Viu.TemplateReference!
-static Assimalign.Viu.TemplateReference.FromReference(Assimalign.Viu.Reactivity.IReactiveReference<object?>! reference) -> Assimalign.Viu.TemplateReference!
-static Assimalign.Viu.ViuWatch.Watch(Assimalign.Viu.Reactivity.IReactiveReference![]! sources, Assimalign.Viu.Reactivity.WatchCallback<object?[]!>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static Assimalign.Viu.ViuWatch.Watch(System.Func<object?>![]! sources, Assimalign.Viu.Reactivity.WatchCallback<object?[]!>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static Assimalign.Viu.ViuWatch.Watch<T>(Assimalign.Viu.Reactivity.IReactiveReference<T>! source, Assimalign.Viu.Reactivity.WatchCallback<T>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static Assimalign.Viu.ViuWatch.Watch<T>(System.Func<T>! source, Assimalign.Viu.Reactivity.WatchCallback<T>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static Assimalign.Viu.ViuWatch.Watch<TReactive>(TReactive! source, Assimalign.Viu.Reactivity.WatchCallback<TReactive!>! callback, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static Assimalign.Viu.ViuWatch.WatchEffect(System.Action! effect, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static Assimalign.Viu.ViuWatch.WatchEffect(System.Action<Assimalign.Viu.Reactivity.OnCleanup!>! effect, Assimalign.Viu.Reactivity.WatchOptions? options = null) -> Assimalign.Viu.Reactivity.WatchHandle!
-static readonly Assimalign.Viu.RenderHelpers._BaseTransition -> object!
-static readonly Assimalign.Viu.RenderHelpers._Fragment -> object!
-static readonly Assimalign.Viu.RenderHelpers._KeepAlive -> object!
-static readonly Assimalign.Viu.RenderHelpers._Suspense -> object!
-static readonly Assimalign.Viu.RenderHelpers._Teleport -> object!
-virtual Assimalign.Viu.Application<TNode>.MountCoreAsync(TNode container, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.Components.IComponentContext?>
-virtual Assimalign.Viu.Application<TNode>.OnInitializeAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-virtual Assimalign.Viu.Application<TNode>.UnmountCoreAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+static Assimalign.Viu.Scheduler.Reset() -> void
+static Assimalign.Viu.Scheduler.UseFlushDispatcher(System.Action<System.Action!>! dispatcher) -> System.IDisposable!
+static Assimalign.Viu.StyleAndClassNormalization.IsTruthy(object? value) -> bool
+static Assimalign.Viu.StyleAndClassNormalization.NormalizeClass(object? value) -> string!
+static Assimalign.Viu.StyleAndClassNormalization.NormalizeStyle(object? value) -> object?
+static Assimalign.Viu.StyleAndClassNormalization.ParseStringStyle(string! cssText) -> System.Collections.Generic.Dictionary<string!, object?>!
+static Assimalign.Viu.StyleAndClassNormalization.StringifyStyle(object? style) -> string!
+virtual Assimalign.Viu.ApplicationDelegate.Invoke(Assimalign.Viu.IApplicationContext! context) -> System.Threading.Tasks.ValueTask
+virtual Assimalign.Viu.ApplicationMiddleware.Invoke(Assimalign.Viu.IApplicationContext! context, Assimalign.Viu.ApplicationDelegate! next) -> System.Threading.Tasks.ValueTask
 virtual Assimalign.Viu.AsynchronousComponentErrorHandler.Invoke(System.Exception! error, System.Action! retry, System.Action! fail, int attempts) -> void
-virtual Assimalign.Viu.AsynchronousComponentErrorRenderer.Invoke(System.Exception! error) -> Assimalign.Viu.Components.IComponent!
+virtual Assimalign.Viu.AsynchronousComponentErrorRenderer.Invoke(System.Exception! error) -> Assimalign.Viu.Components.VirtualNode?
 virtual Assimalign.Viu.AsynchronousComponentLoader.Invoke(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.AsynchronousComponentTarget>!
-virtual Assimalign.Viu.ComponentNodeLifecycleHook.Invoke(Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Components.IComponent? previousComponent) -> void
 virtual Assimalign.Viu.ComponentScriptUpdateResetHandler.Invoke(string! componentIdentifier, System.Type! componentType) -> void
-virtual Assimalign.Viu.DirectiveHook.Invoke(object! element, Assimalign.Viu.DirectiveBinding! binding, Assimalign.Viu.Components.IElementComponent! component, Assimalign.Viu.Components.IElementComponent? previousComponent) -> void
-virtual Assimalign.Viu.InsertStaticContentDelegate<TNode>.Invoke(string! content, TNode parent, TNode? anchor, string? elementNamespace) -> (TNode First, TNode Last)
-virtual Assimalign.Viu.PatchAttributeDelegate<TNode>.Invoke(TNode element, string! elementTag, string! attributeName, object? previousValue, object? nextValue, string? elementNamespace) -> void
-virtual Assimalign.Viu.TransitionDelayLeave.Invoke(object! element, System.Action! earlyRemove, System.Action! delayedLeave) -> void
-virtual Assimalign.Viu.TransitionEnterHook.Invoke(object! element, System.Action! done) -> void
+virtual Assimalign.Viu.DirectiveHook.Invoke(object! element, Assimalign.Viu.DirectiveBinding! binding, Assimalign.Viu.Components.ElementNode! value, Assimalign.Viu.Components.ElementNode? previousValue) -> void
+virtual Assimalign.Viu.InsertStaticContentDelegate<TNode>.Invoke(Assimalign.Viu.Components.MarkupFormat format, string! content, TNode parent, TNode? anchor) -> (TNode First, TNode Last)
+virtual Assimalign.Viu.PatchAttributeDelegate<TNode>.Invoke(TNode element, Assimalign.Viu.Components.ElementBinding? previousBinding, Assimalign.Viu.Components.ElementBinding? nextBinding) -> void
+virtual Assimalign.Viu.TransitionPhaseHook.Invoke(object! element, System.Action! complete) -> void
+virtual Assimalign.Viu.VirtualNodeLifecycleHook.Invoke(Assimalign.Viu.Components.VirtualNode! value, Assimalign.Viu.Components.VirtualNode? previousValue) -> void

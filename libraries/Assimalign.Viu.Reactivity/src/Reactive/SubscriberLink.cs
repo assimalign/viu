@@ -2,13 +2,13 @@ namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
 /// The edge node connecting one <see cref="Dependency"/> to one <see cref="Subscriber"/> in the
-/// reactive dependency graph — one edge of the doubly-linked subscriber graph (<c>[RCT-9]</c>)
-/// (<c>packages/reactivity/src/dep.ts</c>). Each link participates in two intrusive doubly-linked
+/// reactive dependency graph — one edge of the doubly-linked subscriber graph. Each link
+/// participates in two intrusive doubly-linked
 /// lists — the subscriber's dependency list (<see cref="PreviousDependency"/>/<see cref="NextDependency"/>)
 /// and the dependency's subscriber list (<see cref="PreviousSubscriber"/>/<see cref="NextSubscriber"/>)
 /// — enabling O(1) unlink from both sides. Links are reused across subscriber re-runs via
 /// <see cref="Version"/> (set to -1 before a run, refreshed on re-read; stale links are unlinked
-/// afterwards).
+/// afterwards). Specified by <c>[RCT-9]</c>.
 /// <para>
 /// This type is a read-only <b>window</b> onto the engine's dependency graph: .NET developers can
 /// walk it to inspect what a subscriber depends on and which subscribers a dependency notifies, but

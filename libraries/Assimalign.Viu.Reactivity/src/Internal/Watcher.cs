@@ -3,14 +3,13 @@ using System;
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Shared machinery behind <c>Watch</c> and <c>WatchEffect</c> — the state
-/// <c>baseWatch</c> keeps per watcher (<c>packages/reactivity/src/watch.ts</c>): the underlying
+/// Shared machinery behind <c>Watch</c> and <c>WatchEffect</c>: the underlying
 /// <see cref="ReactiveEffect"/>, the pending cleanup, the flush routing, and the stop/pause plumbing.
 /// A trigger re-enters through <see cref="OnTrigger"/>, which either reacts synchronously or hands a
 /// <see cref="WatchJob"/> to the injected <see cref="IReactiveWatchScheduler"/> for pre/post timing. Teardown
 /// funnels through the effect's <see cref="ReactiveEffect.OnStop"/> so stopping the owning
 /// <see cref="EffectScope"/> also runs the watcher's cleanup. Not thread-safe (single-threaded JS
-/// event-loop model).
+/// event-loop model). Specified by <c>[RCT-5]</c> and <c>[RCT-12]</c>.
 /// </summary>
 internal abstract class Watcher
 {

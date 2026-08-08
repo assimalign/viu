@@ -38,7 +38,7 @@ ships only source and its DLL.
 Never write a raw `<ProjectReference Include="..\..\...csproj" />` or `<PackageReference>` in a library,
 test, or example csproj. Use the by-name item groups the build system resolves:
 
-- **`<ViuProjectReference Include="Assimalign.Viu.Shared" />`** — public project reference (flows as a
+- **`<ViuProjectReference Include="Assimalign.Viu.Components" />`** — public project reference (flows as a
   `.nupkg` dependency). Resolved by assembly name against every indexed code root —
   `libraries/`, `tooling/`, `analyzers/`, `sdks/`, `extensions/`, and `benchmarks/` — see
   `build/Targets/Build.References.Projects.targets`.
@@ -77,7 +77,7 @@ Shipping library (`src/`):
   </PropertyGroup>
   <!-- optional -->
   <ItemGroup>
-    <ViuProjectReference Include="Assimalign.Viu.Shared" />
+    <ViuProjectReference Include="Assimalign.Viu.Components" />
   </ItemGroup>
 </Project>
 ```

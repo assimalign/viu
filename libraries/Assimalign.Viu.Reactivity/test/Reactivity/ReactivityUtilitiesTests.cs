@@ -16,7 +16,7 @@ namespace Assimalign.Viu.Reactivity.Tests;
 public sealed class ReactivityUtilitiesTests
 {
     [Fact]
-    public void IsRef_TrueForEveryRefKind_FalseForReactiveObjectsAndValues()
+    public void IsRef_TrueForEveryReferenceKind_FalseForReactiveObjectsAndValues()
     {
         Reactive.IsRef(Reactive.Reference(1)).ShouldBeTrue();
         Reactive.IsRef(Reactive.ShallowReference(1)).ShouldBeTrue();
@@ -60,13 +60,14 @@ public sealed class ReactivityUtilitiesTests
     [Fact]
     public void Unref_UnwrapsRefsWithoutBoxing_AndPassesValuesThrough()
     {
-        // Concrete ref types must unwrap (overload resolution picks the concrete-ref overload, not the
-        // value passthrough) — the guard against Unref(someRef) returning the ref itself.
+        // Concrete reference types must unwrap (overload resolution picks the concrete-reference
+        // overload, not the value passthrough) — the guard against Unref(reference) returning the
+        // reference itself.
         Reactive.Unref(Reactive.Reference(7)).ShouldBe(7);
         Reactive.Unref(Reactive.ShallowReference(8)).ShouldBe(8);
         Reactive.Unref(Reactive.Computed(() => 9)).ShouldBe(9);
 
-        // Non-refs pass through unchanged (struct value never boxed by the generic passthrough).
+        // Non-reference values pass through unchanged (a struct is never boxed by the generic passthrough).
         Reactive.Unref(5).ShouldBe(5);
         Reactive.Unref("hello").ShouldBe("hello");
     }
@@ -99,7 +100,7 @@ public sealed class ReactivityUtilitiesTests
         Reactive.IsRef(nameRef).ShouldBeTrue();
         nameRef.Value.ShouldBe("Ada");
 
-        // Source -> ref: mutating the object triggers a reader of the ref.
+        // Source -> reference: mutating the object triggers a reader of the reference.
         var runs = 0;
         string? seen = null;
         Reactive.Effect(() =>
@@ -114,7 +115,7 @@ public sealed class ReactivityUtilitiesTests
         runs.ShouldBe(2);
         seen.ShouldBe("Grace");
 
-        // Ref -> source: writing the ref mutates the object and triggers its dependency.
+        // Reference -> source: writing the reference mutates the object and triggers its dependency.
         nameRef.Value = "Hopper";
         person.Name.ShouldBe("Hopper");
         runs.ShouldBe(3);
@@ -180,7 +181,7 @@ public sealed class ReactivityUtilitiesTests
         runs.ShouldBe(1);
         seen.ShouldBe(10);
 
-        list[0] = 20; // reactive write triggers the index dep, but the effect never subscribed
+        list[0] = 20; // reactive write triggers the index dependency, but the effect never subscribed
         runs.ShouldBe(1);
     }
 
@@ -273,4 +274,3 @@ public sealed class ReactivityUtilitiesTests
         runs.ShouldBe(1);
     }
 }
-

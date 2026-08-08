@@ -1,188 +1,69 @@
-# Browser host design
+# Assimalign.Viu.Browser design
 
-## Boundary
+## Host boundary
 
-Browser is a host adapter, not an application or component model. Core owns component activation,
-lifecycle, reactivity scheduling, tree diffing, and mounted runtime state. Components owns the
-immutable public tree. Browser owns only browser-specific operations:
+Browser is a concrete Core host with `TNode = int`. Handles are opaque identifiers shared with
+`viu-dom.js`; zero is the no-node sentinel. Core never sees a DOM object, and JavaScript never makes
+rendering decisions. `RendererOptions<int>` is the complete join between the packages
+(`[RND-HOST-1]` through `[RND-HOST-3]`, `[EXE-11]`, `[EXE-12]`).
 
-```text
-IComponent tree
-    -> Core Renderer<int>
-        -> Browser RendererOptions<int>
-            -> direct JS bridge or binary command buffer
-```
+Browser owns every DOM-specific choice: HTML, SVG, MathML, and `foreignObject` namespaces;
+property-versus-attribute selection; class and style normalization; form coercion; event modifiers;
+directives; transition timing; selector resolution; and hydration snapshots. Adding one of those
+policies to Core would make the generic renderer host-specific.
 
-The integer renderer node is an opaque browser handle. Core never resolves CSS selectors, imports a
-JavaScript module, or understands DOM attributes. Conversely, Browser does not activate templates
-or own the application component factory, service provider, or state registry.
+## Buffered interop
 
-This keeps host nodes out of Core's application abstraction. A future WebView2 application can
-implement `IApplication` directly, choose a different node handle and transport, and reuse the same
-Core and Components APIs without inheriting a node-generic application base.
+Renderer writes append primitive operations to a versioned binary command frame. Core crosses the
+host seam through `Commit`, and Browser applies the frame in one interop call. A live-DOM read first
+commits pending writes, so read-after-write ordering is deterministic (`[RND-HOST-4]`,
+`[RND-IO-1]`, `[EXE-13]`).
 
-## Application lifecycle
+Managed code allocates ordinary handles. Selector lookups and hydration snapshots introduce foreign
+handles, so the allocator advances beyond every observed value before issuing another handle.
+Managed and JavaScript registries release handles and listeners on both sides (`[RND-IO-4]`,
+`[EXE-14]`).
 
-`BrowserApplication` implements `IApplication` directly and receives the context whose immutable
-composition snapshot and read-only runtime state are shared with middleware. `StartAsync` claims the
-single-use lifetime, launches the middleware pipeline independently, and waits until the Browser
-terminal has initialized the JavaScript bridge, resolved the configured selector (`#app` by
-default), and mounted or hydrated. It then returns while that pipeline stays active. `StopAsync`
-signals `IApplicationContext.Stopping`, awaits the pipeline, and unmounts before reverse middleware
-cleanup runs [APP-4] [APP-5]. Core's `RunAsync` extension composes start, the shutdown wait, and stop
-for the ordinary long-running entry point. A post-start pipeline failure changes
-`IApplicationContext.IsRunning` to false, reaches the configured error handler, and surfaces from
-`StopAsync` or `RunAsync`.
+Events use a stable per-element invoker. Updating a handler swaps the managed delegate without
+removing and re-adding the host listener. Static content uses Core's optional bulk-insertion
+operation. These paths protect the interop budget in `[RND-IO-2]`, `[RND-IO-3]`, and `[RND-IO-5]`.
 
-The Browser mount path clears a client-mount container and calls
-`Renderer<int>.Render(root, container, context)`; unmount renders null into the same container. The
-public `Mount` and `MountAsync` overloads are Browser-owned lower-level embedding and test seams and
-explicitly bypass the top-level middleware pipeline [APP-7].
+## Application lifetime
 
-The application composition root retains ownership of all supplied resolvers. Browser wraps the
-application's `IComponentFactory` only to resolve `Transition`, `TransitionGroup`, and Core
-`BaseTransition` by type or generated name before delegating all other requests. This wrapper does not implement
-`IServiceProvider`. Browser installs no custom dependency-injection stack and exposes no
-provide/inject API.
+`BrowserApplication` owns browser initialization, mount-target resolution, mount or hydration, and
+full-page development reload. Core's `ApplicationLifetime` owns the host-independent state machine,
+middleware nesting, shutdown signal, and failure reporting (`[APP-1]` through `[APP-5]`).
 
-## DOM operations
+Startup is asynchronous. Middleware wraps the complete interval from pre-mount initialization
+through unmount; lower-level mount APIs deliberately bypass that pipeline for embedding and tests.
+The component factory, services, state registry, directive resolver, and diagnostics are immutable
+borrowed composition values and are never disposed by Browser (`[APP-6]`, `[APP-7]`, `[CMP-9]`).
 
-`BrowserNodeOperations` maps Core operations to the bridge:
+Only one browser renderer lease may control the shared DOM bridge at a time. The lease makes global
+interop dispatch explicit and guarantees that callbacks cannot target an abandoned renderer.
 
-- create, insert, move, remove, and text operations;
-- parent and next-sibling reads;
-- browser property/attribute/event patching;
-- static-content insertion;
-- scoped-style attribute stamping; and
-- teleport selector resolution.
+## Hydration, directives, and transitions
 
-The JavaScript boundary remains explicit and trimming safe. There is no reflection-based
-activation, dynamic code generation, or retained `JSObject` per node/event.
+Browser snapshots the live DOM once and exposes it through Core's generic hydration reader. Core
+owns tree matching and mismatch recovery; Browser owns node classification, property reads, and
+foreign-handle registration (`[HYD-1]`, `[HYD-2]`).
 
-## Hydration
+Browser directives are registered through the application's public directive resolver. The model
+directives, `VShow`, and transition operations use host elements and browser events without adding
+members to `ComponentContext`. Transition nodes remain host-neutral descriptions; Browser supplies
+class scheduling, geometry, and completion behavior through the public host seam (`[BLT-7]` through
+`[BLT-10]`, `[CMP-33]`).
 
-The browser host's hydration mode selects Core's `Renderer<int>.Hydrate` path and deliberately does
-not clear the mount container. Direct and buffered options create a `BrowserHydrationReader` from
-one `snapshotHydration` bridge call per root or teleport target. All structural, kind, text, and
-attribute reads then stay in managed memory. D5 removed the unused
-`BrowserApplication.CreateServerRendererBuilder` entry point; it did not change the renderer's
-hydration protocol or the lower-level hydration coverage [HYD-2].
+## AOT and WASM constraints
 
-Buffered hydration advances its managed handle allocator beyond the maximum handle in each
-snapshot. A localized mismatch can therefore create replacement nodes without colliding with any
-server node registered by the bridge.
+All JavaScript entry points are statically declared `JSImport` or `JSExport` boundaries, and payloads
+are primitive handles, snapshots, or command frames. Browser does not use reflection-based
+serialization, runtime member discovery, emitted code, or dynamically generated delegates
+(`[EXE-4]`).
 
-## Event tasks
+## Non-goals
 
-DOM dispatch must return stop/prevent flags synchronously to JavaScript. A Task-returning event
-handler is therefore invoked synchronously up to its first suspension; its returned Task is retained
-and observed without blocking the JavaScript event callback. Synchronous and asynchronous failures
-flow to the application error handler.
-
-`DomRenderHelpers._withModifiers` and `_withKeys` have dedicated `Func<Task>` and
-`Func<BrowserEvent, Task>` overloads. A passing guard returns the original handler Task; a failing
-guard returns `Task.CompletedTask`. Multicast Task-returning delegates are expanded so every returned
-Task is observed.
-
-An asynchronous continuation cannot call `preventDefault` after the JavaScript dispatch has
-returned. Developers must express `.prevent` or other synchronous event intent in the generated
-guard, before awaiting.
-
-## Command buffering
-
-Buffered operations allocate handles in managed code and serialize DOM writes into one binary
-frame. Reads force pending writes to commit before querying live DOM. Selector-based teleport
-resolution also records the returned foreign handle so later managed allocation cannot collide.
-
-Buffered Browser supplies `ApplyPending` as `RendererOptions<int>.Commit`. Core queues that
-application-scoped callback for synchronous renders and reactive component updates, then drains
-host commits:
-
-1. runs before post-render lifecycle callbacks that read DOM;
-2. runs after those callbacks if they enqueue additional host writes;
-3. participates in `NextTick`.
-
-The callback belongs to each renderer rather than a process-global Browser hook. A future WebView2
-transport can supply its own `RendererOptions<TNode>` implementation without changing Core's
-application contract.
-
-## Browser directives
-
-The Browser builder installs its built-in directive resolver by default. Developers may replace it
-by assigning `ApplicationOptions.Directives` in `ConfigureApplication`. The default resolver
-currently maps compiler-emitted names for:
-
-- `show` to `VShow`;
-- `modelText` to `VModelText`;
-- `modelCheckbox` to `VModelCheckbox`; and
-- `modelRadio` to `VModelRadio`;
-- `modelSelect` to `VModelSelect`; and
-- `modelDynamic` to `VModelDynamic`.
-
-Directive hooks receive the boxed integer host handle, immutable current element component, and
-current/previous binding values from Core. Direct mode writes through bridge-backed property
-leaves. Buffered mode writes through the command buffer and uses the renderer commit callback, so
-mounted and updated hooks observe and extend the same render boundary.
-
-Select model bindings use `DirectiveBinding.GetDescendantElements("option")` to traverse the
-mounted descendants of the bound select in document order, including fragments and child
-templates. Each result carries both the immutable option component and mounted browser handle, so
-raw bound object values retain identity while selected writes target the correct host option.
-Dynamic model bindings forward each lifecycle hook according to the current tag and input type.
-
-## Component CSS variables
-
-The single-file-component generator emits
-`CssVariables.UseCssVariables(Context, getter)` from the generated setup path. The explicit
-`IComponentContext` makes ownership unambiguous and avoids restoring the former ambient component
-instance.
-
-After mount, a post-flush watcher tracks the getter's reactive dependencies and applies each hashed
-custom property to every current outermost host element reported by `ComponentHost`. The updated
-lifecycle hook reapplies the same values when a component changes its element or fragment roots.
-Before unmount, the component stops the watcher.
-
-Direct mode batches all properties for one element into one bridge operation. Buffered mode writes
-the properties into the command frame, then asks the owning component context to queue its
-renderer-specific host commit. This guarantees that a CSS-only reactive update reaches the DOM
-before `NextTick`, even though it does not rerender the component.
-
-## Transitions
-
-Browser `Transition` is an `IComponentTemplate` that consumes the DOM transition arguments and
-renders Core `BaseTransition` with resolved `BaseTransitionProperties`. Core owns transition
-identity, cancellation, mode sequencing, insertion, and deferred removal. Browser owns class
-names, double-animation-frame scheduling, reflow, computed or explicit end timing, and browser
-element handles.
-
-For a persisted transition, Core binds a host-neutral `ComponentTransition` to directive bindings.
-`VShow` invokes `BeforeEnter` and `Enter` before revealing an element, or invokes `Leave` and applies
-`display: none` only in its completion callback. The renderer skips its own insertion/removal
-transition for persisted hooks, so the directive and renderer never both drive the same phase.
-
-Direct mode installs bridge-backed `DomTransitionOperations`. Buffered mode replaces that ambient
-surface with an adapter: class and transform writes plus the forced-reflow barrier are command
-opcodes, while timing and layout reads flush first and delegate to the bridge. Next-frame and end
-callbacks commit the writes they produce. The enter-from/active frame and enter-to frame therefore
-remain distinct, and the leave reflow stays ordered between leave-from and leave-active inside one
-command frame.
-
-`TransitionGroup` creates one `ComponentTransitionScope`, attaches its resolved transition hooks to
-every keyed direct child, and uses that shared scope to finish pending enters before measuring a
-move. Core's `ComponentHost.GetKeyedChildElements<int>` supplies ordered child-key-to-first-host-
-element snapshots: before-update observes the outgoing mounted tree, and updated observes the
-patched incoming tree. Browser maps the snapshots by key and performs the FLIP pass as:
-
-1. measure all outgoing positions in one operation;
-2. finish pending move and enter callbacks;
-3. measure all incoming positions in one operation;
-4. write all inverse transforms;
-5. force one reflow; and
-6. add the move class, clear inverse styles, and register move-end cleanup.
-
-The same sequence runs through direct bridge operations or buffered opcodes. Core carries only
-opaque host elements and transition callbacks, never CSS, rectangles, transforms, or DOM handles.
-
-Teleport, CSS variables, and all model directives are no longer deferred: Core supplies teleport
-target resolution, component root access, context-bound host commit scheduling, and directive
-descendant-host lookup without introducing browser types.
+Browser does not own the virtual-node vocabulary, mounted diff engine, component activation,
+application composition dependencies, routing, server serialization, or scoped-CSS rewriting.
+Routing joins through Browser.Router. Scoped style compilation and host stamping remain deferred
+with the scoped-CSS work (`[STY-1]`, `[STY-6]`).

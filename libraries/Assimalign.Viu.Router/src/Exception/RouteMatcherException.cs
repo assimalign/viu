@@ -8,6 +8,7 @@ namespace Assimalign.Viu.Router;
 /// failures the matcher raises. The specific cause is carried by <see cref="Error"/>; branch on that
 /// rather than on the message text.
 /// </summary>
+/// <remarks>Specified by <c>[RTR-1]</c>.</remarks>
 public sealed class RouteMatcherException : Exception
 {
     /// <summary>Creates a <see cref="RouteMatcherException"/>.</summary>

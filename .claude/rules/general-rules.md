@@ -72,13 +72,13 @@ Viu.
     and `Assimalign.Viu.UtilityCss` link `Shims/IsExternalInit.cs` and
     `Shims/RequiredMemberShims.cs` through
     `..\..\Assimalign.Viu.Syntax\src\Shims\<File>`.
-  - `Assimalign.Viu.Syntax.Templates` links `Internal/DomKnowledgeData.cs`, `PatchFlags.cs`, and
-    `SlotFlags.cs` from Shared through
-    `..\..\..\libraries\Assimalign.Viu.Shared\src\<File>`.
+  - `Assimalign.Viu.Syntax.Templates` links `PatchFlags.cs` and `SlotFlags.cs` from
+    `..\..\..\libraries\Assimalign.Viu.Components\src\`, and links `DomKnowledgeData.cs` from
+    `..\..\..\libraries\Assimalign.Viu.ServerRenderer\src\Internal\`.
   - The Visual Studio project links the external-init shim through
     `$(ViuRepositoryDirectory)tooling\Assimalign.Viu.Syntax\src\Shims\IsExternalInit.cs`; its source
     and test projects link `Internal/DomKnowledgeData.cs` through
-    `$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs`.
+    `$(ViuRepositoryDirectory)libraries\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs`.
   Moving any owner or consumer requires updating every linking csproj in the same change.
 
 ## Files and types

@@ -1,3 +1,1 @@
 #nullable enable
-*REMOVED*Assimalign.Viu.Testing.ComponentMountOptions.ConfigureApplication.get -> System.Action<Assimalign.Viu.IApplicationContext!>?
-Assimalign.Viu.Testing.ComponentMountOptions.ConfigureApplication.get -> System.Action<Assimalign.Viu.ApplicationOptions!>?

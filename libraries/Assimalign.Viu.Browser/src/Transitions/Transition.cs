@@ -1,137 +1,116 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// The DOM <c>&lt;Transition&gt;</c> built-in. It resolves CSS-class-based enter/leave hooks
-/// from its <c>name</c>/<c>type</c>/<c>duration</c>/<c>css</c> and per-phase class-override
-/// properties, then renders the host-neutral
-/// <see cref="BaseTransition"/> with those hooks and the passed-through slot — so a single element or
-/// component child animates on insert/remove. Core owns transition identity, cancellation, mode
-/// sequencing, and deferred removal and knows nothing about CSS; this component owns the class names
-/// and the browser timing ([BLT-7], [BLT-8]).
-/// <para>
-/// The class choreography — <c>v-enter-from</c>/<c>-active</c>/<c>-to</c> and the leave counterparts,
-/// a forced reflow, the next-frame to-class swap, and <c>transitionend</c>/<c>animationend</c>
-/// end-detection with a computed-duration fallback — runs through the injectable
-/// <see cref="DomTransitionOperations"/>, so the whole flow is exercised DOM-free in tests and by the
-/// browser bridge in production. Referenced by the compiled render through
-/// <see cref="DomRenderHelpers._Transition"/>. Not thread-safe (single-threaded JS event-loop model).
-/// </para>
-/// </summary>
-public sealed class Transition : IComponentTemplate
+/// <summary>Decorates one child with Browser CSS enter, appear, and leave behavior.</summary>
+/// <remarks>
+/// The component emits a host-neutral <see cref="TransitionNode"/> carrying a lazy child slot and
+/// resolved <see cref="TransitionProperties"/>. Core owns identity, cancellation, mode sequencing,
+/// and deferred removal; Browser owns CSS class names, double-frame scheduling, forced reflow, and
+/// transition-end detection. The component is not thread-safe and runs on the browser event loop.
+/// Specified by <c>[BLT-7]</c> and <c>[BLT-8]</c>.
+/// </remarks>
+public sealed class Transition : IComponent
 {
-    private static readonly IReadOnlyList<IComponentParameter> DeclaredParameters =
+    private static readonly IReadOnlyList<ComponentParameter> Parameters =
     [
-        new ComponentParameter("name"),
-        new ComponentParameter("type"),
-        new ComponentParameter("css"),
-        new ComponentParameter("duration"),
-        new ComponentParameter("mode"),
-        new ComponentParameter("appear"),
-        new ComponentParameter("persisted"),
-        new ComponentParameter("enterFromClass"),
-        new ComponentParameter("enterActiveClass"),
-        new ComponentParameter("enterToClass"),
-        new ComponentParameter("appearFromClass"),
-        new ComponentParameter("appearActiveClass"),
-        new ComponentParameter("appearToClass"),
-        new ComponentParameter("leaveFromClass"),
-        new ComponentParameter("leaveActiveClass"),
-        new ComponentParameter("leaveToClass"),
-        new ComponentParameter("onBeforeEnter"),
-        new ComponentParameter("onEnter"),
-        new ComponentParameter("onAfterEnter"),
-        new ComponentParameter("onEnterCancelled"),
-        new ComponentParameter("onBeforeLeave"),
-        new ComponentParameter("onLeave"),
-        new ComponentParameter("onAfterLeave"),
-        new ComponentParameter("onLeaveCancelled"),
-        new ComponentParameter("onBeforeAppear"),
-        new ComponentParameter("onAppear"),
-        new ComponentParameter("onAfterAppear"),
-        new ComponentParameter("onAppearCancelled"),
+        new("name"),
+        new("type"),
+        new("css"),
+        new("duration"),
+        new("mode"),
+        new("appear"),
+        new("persisted"),
+        new("enterFromClass"),
+        new("enterActiveClass"),
+        new("enterToClass"),
+        new("appearFromClass"),
+        new("appearActiveClass"),
+        new("appearToClass"),
+        new("leaveFromClass"),
+        new("leaveActiveClass"),
+        new("leaveToClass"),
+        new("onBeforeEnter"),
+        new("onEnter"),
+        new("onAfterEnter"),
+        new("onEnterCancelled"),
+        new("onBeforeLeave"),
+        new("onLeave"),
+        new("onAfterLeave"),
+        new("onLeaveCancelled"),
+        new("onBeforeAppear"),
+        new("onAppear"),
+        new("onAfterAppear"),
+        new("onAppearCancelled"),
     ];
+
+    private static readonly ComponentContract Contract = new(
+        displayName: "Transition",
+        flags: ComponentFlags.None,
+        parameters: Parameters);
+
+    internal static IReadOnlyList<ComponentParameter> ParameterDefinitions => Parameters;
 
     private Transition()
     {
     }
 
-    /// <inheritdoc/>
-    public string? Name => "Transition";
+    /// <summary>Gets the reflection-free component registration.</summary>
+    public static ComponentRegistration Registration { get; } = new(
+        ComponentReference.ForType(typeof(Transition)),
+        Contract,
+        static _ => new Transition());
 
     /// <inheritdoc/>
-    public ComponentFlags Flags => ComponentFlags.None;
-
-    /// <inheritdoc/>
-    public IReadOnlyList<IComponentParameter>? Parameters => DeclaredParameters;
-
-    internal static IReadOnlyList<IComponentParameter> ParameterDefinitions =>
-        DeclaredParameters;
-
-    /// <summary>Gets the AOT-safe registration for the browser transition built-in.</summary>
-    public static ComponentRegistration Registration =>
-        new(
-            typeof(Transition),
-            static () => new Transition(),
-            "Transition");
-
-    /// <inheritdoc/>
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return () =>
+        ComponentTransitionScope scope = new(context);
+        return _ =>
         {
-            BaseTransitionProperties resolved =
-                ResolveTransitionProperties(context.Arguments);
-            ComponentArguments arguments = new(
-            [
-                new KeyValuePair<string, object?>(
-                    BaseTransition.PropertiesArgument,
-                    resolved),
-            ]);
-            return ComponentTree.Template<BaseTransition>(
-                arguments,
-                context.Slots);
+            ComponentSlot child = context.Bindings.Slots.TryGetValue(
+                "default",
+                out ComponentSlot? slot)
+                    ? slot
+                    : static _ => null;
+            return scope.Attach(
+                child,
+                ResolveTransitionProperties(context.Bindings.Parameters));
         };
     }
 
-    /// <summary>
-    /// Builds the CSS-class enter/leave hook set for a supplied transition argument bag.
-    /// With <c>css: false</c> the class/end-detection work is skipped
-    /// and only the user hooks pass through.
-    /// </summary>
-    /// <param name="arguments">The transition component's resolved arguments.</param>
-    /// <returns>The resolved base-transition properties.</returns>
-    internal static BaseTransitionProperties ResolveTransitionProperties(
-        IComponentArguments arguments)
+    internal static TransitionProperties ResolveTransitionProperties(
+        IReadOnlyDictionary<string, object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        var mode = ReadString(arguments, "mode");
-        var appear = ReadBool(arguments, "appear");
-        var persisted = ReadBool(arguments, "persisted");
+        string? mode = ReadString(arguments, "mode");
+        bool appear = ReadBoolean(arguments, "appear");
+        bool persisted = ReadBoolean(arguments, "persisted");
 
-        var (userBeforeEnter, userEnter, userAfterEnter, userEnterCancelled) =
-            (ReadHook(arguments, "onBeforeEnter"), ReadEnterHook(arguments, "onEnter"), ReadHook(arguments, "onAfterEnter"), ReadHook(arguments, "onEnterCancelled"));
-        var (userBeforeLeave, userLeave, userAfterLeave, userLeaveCancelled) =
-            (ReadHook(arguments, "onBeforeLeave"), ReadEnterHook(arguments, "onLeave"), ReadHook(arguments, "onAfterLeave"), ReadHook(arguments, "onLeaveCancelled"));
-        // Appear hooks default to their enter counterparts.
-        var userBeforeAppear = ReadHook(arguments, "onBeforeAppear") ?? userBeforeEnter;
-        var userAppear =
-            arguments.Contains("onAppear")
-                ? ReadEnterHook(arguments, "onAppear")
-                : userEnter;
-        var userAfterAppear = ReadHook(arguments, "onAfterAppear") ?? userAfterEnter;
-        var userAppearCancelled = ReadHook(arguments, "onAppearCancelled") ?? userEnterCancelled;
+        Action<object>? userBeforeEnter = ReadAction(arguments, "onBeforeEnter");
+        PhaseHook userEnter = ReadPhaseHook(arguments, "onEnter");
+        Action<object>? userAfterEnter = ReadAction(arguments, "onAfterEnter");
+        Action<object>? userEnterCancelled = ReadAction(arguments, "onEnterCancelled");
+        Action<object>? userBeforeLeave = ReadAction(arguments, "onBeforeLeave");
+        PhaseHook userLeave = ReadPhaseHook(arguments, "onLeave");
+        Action<object>? userAfterLeave = ReadAction(arguments, "onAfterLeave");
+        Action<object>? userLeaveCancelled = ReadAction(arguments, "onLeaveCancelled");
+        Action<object>? userBeforeAppear =
+            ReadAction(arguments, "onBeforeAppear") ?? userBeforeEnter;
+        PhaseHook userAppear = arguments.ContainsKey("onAppear")
+            ? ReadPhaseHook(arguments, "onAppear")
+            : userEnter;
+        Action<object>? userAfterAppear =
+            ReadAction(arguments, "onAfterAppear") ?? userAfterEnter;
+        Action<object>? userAppearCancelled =
+            ReadAction(arguments, "onAppearCancelled") ?? userEnterCancelled;
 
-        // css === false: no class choreography, only the supplied JavaScript hooks.
-        if (arguments.Contains("css") && arguments["css"] is false)
+        if (arguments.TryGetValue("css", out object? css) && css is false)
         {
-            return new BaseTransitionProperties
+            return new TransitionProperties
             {
                 Mode = mode,
                 Appear = appear,
@@ -151,79 +130,72 @@ public sealed class Transition : IComponentTemplate
             };
         }
 
-        var name = ReadString(arguments, "name") ?? "v";
-        var type = ReadString(arguments, "type");
-        DomTransitionClassNames classNames =
-            ResolveClassNames(arguments);
-        string enterFromClass = classNames.EnterFrom;
-        string enterActiveClass = classNames.EnterActive;
-        string enterToClass = classNames.EnterTo;
-        string appearFromClass = classNames.AppearFrom;
-        string appearActiveClass = classNames.AppearActive;
-        string appearToClass = classNames.AppearTo;
-        string leaveFromClass = classNames.LeaveFrom;
-        string leaveActiveClass = classNames.LeaveActive;
-        string leaveToClass = classNames.LeaveTo;
-        var (enterDuration, leaveDuration) =
-            NormalizeDuration(arguments["duration"]);
+        string? expectedType = ReadString(arguments, "type");
+        DomTransitionClassNames classNames = ResolveClassNames(arguments);
+        (int enterDuration, int leaveDuration) = NormalizeDuration(
+            arguments.TryGetValue("duration", out object? duration) ? duration : null);
 
-        // Removes the enter to+active classes and marks the cancelled flag.
         void FinishEnter(
             DomTransitionOperations operations,
             int element,
             bool isAppear,
             bool cancelled)
         {
+            operations.EnterGenerations[element] =
+                operations.EnterGenerations.GetValueOrDefault(element) + 1;
             operations.EnterCancelledFlags[element] = cancelled;
-            operations.RemoveTransitionClass(element, isAppear ? appearToClass : enterToClass);
-            operations.RemoveTransitionClass(element, isAppear ? appearActiveClass : enterActiveClass);
+            operations.RemoveTransitionClass(
+                element,
+                isAppear ? classNames.AppearFrom : classNames.EnterFrom);
+            operations.RemoveTransitionClass(
+                element,
+                isAppear ? classNames.AppearTo : classNames.EnterTo);
+            operations.RemoveTransitionClass(
+                element,
+                isAppear ? classNames.AppearActive : classNames.EnterActive);
         }
 
-        // Removes all leave classes and clears the leaving flag.
         void FinishLeave(
             DomTransitionOperations operations,
             int element,
-            Action? done)
+            Action? complete)
         {
+            operations.LeaveGenerations[element] =
+                operations.LeaveGenerations.GetValueOrDefault(element) + 1;
             operations.LeavingFlags[element] = false;
-            operations.RemoveTransitionClass(element, leaveFromClass);
-            operations.RemoveTransitionClass(element, leaveToClass);
-            operations.RemoveTransitionClass(element, leaveActiveClass);
-            done?.Invoke();
+            operations.RemoveTransitionClass(element, classNames.LeaveFrom);
+            operations.RemoveTransitionClass(element, classNames.LeaveTo);
+            operations.RemoveTransitionClass(element, classNames.LeaveActive);
+            complete?.Invoke();
         }
 
-        // The enter/appear hook: add the active+from classes are added by onBeforeEnter; here the
-        // next frame removes from-class, adds to-class, and (without an explicit user callback) waits
-        // on the transition end.
-        TransitionEnterHook MakeEnterHook(bool isAppear) => (element, done) =>
+        TransitionPhaseHook MakeEnterHook(bool isAppear) => (element, complete) =>
         {
-            var operations = DomTransitionOperations.Require();
-            var handle = (int)element;
-            var userHook = isAppear ? userAppear : userEnter;
-            int generation =
-                operations.EnterGenerations.GetValueOrDefault(handle) + 1;
+            DomTransitionOperations operations = DomTransitionOperations.Require();
+            int handle = BrowserModelDirective.Handle(element);
+            PhaseHook userHook = isAppear ? userAppear : userEnter;
+            int generation = operations.EnterGenerations.GetValueOrDefault(handle) + 1;
             operations.EnterGenerations[handle] = generation;
             operations.EnterCancelledFlags[handle] = false;
-            void Resolve() => done();
             if (userHook.IsExplicit)
             {
-                userHook.Hook?.Invoke(element, Resolve);
+                userHook.Hook?.Invoke(element, complete);
             }
             else
             {
                 userHook.SynchronousHook?.Invoke(element);
             }
+
             operations.NextFrame(() =>
             {
-                if (operations.EnterGenerations.GetValueOrDefault(handle)
-                    != generation)
+                if (operations.EnterGenerations.GetValueOrDefault(handle) != generation)
                 {
                     return;
                 }
 
                 operations.RemoveTransitionClass(
                     handle,
-                    isAppear ? appearFromClass : enterFromClass);
+                    isAppear ? classNames.AppearFrom : classNames.EnterFrom);
                 if (operations.EnterCancelledFlags.GetValueOrDefault(handle))
                 {
                     return;
@@ -231,166 +203,147 @@ public sealed class Transition : IComponentTemplate
 
                 operations.AddTransitionClass(
                     handle,
-                    isAppear ? appearToClass : enterToClass);
+                    isAppear ? classNames.AppearTo : classNames.EnterTo);
                 if (!userHook.IsExplicit)
                 {
                     operations.WhenTransitionEnds(
                         handle,
-                        type,
+                        expectedType,
                         enterDuration,
-                        Resolve);
+                        complete);
                 }
             });
         };
 
-        return new BaseTransitionProperties
+        return new TransitionProperties
         {
             Mode = mode,
             Appear = appear,
             Persisted = persisted,
             OnBeforeEnter = element =>
             {
-                var operations = DomTransitionOperations.Require();
-                var handle = (int)element;
                 userBeforeEnter?.Invoke(element);
-                operations.AddTransitionClass(handle, enterFromClass);
-                operations.AddTransitionClass(handle, enterActiveClass);
+                DomTransitionOperations operations = DomTransitionOperations.Require();
+                int handle = BrowserModelDirective.Handle(element);
+                operations.AddTransitionClass(handle, classNames.EnterFrom);
+                operations.AddTransitionClass(handle, classNames.EnterActive);
             },
             OnBeforeAppear = element =>
             {
-                var operations = DomTransitionOperations.Require();
-                var handle = (int)element;
                 userBeforeAppear?.Invoke(element);
-                operations.AddTransitionClass(handle, appearFromClass);
-                operations.AddTransitionClass(handle, appearActiveClass);
+                DomTransitionOperations operations = DomTransitionOperations.Require();
+                int handle = BrowserModelDirective.Handle(element);
+                operations.AddTransitionClass(handle, classNames.AppearFrom);
+                operations.AddTransitionClass(handle, classNames.AppearActive);
             },
-            OnEnter = MakeEnterHook(false),
-            OnAppear = MakeEnterHook(true),
+            OnEnter = MakeEnterHook(isAppear: false),
+            OnAppear = MakeEnterHook(isAppear: true),
             OnAfterEnter = element =>
             {
-                DomTransitionOperations operations =
-                    DomTransitionOperations.Require();
                 FinishEnter(
-                    operations,
-                    (int)element,
+                    DomTransitionOperations.Require(),
+                    BrowserModelDirective.Handle(element),
                     isAppear: false,
                     cancelled: false);
                 userAfterEnter?.Invoke(element);
             },
             OnAfterAppear = element =>
             {
-                DomTransitionOperations operations =
-                    DomTransitionOperations.Require();
                 FinishEnter(
-                    operations,
-                    (int)element,
+                    DomTransitionOperations.Require(),
+                    BrowserModelDirective.Handle(element),
                     isAppear: true,
                     cancelled: false);
                 userAfterAppear?.Invoke(element);
             },
-            OnBeforeLeave = userBeforeLeave,
-            OnAfterLeave = userAfterLeave,
-            OnLeave = (element, done) =>
-            {
-                var operations = DomTransitionOperations.Require();
-                var handle = (int)element;
-                int generation =
-                    operations.LeaveGenerations.GetValueOrDefault(handle) + 1;
-                operations.LeaveGenerations[handle] = generation;
-                operations.LeavingFlags[handle] = true;
-                void Resolve() => FinishLeave(operations, handle, done);
-                operations.AddTransitionClass(handle, leaveFromClass);
-                if (!operations.EnterCancelledFlags.GetValueOrDefault(handle))
-                {
-                    operations.ForceReflow();
-                    operations.AddTransitionClass(handle, leaveActiveClass);
-                }
-                else
-                {
-                    operations.AddTransitionClass(handle, leaveActiveClass);
-                    operations.ForceReflow();
-                }
-                operations.NextFrame(() =>
-                {
-                    if (!operations.LeavingFlags.GetValueOrDefault(handle)
-                        || operations.LeaveGenerations.GetValueOrDefault(handle)
-                            != generation)
-                    {
-                        return;
-                    }
-                    operations.RemoveTransitionClass(handle, leaveFromClass);
-                    operations.AddTransitionClass(handle, leaveToClass);
-                    if (!userLeave.IsExplicit)
-                    {
-                        operations.WhenTransitionEnds(
-                            handle,
-                            type,
-                            leaveDuration,
-                            Resolve);
-                    }
-                });
-                userLeave.Hook?.Invoke(element, Resolve);
-            },
             OnEnterCancelled = element =>
             {
-                var operations = DomTransitionOperations.Require();
                 FinishEnter(
-                    operations,
-                    (int)element,
+                    DomTransitionOperations.Require(),
+                    BrowserModelDirective.Handle(element),
                     isAppear: false,
                     cancelled: true);
                 userEnterCancelled?.Invoke(element);
             },
             OnAppearCancelled = element =>
             {
-                var operations = DomTransitionOperations.Require();
                 FinishEnter(
-                    operations,
-                    (int)element,
+                    DomTransitionOperations.Require(),
+                    BrowserModelDirective.Handle(element),
                     isAppear: true,
                     cancelled: true);
                 userAppearCancelled?.Invoke(element);
             },
+            OnBeforeLeave = userBeforeLeave,
+            OnLeave = (element, complete) =>
+            {
+                DomTransitionOperations operations = DomTransitionOperations.Require();
+                int handle = BrowserModelDirective.Handle(element);
+                int generation = operations.LeaveGenerations.GetValueOrDefault(handle) + 1;
+                operations.LeaveGenerations[handle] = generation;
+                operations.LeavingFlags[handle] = true;
+                void Resolve() => FinishLeave(operations, handle, complete);
+                operations.AddTransitionClass(handle, classNames.LeaveFrom);
+                if (!operations.EnterCancelledFlags.GetValueOrDefault(handle))
+                {
+                    operations.ForceReflow();
+                    operations.AddTransitionClass(handle, classNames.LeaveActive);
+                }
+                else
+                {
+                    operations.AddTransitionClass(handle, classNames.LeaveActive);
+                    operations.ForceReflow();
+                }
+
+                operations.NextFrame(() =>
+                {
+                    if (!operations.LeavingFlags.GetValueOrDefault(handle)
+                        || operations.LeaveGenerations.GetValueOrDefault(handle) != generation)
+                    {
+                        return;
+                    }
+
+                    operations.RemoveTransitionClass(handle, classNames.LeaveFrom);
+                    operations.AddTransitionClass(handle, classNames.LeaveTo);
+                    if (!userLeave.IsExplicit)
+                    {
+                        operations.WhenTransitionEnds(
+                            handle,
+                            expectedType,
+                            leaveDuration,
+                            Resolve);
+                    }
+                });
+
+                if (userLeave.IsExplicit)
+                {
+                    userLeave.Hook?.Invoke(element, Resolve);
+                }
+                else
+                {
+                    userLeave.SynchronousHook?.Invoke(element);
+                }
+            },
+            OnAfterLeave = userAfterLeave,
             OnLeaveCancelled = element =>
             {
-                var operations = DomTransitionOperations.Require();
-                FinishLeave(operations, (int)element, done: null);
+                FinishLeave(
+                    DomTransitionOperations.Require(),
+                    BrowserModelDirective.Handle(element),
+                    complete: null);
                 userLeaveCancelled?.Invoke(element);
             },
         };
     }
 
-    // --- argument readers -----------------------------------------------------------------------
-
-    private static string? ReadString(
-        IComponentArguments arguments,
-        string name)
-        => arguments[name] as string;
-
-    private static bool ReadBool(
-        IComponentArguments arguments,
-        string name)
-        => arguments[name] is true;
-
-    private static string ClassName(
-        IComponentArguments arguments,
-        string name,
-        string fallback)
-        => arguments[name] is string text && text.Length > 0
-            ? text
-            : fallback;
-
     internal static DomTransitionClassNames ResolveClassNames(
-        IComponentArguments arguments)
+        IReadOnlyDictionary<string, object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         string name = ReadString(arguments, "name") ?? "v";
-        string enterFrom =
-            ClassName(arguments, "enterFromClass", name + "-enter-from");
-        string enterActive =
-            ClassName(arguments, "enterActiveClass", name + "-enter-active");
-        string enterTo =
-            ClassName(arguments, "enterToClass", name + "-enter-to");
+        string enterFrom = ClassName(arguments, "enterFromClass", name + "-enter-from");
+        string enterActive = ClassName(arguments, "enterActiveClass", name + "-enter-active");
+        string enterTo = ClassName(arguments, "enterToClass", name + "-enter-to");
         return new DomTransitionClassNames(
             enterFrom,
             enterActive,
@@ -403,65 +356,82 @@ public sealed class Transition : IComponentTemplate
             ClassName(arguments, "leaveToClass", name + "-leave-to"));
     }
 
-    private static Action<object>? ReadHook(
-        IComponentArguments arguments,
-        string name)
-        => arguments[name] as Action<object>;
+    private static string? ReadString(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name) =>
+        arguments.TryGetValue(name, out object? value) ? value as string : null;
 
-    // An explicit (el, done) hook waits for its own done; a fire-and-forget (el) hook auto-completes.
-    private static (
-        TransitionEnterHook? Hook,
-        Action<object>? SynchronousHook,
-        bool IsExplicit) ReadEnterHook(
-        IComponentArguments arguments,
+    private static bool ReadBoolean(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name) =>
+        arguments.TryGetValue(name, out object? value) && value is true;
+
+    private static string ClassName(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name,
+        string fallback) =>
+        arguments.TryGetValue(name, out object? value)
+            && value is string text
+            && text.Length > 0
+                ? text
+                : fallback;
+
+    private static Action<object>? ReadAction(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name) =>
+        arguments.TryGetValue(name, out object? value) ? value as Action<object> : null;
+
+    private static PhaseHook ReadPhaseHook(
+        IReadOnlyDictionary<string, object?> arguments,
         string name)
     {
-        if (!arguments.Contains(name))
+        if (!arguments.TryGetValue(name, out object? value))
         {
-            return (null, null, false);
+            return default;
         }
-        object? value = arguments[name];
+
         return value switch
         {
-            TransitionEnterHook hook => (hook, null, true),
-            Action<object> action =>
-                (
-                    (element, done) =>
-                    {
-                        action(element);
-                        done();
-                    },
-                    action,
-                    false),
-            _ => (null, null, false),
+            TransitionPhaseHook hook => new PhaseHook(hook, null, true),
+            Action<object> action => new PhaseHook(
+                (element, complete) =>
+                {
+                    action(element);
+                    complete();
+                },
+                action,
+                false),
+            _ => default,
         };
     }
 
-    // A scalar duration applies to both phases; an {enter, leave} map splits them. A negative value
-    // marks "no explicit duration" so end-detection reads getComputedStyle instead.
     private static (int Enter, int Leave) NormalizeDuration(object? duration)
     {
-        switch (duration)
+        if (duration is IReadOnlyDictionary<string, object?> map)
         {
-            case null:
-                return (-1, -1);
-            case IReadOnlyDictionary<string, object?> map:
-                return (
-                    NumberOf(map.TryGetValue("enter", out var enter) ? enter : null),
-                    NumberOf(map.TryGetValue("leave", out var leave) ? leave : null));
-            default:
-                var scalar = NumberOf(duration);
-                return (scalar, scalar);
+            return (
+                NumberOf(map.TryGetValue("enter", out object? enter) ? enter : null),
+                NumberOf(map.TryGetValue("leave", out object? leave) ? leave : null));
         }
+
+        int scalar = NumberOf(duration);
+        return (scalar, scalar);
     }
 
     private static int NumberOf(object? value) => value switch
     {
         int number => number,
-        long number => (int)number,
-        double number => (int)number,
-        float number => (int)number,
-        string text when int.TryParse(text, out var parsed) => parsed,
+        long number when number is >= int.MinValue and <= int.MaxValue => (int)number,
+        double number when double.IsFinite(number)
+            && number is >= int.MinValue and <= int.MaxValue => (int)number,
+        float number when float.IsFinite(number)
+            && number is >= int.MinValue and <= int.MaxValue => (int)number,
+        string text when int.TryParse(text, out int parsed) => parsed,
         _ => -1,
     };
+
+    private readonly record struct PhaseHook(
+        TransitionPhaseHook? Hook,
+        Action<object>? SynchronousHook,
+        bool IsExplicit);
 }

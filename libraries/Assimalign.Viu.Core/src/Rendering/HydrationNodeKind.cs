@@ -1,12 +1,9 @@
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Identifies an existing host node while a server-rendered tree is being hydrated.
-/// </summary>
+/// <summary>Identifies an existing host node while Core hydrates a server-rendered tree.</summary>
 /// <remarks>
-/// The hydration walker must classify a node it did not create, so this enumeration is the
-/// host-neutral form of the node-kind question — a host reports it without Core knowing anything
-/// about DOM node types.
+/// The host reports this closed classification without exposing a platform node model to Core.
+/// Specified by <c>[HYD-1]</c> and <c>[HYD-2]</c>.
 /// </remarks>
 public enum HydrationNodeKind
 {
@@ -19,6 +16,6 @@ public enum HydrationNodeKind
     /// <summary>A comment node.</summary>
     Comment,
 
-    /// <summary>A host node that cannot be adopted by the component renderer.</summary>
+    /// <summary>A host node that the renderer cannot adopt.</summary>
     Other,
 }

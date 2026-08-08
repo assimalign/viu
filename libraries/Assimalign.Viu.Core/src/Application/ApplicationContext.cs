@@ -7,37 +7,36 @@ using Assimalign.Viu.State;
 
 namespace Assimalign.Viu;
 
-/// <summary>The default context with immutable composition and host-owned runtime state.</summary>
+/// <summary>Provides the default immutable application composition and observable lifetime state.</summary>
+/// <remarks>
+/// Constructing a context snapshots the option references. One
+/// <see cref="ApplicationLifetime"/> may claim it; a second attachment is rejected. Specified by
+/// <c>[APP-1]</c>, <c>[APP-2]</c>, and <c>[APP-6]</c>.
+/// </remarks>
 public sealed class ApplicationContext : IApplicationContext
 {
-    private bool _isRuntimeInitialized;
+    private bool _isLifetimeAttached;
 
-    /// <summary>Creates an application context.</summary>
-    /// <param name="rootComponent">The root value in the component tree.</param>
-    /// <param name="components">The application-selected component resolver.</param>
-    /// <param name="services">The independently supplied application service resolver.</param>
-    /// <param name="state">The optional application state registry.</param>
-    /// <param name="directives">The optional application directive resolver.</param>
-    /// <param name="options">The optional diagnostics to snapshot into the context.</param>
-    public ApplicationContext(
-        IComponent rootComponent,
-        IComponentFactory components,
-        IServiceProvider services,
-        IStateStoreRegistry? state = null,
-        IDirectiveResolver? directives = null,
-        ApplicationOptions? options = null)
+    /// <summary>Initializes a context from the current application options.</summary>
+    /// <param name="options">The options whose borrowed values are captured.</param>
+    /// <exception cref="InvalidOperationException">No root component was configured.</exception>
+    public ApplicationContext(ApplicationOptions options)
     {
-        ArgumentNullException.ThrowIfNull(rootComponent);
-        ArgumentNullException.ThrowIfNull(components);
-        ArgumentNullException.ThrowIfNull(services);
-        RootComponent = rootComponent;
-        Components = components;
-        Services = services;
-        State = state;
-        Directives = directives;
-        ErrorHandler = options?.ErrorHandler;
-        WarnHandler = options?.WarnHandler;
-        EventObserver = options?.EventObserver;
+        ArgumentNullException.ThrowIfNull(options);
+        RootComponent = options.RootComponent
+            ?? throw new InvalidOperationException(
+                "Configure ApplicationOptions.RootComponent before building the application.");
+        Components = options.Components
+            ?? throw new InvalidOperationException(
+                "Configure ApplicationOptions.Components with a component resolver.");
+        State = options.State;
+        Services = State is null
+            ? options.Services
+            : new ApplicationServiceProvider(options.Services, State);
+        ErrorHandler = options.ErrorHandler;
+        WarnHandler = options.WarnHandler;
+        EventObserver = options.EventObserver;
+        Directives = options.Directives;
     }
 
     /// <inheritdoc/>
@@ -47,13 +46,13 @@ public sealed class ApplicationContext : IApplicationContext
     public CancellationToken Stopping { get; private set; }
 
     /// <inheritdoc/>
-    public IComponent RootComponent { get; }
+    public VirtualNode RootComponent { get; }
 
     /// <inheritdoc/>
     public IComponentFactory Components { get; }
 
     /// <inheritdoc/>
-    public IServiceProvider Services { get; }
+    public IServiceProvider? Services { get; }
 
     /// <inheritdoc/>
     public IStateStoreRegistry? State { get; }
@@ -62,27 +61,25 @@ public sealed class ApplicationContext : IApplicationContext
     public IDirectiveResolver? Directives { get; }
 
     /// <inheritdoc/>
-    public Action<Exception, IComponentContext?, string>? ErrorHandler { get; }
+    public Action<Exception, ComponentContext?, string>? ErrorHandler { get; }
 
     /// <inheritdoc/>
     public Action<string>? WarnHandler { get; }
 
-    internal Action<IComponentContext, string, IReadOnlyList<object?>>? EventObserver { get; }
+    /// <inheritdoc/>
+    public Action<ComponentContext, string, IReadOnlyList<object?>>? EventObserver { get; }
 
-    internal void InitializeRuntime(CancellationToken stopping)
+    internal void ClaimLifetime(CancellationToken stopping)
     {
-        if (_isRuntimeInitialized)
+        if (_isLifetimeAttached)
         {
             throw new InvalidOperationException(
-                "An application context can be attached to only one persistent host.");
+                "An application context can be attached to only one application lifetime.");
         }
 
-        _isRuntimeInitialized = true;
+        _isLifetimeAttached = true;
         Stopping = stopping;
     }
 
-    internal void SetIsRunning(bool isRunning)
-    {
-        IsRunning = isRunning;
-    }
+    internal void SetIsRunning(bool isRunning) => IsRunning = isRunning;
 }

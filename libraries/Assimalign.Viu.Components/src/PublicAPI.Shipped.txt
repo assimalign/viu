@@ -1,75 +1,114 @@
 #nullable enable
-Assimalign.Viu.Components.AsynchronousComponentEventArgumentsHandler
-Assimalign.Viu.Components.AsynchronousComponentEventHandler
-Assimalign.Viu.Components.CommentComponent
-Assimalign.Viu.Components.CommentComponent.CommentComponent(string? text = null) -> void
-Assimalign.Viu.Components.CommentComponent.Key.get -> object?
-Assimalign.Viu.Components.CommentComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.CommentComponent.Text.get -> string?
+abstract Assimalign.Viu.Components.ComponentContext.Bindings.get -> Assimalign.Viu.Components.ComponentBindings!
+abstract Assimalign.Viu.Components.ComponentContext.Emit(string! name, params object?[]! arguments) -> void
+abstract Assimalign.Viu.Components.ComponentContext.Expose(object? value) -> void
+abstract Assimalign.Viu.Components.ComponentContext.Lifecycle.get -> Assimalign.Viu.Components.ComponentLifecycle!
+abstract Assimalign.Viu.Components.ComponentContext.OnWatchError(System.Exception! exception) -> void
+abstract Assimalign.Viu.Components.ComponentContext.Parent.get -> Assimalign.Viu.Components.ComponentContext?
+abstract Assimalign.Viu.Components.ComponentContext.Scope.get -> Assimalign.Viu.Reactivity.IReactiveEffectScope!
+abstract Assimalign.Viu.Components.ComponentContext.Services.get -> System.IServiceProvider?
+abstract Assimalign.Viu.Components.ComponentContext.Warn(string! message) -> void
+abstract Assimalign.Viu.Components.ComponentContext.WatchScheduler.get -> Assimalign.Viu.Reactivity.IReactiveWatchScheduler?
+Assimalign.Viu.Components.CommentNode
+Assimalign.Viu.Components.CommentNode.CommentNode(string! text) -> void
+Assimalign.Viu.Components.CommentNode.Text.get -> string!
 Assimalign.Viu.Components.ComponentActivator
-Assimalign.Viu.Components.ComponentArguments
-Assimalign.Viu.Components.ComponentArguments.ComponentArguments() -> void
-Assimalign.Viu.Components.ComponentArguments.ComponentArguments(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, object?>>! values) -> void
-Assimalign.Viu.Components.ComponentArguments.Contains(string! parameterName) -> bool
-Assimalign.Viu.Components.ComponentArguments.Count.get -> int
-Assimalign.Viu.Components.ComponentArguments.Get<T>(string! parameterName) -> T?
-Assimalign.Viu.Components.ComponentArguments.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<string!, object?>>!
-Assimalign.Viu.Components.ComponentArguments.this[string! parameterName].get -> object?
-Assimalign.Viu.Components.ComponentAttribute
-Assimalign.Viu.Components.ComponentAttribute.ComponentAttribute(string! name, object? value) -> void
-Assimalign.Viu.Components.ComponentAttribute.Name.get -> string!
-Assimalign.Viu.Components.ComponentAttribute.Value.get -> object?
-Assimalign.Viu.Components.ComponentAttributes
-Assimalign.Viu.Components.ComponentAttributes.ComponentAttributes() -> void
-Assimalign.Viu.Components.ComponentAttributes.ComponentAttributes(System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.IComponentAttribute!>! attributes) -> void
-Assimalign.Viu.Components.ComponentAttributes.Count.get -> int
-Assimalign.Viu.Components.ComponentAttributes.GetEnumerator() -> System.Collections.Generic.IEnumerator<Assimalign.Viu.Components.IComponentAttribute!>!
-Assimalign.Viu.Components.ComponentAttributes.this[int index].get -> Assimalign.Viu.Components.IComponentAttribute!
-Assimalign.Viu.Components.ComponentAttributes.TryGetValue(string! name, out object? value) -> bool
-Assimalign.Viu.Components.ComponentDirectiveBinding
-Assimalign.Viu.Components.ComponentDirectiveBinding.Argument.get -> string?
-Assimalign.Viu.Components.ComponentDirectiveBinding.ComponentDirectiveBinding(string! directiveName, object? value = null, string? argument = null, System.Collections.Generic.IReadOnlyDictionary<string!, bool>? modifiers = null) -> void
-Assimalign.Viu.Components.ComponentDirectiveBinding.DirectiveName.get -> string!
-Assimalign.Viu.Components.ComponentDirectiveBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, bool>!
-Assimalign.Viu.Components.ComponentDirectiveBinding.Value.get -> object?
+Assimalign.Viu.Components.ComponentBase
+Assimalign.Viu.Components.ComponentBase.ComponentBase() -> void
+Assimalign.Viu.Components.ComponentBase.Context.get -> Assimalign.Viu.Components.ComponentContext?
+Assimalign.Viu.Components.ComponentBase.Context.set -> void
+Assimalign.Viu.Components.ComponentBindingDiagnostic
+Assimalign.Viu.Components.ComponentBindingDiagnostic.ComponentBindingDiagnostic(Assimalign.Viu.Components.ComponentBindingDiagnosticKind kind, string! name, string! message) -> void
+Assimalign.Viu.Components.ComponentBindingDiagnostic.Kind.get -> Assimalign.Viu.Components.ComponentBindingDiagnosticKind
+Assimalign.Viu.Components.ComponentBindingDiagnostic.Message.get -> string!
+Assimalign.Viu.Components.ComponentBindingDiagnostic.Name.get -> string!
+Assimalign.Viu.Components.ComponentBindingDiagnosticKind
+Assimalign.Viu.Components.ComponentBindingDiagnosticKind.DuplicateAlias = 2 -> Assimalign.Viu.Components.ComponentBindingDiagnosticKind
+Assimalign.Viu.Components.ComponentBindingDiagnosticKind.MissingRequiredParameter = 0 -> Assimalign.Viu.Components.ComponentBindingDiagnosticKind
+Assimalign.Viu.Components.ComponentBindingDiagnosticKind.ParameterValidationFailed = 1 -> Assimalign.Viu.Components.ComponentBindingDiagnosticKind
+Assimalign.Viu.Components.ComponentBindings
+Assimalign.Viu.Components.ComponentBindings.ComponentBindings(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? parameters = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, object?>? fallthroughBindings = null) -> void
+Assimalign.Viu.Components.ComponentBindings.FallthroughBindings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Assimalign.Viu.Components.ComponentBindings.Parameters.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Assimalign.Viu.Components.ComponentBindings.Slots.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>!
+Assimalign.Viu.Components.ComponentContext
+Assimalign.Viu.Components.ComponentContext.ComponentContext() -> void
+Assimalign.Viu.Components.ComponentContext.Watch<TValue>(System.Func<TValue>! getter, System.Action<TValue, TValue>! callback) -> Assimalign.Viu.Reactivity.WatchHandle!
+Assimalign.Viu.Components.ComponentContract
+Assimalign.Viu.Components.ComponentContract.ComponentContract(int renderCacheSize, string? displayName = null, Assimalign.Viu.Components.ComponentFlags flags = Assimalign.Viu.Components.ComponentFlags.InheritFallthroughBindings, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentParameter!>? parameters = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentEvent!>? events = null) -> void
+Assimalign.Viu.Components.ComponentContract.ComponentContract(string? displayName = null, Assimalign.Viu.Components.ComponentFlags flags = Assimalign.Viu.Components.ComponentFlags.InheritFallthroughBindings, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentParameter!>? parameters = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentEvent!>? events = null) -> void
+Assimalign.Viu.Components.ComponentContract.DisplayName.get -> string?
+Assimalign.Viu.Components.ComponentContract.Events.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ComponentEvent!>!
+Assimalign.Viu.Components.ComponentContract.Flags.get -> Assimalign.Viu.Components.ComponentFlags
+Assimalign.Viu.Components.ComponentContract.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ComponentParameter!>!
+Assimalign.Viu.Components.ComponentContract.RenderCacheSize.get -> int
 Assimalign.Viu.Components.ComponentEvent
 Assimalign.Viu.Components.ComponentEvent.ComponentEvent(string! name, System.Func<System.Collections.Generic.IReadOnlyList<object?>!, bool>? validator = null) -> void
 Assimalign.Viu.Components.ComponentEvent.Name.get -> string!
 Assimalign.Viu.Components.ComponentEvent.Validator.get -> System.Func<System.Collections.Generic.IReadOnlyList<object?>!, bool>?
-Assimalign.Viu.Components.ComponentEventArgumentsHandler
-Assimalign.Viu.Components.ComponentEventHandler
 Assimalign.Viu.Components.ComponentEventListener
-Assimalign.Viu.Components.ComponentEventListener.ArgumentsHandler.get -> Assimalign.Viu.Components.ComponentEventArgumentsHandler?
-Assimalign.Viu.Components.ComponentEventListener.AsynchronousArgumentsHandler.get -> Assimalign.Viu.Components.AsynchronousComponentEventArgumentsHandler?
-Assimalign.Viu.Components.ComponentEventListener.AsynchronousHandler.get -> Assimalign.Viu.Components.AsynchronousComponentEventHandler?
-Assimalign.Viu.Components.ComponentEventListener.ComponentEventListener(Assimalign.Viu.Components.AsynchronousComponentEventHandler! handler, bool isOnce = false) -> void
-Assimalign.Viu.Components.ComponentEventListener.ComponentEventListener(Assimalign.Viu.Components.ComponentEventHandler! handler, bool isOnce = false) -> void
-Assimalign.Viu.Components.ComponentEventListener.Handler.get -> Assimalign.Viu.Components.ComponentEventHandler?
-Assimalign.Viu.Components.ComponentEventListener.IsAsynchronous.get -> bool
-Assimalign.Viu.Components.ComponentEventListener.IsOnce.get -> bool
 Assimalign.Viu.Components.ComponentFactory
-Assimalign.Viu.Components.ComponentFactory.ComponentFactory(System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentRegistration>! registrations) -> void
-Assimalign.Viu.Components.ComponentFactory.Create(string! name) -> Assimalign.Viu.Components.IComponentTemplate!
-Assimalign.Viu.Components.ComponentFactory.Create(System.Type! componentType) -> Assimalign.Viu.Components.IComponentTemplate!
-Assimalign.Viu.Components.ComponentFactory.Create<TComponent>() -> TComponent!
+Assimalign.Viu.Components.ComponentFactory.ComponentFactory() -> void
+Assimalign.Viu.Components.ComponentFactory.Register(Assimalign.Viu.Components.ComponentRegistration! registration) -> void
 Assimalign.Viu.Components.ComponentFlags
-Assimalign.Viu.Components.ComponentFlags.InheritAttributes = 1 -> Assimalign.Viu.Components.ComponentFlags
+Assimalign.Viu.Components.ComponentFlags.InheritFallthroughBindings = 1 -> Assimalign.Viu.Components.ComponentFlags
 Assimalign.Viu.Components.ComponentFlags.None = 0 -> Assimalign.Viu.Components.ComponentFlags
-Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Comment = 3 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Element = 0 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Fragment = 5 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Static = 4 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Teleport = 6 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Template = 1 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentKind.Text = 2 -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ComponentOptimization
-Assimalign.Viu.Components.ComponentOptimization.ComponentOptimization(Assimalign.Viu.Shared.PatchFlags patchFlags = (Assimalign.Viu.Shared.PatchFlags)0, System.Collections.Generic.IReadOnlyList<string!>? dynamicProperties = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? dynamicChildren = null, bool hasOnce = false) -> void
-Assimalign.Viu.Components.ComponentOptimization.DynamicChildren.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>?
-Assimalign.Viu.Components.ComponentOptimization.DynamicProperties.get -> System.Collections.Generic.IReadOnlyList<string!>?
-Assimalign.Viu.Components.ComponentOptimization.HasOnce.get -> bool
-Assimalign.Viu.Components.ComponentOptimization.IsBlock.get -> bool
-Assimalign.Viu.Components.ComponentOptimization.PatchFlags.get -> Assimalign.Viu.Shared.PatchFlags
+Assimalign.Viu.Components.ComponentInvocation
+Assimalign.Viu.Components.ComponentInvocation.Arguments.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
+Assimalign.Viu.Components.ComponentInvocation.ComponentInvocation(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, Assimalign.Viu.Components.SlotFlags slotStability = Assimalign.Viu.Components.SlotFlags.Stable) -> void
+Assimalign.Viu.Components.ComponentInvocation.Directives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.DirectiveInvocation!>!
+Assimalign.Viu.Components.ComponentInvocation.Listeners.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>!
+Assimalign.Viu.Components.ComponentInvocation.Slots.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>!
+Assimalign.Viu.Components.ComponentInvocation.SlotStability.get -> Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Components.ComponentLifecycle
+Assimalign.Viu.Components.ComponentLifecycle.Cancel() -> void
+Assimalign.Viu.Components.ComponentLifecycle.CancellationToken.get -> System.Threading.CancellationToken
+Assimalign.Viu.Components.ComponentLifecycle.ComponentLifecycle() -> void
+Assimalign.Viu.Components.ComponentLifecycle.Dispose() -> void
+Assimalign.Viu.Components.ComponentLifecycle.DrainAsync() -> System.Threading.Tasks.Task!
+Assimalign.Viu.Components.ComponentLifecycle.InvokeActivated() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeBeforeMount() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeBeforeUnmount() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeBeforeUpdate() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeDeactivated() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeErrorCaptured(System.Exception! exception, Assimalign.Viu.Components.ComponentContext? source, string! diagnosticInformation) -> bool
+Assimalign.Viu.Components.ComponentLifecycle.InvokeMounted() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeServerPrefetchAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Assimalign.Viu.Components.ComponentLifecycle.InvokeUnmounted() -> void
+Assimalign.Viu.Components.ComponentLifecycle.InvokeUpdated() -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnActivated(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnActivated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnActivated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeMount(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeMount(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeMount(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeUnmount(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeUnmount(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeUnmount(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeUpdate(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeUpdate(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnBeforeUpdate(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnDeactivated(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnDeactivated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnDeactivated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnErrorCaptured(System.Func<System.Exception!, Assimalign.Viu.Components.ComponentContext?, string!, bool>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnMounted(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnMounted(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnMounted(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnServerPrefetch(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnServerPrefetch(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnServerPrefetch(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnUnmounted(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnUnmounted(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnUnmounted(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnUpdated(System.Action! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnUpdated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.OnUpdated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
+Assimalign.Viu.Components.ComponentLifecycle.SetObservedTaskFaultHandler(System.Action<System.Exception!, string!>! handler) -> void
+Assimalign.Viu.Components.ComponentNode
+Assimalign.Viu.Components.ComponentNode.Component.get -> Assimalign.Viu.Components.ComponentReference!
+Assimalign.Viu.Components.ComponentNode.ComponentNode(Assimalign.Viu.Components.ComponentReference! component, Assimalign.Viu.Components.ComponentInvocation? invocation = null, object? key = null, Assimalign.Viu.Components.MountReference? mountReference = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> void
+Assimalign.Viu.Components.ComponentNode.Invocation.get -> Assimalign.Viu.Components.ComponentInvocation!
 Assimalign.Viu.Components.ComponentParameter
 Assimalign.Viu.Components.ComponentParameter.ComponentParameter(string! name, bool isRequired = false, System.Func<object?>? defaultFactory = null, System.Func<object?, bool>? validator = null, System.Type? parameterType = null) -> void
 Assimalign.Viu.Components.ComponentParameter.DefaultFactory.get -> System.Func<object?>?
@@ -77,193 +116,77 @@ Assimalign.Viu.Components.ComponentParameter.IsRequired.get -> bool
 Assimalign.Viu.Components.ComponentParameter.Name.get -> string!
 Assimalign.Viu.Components.ComponentParameter.ParameterType.get -> System.Type?
 Assimalign.Viu.Components.ComponentParameter.Validator.get -> System.Func<object?, bool>?
+Assimalign.Viu.Components.ComponentReference
+Assimalign.Viu.Components.ComponentReference.<Clone>$() -> Assimalign.Viu.Components.ComponentReference!
+Assimalign.Viu.Components.ComponentReference.ComponentType.get -> System.Type?
+Assimalign.Viu.Components.ComponentReference.Equals(Assimalign.Viu.Components.ComponentReference? other) -> bool
+Assimalign.Viu.Components.ComponentReference.Kind.get -> Assimalign.Viu.Components.ComponentReferenceKind
+Assimalign.Viu.Components.ComponentReference.RegisteredName.get -> string?
+Assimalign.Viu.Components.ComponentReferenceKind
+Assimalign.Viu.Components.ComponentReferenceKind.RegisteredName = 1 -> Assimalign.Viu.Components.ComponentReferenceKind
+Assimalign.Viu.Components.ComponentReferenceKind.Type = 0 -> Assimalign.Viu.Components.ComponentReferenceKind
 Assimalign.Viu.Components.ComponentRegistration
 Assimalign.Viu.Components.ComponentRegistration.Activator.get -> Assimalign.Viu.Components.ComponentActivator!
-Assimalign.Viu.Components.ComponentRegistration.ComponentRegistration() -> void
-Assimalign.Viu.Components.ComponentRegistration.ComponentRegistration(System.Type! componentType, Assimalign.Viu.Components.ComponentActivator! activator, string? name = null) -> void
-Assimalign.Viu.Components.ComponentRegistration.ComponentType.get -> System.Type!
-Assimalign.Viu.Components.ComponentRegistration.Name.get -> string?
+Assimalign.Viu.Components.ComponentRegistration.ComponentRegistration(Assimalign.Viu.Components.ComponentReference! reference, Assimalign.Viu.Components.ComponentContract! contract, Assimalign.Viu.Components.ComponentActivator! activator) -> void
+Assimalign.Viu.Components.ComponentRegistration.Contract.get -> Assimalign.Viu.Components.ComponentContract!
+Assimalign.Viu.Components.ComponentRegistration.Reference.get -> Assimalign.Viu.Components.ComponentReference!
 Assimalign.Viu.Components.ComponentRenderer
+Assimalign.Viu.Components.ComponentRenderFrame
+Assimalign.Viu.Components.ComponentRenderFrame.Cache.get -> object?[]!
+Assimalign.Viu.Components.ComponentRenderFrame.CacheHandler<TDelegate>(int slot, System.Func<TDelegate!>! factory) -> TDelegate!
+Assimalign.Viu.Components.ComponentRenderFrame.CacheHandler<TDelegate>(int slot, TDelegate! handler) -> TDelegate!
+Assimalign.Viu.Components.ComponentRenderFrame.CloseBlock() -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.VirtualNode!>?
+Assimalign.Viu.Components.ComponentRenderFrame.ComponentRenderFrame(Assimalign.Viu.Components.ComponentContract! contract) -> void
+Assimalign.Viu.Components.ComponentRenderFrame.ComponentRenderFrame(int cacheSize = 0) -> void
+Assimalign.Viu.Components.ComponentRenderFrame.GetOrAddCache<TValue>(int slot, System.Func<TValue>! factory) -> TValue
+Assimalign.Viu.Components.ComponentRenderFrame.IsMemoSame(int slot, System.Collections.Generic.IReadOnlyList<object?>! dependencies) -> bool
+Assimalign.Viu.Components.ComponentRenderFrame.Memo(int slot, System.Collections.Generic.IReadOnlyList<object?>! dependencies, System.Func<Assimalign.Viu.Components.VirtualNode?>! render) -> Assimalign.Viu.Components.VirtualNode?
+Assimalign.Viu.Components.ComponentRenderFrame.OpenBlock(bool disableTracking = false) -> void
+Assimalign.Viu.Components.ComponentRenderFrame.ResetBlockTracking() -> void
+Assimalign.Viu.Components.ComponentRenderFrame.SetBlockTracking(int value) -> void
+Assimalign.Viu.Components.ComponentRenderFrame.SetCache<TValue>(int slot, TValue value) -> TValue
+Assimalign.Viu.Components.ComponentRenderFrame.Track(Assimalign.Viu.Components.VirtualNode! node) -> void
+Assimalign.Viu.Components.ComponentSetup
 Assimalign.Viu.Components.ComponentSlot
-Assimalign.Viu.Components.ComponentSlots
-Assimalign.Viu.Components.ComponentSlots.ComponentSlots() -> void
-Assimalign.Viu.Components.ComponentSlots.ComponentSlots(Assimalign.Viu.Shared.SlotFlags flags) -> void
-Assimalign.Viu.Components.ComponentSlots.ContainsKey(string! key) -> bool
-Assimalign.Viu.Components.ComponentSlots.Count.get -> int
-Assimalign.Viu.Components.ComponentSlots.Flags.get -> Assimalign.Viu.Shared.SlotFlags
-Assimalign.Viu.Components.ComponentSlots.Flags.set -> void
-Assimalign.Viu.Components.ComponentSlots.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<string!, Assimalign.Viu.Components.ComponentSlot!>>!
-Assimalign.Viu.Components.ComponentSlots.Keys.get -> System.Collections.Generic.IEnumerable<string!>!
-Assimalign.Viu.Components.ComponentSlots.Remove(string! name) -> bool
-Assimalign.Viu.Components.ComponentSlots.this[string! name].get -> Assimalign.Viu.Components.ComponentSlot!
-Assimalign.Viu.Components.ComponentSlots.this[string! name].set -> void
-Assimalign.Viu.Components.ComponentSlots.TryGetValue(string! key, out Assimalign.Viu.Components.ComponentSlot! value) -> bool
-Assimalign.Viu.Components.ComponentSlots.Values.get -> System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ComponentSlot!>!
-Assimalign.Viu.Components.ComponentTemplateBase
-Assimalign.Viu.Components.ComponentTemplateBase.ComponentTemplateBase() -> void
-Assimalign.Viu.Components.ComponentTemplateBase.Context.get -> Assimalign.Viu.Components.IComponentContext!
-Assimalign.Viu.Components.ComponentTemplateBase.Context.set -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnActivated(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnActivated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnActivated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeMount(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeMount(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeMount(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeUnmount(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeUnmount(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeUnmount(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeUpdate(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeUpdate(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnBeforeUpdate(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnDeactivated(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnDeactivated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnDeactivated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnErrorCaptured(System.Func<System.Exception!, Assimalign.Viu.Components.IComponentContext?, string!, bool>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnMounted(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnMounted(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnMounted(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnServerPrefetch(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnServerPrefetch(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnUnmounted(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnUnmounted(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnUnmounted(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnUpdated(System.Action! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnUpdated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTemplateBase.OnUpdated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.ComponentTree
-Assimalign.Viu.Components.ElementComponent
-Assimalign.Viu.Components.ElementComponent.Attributes.get -> Assimalign.Viu.Components.IComponentAttributeCollection!
-Assimalign.Viu.Components.ElementComponent.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>!
-Assimalign.Viu.Components.ElementComponent.Directives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>!
-Assimalign.Viu.Components.ElementComponent.ElementComponent(string! tag, Assimalign.Viu.Components.IComponentAttributeCollection? attributes = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> void
-Assimalign.Viu.Components.ElementComponent.Key.get -> object?
-Assimalign.Viu.Components.ElementComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.ElementComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.ElementComponent.Reference.get -> Assimalign.Viu.Components.IComponentReference?
-Assimalign.Viu.Components.ElementComponent.Tag.get -> string!
+Assimalign.Viu.Components.CompositeVirtualNode
+Assimalign.Viu.Components.CompositeVirtualNode.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.VirtualNode!>!
+Assimalign.Viu.Components.DirectiveInvocation
+Assimalign.Viu.Components.DirectiveInvocation.DirectiveInvocation(System.Type! directiveType, object? value = null) -> void
+Assimalign.Viu.Components.DirectiveInvocation.DirectiveType.get -> System.Type!
+Assimalign.Viu.Components.DirectiveInvocation.Value.get -> object?
+Assimalign.Viu.Components.ElementBinding
+Assimalign.Viu.Components.ElementBinding.Kind.get -> Assimalign.Viu.Components.ElementBindingKind
+Assimalign.Viu.Components.ElementBinding.Name.get -> Assimalign.Viu.Components.QualifiedName
+Assimalign.Viu.Components.ElementBinding.Value.get -> object?
+Assimalign.Viu.Components.ElementBindingKind
+Assimalign.Viu.Components.ElementBindingKind.Attribute = 0 -> Assimalign.Viu.Components.ElementBindingKind
+Assimalign.Viu.Components.ElementBindingKind.Event = 2 -> Assimalign.Viu.Components.ElementBindingKind
+Assimalign.Viu.Components.ElementBindingKind.Property = 1 -> Assimalign.Viu.Components.ElementBindingKind
+Assimalign.Viu.Components.ElementNode
+Assimalign.Viu.Components.ElementNode.Bindings.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ElementBinding!>!
+Assimalign.Viu.Components.ElementNode.Directives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.DirectiveInvocation!>!
+Assimalign.Viu.Components.ElementNode.ElementNode(Assimalign.Viu.Components.QualifiedName name, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ElementBinding!>? bindings = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.VirtualNode!>? children = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, object? key = null, Assimalign.Viu.Components.MountReference? mountReference = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> void
+Assimalign.Viu.Components.ElementNode.Name.get -> Assimalign.Viu.Components.QualifiedName
 Assimalign.Viu.Components.EventAttribute
 Assimalign.Viu.Components.EventAttribute.EventAttribute() -> void
 Assimalign.Viu.Components.EventAttribute.EventAttribute(string! name) -> void
 Assimalign.Viu.Components.EventAttribute.Name.get -> string?
 Assimalign.Viu.Components.EventAttribute.Name.set -> void
-Assimalign.Viu.Components.FragmentComponent
-Assimalign.Viu.Components.FragmentComponent.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>!
-Assimalign.Viu.Components.FragmentComponent.FragmentComponent(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null) -> void
-Assimalign.Viu.Components.FragmentComponent.Key.get -> object?
-Assimalign.Viu.Components.FragmentComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.FragmentComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.ICommentComponent
-Assimalign.Viu.Components.ICommentComponent.Text.get -> string?
+Assimalign.Viu.Components.FragmentNode
+Assimalign.Viu.Components.FragmentNode.FragmentNode(System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.VirtualNode!>? children = null, object? key = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> void
 Assimalign.Viu.Components.IComponent
-Assimalign.Viu.Components.IComponent.Key.get -> object?
-Assimalign.Viu.Components.IComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.IComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.IComponent.Reference.get -> Assimalign.Viu.Components.IComponentReference?
-Assimalign.Viu.Components.IComponentArguments
-Assimalign.Viu.Components.IComponentArguments.Contains(string! parameterName) -> bool
-Assimalign.Viu.Components.IComponentArguments.Count.get -> int
-Assimalign.Viu.Components.IComponentArguments.Get<T>(string! parameterName) -> T?
-Assimalign.Viu.Components.IComponentArguments.this[string! parameterName].get -> object?
-Assimalign.Viu.Components.IComponentAttribute
-Assimalign.Viu.Components.IComponentAttribute.Name.get -> string!
-Assimalign.Viu.Components.IComponentAttribute.Value.get -> object?
-Assimalign.Viu.Components.IComponentAttributeCollection
-Assimalign.Viu.Components.IComponentAttributeCollection.TryGetValue(string! name, out object? value) -> bool
-Assimalign.Viu.Components.IComponentContext
-Assimalign.Viu.Components.IComponentContext.Arguments.get -> Assimalign.Viu.Components.IComponentArguments!
-Assimalign.Viu.Components.IComponentContext.Attributes.get -> Assimalign.Viu.Components.IComponentAttributeCollection!
-Assimalign.Viu.Components.IComponentContext.Components.get -> Assimalign.Viu.Components.IComponentFactory!
-Assimalign.Viu.Components.IComponentContext.Emit(string! eventName, params object?[]! arguments) -> void
-Assimalign.Viu.Components.IComponentContext.Expose(object? value) -> void
-Assimalign.Viu.Components.IComponentContext.Lifecycle.get -> Assimalign.Viu.Components.IComponentLifecycle!
-Assimalign.Viu.Components.IComponentContext.Services.get -> System.IServiceProvider!
-Assimalign.Viu.Components.IComponentContext.Slots.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>!
-Assimalign.Viu.Components.IComponentDirectiveBinding
-Assimalign.Viu.Components.IComponentDirectiveBinding.Argument.get -> string?
-Assimalign.Viu.Components.IComponentDirectiveBinding.DirectiveName.get -> string!
-Assimalign.Viu.Components.IComponentDirectiveBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyDictionary<string!, bool>!
-Assimalign.Viu.Components.IComponentDirectiveBinding.Value.get -> object?
-Assimalign.Viu.Components.IComponentEvent
-Assimalign.Viu.Components.IComponentEvent.Name.get -> string!
-Assimalign.Viu.Components.IComponentEvent.Validator.get -> System.Func<System.Collections.Generic.IReadOnlyList<object?>!, bool>?
+Assimalign.Viu.Components.IComponent.Setup(Assimalign.Viu.Components.ComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
 Assimalign.Viu.Components.IComponentFactory
-Assimalign.Viu.Components.IComponentFactory.Create(string! name) -> Assimalign.Viu.Components.IComponentTemplate!
-Assimalign.Viu.Components.IComponentFactory.Create(System.Type! componentType) -> Assimalign.Viu.Components.IComponentTemplate!
-Assimalign.Viu.Components.IComponentFactory.Create<TComponent>() -> TComponent!
-Assimalign.Viu.Components.IComponentHotReloadMetadata
-Assimalign.Viu.Components.IComponentHotReloadMetadata.ComponentIdentifier.get -> string!
-Assimalign.Viu.Components.IComponentHotReloadMetadata.ScriptUpdateMarkerType.get -> System.Type!
-Assimalign.Viu.Components.IComponentHotReloadMetadata.StyleUpdateMarkerType.get -> System.Type!
-Assimalign.Viu.Components.IComponentHotReloadMetadata.TemplateUpdateMarkerType.get -> System.Type!
-Assimalign.Viu.Components.IComponentLifecycle
-Assimalign.Viu.Components.IComponentLifecycle.CancellationToken.get -> System.Threading.CancellationToken
-Assimalign.Viu.Components.IComponentLifecycle.OnActivated(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnActivated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnActivated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeMount(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeMount(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeMount(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeUnmount(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeUnmount(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeUnmount(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeUpdate(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeUpdate(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnBeforeUpdate(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnDeactivated(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnDeactivated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnDeactivated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnErrorCaptured(System.Func<System.Exception!, Assimalign.Viu.Components.IComponentContext?, string!, bool>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnMounted(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnMounted(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnMounted(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnServerPrefetch(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnServerPrefetch(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnUnmounted(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnUnmounted(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnUnmounted(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnUpdated(System.Action! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnUpdated(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentLifecycle.OnUpdated(System.Func<System.Threading.Tasks.Task!>! callback) -> void
-Assimalign.Viu.Components.IComponentParameter
-Assimalign.Viu.Components.IComponentParameter.DefaultFactory.get -> System.Func<object?>?
-Assimalign.Viu.Components.IComponentParameter.IsRequired.get -> bool
-Assimalign.Viu.Components.IComponentParameter.Name.get -> string!
-Assimalign.Viu.Components.IComponentParameter.ParameterType.get -> System.Type?
-Assimalign.Viu.Components.IComponentParameter.Validator.get -> System.Func<object?, bool>?
-Assimalign.Viu.Components.IComponentReference
-Assimalign.Viu.Components.IComponentReference.Set(object? value) -> void
-Assimalign.Viu.Components.IComponentSlotCollection
-Assimalign.Viu.Components.IComponentSlotCollection.Flags.get -> Assimalign.Viu.Shared.SlotFlags
-Assimalign.Viu.Components.IComponentTemplate
-Assimalign.Viu.Components.IComponentTemplate.Events.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentEvent!>?
-Assimalign.Viu.Components.IComponentTemplate.Flags.get -> Assimalign.Viu.Components.ComponentFlags
-Assimalign.Viu.Components.IComponentTemplate.Name.get -> string?
-Assimalign.Viu.Components.IComponentTemplate.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
-Assimalign.Viu.Components.IComponentTemplate.ScopeIdentifier.get -> string?
-Assimalign.Viu.Components.IComponentTemplate.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
-Assimalign.Viu.Components.IElementComponent
-Assimalign.Viu.Components.IElementComponent.Attributes.get -> Assimalign.Viu.Components.IComponentAttributeCollection!
-Assimalign.Viu.Components.IElementComponent.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>!
-Assimalign.Viu.Components.IElementComponent.Directives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>!
-Assimalign.Viu.Components.IElementComponent.Tag.get -> string!
-Assimalign.Viu.Components.IFragmentComponent
-Assimalign.Viu.Components.IFragmentComponent.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>!
-Assimalign.Viu.Components.IStaticComponent
-Assimalign.Viu.Components.IStaticComponent.Content.get -> string!
-Assimalign.Viu.Components.ITeleportComponent
-Assimalign.Viu.Components.ITeleportComponent.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>!
-Assimalign.Viu.Components.ITeleportComponent.IsDeferred.get -> bool
-Assimalign.Viu.Components.ITeleportComponent.IsDisabled.get -> bool
-Assimalign.Viu.Components.ITeleportComponent.Target.get -> object!
-Assimalign.Viu.Components.ITemplateComponent
-Assimalign.Viu.Components.ITemplateComponent.Arguments.get -> Assimalign.Viu.Components.IComponentArguments!
-Assimalign.Viu.Components.ITemplateComponent.Directives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>!
-Assimalign.Viu.Components.ITemplateComponent.Listeners.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>?
-Assimalign.Viu.Components.ITemplateComponent.Slots.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>?
-Assimalign.Viu.Components.ITemplateComponent.TemplateName.get -> string?
-Assimalign.Viu.Components.ITemplateComponent.TemplateType.get -> System.Type?
-Assimalign.Viu.Components.ITextComponent
-Assimalign.Viu.Components.ITextComponent.Text.get -> string!
+Assimalign.Viu.Components.IComponentFactory.Resolve(Assimalign.Viu.Components.ComponentReference! reference) -> Assimalign.Viu.Components.ComponentRegistration!
+Assimalign.Viu.Components.IComponentFactory.TryResolve(Assimalign.Viu.Components.ComponentReference! reference, out Assimalign.Viu.Components.ComponentRegistration? registration) -> bool
+Assimalign.Viu.Components.KeepAliveNode
+Assimalign.Viu.Components.KeepAliveNode.Invocation.get -> Assimalign.Viu.Components.ComponentInvocation!
+Assimalign.Viu.Components.KeepAliveNode.KeepAliveNode(Assimalign.Viu.Components.ComponentInvocation! invocation, object? key = null) -> void
+Assimalign.Viu.Components.MarkupFormat
+Assimalign.Viu.Components.MarkupFormat.ExtensibleMarkupLanguage = 1 -> Assimalign.Viu.Components.MarkupFormat
+Assimalign.Viu.Components.MarkupFormat.Html = 0 -> Assimalign.Viu.Components.MarkupFormat
+Assimalign.Viu.Components.MountReference
+Assimalign.Viu.Components.NameNormalization
 Assimalign.Viu.Components.ParameterAttribute
 Assimalign.Viu.Components.ParameterAttribute.IsRequired.get -> bool
 Assimalign.Viu.Components.ParameterAttribute.IsRequired.set -> void
@@ -271,56 +194,112 @@ Assimalign.Viu.Components.ParameterAttribute.Name.get -> string?
 Assimalign.Viu.Components.ParameterAttribute.Name.set -> void
 Assimalign.Viu.Components.ParameterAttribute.ParameterAttribute() -> void
 Assimalign.Viu.Components.ParameterAttribute.ParameterAttribute(string! name) -> void
-Assimalign.Viu.Components.StaticComponent
-Assimalign.Viu.Components.StaticComponent.Content.get -> string!
-Assimalign.Viu.Components.StaticComponent.Key.get -> object?
-Assimalign.Viu.Components.StaticComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.StaticComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.StaticComponent.StaticComponent(string! content, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null) -> void
-Assimalign.Viu.Components.TeleportComponent
-Assimalign.Viu.Components.TeleportComponent.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>!
-Assimalign.Viu.Components.TeleportComponent.IsDeferred.get -> bool
-Assimalign.Viu.Components.TeleportComponent.IsDisabled.get -> bool
-Assimalign.Viu.Components.TeleportComponent.Key.get -> object?
-Assimalign.Viu.Components.TeleportComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.TeleportComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.TeleportComponent.Target.get -> object!
-Assimalign.Viu.Components.TeleportComponent.TeleportComponent(object! target, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, bool isDisabled = false, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, bool isDeferred = false) -> void
-Assimalign.Viu.Components.TemplateComponent
-Assimalign.Viu.Components.TemplateComponent.Arguments.get -> Assimalign.Viu.Components.IComponentArguments!
-Assimalign.Viu.Components.TemplateComponent.Directives.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>!
-Assimalign.Viu.Components.TemplateComponent.Key.get -> object?
-Assimalign.Viu.Components.TemplateComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.TemplateComponent.Listeners.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>?
-Assimalign.Viu.Components.TemplateComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.TemplateComponent.Reference.get -> Assimalign.Viu.Components.IComponentReference?
-Assimalign.Viu.Components.TemplateComponent.Slots.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>?
-Assimalign.Viu.Components.TemplateComponent.TemplateComponent(string! templateName, Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> void
-Assimalign.Viu.Components.TemplateComponent.TemplateComponent(System.Type! templateType, Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> void
-Assimalign.Viu.Components.TemplateComponent.TemplateName.get -> string?
-Assimalign.Viu.Components.TemplateComponent.TemplateType.get -> System.Type?
-Assimalign.Viu.Components.TextComponent
-Assimalign.Viu.Components.TextComponent.Key.get -> object?
-Assimalign.Viu.Components.TextComponent.Kind.get -> Assimalign.Viu.Components.ComponentKind
-Assimalign.Viu.Components.TextComponent.Optimization.get -> Assimalign.Viu.Components.ComponentOptimization!
-Assimalign.Viu.Components.TextComponent.Text.get -> string!
-Assimalign.Viu.Components.TextComponent.TextComponent(string! text, Assimalign.Viu.Components.ComponentOptimization? optimization = null) -> void
-static Assimalign.Viu.Components.ComponentEventListener.ForArguments(Assimalign.Viu.Components.ComponentEventArgumentsHandler! handler, bool isOnce = false) -> Assimalign.Viu.Components.ComponentEventListener!
-static Assimalign.Viu.Components.ComponentEventListener.ForAsynchronousArguments(Assimalign.Viu.Components.AsynchronousComponentEventArgumentsHandler! handler, bool isOnce = false) -> Assimalign.Viu.Components.ComponentEventListener!
-static Assimalign.Viu.Components.ComponentOptimization.None.get -> Assimalign.Viu.Components.ComponentOptimization!
-static Assimalign.Viu.Components.ComponentTree.Comment(string? text = null) -> Assimalign.Viu.Components.ICommentComponent!
-static Assimalign.Viu.Components.ComponentTree.Element(string! tag, Assimalign.Viu.Components.IComponentAttributeCollection? attributes = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> Assimalign.Viu.Components.IElementComponent!
-static Assimalign.Viu.Components.ComponentTree.Fragment(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null) -> Assimalign.Viu.Components.IFragmentComponent!
-static Assimalign.Viu.Components.ComponentTree.Static(string! content, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null) -> Assimalign.Viu.Components.IStaticComponent!
-static Assimalign.Viu.Components.ComponentTree.Teleport(object! target, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponent!>? children = null, bool isDisabled = false, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, bool isDeferred = false) -> Assimalign.Viu.Components.ITeleportComponent!
-static Assimalign.Viu.Components.ComponentTree.Template(string! templateName, Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> Assimalign.Viu.Components.ITemplateComponent!
-static Assimalign.Viu.Components.ComponentTree.Template(System.Type! templateType, Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> Assimalign.Viu.Components.ITemplateComponent!
-static Assimalign.Viu.Components.ComponentTree.Template<TComponent>(Assimalign.Viu.Components.IComponentArguments? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, object? key = null, Assimalign.Viu.Components.ComponentOptimization? optimization = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentDirectiveBinding!>? directives = null, Assimalign.Viu.Components.IComponentReference? reference = null) -> Assimalign.Viu.Components.ITemplateComponent!
-static Assimalign.Viu.Components.ComponentTree.Text(string! text, Assimalign.Viu.Components.ComponentOptimization? optimization = null) -> Assimalign.Viu.Components.ITextComponent!
-virtual Assimalign.Viu.Components.AsynchronousComponentEventArgumentsHandler.Invoke(System.Collections.Generic.IReadOnlyList<object?>! arguments) -> System.Threading.Tasks.Task!
-virtual Assimalign.Viu.Components.AsynchronousComponentEventHandler.Invoke(object? value) -> System.Threading.Tasks.Task!
-virtual Assimalign.Viu.Components.ComponentActivator.Invoke() -> Assimalign.Viu.Components.IComponentTemplate!
-virtual Assimalign.Viu.Components.ComponentEventArgumentsHandler.Invoke(System.Collections.Generic.IReadOnlyList<object?>! arguments) -> void
-virtual Assimalign.Viu.Components.ComponentEventHandler.Invoke(object? value) -> void
-virtual Assimalign.Viu.Components.ComponentRenderer.Invoke() -> Assimalign.Viu.Components.IComponent?
-virtual Assimalign.Viu.Components.ComponentSlot.Invoke(Assimalign.Viu.Components.IComponentArguments! arguments) -> Assimalign.Viu.Components.IComponent?
+Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Bail = -2 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Cached = -1 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Class = 2 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.DevRootFragment = 2048 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.DynamicSlots = 1024 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.FullProps = 16 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.KeyedFragment = 128 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.NeedHydration = 32 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.NeedPatch = 512 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.None = 0 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Props = 8 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.StableFragment = 64 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Style = 4 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.Text = 1 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.PatchFlags.UnkeyedFragment = 256 -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.QualifiedName
+Assimalign.Viu.Components.QualifiedName.Equals(Assimalign.Viu.Components.QualifiedName other) -> bool
+Assimalign.Viu.Components.QualifiedName.LocalName.get -> string!
+Assimalign.Viu.Components.QualifiedName.NamespaceName.get -> string?
+Assimalign.Viu.Components.QualifiedName.Prefix.get -> string?
+Assimalign.Viu.Components.QualifiedName.QualifiedName() -> void
+Assimalign.Viu.Components.QualifiedName.QualifiedName(string! localName, string? namespaceName = null, string? prefix = null) -> void
+Assimalign.Viu.Components.RenderPlan
+Assimalign.Viu.Components.RenderPlan.DynamicBindingIndices.get -> System.Collections.Generic.IReadOnlyList<int>?
+Assimalign.Viu.Components.RenderPlan.DynamicChildren.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.VirtualNode!>?
+Assimalign.Viu.Components.RenderPlan.IsBlock.get -> bool
+Assimalign.Viu.Components.RenderPlan.PatchFlags.get -> Assimalign.Viu.Components.PatchFlags
+Assimalign.Viu.Components.RenderPlan.RenderPlan(Assimalign.Viu.Components.PatchFlags patchFlags = Assimalign.Viu.Components.PatchFlags.None, System.Collections.Generic.IEnumerable<int>? dynamicBindingIndices = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.VirtualNode!>? dynamicChildren = null) -> void
+Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.ArrayChildren = 16 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.Component = Assimalign.Viu.Components.ShapeFlags.FunctionalComponent | Assimalign.Viu.Components.ShapeFlags.StatefulComponent -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.ComponentKeptAlive = 512 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.ComponentShouldKeepAlive = 256 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.Element = 1 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.FunctionalComponent = 2 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.SlotsChildren = 32 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.StatefulComponent = 4 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.Suspense = 128 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.Teleport = 64 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.ShapeFlags.TextChildren = 8 -> Assimalign.Viu.Components.ShapeFlags
+Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Components.SlotFlags.Dynamic = 2 -> Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Components.SlotFlags.Forwarded = 3 -> Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Components.SlotFlags.Stable = 1 -> Assimalign.Viu.Components.SlotFlags
+Assimalign.Viu.Components.StaticNode
+Assimalign.Viu.Components.StaticNode.Content.get -> string!
+Assimalign.Viu.Components.StaticNode.Format.get -> Assimalign.Viu.Components.MarkupFormat
+Assimalign.Viu.Components.StaticNode.StaticNode(Assimalign.Viu.Components.MarkupFormat format, string! content) -> void
+Assimalign.Viu.Components.SuspenseNode
+Assimalign.Viu.Components.SuspenseNode.Invocation.get -> Assimalign.Viu.Components.ComponentInvocation!
+Assimalign.Viu.Components.SuspenseNode.SuspenseNode(Assimalign.Viu.Components.ComponentInvocation! invocation, object? key = null) -> void
+Assimalign.Viu.Components.TeleportNode
+Assimalign.Viu.Components.TeleportNode.IsDeferred.get -> bool
+Assimalign.Viu.Components.TeleportNode.IsDisabled.get -> bool
+Assimalign.Viu.Components.TeleportNode.TargetIdentifier.get -> string!
+Assimalign.Viu.Components.TeleportNode.TeleportNode(string! targetIdentifier, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.VirtualNode!>? children = null, bool isDisabled = false, bool isDeferred = false, object? key = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> void
+Assimalign.Viu.Components.TextNode
+Assimalign.Viu.Components.TextNode.Text.get -> string!
+Assimalign.Viu.Components.TextNode.TextNode(string! text, Assimalign.Viu.Components.MountReference? mountReference = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> void
+Assimalign.Viu.Components.TransitionNode
+Assimalign.Viu.Components.TransitionNode.Invocation.get -> Assimalign.Viu.Components.ComponentInvocation!
+Assimalign.Viu.Components.TransitionNode.TransitionNode(Assimalign.Viu.Components.ComponentInvocation! invocation, object? key = null) -> void
+Assimalign.Viu.Components.VirtualNode
+Assimalign.Viu.Components.VirtualNode.Key.get -> object?
+Assimalign.Viu.Components.VirtualNode.Kind.get -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNode.MountReference.get -> Assimalign.Viu.Components.MountReference?
+Assimalign.Viu.Components.VirtualNode.RenderPlan.get -> Assimalign.Viu.Components.RenderPlan!
+Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Comment = 2 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Component = 5 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Element = 0 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Fragment = 4 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.KeepAlive = 7 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Static = 3 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Suspense = 8 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Teleport = 6 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Text = 1 -> Assimalign.Viu.Components.VirtualNodeKind
+Assimalign.Viu.Components.VirtualNodeKind.Transition = 9 -> Assimalign.Viu.Components.VirtualNodeKind
+override Assimalign.Viu.Components.ComponentReference.Equals(object? obj) -> bool
+override Assimalign.Viu.Components.ComponentReference.GetHashCode() -> int
+override Assimalign.Viu.Components.ComponentReference.ToString() -> string!
+override Assimalign.Viu.Components.QualifiedName.Equals(object? value) -> bool
+override Assimalign.Viu.Components.QualifiedName.GetHashCode() -> int
+override Assimalign.Viu.Components.QualifiedName.ToString() -> string!
+static Assimalign.Viu.Components.ComponentBindings.Resolve(Assimalign.Viu.Components.ComponentContract! contract, Assimalign.Viu.Components.ComponentInvocation! invocation, System.Collections.Generic.ICollection<Assimalign.Viu.Components.ComponentBindingDiagnostic!>? diagnostics = null) -> Assimalign.Viu.Components.ComponentBindings!
+static Assimalign.Viu.Components.ComponentInvocation.Empty.get -> Assimalign.Viu.Components.ComponentInvocation!
+static Assimalign.Viu.Components.ComponentReference.ForName(string! registeredName) -> Assimalign.Viu.Components.ComponentReference!
+static Assimalign.Viu.Components.ComponentReference.ForType(System.Type! componentType) -> Assimalign.Viu.Components.ComponentReference!
+static Assimalign.Viu.Components.ComponentReference.operator !=(Assimalign.Viu.Components.ComponentReference? left, Assimalign.Viu.Components.ComponentReference? right) -> bool
+static Assimalign.Viu.Components.ComponentReference.operator ==(Assimalign.Viu.Components.ComponentReference? left, Assimalign.Viu.Components.ComponentReference? right) -> bool
+static Assimalign.Viu.Components.ComponentRegistration.Define(string! name, Assimalign.Viu.Components.ComponentContract! contract, Assimalign.Viu.Components.ComponentSetup! setup) -> Assimalign.Viu.Components.ComponentRegistration!
+static Assimalign.Viu.Components.ElementBinding.Attribute(Assimalign.Viu.Components.QualifiedName name, object? value) -> Assimalign.Viu.Components.ElementBinding!
+static Assimalign.Viu.Components.ElementBinding.Event(string! name, System.Delegate! listener) -> Assimalign.Viu.Components.ElementBinding!
+static Assimalign.Viu.Components.ElementBinding.Property(string! name, object? value) -> Assimalign.Viu.Components.ElementBinding!
+static Assimalign.Viu.Components.NameNormalization.Camelize(string! value) -> string!
+static Assimalign.Viu.Components.NameNormalization.Hyphenate(string! name) -> string!
+static Assimalign.Viu.Components.NameNormalization.Pascalize(string! value) -> string!
+static Assimalign.Viu.Components.QualifiedName.operator !=(Assimalign.Viu.Components.QualifiedName left, Assimalign.Viu.Components.QualifiedName right) -> bool
+static Assimalign.Viu.Components.QualifiedName.operator ==(Assimalign.Viu.Components.QualifiedName left, Assimalign.Viu.Components.QualifiedName right) -> bool
+static Assimalign.Viu.Components.RenderPlan.None.get -> Assimalign.Viu.Components.RenderPlan!
+virtual Assimalign.Viu.Components.ComponentActivator.Invoke(System.IServiceProvider? services) -> Assimalign.Viu.Components.IComponent!
+virtual Assimalign.Viu.Components.ComponentEventListener.Invoke(System.Collections.Generic.IReadOnlyList<object?>! arguments) -> void
+virtual Assimalign.Viu.Components.ComponentFactory.Resolve(Assimalign.Viu.Components.ComponentReference! reference) -> Assimalign.Viu.Components.ComponentRegistration!
+virtual Assimalign.Viu.Components.ComponentFactory.TryResolve(Assimalign.Viu.Components.ComponentReference! reference, out Assimalign.Viu.Components.ComponentRegistration? registration) -> bool
+virtual Assimalign.Viu.Components.ComponentRenderer.Invoke(Assimalign.Viu.Components.ComponentRenderFrame! frame) -> Assimalign.Viu.Components.VirtualNode?
+virtual Assimalign.Viu.Components.ComponentSetup.Invoke(Assimalign.Viu.Components.ComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
+virtual Assimalign.Viu.Components.ComponentSlot.Invoke(System.Collections.Generic.IReadOnlyDictionary<string!, object?>! arguments) -> Assimalign.Viu.Components.VirtualNode?
+virtual Assimalign.Viu.Components.MountReference.Invoke(object? value) -> void

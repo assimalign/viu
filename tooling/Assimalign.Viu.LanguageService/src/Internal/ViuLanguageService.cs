@@ -32,15 +32,17 @@ internal sealed class ViuLanguageService :
             ["v-for"] = "**`v-for`** repeats an element or component for values in a source.",
             ["v-model"] = "**`v-model`** creates a two-way form value binding.",
             ["@click"] = "**`@click`** registers a click event handler. Task-returning handlers are supported.",
-            ["Context"] = "**`Context`** is the generated component's `IComponentContext`.",
-            ["Context.Arguments"] = "**`Context.Arguments`** exposes arguments supplied by the parent render.",
-            ["Context.Attributes"] = "**`Context.Attributes`** exposes undeclared fallthrough attributes.",
-            ["Context.Components"] = "**`Context.Components`** is the application-selected `IComponentFactory`.",
+            ["Context"] = "**`Context`** is the generated component's `ComponentContext`.",
+            ["Context.Bindings"] = "**`Context.Bindings`** exposes the contract-resolved parent invocation.",
             ["Context.Services"] = "**`Context.Services`** is the application's independent `IServiceProvider`.",
             ["Context.Lifecycle"] = "**`Context.Lifecycle`** registers lifecycle callbacks and exposes component cancellation.",
-            ["Context.Slots"] = "**`Context.Slots`** exposes the component's current named slots.",
+            ["Context.Scope"] = "**`Context.Scope`** owns this component's reactive effects and watches.",
+            ["Context.WatchScheduler"] = "**`Context.WatchScheduler`** schedules this component's watch callbacks.",
+            ["Context.Parent"] = "**`Context.Parent`** is the parent component context, or `null` at a root.",
             ["Context.Emit"] = "**`Context.Emit`** emits a declared component event to the parent.",
             ["Context.Expose"] = "**`Context.Expose`** selects the public surface returned through template references.",
+            ["Context.Warn"] = "**`Context.Warn`** routes a development warning through the application.",
+            ["Context.Watch"] = "**`Context.Watch`** observes a getter within this component's reactive scope.",
             // The root-level lifecycle registrations every component inherits from
             // ComponentTemplateBase ([CMP-32]). Each is a pass-through to the Context.Lifecycle form
             // above, so the two are interchangeable and may be mixed within one component.

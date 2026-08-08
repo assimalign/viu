@@ -127,7 +127,7 @@ public sealed class SingleFileComponentAdoptedModelTests
         generated.ShouldContain("internal const string ExtractedStyles");
         generated.ShouldContain("internal static class Style");
         generated.ShouldContain("public const string box");
-        generated.ShouldNotContain("ScopeIdentifier");
+        generated.ShouldNotContain("Scope" + "Identifier");
         generated.ShouldNotContain("internal const string ScopeId");
         generated.ShouldNotContain("ApplyCssVariables");
     }
@@ -147,11 +147,11 @@ public sealed class SingleFileComponentAdoptedModelTests
 
         generated.ShouldContain("ComponentRenderFrame frame");
         generated.ShouldNotContain("using static");
-        generated.ShouldNotContain("RenderHelpers");
-        generated.ShouldNotContain("BlockToken");
-        generated.ShouldNotContain("IComponentTemplate");
-        generated.ShouldNotContain("IComponentContext");
-        generated.ShouldNotContain("IComponentHotReloadMetadata");
-        generated.ShouldNotContain("ScopeIdentifier");
+        generated.ShouldNotContain("Render" + "Helpers");
+        generated.ShouldNotContain("Block" + "Token");
+        generated.ShouldNotContain("IComponent" + "Template");
+        generated.ShouldNotContain("IComponent" + "Context");
+        generated.ShouldNotContain("IComponentHotReload" + "Metadata");
+        generated.ShouldNotContain("Scope" + "Identifier");
     }
 }

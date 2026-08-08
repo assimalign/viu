@@ -7,13 +7,11 @@ internal sealed class TransitionState
 {
     internal bool IsMounted;
 
-    internal bool IsLeaving;
-
     internal bool IsUnmounting;
 
-    internal Dictionary<object, Action<bool>> EnterCallbacks { get; } = new();
+    internal Dictionary<object, Action<bool>> EnterCallbacks { get; } = [];
 
-    internal Dictionary<object, Action<bool>> LeaveCallbacks { get; } = new();
+    internal Dictionary<object, Action<bool>> LeaveCallbacks { get; } = [];
 
-    internal Dictionary<TransitionIdentity, TransitionHooks> Leaving { get; } = new();
+    internal Dictionary<TransitionIdentity, Action<bool>> Leaving { get; } = [];
 }

@@ -1,54 +1,47 @@
 using System;
 
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Defines factory-registered asynchronous components.
-/// </summary>
+/// <summary>Defines explicitly registered asynchronous components.</summary>
 /// <remarks>
-/// A definition is an explicit registration/request
-/// facade; it is not an activated component and does not resolve services.
+/// Definitions are registration/request facades and never activate a target directly. Specified
+/// by <c>[BLT-14]</c>.
 /// </remarks>
 public static class AsynchronousComponents
 {
-    /// <summary>Defines an asynchronous component under a compile-time wrapper identity.</summary>
-    /// <typeparam name="TIdentity">
-    /// The stable marker type registered for the asynchronous wrapper.
-    /// </typeparam>
+    /// <summary>Defines an asynchronous component under an authored wrapper type.</summary>
+    /// <typeparam name="TComponent">The stable wrapper component type.</typeparam>
     /// <param name="loader">The target-identity loader.</param>
-    /// <param name="name">The optional component-factory name for the wrapper.</param>
-    /// <returns>The definition whose registration is added to the application component factory.</returns>
-    public static AsynchronousComponentDefinition DefineAsynchronousComponent<TIdentity>(
+    /// <param name="name">The optional explicit registration name.</param>
+    /// <returns>The reusable asynchronous definition.</returns>
+    public static AsynchronousComponentDefinition DefineAsynchronousComponent<TComponent>(
         AsynchronousComponentLoader loader,
         string? name = null)
-        where TIdentity : class
+        where TComponent : class, IComponent
     {
-        return DefineAsynchronousComponent(typeof(TIdentity), loader, name);
+        return DefineAsynchronousComponent(typeof(TComponent), loader, name);
     }
 
-    /// <summary>Defines an asynchronous component under a compile-time wrapper identity.</summary>
-    /// <typeparam name="TIdentity">
-    /// The stable marker type registered for the asynchronous wrapper.
-    /// </typeparam>
-    /// <param name="options">The loading, error, timing, and retry policy.</param>
-    /// <param name="name">The optional component-factory name for the wrapper.</param>
-    /// <returns>The definition whose registration is added to the application component factory.</returns>
-    public static AsynchronousComponentDefinition DefineAsynchronousComponent<TIdentity>(
+    /// <summary>Defines an asynchronous component under an authored wrapper type.</summary>
+    /// <typeparam name="TComponent">The stable wrapper component type.</typeparam>
+    /// <param name="options">The loading, failure, timing, and retry policy.</param>
+    /// <param name="name">The optional explicit registration name.</param>
+    /// <returns>The reusable asynchronous definition.</returns>
+    public static AsynchronousComponentDefinition DefineAsynchronousComponent<TComponent>(
         AsynchronousComponentOptions options,
         string? name = null)
-        where TIdentity : class
+        where TComponent : class, IComponent
     {
-        return DefineAsynchronousComponent(typeof(TIdentity), options, name);
+        return DefineAsynchronousComponent(typeof(TComponent), options, name);
     }
 
-    /// <summary>Defines an asynchronous component from a loader.</summary>
-    /// <param name="componentType">
-    /// The stable type identity under which the wrapper is registered. The identity is supplied
-    /// explicitly and is never discovered or activated through reflection.
-    /// </param>
+    /// <summary>Defines an asynchronous component from an authored wrapper type and loader.</summary>
+    /// <param name="componentType">The stable wrapper <see cref="IComponent"/> type.</param>
     /// <param name="loader">The target-identity loader.</param>
-    /// <param name="name">The optional component-factory name for the wrapper.</param>
-    /// <returns>The definition whose registration is added to the application component factory.</returns>
+    /// <param name="name">The optional explicit registration name.</param>
+    /// <returns>The reusable asynchronous definition.</returns>
     public static AsynchronousComponentDefinition DefineAsynchronousComponent(
         Type componentType,
         AsynchronousComponentLoader loader,
@@ -57,20 +50,15 @@ public static class AsynchronousComponents
         ArgumentNullException.ThrowIfNull(loader);
         return DefineAsynchronousComponent(
             componentType,
-            new AsynchronousComponentOptions
-            {
-                Loader = loader,
-            },
+            new AsynchronousComponentOptions { Loader = loader },
             name);
     }
 
-    /// <summary>Defines an asynchronous component from an options object.</summary>
-    /// <param name="componentType">
-    /// The stable type identity under which the wrapper is registered.
-    /// </param>
-    /// <param name="options">The loading, error, timing, and retry policy.</param>
-    /// <param name="name">The optional component-factory name for the wrapper.</param>
-    /// <returns>The definition whose registration is added to the application component factory.</returns>
+    /// <summary>Defines an asynchronous component from an authored wrapper type and policy.</summary>
+    /// <param name="componentType">The stable wrapper <see cref="IComponent"/> type.</param>
+    /// <param name="options">The loading, failure, timing, and retry policy.</param>
+    /// <param name="name">The optional explicit registration name.</param>
+    /// <returns>The reusable asynchronous definition.</returns>
     public static AsynchronousComponentDefinition DefineAsynchronousComponent(
         Type componentType,
         AsynchronousComponentOptions options,

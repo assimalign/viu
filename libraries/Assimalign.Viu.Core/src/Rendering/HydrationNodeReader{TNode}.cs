@@ -1,56 +1,53 @@
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Reads an immutable or live view of an existing server-rendered host subtree.
-/// </summary>
+/// <summary>Reads an immutable or live view of an existing server-rendered host subtree.</summary>
 /// <remarks>
-/// Hosts may snapshot the complete subtree when the reader is created. This lets a browser or
-/// WebView2 host cross its interop boundary once instead of once per structural read. Core reads
-/// the complete removal range before mutating it, so immutable snapshots remain valid during
-/// mismatch recovery. The reader is not thread-safe.
+/// A host may snapshot the complete subtree when it creates this reader, allowing every later
+/// structural read to remain in managed memory. The reader is not thread-safe. Specified by
+/// <c>[HYD-1]</c> and <c>[HYD-2]</c>.
 /// </remarks>
-/// <typeparam name="TNode">The host node type.</typeparam>
+/// <typeparam name="TNode">The opaque host node type.</typeparam>
 public abstract class HydrationNodeReader<TNode>
     where TNode : notnull
 {
-    /// <summary>Initializes a hydration reader.</summary>
+    /// <summary>Initializes a host-supplied hydration reader.</summary>
     protected HydrationNodeReader()
     {
     }
 
-    /// <summary>Gets the kind of an existing host node.</summary>
+    /// <summary>Gets the closed kind of an existing host node.</summary>
     /// <param name="node">The host node.</param>
-    /// <returns>The host node kind.</returns>
+    /// <returns>The host-neutral node kind.</returns>
     public abstract HydrationNodeKind Kind(TNode node);
 
-    /// <summary>Gets the first child, or default when the node has no child.</summary>
+    /// <summary>Gets the first child, or the default node value when there is no child.</summary>
     /// <param name="node">The host parent.</param>
-    /// <returns>The first child.</returns>
+    /// <returns>The first child or the missing-node value.</returns>
     public abstract TNode? FirstChild(TNode node);
 
-    /// <summary>Gets the next sibling, or default when the node is last.</summary>
+    /// <summary>Gets the next sibling, or the default node value when this node is last.</summary>
     /// <param name="node">The host node.</param>
-    /// <returns>The next sibling.</returns>
+    /// <returns>The next sibling or the missing-node value.</returns>
     public abstract TNode? NextSibling(TNode node);
 
-    /// <summary>Gets the parent, or default when the node is a root.</summary>
+    /// <summary>Gets the parent, or the default node value when this node is a root.</summary>
     /// <param name="node">The host node.</param>
-    /// <returns>The parent.</returns>
+    /// <returns>The parent or the missing-node value.</returns>
     public abstract TNode? ParentNode(TNode node);
 
-    /// <summary>Gets an element's tag name.</summary>
+    /// <summary>Gets an element node's serialized local tag name.</summary>
     /// <param name="node">The element node.</param>
-    /// <returns>The element tag.</returns>
+    /// <returns>The element tag name.</returns>
     public abstract string ElementTag(TNode node);
 
     /// <summary>Gets a text or comment node's character data.</summary>
     /// <param name="node">The text or comment node.</param>
-    /// <returns>The character data.</returns>
+    /// <returns>The node data.</returns>
     public abstract string Data(TNode node);
 
     /// <summary>Gets an element attribute, or null when it is absent.</summary>
     /// <param name="node">The element node.</param>
     /// <param name="name">The attribute name.</param>
-    /// <returns>The serialized attribute value.</returns>
+    /// <returns>The serialized value or null.</returns>
     public abstract string? Attribute(TNode node, string name);
 }

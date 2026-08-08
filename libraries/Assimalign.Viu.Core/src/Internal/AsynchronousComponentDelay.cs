@@ -4,22 +4,10 @@ using System.Threading.Tasks;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Schedules the loading delay and timeout used by asynchronous components.
-/// </summary>
-/// <remarks>Ambient and single-threaded; tests replace the scheduler with virtual time.</remarks>
 internal static class AsynchronousComponentDelay
 {
-    internal static Func<int, Action, IDisposable>? Scheduler;
-
     internal static IDisposable Schedule(int milliseconds, Action callback)
     {
-        Func<int, Action, IDisposable>? scheduler = Scheduler;
-        if (scheduler is not null)
-        {
-            return scheduler(milliseconds, callback);
-        }
-
         DelayTimer timer = new();
         timer.Start(milliseconds, callback);
         return timer;
@@ -41,7 +29,7 @@ internal static class AsynchronousComponentDelay
         {
             try
             {
-                await Task.Delay(milliseconds, cancellationToken);
+                await Task.Delay(milliseconds, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

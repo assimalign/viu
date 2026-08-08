@@ -39,13 +39,16 @@ namespace Assimalign.Viu.Router;
 /// <para>
 /// <b>Three deliberate API shapes</b> (see <c>docs/DESIGN.md</c>): a guard returns a
 /// <see cref="NavigationGuardResult"/> rather than invoking a continuation, so it decides exactly
-/// once ([RTR-5]); <see cref="Push"/> completes with a <see cref="NavigationFailure"/> for
+/// once (<c>[RTR-5]</c>); <see cref="Push"/> completes with a <see cref="NavigationFailure"/> for
 /// abort/cancel/duplicate and faults only on a genuinely unexpected guard exception (routed to
 /// <see cref="OnError"/>), keeping routine outcomes out of exception control flow; and a redirect
 /// loop throws <see cref="NavigationRedirectException"/> in every configuration, not only in
 /// development builds.
 /// </para>
 /// <para>Not thread-safe: the router targets the single-threaded JS event loop.</para>
+/// <para>
+/// Specified by <c>[RTR-3]</c>, <c>[RTR-5]</c>, <c>[RTR-6]</c>, and <c>[RTR-7]</c>.
+/// </para>
 /// </remarks>
 public sealed class Router : IDisposable
 {
@@ -380,7 +383,7 @@ public sealed class Router : IDisposable
         if (from.Matched.Count > 0 && IsSameLocation(from, to))
         {
             // Duplicated: skip the pipeline entirely but still notify afterEach, so a hook that
-            // mirrors navigation state stays in sync even for a no-op navigation.
+            // the navigation state stays in sync even for a no-op navigation.
             failure = new NavigationFailure(NavigationFailureType.Duplicated, to, from);
         }
         else

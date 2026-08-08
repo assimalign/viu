@@ -9,7 +9,7 @@ namespace Assimalign.Viu.Reactivity;
 /// <c>Assimalign.Viu.Generators.Reactivity</c> source generator fills in every <c>partial</c>
 /// property with a per-property <see cref="Dependency"/>: the getter tracks, the setter triggers
 /// only on an <see cref="System.Collections.Generic.EqualityComparer{T}"/> change. The generated
-/// type implements <see cref="IReactiveObject"/>, so nested <c>[Reactive]</c> objects, refs, and
+/// type implements <see cref="IReactiveObject"/>, so nested <c>[Reactive]</c> objects, references, and
 /// reactive collections compose and are reachable by a deep <c>watch</c> without reflection.
 /// <para>
 /// Consequences of the build-time model: the reactive member set is fixed at compile time (no

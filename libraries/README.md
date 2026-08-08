@@ -1,8 +1,7 @@
 # Viu runtime libraries
 
 This directory contains Viu's shipping runtime libraries. Their documentation describes the
-adopted `[V01.01.15]` component model; the atomic implementation swap lands on
-`feature/V01.01.15-component-model`, using `.redesign/` only as the exact contract scaffold.
+installed `[V01.01.15]` component model and its current compiler/runtime contracts.
 
 The principal packages are:
 

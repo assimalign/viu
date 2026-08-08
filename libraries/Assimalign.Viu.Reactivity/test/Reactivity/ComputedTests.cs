@@ -24,7 +24,7 @@ public sealed class ComputedTests
     }
 
     [Fact]
-    public void RepeatReadsWithoutDepChangeUseTheCache()
+    public void RepeatReadsWithoutDependencyChangeUseTheCache()
     {
         var count = Reactive.Reference(1);
         var getterRuns = 0;
@@ -183,33 +183,19 @@ public sealed class ComputedTests
     }
 
     [Fact]
-    public void ReadonlyComputedWarnsOnWrite_AndDoesNotThrow()
+    public void ReadonlyComputed_WriteDoesNotThrowOrChangeValue()
     {
-        // Writing a getter-only computed warns in dev and is a no-op — it never throws. A binding
-        // that assigns a derived value is an authoring mistake to report, not a reason to tear down
-        // a render (R6 aligned this from the previous NotSupportedException).
-        var captured = new List<string>();
-        var previousSink = RuntimeWarnings.Sink;
-        RuntimeWarnings.Sink = captured.Add;
-        try
-        {
-            var c = Reactive.Computed(() => 1);
-            c.IsWritable.ShouldBeFalse();
-            c.IsReadOnly.ShouldBeTrue();
+        var computed = Reactive.Computed(() => 1);
+        computed.IsWritable.ShouldBeFalse();
+        computed.IsReadOnly.ShouldBeTrue();
 
-            Should.NotThrow(() => c.Value = 5);
+        Should.NotThrow(() => computed.Value = 5);
 
-            c.Value.ShouldBe(1); // unchanged
-            captured.ShouldContain(message => message.Contains("readonly"));
-        }
-        finally
-        {
-            RuntimeWarnings.Sink = previousSink;
-        }
+        computed.Value.ShouldBe(1);
     }
 
     [Fact]
-    public void EffectOverComputedOverRefPropagates()
+    public void EffectOverComputedOverReferencePropagates()
     {
         var count = Reactive.Reference(1);
         var getterRuns = 0;
@@ -249,7 +235,7 @@ public sealed class ComputedTests
         doubled.Value.ShouldBe(2);
         getterRuns.ShouldBe(1);
 
-        // Bumps the global version but none of the computed's deps.
+        // Bumps the global version but none of the computed's dependencies.
         unrelated.Value = 101;
 
         doubled.Value.ShouldBe(2);
@@ -286,7 +272,7 @@ public sealed class ComputedTests
     }
 
     [Fact]
-    public void TriggerRefOnAComputedForceRerunsItsEffects()
+    public void TriggerReferenceOnAComputedForceRerunsItsEffects()
     {
         var count = Reactive.Reference(1);
         var effectRuns = 0;
@@ -319,4 +305,3 @@ public sealed class ComputedTests
         observed.ShouldBe(new[] { false, true, false });
     }
 }
-

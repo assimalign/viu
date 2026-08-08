@@ -13,4 +13,5 @@ namespace Assimalign.Viu.Router;
 /// <param name="error">The exception thrown during navigation.</param>
 /// <param name="to">The location that was being navigated to.</param>
 /// <param name="from">The location that was being navigated away from.</param>
+/// <remarks>Specified by <c>[RTR-6]</c>.</remarks>
 public delegate void NavigationErrorHandler(Exception error, RouteLocation to, RouteLocation from);

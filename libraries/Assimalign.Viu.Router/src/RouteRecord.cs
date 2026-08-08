@@ -7,16 +7,17 @@ namespace Assimalign.Viu.Router;
 
 /// <summary>
 /// An immutable route definition: a path, an optional name, optional nested children, optional
-/// metadata, the component (with its props resolver) the route renders, and an optional per-record
-/// <see cref="BeforeEnter"/> navigation guard. One record type serves as both the declaration and
-/// the normalized table entry, so there is no second shape to keep in sync. Redirects and aliases
-/// belong to later router features and are intentionally not modeled here.
+/// metadata, the immutable route subtree and its argument resolver, and an optional per-record
+/// <see cref="BeforeEnter"/> navigation guard. One record type serves as both the declaration and the
+/// normalized table entry, so there is no second shape to keep in sync. Redirects and aliases belong
+/// to later router features and are intentionally not modeled here.
 /// </summary>
 /// <remarks>
 /// A reference type with identity semantics: the same instance appears in every resolved
 /// <see cref="RouteLocation.Matched"/> chain it participates in, so consumers can compare matched
 /// records by reference. Child paths that do not start with <c>/</c> are joined onto the parent's
 /// path; an empty child path resolves to the parent's path (the empty-path default child).
+/// Specified by <c>[RTR-1]</c>, <c>[RTR-4]</c>, <c>[RTR-5]</c>, and <c>[RTR-8]</c>.
 /// </remarks>
 public sealed class RouteRecord
 {
@@ -32,8 +33,10 @@ public sealed class RouteRecord
     /// <param name="children">Optional nested child records.</param>
     /// <param name="meta">Optional arbitrary metadata, merged into every resolved location that matches this record.</param>
     /// <param name="component">
-    /// The component <see cref="RouterView"/> renders for this record, or <see langword="null"/> when
-    /// the record is a component-less grouping path.
+    /// The immutable subtree <see cref="RouterView"/> renders for this record, or
+    /// <see langword="null"/> when the record is a component-less grouping path. A
+    /// <see cref="ComponentNode"/> is copied with route arguments and matched-record identity;
+    /// every other node is returned unchanged.
     /// </param>
     /// <param name="argumentsResolver">
     /// Resolves the arguments passed to <paramref name="component"/>: use
@@ -48,30 +51,31 @@ public sealed class RouteRecord
     /// <see langword="null"/> registers no per-record enter guard.
     /// </param>
     /// <param name="routeEnterGuard">
-    /// An optional component-associated enter guard that runs after async component resolution and
+    /// An optional component-associated enter guard that runs after asynchronous component resolution and
     /// before global before-resolve guards. It is recorded explicitly because component activation
-    /// belongs to Core and has not occurred when navigation guards run.
+    /// belongs to the renderer and has not occurred when navigation guards run.
     /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">
-    /// <paramref name="argumentsResolver"/> is supplied for a non-template component.
+    /// <paramref name="argumentsResolver"/> is supplied for a node other than
+    /// <see cref="ComponentNode"/>.
     /// </exception>
     public RouteRecord(
         string path,
         string? name = null,
         IReadOnlyList<RouteRecord>? children = null,
         IReadOnlyDictionary<string, object?>? meta = null,
-        IComponent? component = null,
+        VirtualNode? component = null,
         RouteComponentArgumentsResolver? argumentsResolver = null,
         NavigationGuard? beforeEnter = null,
         IRouteEnterGuard? routeEnterGuard = null)
     {
         ArgumentNullException.ThrowIfNull(path);
         if (argumentsResolver is not null
-            && component is not ITemplateComponent)
+            && component is not ComponentNode)
         {
             throw new ArgumentException(
-                "Route component arguments require an ITemplateComponent request.",
+                "Route component arguments require a ComponentNode request.",
                 nameof(argumentsResolver));
         }
 
@@ -102,7 +106,7 @@ public sealed class RouteRecord
     /// <see langword="null"/> for a component-less grouping path. The matcher ignores this field — it
     /// is consumed only by the view components.
     /// </summary>
-    public IComponent? Component { get; }
+    public VirtualNode? Component { get; }
 
     /// <summary>
     /// Resolves the arguments passed to <see cref="Component"/> from the resolved location, or
