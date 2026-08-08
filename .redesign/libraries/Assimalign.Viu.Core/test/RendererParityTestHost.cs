@@ -92,6 +92,8 @@ internal sealed class RendererParityHost : IDisposable
 
     internal int CommitCount { get; private set; }
 
+    internal int TeleportResolveCount { get; private set; }
+
     internal Renderer<RendererParityNode> CreateRenderer() =>
         RendererFactory.CreateRenderer(
             new RendererOptions<RendererParityNode>
@@ -128,6 +130,7 @@ internal sealed class RendererParityHost : IDisposable
         BindingPatchCount = 0;
         BindingPatchNames.Clear();
         CommitCount = 0;
+        TeleportResolveCount = 0;
     }
 
     internal int RunScheduledFlushes()
@@ -254,8 +257,11 @@ internal sealed class RendererParityHost : IDisposable
         BindingPatchNames.Add(binding.Name.LocalName);
     }
 
-    private RendererParityNode? ResolveTeleportTarget(string selector) =>
-        _teleportTargets.TryGetValue(selector, out RendererParityNode? target)
+    private RendererParityNode? ResolveTeleportTarget(string selector)
+    {
+        TeleportResolveCount++;
+        return _teleportTargets.TryGetValue(selector, out RendererParityNode? target)
             ? target
             : null;
+    }
 }

@@ -1,7 +1,5 @@
 using System;
 
-using Assimalign.Viu.Components;
-
 namespace Assimalign.Viu;
 
 internal enum TransitionOperationKind
@@ -16,12 +14,12 @@ internal sealed class TransitionOperation<TNode>
     internal TransitionOperation(
         TransitionOperationKind kind,
         TNode element,
-        TransitionNode transition,
+        TransitionController controller,
         Action<bool> completion)
     {
         Kind = kind;
         Element = element;
-        Transition = transition;
+        Controller = controller;
         Completion = completion;
     }
 
@@ -29,7 +27,7 @@ internal sealed class TransitionOperation<TNode>
 
     internal TNode Element { get; }
 
-    internal TransitionNode Transition { get; }
+    internal TransitionController Controller { get; }
 
     internal Action<bool> Completion { get; }
 

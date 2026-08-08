@@ -13,4 +13,6 @@ internal sealed class MountedTree<TNode>
 
     internal Dictionary<VirtualNode, MountedNode<TNode>> Nodes { get; } =
         new(ReferenceEqualityComparer.Instance);
+
+    internal List<MountedTransition<TNode>> PendingTransitionRemovals { get; } = [];
 }

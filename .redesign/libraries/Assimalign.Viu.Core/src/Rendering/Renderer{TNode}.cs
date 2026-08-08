@@ -25,6 +25,7 @@ public sealed partial class Renderer<TNode>
     private readonly Dictionary<TNode, MountedTree<TNode>> _containerTrees =
         new(NodeComparer);
     private readonly RendererOptions<TNode> _options;
+    private TransitionMountContext<TNode>? _activeTransitionMount;
     private int _nextComponentIdentifier;
 
     internal Renderer(RendererOptions<TNode> options)
@@ -77,6 +78,17 @@ public sealed partial class Renderer<TNode>
         {
             if (tree?.Root is not null)
             {
+                List<MountedTransition<TNode>> transitions =
+                    new(tree.PendingTransitionRemovals);
+                for (int index = 0; index < transitions.Count; index++)
+                {
+                    MountedTransition<TNode> transition = transitions[index];
+                    if (!transition.IsUnmounted)
+                    {
+                        Unmount(tree, transition, removeHostNodes: true);
+                    }
+                }
+
                 Unmount(tree, tree.Root, removeHostNodes: true);
                 tree.Nodes.Clear();
                 tree.Root = null;
@@ -118,6 +130,7 @@ public sealed partial class Renderer<TNode>
                 owner: null);
         }
 
+        NormalizeTeleportTargetOrder(tree);
         QueueHostCommit();
         Scheduler.FlushAfterSynchronousRender();
         return tree.Root is MountedComponent<TNode> component
@@ -193,7 +206,8 @@ public sealed partial class Renderer<TNode>
         VirtualNode next,
         TNode container,
         TNode? anchor,
-        RuntimeComponentContext? owner)
+        RuntimeComponentContext? owner,
+        bool allowTransitionLeave = true)
     {
         PatchVisitCount++;
         if (current is null)
@@ -210,7 +224,15 @@ public sealed partial class Renderer<TNode>
         {
             TNode? replacementAnchor = GetNextHostNode(current);
             RuntimeComponentContext? replacementOwner = current.Owner;
-            Unmount(tree, current, removeHostNodes: true);
+            if (allowTransitionLeave)
+            {
+                Remove(tree, current);
+            }
+            else
+            {
+                Unmount(tree, current, removeHostNodes: true);
+            }
+
             return Mount(tree, next, container, replacementAnchor, replacementOwner);
         }
 
@@ -289,6 +311,7 @@ public sealed partial class Renderer<TNode>
             tree,
             value.Directives,
             owner);
+        BindActiveTransition(tree, element, directiveBindings);
         InvokeDirectiveHooks(
             tree,
             element,
@@ -435,6 +458,7 @@ public sealed partial class Renderer<TNode>
             next.Directives,
             mounted.Owner,
             mounted.DirectiveBindings);
+        BindActiveTransition(tree, mounted.HostNode, nextDirectiveBindings);
         InvokeVirtualNodeLifecycleHook(
             tree,
             mounted.Owner,
@@ -688,7 +712,7 @@ public sealed partial class Renderer<TNode>
 
         for (int index = commonCount; index < current.Count; index++)
         {
-            Unmount(tree, current[index], removeHostNodes: true);
+            Remove(tree, current[index]);
         }
 
         return nextMounted;
@@ -748,7 +772,8 @@ public sealed partial class Renderer<TNode>
             int nextIndex = -1;
             if (previousValue.Key is { } key
                 && keyToNextIndex.TryGetValue(key, out int keyedIndex)
-                && !claimed[keyedIndex])
+                && !claimed[keyedIndex]
+                && IsSameNodeType(previousValue, nextValues[keyedIndex]))
             {
                 nextIndex = keyedIndex;
             }
@@ -762,7 +787,7 @@ public sealed partial class Renderer<TNode>
 
             if (nextIndex < 0)
             {
-                Unmount(tree, previousMounted, removeHostNodes: true);
+                Remove(tree, previousMounted);
                 continue;
             }
 
@@ -810,6 +835,10 @@ public sealed partial class Renderer<TNode>
                     || longestIncreasingSubsequence[sequenceIndex] != nextIndex)
                 {
                     Move(nextMounted[nextIndex]!, container, anchor);
+                    ReorderTeleportTargetRange(
+                        nextMounted[nextIndex]!,
+                        nextMounted,
+                        nextIndex);
                 }
                 else
                 {
@@ -1159,6 +1188,46 @@ public sealed partial class Renderer<TNode>
             bindings[index].BindHostElements(
                 localName => GetDirectiveHostElements(mounted, localName));
         }
+    }
+
+    private void BindActiveTransition(
+        MountedTree<TNode> tree,
+        TNode element,
+        IReadOnlyList<DirectiveBinding> bindings)
+    {
+        TransitionMountContext<TNode>? active = _activeTransitionMount;
+        if (active is null || active.IsClaimed)
+        {
+            return;
+        }
+
+        active.IsClaimed = true;
+        active.Element = element;
+        for (TransitionMountContext<TNode>? ancestor = active.Parent;
+            ancestor is not null && !ancestor.IsClaimed;
+            ancestor = ancestor.Parent)
+        {
+            ancestor.IsClaimed = true;
+            ancestor.Element = element;
+            ancestor.Suppress();
+        }
+
+        ComponentTransition transition = active.Controller.ComponentTransition;
+        for (int index = 0; index < bindings.Count; index++)
+        {
+            bindings[index].BindTransition(transition);
+        }
+
+        if (!active.IsSuppressed
+            && active.ShouldEnter
+            && !active.IsHydrating
+            && !active.Controller.Properties.Persisted
+            && !active.BeforeEnterInvoked)
+        {
+            active.BeforeEnterInvoked = active.Controller.BeforeEnter(element);
+        }
+
+        _ = tree;
     }
 
     private static IReadOnlyList<DirectiveHostElement> GetDirectiveHostElements(
@@ -1790,6 +1859,25 @@ public sealed partial class Renderer<TNode>
 
         Unregister(tree, mounted);
         mounted.IsUnmounted = true;
+    }
+
+    private void Remove(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted)
+    {
+        if (mounted.IsUnmounted)
+        {
+            return;
+        }
+
+        if (mounted is MountedTransition<TNode> transition
+            && TryDeferTransitionUnmount(tree, transition))
+        {
+            UnmountVisitCount++;
+            return;
+        }
+
+        Unmount(tree, mounted, removeHostNodes: true);
     }
 
     private void UnmountOwnedChildren(

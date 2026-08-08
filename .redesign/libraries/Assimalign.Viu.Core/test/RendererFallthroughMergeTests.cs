@@ -116,6 +116,88 @@ public sealed class RendererFallthroughMergeTests
         element.Bindings["title"].ShouldBe("parent title");
     }
 
+    [Fact]
+    public void Render_FallthroughUpdate_RefreshesContextBeforeLifecycleAndPatchesSameRoot()
+    {
+        using var host = new RendererParityHost();
+        List<string> order = [];
+        ComponentReference reference = ComponentReference.ForType(
+            typeof(FallthroughUpdateComponent));
+        var components = new ComponentFactory();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new FallthroughUpdateComponent(order)));
+        ComponentNode initial = Request(reference, "first");
+        ApplicationContext application = new(
+            new ApplicationOptions
+            {
+                RootComponent = initial,
+                Components = components,
+            });
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+
+        renderer.Render(initial, host.Container, application);
+        RendererParityNode element = host.Container.Children.ShouldHaveSingleItem();
+        order.Clear();
+
+        renderer.Render(Request(reference, "second"), host.Container);
+
+        host.Container.Children.ShouldHaveSingleItem().ShouldBeSameAs(element);
+        element.Bindings["title"].ShouldBe("second");
+        order.ShouldBe(
+        [
+            "before-update:second",
+            "render:second",
+            "updated:second",
+        ]);
+    }
+
+    [Fact]
+    public void Render_NonElementFallthrough_WarnsAfterInitialBindingDiagnosticsAndOnUpdate()
+    {
+        using var host = new RendererParityHost();
+        List<string> warnings = [];
+        ComponentReference reference = ComponentReference.ForType(
+            typeof(NonElementRootComponent));
+        var components = new ComponentFactory();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(
+                    parameters: [new ComponentParameter("required", isRequired: true)]),
+                _ => new NonElementRootComponent()));
+        ComponentNode initial = Request(reference, "first");
+        ApplicationContext application = new(
+            new ApplicationOptions
+            {
+                RootComponent = initial,
+                Components = components,
+                WarnHandler = warnings.Add,
+            });
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+
+        renderer.Render(initial, host.Container, application);
+
+        warnings.Count.ShouldBe(2);
+        warnings[0].ShouldContain("Required parameter 'required'");
+        warnings[1].ShouldBe(
+            "Component root bindings and directives require one element root.");
+
+        renderer.Render(Request(reference, "second"), host.Container);
+
+        warnings.Count.ShouldBe(3);
+        warnings[2].ShouldBe(
+            "Component root bindings and directives require one element root.");
+    }
+
+    private static ComponentNode Request(ComponentReference reference, string title) =>
+        new(
+            reference,
+            new ComponentInvocation(
+                arguments: new Dictionary<string, object?> { ["title"] = title }));
+
     private static RendererParityNode RenderComponent(
         RendererParityHost host,
         IEnumerable<ElementBinding> rootBindings,
@@ -143,5 +225,37 @@ public sealed class RendererFallthroughMergeTests
         renderer.Render(request, host.Container, application);
 
         return host.Container.Children.ShouldHaveSingleItem();
+    }
+
+    private sealed class FallthroughUpdateComponent : IComponent
+    {
+        private readonly List<string> _order;
+
+        internal FallthroughUpdateComponent(List<string> order)
+        {
+            _order = order;
+        }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            context.Lifecycle.OnBeforeUpdate(
+                () => _order.Add(
+                    $"before-update:{context.Bindings.FallthroughBindings["title"]}"));
+            context.Lifecycle.OnUpdated(
+                () => _order.Add(
+                    $"updated:{context.Bindings.FallthroughBindings["title"]}"));
+            return _ =>
+            {
+                _order.Add(
+                    $"render:{context.Bindings.FallthroughBindings["title"]}");
+                return new ElementNode(new QualifiedName("fallthrough-update-root"));
+            };
+        }
+    }
+
+    private sealed class NonElementRootComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) =>
+            _ => new FragmentNode([new TextNode("content")]);
     }
 }

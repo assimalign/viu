@@ -13,20 +13,25 @@ internal sealed class SuspenseBoundary : IDisposable
 
     internal int PendingCount => _dependencies.Count;
 
-    internal void Register(
-        Task dependency,
-        RuntimeComponentContext context,
-        bool rethrowIfUnhandled)
+    internal void Register(Task dependency)
     {
         ArgumentNullException.ThrowIfNull(dependency);
-        ArgumentNullException.ThrowIfNull(context);
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         if (!_dependencies.Add(dependency))
         {
             return;
         }
+    }
 
-        _ = ObserveAsync(dependency, context, rethrowIfUnhandled);
+    internal void Settle(Task dependency)
+    {
+        ArgumentNullException.ThrowIfNull(dependency);
+        if (!_isDisposed
+            && _dependencies.Remove(dependency)
+            && _dependencies.Count == 0)
+        {
+            Resolved?.Invoke();
+        }
     }
 
     public void Dispose()
@@ -34,36 +39,5 @@ internal sealed class SuspenseBoundary : IDisposable
         _isDisposed = true;
         Resolved = null;
         _dependencies.Clear();
-    }
-
-    private async Task ObserveAsync(
-        Task dependency,
-        RuntimeComponentContext context,
-        bool rethrowIfUnhandled)
-    {
-        try
-        {
-            await dependency.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-            when (context.Lifecycle.CancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            context.RouteError(
-                exception,
-                "suspense asynchronous dependency",
-                rethrowIfUnhandled);
-        }
-        finally
-        {
-            if (!_isDisposed
-                && _dependencies.Remove(dependency)
-                && _dependencies.Count == 0)
-            {
-                Resolved?.Invoke();
-            }
-        }
     }
 }

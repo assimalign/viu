@@ -48,7 +48,14 @@ public sealed partial class Renderer<TNode>
                 endAnchor,
                 owner);
             mounted.ChildrenMounted = true;
-            TryInstallTeleportTargetAnchor(tree, mounted, value);
+            if (value.IsDeferred)
+            {
+                QueueDeferredTeleportMount(tree, mounted, container);
+            }
+            else
+            {
+                TryInstallTeleportTargetAnchor(tree, mounted, value);
+            }
         }
         else if (value.IsDeferred)
         {
@@ -77,6 +84,12 @@ public sealed partial class Renderer<TNode>
         TeleportNode previous = (TeleportNode)mounted.Value;
         CancelDeferredTeleport(mounted);
         ReplaceValue(tree, mounted, next);
+        bool canReuseDeferredTarget = next.IsDeferred
+            && mounted.HasTarget
+            && string.Equals(
+                previous.TargetIdentifier,
+                next.TargetIdentifier,
+                StringComparison.Ordinal);
 
         if (next.IsDisabled)
         {
@@ -104,33 +117,56 @@ public sealed partial class Renderer<TNode>
                 mounted.ChildrenMounted = true;
             }
 
-            EnsureTeleportTarget(
-                tree,
-                mounted,
-                next,
-                moveChildrenToTarget: false);
+            if (next.IsDeferred)
+            {
+                if (!canReuseDeferredTarget)
+                {
+                    QueueDeferredTeleportMount(tree, mounted, originContainer);
+                }
+            }
+            else
+            {
+                EnsureTeleportTarget(
+                    tree,
+                    mounted,
+                    next,
+                    moveChildrenToTarget: false);
+            }
+
             return;
         }
 
-        if (next.IsDeferred)
+        if (next.IsDeferred && !canReuseDeferredTarget)
         {
             if (mounted.ChildrenMounted)
             {
-                UnmountChildren(tree, mounted.Children, removeHostNodes: true);
-                mounted.Children.Clear();
-                mounted.ChildrenMounted = false;
+                TNode currentContainer = previous.IsDisabled
+                    ? originContainer
+                    : mounted.TargetContainer!;
+                TNode? currentAnchor = previous.IsDisabled
+                    ? mounted.EndAnchor
+                    : mounted.TargetAnchor;
+                PatchTeleportChildren(
+                    tree,
+                    mounted,
+                    previous.Children,
+                    next.Children,
+                    currentContainer,
+                    currentAnchor,
+                    previous,
+                    next);
             }
 
-            RemoveTeleportTargetAnchor(mounted);
             QueueDeferredTeleportMount(tree, mounted, originContainer);
             return;
         }
 
-        if (!EnsureTeleportTarget(
-            tree,
-            mounted,
-            next,
-            moveChildrenToTarget: false))
+        if (!canReuseDeferredTarget
+            && !EnsureTeleportTarget(
+                tree,
+                mounted,
+                next,
+                moveChildrenToTarget: false))
         {
             if (mounted.ChildrenMounted)
             {
@@ -211,29 +247,47 @@ public sealed partial class Renderer<TNode>
         MountedTeleport<TNode> mounted,
         TNode originContainer)
     {
-        SchedulerJob job = new(
+        SchedulerJob job = null!;
+        job = new SchedulerJob(
             () =>
             {
                 if (mounted.IsUnmounted
+                    || !ReferenceEquals(mounted.PendingJob, job)
                     || mounted.Value is not TeleportNode current
-                    || current.IsDisabled
                     || !current.IsDeferred)
                 {
                     return;
                 }
 
-                if (!EnsureTeleportTarget(tree, mounted, current))
+                mounted.PendingJob = null;
+                if (!EnsureTeleportTarget(
+                    tree,
+                    mounted,
+                    current,
+                    moveChildrenToTarget: !current.IsDisabled))
                 {
+                    if (!current.IsDisabled && mounted.ChildrenMounted)
+                    {
+                        UnmountChildren(tree, mounted.Children, removeHostNodes: true);
+                        mounted.Children.Clear();
+                        mounted.ChildrenMounted = false;
+                    }
+
                     return;
                 }
 
-                mounted.Children = MountChildren(
-                    tree,
-                    current.Children,
-                    mounted.TargetContainer!,
-                    mounted.TargetAnchor,
-                    mounted.Owner);
-                mounted.ChildrenMounted = true;
+                if (!current.IsDisabled && !mounted.ChildrenMounted)
+                {
+                    mounted.Children = MountChildren(
+                        tree,
+                        current.Children,
+                        mounted.TargetContainer!,
+                        mounted.TargetAnchor,
+                        mounted.Owner);
+                    mounted.ChildrenMounted = true;
+                }
+
+                NormalizeTeleportTargetOrder(tree);
                 QueueHostCommit();
             })
         {
@@ -333,6 +387,146 @@ public sealed partial class Renderer<TNode>
         }
     }
 
+    private void ReorderTeleportTargetRange(
+        MountedNode<TNode> mounted,
+        IReadOnlyList<MountedNode<TNode>?> siblings,
+        int siblingIndex)
+    {
+        if (mounted is not MountedTeleport<TNode>
+            {
+                HasTarget: true,
+                TargetContainer: { } targetContainer,
+                TargetAnchor: { } targetRangeEnd,
+            } teleport)
+        {
+            return;
+        }
+
+        TNode? targetInsertionAnchor = default;
+        for (int index = siblingIndex + 1; index < siblings.Count; index++)
+        {
+            if (siblings[index] is MountedTeleport<TNode>
+                {
+                    HasTarget: true,
+                    TargetContainer: { } candidateTarget,
+                } candidate
+                && NodeComparer.Equals(targetContainer, candidateTarget))
+            {
+                targetInsertionAnchor = FirstTeleportTargetHostNode(candidate);
+                break;
+            }
+        }
+
+        MoveRange(
+            FirstTeleportTargetHostNode(teleport),
+            targetRangeEnd,
+            targetContainer,
+            targetInsertionAnchor);
+    }
+
+    private static TNode FirstTeleportTargetHostNode(MountedTeleport<TNode> teleport)
+    {
+        if (teleport.Value is TeleportNode { IsDisabled: false }
+            && teleport.ChildrenMounted
+            && teleport.Children.Count > 0)
+        {
+            return teleport.Children[0].FirstHostNode;
+        }
+
+        return teleport.TargetAnchor!;
+    }
+
+    private void NormalizeTeleportTargetOrder(MountedTree<TNode> tree)
+    {
+        if (tree.Root is null)
+        {
+            return;
+        }
+
+        Dictionary<TNode, List<MountedTeleport<TNode>>> teleportsByTarget =
+            new(NodeComparer);
+        CollectTargetedTeleports(tree.Root, teleportsByTarget);
+        foreach (List<MountedTeleport<TNode>> teleports in teleportsByTarget.Values)
+        {
+            for (int index = teleports.Count - 2; index >= 0; index--)
+            {
+                MountedTeleport<TNode> current = teleports[index];
+                MountedTeleport<TNode> next = teleports[index + 1];
+                TNode insertionAnchor = FirstTeleportTargetHostNode(next);
+                TNode? currentNext = _options.NextSibling(current.TargetAnchor!);
+                if (HasHostNode(currentNext)
+                    && NodeComparer.Equals(currentNext!, insertionAnchor))
+                {
+                    continue;
+                }
+
+                MoveRange(
+                    FirstTeleportTargetHostNode(current),
+                    current.TargetAnchor!,
+                    current.TargetContainer!,
+                    insertionAnchor);
+            }
+        }
+    }
+
+    private static void CollectTargetedTeleports(
+        MountedNode<TNode> mounted,
+        Dictionary<TNode, List<MountedTeleport<TNode>>> teleportsByTarget)
+    {
+        switch (mounted)
+        {
+            case MountedComponent<TNode> component:
+                CollectTargetedTeleports(component.Subtree, teleportsByTarget);
+                break;
+            case MountedElement<TNode> element:
+                CollectTargetedTeleports(element.Children, teleportsByTarget);
+                break;
+            case MountedRange<TNode> range:
+                CollectTargetedTeleports(range.Children, teleportsByTarget);
+                break;
+            case MountedTeleport<TNode> teleport:
+                if (teleport.HasTarget
+                    && HasHostNode(teleport.TargetContainer)
+                    && HasHostNode(teleport.TargetAnchor))
+                {
+                    TNode target = teleport.TargetContainer!;
+                    if (!teleportsByTarget.TryGetValue(
+                        target,
+                        out List<MountedTeleport<TNode>>? teleports))
+                    {
+                        teleports = [];
+                        teleportsByTarget.Add(target, teleports);
+                    }
+
+                    teleports.Add(teleport);
+                }
+
+                CollectTargetedTeleports(teleport.Children, teleportsByTarget);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                CollectTargetedTeleports(keepAlive.Active, teleportsByTarget);
+                break;
+            case MountedSuspense<TNode> suspense:
+                CollectTargetedTeleports(suspense.ActiveBranch, teleportsByTarget);
+                break;
+            case MountedTransition<TNode> transition:
+                CollectTargetedTeleports(
+                    CurrentTransitionChild(transition),
+                    teleportsByTarget);
+                break;
+        }
+    }
+
+    private static void CollectTargetedTeleports(
+        IReadOnlyList<MountedNode<TNode>> mounted,
+        Dictionary<TNode, List<MountedTeleport<TNode>>> teleportsByTarget)
+    {
+        for (int index = 0; index < mounted.Count; index++)
+        {
+            CollectTargetedTeleports(mounted[index], teleportsByTarget);
+        }
+    }
+
     private MountedKeepAlive<TNode> MountKeepAlive(
         MountedTree<TNode> tree,
         KeepAliveNode value,
@@ -397,7 +591,11 @@ public sealed partial class Renderer<TNode>
         }
 
         mounted.ActiveKey = null;
-        if (TryGetKeepAliveIdentity(nextValue, out object? incomingKey, out string? incomingName)
+        bool hasIncomingIdentity = TryGetKeepAliveIdentity(
+            nextValue,
+            out object? incomingKey,
+            out string? incomingName);
+        if (hasIncomingIdentity
             && mounted.Cache.TryGetValue(incomingKey, out KeepAliveCacheEntry<TNode>? cached)
             && IsSameNodeType(cached.Node.Value, nextValue))
         {
@@ -417,6 +615,15 @@ public sealed partial class Renderer<TNode>
         }
         else
         {
+            if (hasIncomingIdentity
+                && mounted.Cache.TryGetValue(
+                    incomingKey,
+                    out KeepAliveCacheEntry<TNode>? incompatible))
+            {
+                mounted.Remove(incomingKey);
+                UnmountCachedKeepAliveEntry(tree, incompatible.Node);
+            }
+
             mounted.Active = Mount(
                 tree,
                 nextValue,
@@ -507,7 +714,7 @@ public sealed partial class Renderer<TNode>
             mounted.Remove(key);
             if (!ReferenceEquals(entry.Node, mounted.Active))
             {
-                Unmount(tree, entry.Node, removeHostNodes: true);
+                UnmountCachedKeepAliveEntry(tree, entry.Node);
             }
             else
             {
@@ -533,9 +740,17 @@ public sealed partial class Renderer<TNode>
             }
             else
             {
-                Unmount(tree, entry.Node, removeHostNodes: true);
+                UnmountCachedKeepAliveEntry(tree, entry.Node);
             }
         }
+    }
+
+    private void UnmountCachedKeepAliveEntry(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> mounted)
+    {
+        InvokeKeepAliveLifecycle(mounted, activate: false);
+        Unmount(tree, mounted, removeHostNodes: true);
     }
 
     private static bool TryGetKeepAliveIdentity(
@@ -573,6 +788,11 @@ public sealed partial class Renderer<TNode>
 
     private static bool MatchesComponentFilter(object filter, string componentName)
     {
+        if (filter is Func<string, bool> predicate)
+        {
+            return predicate(componentName);
+        }
+
         if (filter is string text)
         {
             string[] configuredNames = text.Split(
@@ -657,6 +877,19 @@ public sealed partial class Renderer<TNode>
                 }
 
                 InvokeKeepAliveLifecycle(component.Subtree, activate);
+                if (!activate && !component.HasKeepAliveLifecycleState)
+                {
+                    return;
+                }
+
+                if (component.HasKeepAliveLifecycleState
+                    && component.IsKeepAliveLifecycleActive == activate)
+                {
+                    return;
+                }
+
+                component.HasKeepAliveLifecycleState = true;
+                component.IsKeepAliveLifecycleActive = activate;
                 component.Context.Run(
                     activate
                         ? component.Lifecycle.InvokeActivated
@@ -670,6 +903,15 @@ public sealed partial class Renderer<TNode>
                 break;
             case MountedTeleport<TNode> teleport:
                 InvokeKeepAliveLifecycle(teleport.Children, activate);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                InvokeKeepAliveLifecycle(keepAlive.Active, activate);
+                break;
+            case MountedSuspense<TNode> suspense:
+                InvokeKeepAliveLifecycle(suspense.ActiveBranch, activate);
+                break;
+            case MountedTransition<TNode> transition:
+                InvokeKeepAliveLifecycle(CurrentTransitionChild(transition), activate);
                 break;
         }
     }
@@ -689,6 +931,13 @@ public sealed partial class Renderer<TNode>
         MountedKeepAlive<TNode> mounted,
         bool removeHostNodes)
     {
+        if (mounted.ActiveKey is { } activeKey
+            && mounted.Cache.TryGetValue(activeKey, out KeepAliveCacheEntry<TNode>? activeEntry)
+            && ReferenceEquals(activeEntry.Node, mounted.Active))
+        {
+            InvokeKeepAliveLifecycle(mounted.Active, activate: false);
+        }
+
         HashSet<MountedNode<TNode>> released = new(ReferenceEqualityComparer.Instance);
         foreach (KeepAliveCacheEntry<TNode> entry in mounted.Cache.Values)
         {
@@ -937,17 +1186,46 @@ public sealed partial class Renderer<TNode>
     {
         VirtualNode childValue = EvaluateSlot(value.Invocation, "default", owner)
             ?? new CommentNode(string.Empty);
-        MountedNode<TNode> child = Mount(tree, childValue, container, anchor, owner);
-        MountedTransition<TNode> mounted = new(value, child, owner)
+        TransitionProperties properties = ResolveTransitionProperties(value);
+        TransitionState sharedState = ResolveTransitionState(value) ?? new TransitionState();
+        TransitionController controller = CreateTransitionController(
+            tree,
+            owner,
+            properties,
+            sharedState,
+            childValue);
+        bool shouldEnter = !properties.Persisted
+            && (sharedState.IsMounted || properties.Appear);
+        (MountedNode<TNode> child, TransitionMountContext<TNode> mountContext) =
+            MountTransitionChild(
+                tree,
+                childValue,
+                container,
+                anchor,
+                owner,
+                controller,
+                shouldEnter);
+        MountedTransition<TNode> mounted = new(
+            value,
+            child,
+            sharedState,
+            controller,
+            owner)
         {
             State = TransitionExecutionState.Entered,
         };
         Register(tree, value, mounted);
-        if (!ReadTransitionBoolean(value, "persisted")
-            && ReadTransitionBoolean(value, "appear"))
+        if (shouldEnter)
         {
-            BeginTransitionEnter(tree, mounted, child, value);
+            BeginTransitionEnter(
+                tree,
+                mounted,
+                child,
+                controller,
+                mountContext);
         }
+
+        QueueTransitionMountedState(mounted, controller, sharedState);
 
         return mounted;
     }
@@ -958,54 +1236,88 @@ public sealed partial class Renderer<TNode>
         TransitionNode next,
         TNode container)
     {
-        TransitionNode previous = (TransitionNode)mounted.Value;
         SettleTransitionBeforePatch(tree, mounted);
-        IReadOnlyList<KeyValuePair<object, TNode>> outgoingSnapshot =
+        IReadOnlyList<TransitionElementSnapshot> outgoingSnapshot =
             CaptureTransitionSnapshot(CurrentTransitionChild(mounted));
-        ObserveTransitionBeforeUpdate(tree, mounted, outgoingSnapshot);
+        ObserveTransitionBeforeUpdate(mounted.Controller, outgoingSnapshot);
         VirtualNode nextValue = EvaluateSlot(next.Invocation, "default", mounted.Owner)
             ?? new CommentNode(string.Empty);
+        TransitionProperties nextProperties = ResolveTransitionProperties(next);
+        TransitionState nextState = ResolveTransitionState(next) ?? mounted.SharedState;
         MountedNode<TNode> current = CurrentTransitionChild(mounted);
-        if (ReadTransitionBoolean(previous, "persisted")
-            || ReadTransitionBoolean(next, "persisted")
-            || IsSameNodeType(current.Value, nextValue))
+        TransitionController currentController = mounted.Controller;
+        bool wasPersisted = currentController.Properties.Persisted;
+        bool isSameNodeType = IsSameNodeType(current.Value, nextValue);
+        bool preservePersistedController = wasPersisted
+            && nextProperties.Persisted
+            && isSameNodeType
+            && ReferenceEquals(nextState, mounted.SharedState);
+        TransitionController nextController;
+        if (preservePersistedController)
         {
-            mounted.Child = Patch(
+            currentController.UpdateProperties(nextProperties);
+            nextController = currentController;
+        }
+        else
+        {
+            nextController = CreateTransitionController(
+                tree,
+                mounted.Owner,
+                nextProperties,
+                nextState,
+                nextValue);
+        }
+
+        if (wasPersisted
+            || nextProperties.Persisted
+            || isSameNodeType)
+        {
+            MountedNode<TNode> patched = PatchTransitionChild(
                 tree,
                 current,
                 nextValue,
                 container,
                 GetNextHostNode(current),
-                mounted.Owner);
+                mounted.Owner,
+                nextController);
+            if (!ReferenceEquals(currentController, nextController))
+            {
+                currentController.Dispose();
+            }
+
+            mounted.Child = patched;
+            mounted.Controller = nextController;
+            mounted.SharedState = nextState;
             mounted.IncomingChild = null;
             mounted.Overlap = null;
             mounted.State = TransitionExecutionState.Entered;
             ReplaceValue(tree, mounted, next);
             ObserveTransitionUpdated(
-                tree,
-                mounted,
+                nextController,
                 CaptureTransitionSnapshot(mounted.Child));
             return;
         }
 
-        switch (ReadTransitionMode(next))
+        switch (ReadTransitionMode(nextProperties))
         {
             case TransitionMode.OutgoingThenIncoming:
                 PatchTransitionOutgoingThenIncoming(
                     tree,
                     mounted,
-                    previous,
                     next,
                     nextValue,
+                    nextController,
+                    nextState,
                     container);
                 break;
             case TransitionMode.IncomingThenOutgoing:
                 PatchTransitionWithOverlap(
                     tree,
                     mounted,
-                    previous,
                     next,
                     nextValue,
+                    nextController,
+                    nextState,
                     container,
                     delayLeaveUntilEnter: true);
                 break;
@@ -1013,9 +1325,10 @@ public sealed partial class Renderer<TNode>
                 PatchTransitionWithOverlap(
                     tree,
                     mounted,
-                    previous,
                     next,
                     nextValue,
+                    nextController,
+                    nextState,
                     container,
                     delayLeaveUntilEnter: false);
                 break;
@@ -1025,20 +1338,23 @@ public sealed partial class Renderer<TNode>
     private void PatchTransitionOutgoingThenIncoming(
         MountedTree<TNode> tree,
         MountedTransition<TNode> mounted,
-        TransitionNode previous,
         TransitionNode next,
         VirtualNode nextValue,
+        TransitionController nextController,
+        TransitionState nextState,
         TNode container)
     {
         MountedNode<TNode> outgoing = mounted.Child;
+        TransitionController outgoingController = mounted.Controller;
         TNode? insertionAnchor = GetNextHostNode(outgoing);
         ReplaceValue(tree, mounted, next);
+        bool outgoingRemoved = false;
         BeginTransitionLeave(
             tree,
             mounted,
             outgoing,
-            previous,
-            cancelled =>
+            outgoingController,
+            _ =>
             {
                 if (mounted.IsUnmounted || !ReferenceEquals(mounted.Child, outgoing))
                 {
@@ -1046,47 +1362,73 @@ public sealed partial class Renderer<TNode>
                 }
 
                 Unmount(tree, outgoing, removeHostNodes: true);
-                MountedNode<TNode> incoming = Mount(
-                    tree,
-                    nextValue,
-                    container,
-                    insertionAnchor,
-                    mounted.Owner);
+                outgoingController.Dispose();
+                outgoingRemoved = true;
+            },
+            cancelled =>
+            {
+                if (!outgoingRemoved || mounted.IsUnmounted)
+                {
+                    return;
+                }
+
+                (MountedNode<TNode> incoming, TransitionMountContext<TNode> mountContext) =
+                    MountTransitionChild(
+                        tree,
+                        nextValue,
+                        container,
+                        insertionAnchor,
+                        mounted.Owner,
+                        nextController,
+                        shouldEnter: !cancelled && !nextController.Properties.Persisted);
                 mounted.Child = incoming;
+                mounted.Controller = nextController;
+                mounted.SharedState = nextState;
                 mounted.State = TransitionExecutionState.Entered;
                 if (!cancelled)
                 {
-                    BeginTransitionEnter(tree, mounted, incoming, next);
+                    BeginTransitionEnter(
+                        tree,
+                        mounted,
+                        incoming,
+                        nextController,
+                        mountContext);
                 }
 
+                NormalizeTeleportTargetOrder(tree);
                 ObserveTransitionUpdated(
-                    tree,
-                    mounted,
+                    nextController,
                     CaptureTransitionSnapshot(incoming));
+                QueueTransitionMountedState(mounted, nextController, nextState);
             });
     }
 
     private void PatchTransitionWithOverlap(
         MountedTree<TNode> tree,
         MountedTransition<TNode> mounted,
-        TransitionNode previous,
         TransitionNode next,
         VirtualNode nextValue,
+        TransitionController nextController,
+        TransitionState nextState,
         TNode container,
         bool delayLeaveUntilEnter)
     {
         MountedNode<TNode> outgoing = mounted.Child;
+        TransitionController outgoingController = mounted.Controller;
         TNode? insertionAnchor = GetNextHostNode(outgoing);
         TNode startAnchor = _options.CreateComment("transition overlap start");
         TNode endAnchor = _options.CreateComment("transition overlap end");
         _options.Insert(startAnchor, container, outgoing.FirstHostNode);
         _options.Insert(endAnchor, container, insertionAnchor);
-        MountedNode<TNode> incoming = Mount(
-            tree,
-            nextValue,
-            container,
-            endAnchor,
-            mounted.Owner);
+        (MountedNode<TNode> incoming, TransitionMountContext<TNode> mountContext) =
+            MountTransitionChild(
+                tree,
+                nextValue,
+                container,
+                endAnchor,
+                mounted.Owner,
+                nextController,
+                shouldEnter: !nextController.Properties.Persisted);
         FragmentNode overlapValue = new([outgoing.Value, incoming.Value]);
         MountedRange<TNode> overlap = new(
             overlapValue,
@@ -1098,11 +1440,9 @@ public sealed partial class Renderer<TNode>
         mounted.Child = overlap;
         mounted.Overlap = overlap;
         mounted.IncomingChild = incoming;
+        mounted.Controller = nextController;
+        mounted.SharedState = nextState;
         ReplaceValue(tree, mounted, next);
-        ObserveTransitionUpdated(
-            tree,
-            mounted,
-            CaptureTransitionSnapshot(incoming));
 
         void BeginLeaveAfterEnter(bool _)
         {
@@ -1115,26 +1455,34 @@ public sealed partial class Renderer<TNode>
                 tree,
                 mounted,
                 outgoing,
-                previous,
+                outgoingController,
                 cancelled => CompleteTransitionOverlap(
                     tree,
                     mounted,
                     overlap,
                     outgoing,
                     incoming,
-                    cancelled));
+                    cancelled,
+                    outgoingController),
+                afterCompletion: null);
         }
 
         BeginTransitionEnter(
             tree,
             mounted,
             incoming,
-            next,
+            nextController,
+            mountContext,
             delayLeaveUntilEnter ? BeginLeaveAfterEnter : null);
+        ObserveTransitionUpdated(
+            nextController,
+            CaptureTransitionSnapshot(incoming));
         if (!delayLeaveUntilEnter)
         {
             BeginLeaveAfterEnter(false);
         }
+
+        QueueTransitionMountedState(mounted, nextController, nextState);
     }
 
     private void CompleteTransitionOverlap(
@@ -1143,7 +1491,8 @@ public sealed partial class Renderer<TNode>
         MountedRange<TNode> overlap,
         MountedNode<TNode> outgoing,
         MountedNode<TNode> incoming,
-        bool cancelled)
+        bool cancelled,
+        TransitionController outgoingController)
     {
         _ = cancelled;
         if (mounted.IsUnmounted || !ReferenceEquals(mounted.Overlap, overlap))
@@ -1152,6 +1501,7 @@ public sealed partial class Renderer<TNode>
         }
 
         Unmount(tree, outgoing, removeHostNodes: true);
+        outgoingController.Dispose();
         _options.Remove(overlap.StartAnchor);
         _options.Remove(overlap.EndAnchor);
         Unregister(tree, overlap);
@@ -1179,44 +1529,74 @@ public sealed partial class Renderer<TNode>
         MountedTransition<TNode> mounted,
         bool removeHostNodes)
     {
-        CancelTransitionOperationForUnmount(
-            tree,
-            mounted,
-            mounted.EnterOperation,
-            isEnter: true);
-        CancelTransitionOperationForUnmount(
-            tree,
-            mounted,
-            mounted.LeaveOperation,
-            isEnter: false);
+        tree.PendingTransitionRemovals.Remove(mounted);
+        mounted.IsUnmounted = true;
+        TransitionOperation<TNode>? enter = mounted.EnterOperation;
+        if (enter is not null)
+        {
+            enter.Controller.FinishEnter(enter.Element!, cancelled: true);
+        }
+
+        TransitionOperation<TNode>? leave = mounted.LeaveOperation;
+        if (leave is not null)
+        {
+            leave.Controller.FinishLeave(leave.Element!, cancelled: false);
+        }
+
+        mounted.Controller.Drain();
         Unmount(tree, mounted.Child, removeHostNodes);
+        mounted.Controller.Dispose();
         mounted.IncomingChild = null;
         mounted.Overlap = null;
         mounted.State = TransitionExecutionState.Left;
     }
 
-    private void CancelTransitionOperationForUnmount(
+    private bool TryDeferTransitionUnmount(
         MountedTree<TNode> tree,
-        MountedTransition<TNode> mounted,
-        TransitionOperation<TNode>? operation,
-        bool isEnter)
+        MountedTransition<TNode> mounted)
     {
-        if (operation is null)
+        if (mounted.Controller.Properties.Persisted)
+        {
+            return false;
+        }
+
+        if (mounted.IsUnmountPending)
+        {
+            return true;
+        }
+
+        SettleTransitionBeforePatch(tree, mounted);
+        if (mounted.IsUnmounted)
+        {
+            return true;
+        }
+
+        MountedNode<TNode> child = CurrentTransitionChild(mounted);
+        mounted.IsUnmountPending = true;
+        tree.PendingTransitionRemovals.Add(mounted);
+        BeginTransitionLeave(
+            tree,
+            mounted,
+            child,
+            mounted.Controller,
+            _ => FinalizeDeferredTransitionUnmount(
+                tree,
+                mounted));
+        return true;
+    }
+
+    private void FinalizeDeferredTransitionUnmount(
+        MountedTree<TNode> tree,
+        MountedTransition<TNode> mounted)
+    {
+        if (mounted.IsUnmounted)
         {
             return;
         }
 
-        operation.IsCompleted = true;
-        if (isEnter)
-        {
-            mounted.EnterOperation = null;
-        }
-        else
-        {
-            mounted.LeaveOperation = null;
-        }
-
-        _ = tree;
+        ClearReference(tree, mounted);
+        UnmountTransition(tree, mounted, removeHostNodes: true);
+        Unregister(tree, mounted);
     }
 
     private void FinishPendingTransitionEnter(
@@ -1230,10 +1610,7 @@ public sealed partial class Renderer<TNode>
         }
 
         _ = tree;
-        CompleteTransitionOperation(
-            mounted,
-            operation,
-            cancelled: false);
+        operation.Controller.FinishEnter(operation.Element!, cancelled: false);
     }
 
     private void CancelPendingTransitionLeave(
@@ -1247,38 +1624,84 @@ public sealed partial class Renderer<TNode>
         }
 
         _ = tree;
-        CompleteTransitionOperation(
-            mounted,
-            operation,
-            cancelled: true);
+        operation.Controller.FinishLeave(operation.Element!, cancelled: true);
     }
 
     private void BeginTransitionEnter(
         MountedTree<TNode> tree,
         MountedTransition<TNode> mounted,
         MountedNode<TNode> child,
-        TransitionNode transition,
+        TransitionController controller,
+        TransitionMountContext<TNode> mountContext,
         Action<bool>? afterCompletion = null)
     {
+        if (controller.Properties.Persisted || mountContext.IsSuppressed)
+        {
+            mounted.State = TransitionExecutionState.Entered;
+            afterCompletion?.Invoke(false);
+            return;
+        }
+
+        TNode element;
+        if (HasHostNode(mountContext.Element))
+        {
+            element = mountContext.Element!;
+        }
+        else if (!TryGetFirstTransitionElement(child, out element))
+        {
+            mounted.State = TransitionExecutionState.Entered;
+            afterCompletion?.Invoke(false);
+            return;
+        }
+
+        if (!mountContext.BeforeEnterInvoked && !controller.BeforeEnter(element!))
+        {
+            mounted.State = TransitionExecutionState.Entered;
+            afterCompletion?.Invoke(false);
+            return;
+        }
+
+        TransitionOperation<TNode> operation = new(
+            TransitionOperationKind.Enter,
+            element,
+            controller,
+            afterCompletion ?? (static _ => { }));
+        mounted.EnterOperation = operation;
+        mounted.State = TransitionExecutionState.Entering;
+        controller.Enter(
+            element!,
+            cancelled => CompleteTransitionOperation(mounted, operation, cancelled));
         _ = tree;
-        _ = child;
-        _ = transition;
-        mounted.State = TransitionExecutionState.Entered;
-        afterCompletion?.Invoke(false);
     }
 
     private void BeginTransitionLeave(
         MountedTree<TNode> tree,
         MountedTransition<TNode> mounted,
         MountedNode<TNode> child,
-        TransitionNode transition,
-        Action<bool> afterCompletion)
+        TransitionController controller,
+        Action<bool> removal,
+        Action<bool>? afterCompletion = null)
     {
+        if (controller.Properties.Persisted
+            || !TryGetFirstTransitionElement(child, out TNode element))
+        {
+            removal(false);
+            afterCompletion?.Invoke(false);
+            return;
+        }
+
+        TransitionOperation<TNode> operation = new(
+            TransitionOperationKind.Leave,
+            element,
+            controller,
+            removal);
+        mounted.LeaveOperation = operation;
+        mounted.State = TransitionExecutionState.Leaving;
+        controller.Leave(
+            element!,
+            cancelled => CompleteTransitionOperation(mounted, operation, cancelled),
+            afterCompletion);
         _ = tree;
-        _ = mounted;
-        _ = child;
-        _ = transition;
-        afterCompletion(false);
     }
 
     private void CancelPendingTransitionEnter(
@@ -1292,10 +1715,7 @@ public sealed partial class Renderer<TNode>
         }
 
         _ = tree;
-        CompleteTransitionOperation(
-            mounted,
-            operation,
-            cancelled: true);
+        operation.Controller.FinishEnter(operation.Element!, cancelled: true);
     }
 
     private void CompleteTransitionOperation(
@@ -1356,54 +1776,70 @@ public sealed partial class Renderer<TNode>
             });
     }
 
-    private void ObserveTransitionBeforeUpdate(
-        MountedTree<TNode> tree,
-        MountedTransition<TNode> mounted,
-        IReadOnlyList<KeyValuePair<object, TNode>> outgoing)
-    {
-        _ = tree;
-        _ = mounted;
-        _ = outgoing;
-    }
+    private static void ObserveTransitionBeforeUpdate(
+        TransitionController controller,
+        IReadOnlyList<TransitionElementSnapshot> outgoing) =>
+        controller.ObserveBeforeUpdate(outgoing);
 
-    private void ObserveTransitionUpdated(
-        MountedTree<TNode> tree,
-        MountedTransition<TNode> mounted,
-        IReadOnlyList<KeyValuePair<object, TNode>> incoming)
-    {
-        _ = tree;
-        _ = mounted;
-        _ = incoming;
-    }
+    private static void ObserveTransitionUpdated(
+        TransitionController controller,
+        IReadOnlyList<TransitionElementSnapshot> incoming) =>
+        controller.ObserveUpdated(incoming);
 
-    private static IReadOnlyList<KeyValuePair<object, TNode>> CaptureTransitionSnapshot(
+    private static IReadOnlyList<TransitionElementSnapshot> CaptureTransitionSnapshot(
         MountedNode<TNode> mounted)
     {
-        List<KeyValuePair<object, TNode>> snapshot = [];
-        if (mounted is MountedRange<TNode> range
-            && mounted.Value is FragmentNode)
-        {
-            for (int index = 0; index < range.Children.Count; index++)
-            {
-                AddTransitionSnapshotEntry(range.Children[index], snapshot);
-            }
-        }
-        else
-        {
-            AddTransitionSnapshotEntry(mounted, snapshot);
-        }
-
+        List<TransitionElementSnapshot> snapshot = [];
+        CollectTransitionSnapshotEntries(mounted, snapshot);
         return snapshot.AsReadOnly();
     }
 
-    private static void AddTransitionSnapshotEntry(
+    private static void CollectTransitionSnapshotEntries(
         MountedNode<TNode> mounted,
-        List<KeyValuePair<object, TNode>> snapshot)
+        List<TransitionElementSnapshot> snapshot)
     {
         if (mounted.Value.Key is { } key
-            && TryGetFirstTransitionElement(mounted, out TNode element))
+            && TryGetFirstTransitionElement(mounted, out TNode keyedElement))
         {
-            snapshot.Add(new KeyValuePair<object, TNode>(key, element));
+            snapshot.Add(new TransitionElementSnapshot(key, keyedElement));
+            return;
+        }
+
+        switch (mounted)
+        {
+            case MountedElement<TNode> element:
+                CollectTransitionSnapshotEntries(element.Children, snapshot);
+                break;
+            case MountedRange<TNode> range:
+                CollectTransitionSnapshotEntries(range.Children, snapshot);
+                break;
+            case MountedComponent<TNode> component:
+                CollectTransitionSnapshotEntries(component.Subtree, snapshot);
+                break;
+            case MountedTeleport<TNode> teleport:
+                CollectTransitionSnapshotEntries(teleport.Children, snapshot);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                CollectTransitionSnapshotEntries(keepAlive.Active, snapshot);
+                break;
+            case MountedSuspense<TNode> suspense:
+                CollectTransitionSnapshotEntries(suspense.ActiveBranch, snapshot);
+                break;
+            case MountedTransition<TNode> transition:
+                CollectTransitionSnapshotEntries(
+                    CurrentTransitionChild(transition),
+                    snapshot);
+                break;
+        }
+    }
+
+    private static void CollectTransitionSnapshotEntries(
+        IReadOnlyList<MountedNode<TNode>> mounted,
+        List<TransitionElementSnapshot> snapshot)
+    {
+        for (int index = 0; index < mounted.Count; index++)
+        {
+            CollectTransitionSnapshotEntries(mounted[index], snapshot);
         }
     }
 
@@ -1452,7 +1888,7 @@ public sealed partial class Renderer<TNode>
         return false;
     }
 
-    private void InvokeTransitionHostCallback(
+    private bool TryInvokeTransitionHostCallback(
         MountedTree<TNode> tree,
         RuntimeComponentContext? owner,
         Action callback,
@@ -1468,6 +1904,8 @@ public sealed partial class Renderer<TNode>
             {
                 owner.Run(callback);
             }
+
+            return true;
         }
         catch (Exception exception)
         {
@@ -1483,6 +1921,8 @@ public sealed partial class Renderer<TNode>
             {
                 throw;
             }
+
+            return false;
         }
     }
 
@@ -1490,27 +1930,189 @@ public sealed partial class Renderer<TNode>
         MountedTransition<TNode> mounted) =>
         mounted.IncomingChild ?? mounted.Child;
 
-    private static bool ReadTransitionBoolean(
-        TransitionNode transition,
-        string name) =>
-        transition.Invocation.Arguments.TryGetValue(name, out object? value)
-        && value is true;
-
-    private static TransitionMode ReadTransitionMode(TransitionNode transition)
+    private static TransitionMode ReadTransitionMode(TransitionProperties properties)
     {
-        if (!transition.Invocation.Arguments.TryGetValue("mode", out object? value)
-            || value is not string mode)
-        {
-            return TransitionMode.Simultaneous;
-        }
-
-        return mode switch
+        return properties.Mode switch
         {
             "out-in" => TransitionMode.OutgoingThenIncoming,
             "in-out" => TransitionMode.IncomingThenOutgoing,
             _ => TransitionMode.Simultaneous,
         };
     }
+
+    private TransitionController CreateTransitionController(
+        MountedTree<TNode> tree,
+        RuntimeComponentContext? owner,
+        TransitionProperties properties,
+        TransitionState state,
+        VirtualNode child) =>
+        new(
+            properties,
+            state,
+            TransitionIdentity.Create(child),
+            (callback, information) => TryInvokeTransitionHostCallback(
+                tree,
+                owner,
+                callback,
+                information));
+
+    private (MountedNode<TNode> Child, TransitionMountContext<TNode> Context)
+        MountTransitionChild(
+            MountedTree<TNode> tree,
+            VirtualNode child,
+            TNode container,
+            TNode? anchor,
+            RuntimeComponentContext? owner,
+            TransitionController controller,
+            bool shouldEnter)
+    {
+        TransitionMountContext<TNode>? previous = _activeTransitionMount;
+        TransitionMountContext<TNode> context = new(
+            controller,
+            previous,
+            shouldEnter,
+            isHydrating: false);
+        _activeTransitionMount = context;
+        try
+        {
+            return (Mount(tree, child, container, anchor, owner), context);
+        }
+        finally
+        {
+            _activeTransitionMount = previous;
+        }
+    }
+
+    private MountedNode<TNode> PatchTransitionChild(
+        MountedTree<TNode> tree,
+        MountedNode<TNode> current,
+        VirtualNode next,
+        TNode container,
+        TNode? anchor,
+        RuntimeComponentContext? owner,
+        TransitionController controller)
+    {
+        TransitionMountContext<TNode>? previous = _activeTransitionMount;
+        _activeTransitionMount = new TransitionMountContext<TNode>(
+            controller,
+            previous,
+            shouldEnter: false,
+            isHydrating: false);
+        try
+        {
+            return Patch(
+                tree,
+                current,
+                next,
+                container,
+                anchor,
+                owner,
+                allowTransitionLeave: false);
+        }
+        finally
+        {
+            _activeTransitionMount = previous;
+        }
+    }
+
+    private static void QueueTransitionMountedState(
+        MountedTransition<TNode> mounted,
+        TransitionController controller,
+        TransitionState state)
+    {
+        Scheduler.QueuePostFlushCallback(
+            new SchedulerJob(
+                () =>
+                {
+                    if (!mounted.IsUnmounted)
+                    {
+                        state.IsMounted = true;
+                    }
+
+                    controller.IsHydrating = false;
+                })
+            {
+                Name = "transition mounted state",
+            });
+    }
+
+    private static TransitionState? ResolveTransitionState(TransitionNode transition) =>
+        transition.Invocation.Arguments.TryGetValue(
+            TransitionProperties.StateArgument,
+            out object? value)
+            ? value as TransitionState
+            : null;
+
+    private static TransitionProperties ResolveTransitionProperties(
+        TransitionNode transition)
+    {
+        IReadOnlyDictionary<string, object?> arguments = transition.Invocation.Arguments;
+        if (arguments.TryGetValue(
+                TransitionProperties.ResolvedArgument,
+                out object? value)
+            && value is TransitionProperties properties)
+        {
+            return properties;
+        }
+
+        return new TransitionProperties
+        {
+            Mode = arguments.TryGetValue("mode", out value) ? value as string : null,
+            Appear = arguments.TryGetValue("appear", out value) && value is true,
+            Persisted = arguments.TryGetValue("persisted", out value) && value is true,
+            OnBeforeEnter = ReadTransitionAction(arguments, "onBeforeEnter"),
+            OnEnter = ReadTransitionPhase(arguments, "onEnter"),
+            OnAfterEnter = ReadTransitionAction(arguments, "onAfterEnter"),
+            OnEnterCancelled = ReadTransitionAction(arguments, "onEnterCancelled"),
+            OnBeforeLeave = ReadTransitionAction(arguments, "onBeforeLeave"),
+            OnLeave = ReadTransitionPhase(arguments, "onLeave"),
+            OnAfterLeave = ReadTransitionAction(arguments, "onAfterLeave"),
+            OnLeaveCancelled = ReadTransitionAction(arguments, "onLeaveCancelled"),
+            OnBeforeAppear = ReadTransitionAction(arguments, "onBeforeAppear"),
+            OnAppear = ReadTransitionPhase(arguments, "onAppear"),
+            OnAfterAppear = ReadTransitionAction(arguments, "onAfterAppear"),
+            OnAppearCancelled = ReadTransitionAction(arguments, "onAppearCancelled"),
+            OnBeforeUpdate = ReadTransitionSnapshotObserver(arguments, "onBeforeUpdate"),
+            OnUpdated = ReadTransitionSnapshotObserver(arguments, "onUpdated"),
+        };
+    }
+
+    private static Action<object>? ReadTransitionAction(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name) =>
+        arguments.TryGetValue(name, out object? value)
+            ? value as Action<object>
+            : null;
+
+    private static TransitionPhaseHook? ReadTransitionPhase(
+        IReadOnlyDictionary<string, object?> arguments,
+        string name)
+    {
+        if (!arguments.TryGetValue(name, out object? value))
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            TransitionPhaseHook hook => hook,
+            Action<object> action => (element, complete) =>
+            {
+                action(element);
+                complete();
+            }
+            ,
+            _ => null,
+        };
+    }
+
+    private static Action<IReadOnlyList<TransitionElementSnapshot>>?
+        ReadTransitionSnapshotObserver(
+            IReadOnlyDictionary<string, object?> arguments,
+            string name) =>
+        arguments.TryGetValue(name, out object? value)
+            ? value as Action<IReadOnlyList<TransitionElementSnapshot>>
+            : null;
 
     private static VirtualNode? EvaluateSlot(
         ComponentInvocation invocation,

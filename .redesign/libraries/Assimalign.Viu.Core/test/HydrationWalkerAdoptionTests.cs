@@ -13,6 +13,10 @@ namespace Assimalign.Viu.Core.Tests;
 /// <summary>
 /// Pins Core's host-neutral hydration adoption and smallest-range fallback semantics.
 /// </summary>
+/// <remarks>
+/// Specified by <c>[HYD-1]</c> through <c>[HYD-7]</c> and <c>[BLT-5]</c> through
+/// <c>[BLT-6]</c>.
+/// </remarks>
 public sealed class HydrationWalkerAdoptionTests
 {
     [Fact]
@@ -278,6 +282,99 @@ public sealed class HydrationWalkerAdoptionTests
 
         target.Children[0].ShouldBeSameAs(targetText);
         targetText.Data.ShouldBe("returned");
+    }
+
+    [Fact]
+    public void Hydrate_UnresolvedTeleportTarget_WarnsAndAdoptsTheOriginRange()
+    {
+        HydrationWalkerFakeHost host = new();
+        HydrationWalkerHostNode originStart = host.CreateServerComment(
+            CommentData(HydrationMarkers.TeleportStart));
+        HydrationWalkerHostNode originEnd = host.CreateServerComment(
+            CommentData(HydrationMarkers.TeleportEnd));
+        host.AppendServerChild(host.Root, originStart);
+        host.AppendServerChild(host.Root, originEnd);
+        TeleportNode client = new(
+            "missing",
+            children: [new TextNode("unavailable")]);
+        List<string> warnings = [];
+        Renderer<HydrationWalkerHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Hydrate(client, host.Root, CreateApplication(client, warnings));
+
+        host.Root.Children.ShouldBe([originStart, originEnd]);
+        host.ClientCreationCount.ShouldBe(0);
+        warnings.ShouldHaveSingleItem()
+            .ShouldBe("Failed to resolve teleport target 'missing'.");
+    }
+
+    [Fact]
+    public void Hydrate_KeepAlive_AdoptsMatchingComponentSubtreeAndRetainsItForUpdates()
+    {
+        HydrationWalkerFakeHost host = new();
+        HydrationWalkerHostNode serverText = host.CreateServerText("ready");
+        HydrationWalkerHostNode serverElement = host.CreateServerElement("strong", serverText);
+        host.AppendServerChild(host.Root, serverElement);
+        ComponentReference reference = ComponentReference.ForType(
+            typeof(HydrationWalkerGreetingComponent));
+        ComponentFactory components = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(
+                    parameters: [new ComponentParameter("message")]),
+                _ => new HydrationWalkerGreetingComponent()));
+        KeepAliveNode client = KeepAliveGreeting(reference, "ready");
+        List<string> warnings = [];
+        ApplicationContext application = CreateApplication(client, warnings, components);
+        Renderer<HydrationWalkerHostNode> renderer =
+            RendererFactory.CreateRenderer(host.Options);
+
+        renderer.Hydrate(client, host.Root, application);
+
+        host.Root.Children.Count.ShouldBe(3);
+        host.Root.Children[0].Kind.ShouldBe(HydrationNodeKind.Comment);
+        host.Root.Children[0].Data.ShouldBe("keep-alive start");
+        host.Root.Children[1].ShouldBeSameAs(serverElement);
+        host.Root.Children[2].Kind.ShouldBe(HydrationNodeKind.Comment);
+        host.Root.Children[2].Data.ShouldBe("keep-alive end");
+        serverElement.Children.Single().ShouldBeSameAs(serverText);
+        host.ClientCreationCount.ShouldBe(3);
+        host.Operations.ShouldNotContain(
+            operation => operation.StartsWith("remove:", StringComparison.Ordinal));
+        warnings.ShouldBeEmpty();
+        renderer.GetMountedComponentViews(host.Root)
+            .ShouldHaveSingleItem()
+            .FirstHostNode.ShouldBeSameAs(serverElement);
+
+        KeepAliveNode updated = KeepAliveGreeting(reference, "updated");
+        renderer.Render(updated, host.Root, application);
+
+        host.Root.Children[1].ShouldBeSameAs(serverElement);
+        serverElement.Children.Single().ShouldBeSameAs(serverText);
+        serverText.Data.ShouldBe("updated");
+        host.ClientCreationCount.ShouldBe(3);
+        warnings.ShouldBeEmpty();
+    }
+
+    private static KeepAliveNode KeepAliveGreeting(
+        ComponentReference reference,
+        string message)
+    {
+        return new KeepAliveNode(
+            new ComponentInvocation(
+                slots: new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+                {
+                    ["default"] = _ => new ComponentNode(
+                        reference,
+                        new ComponentInvocation(
+                            arguments: new Dictionary<string, object?>
+                            {
+                                ["message"] = message,
+                            }),
+                        key: "greeting"),
+                }));
     }
 
     private static ApplicationContext CreateApplication(

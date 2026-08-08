@@ -42,6 +42,10 @@ internal sealed class MountedComponent<TNode> : MountedNode<TNode>
 
     internal VirtualNode? PendingTree;
 
+    internal bool HasKeepAliveLifecycleState;
+
+    internal bool IsKeepAliveLifecycleActive;
+
     internal IDisposable? HotReloadRegistration;
 
     internal MountedComponentView<TNode> View;

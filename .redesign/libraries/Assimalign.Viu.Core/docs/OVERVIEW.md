@@ -1,25 +1,67 @@
 # Assimalign.Viu.Core
 
-Core is **the Application Model**: the engine that executes the Components-owned component model
-plus the public operations hosts consume. Its public contracts are:
+Core is the host-neutral Application Model and mounted rendering engine. Components owns the
+immutable `VirtualNode` vocabulary; Core activates authored components, maintains their mounted
+counterparts, schedules updates, executes structural built-ins, and translates tree changes into
+the operations supplied by a host. Core contains no browser handles or interop [RND-HOST-1] through
+[RND-HOST-4].
 
-- `ComponentHost.RenderAsync(ComponentRenderRequest)` → `IComponentRenderScope { Tree; Context }`:
-  one-shot activate, setup-in-scope, prefetch, render-once, and abort-on-dispose. The host
-  constructs one `ComponentRenderFrame` per mount, invokes the renderer with it, and keeps the
-  frame on the internal lease so repeated renders reuse the mount's frame — there is no ambient
-  render-helper state. Aborting cancels the component-lifetime token before stopping its reactive
-  scope, disposes the authored instance, drains observed lifecycle tasks, and then releases the
-  lifecycle;
-- `ComponentRuntimeOptions.ErrorHandler`: the terminal sink after ancestor `OnErrorCaptured`
-  callbacks for lifecycle, watcher, and event faults; with no configured sink, an unhandled fault
-  keeps its exception;
-- `MountedComponentView<TNode>`: the cold-path testing/diagnostics view (`Request`, `Instance`,
-  `Context`, `FirstHostNode`, `LastHostNode`, `IsMounted`) with stable per-mount identity;
-- `IVirtualNodeHost<TNode>`: genuine host operation variation;
-- `ComponentCompilerServices` + `ComponentDevelopmentMetadata`: the hidden hot-reload
-  registration ABI for generated code.
+## Mounted rendering
 
-`RuntimeComponentContext` — the single implementation of Components' abstract `ComponentContext` —
-is internal and sealed, as are the render lease and the mounted engine types the full
-implementation would add (`MountedComponent`, mounted node variants, built-in executors, the
-persistent `Renderer<TNode>`). No host is a compile-time friend of Core.
+`Renderer<TNode>` mounts, patches, moves, hydrates, and unmounts the ten closed node variants. Each
+renderer owns its mounted tree and stable `MountedComponentView<TNode>` identities. Element and
+fragment updates consume compiler `RenderPlan` information where available, including the distinct
+`Cached` and `Bail` whole-value paths; keyed children preserve retained host identity and minimize
+moves [RND-1] through [RND-6], [RND-BLOCK-1] through [RND-BLOCK-6], and [RND-KEY-1] through
+[RND-KEY-3].
+
+`RendererOptions<TNode>` is the complete host contract. It carries creation, insertion, removal,
+navigation, binding-patch, commit, static-content, teleport-resolution, and hydration-reader
+operations. A missing optional operation means that capability is unavailable. Host batching is
+crossed only through `Commit`; Core does not infer host namespaces or timing policy.
+
+Teleport, KeepAlive, Suspense, and Transition are internal executors over structural nodes. Their
+descriptions remain lazy through `ComponentInvocation` slots. Transition properties and callbacks
+ride the transition invocation; host options remain limited to the renderer contract. Suspense owns
+pending-branch storage, nested dependency accounting, fallback ownership, and reveal, subject to
+the explicit limits in [BLT-11] through [BLT-13]. Asynchronous component definitions deduplicate a
+shared load while every mount retains its own wrapper and target activation [BLT-14].
+
+## Component lifetime and application composition
+
+Persistent renderer mounts and one-shot server rendering share the same activation core. One
+`ComponentRenderFrame` with 64 cache slots is retained per activation until compiler emission gains
+the cache-size channel. `ComponentHost.RenderAsync(ComponentRenderRequest)` returns an
+`IComponentRenderScope` after setup, awaited server prefetch, and one render. Disposing that lease
+aborts the lifetime without client hooks; nested requests use the still-live parent context [SSR-4],
+[SSR-5], and [SSR-10].
+
+`RuntimeComponentContext` is the single internal implementation of Components'
+`ComponentContext`. It owns resolved bindings, per-mount defaults and warning suppression,
+listener-once state, the exposed value, component watches, the active Suspense boundary, and error
+propagation. Observed failures traverse ancestor `OnErrorCaptured` callbacks before the application
+error handler [CMP-12] through [CMP-23].
+
+`ApplicationContext` snapshots application composition, including components, directives, nullable
+services, state, diagnostics, and event observation. `ApplicationLifetime` owns the one-way
+start/stop/failure state machine. `Scheduler` orders component and watcher jobs, deduplicates work,
+and drains pre-flush, commit, and post-flush phases [APP-1] through [APP-7] and [SCH-1] through
+[SCH-12].
+
+## Hydration and development updates
+
+`HydrationMarkers` is the single marker vocabulary shared with serialization and hosts.
+`HydrationNodeReader<TNode>` supplies a host snapshot reader; matching nodes are adopted and the
+smallest mismatched range is remounted. Class and style comparison is semantic, and
+`data-allow-mismatch` suppresses expected divergence [SSR-MARKERS-1] through [SSR-MARKERS-3] and
+[HYD-1] through [HYD-7].
+
+Generated development builds call the hidden `ComponentHotReload.Register` binary interface with
+stable component and marker type identities. `ApplyUpdates` classifies marker sets without
+reflection: style-only changes leave mounted state untouched, while template and script changes
+remount affected instances. There is no public component metadata interface and no compiler service
+surface in Core [SFC-CG-2] through [SFC-CG-4].
+
+Mounted node variants, component activations, built-in state, and update registrations remain
+internal. Hosts consume the public operations and renderer contracts; no host is a compile-time
+friend of Core.

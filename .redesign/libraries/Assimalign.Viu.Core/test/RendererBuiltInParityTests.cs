@@ -11,6 +11,12 @@ using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Core.Tests;
 
+/// <summary>
+/// Pins Core's host-neutral Teleport, KeepAlive, Suspense, and Transition executors.
+/// </summary>
+/// <remarks>
+/// Specified by <c>[BLT-1]</c> through <c>[BLT-13]</c>.
+/// </remarks>
 public sealed class RendererBuiltInParityTests
 {
     [Fact]
@@ -62,8 +68,9 @@ public sealed class RendererBuiltInParityTests
     {
         using var host = new RendererParityHost();
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
-        RendererParityNode target = host.CreateTeleportTarget("#late");
+        RendererParityNode? target = null;
         bool targetWasEmptyDuringRender = false;
+        bool targetWasNotResolvedDuringRender = false;
 
         Scheduler.QueueJob(
             new SchedulerJob(
@@ -75,13 +82,17 @@ public sealed class RendererBuiltInParityTests
                             [new TextNode("deferred")],
                             isDeferred: true),
                         host.Container);
-                    targetWasEmptyDuringRender = TextChildren(target).Count == 0;
+                    targetWasNotResolvedDuringRender = host.TeleportResolveCount == 0;
+                    target = host.CreateTeleportTarget("#late");
+                    targetWasEmptyDuringRender = target.Children.Count == 0;
                 }));
 
         host.RunScheduledFlushes();
 
         targetWasEmptyDuringRender.ShouldBeTrue();
-        TextChildren(target).ShouldHaveSingleItem().Text.ShouldBe("deferred");
+        targetWasNotResolvedDuringRender.ShouldBeTrue();
+        host.TeleportResolveCount.ShouldBe(1);
+        TextChildren(target!).ShouldHaveSingleItem().Text.ShouldBe("deferred");
         TextChildren(host.Container).ShouldBeEmpty();
     }
 
@@ -93,6 +104,7 @@ public sealed class RendererBuiltInParityTests
         RendererParityNode target = host.CreateTeleportTarget("#disabled");
         bool contentWasLogicalDuringRender = false;
         bool targetHadNoContentDuringRender = false;
+        bool targetWasNotResolvedDuringRender = false;
 
         Scheduler.QueueJob(
             new SchedulerJob(
@@ -107,18 +119,107 @@ public sealed class RendererBuiltInParityTests
                         host.Container);
                     contentWasLogicalDuringRender =
                         TextChildren(host.Container).Single().Text == "local";
-                    targetHadNoContentDuringRender = TextChildren(target).Count == 0;
+                    targetHadNoContentDuringRender = target.Children.Count == 0;
+                    targetWasNotResolvedDuringRender = host.TeleportResolveCount == 0;
                 }));
 
         host.RunScheduledFlushes();
 
         contentWasLogicalDuringRender.ShouldBeTrue();
         targetHadNoContentDuringRender.ShouldBeTrue();
+        targetWasNotResolvedDuringRender.ShouldBeTrue();
+        host.TeleportResolveCount.ShouldBe(1);
         TextChildren(host.Container).ShouldHaveSingleItem().Text.ShouldBe("local");
         TextChildren(target).ShouldBeEmpty();
         RendererParityNode targetAnchor = target.Children.ShouldHaveSingleItem();
         targetAnchor.Kind.ShouldBe(RendererParityNodeKind.Comment);
         targetAnchor.Text.ShouldBe("teleport anchor");
+    }
+
+    [Fact]
+    public void Teleport_NonDeferredUnresolvedTarget_WarnsAndDoesNotRetryLater()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        List<string> warnings = [];
+        TeleportNode initial = new("#too-late", [new TextNode("skipped")]);
+        ApplicationContext application = new(
+            new ApplicationOptions
+            {
+                RootComponent = initial,
+                Components = new ComponentFactory(),
+                WarnHandler = warnings.Add,
+            });
+
+        renderer.Render(initial, host.Container, application);
+        RendererParityNode target = host.CreateTeleportTarget("#too-late");
+        host.RunScheduledFlushes();
+
+        host.TeleportResolveCount.ShouldBe(1);
+        target.Children.ShouldBeEmpty();
+        warnings.ShouldHaveSingleItem()
+            .ShouldContain("Failed to resolve teleport target '#too-late'");
+    }
+
+    [Fact]
+    public void Teleport_PendingDeferredUpdate_MountsOnlyTheLatestTree()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#latest");
+        bool targetWasEmptyDuringRender = false;
+
+        Scheduler.QueueJob(
+            new SchedulerJob(
+                () =>
+                {
+                    renderer.Render(
+                        new TeleportNode(
+                            "#latest",
+                            [new TextNode("stale")],
+                            isDeferred: true),
+                        host.Container);
+                    renderer.Render(
+                        new TeleportNode(
+                            "#latest",
+                            [new TextNode("latest")],
+                            isDeferred: true),
+                        host.Container);
+                    targetWasEmptyDuringRender = target.Children.Count == 0;
+                }));
+
+        host.RunScheduledFlushes();
+
+        targetWasEmptyDuringRender.ShouldBeTrue();
+        TextChildren(target).ShouldHaveSingleItem().Text.ShouldBe("latest");
+        host.TeleportResolveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Teleport_UnmountPendingDeferredSetup_CancelsTargetResolution()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#cancelled");
+
+        Scheduler.QueueJob(
+            new SchedulerJob(
+                () =>
+                {
+                    renderer.Render(
+                        new TeleportNode(
+                            "#cancelled",
+                            [new TextNode("stale")],
+                            isDeferred: true),
+                        host.Container);
+                    renderer.Render(null, host.Container);
+                }));
+
+        host.RunScheduledFlushes();
+
+        target.Children.ShouldBeEmpty();
+        host.TeleportResolveCount.ShouldBe(0);
+        host.Container.Children.ShouldBeEmpty();
     }
 
     [Fact]
@@ -206,6 +307,64 @@ public sealed class RendererBuiltInParityTests
     }
 
     [Fact]
+    public void Teleport_DeferredBlockUpdate_PreservesStaticHostIdentity()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#deferred-block");
+        ElementNode initialStatic = TeleportBlockElement(
+            "static",
+            "compiler-static",
+            null,
+            RenderPlan.None);
+        ElementNode initialDynamic = TeleportBlockElement(
+            "dynamic",
+            "dynamic",
+            "one",
+            new RenderPlan(PatchFlags.Class));
+        renderer.Render(
+            new TeleportNode(
+                "#deferred-block",
+                [initialStatic, initialDynamic],
+                isDeferred: true,
+                renderPlan: new RenderPlan(
+                    PatchFlags.NeedPatch,
+                    dynamicChildren: [initialDynamic])),
+            host.Container);
+        host.RunScheduledFlushes();
+        RendererParityNode[] initialElements = ElementChildren(target);
+        RendererParityNode staticHost = initialElements[0];
+        RendererParityNode dynamicHost = initialElements[1];
+        ElementNode nextStatic = TeleportBlockElement(
+            "static",
+            "must-be-carried",
+            null,
+            RenderPlan.None);
+        ElementNode nextDynamic = TeleportBlockElement(
+            "dynamic",
+            "dynamic",
+            "two",
+            new RenderPlan(PatchFlags.Class));
+
+        renderer.Render(
+            new TeleportNode(
+                "#deferred-block",
+                [nextStatic, nextDynamic],
+                isDeferred: true,
+                renderPlan: new RenderPlan(
+                    PatchFlags.NeedPatch,
+                    dynamicChildren: [nextDynamic])),
+            host.Container);
+        host.RunScheduledFlushes();
+
+        RendererParityNode[] updatedElements = ElementChildren(target);
+        updatedElements[0].ShouldBeSameAs(staticHost);
+        updatedElements[0].DescendantText.ShouldBe("compiler-static");
+        updatedElements[1].ShouldBeSameAs(dynamicHost);
+        updatedElements[1].Bindings["class"].ShouldBe("two");
+    }
+
+    [Fact]
     public void Teleport_SharedTargetKeyedReorder_PreservesTargetRangesAndPatchesIndependently()
     {
         using var host = new RendererParityHost();
@@ -227,9 +386,147 @@ public sealed class RendererBuiltInParityTests
             host.Container);
 
         RendererParityNode[] reorderedText = TextChildren(target).ToArray();
-        reorderedText[0].ShouldBeSameAs(initialText[0]);
-        reorderedText[1].ShouldBeSameAs(initialText[1]);
-        reorderedText.Select(node => node.Text).ShouldBe(["A", "B2"]);
+        reorderedText[0].ShouldBeSameAs(initialText[1]);
+        reorderedText[1].ShouldBeSameAs(initialText[0]);
+        reorderedText.Select(node => node.Text).ShouldBe(["B2", "A"]);
+        target.Children.Select(node => node.Text).ShouldBe(
+        [
+            "B2",
+            "teleport anchor",
+            "A",
+            "teleport anchor",
+        ]);
+    }
+
+    [Fact]
+    public void Teleport_SharedTargetRotation_MovesTheTrailingLogicalRangeToTheTargetEnd()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#rotation");
+        renderer.Render(
+            KeyedTeleportTreeForTarget(
+                "#rotation",
+                ("a", "A"),
+                ("b", "B"),
+                ("c", "C")),
+            host.Container);
+        RendererParityNode[] initialText = TextChildren(target).ToArray();
+
+        renderer.Render(
+            KeyedTeleportTreeForTarget(
+                "#rotation",
+                ("b", "B"),
+                ("c", "C"),
+                ("a", "A")),
+            host.Container);
+
+        RendererParityNode[] rotated = TextChildren(target).ToArray();
+        rotated.ShouldBe([initialText[1], initialText[2], initialText[0]]);
+        rotated.Select(node => node.Text).ShouldBe(["B", "C", "A"]);
+    }
+
+    [Fact]
+    public void Teleport_SharedTargetInsertion_PlacesNewRangeAtItsLogicalPosition()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#insertion");
+        renderer.Render(
+            KeyedTeleportTreeForTarget(
+                "#insertion",
+                ("a", "A"),
+                ("b", "B")),
+            host.Container);
+        RendererParityNode[] initial = TextChildren(target).ToArray();
+
+        renderer.Render(
+            KeyedTeleportTreeForTarget(
+                "#insertion",
+                ("x", "X"),
+                ("a", "A"),
+                ("b", "B")),
+            host.Container);
+
+        RendererParityNode[] updated = TextChildren(target).ToArray();
+        updated.Select(node => node.Text).ShouldBe(["X", "A", "B"]);
+        updated[1].ShouldBeSameAs(initial[0]);
+        updated[2].ShouldBeSameAs(initial[1]);
+    }
+
+    [Fact]
+    public void Teleport_RetargetedRange_JoinsSharedTargetAtItsLogicalPosition()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode source = host.CreateTeleportTarget("#source");
+        RendererParityNode target = host.CreateTeleportTarget("#retarget");
+        renderer.Render(
+            KeyedTeleportTree(
+                ("x", "#source", "X", false),
+                ("a", "#retarget", "A", false),
+                ("b", "#retarget", "B", false)),
+            host.Container);
+        RendererParityNode moved = TextChildren(source).ShouldHaveSingleItem();
+        RendererParityNode[] retained = TextChildren(target).ToArray();
+
+        renderer.Render(
+            KeyedTeleportTree(
+                ("x", "#retarget", "X", false),
+                ("a", "#retarget", "A", false),
+                ("b", "#retarget", "B", false)),
+            host.Container);
+
+        source.Children.ShouldBeEmpty();
+        RendererParityNode[] updated = TextChildren(target).ToArray();
+        updated.ShouldBe([moved, retained[0], retained[1]]);
+        updated.Select(node => node.Text).ShouldBe(["X", "A", "B"]);
+    }
+
+    [Fact]
+    public void Teleport_MixedImmediateAndDeferredRanges_FollowLogicalTargetOrder()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#mixed");
+
+        renderer.Render(
+            KeyedTeleportTree(
+                ("x", "#mixed", "X", true),
+                ("a", "#mixed", "A", false),
+                ("b", "#mixed", "B", true)),
+            host.Container);
+
+        host.RunScheduledFlushes();
+        TextChildren(target).Select(node => node.Text).ShouldBe(["X", "A", "B"]);
+    }
+
+    [Fact]
+    public void Teleport_Unmount_RemovesTargetRangeAndRunsComponentLifecycle()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RendererParityNode target = host.CreateTeleportTarget("#lifecycle");
+        ComponentFactory components = new();
+        List<KeepAliveProbeComponent> instances = [];
+        List<string> events = [];
+        RegisterKeepAliveProbe(components, "Teleported", instances, events);
+        TeleportNode initial = new(
+            "#lifecycle",
+            children:
+            [
+                new ComponentNode(ComponentReference.ForName("Teleported")),
+            ]);
+        ApplicationContext application = CreateApplication(initial, components);
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+
+        renderer.Render(null, host.Container, application);
+        host.RunScheduledFlushes();
+
+        target.Children.ShouldBeEmpty();
+        events.Count(value => value == "Teleported:unmounted").ShouldBe(1);
+        instances.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -301,6 +598,7 @@ public sealed class RendererBuiltInParityTests
         ApplicationContext application = CreateApplication(initial, components);
 
         renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
         MountedComponentView<RendererParityNode> firstAlpha = FindView(
             renderer,
             host,
@@ -310,18 +608,209 @@ public sealed class RendererBuiltInParityTests
             KeepAlive("Beta", ("maximum", 1)),
             host.Container,
             application);
+        host.RunScheduledFlushes();
 
         firstAlpha.IsMounted.ShouldBeFalse();
+        events.Count(value => value == "Alpha:deactivated").ShouldBe(1);
         events.Count(value => value == "Alpha:unmounted").ShouldBe(1);
+        events.IndexOf("Alpha:deactivated")
+            .ShouldBeLessThan(events.IndexOf("Alpha:unmounted"));
 
         renderer.Render(
             KeepAlive("Alpha", ("maximum", 1)),
             host.Container,
             application);
+        host.RunScheduledFlushes();
 
         instances.Count(instance => instance.Name == "Alpha").ShouldBe(2);
         FindView(renderer, host, "Alpha").Instance.ShouldNotBeSameAs(firstAlpha.Instance);
         events.Count(value => value == "Beta:unmounted").ShouldBe(1);
+    }
+
+    [Fact]
+    public void KeepAlive_SameKeyDifferentComponent_UnmountsIncompatibleCachedEntry()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        ComponentFactory components = new();
+        List<KeepAliveProbeComponent> instances = [];
+        List<string> events = [];
+        RegisterKeepAliveProbe(components, "Alpha", instances, events);
+        RegisterKeepAliveProbe(components, "Beta", instances, events);
+        KeepAliveNode initial = KeepAliveWithComponentKey("Alpha", "shared");
+        ApplicationContext application = CreateApplication(initial, components);
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+        MountedComponentView<RendererParityNode> alpha = FindView(
+            renderer,
+            host,
+            "Alpha");
+
+        renderer.Render(
+            KeepAliveWithComponentKey("Beta", "shared"),
+            host.Container,
+            application);
+        host.RunScheduledFlushes();
+
+        alpha.IsMounted.ShouldBeFalse();
+        events.Count(value => value == "Alpha:deactivated").ShouldBe(1);
+        events.Count(value => value == "Alpha:unmounted").ShouldBe(1);
+        renderer.GetMountedComponentViews(host.Container)
+            .Select(view => ((KeepAliveProbeComponent)view.Instance).Name)
+            .ShouldBe(["Beta"]);
+
+        renderer.Render(null, host.Container, application);
+        host.RunScheduledFlushes();
+        events.Count(value => value == "Alpha:unmounted").ShouldBe(1);
+    }
+
+    [Fact]
+    public void KeepAlive_PredicateFilter_CachesOnlyMatchingComponentNames()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        ComponentFactory components = new();
+        List<KeepAliveProbeComponent> instances = [];
+        List<string> events = [];
+        RegisterKeepAliveProbe(components, "Alpha", instances, events);
+        RegisterKeepAliveProbe(components, "Beta", instances, events);
+        Func<string, bool> include = name => string.Equals(
+            name,
+            "Alpha",
+            StringComparison.Ordinal);
+        KeepAliveNode initial = KeepAlive("Alpha", ("include", include));
+        ApplicationContext application = CreateApplication(initial, components);
+
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+        renderer.Render(
+            KeepAlive("Beta", ("include", include)),
+            host.Container,
+            application);
+        host.RunScheduledFlushes();
+        renderer.Render(
+            KeepAlive("Alpha", ("include", include)),
+            host.Container,
+            application);
+        host.RunScheduledFlushes();
+
+        instances.Count(instance => instance.Name == "Alpha").ShouldBe(1);
+        instances.Count(instance => instance.Name == "Beta").ShouldBe(1);
+        events.ShouldNotContain("Beta:activated");
+        events.Count(value => value == "Beta:unmounted").ShouldBe(1);
+    }
+
+    [Fact]
+    public void KeepAlive_ChangedFilter_PrunesNewlyExcludedCachedComponent()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        ComponentFactory components = new();
+        List<KeepAliveProbeComponent> instances = [];
+        List<string> events = [];
+        RegisterKeepAliveProbe(components, "Alpha", instances, events);
+        RegisterKeepAliveProbe(components, "Beta", instances, events);
+        KeepAliveNode initial = KeepAlive("Alpha");
+        ApplicationContext application = CreateApplication(initial, components);
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+        renderer.Render(KeepAlive("Beta"), host.Container, application);
+        host.RunScheduledFlushes();
+
+        renderer.Render(
+            KeepAlive("Beta", ("include", "Beta")),
+            host.Container,
+            application);
+        host.RunScheduledFlushes();
+
+        events.Count(value => value == "Alpha:unmounted").ShouldBe(1);
+        renderer.Render(KeepAlive("Alpha"), host.Container, application);
+        host.RunScheduledFlushes();
+        instances.Count(instance => instance.Name == "Alpha").ShouldBe(2);
+    }
+
+    [Fact]
+    public void KeepAlive_NestedStructuralWrappers_InvokeLifecycleChildBeforeParent()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        ComponentFactory components = new();
+        List<string> events = [];
+        RegisterNestedKeepAliveProbe(
+            components,
+            "Outer",
+            "outer",
+            events,
+            NestedKeepAliveWrappers);
+        RegisterNestedKeepAliveProbe(
+            components,
+            "Inner",
+            "inner",
+            events,
+            () => new ElementNode(new QualifiedName("inner")));
+        RegisterNestedKeepAliveProbe(
+            components,
+            "Alternative",
+            "alternative",
+            events,
+            () => new ElementNode(new QualifiedName("alternative")));
+        KeepAliveNode initial = KeepAlive("Outer");
+        ApplicationContext application = CreateApplication(initial, components);
+
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+
+        events.Where(IsInnerOrOuterLifecycle).ShouldBe(
+        [
+            "inner:activated",
+            "outer:activated",
+        ]);
+
+        events.Clear();
+        renderer.Render(KeepAlive("Alternative"), host.Container, application);
+        host.RunScheduledFlushes();
+
+        events.Where(IsInnerOrOuterLifecycle).ShouldBe(
+        [
+            "inner:deactivated",
+            "outer:deactivated",
+        ]);
+
+        events.Clear();
+        renderer.Render(KeepAlive("Outer"), host.Container, application);
+        host.RunScheduledFlushes();
+
+        events.Where(IsInnerOrOuterLifecycle).ShouldBe(
+        [
+            "inner:activated",
+            "outer:activated",
+        ]);
+    }
+
+    [Fact]
+    public void KeepAlive_RootUnmount_DeactivatesCachedTreeBeforeUnmountingIt()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        ComponentFactory components = new();
+        List<KeepAliveProbeComponent> instances = [];
+        List<string> events = [];
+        RegisterKeepAliveProbe(components, "Alpha", instances, events);
+        KeepAliveNode initial = KeepAlive("Alpha");
+        ApplicationContext application = CreateApplication(initial, components);
+        renderer.Render(initial, host.Container, application);
+        host.RunScheduledFlushes();
+        events.Clear();
+
+        renderer.Render(null, host.Container, application);
+        host.RunScheduledFlushes();
+
+        events.ShouldBe(
+        [
+            "Alpha:deactivated",
+            "Alpha:unmounted",
+        ]);
+        host.Container.Children.ShouldBeEmpty();
     }
 
     [Fact]
@@ -441,14 +930,41 @@ public sealed class RendererBuiltInParityTests
     private static FragmentNode KeyedTeleportTree(
         params (string Key, string Text)[] values)
     {
+        return KeyedTeleportTreeForTarget("#shared", values);
+    }
+
+    private static FragmentNode KeyedTeleportTreeForTarget(
+        string target,
+        params (string Key, string Text)[] values)
+    {
         List<VirtualNode> teleports = new(values.Length);
         for (int index = 0; index < values.Length; index++)
         {
             (string key, string text) = values[index];
             teleports.Add(
                 new TeleportNode(
-                    "#shared",
+                    target,
                     [new TextNode(text)],
+                    key: key));
+        }
+
+        return new FragmentNode(
+            teleports,
+            renderPlan: new RenderPlan(PatchFlags.KeyedFragment));
+    }
+
+    private static FragmentNode KeyedTeleportTree(
+        params (string Key, string Target, string Text, bool IsDeferred)[] values)
+    {
+        List<VirtualNode> teleports = new(values.Length);
+        for (int index = 0; index < values.Length; index++)
+        {
+            (string key, string target, string text, bool isDeferred) = values[index];
+            teleports.Add(
+                new TeleportNode(
+                    target,
+                    [new TextNode(text)],
+                    isDeferred: isDeferred,
                     key: key));
         }
 
@@ -476,6 +992,19 @@ public sealed class RendererBuiltInParityTests
         return new KeepAliveNode(new ComponentInvocation(argumentValues, slots));
     }
 
+    private static KeepAliveNode KeepAliveWithComponentKey(
+        string componentName,
+        object componentKey)
+    {
+        Dictionary<string, ComponentSlot> slots = new(StringComparer.Ordinal)
+        {
+            ["default"] = _ => new ComponentNode(
+                ComponentReference.ForName(componentName),
+                key: componentKey),
+        };
+        return new KeepAliveNode(new ComponentInvocation(slots: slots));
+    }
+
     private static TransitionNode Transition(string text)
     {
         return new TransitionNode(
@@ -485,6 +1014,28 @@ public sealed class RendererBuiltInParityTests
                     ["default"] = _ => new TextNode(text),
                 }));
     }
+
+    private static VirtualNode NestedKeepAliveWrappers()
+    {
+        KeepAliveNode keepAlive = KeepAlive("Inner");
+        SuspenseNode suspense = new(
+            new ComponentInvocation(
+                slots: new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+                {
+                    ["default"] = _ => keepAlive,
+                    ["fallback"] = _ => new CommentNode("fallback"),
+                }));
+        return new TransitionNode(
+            new ComponentInvocation(
+                slots: new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+                {
+                    ["default"] = _ => suspense,
+                }));
+    }
+
+    private static bool IsInnerOrOuterLifecycle(string value) =>
+        value.StartsWith("inner:", StringComparison.Ordinal)
+        || value.StartsWith("outer:", StringComparison.Ordinal);
 
     private static void RegisterKeepAliveProbe(
         ComponentFactory components,
@@ -502,6 +1053,20 @@ public sealed class RendererBuiltInParityTests
                     instances.Add(instance);
                     return instance;
                 }));
+    }
+
+    private static void RegisterNestedKeepAliveProbe(
+        ComponentFactory components,
+        string registeredName,
+        string eventName,
+        List<string> events,
+        Func<VirtualNode> render)
+    {
+        components.Register(
+            new ComponentRegistration(
+                ComponentReference.ForName(registeredName),
+                new ComponentContract(displayName: registeredName),
+                _ => new NestedKeepAliveProbeComponent(eventName, events, render)));
     }
 
     private static MountedComponentView<RendererParityNode> FindView(
@@ -562,6 +1127,32 @@ public sealed class RendererBuiltInParityTests
             return _ => new ElementNode(
                 new QualifiedName("probe"),
                 children: [new TextNode(Name)]);
+        }
+    }
+
+    private sealed class NestedKeepAliveProbeComponent : IComponent
+    {
+        private readonly string _eventName;
+        private readonly List<string> _events;
+        private readonly Func<VirtualNode> _render;
+
+        internal NestedKeepAliveProbeComponent(
+            string eventName,
+            List<string> events,
+            Func<VirtualNode> render)
+        {
+            _eventName = eventName;
+            _events = events;
+            _render = render;
+        }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            context.Lifecycle.OnActivated(
+                () => _events.Add($"{_eventName}:activated"));
+            context.Lifecycle.OnDeactivated(
+                () => _events.Add($"{_eventName}:deactivated"));
+            return _ => _render();
         }
     }
 

@@ -40,6 +40,12 @@ public sealed class DirectiveBinding
     /// <summary>Gets the value captured for the previous render, or null.</summary>
     public object? PreviousValue { get; }
 
+    /// <summary>
+    /// Gets the transition bound to this element, or null when no structural transition owns it.
+    /// </summary>
+    /// <remarks>Persisted directives use this host-neutral seam as specified by <c>[BLT-10]</c>.</remarks>
+    public ComponentTransition? Transition { get; private set; }
+
     /// <summary>Gets mounted descendant host elements with the supplied local name in tree order.</summary>
     /// <param name="localName">The non-empty host-element local name.</param>
     /// <returns>The matching immutable-node and host-element pairs.</returns>
@@ -54,5 +60,11 @@ public sealed class DirectiveBinding
     {
         ArgumentNullException.ThrowIfNull(hostElements);
         _hostElements = hostElements;
+    }
+
+    internal void BindTransition(ComponentTransition transition)
+    {
+        ArgumentNullException.ThrowIfNull(transition);
+        Transition = transition;
     }
 }

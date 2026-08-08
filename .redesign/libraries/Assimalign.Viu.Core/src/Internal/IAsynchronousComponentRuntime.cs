@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
@@ -10,11 +11,9 @@ internal interface IAsynchronousComponentRuntime
 
     MountReference? MountReference { get; }
 
-    bool RegisterAsynchronousDependency(
-        Task dependency,
-        bool rethrowIfUnhandled);
+    bool RegisterAsynchronousDependency(Task dependency);
 
-    void ObserveAsynchronousDependency(
-        Task dependency,
-        bool rethrowIfUnhandled);
+    void SettleAsynchronousDependency(Task dependency);
+
+    void RouteAsynchronousError(Exception exception, bool rethrowIfUnhandled);
 }

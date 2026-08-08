@@ -153,7 +153,7 @@ public sealed partial class Renderer<TNode>
                 teleport,
                 container,
                 owner),
-            KeepAliveNode keepAlive => HydrateMismatch(
+            KeepAliveNode keepAlive => HydrateKeepAlive(
                 tree,
                 reader,
                 node,
@@ -194,6 +194,7 @@ public sealed partial class Renderer<TNode>
             tree,
             value.Directives,
             owner);
+        BindActiveTransition(tree, node, directiveBindings);
         InvokeDirectiveHooks(
             tree,
             node,
@@ -591,6 +592,12 @@ public sealed partial class Renderer<TNode>
 
             SetHydrationTargetCursor(target, targetReader.NextSibling(targetAnchor!));
         }
+        else
+        {
+            ReportHydrationWarning(
+                tree,
+                $"Failed to resolve teleport target '{value.TargetIdentifier}'.");
+        }
 
         MountedTeleport<TNode> mounted = new(
             value,
@@ -608,6 +615,43 @@ public sealed partial class Renderer<TNode>
         return (mounted, next);
     }
 
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateKeepAlive(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        KeepAliveNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        TNode keepAliveContainer = HasHostNode(reader.ParentNode(node))
+            ? reader.ParentNode(node)!
+            : container;
+        VirtualNode childValue = EvaluateSlot(value.Invocation, "default", owner)
+            ?? new CommentNode(string.Empty);
+        (MountedNode<TNode> active, TNode? next) = HydrateNode(
+            tree,
+            reader,
+            node,
+            childValue,
+            keepAliveContainer,
+            owner);
+        TNode startAnchor = _options.CreateComment("keep-alive start");
+        TNode endAnchor = _options.CreateComment("keep-alive end");
+        _options.Insert(startAnchor, keepAliveContainer, active.FirstHostNode);
+        _options.Insert(endAnchor, keepAliveContainer, next);
+        TNode storage = _options.CreateElement(StorageContainerName);
+        MountedKeepAlive<TNode> mounted = new(
+            value,
+            startAnchor,
+            endAnchor,
+            storage,
+            active,
+            owner);
+        Register(tree, value, mounted);
+        CacheActiveKeepAlive(tree, mounted, value, active);
+        return (mounted, next);
+    }
+
     private (MountedNode<TNode> Mounted, TNode? Next) HydrateTransition(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
@@ -618,18 +662,50 @@ public sealed partial class Renderer<TNode>
     {
         VirtualNode childValue = EvaluateSlot(value.Invocation, "default", owner)
             ?? new CommentNode(string.Empty);
-        (MountedNode<TNode> child, TNode? next) = HydrateNode(
+        TransitionProperties properties = ResolveTransitionProperties(value);
+        TransitionState sharedState = ResolveTransitionState(value) ?? new TransitionState();
+        TransitionController controller = CreateTransitionController(
             tree,
-            reader,
-            node,
-            childValue,
-            container,
-            owner);
-        MountedTransition<TNode> mounted = new(value, child, owner)
+            owner,
+            properties,
+            sharedState,
+            childValue);
+        controller.IsHydrating = true;
+        TransitionMountContext<TNode>? previous = _activeTransitionMount;
+        TransitionMountContext<TNode> hydrationContext = new(
+            controller,
+            previous,
+            shouldEnter: false,
+            isHydrating: true);
+        _activeTransitionMount = hydrationContext;
+        MountedNode<TNode> child;
+        TNode? next;
+        try
+        {
+            (child, next) = HydrateNode(
+                tree,
+                reader,
+                node,
+                childValue,
+                container,
+                owner);
+        }
+        finally
+        {
+            _activeTransitionMount = previous;
+        }
+
+        MountedTransition<TNode> mounted = new(
+            value,
+            child,
+            sharedState,
+            controller,
+            owner)
         {
             State = TransitionExecutionState.Entered,
         };
         Register(tree, value, mounted);
+        QueueTransitionMountedState(mounted, controller, sharedState);
         return (mounted, next);
     }
 

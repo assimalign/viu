@@ -287,32 +287,44 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     }
 
     public bool RegisterAsynchronousDependency(
-        Task dependency,
-        bool rethrowIfUnhandled)
+        Task dependency)
     {
         ArgumentNullException.ThrowIfNull(dependency);
         if (SuspenseBoundary is not null)
         {
-            SuspenseBoundary.Register(dependency, this, rethrowIfUnhandled);
+            SuspenseBoundary.Register(dependency);
             return true;
         }
 
-        ObserveTask(
-            dependency,
-            "asynchronous component dependency",
-            rethrowIfUnhandled);
         return false;
     }
 
-    public void ObserveAsynchronousDependency(
-        Task dependency,
-        bool rethrowIfUnhandled)
+    public void SettleAsynchronousDependency(Task dependency)
     {
         ArgumentNullException.ThrowIfNull(dependency);
-        ObserveTask(
-            dependency,
-            "asynchronous component loader",
-            rethrowIfUnhandled);
+        SuspenseBoundary?.Settle(dependency);
+    }
+
+    public void RouteAsynchronousError(
+        Exception exception,
+        bool rethrowIfUnhandled)
+    {
+        try
+        {
+            RouteError(
+                exception,
+                "asynchronous component loader",
+                rethrowIfUnhandled);
+        }
+        catch (Exception unhandled)
+        {
+            ExceptionDispatchInfo captured = ExceptionDispatchInfo.Capture(unhandled);
+            Scheduler.QueuePostFlushCallback(
+                new SchedulerJob(captured.Throw)
+                {
+                    Name = "asynchronous component loader",
+                });
+        }
     }
 
     internal async Task DrainObservedTasksAsync()

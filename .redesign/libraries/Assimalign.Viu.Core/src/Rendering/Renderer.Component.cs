@@ -274,6 +274,7 @@ public sealed partial class Renderer<TNode>
             {
                 Name = "component updated lifecycle",
             });
+        NormalizeTeleportTargetOrder(tree);
         QueueHostCommit();
     }
 

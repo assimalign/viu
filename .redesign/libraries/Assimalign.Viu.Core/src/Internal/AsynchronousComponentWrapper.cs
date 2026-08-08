@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
@@ -58,19 +57,10 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         else
         {
             Task<AsynchronousComponentTarget> pendingLoad = _load.PendingLoad;
-            bool runtimeOwnsDependency = runtime is not null;
-            bool rethrowIfUnhandled = options.ErrorComponent is null;
             if (options.Suspensible && runtime is not null)
             {
                 _suspenseControlled = runtime.RegisterAsynchronousDependency(
-                    pendingLoad,
-                    rethrowIfUnhandled);
-            }
-            else
-            {
-                runtime?.ObserveAsynchronousDependency(
-                    pendingLoad,
-                    rethrowIfUnhandled);
+                    pendingLoad);
             }
 
             if (_suspenseControlled)
@@ -82,9 +72,8 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
                 SchedulePresentation(options);
             }
 
-            Task trackedLoad = TrackLoadAsync(pendingLoad);
-            context.Lifecycle.OnServerPrefetch(
-                () => runtimeOwnsDependency ? trackedLoad : pendingLoad);
+            Task trackedLoad = TrackLoadAsync(pendingLoad, runtime);
+            context.Lifecycle.OnServerPrefetch(() => trackedLoad);
         }
 
         return Render;
@@ -136,13 +125,16 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
             {
                 if (_isActive && !_loaded!.Value && _error!.Value is null)
                 {
-                    _error!.Value = new TimeoutException(
-                        $"Asynchronous component timed out after {timeout}ms.");
+                    HandleError(
+                        new TimeoutException(
+                            $"Asynchronous component timed out after {timeout}ms."));
                 }
             });
     }
 
-    private async Task TrackLoadAsync(Task<AsynchronousComponentTarget> pendingLoad)
+    private async Task TrackLoadAsync(
+        Task<AsynchronousComponentTarget> pendingLoad,
+        IAsynchronousComponentRuntime? runtime)
     {
         try
         {
@@ -154,6 +146,8 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
 
             _target = target;
             _hasTarget = true;
+            runtime?.SettleAsynchronousDependency(pendingLoad);
+            runtime = null;
             _loaded!.Value = true;
         }
         catch (OperationCanceledException) when (!_isActive)
@@ -163,9 +157,28 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         {
             if (_isActive)
             {
-                _error!.Value = error;
+                runtime?.SettleAsynchronousDependency(pendingLoad);
+                runtime = null;
+                HandleError(error);
             }
         }
+        finally
+        {
+            runtime?.SettleAsynchronousDependency(pendingLoad);
+        }
+    }
+
+    private void HandleError(Exception error)
+    {
+        if (_error!.Value is not null)
+        {
+            return;
+        }
+
+        _error!.Value = error;
+        _runtime?.RouteAsynchronousError(
+            error,
+            rethrowIfUnhandled: _definition.Options.ErrorComponent is null);
     }
 
     private VirtualNode? Render(ComponentRenderFrame frame)
@@ -183,7 +196,7 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
                 return errorComponent(error);
             }
 
-            ExceptionDispatchInfo.Capture(error).Throw();
+            return new CommentNode(string.Empty);
         }
 
         if (!_suspenseControlled
