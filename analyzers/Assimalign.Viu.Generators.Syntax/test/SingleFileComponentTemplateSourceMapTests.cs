@@ -105,7 +105,8 @@ public sealed class SingleFileComponentTemplateSourceMapTests
         // `label` is at file line 2, column 7 (one-based) through column 12 (its 5-char span end).
         generated.ShouldContain("#line (2,7)-(2,12) ");
         generated.ShouldContain("\"C:/proj/Tag.viu\"");
-        generated.ShouldContain("_toDisplayString(_ctx.label)");
+        generated.ShouldContain(
+            "global::Assimalign.Viu.DisplayStringFormatter.ToDisplayString(component.label)");
         generated.ShouldContain("#line default");
     }
 
@@ -228,40 +229,128 @@ public sealed class SingleFileComponentTemplateSourceMapTests
     private static SourceLocation Loc(int startLine, int startColumn, int endLine, int endColumn, string source)
         => new(new Position(0, startLine, startColumn), new Position(source.Length, endLine, endColumn), source);
 
-    // Compiles the generated .g.cs together with a minimal runtime render-helper stub so every emitted
-    // helper call (_openBlock/_createElementBlock/_toDisplayString) and the [V01.01.06.07]
-    // IComponentTemplate bridge bind, leaving the unresolved template member (`_ctx.Cont`) as the SOLE
+    // Compiles the generated .g.cs together with a minimal adopted-runtime stub so the closed node
+    // algebra, frame API, generated lifecycle glue, and [SFC-CG-4] IComponent bridge bind, leaving the
+    // unresolved template member (`component.Cont`) as the SOLE
     // compile error — the one the #line map must relocate. These templates use no DOM-only capability,
     // so the generator emits no Browser helper import and the stub remains host-neutral.
     private static ImmutableArray<RoslynDiagnostic> CompileGeneratedWithHelperStub(string generated)
     {
         const string helperStub =
-            "namespace Assimalign.Viu.Components\n" +
-            "{\n" +
-            "    internal interface IComponent { }\n" +
-            "    internal interface IComponentContext { }\n" +
-            "    internal delegate IComponent? ComponentRenderer();\n" +
-            "    internal interface IComponentTemplate\n" +
-            "    {\n" +
-            "        string? Name { get; }\n" +
-            "        ComponentRenderer Setup(IComponentContext context);\n" +
-            "    }\n" +
-            // [SFC-CG-4] The scaffold's base class: it owns the Context the generated Setup assigns.
-            "    internal abstract class ComponentTemplateBase\n" +
-            "    {\n" +
-            "        protected IComponentContext Context { get; set; } = null!;\n" +
-            "    }\n" +
-            "}\n" +
-            "namespace Assimalign.Viu\n" +
-            "{\n" +
-            "    internal static class RenderHelpers\n" +
-            "    {\n" +
-            "        internal static object _openBlock(bool disableTracking = false) => null!;\n" +
-            "        internal static object? _createElementBlock(object token, object tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null) => null;\n" +
-            "        internal static string _toDisplayString(object? value) => \"\";\n" +
-            "        internal static Components.IComponent NormalizeRoot(object? value) => null!;\n" +
-            "    }\n" +
-            "}\n";
+            """
+            namespace Assimalign.Viu.Components
+            {
+                internal abstract class VirtualNode { }
+                internal sealed class TextNode : VirtualNode
+                {
+                    internal TextNode(string? text, RenderPlan? renderPlan = null) { }
+                }
+                internal sealed class ElementNode : VirtualNode
+                {
+                    internal ElementNode(
+                        QualifiedName name,
+                        object? bindings = null,
+                        object? children = null,
+                        object? directives = null,
+                        object? key = null,
+                        MountReference? mountReference = null,
+                        RenderPlan? renderPlan = null) { }
+                }
+                internal sealed class QualifiedName
+                {
+                    internal QualifiedName(string name) { }
+                }
+                internal abstract class MountReference { }
+                internal sealed class ElementBinding
+                {
+                    internal static ElementBinding Event(string name, global::System.Delegate listener) => new();
+                    internal static ElementBinding Property(string name, object? value) => new();
+                    internal static ElementBinding Attribute(QualifiedName name, object? value) => new();
+                }
+                internal enum PatchFlags { }
+                internal sealed class RenderPlan
+                {
+                    internal RenderPlan(PatchFlags flags, object? dynamicProperties = null, object? dynamicChildren = null) { }
+                }
+                internal sealed class ComponentRenderFrame
+                {
+                    internal object?[] Cache { get; } = [];
+                    internal void OpenBlock() { }
+                    internal object? CloseBlock() => null;
+                    internal void Track(VirtualNode? node) { }
+                    internal T GetOrAddCache<T>(int index, global::System.Func<T> factory) => factory();
+                    internal T CacheHandler<T>(int index, T handler) => handler;
+                }
+                internal sealed class ComponentBindings
+                {
+                    internal global::System.Collections.Generic.IReadOnlyDictionary<string, object?> Parameters { get; } =
+                        new global::System.Collections.Generic.Dictionary<string, object?>();
+                    internal global::System.Collections.Generic.IReadOnlyDictionary<string, ComponentSlot> Slots { get; } =
+                        new global::System.Collections.Generic.Dictionary<string, ComponentSlot>();
+                }
+                internal delegate VirtualNode? ComponentSlot(
+                    global::System.Collections.Generic.IReadOnlyDictionary<string, object?> arguments);
+                internal sealed class ComponentContext
+                {
+                    internal ComponentBindings Bindings { get; } = new();
+                    internal global::System.IServiceProvider Services { get; } = null!;
+                    internal void Emit(string name, global::System.Collections.Generic.IReadOnlyList<object?> arguments) { }
+                }
+                internal abstract class ComponentBase
+                {
+                    protected ComponentContext? Context { get; set; }
+                }
+                internal delegate VirtualNode? ComponentRenderer(ComponentRenderFrame frame);
+                internal interface IComponent
+                {
+                    ComponentRenderer Setup(ComponentContext context);
+                }
+                internal enum ComponentFlags { InheritFallthroughBindings }
+                internal sealed class ComponentContract
+                {
+                    internal ComponentContract(
+                        string? displayName = null,
+                        ComponentFlags flags = default,
+                        object? parameters = null,
+                        object? events = null,
+                        int renderCacheSize = 0) { }
+                }
+                internal sealed class ComponentReference
+                {
+                    internal static ComponentReference ForName(string name) => new();
+                }
+                internal sealed class ComponentRegistration
+                {
+                    internal ComponentRegistration(
+                        ComponentReference reference,
+                        ComponentContract contract,
+                        global::System.Func<global::System.IServiceProvider, IComponent> activator) { }
+                }
+            }
+            namespace Assimalign.Viu
+            {
+                internal static class DisplayStringFormatter
+                {
+                    internal static string ToDisplayString(object? value) => string.Empty;
+                }
+            }
+            namespace Assimalign.Viu.Generated
+            {
+                internal static class RenderGlue
+                {
+                    internal static void OnBeforeMount<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnMounted<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnBeforeUpdate<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnUpdated<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnBeforeUnmount<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnUnmounted<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnActivated<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnDeactivated<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnServerPrefetch<T>(Components.ComponentContext context, T callback) { }
+                    internal static void OnErrorCaptured<T>(Components.ComponentContext context, T callback) { }
+                }
+            }
+            """;
 
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         var trees = new[] { generated, helperStub }

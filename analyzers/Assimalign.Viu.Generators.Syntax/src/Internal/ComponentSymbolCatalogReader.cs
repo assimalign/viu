@@ -10,7 +10,7 @@ namespace Assimalign.Viu.Generators.Syntax;
 
 /// <summary>
 /// Reads the component declarations a compilation can see through Roslyn symbols — hand-authored
-/// <c>IComponentTemplate</c> types in this compilation, and every component in a <b>referenced
+/// <c>IComponent</c> types in this compilation, and every component in a <b>referenced
 /// assembly</b> ([SFC-USE-1]). The metadata half is what the [CMP-26] attribute form buys: a
 /// <c>[Parameter]</c> survives into the assembly, so a package's component surface is readable by the
 /// consumer's template compiler. A component that declares its parameters imperatively carries nothing
@@ -25,7 +25,7 @@ namespace Assimalign.Viu.Generators.Syntax;
 internal static class ComponentSymbolCatalogReader
 {
     private const string ComponentsAssemblyName = "Assimalign.Viu.Components";
-    private const string TemplateInterfaceName = "Assimalign.Viu.Components.IComponentTemplate";
+    private const string ComponentInterfaceName = "Assimalign.Viu.Components.IComponent";
     private const string ParameterAttributeName = "Assimalign.Viu.Components.ParameterAttribute";
 
     /// <summary>Reads every statically declared component surface visible to <paramref name="compilation"/>.</summary>
@@ -36,15 +36,15 @@ internal static class ComponentSymbolCatalogReader
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        var templateInterface = compilation.GetTypeByMetadataName(TemplateInterfaceName);
+        var componentInterface = compilation.GetTypeByMetadataName(ComponentInterfaceName);
         var parameterAttribute = compilation.GetTypeByMetadataName(ParameterAttributeName);
-        if (templateInterface is null || parameterAttribute is null)
+        if (componentInterface is null || parameterAttribute is null)
         {
             return EquatableArray<ComponentDeclarationEntry>.Empty;
         }
 
         var entries = new List<ComponentDeclarationEntry>();
-        var context = new ScanContext(templateInterface, parameterAttribute, entries, cancellationToken);
+        var context = new ScanContext(componentInterface, parameterAttribute, entries, cancellationToken);
         ScanAssembly(compilation.Assembly, context);
         foreach (var reference in compilation.References)
         {
@@ -113,7 +113,7 @@ internal static class ComponentSymbolCatalogReader
         if (type.TypeKind != TypeKind.Class ||
             type.IsAbstract ||
             type.IsGenericType ||
-            !ImplementsTemplate(type, context.TemplateInterface))
+            !ImplementsComponent(type, context.ComponentInterface))
         {
             return;
         }
@@ -201,11 +201,11 @@ internal static class ComponentSymbolCatalogReader
             _ => ComponentValueKind.Reference,
         };
 
-    private static bool ImplementsTemplate(INamedTypeSymbol type, INamedTypeSymbol templateInterface)
+    private static bool ImplementsComponent(INamedTypeSymbol type, INamedTypeSymbol componentInterface)
     {
         foreach (var implemented in type.AllInterfaces)
         {
-            if (SymbolEqualityComparer.Default.Equals(implemented, templateInterface))
+            if (SymbolEqualityComparer.Default.Equals(implemented, componentInterface))
             {
                 return true;
             }
@@ -221,12 +221,12 @@ internal static class ComponentSymbolCatalogReader
         miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
     private readonly struct ScanContext(
-        INamedTypeSymbol templateInterface,
+        INamedTypeSymbol componentInterface,
         INamedTypeSymbol parameterAttribute,
         List<ComponentDeclarationEntry> entries,
         CancellationToken cancellationToken)
     {
-        public INamedTypeSymbol TemplateInterface { get; } = templateInterface;
+        public INamedTypeSymbol ComponentInterface { get; } = componentInterface;
 
         public INamedTypeSymbol ParameterAttribute { get; } = parameterAttribute;
 

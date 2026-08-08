@@ -612,6 +612,7 @@ public sealed partial class Renderer<TNode>
         PatchFlags flags = next.RenderPlan.PatchFlags;
         bool blockPatched = flags != PatchFlags.Bail
             && flags != PatchFlags.Cached
+            && (flags & PatchFlags.StableFragment) != 0
             && TryPatchBlockChildren(tree, previous, next, container);
         if (flags != PatchFlags.Cached && !blockPatched)
         {

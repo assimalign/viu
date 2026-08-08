@@ -3,7 +3,8 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// <summary>
 /// The attribute-declared component surface read out of one <c>@script</c> block ([CMP-26], [CMP-30]) —
 /// the <c>[Parameter]</c> properties and <c>[Event]</c> methods the generator turns into the partial's
-/// <c>IComponentTemplate.Parameters</c>/<c>Events</c> — plus the two emission facts the scaffold needs
+/// generated <c>ComponentContract.Parameters</c>/<c>Events</c> — plus the two emission facts the
+/// scaffold needs
 /// about the authored class body. Value-equatable, so it rides inside the incremental generator's
 /// cached model without defeating the cache.
 /// </summary>

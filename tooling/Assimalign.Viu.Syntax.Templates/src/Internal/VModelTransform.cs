@@ -193,14 +193,43 @@ internal static class VModelTransform
     /// and its assignment lambda together. Specified by <c>[SFC-CG-7]</c>.
     /// </summary>
     /// <param name="expression">The writable model expression.</param>
+    /// <param name="modifiers">The compile-time modifier names carried by the typed binding.</param>
     /// <returns>The generated <c>ViuModelBinding</c> construction.</returns>
-    internal static CompoundExpressionNode CreateNativeBinding(ExpressionNode expression)
-        => Ir.CompoundExpression(
+    internal static CompoundExpressionNode CreateNativeBinding(
+        ExpressionNode expression,
+        IReadOnlyList<SimpleExpressionNode> modifiers)
+    {
+        if (modifiers.Count == 0)
+        {
+            return Ir.CompoundExpression(
+                "new global::Assimalign.Viu.Browser.ViuModelBinding(",
+                expression,
+                ", ",
+                CreateAssignmentAction(expression),
+                ")");
+        }
+
+        var parts = new List<object>
+        {
             "new global::Assimalign.Viu.Browser.ViuModelBinding(",
             expression,
             ", ",
             CreateAssignmentAction(expression),
-            ")");
+            ", new string[] { ",
+        };
+        for (var index = 0; index < modifiers.Count; index++)
+        {
+            if (index > 0)
+            {
+                parts.Add(", ");
+            }
+
+            parts.Add(JsonString(modifiers[index].Content));
+        }
+
+        parts.Add(" })");
+        return Ir.CompoundExpression(parts.ToArray());
+    }
 
     private static ExpressionNode BuildEventName(ExpressionNode? argument)
     {

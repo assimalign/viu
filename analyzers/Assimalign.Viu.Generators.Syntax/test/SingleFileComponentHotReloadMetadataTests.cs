@@ -75,45 +75,36 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             styleValue: "blue");
 
         baseline.GeneratedSource.ShouldContain(
-            "global::Assimalign.Viu.Components.IComponentHotReloadMetadata");
+            "[global::System.Runtime.CompilerServices.ModuleInitializer]");
         baseline.GeneratedSource.ShouldContain(
-            "IComponentHotReloadMetadata.ComponentIdentifier");
+            "global::Assimalign.Viu.ComponentHotReload.Register(");
+        baseline.GeneratedSource.ShouldContain("typeof(Counter),");
         baseline.GeneratedSource.ShouldContain(
-            "IComponentHotReloadMetadata.TemplateUpdateMarkerType");
+            "typeof(SingleFileComponentTemplateUpdateMarker),");
         baseline.GeneratedSource.ShouldContain(
-            "IComponentHotReloadMetadata.ScriptUpdateMarkerType");
-        baseline.GeneratedSource.ShouldNotContain(
-            "ComponentHotReloadBridge");
+            "typeof(SingleFileComponentScriptUpdateMarker),");
+        baseline.GeneratedSource.ShouldContain(
+            "typeof(SingleFileComponentStyleUpdateMarker));");
         baseline.GeneratedSource.ShouldContain(
             "private static class SingleFileComponentTemplateUpdateMarker");
         baseline.GeneratedSource.ShouldContain(
             "private static class SingleFileComponentScriptUpdateMarker");
         baseline.GeneratedSource.ShouldContain(
             "private static class SingleFileComponentStyleUpdateMarker");
-        baseline.GeneratedSource.ShouldContain(
-            "IComponentHotReloadMetadata.StyleUpdateMarkerType");
+        baseline.GeneratedSource.ShouldNotContain("IComponentHotReloadMetadata");
+        baseline.GeneratedSource.ShouldNotContain("HotReloadComponentIdentifier");
         baseline.GeneratedSource.ShouldNotContain(
             "_hotReloadRenderCache = new object?[RenderCacheSize]");
         baseline.GeneratedSource.ShouldNotContain(
             "readonly object?[] _hotReloadRenderCache");
-        baseline.GeneratedSource.ShouldContain(
-            "NormalizeRoot(Render(this, _hotReloadRenderCache))");
+        baseline.GeneratedSource.ShouldNotContain("NormalizeRoot(");
         baseline.GeneratedSource.ShouldContain(
             "global::System.GC.KeepAlive(\"" + baseline.TemplateContentHash + "\");");
-        baseline.GeneratedSource.ShouldContain(
-            "internal static int RenderCacheSize => ");
-        baseline.GeneratedSource.ShouldContain(
-            "internal static string HotReloadTemplateContentHash => ");
-        baseline.GeneratedSource.ShouldContain(
-            "internal static string HotReloadScriptContentHash => ");
-        baseline.GeneratedSource.ShouldContain(
-            "internal static string HotReloadStyleContentHash => ");
+        baseline.GeneratedSource.ShouldContain("renderCacheSize: 0");
         baseline.GeneratedSource.ShouldContain(
             "internal static string ExtractedStyles => ");
-        baseline.GeneratedSource.ShouldNotContain(
-            "internal const int RenderCacheSize");
-        baseline.GeneratedSource.ShouldNotContain(
-            "internal const string HotReload");
+        baseline.GeneratedSource.ShouldNotContain("RenderCacheSize =>");
+        baseline.GeneratedSource.ShouldNotContain("internal const string HotReload");
         baseline.GeneratedSource.ShouldNotContain(
             "internal const string ExtractedStyles");
         baseline.GeneratedSource.ShouldContain(
@@ -250,11 +241,9 @@ public sealed class SingleFileComponentHotReloadMetadataTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "Counter.SingleFileComponent.g.cs");
-        generated.ShouldNotContain("IComponentHotReloadMetadata");
-        generated.ShouldNotContain("HotReloadComponentIdentifier");
-        generated.ShouldNotContain("HotReloadTemplateContentHash");
-        generated.ShouldNotContain("HotReloadScriptContentHash");
-        generated.ShouldNotContain("HotReloadStyleContentHash");
+        generated.ShouldNotContain("[global::System.Runtime.CompilerServices.ModuleInitializer]");
+        generated.ShouldNotContain("RegisterViuHotReloadMetadata");
+        generated.ShouldNotContain("SingleFileComponentTemplateUpdateMarker");
         outcome.Sources.ShouldNotContain(source =>
             string.Equals(source.HintName, HandlerHintName, StringComparison.Ordinal));
     }
@@ -279,8 +268,9 @@ public sealed class SingleFileComponentHotReloadMetadataTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "Counter.SingleFileComponent.g.cs");
-        generated.ShouldContain("IComponentHotReloadMetadata");
-        generated.ShouldContain("internal static string HotReloadComponentIdentifier => ");
+        generated.ShouldContain("[global::System.Runtime.CompilerServices.ModuleInitializer]");
+        generated.ShouldContain("global::Assimalign.Viu.ComponentHotReload.Register(");
+        generated.ShouldNotContain("IComponentHotReloadMetadata");
         outcome.Sources.ShouldContain(source =>
             string.Equals(source.HintName, HandlerHintName, StringComparison.Ordinal));
     }
@@ -301,8 +291,8 @@ public sealed class SingleFileComponentHotReloadMetadataTests
         var generated = GeneratorTestHarness.GeneratedSource(
             outcome,
             "Counter.SingleFileComponent.g.cs");
-        generated.ShouldNotContain("IComponentHotReloadMetadata");
-        generated.ShouldNotContain("HotReloadComponentIdentifier");
+        generated.ShouldNotContain("[global::System.Runtime.CompilerServices.ModuleInitializer]");
+        generated.ShouldNotContain("RegisterViuHotReloadMetadata");
         outcome.Sources.ShouldNotContain(source =>
             string.Equals(source.HintName, HandlerHintName, StringComparison.Ordinal));
     }
@@ -333,6 +323,7 @@ public sealed class SingleFileComponentHotReloadMetadataTests
                 /// <summary>
                 /// Forwards consumer-assembly metadata updates to Viu's component hot-reload runtime.
                 /// </summary>
+                [global::System.CodeDom.Compiler.GeneratedCode("Assimalign.Viu.Generators.Syntax", "1.0.0.0")]
                 internal static class SingleFileComponentHotReloadMetadataUpdateHandler
                 {
                     /// <summary>
@@ -392,10 +383,10 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             "Components.Counter.SingleFileComponent.g.cs");
         return new HotReloadMetadataValues(
             generated,
-            GetterValue(generated, "HotReloadComponentIdentifier"),
-            GetterValue(generated, "HotReloadTemplateContentHash"),
-            GetterValue(generated, "HotReloadScriptContentHash"),
-            GetterValue(generated, "HotReloadStyleContentHash"));
+            RegistrationIdentifier(generated),
+            MarkerHash(generated, "SingleFileComponentTemplateUpdateMarker"),
+            MarkerHash(generated, "SingleFileComponentScriptUpdateMarker"),
+            MarkerHash(generated, "SingleFileComponentStyleUpdateMarker"));
     }
 
     private static HotReloadMetadataValues GeneratedMetadata(GeneratorDriver driver)
@@ -408,10 +399,10 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             "Components.Counter.SingleFileComponent.g.cs");
         return new HotReloadMetadataValues(
             generated,
-            GetterValue(generated, "HotReloadComponentIdentifier"),
-            GetterValue(generated, "HotReloadTemplateContentHash"),
-            GetterValue(generated, "HotReloadScriptContentHash"),
-            GetterValue(generated, "HotReloadStyleContentHash"));
+            RegistrationIdentifier(generated),
+            MarkerHash(generated, "SingleFileComponentTemplateUpdateMarker"),
+            MarkerHash(generated, "SingleFileComponentScriptUpdateMarker"),
+            MarkerHash(generated, "SingleFileComponentStyleUpdateMarker"));
     }
 
     private static string GeneratedHandler(GeneratorDriver driver)
@@ -453,13 +444,30 @@ public sealed class SingleFileComponentHotReloadMetadataTests
             "</style>\n";
     }
 
-    private static string GetterValue(string generated, string name)
+    private static string RegistrationIdentifier(string generated)
     {
-        var marker = "internal static string " + name + " => \"";
-        var start = generated.IndexOf(marker, StringComparison.Ordinal);
-        start.ShouldBeGreaterThanOrEqualTo(0, generated);
-        start += marker.Length;
-        var end = generated.IndexOf("\";", start, StringComparison.Ordinal);
+        const string marker = "typeof(Counter),";
+        var markerStart = generated.IndexOf(marker, StringComparison.Ordinal);
+        markerStart.ShouldBeGreaterThanOrEqualTo(0, generated);
+        var start = generated.IndexOf('"', markerStart + marker.Length);
+        start.ShouldBeGreaterThan(markerStart, generated);
+        start++;
+        var end = generated.IndexOf("\",", start, StringComparison.Ordinal);
+        end.ShouldBeGreaterThan(start, generated);
+        return generated.Substring(start, end - start);
+    }
+
+    private static string MarkerHash(string generated, string markerName)
+    {
+        var markerStart = generated.IndexOf(
+            "private static class " + markerName,
+            StringComparison.Ordinal);
+        markerStart.ShouldBeGreaterThanOrEqualTo(0, generated);
+        const string keepAlive = "global::System.GC.KeepAlive(\"";
+        var start = generated.IndexOf(keepAlive, markerStart, StringComparison.Ordinal);
+        start.ShouldBeGreaterThan(markerStart, generated);
+        start += keepAlive.Length;
+        var end = generated.IndexOf("\");", start, StringComparison.Ordinal);
         end.ShouldBeGreaterThan(start, generated);
         return generated.Substring(start, end - start);
     }

@@ -26,22 +26,23 @@ public sealed class ComponentInvocation
     /// <param name="slots">Raw named slot functions.</param>
     /// <param name="listeners">Raw named event listeners.</param>
     /// <param name="directives">Directives attached to the invocation site.</param>
-    /// <param name="slotFlags">
-    /// The compiler classification for the complete slot set. Hand-authored invocations default
-    /// to <see cref="Components.SlotFlags.Dynamic"/> because stability must be proved.
+    /// <param name="slotStability">
+    /// The compiler classification for the complete slot set. Invocations default to
+    /// <see cref="Components.SlotFlags.Stable"/>; callers whose slot structure can change must
+    /// explicitly select <see cref="Components.SlotFlags.Dynamic"/>.
     /// </param>
     public ComponentInvocation(
         IReadOnlyDictionary<string, object?>? arguments = null,
         IReadOnlyDictionary<string, ComponentSlot>? slots = null,
         IReadOnlyDictionary<string, ComponentEventListener>? listeners = null,
         IEnumerable<DirectiveInvocation>? directives = null,
-        SlotFlags slotFlags = SlotFlags.Dynamic)
+        SlotFlags slotStability = SlotFlags.Stable)
     {
-        if (slotFlags is not SlotFlags.Stable
+        if (slotStability is not SlotFlags.Stable
             and not SlotFlags.Dynamic
             and not SlotFlags.Forwarded)
         {
-            throw new ArgumentOutOfRangeException(nameof(slotFlags));
+            throw new ArgumentOutOfRangeException(nameof(slotStability));
         }
 
         Arguments = arguments is null
@@ -52,7 +53,7 @@ public sealed class ComponentInvocation
             : CollectionSnapshot.CopyNonNullDictionary(slots, nameof(slots));
         Listeners = CollectionSnapshot.CopyNonNullDictionary(listeners, nameof(listeners));
         Directives = CollectionSnapshot.CopyNonNull(directives, nameof(directives));
-        SlotFlags = slotFlags;
+        SlotStability = slotStability;
     }
 
     /// <summary>Gets raw named arguments before contract resolution.</summary>
@@ -72,5 +73,5 @@ public sealed class ComponentInvocation
     /// <see cref="Components.SlotFlags.Forwarded"/> value is resolved against the active parent
     /// component by Core. Specified by <c>[CMP-18]</c> and <c>[CMP-19]</c>.
     /// </summary>
-    public SlotFlags SlotFlags { get; }
+    public SlotFlags SlotStability { get; }
 }

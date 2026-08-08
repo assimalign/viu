@@ -130,7 +130,10 @@ internal static class VOnTransform
                 {
                     if (expression.Content.Contains("$event"))
                     {
-                        expression = expression with { Content = expression.Content.Replace("$event", "__event") };
+                        expression = expression with
+                        {
+                            Content = CompilerText.ReplaceIdentifierToken(expression.Content, "$event", "__event"),
+                        };
                     }
 
                     context.AddIdentifiers("__event");

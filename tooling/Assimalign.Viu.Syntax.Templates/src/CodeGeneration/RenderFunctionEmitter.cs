@@ -5,20 +5,17 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Serializes a <see cref="TransformResult"/>'s code-generation tree into a C# render-function body.
-/// Every render node becomes a direct invocation of a
-/// runtime helper referenced <b>by name</b> in its underscore-prefixed alias form (<c>_openBlock</c>,
-/// <c>_createElementBlock</c>, <c>_toDisplayString</c>, …, per <see cref="HelperNames"/> and
-/// <see cref="TransformContext.HelperString(RuntimeHelper)"/>); this library never references the runtime
-/// assembly, and the composition root (the source generator, [V01.01.06.02]) binds the names via a
-/// file-level <c>using static</c> of the runtime render-helper surface. The name/signature contract is
-/// documented in this library's <c>docs/DESIGN.md</c> and pinned by <c>RenderFunctionEmitterTests</c>.
+/// Every render node becomes ordered statements against a caller-provided component instance and
+/// <c>ComponentRenderFrame</c>, with direct construction of the closed virtual-node algebra. This
+/// analyzer-host library still does not reference runtime assemblies: adopted runtime types are written
+/// as fully qualified names into consumer code. Specified by <c>[SFC-CG-1]</c> and <c>[SFC-CG-2]</c>.
 /// </summary>
 /// <remarks>
 /// The emission is deterministic — ordinal string handling, invariant-culture numbers, LF newlines — and
-/// pure: equal input produces an equal <see cref="RenderFunctionEmitterResult"/>. The load-bearing
-/// emission detail is the block sequence: opening a block must happen <em>before</em> the child arguments
-/// are evaluated, which is expressed as <c>_createElementBlock(_openBlock(), ...)</c> and relies on C#'s
-/// guaranteed left-to-right argument evaluation. See <c>docs/DESIGN.md</c> for the full emission table.
+/// pure: equal input produces an equal <see cref="RenderFunctionEmitterResult"/>. Block assembly is an
+/// explicit sequence: <c>frame.OpenBlock()</c>, descendant construction and tracking, then
+/// <c>frame.CloseBlock()</c> in the owning node's render plan. This makes lifetime and nesting visible
+/// without ambient state. Specified by <c>[RND-BLOCK-3]</c>.
 /// </remarks>
 public static class RenderFunctionEmitter
 {
@@ -46,7 +43,7 @@ public static class RenderFunctionEmitter
             throw new ArgumentNullException(nameof(options));
         }
 
-        var writer = new RenderCodeWriter(result, options.IndentLevel, options.IndentText);
+        var writer = new FrameRenderCodeWriter(result, options.IndentLevel, options.IndentText);
         var code = writer.EmitRenderBody();
         var mappings = writer.SourceMappings;
         return new RenderFunctionEmitterResult

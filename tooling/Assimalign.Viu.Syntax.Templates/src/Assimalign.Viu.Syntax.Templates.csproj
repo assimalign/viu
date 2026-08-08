@@ -46,17 +46,15 @@
          net10.0 and cannot be referenced from netstandard2.0). See the file header and the
          Assimalign.Viu.Shared.GeneratorFixture precedent. -->
     <Compile Include="..\..\..\libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs" Link="Internal\DomKnowledgeData.cs" />
-    <!-- Linked shared-source seam ([V01.01.01.03], per the #50 boundary note): PatchFlags and SlotFlags are the
-         compiler <-> runtime contract authored in Assimalign.Viu.Shared. Shared is net10.0 and cannot be
-         referenced from this netstandard2.0 analyzer-host project, so — exactly as with DomKnowledgeData above —
-         the two enum source files are <Compile Include>'d here. Both are netstandard2.0-clean (a [Flags] enum and
-         a plain enum, System-only), keeping one authoritative definition instead of a drifting mirror. The
-         compiler assembly is consumed only at build time by the generator ([V01.01.05.05]) and is never loaded
-         beside Shared at runtime. The duplicate public identities still cause CS0433 when code names either type
-         while both assemblies are referenced; the separate Testing and Browser generator-driving test projects
-         keep that compile-time closure isolated, and not producing a standalone package does not remove that
-         requirement. -->
-    <Compile Include="..\..\..\libraries\Assimalign.Viu.Shared\src\PatchFlags.cs" Link="Shared\PatchFlags.cs" />
-    <Compile Include="..\..\..\libraries\Assimalign.Viu.Shared\src\SlotFlags.cs" Link="Shared\SlotFlags.cs" />
+    <!-- Linked staged-source seam ([SFC-CG-7]): PatchFlags and SlotFlags are the compiler <-> runtime
+         contracts owned by Assimalign.Viu.Components. Components targets net10.0 and cannot be referenced
+         from this netstandard2.0 analyzer-host project, so the two enum source files are <Compile Include>'d
+         here. Both remain netstandard2.0-clean and keep one authoritative definition instead of a drifting
+         compiler mirror. The compiler assembly is build-time-only and is never loaded beside Components at
+         runtime; generated consumer code names the Components identities from the adopted runtime assembly. -->
+    <!-- TODO(swap): Flip this staged Components path to libraries/ when the adopted tree swaps. -->
+    <Compile Include="..\..\..\.redesign\libraries\Assimalign.Viu.Components\src\PatchFlags.cs" Link="Components\PatchFlags.cs" />
+    <!-- TODO(swap): Flip this staged Components path to libraries/ when the adopted tree swaps. -->
+    <Compile Include="..\..\..\.redesign\libraries\Assimalign.Viu.Components\src\SlotFlags.cs" Link="Components\SlotFlags.cs" />
   </ItemGroup>
 </Project>

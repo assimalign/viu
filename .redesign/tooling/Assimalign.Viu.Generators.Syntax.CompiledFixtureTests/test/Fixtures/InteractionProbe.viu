@@ -1,0 +1,22 @@
+<template>
+<main>
+  <h2>{{ Title }}</h2>
+  <button @click="Raise">raise</button>
+  <input v-model="Model" />
+</main>
+</template>
+
+@script {
+using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
+
+[Parameter(IsRequired = true)]
+public string Title { get; set; } = "Default";
+
+[Event]
+public partial void Changed(string value);
+
+public Reference<object?> Model = Reactive.Reference<object?>("initial");
+
+private void Raise() => Changed(Title);
+}

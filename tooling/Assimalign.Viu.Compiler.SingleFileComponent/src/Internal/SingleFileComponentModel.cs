@@ -34,15 +34,14 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// pipeline stays value-equatable.
 /// </param>
 /// <param name="RenderCacheSize">
-/// The number of <c>_cache</c> slots the render function uses (<c>v-once</c> subtrees and cached
-/// handlers); surfaced as a generated constant because the cache is a fixed-length C# array allocated
-/// once per instance and cannot grow on assignment.
+/// The exact number of per-mount cache slots the frame-based render function uses. Emitted through
+/// <c>ComponentContract.RenderCacheSize</c> so Core creates the mount-owned frame at the compiled size.
 /// </param>
 /// <param name="ScopeId">
 /// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
-/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]). Emitted as a
-/// generated constant so the renderer can stamp the matching <c>data-v-&lt;hash&gt;</c> attribute on the
-/// component's elements — the scope-id propagation contract the runtime side implements.
+/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]). Retained as style-
+/// compilation metadata; runtime scope-identifier emission is deferred during the component-model
+/// migration.
 /// </param>
 /// <param name="ExtractedStyles">
 /// The component's compiled CSS — scoped style blocks rewritten with <see cref="ScopeId"/> and
@@ -57,8 +56,8 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// </param>
 /// <param name="CssVariableBindings">
 /// The <c>v-bind()</c> CSS bindings ([V01.01.06.06]) — one entry per distinct <c>(hash, expression)</c> —
-/// emitted as the <c>ApplyCssVariables</c> seam the <c>UseCssVariables</c> runtime consumes. Empty when no
-/// style block uses <c>v-bind()</c>.
+/// retained for parsing and diagnostics while runtime CSS-variable application is deferred. Empty when
+/// no style block uses <c>v-bind()</c>.
 /// </param>
 internal readonly record struct SingleFileComponentModel(
     string? Namespace,
@@ -102,7 +101,7 @@ internal readonly record struct SingleFileComponentModel(
     /// <summary>
     /// The attribute-declared component surface merged from every script block ([CMP-26], [CMP-30]):
     /// the <c>[Parameter]</c> properties and <c>[Event]</c> methods the scaffold turns into the
-    /// partial's <c>IComponentTemplate.Parameters</c>/<c>Events</c>, the per-render argument
+    /// partial's <c>ComponentContract.Parameters</c>/<c>Events</c>, the per-render argument
     /// assignment, and the typed emit implementations. <see cref="ScriptDeclarations.None"/> for a
     /// component that declares its surface imperatively or not at all — the form that keeps compiling
     /// unchanged [CMP-31].

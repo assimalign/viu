@@ -92,7 +92,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
 
     internal ComponentInvocation Invocation { get; private set; }
 
-    internal SlotFlags EffectiveSlotFlags { get; private set; } = SlotFlags.Dynamic;
+    internal SlotFlags EffectiveSlotStability { get; private set; } = SlotFlags.Stable;
 
     ComponentInvocation IAsynchronousComponentRuntime.Invocation => Invocation;
 
@@ -164,7 +164,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     {
         ArgumentNullException.ThrowIfNull(invocation);
         Invocation = invocation;
-        EffectiveSlotFlags = ResolveEffectiveSlotFlags(invocation.SlotFlags);
+        EffectiveSlotStability = ResolveEffectiveSlotStability(invocation.SlotStability);
 
         List<ComponentBindingDiagnostic> diagnostics = [];
         ComponentBindings resolved = Run(
@@ -232,15 +232,15 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     internal void UpdateMountReference(MountReference? mountReference) =>
         MountReference = mountReference;
 
-    private SlotFlags ResolveEffectiveSlotFlags(SlotFlags slotFlags) => slotFlags switch
+    private SlotFlags ResolveEffectiveSlotStability(SlotFlags slotStability) => slotStability switch
     {
         SlotFlags.Stable => SlotFlags.Stable,
         SlotFlags.Dynamic => SlotFlags.Dynamic,
-        SlotFlags.Forwarded => (Parent as RuntimeComponentContext)?.EffectiveSlotFlags
+        SlotFlags.Forwarded => (Parent as RuntimeComponentContext)?.EffectiveSlotStability
             == SlotFlags.Stable
                 ? SlotFlags.Stable
                 : SlotFlags.Dynamic,
-        _ => throw new ArgumentOutOfRangeException(nameof(slotFlags)),
+        _ => throw new ArgumentOutOfRangeException(nameof(slotStability)),
     };
 
     internal void Run(Action action)

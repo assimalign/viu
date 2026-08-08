@@ -47,4 +47,7 @@
   <Folder Name="/tooling/Assimalign.Viu.Compiler.SingleFileComponent/test/">
     <Project Path="tooling/Assimalign.Viu.Compiler.SingleFileComponent/test/Assimalign.Viu.Compiler.SingleFileComponent.Tests.csproj" />
   </Folder>
+  <Folder Name="/tooling/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests/test/">
+    <Project Path="tooling/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests/test/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests.csproj" />
+  </Folder>
 </Solution>

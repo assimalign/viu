@@ -111,6 +111,19 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                 "The canonical .viu component takes precedence.",
                 file.FilePath));
 
+        // [SFC-CG-3]/[SFC-CG-4] Each per-file scaffold stays on its independent output branch. A
+        // separate collected branch emits the one assembly catalog and the tier-three glue once;
+        // changes here never cause another component's source file to be re-emitted.
+        var generatedComponents = results
+            .Where(static result => result.Model.RenderBody is not null)
+            .Select(static (result, _) => new GeneratedComponentRegistration(
+                result.Model.Namespace,
+                result.Model.ClassName,
+                result.Model.FilePath))
+            .Collect();
+        var assemblyEmission = generatedComponents.Combine(
+            projectOptions.Select(static (options, _) => options.RootNamespace));
+
         // [SFC-USE-1] The component declarations this compilation can read: the attribute-declared
         // surfaces of the .viu components being generated here, plus everything Roslyn can see through
         // symbols (hand-authored components in this compilation, and components in referenced
@@ -139,6 +152,17 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             static (production, pair) => ValidateComponentUsages(production, pair.Left, pair.Right));
         context.RegisterSourceOutput(collisions, static (production, diagnostic) =>
             production.ReportDiagnostic(SingleFileComponentDiagnosticAdapter.ToDiagnostic(diagnostic)));
+        context.RegisterSourceOutput(
+            assemblyEmission,
+            static (production, pair) =>
+            {
+                if (!pair.Left.IsDefaultOrEmpty)
+                {
+                    production.AddSource(
+                        SingleFileComponentAssemblyEmitter.HintName,
+                        SingleFileComponentAssemblyEmitter.Emit(pair.Right, pair.Left));
+                }
+            });
         context.RegisterSourceOutput(
             projectOptions,
             static (production, options) =>

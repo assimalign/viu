@@ -12,7 +12,7 @@ namespace Assimalign.Viu.Core.Tests;
 
 /// <summary>
 /// Pins keyed reconciliation identity, diagnostics, and longest-increasing-subsequence behavior
-/// specified by <c>[RND-KEY-3]</c> and <c>[RND-KEY-4]</c>.
+/// specified by <c>[RND-KEY-1]</c>, <c>[RND-KEY-3]</c>, and <c>[RND-KEY-4]</c>.
 /// </summary>
 public sealed class RendererKeyedParityTests
 {
@@ -89,6 +89,38 @@ public sealed class RendererKeyedParityTests
         rendered[0].ShouldBeSameAs(original[0]);
         rendered[1].ShouldBeSameAs(original[1]);
         host.MoveCount.ShouldBe(0);
+        host.InsertCount.ShouldBe(0);
+        host.RemoveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Render_KeyedFragmentWithEmptyBlockMetadata_StillReconcilesAndMovesChildren()
+    {
+        using var host = new RendererParityHost();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(
+            KeyedBlockFragment(
+                KeyedElement("item", "alpha", "A"),
+                KeyedElement("item", "beta", "B")),
+            host.Container);
+        RendererParityNode[] original = host.Container.Children
+            .Where(node => node.Kind == RendererParityNodeKind.Element)
+            .ToArray();
+        host.ResetOperationCounts();
+
+        renderer.Render(
+            KeyedBlockFragment(
+                KeyedElement("item", "beta", "B"),
+                KeyedElement("item", "alpha", "A")),
+            host.Container);
+
+        RendererParityNode[] reordered = host.Container.Children
+            .Where(node => node.Kind == RendererParityNodeKind.Element)
+            .ToArray();
+        reordered.Select(node => node.DescendantText).ShouldBe(["B", "A"]);
+        reordered[0].ShouldBeSameAs(original[1]);
+        reordered[1].ShouldBeSameAs(original[0]);
+        host.MoveCount.ShouldBe(1);
         host.InsertCount.ShouldBe(0);
         host.RemoveCount.ShouldBe(0);
     }
@@ -251,6 +283,13 @@ public sealed class RendererKeyedParityTests
                     children: [new TextNode("A2")]),
             ],
             key: key);
+
+    private static FragmentNode KeyedBlockFragment(params VirtualNode[] children) =>
+        new(
+            children,
+            renderPlan: new RenderPlan(
+                PatchFlags.KeyedFragment,
+                dynamicChildren: Array.Empty<VirtualNode>()));
 
     private static FragmentNode UnkeyedFragment(params string[] values)
     {

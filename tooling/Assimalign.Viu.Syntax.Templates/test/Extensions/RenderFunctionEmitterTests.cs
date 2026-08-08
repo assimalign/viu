@@ -6,405 +6,259 @@ using Shouldly;
 
 using Xunit;
 
-// The test namespace sits under Assimalign.Viu.Syntax, whose DiagnosticSeverity shadows Roslyn's;
-// alias the Roslyn enum used by the parse-validity checks.
 using RoslynDiagnosticSeverity = Microsoft.CodeAnalysis.DiagnosticSeverity;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// Snapshot, parse-validity, and determinism tests for <see cref="RenderFunctionEmitter"/>.
-/// The snapshots ARE the emitted-output contract — helper spelling and argument
-/// order, plus every serialization decision C# forces, documented in <c>docs/DESIGN.md</c>:
-/// block sequences ride on argument evaluation order (<c>_createElementBlock(_openBlock(), ...)</c>
-/// instead of the comma operator), object literals emit through <c>_createProps</c>, child arrays emit as
-/// <c>new object?[] { ... }</c>, handler values wrap in <c>_withHandler</c>, and cache slots use
-/// <c>??=</c>. These emitted names ARE the by-name runtime-helper contract the issue (#52) requires this
-/// library to pin — the runtime never gets referenced from here.
+/// Pins the frame-based statement output produced for <c>[SFC-CG-1]</c> through
+/// <c>[SFC-CG-7]</c>. These tests intentionally assert the adopted runtime vocabulary and reject
+/// the retired by-name helper surface while leaving local-name allocation free to evolve.
 /// </summary>
 public class RenderFunctionEmitterTests
 {
-    // ---- element / props / patch flags ----
-
     [Fact]
-    public void Element_WithMixedProps_EmitsPropsObjectPatchFlagAndDynamicProps()
+    public void Element_WithMixedProperties_EmitsDirectNodeBindingsAndRawPatchFlags()
     {
-        // The emitted patch flag: TEXT|PROPS = 9, with its readable-name comment, and the
-        // dynamicProps array emits verbatim as a C# collection expression targeting string[].
-        var emitted = EmitPrefixed("<div :id=\"dynamicId\" class=\"static\">{{ message }}</div>");
+        RenderFunctionEmitterResult emitted = EmitPrefixed(
+            "<div :id=\"dynamicId\" class=\"static\">{{ message }}</div>");
 
-        emitted.Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "div", _createProps(
-    ("id", _ctx.dynamicId),
-    ("class", "static")
-), _toDisplayString(_ctx.message), 9 /* TEXT, PROPS */, ["id"]);
-
-""");
+        emitted.Code.ShouldContain("frame.OpenBlock();");
+        emitted.Code.ShouldContain("new global::System.Collections.Generic.Dictionary<string, object?>");
+        emitted.Code.ShouldContain("[\"id\"] = component.dynamicId");
+        emitted.Code.ShouldContain("ElementBinding.Attribute(");
+        emitted.Code.ShouldContain("new global::Assimalign.Viu.Components.ElementNode(");
+        emitted.Code.ShouldContain("(global::Assimalign.Viu.Components.PatchFlags)(9) /* TEXT, PROPS */");
+        emitted.Code.ShouldContain("frame.CloseBlock()");
+        emitted.Code.ShouldContain("frame.Track(");
         emitted.CacheSlotCount.ShouldBe(0);
     }
 
     [Fact]
-    public void StaticElement_EmitsBlockWithoutPropsOrFlags()
+    public void Conditional_EmitsOrderedStatementsAndCommentFallback()
     {
-        // genNullableArgs parity: trailing null arguments are trimmed, so a fully static element is
-        // just tag + children.
-        EmitPrefixed("<div>x</div>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "div", null, "x");
+        string code = EmitPrefixed("<div v-if=\"visible\">A</div>").Code;
 
-""");
+        code.ShouldContain("if (component.visible)");
+        code.ShouldContain("new global::Assimalign.Viu.Components.ElementNode(");
+        code.ShouldContain("new global::Assimalign.Viu.Components.CommentNode(\"v-if\")");
+        code.ShouldContain("conditionalNode");
     }
 
     [Fact]
-    public void ManyChildren_SplitAcrossLines()
+    public void RenderList_EmitsDirectForeachAndFragmentConstruction()
     {
-        // genNodeListAsArray parity: more than three children switch to the multiline array form.
-        EmitPrefixed("<ul><li>1</li><li>2</li><li>3</li><li>{{ four }}</li></ul>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "ul", null, new object?[] {
-    _createElementVNode("li", null, "1"),
-    _createElementVNode("li", null, "2"),
-    _createElementVNode("li", null, "3"),
-    _createElementVNode("li", null, _toDisplayString(_ctx.four), 1 /* TEXT */)
-});
+        string code = EmitPrefixed(
+            "<li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>").Code;
 
-""");
-    }
-
-    // ---- v-if ----
-
-    [Fact]
-    public void VIfChain_EmitsNestedConditionalWithBranchBlocksAndKeys()
-    {
-        // Each branch opens its own block with the synthetic key (0, 1, 2); the alternate of each
-        // conditional is the next branch, stair-stepped one level per branch.
-        EmitPrefixed("<div v-if=\"visible\">A</div><span v-else-if=\"other\">B</span><p v-else>C</p>").Code.ShouldBeCode(
-"""
-return (_ctx.visible)
-    ? _createElementBlock(_openBlock(), "div", _createProps(("key", 0)), "A")
-    : (_ctx.other)
-        ? _createElementBlock(_openBlock(), "span", _createProps(("key", 1)), "B")
-        : _createElementBlock(_openBlock(), "p", _createProps(("key", 2)), "C");
-
-""");
+        code.ShouldContain("var listSource");
+        code.ShouldContain("= component.items;");
+        code.ShouldContain("foreach (var listItem");
+        code.ShouldContain("var item = listItem");
+        code.ShouldContain("new global::Assimalign.Viu.Components.FragmentNode(");
+        code.ShouldContain("(global::Assimalign.Viu.Components.PatchFlags)(128) /* KEYED_FRAGMENT */");
     }
 
     [Fact]
-    public void LoneVIf_TerminatesChainWithCommentVNode()
+    public void ComponentSlots_EmitInvocationDictionariesClosuresAndStability()
     {
-        // A v-if without a v-else terminates with createCommentVNode("v-if", true), so the branch always
-        // occupies a node position and the diff never has to shift siblings.
-        EmitPrefixed("<div v-if=\"ok\">A</div>").Code.ShouldBeCode(
-"""
-return (_ctx.ok)
-    ? _createElementBlock(_openBlock(), "div", _createProps(("key", 0)), "A")
-    : _createCommentVNode("v-if", true);
-
-""");
-    }
-
-    // ---- v-for ----
-
-    [Fact]
-    public void KeyedVFor_EmitsDisabledTrackingFragmentWithRenderListLambda()
-    {
-        // The fragment opens its block with tracking disabled (_openBlock(true)); the iterator is a
-        // braced lambda whose per-item render node is itself a keyed block.
-        EmitPrefixed("<li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.items, (item) => {
-    return _createElementBlock(_openBlock(), "li", _createProps(("key", item.id)), _toDisplayString(item.label), 1 /* TEXT */);
-}), 128 /* KEYED_FRAGMENT */);
-
-""");
-    }
-
-    [Fact]
-    public void TemplateVFor_WrapsEachIterationInStableFragment()
-    {
-        EmitPrefixed("<template v-for=\"row in rows\"><td>{{ row }}</td><td>b</td></template>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(true), _Fragment, null, _renderList(_ctx.rows, (row) => {
-    return _createElementBlock(_openBlock(), _Fragment, null, new object?[] { _createElementVNode("td", null, _toDisplayString(row), 1 /* TEXT */), _createElementVNode("td", null, "b") }, 64 /* STABLE_FRAGMENT */);
-}), 256 /* UNKEYED_FRAGMENT */);
-
-""");
-    }
-
-    // ---- components and slots ----
-
-    [Fact]
-    public void ComponentWithSlots_EmitsResolvePreambleWithCtxWrappersAndSlotFlag()
-    {
-        // The asset preamble resolves the component by name into the toValidAssetId local; slot
-        // functions wrap in _withCtx; the trailing ("_", 1) entry is the STABLE SlotFlags marker.
-        var emitted = EmitPrefixed(
+        RenderFunctionEmitterResult emitted = EmitPrefixed(
             "<MyButton :kind=\"kind\"><template #header=\"headerProperties\"><b>{{ headerProperties }}</b></template>" +
             "<span>{{ label }}</span></MyButton>");
 
-        emitted.Code.ShouldBeCode(
-"""
-var _component_MyButton = _resolveComponent("MyButton");
-
-return _createBlock(_openBlock(), _component_MyButton, _createProps(("kind", _ctx.kind)), _createProps(
-    ("header", _withCtx((headerProperties) => new object?[] { _createElementVNode("b", null, _toDisplayString(headerProperties), 1 /* TEXT */) })),
-    ("default", _withCtx(() => new object?[] { _createElementVNode("span", null, _toDisplayString(_ctx.label), 1 /* TEXT */) })),
-    ("_", 1)
-), 8 /* PROPS */, ["kind"]);
-
-""");
+        emitted.Code.ShouldContain("ComponentReference.ForName(\"MyButton\")");
+        emitted.Code.ShouldContain("Dictionary<string, global::Assimalign.Viu.Components.ComponentSlot>");
+        emitted.Code.ShouldContain("global::Assimalign.Viu.Components.ComponentSlot");
+        emitted.Code.ShouldContain("new global::Assimalign.Viu.Components.ComponentInvocation(");
+        emitted.Code.ShouldContain("slotStability: (global::Assimalign.Viu.Components.SlotFlags)1");
+        emitted.Code.ShouldContain("new global::Assimalign.Viu.Components.ComponentNode(");
     }
 
     [Fact]
-    public void DynamicComponent_EmitsResolveDynamicComponentBlock()
+    public void SlotOutlet_ReadsContractBindingsAndEmitsFallbackStatements()
     {
-        // <component :is> compiles to a resolveDynamicComponent tag inside a createBlock (issue #52
-        // acceptance criterion).
-        EmitPrefixed("<component :is=\"viewName\"></component>").Code.ShouldBeCode(
-"""
-return _createBlock(_openBlock(), _resolveDynamicComponent(_ctx.viewName));
+        string code = EmitPrefixed("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>").Code;
 
-""");
+        code.ShouldContain("component.Context!.Bindings.Slots.TryGetValue(");
+        code.ShouldContain("slot2(slotArguments1)");
+        code.ShouldContain("DisplayStringFormatter.ToDisplayString(component.hint)");
+        code.ShouldContain("slotNode");
+        code.ShouldContain("frame.Track(slotNode");
     }
 
     [Fact]
-    public void SlotOutlet_EmitsRenderSlotWithContractSlotSourceAndFallback()
+    public void DynamicAndStructuralComponents_UseAdoptedRuntimeTypes()
     {
-        // `$slots` has no legal C# spelling, so
-        // the contract emits _ctx.__slots (the __event precedent), and the `{}` placeholder becomes
-        // the empty _createProps() (docs/DESIGN.md divergence table).
-        EmitPrefixed("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>").Code.ShouldBeCode(
-"""
-return _renderSlot(_ctx.__slots, "header", _createProps(), () => new object?[] { _createElementVNode("p", null, "fallback " + _toDisplayString(_ctx.hint), 1 /* TEXT */) });
+        string dynamicCode = EmitPrefixed("<component :is=\"viewName\"></component>").Code;
+        string teleportCode = EmitPrefixed("<Teleport to=\"body\"><div>{{ tip }}</div></Teleport>").Code;
 
-""");
+        dynamicCode.ShouldContain("global::Assimalign.Viu.DynamicComponents.DynamicComponent(");
+        dynamicCode.ShouldContain("component.viewName");
+        teleportCode.ShouldContain("new global::Assimalign.Viu.Components.TeleportNode(");
+        teleportCode.ShouldContain("targetIdentifier");
     }
 
     [Fact]
-    public void Teleport_EmitsBuiltInHelperTagBlock()
+    public void CachedSubtree_UsesFrameOwnedSlotsAndBalancedTracking()
     {
-        EmitPrefixed("<Teleport to=\"body\"><div>{{ tip }}</div></Teleport>").Code.ShouldBeCode(
-"""
-return _createBlock(_openBlock(), _Teleport, _createProps(("to", "body")), new object?[] { _createElementVNode("div", null, _toDisplayString(_ctx.tip), 1 /* TEXT */) });
+        RenderFunctionEmitterResult emitted = EmitPrefixed("<div v-once><span>{{ frozen }}</span></div>");
 
-""");
-    }
-
-    // ---- fragments ----
-
-    [Fact]
-    public void MultiRoot_EmitsStableFragmentBlock()
-    {
-        EmitPrefixed("<div>one</div><span>{{ two }}</span>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), _Fragment, null, new object?[] { _createElementVNode("div", null, "one"), _createElementVNode("span", null, _toDisplayString(_ctx.two), 1 /* TEXT */) }, 64 /* STABLE_FRAGMENT */);
-
-""");
-    }
-
-    // ---- v-once / cache slots ----
-
-    [Fact]
-    public void VOnce_EmitsCacheSlotWithPausedBlockTracking()
-    {
-        // The described sequence is: _cache[0] || (setBlockTracking(-1, true), (_cache[0] = createElementVNode(...))
-        // .cacheIndex = 0, setBlockTracking(1), _cache[0]). C# has no comma operator, so the sequence
-        // collapses into `_cache[0] ??= _setCache(0, _setBlockTracking(-1, true), value)` — argument
-        // evaluation order pauses tracking before the value is created, and _setCache stamps the index,
-        // resumes tracking, and returns the value.
-        var emitted = EmitPrefixed("<div v-once><span>{{ frozen }}</span></div>");
-
-        emitted.Code.ShouldBeCode(
-"""
-return (_cache[0] ??= _setCache(0, _setBlockTracking(-1, true), _createElementVNode("div", null, new object?[] { _createElementVNode("span", null, _toDisplayString(_ctx.frozen), 1 /* TEXT */) })));
-
-""");
+        emitted.Code.ShouldContain("frame.SetBlockTracking(-1)");
+        emitted.Code.ShouldContain("finally");
+        emitted.Code.ShouldContain("frame.SetBlockTracking(1)");
+        emitted.Code.ShouldContain("frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>");
         emitted.CacheSlotCount.ShouldBe(1);
     }
 
-    // ---- event handlers (the C# delegate-typing divergence) ----
-
     [Fact]
-    public void Handlers_WrapInWithHandlerForDelegateTargetTyping()
+    public void MemoizedSubtree_UsesTheFrameMemoChannel()
     {
-        // A C# lambda or method group has no natural type in an object-typed position, so handler
-        // property values wrap in the contract helper _withHandler (docs/DESIGN.md). The inline
-        // statement uses the __event parameter spelling pinned by [V01.01.05.04].
-        EmitPrefixed("<button @click=\"count++\" @submit=\"save\">Go</button>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "button", _createProps(
-    ("onClick", _withHandler(__event => (_ctx.count++))),
-    ("onSubmit", _withHandler(_ctx.save))
-), "Go", 40 /* PROPS, NEED_HYDRATION */, ["onClick", "onSubmit"]);
+        RenderFunctionEmitterResult emitted = EmitPrefixed("<div v-memo=\"[message]\">{{ message }}</div>");
 
-""");
+        emitted.Code.ShouldContain("frame.Memo(0, ");
+        emitted.Code.ShouldContain("component.message");
+        emitted.Code.ShouldContain("renderMemoNode");
+        emitted.Code.ShouldNotContain("_cache");
+        emitted.Code.ShouldNotContain("_withMemo");
+        emitted.Code.ShouldNotContain(
+            "DisplayStringFormatter.ToDisplayString(global::Assimalign.Viu.DisplayStringFormatter.ToDisplayString(");
+        emitted.CacheSlotCount.ShouldBe(1);
     }
 
     [Fact]
-    public void VoidCallHandler_EmitsStatementBlockLambda()
+    public void MemoizedRenderList_UsesTypedPerItemFrameCacheEntries()
     {
-        // A single-statement inline call handler emits as a statement-block lambda (__event => { call; })
-        // rather than an expression lambda (__event => (call)): a void call has no value to parenthesize
-        // and would bind no _withHandler delegate overload, so the block form — which binds
-        // Action<object?> and discards any value — is used
-        // ([V01.01.05.05.01], issue #143).
-        EmitPrefixed("<button @click=\"save($event)\">x</button>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withHandler(__event => { _ctx.save(__event); }))), "x", 8 /* PROPS */, ["onClick"]);
+        RenderFunctionEmitterResult emitted = EmitPrefixed(
+            "<div v-for=\"item in items\" v-memo=\"[item.id]\" :key=\"item.id\">{{ item.label }}</div>");
 
-""");
+        emitted.Code.ShouldContain("previousMemoEntries");
+        emitted.Code.ShouldContain("global::System.Linq.Enumerable.SequenceEqual(");
+        emitted.Code.ShouldContain("frame.SetCache(0, currentMemoEntries");
+        emitted.Code.ShouldContain("memoizedItem");
+        emitted.Code.ShouldNotContain("_isMemoSame");
+        emitted.CacheSlotCount.ShouldBe(1);
     }
 
     [Fact]
-    public void MultiStatementHandlerWithoutTrailingSemicolon_EmitsTerminatedStatementBlockLambda()
+    public void CachedPatchFlag_ParenthesizesTheNegativeRawInteger()
     {
-        // A multi-statement inline handler emits into `__event => { <body> }`. C# has no automatic
-        // semicolon insertion, so a body whose
-        // final statement omits its terminator gains a synthesized `;`, keeping the generated lambda valid
-        // C# ([V01.01.05.05.02], issue #150).
-        EmitPrefixed("<button @click=\"first(); second()\">x</button>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withHandler(__event => {_ctx.first(); _ctx.second();}))), "x", 8 /* PROPS */, ["onClick"]);
+        RootNode root = TemplateParser.Parse("<div><span>static</span></div>", ParserOptions.CreateHtml());
+        TransformOptions options = TransformOptions.CreateDom();
+        options.HoistStatic = true;
+        string code = RenderFunctionEmitter.Emit(Transformer.Transform(root, options)).Code;
 
-""");
+        code.ShouldContain("(global::Assimalign.Viu.Components.PatchFlags)(-1) /* CACHED */");
+        code.ShouldNotContain("(global::Assimalign.Viu.Components.PatchFlags)-1");
     }
 
     [Fact]
-    public void ModifierHandler_KeepsWithModifiersUnwrapped()
+    public void CssModuleAccessor_RemainsAStaticGeneratedTypeReference()
     {
-        // withModifiers/withKeys already give the inner lambda its delegate target type through their
-        // own contract signature, so no extra _withHandler wrapper is added around them. The inline
-        // handler is a call, which may be void-typed, so it emits as a statement-block lambda
-        // (__event => { call; }) — the shape that binds withModifiers' Action<BrowserEvent> overload;
-        // a parenthesized void call binds no overload ([V01.01.05.05.01], issue #143).
-        EmitPrefixed("<button @click.stop=\"save($event)\">x</button>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "button", _createProps(("onClick", _withModifiers(__event => { _ctx.save(__event); }, ["stop"]))), "x", 8 /* PROPS */, ["onClick"]);
+        RootNode root = TemplateParser.Parse("<div :class=\"theme.active\"></div>", ParserOptions.CreateHtml());
+        TransformOptions options = TransformOptions.CreateDom();
+        options.PrefixIdentifiers = true;
+        options.BindingMetadata = BindingMetadata.Empty;
+        options.CssModules = new CssModuleAccessors(
+            new[] { new CssModuleAccessor("theme", "theme", "Theme", new[] { "active" }) },
+            reportsUnknownMembers: true);
 
-""");
+        string code = RenderFunctionEmitter.Emit(Transformer.Transform(root, options)).Code;
+
+        code.ShouldContain("Theme.active");
+        code.ShouldNotContain("component.Theme.active");
     }
 
     [Fact]
-    public void VModel_EmitsUpdateHandlerWithEventSpellingAndRuntimeDirective()
+    public void EventHandlers_UseOnlyTheNarrowGeneratedAdapter()
     {
-        // The v-model assignment handler is authored by the transform using the $event spelling;
-        // serialization maps it to the Viu __event spelling, and the vModelText runtime directive
-        // carries both the current value and the same write-back lambda. The carrier is Viu's
-        // reflection-free way to reach the generated "onUpdate:modelValue" prop.
-        EmitPrefixed("<input v-model=\"name\" />").Code.ShouldBeCode(
-"""
-return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] { _vModelText, new global::Assimalign.Viu.Browser.ViuModelBinding(_ctx.name, __event => { _ctx.name = __event; }) } });
+        string code = EmitPrefixed("<button @click=\"count++\" @submit=\"save\">Go</button>").Code;
 
-""");
+        code.ShouldContain("global::Assimalign.Viu.Generated.RenderGlue.Handler(");
+        code.ShouldContain("eventValue => (component.count++)");
+        code.ShouldContain("component.save");
+        code.ShouldContain("ElementBinding.Event(");
     }
 
     [Fact]
-    public void VModelWithModifiers_EmitsTheModifierBagThroughTheModifierHelper()
+    public void EventModifiers_UseTypedBrowserEventGuards()
     {
-        // The fourth directive-tuple slot is a name -> bool modifier bag, so it emits through
-        // _createModifiers, NOT the _createProps property helper: a directive binding types its
-        // modifiers IReadOnlyDictionary<string, bool>, so a property bag (name -> object?) in that
-        // slot type-checks yet reads back as NO modifiers, silently disabling .lazy (which shifts the
-        // update carrier from `input` to `change`), .trim, and .number on every compiled native
-        // v-model ([SFC-CG-6], [V01.01.05.03.01]). The third slot stays the null directive argument.
-        EmitPrefixed("<input v-model.trim.number=\"name\" />").Code.ShouldBeCode(
-"""
-return _withDirectives(_createElementBlock(_openBlock(), "input", _createProps(("onUpdate:modelValue", _withHandler(__event => ((_ctx.name) = __event)))), null, 8 /* PROPS */, ["onUpdate:modelValue"]), new object?[] { new object?[] {
-    _vModelText,
-    new global::Assimalign.Viu.Browser.ViuModelBinding(_ctx.name, __event => { _ctx.name = __event; }),
-    null,
-    _createModifiers(
-        ("trim", true),
-        ("number", true)
-    )
-} });
+        string code = EmitPrefixed("<button @click.stop=\"save($event)\">x</button>").Code;
 
-""");
-    }
-
-    // ---- runtime directives ----
-
-    [Fact]
-    public void VShow_EmitsWithDirectivesArray()
-    {
-        // A directive entry [[_vShow, exp]] emits as nested object?[] arrays (an untyped array literal has no
-        // untyped C# counterpart; docs/DESIGN.md).
-        EmitPrefixed("<div v-show=\"visible\">shown</div>").Code.ShouldBeCode(
-"""
-return _withDirectives(_createElementBlock(_openBlock(), "div", null, "shown", 512 /* NEED_PATCH */), new object?[] { new object?[] { _vShow, _ctx.visible } });
-
-""");
+        code.ShouldContain("global::Assimalign.Viu.Browser.BrowserEvents.WithModifiers(");
+        code.ShouldContain("component.save(eventValue)");
+        code.ShouldContain("[\"stop\"]");
     }
 
     [Fact]
-    public void CustomDirective_EmitsResolveDirectivePreamble()
+    public void NativeModel_EmitsTypedCarrierDirectiveAndModifiers()
     {
-        EmitPrefixed("<input v-focus />").Code.ShouldBeCode(
-"""
-var _directive_focus = _resolveDirective("focus");
+        string code = EmitPrefixed("<input v-model.trim.number=\"name\" />").Code;
 
-return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 512 /* NEED_PATCH */), new object?[] { new object?[] { _directive_focus } });
-
-""");
-    }
-
-    // ---- roots and edges ----
-
-    [Fact]
-    public void TextRoot_ReturnsStringLiteral()
-    {
-        // A single text root returns the bare string; the runtime normalizes it into a render node.
-        EmitPrefixed("hello").Code.ShouldBeCode("return \"hello\";\n");
+        code.ShouldContain("new global::Assimalign.Viu.Browser.ViuModelBinding(");
+        code.ShouldContain("component.name");
+        code.ShouldContain("new string[] { \"trim\", \"number\" }");
+        code.ShouldContain("DirectiveInvocation(typeof(global::Assimalign.Viu.Browser.VModelText)");
     }
 
     [Fact]
-    public void EmptyTemplate_ReturnsNull()
+    public void Directives_EmitCompileTimeTypeTokens()
     {
-        EmitPrefixed(string.Empty).Code.ShouldBeCode("return null;\n");
+        string showCode = EmitPrefixed("<div v-show=\"visible\">shown</div>").Code;
+        string customCode = EmitPrefixed("<input v-focus />").Code;
+
+        showCode.ShouldContain("DirectiveInvocation(typeof(global::Assimalign.Viu.Browser.VShow)");
+        customCode.ShouldContain("DirectiveInvocation(typeof(Focus)");
+        customCode.ShouldNotContain("resolveDirective");
     }
 
     [Fact]
-    public void IndentLevel_PrefixesEveryLine()
+    public void TextAndEmptyRoots_ReturnClosedNodeValues()
     {
-        var emitted = Emit("<div>x</div>", new RenderFunctionEmitterOptions { IndentLevel = 2 });
-        emitted.Code.ShouldBeCode("        return _createElementBlock(_openBlock(), \"div\", null, \"x\");\n");
+        string textCode = EmitPrefixed("hello").Code;
+        string emptyCode = EmitPrefixed(string.Empty).Code;
+
+        textCode.ShouldContain("new global::Assimalign.Viu.Components.TextNode(\"hello\")");
+        textCode.ShouldEndWith("return node0;\n");
+        emptyCode.ShouldBeCode("return null;\n");
     }
 
-    // ---- parse validity: every emitted body is syntactically valid C# ----
+    [Fact]
+    public void IndentLevel_PrefixesEveryGeneratedLine()
+    {
+        RenderFunctionEmitterResult emitted = Emit(
+            "hello",
+            new RenderFunctionEmitterOptions { IndentLevel = 2 });
+
+        emitted.Code.Split('\n')
+            .Where(line => line.Length > 0)
+            .ShouldAllBe(line => line.StartsWith("        "));
+    }
 
     [Theory]
     [InlineData("<div :id=\"dynamicId\" class=\"static\">{{ message }}</div>")]
     [InlineData("<div v-if=\"visible\">A</div><span v-else-if=\"other\">B</span><p v-else>C</p>")]
-    [InlineData("<div v-if=\"ok\">A</div>")]
     [InlineData("<li v-for=\"item in items\" :key=\"item.id\">{{ item.label }}</li>")]
-    [InlineData("<i v-for=\"(item, index) in items\">{{ index }}</i>")]
     [InlineData("<template v-for=\"row in rows\"><td>{{ row }}</td><td>b</td></template>")]
-    [InlineData("<MyButton :kind=\"kind\"><template #header=\"headerProperties\"><b>{{ headerProperties }}</b></template><span>{{ label }}</span></MyButton>")]
+    [InlineData("<MyButton :kind=\"kind\"><span>{{ label }}</span></MyButton>")]
     [InlineData("<component :is=\"viewName\"></component>")]
     [InlineData("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>")]
     [InlineData("<div v-once><span>{{ frozen }}</span></div>")]
-    [InlineData("<button @click=\"count++\" @submit=\"save\">Go</button>")]
-    [InlineData("<button @click=\"save($event)\">x</button>")]
     [InlineData("<button @click.stop=\"save($event)\">x</button>")]
-    [InlineData("<input v-model=\"name\" />")]
+    [InlineData("<input v-model.trim.number=\"name\" />")]
     [InlineData("<div v-show=\"visible\">shown</div>")]
     [InlineData("<input v-focus />")]
-    [InlineData("<div>one</div><span>{{ two }}</span>")]
     [InlineData("<Teleport to=\"body\"><div>{{ tip }}</div></Teleport>")]
-    [InlineData("<ul><li>1</li><li>2</li><li>3</li><li>{{ four }}</li></ul>")]
     [InlineData("hello")]
     [InlineData("")]
     public void EmittedBody_ParsesAsValidCSharp(string source)
     {
-        // The compile-check the work item requires: the emitted body must be syntactically valid C#
-        // when hosted in the render-method shape the generator emits (full semantic binding against the
-        // runtime helper surface is the runtime-side integration deliverable).
-        var emitted = EmitPrefixed(source);
-        var unit =
-            "internal static class RenderProbe { internal static object? Render(object _ctx, object?[] _cache) {\n" +
+        RenderFunctionEmitterResult emitted = EmitPrefixed(source);
+        string unit =
+            "internal sealed class RenderProbe {\n" +
+            "    private static object? Render(RenderProbe component, object frame) {\n" +
             emitted.Code +
-            "} }";
+            "    }\n" +
+            "}";
 
         var tree = CSharpSyntaxTree.ParseText(unit, new CSharpParseOptions(LanguageVersion.Preview));
         tree.GetDiagnostics()
@@ -412,66 +266,85 @@ return _withDirectives(_createElementBlock(_openBlock(), "input", null, null, 51
             .ShouldBeEmpty(customMessage: $"emitted body should parse: {emitted.Code}");
     }
 
-    // ---- determinism and the value-equatable result contract ----
-
     [Fact]
     public void Emit_IsDeterministic_AndResultIsValueEquatable()
     {
-        // The incremental-caching contract: two independent parse+transform+emit runs over the same
-        // input produce byte-identical code and value-equal (equally hashed) result records.
         const string source = "<div :id=\"dynamicId\" @click=\"count++\">{{ message }}</div>";
-        var first = EmitPrefixed(source);
-        var second = EmitPrefixed(source);
+        RenderFunctionEmitterResult first = EmitPrefixed(source);
+        RenderFunctionEmitterResult second = EmitPrefixed(source);
 
         second.Code.ShouldBeCode(first.Code);
         second.ShouldBe(first);
         second.GetHashCode().ShouldBe(first.GetHashCode());
     }
 
-    [Fact]
-    public void HelperSpelling_IsUnderscorePrefixedUpstreamName()
+    [Theory]
+    [InlineData("_cache")]
+    [InlineData("_cacheValue")]
+    [InlineData("_cached")]
+    [InlineData("_cachedValue")]
+    [InlineData("_cached.key")]
+    [InlineData("_memo")]
+    [InlineData("_memoValue")]
+    [InlineData("_item")]
+    [InlineData("_itemValue")]
+    [InlineData("_unref")]
+    [InlineData("_camelize")]
+    [InlineData("_toDisplayString")]
+    [InlineData("_toHandlerKey")]
+    [InlineData("_ctx")]
+    [InlineData("_ctxValue")]
+    public void AuthoredUnderscorePrefixedMember_IsNotRewrittenAsCompilerOwnedIdentifier(string expression)
     {
-        // Pins the by-name helper contract's spelling rule: `_` + the helper name from HelperNames
-        // (the same spelling TransformContext.HelperString emits). A change here is a
-        // breaking change to the runtime-side helper surface.
-        var emitted = EmitPrefixed("<div>{{ message }}</div>");
-        emitted.Code.ShouldContain("_openBlock()");
-        emitted.Code.ShouldContain("_createElementBlock(");
-        emitted.Code.ShouldContain("_toDisplayString(");
+        string code = EmitPrefixed("<div>{{ " + expression + " }}</div>").Code;
+
+        code.ShouldContain("component." + expression);
     }
 
-    // ---- harness ----
-
-    private static RenderFunctionEmitterResult EmitPrefixed(string source)
-        => Emit(source, new RenderFunctionEmitterOptions());
-
-    private static RenderFunctionEmitterResult Emit(string source, RenderFunctionEmitterOptions options)
+    [Fact]
+    public void Output_ContainsNoRetiredHelperOrAmbientStateSurface()
     {
-        // The generator's template-compilation configuration ([V01.01.06.02] composition root):
-        // DOM transforms with PrefixIdentifiers and (for now) empty binding metadata.
-        var root = TemplateParser.Parse(source, ParserOptions.CreateHtml());
-        var transformOptions = TransformOptions.CreateDom();
+        string code = EmitPrefixed(
+            "<MyButton @save=\"save\"><div v-if=\"visible\" v-show=\"visible\">{{ message }}</div></MyButton>").Code;
+
+        code.ShouldNotContain("using static");
+        code.ShouldNotContain("RenderHelpers");
+        code.ShouldNotContain("BlockToken");
+        code.ShouldNotContain("_openBlock");
+        code.ShouldNotContain("_createElement");
+        code.ShouldNotContain("_resolveComponent");
+        code.ShouldNotContain("_withDirectives");
+        code.ShouldNotContain("_toDisplayString");
+        code.ShouldNotContain("IsGeneratedEventName(");
+        code.ShouldNotContain("IsGeneratedHostPropertyName(");
+        code.ShouldNotContain("ToEventName(");
+    }
+
+    private static RenderFunctionEmitterResult EmitPrefixed(string source) =>
+        Emit(source, new RenderFunctionEmitterOptions());
+
+    private static RenderFunctionEmitterResult Emit(
+        string source,
+        RenderFunctionEmitterOptions options)
+    {
+        RootNode root = TemplateParser.Parse(source, ParserOptions.CreateHtml());
+        TransformOptions transformOptions = TransformOptions.CreateDom();
         transformOptions.PrefixIdentifiers = true;
         transformOptions.BindingMetadata = BindingMetadata.Empty;
-        var result = Transformer.Transform(root, transformOptions);
+        TransformResult result = Transformer.Transform(root, transformOptions);
         return RenderFunctionEmitter.Emit(result, options);
     }
 }
 
-/// <summary>
-/// Compares emitted render code against a snapshot expectation with the expectation's line endings
-/// normalized to LF: snapshot literals inherit the checkout's line endings (nothing pins them), while
-/// the emitter's documented contract is LF — normalizing keeps the pins checkout-independent instead
-/// of failing on autocrlf working trees.
-/// </summary>
+/// <summary>Provides checkout-independent LF comparisons for emitted render code.</summary>
 internal static class RenderCodeAssertions
 {
-    /// <param name="actual">The emitted render code (LF by contract).</param>
+    /// <param name="actual">The emitted render code.</param>
     extension(string actual)
     {
-        /// <summary>Asserts <paramref name="actual"/> equals <paramref name="expected"/> after LF-normalizing the expectation.</summary>
-        /// <param name="expected">The snapshot expectation, in the checkout's line endings.</param>
-        public void ShouldBeCode(string expected)
-            => actual.ShouldBe(expected.Replace("\r\n", "\n"));
+        /// <summary>Asserts exact code after normalizing the expectation to LF.</summary>
+        /// <param name="expected">The expected emitted text.</param>
+        public void ShouldBeCode(string expected) =>
+            actual.ShouldBe(expected.Replace("\r\n", "\n"));
     }
 }

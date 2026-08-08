@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -516,7 +516,7 @@ internal static class TransformElement
         {
             arguments.Add(
                 directive.Name == "model" && runtime is not null
-                    ? VModelTransform.CreateNativeBinding(directive.Expression)
+                    ? VModelTransform.CreateNativeBinding(directive.Expression, directive.Modifiers)
                     : directive.Expression);
         }
 

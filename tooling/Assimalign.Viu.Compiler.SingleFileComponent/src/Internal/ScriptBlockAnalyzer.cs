@@ -105,7 +105,7 @@ internal static class ScriptBlockAnalyzer
     /// <param name="diagnostics">The diagnostic accumulator the mapped script diagnostics are added to.</param>
     /// <param name="reservesGeneratedMembers">
     /// Whether the containing file has a template and therefore reserves <c>Context</c> and
-    /// <c>OnSetup</c> for the generated <c>IComponentTemplate</c> bridge.
+    /// <c>OnSetup</c> for the generated <c>IComponent.Setup</c> bridge.
     /// </param>
     /// <returns>The regions to emit and the value-equatable classified bindings (empty when the block declares no members).</returns>
     public static ScriptAnalysis Analyze(
@@ -326,7 +326,7 @@ internal static class ScriptBlockAnalyzer
         }
 
         // [CMP-26]/[CMP-30] The attribute-declared component surface. Only a template-bearing component
-        // gets an IComponentTemplate bridge to hang the declarations on, so a style-only .viu never
+        // gets an IComponent.Setup bridge to hang the declarations on, so a style-only .viu never
         // reads them.
         if (reservesGeneratedMembers)
         {
@@ -642,7 +642,7 @@ internal static class ScriptBlockAnalyzer
                         $"'{identifier.Text}' is reserved by the generated component scaffold. " +
                         (identifier.Text == SetupMemberName
                             ? "Implement it only as 'partial void OnSetup()'."
-                            : "Access the generated IComponentContext through this member instead of declaring it."),
+                            : "Access the generated ComponentContext through this member instead of declaring it."),
                         filePath,
                         identifier.GetLocation(),
                         memberRegionStart,

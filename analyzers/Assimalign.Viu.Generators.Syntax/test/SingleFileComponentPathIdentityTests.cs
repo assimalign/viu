@@ -46,18 +46,23 @@ public sealed class SingleFileComponentPathIdentityTests
                 "C:/project")
             .RunGenerators(GeneratorTestHarness.CreateCompilation());
         var result = driver.GetRunResult().Results[0];
+        var componentSources = result.GeneratedSources
+            .Where(source => source.HintName.EndsWith(
+                ".SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .ToArray();
 
         result.Exception.ShouldBeNull();
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            result.GeneratedSources.ShouldHaveSingleItem();
+            componentSources.ShouldHaveSingleItem();
             result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("VIU1004");
         }
         else
         {
-            result.GeneratedSources.Length.ShouldBe(2);
+            componentSources.Length.ShouldBe(2);
             result.Diagnostics.ShouldBeEmpty();
-            result.GeneratedSources
+            componentSources
                 .Select(source => source.HintName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count()
@@ -80,10 +85,15 @@ public sealed class SingleFileComponentPathIdentityTests
                 "C:/project")
             .RunGenerators(GeneratorTestHarness.CreateCompilation());
         var result = driver.GetRunResult().Results[0];
+        var componentSources = result.GeneratedSources
+            .Where(source => source.HintName.EndsWith(
+                ".SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .ToArray();
 
         result.Exception.ShouldBeNull();
-        result.GeneratedSources.ShouldHaveSingleItem();
-        result.GeneratedSources.Single().HintName.ShouldBe(
+        componentSources.ShouldHaveSingleItem();
+        componentSources.Single().HintName.ShouldBe(
             "Components.Choice.SingleFileComponent.g.cs");
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("VIU1004");
     }

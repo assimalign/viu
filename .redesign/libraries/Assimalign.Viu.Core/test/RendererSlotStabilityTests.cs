@@ -15,17 +15,24 @@ public sealed class RendererSlotStabilityTests
         new Dictionary<string, object?>();
 
     [Fact]
-    public void ComponentInvocation_OmittedSlotMetadata_DefaultsToDynamic()
+    public void ComponentInvocation_OmittedSlotStability_DefaultsToStable()
     {
         var slots = new Dictionary<string, ComponentSlot>
         {
             ["default"] = static _ => new TextNode("content"),
         };
 
-        new ComponentInvocation().SlotFlags.ShouldBe(SlotFlags.Dynamic);
-        new ComponentInvocation(slots: slots).SlotFlags.ShouldBe(SlotFlags.Dynamic);
-        new ComponentInvocation(slots: slots, slotFlags: SlotFlags.Stable)
-            .SlotFlags.ShouldBe(SlotFlags.Stable);
+        new ComponentInvocation().SlotStability.ShouldBe(SlotFlags.Stable);
+        new ComponentInvocation(slots: slots).SlotStability.ShouldBe(SlotFlags.Stable);
+        new ComponentInvocation(slots: slots, slotStability: SlotFlags.Dynamic)
+            .SlotStability.ShouldBe(SlotFlags.Dynamic);
+    }
+
+    [Fact]
+    public void ComponentInvocation_InvalidSlotStability_ThrowsArgumentOutOfRangeException()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => new ComponentInvocation(slotStability: (SlotFlags)0));
     }
 
     [Fact]
@@ -115,7 +122,7 @@ public sealed class RendererSlotStabilityTests
             [
                 new DirectiveInvocation(typeof(RootTransferDirectiveToken)),
             ],
-            slotFlags: SlotFlags.Stable);
+            slotStability: SlotFlags.Stable);
         var request = new ComponentNode(reference, invocation);
         var application = new ApplicationContext(
             new ApplicationOptions
@@ -144,7 +151,7 @@ public sealed class RendererSlotStabilityTests
     }
 
     private static SlotScenario RunDirectScenario(
-        SlotFlags slotFlags,
+        SlotFlags slotStability,
         string initialText,
         string nextText,
         RenderPlan? nextRenderPlan = null)
@@ -156,13 +163,13 @@ public sealed class RendererSlotStabilityTests
         ComponentRegistration registration = CreateSlotConsumerRegistration(
             reference,
             counter);
-        ComponentNode initial = CreateSlotRequest(reference, slotFlags, initialText);
+        ComponentNode initial = CreateSlotRequest(reference, slotStability, initialText);
         ApplicationContext application = CreateApplication(initial, registration);
 
         renderer.Render(initial, host.Container, application);
         host.RunScheduledFlushes();
         renderer.Render(
-            CreateSlotRequest(reference, slotFlags, nextText, nextRenderPlan),
+            CreateSlotRequest(reference, slotStability, nextText, nextRenderPlan),
             host.Container);
         host.RunScheduledFlushes();
 
@@ -222,7 +229,7 @@ public sealed class RendererSlotStabilityTests
 
     private static ComponentNode CreateSlotRequest(
         ComponentReference reference,
-        SlotFlags slotFlags,
+        SlotFlags slotStability,
         string text,
         RenderPlan? renderPlan = null) =>
         new(
@@ -232,12 +239,12 @@ public sealed class RendererSlotStabilityTests
                 {
                     ["default"] = _ => new TextNode(text),
                 },
-                slotFlags: slotFlags),
+                slotStability: slotStability),
             renderPlan: renderPlan);
 
     private static ComponentNode CreateForwardingOwnerRequest(
         ComponentReference reference,
-        SlotFlags slotFlags,
+        SlotFlags slotStability,
         string content) =>
         new(
             reference,
@@ -250,7 +257,7 @@ public sealed class RendererSlotStabilityTests
                 {
                     ["owner"] = static _ => null,
                 },
-                slotFlags: slotFlags));
+                slotStability: slotStability));
 
     private static ApplicationContext CreateApplication(
         ComponentNode root,
@@ -314,7 +321,7 @@ public sealed class RendererSlotStabilityTests
                         {
                             ["default"] = _ => new TextNode(content),
                         },
-                        slotFlags: SlotFlags.Forwarded));
+                        slotStability: SlotFlags.Forwarded));
             };
     }
 

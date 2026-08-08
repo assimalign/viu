@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// </summary>
 public sealed record CacheExpression : TemplateSyntaxNode
 {
-    /// <summary>The slot index in the render function's <c>_cache</c> array.</summary>
+    /// <summary>The slot index in the render function's per-mount <c>ComponentRenderFrame</c>.</summary>
     public required int Index { get; init; }
 
     /// <summary>The value to cache.</summary>

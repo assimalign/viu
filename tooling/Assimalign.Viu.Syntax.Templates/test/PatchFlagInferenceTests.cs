@@ -1,4 +1,4 @@
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -8,7 +8,7 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 // [V01.01.05.06] patch-flag inference. Every expected numeric value below IS the contract: the exact
 // PatchFlags bit combination the compiler stamps and the runtime diff consumes. The enum itself lives
-// once in Assimalign.Viu.Shared, so these tests are the compiler-side half of a two-artifact contract —
+// once in Assimalign.Viu.Components, so these tests are the compiler-side half of a two-artifact contract —
 // compiled output and runtime must agree on every bit, and a value is additive only, never renumbered.
 public class PatchFlagInferenceTests
 {
@@ -200,7 +200,7 @@ public class PatchFlagInferenceTests
 
     // Each row is the exact patchFlag the compiler stamps for that template under base compiler options
     // (no prefixIdentifiers, no cacheHandlers). The same numbers appear in
-    // Assimalign.Viu.Shared.Tests.PatchFlagsParityTests, produced there by reading the enum and here by
+// Assimalign.Viu.Components.Tests.PatchFlagsParityTests, produced there by reading the enum and here by
     // inference, so a divergence in either the enum or the inference is caught.
     [Theory]
     [InlineData("<div>{{ x }}</div>", 1)]                    // TEXT

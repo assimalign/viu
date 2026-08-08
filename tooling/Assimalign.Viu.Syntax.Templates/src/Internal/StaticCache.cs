@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -19,10 +19,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// Deliberate scope decisions, pinned by tests (see <c>docs/DESIGN.md</c>):
 /// </para>
 /// <list type="bullet">
-/// <item>Both cached subtrees and cached props objects route through the single per-instance
-/// <c>_cache</c> seam, rather than splitting per-type values into a module-level scope. The C# generator
-/// model has no module-const scope without a new field-emission contract, and per-instance caching
-/// already achieves the goal: each value is created once per instance and reused across re-renders.</item>
+/// <item>Both cached subtrees and cached property objects route through the single per-mount
+/// <c>ComponentRenderFrame</c> cache, rather than splitting values into module-level state. This keeps
+/// ownership explicit while creating each value once per mount and reusing it across re-renders.</item>
 /// <item>The whole-children-array cache and text-call caching are
 /// omitted; each eligible static sibling is cached individually. A fully static text run is a single
 /// <see cref="TextNode"/> folded into its element's cached subtree, so the <c>TEXT_CALL</c> path is

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,6 +15,25 @@ namespace Assimalign.Viu.Core.Tests;
 
 public sealed class ComponentHostTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task RenderAsync_CompilerContract_UsesExactRenderCacheSize(int renderCacheSize)
+    {
+        string actual = await RenderCacheSizeAsync(
+            new ComponentContract(renderCacheSize: renderCacheSize));
+
+        actual.ShouldBe(renderCacheSize.ToString(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task RenderAsync_LegacyContract_UsesCompatibilityRenderCacheSize()
+    {
+        string actual = await RenderCacheSizeAsync(new ComponentContract());
+
+        actual.ShouldBe("64");
+    }
+
     [Fact]
     public async Task RenderAsync_RawInvocation_ProducesNormalizedBindingsAndFreshTree()
     {
@@ -412,6 +432,13 @@ public sealed class ComponentHostTests
             _ => new TextNode($"Hello {context.Bindings.Parameters["name"]}");
     }
 
+    private sealed class CacheSizeReportingComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) =>
+            frame => new TextNode(
+                frame.Cache.Length.ToString(CultureInfo.InvariantCulture));
+    }
+
     private sealed class ContextCaptureComponent : IComponent
     {
         internal ComponentContext? Context { get; private set; }
@@ -565,5 +592,24 @@ public sealed class ComponentHostTests
         lifecycle.OnUnmounted(() => probe.ClientHookRuns++);
         lifecycle.OnActivated(() => probe.ClientHookRuns++);
         lifecycle.OnDeactivated(() => probe.ClientHookRuns++);
+    }
+
+    private static async Task<string> RenderCacheSizeAsync(ComponentContract contract)
+    {
+        ComponentReference reference = ComponentReference.ForType(
+            typeof(CacheSizeReportingComponent));
+        ComponentFactory components = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                contract,
+                _ => new CacheSizeReportingComponent()));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(components, new ImmediateWatchScheduler()));
+
+        await using IComponentRenderScope scope = await host.RenderAsync(
+            new ComponentRenderRequest(new ComponentNode(reference)));
+
+        return scope.Tree.ShouldBeOfType<TextNode>().Text;
     }
 }

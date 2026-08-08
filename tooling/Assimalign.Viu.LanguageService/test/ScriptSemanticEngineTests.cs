@@ -211,6 +211,50 @@ public class ScriptSemanticEngineTests
     }
 
     [Fact]
+    public void GetCompletions_AdoptedComponentBaseSource_UsesProjectContractWithoutCompatibilityBridge()
+    {
+        const string source =
+            "<template>\n  <div>x</div>\n</template>\n" +
+            "@script {\n" +
+            "public void Handle()\n" +
+            "{\n" +
+            "    Context.\n" +
+            "}\n" +
+            "}\n";
+        var adoptedContract = new LanguageProjectSourceDocument(
+            "C:\\workspace\\App\\ComponentModel.cs",
+            "namespace Assimalign.Viu.Components;\n" +
+            "\n" +
+            "public abstract class ComponentBase\n" +
+            "{\n" +
+            "    protected ComponentContext? Context { get; set; }\n" +
+            "}\n" +
+            "\n" +
+            "public abstract class ComponentContext\n" +
+            "{\n" +
+            "    public abstract object AdoptedControl { get; }\n" +
+            "}\n",
+            IsComponent: false);
+        var engine = new ScriptSemanticEngine();
+
+        var result = engine.GetCompletions(
+            ScriptSemanticFixture.CreateContext(adoptedContract),
+            DocumentUri,
+            DocumentFilePath,
+            source,
+            OffsetAfter(source, "    Context."),
+            string.Empty,
+            ScriptCompletionContextKind.Expression,
+            CancellationToken.None);
+
+        result.ShouldNotBeNull();
+        result.Items.ShouldContain(
+            item => item.Label == "AdoptedControl"
+                && item.Kind == LanguageCompletionItemKind.Property);
+        result.Items.ShouldNotContain(item => item.Label == "Arguments");
+    }
+
+    [Fact]
     public void GetCompletions_NamespaceQualifierAtClassLevel_ListsNamespaceTypes()
     {
         // An incomplete member declaration at class level parses as a qualified name, exercising

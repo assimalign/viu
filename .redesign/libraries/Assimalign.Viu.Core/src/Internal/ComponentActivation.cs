@@ -13,8 +13,6 @@ namespace Assimalign.Viu;
 /// </summary>
 internal sealed class ComponentActivation
 {
-    private const int DefaultRenderCacheSize = 64;
-
     private Task? _releaseTask;
     private ComponentRenderer? _renderer;
 
@@ -60,7 +58,6 @@ internal sealed class ComponentActivation
         ComponentRuntimeOptions options,
         ComponentContext? parent = null,
         IReactiveWatchScheduler? watchScheduler = null,
-        int renderCacheSize = DefaultRenderCacheSize,
         SuspenseBoundary? suspenseBoundary = null)
     {
         ComponentActivation activation = Create(
@@ -68,7 +65,6 @@ internal sealed class ComponentActivation
             options,
             parent,
             watchScheduler,
-            renderCacheSize,
             suspenseBoundary);
         try
         {
@@ -98,7 +94,6 @@ internal sealed class ComponentActivation
         ComponentRuntimeOptions options,
         ComponentContext? parent = null,
         IReactiveWatchScheduler? watchScheduler = null,
-        int renderCacheSize = DefaultRenderCacheSize,
         SuspenseBoundary? suspenseBoundary = null)
     {
         ComponentActivation activation = Create(
@@ -106,7 +101,6 @@ internal sealed class ComponentActivation
             options,
             parent,
             watchScheduler,
-            renderCacheSize,
             suspenseBoundary);
         try
         {
@@ -233,12 +227,10 @@ internal sealed class ComponentActivation
         ComponentRuntimeOptions options,
         ComponentContext? parent,
         IReactiveWatchScheduler? watchScheduler,
-        int renderCacheSize,
         SuspenseBoundary? suspenseBoundary)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentOutOfRangeException.ThrowIfNegative(renderCacheSize);
 
         ComponentRegistration registration = options.Components.Resolve(request.Component);
         IComponent instance = registration.Activator(options.Services)
@@ -263,7 +255,7 @@ internal sealed class ComponentActivation
         lifecycle.SetObservedTaskFaultHandler(
             (exception, diagnosticInformation) =>
                 context.RouteError(exception, diagnosticInformation));
-        ComponentRenderFrame frame = new(renderCacheSize);
+        ComponentRenderFrame frame = new(registration.Contract);
         return new ComponentActivation(
             request,
             registration,

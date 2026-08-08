@@ -334,13 +334,15 @@ host-event merge.
 
 ### 4.6 Slots
 
-`[CMP-18]` Generated slot sets carry `SlotFlags` metadata — `Stable`, `Dynamic`, or `Forwarded` —
-preserved from compilation into the immutable invocation. Core uses that classification to
-**skip** child renders for structurally stable slots while forcing updates for dynamic and
-effectively-dynamic forwarded slots.
+`[CMP-18]` Generated slot sets carry a `SlotFlags` classification — `Stable`, `Dynamic`, or
+`Forwarded` — in the immutable invocation's `SlotStability` property. Core's component-update gate
+consumes that classification to **skip** child renders for structurally stable slots while forcing
+updates for dynamic and effectively-dynamic forwarded slots.
 
-`[CMP-19]` A hand-authored slot collection that cannot prove stability MUST report
-`SlotFlags.Dynamic`. An over-optimistic flag manifests as a child that silently stops updating.
+`[CMP-19]` `ComponentInvocation.SlotStability` defaults to `SlotFlags.Stable` for empty or fixed
+hand-authored slot sets. A caller whose slot structure can change MUST explicitly supply
+`SlotFlags.Dynamic`; a caller forwarding its parent's slots MUST supply `SlotFlags.Forwarded`.
+An over-optimistic classification manifests as a child that silently stops updating.
 
 ### 4.7 Lifecycle
 
@@ -666,12 +668,17 @@ output. The closed `VirtualNode` algebra is authoritative for runtime shape disp
 layout remains stable even where a current runtime path no longer consumes it.
 
 `[RND-FLAGS-5]` `SlotFlags` is a plain enumeration, not a bitmask: a slot collection has exactly one
-of `Stable`, `Dynamic`, `Forwarded`.
+of `Stable`, `Dynamic`, `Forwarded`. `ComponentInvocation.SlotStability` transports that value from
+compiled output to Core, defaults to `Stable`, and is consumed by the component-update gate after
+`Forwarded` is resolved against the active parent.
 
 `[RND-FLAGS-6]` `PatchFlags.cs` and `SlotFlags.cs` are `<Compile Include>`-linked into the
 `netstandard2.0` generator projects. **Their file paths are frozen**; moving them requires updating
 every linking csproj in the same change. The authoritative paths are
-`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotFlags.cs}`.
+`libraries/Assimalign.Viu.Components/src/{PatchFlags.cs,SlotFlags.cs}`. During the `[V01.01.15]`
+migration only, the linking projects reference the staged copies under
+`.redesign/libraries/Assimalign.Viu.Components/src/` (marked `TODO(swap)` at each link site); the
+swap wave restores the authoritative paths and removes this transitional sentence.
 
 ### 6.3 The block tree
 
@@ -1103,8 +1110,10 @@ diagnostic span — is unchanged.
 produces `VirtualNode?`. The frame owns per-mount cache slots and block assembly. Generated render
 implementation names are collision-safe internal details; `.viu` authoring reserves no `Render`,
 cache, or underscore-prefixed helper members. The frame exposes exactly `Cache`, `OpenBlock`,
-`Track`, `CloseBlock`, and `CacheHandler<TDelegate>`; generated code MUST NOT assume an unscaffolded
-frame member.
+`SetBlockTracking`, `Track`, `CloseBlock`, `GetOrAddCache`, `SetCache`, `CacheHandler<TDelegate>`,
+and `Memo` — the complete compiled-output surface for block assembly, cached values, stable handler
+identity, and memoized subtrees. Generated code MUST NOT assume an unlisted frame member; adding a
+member is an additive amendment to this clause in the same change.
 
 `[SFC-CG-2]` Generated render code calls through its frame parameter and qualified APIs; it MUST NOT
 use file-level static imports or an underscore name-binding convention. The compiler/runtime ABI has
@@ -1194,6 +1203,10 @@ render line, falls back to the generated file.
 
 `[SFC-OPT-1]` A fully static subtree is marked `PatchFlags.Cached` and stored in a
 `ComponentRenderFrame.Cache` slot, so it is created once per mount and reused across every re-render.
+The generated `ComponentContract.RenderCacheSize` carries the exact non-negative slot count,
+including zero, and Core constructs each mount's frame from that value. The legacy contract
+constructor that predates compiler cache-size metadata alone receives a 64-slot compatibility
+fallback; newly generated contracts always supply the exact value.
 
 `[SFC-OPT-2]` Contiguous runs of cached, stringifiable siblings collapse into a single static
 insert. The thresholds are **`NODE_COUNT = 20`** consecutive stringifiable nodes and

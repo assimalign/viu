@@ -4,12 +4,11 @@ using System.Linq;
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// The canonical table of runtime helper references emitted by the transform pipeline or its render-code
-/// writer. Each field is a <see cref="RuntimeHelper"/> whose <see cref="RuntimeHelper.Name"/> equals the
-/// member name generated code binds against on <c>Assimalign.Viu.RenderHelpers</c> (and
-/// <c>DomRenderHelpers</c> for the DOM helpers below). The binding is <b>by name</b>: no
-/// <c>Assimalign.Viu.Syntax.*</c> assembly references any runtime assembly, so the name in this table is
-/// a one-way contract that a rename on either side breaks (<c>[SFC-CG-2]</c>).
+/// The canonical symbolic-operation table used by the template transform intermediate representation.
+/// Each field is a <see cref="RuntimeHelper"/> identity that lets transforms communicate an operation to
+/// the render writer. The writer lowers these identities to direct frame calls, virtual-node constructors,
+/// collection operations, typed Browser APIs, or the narrow generated adapter surface; their names are
+/// never emitted as a runtime lookup contract. Specified by <c>[SFC-CG-2]</c>.
 /// </summary>
 public static class HelperNames
 {
@@ -117,24 +116,8 @@ public static class HelperNames
     /// <summary>Compares two memo dependency arrays.</summary>
     public static readonly RuntimeHelper IsMemoSame = new("isMemoSame");
 
-    // ---- Writer-only helpers: bound against Assimalign.Viu.RenderHelpers. ----
-    // These names are serialized directly by RenderCodeWriter after transformation. Do not route them
-    // through TransformContext.Helper or HelperString: doing so would add them to TransformResult.Helpers
-    // and change that observable transform contract.
-
-    internal static readonly RuntimeHelper CreateProps = new("createProps");
-
-    internal static readonly RuntimeHelper CreateModifiers = new("createModifiers");
-
-    internal static readonly RuntimeHelper WithHandler = new("withHandler");
-
-    internal static readonly RuntimeHelper SetCache = new("setCache");
-
-    internal static readonly RuntimeHelper SpreadCache = new("spreadCache");
-
-    // ---- DOM helpers: bound against Assimalign.Viu.Browser.DomRenderHelpers ----
-    // Register every DOM helper through RegisterDomHelper. DomHelpers is derived from these declarations,
-    // so the source emitter's conditional using-static import cannot drift from the canonical names.
+    // Browser operation identities are registered together so composition roots can detect whether a
+    // template requires the Browser runtime closure without inspecting every transform node.
 
     /// <summary>The <c>v-model</c> directive for radio inputs.</summary>
     public static readonly RuntimeHelper VModelRadio = RegisterDomHelper("vModelRadio");

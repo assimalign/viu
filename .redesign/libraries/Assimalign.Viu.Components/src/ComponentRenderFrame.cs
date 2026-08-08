@@ -18,6 +18,7 @@ namespace Assimalign.Viu.Components;
 /// </remarks>
 public sealed class ComponentRenderFrame
 {
+    private const int LegacyRenderCacheSize = 64;
     private readonly List<BlockFrame> _blocks = [];
     private readonly bool[] _initializedCacheSlots;
     private readonly MemoEntry?[] _memoEntries;
@@ -31,6 +32,20 @@ public sealed class ComponentRenderFrame
         Cache = cacheSize == 0 ? [] : new object?[cacheSize];
         _initializedCacheSlots = cacheSize == 0 ? [] : new bool[cacheSize];
         _memoEntries = cacheSize == 0 ? [] : new MemoEntry?[cacheSize];
+    }
+
+    /// <summary>
+    /// Initializes a frame from one component's immutable compiler contract.
+    /// </summary>
+    /// <param name="contract">The non-null contract that owns the cache-size declaration.</param>
+    /// <remarks>
+    /// Compiler-aware contracts use their exact size, including zero. The 64-slot capacity is
+    /// retained only for compatibility contracts created before the compiler supplied cache-size
+    /// metadata. Specified by <c>[SFC-OPT-1]</c>.
+    /// </remarks>
+    public ComponentRenderFrame(ComponentContract contract)
+        : this(ResolveCacheSize(contract))
+    {
     }
 
     /// <summary>
@@ -174,7 +189,7 @@ public sealed class ComponentRenderFrame
     /// <param name="dependencies">The ordered dependency values for this render.</param>
     /// <param name="render">The subtree factory invoked on a cache miss.</param>
     /// <returns>The cached or newly rendered subtree.</returns>
-    public VirtualNode? Memoize(
+    public VirtualNode? Memo(
         int slot,
         IReadOnlyList<object?> dependencies,
         Func<VirtualNode?> render)
@@ -254,6 +269,14 @@ public sealed class ComponentRenderFrame
         }
 
         return true;
+    }
+
+    private static int ResolveCacheSize(ComponentContract contract)
+    {
+        ArgumentNullException.ThrowIfNull(contract);
+        return contract.HasCompilerRenderCacheSize
+            ? contract.RenderCacheSize
+            : LegacyRenderCacheSize;
     }
 
     private void ValidateCacheSlot(int slot)

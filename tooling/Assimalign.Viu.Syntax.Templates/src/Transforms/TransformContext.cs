@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -230,8 +230,12 @@ public sealed class TransformContext
         }
     }
 
-    /// <summary>Registers and returns the <c>_name</c> reference string for <paramref name="helper"/>.</summary>
-    /// <param name="helper">The runtime helper.</param>
+    /// <summary>
+    /// Registers <paramref name="helper"/> and returns its underscore-prefixed intermediate marker.
+    /// The frame render writer consumes the marker and emits the corresponding direct API expression;
+    /// it is never retained as a consumer runtime lookup.
+    /// </summary>
+    /// <param name="helper">The symbolic transform operation.</param>
     public string HelperString(RuntimeHelper helper) => "_" + Helper(helper).Name;
 
     /// <summary>Registers a resolved component name.</summary>

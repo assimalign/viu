@@ -1,16 +1,14 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A by-name reference to a runtime helper the generated render function will import from the runtime
-/// (e.g. <c>createElementBlock</c>, <c>renderList</c>, <c>withModifiers</c>).
+/// A symbolic operation carried by the template transform intermediate representation, such as block
+/// creation, list rendering, or an event modifier guard.
 /// </summary>
 /// <remarks>
-/// The compiler NEVER references the runtime assembly: helpers are carried as plain names and resolved to
-/// concrete members by code generation ([V01.01.05.05]) and the runtime ([V01.01.05.02]) — the one-way
-/// name-binding contract of <c>[SFC-CG-2]</c>. Two helpers with
-/// the same <see cref="Name"/> are equal, so a transform may request a helper without coordinating with
-/// any other transform and the emitter still imports it once; the canonical names
-/// live in <see cref="HelperNames"/>.
+/// The compiler does not reference runtime assemblies. The render writer recognizes each identity and
+/// lowers it to the adopted direct API or language construct; <see cref="Name"/> is an internal IR key,
+/// not a member emitted for runtime lookup. Two operations with the same name are equal so transforms
+/// can register requirements independently. Specified by <c>[SFC-CG-2]</c>.
 /// </remarks>
-/// <param name="Name">The helper's runtime member name, used verbatim in generated code.</param>
+/// <param name="Name">The canonical intermediate-operation name.</param>
 public sealed record RuntimeHelper(string Name);

@@ -97,7 +97,7 @@ public class ScriptSemanticCompletionTests
     }
 
     [Fact]
-    public void GetCompletions_EditorBrowsableNeverRenderHelperMembers_OmitsCompilerSeam()
+    public void GetCompletions_RetiredRenderHelpers_AreNotStaticallyImported()
     {
         const string source =
             "<template>\n  <div>x</div>\n</template>\n" +
@@ -130,9 +130,9 @@ public class ScriptSemanticCompletionTests
             DocumentUri,
             PositionAfter(source, "set; }\n    "));
 
-        // [V01.01.14.02] RenderHelpers is statically imported into the generated unit containing
-        // @script, so filtering must honor EditorBrowsable on each imported member.
-        completions.ShouldContain(completion => completion.Label == "CompletionControl");
+        // [SFC-CG-1] adopted generated units contain no `using static RenderHelpers`; neither its
+        // public member nor its retired underscore-prefixed seam enters unqualified completion.
+        completions.ShouldNotContain(completion => completion.Label == "CompletionControl");
         completions.ShouldNotContain(
             completion => completion.Label.StartsWith("_", StringComparison.Ordinal));
     }

@@ -1,0 +1,12 @@
+<template>
+<article>
+  <span>static</span>
+  <h2>{{ Message }}</h2>
+</article>
+</template>
+
+@script {
+using Assimalign.Viu.Reactivity;
+
+public Reference<string> Message = Reactive.Reference("first");
+}

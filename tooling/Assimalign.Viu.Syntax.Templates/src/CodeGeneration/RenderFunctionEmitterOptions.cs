@@ -3,9 +3,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// <summary>
 /// Configures <see cref="RenderFunctionEmitter"/>. The surface is deliberately tiny — indentation only —
 /// because the emitter produces a method <em>body</em>, nothing more: the composition root (the source
-/// generator, [V01.01.06.02]) owns the method declaration, the enclosing partial class, and the
-/// file-level <c>using static</c> that binds the helper names (<c>[SFC-CG-1]</c>,
-/// <c>[SFC-CG-2]</c>).
+/// generator, [V01.01.06.02]) owns the method declaration, its component and frame parameters, and the
+/// enclosing partial class. Generated runtime references are fully qualified, so no import contract is
+/// required. Specified by <c>[SFC-CG-1]</c> and <c>[SFC-CG-2]</c>.
 /// </summary>
 public sealed class RenderFunctionEmitterOptions
 {

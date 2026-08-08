@@ -10,6 +10,28 @@ namespace Assimalign.Viu.Components.Tests;
 
 public sealed class ComponentRenderFrameTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public void Constructor_CompilerContract_UsesExactCacheSize(int renderCacheSize)
+    {
+        ComponentContract contract = new(renderCacheSize: renderCacheSize);
+
+        ComponentRenderFrame frame = new(contract);
+
+        frame.Cache.Length.ShouldBe(renderCacheSize);
+    }
+
+    [Fact]
+    public void Constructor_LegacyContract_UsesCompatibilityCacheSize()
+    {
+        ComponentContract contract = new();
+
+        ComponentRenderFrame frame = new(contract);
+
+        frame.Cache.Length.ShouldBe(64);
+    }
+
     [Fact]
     public void CloseBlock_TwoTrackedNodes_ReturnsExactlyThoseNodesInOrder()
     {
@@ -147,11 +169,11 @@ public sealed class ComponentRenderFrameTests
     }
 
     [Fact]
-    public void Memoize_UnchangedDependencies_ReusesNodeAndTracksCacheHit()
+    public void Memo_UnchangedDependencies_ReusesNodeAndTracksCacheHit()
     {
         ComponentRenderFrame frame = new(cacheSize: 1);
         int renders = 0;
-        TextNode first = (TextNode)frame.Memoize(
+        TextNode first = (TextNode)frame.Memo(
             0,
             new object?[] { 1, "stable" },
             () =>
@@ -161,7 +183,7 @@ public sealed class ComponentRenderFrameTests
             })!;
 
         frame.OpenBlock();
-        VirtualNode? second = frame.Memoize(
+        VirtualNode? second = frame.Memo(
             0,
             new object?[] { 1, "stable" },
             () =>
@@ -178,11 +200,11 @@ public sealed class ComponentRenderFrameTests
     }
 
     [Fact]
-    public void Memoize_ChangedDependency_ReplacesCachedNode()
+    public void Memo_ChangedDependency_ReplacesCachedNode()
     {
         ComponentRenderFrame frame = new(cacheSize: 1);
-        VirtualNode? first = frame.Memoize(0, new object?[] { 1 }, () => new TextNode("first"));
-        VirtualNode? second = frame.Memoize(0, new object?[] { 2 }, () => new TextNode("second"));
+        VirtualNode? first = frame.Memo(0, new object?[] { 1 }, () => new TextNode("first"));
+        VirtualNode? second = frame.Memo(0, new object?[] { 2 }, () => new TextNode("second"));
 
         second.ShouldNotBeSameAs(first);
         second.ShouldBeOfType<TextNode>().Text.ShouldBe("second");
