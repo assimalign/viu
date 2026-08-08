@@ -94,6 +94,47 @@ public sealed class GeneratedComponentFixtureTests
     }
 
     [Fact]
+    public void NullableReferenceParameter_GeneratedContractCompilesAndMountsThroughShippingRuntime()
+    {
+        // [CMP-26]/[SFC-CG-3] The generated contract carries the runtime string type, while
+        // [CMP-29] keeps the nullable annotation on the authored property and its binding path.
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        string generated = fixtures.GeneratedSources
+            .Single(pair => pair.Key.EndsWith(
+                "NullableParameterProbe.SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .Value;
+        ComponentFactory factory = CreateFactory(fixtures);
+        var invocation = new ComponentInvocation(
+            arguments: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["label"] = "optional",
+            });
+        ComponentNode root = new(
+            ComponentReference.ForName("NullableParameterProbe"),
+            invocation);
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+
+        renderer.Render(root, host.Container, CreateApplication(root, factory));
+        host.RunScheduledFlushes();
+
+        generated.ShouldContain(
+            "ComponentParameter(\"label\", parameterType: typeof(string))");
+        generated.ShouldContain(
+            "ComponentParameter(\"values\", parameterType: " +
+            "global::Assimalign.Viu.Generated.RenderGlue.ParameterRuntimeType<List<string>?>())");
+        generated.ShouldNotContain("typeof(string?)");
+        generated.ShouldNotContain("typeof(List<string>?)");
+        host.Container.DescendantText.ShouldBe("optional");
+        renderer.GetMountedComponentViews(host.Container)
+            .ShouldHaveSingleItem()
+            .Instance.GetType().Name.ShouldBe("NullableParameterProbe");
+
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
     public void ShippingFixtures_MountBindFallThroughAndEmitThroughTheAdoptedModel()
     {
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;

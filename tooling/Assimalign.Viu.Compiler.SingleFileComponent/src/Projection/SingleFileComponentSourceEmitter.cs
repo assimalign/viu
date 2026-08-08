@@ -366,8 +366,6 @@ public static class SingleFileComponentSourceEmitter
         int indent,
         in SingleFileComponentModel model)
     {
-        AppendIndent(builder, indent);
-        builder.Append("#pragma warning disable CS8639 // typeof erases nullable reference annotations.\n");
         foreach (var parameter in model.Declarations.Parameters)
         {
             AppendIndent(builder, indent);
@@ -378,11 +376,63 @@ public static class SingleFileComponentSourceEmitter
                 builder.Append(", isRequired: true");
             }
 
-            builder.Append(", parameterType: typeof(").Append(parameter.TypeText).Append(")),\n");
+            builder.Append(", parameterType: ");
+            AppendParameterRuntimeType(builder, parameter);
+            builder.Append("),\n");
+        }
+    }
+
+    private static void AppendParameterRuntimeType(
+        StringBuilder builder,
+        in ComponentParameterDeclaration parameter)
+    {
+        var typeWithoutNullableAnnotation = HasTopLevelNullableAnnotation(parameter.TypeText)
+            ? WithoutTopLevelNullableAnnotation(parameter.TypeText)
+            : parameter.TypeText.Trim();
+        if (string.Equals(typeWithoutNullableAnnotation, "dynamic", StringComparison.Ordinal))
+        {
+            // A dynamic declaration has object as its runtime identity and dynamic is not legal in typeof.
+            builder.Append("typeof(object)");
+            return;
         }
 
-        AppendIndent(builder, indent);
-        builder.Append("#pragma warning restore CS8639\n");
+        if (!HasTopLevelNullableAnnotation(parameter.TypeText) ||
+            parameter.TypeKind == ComponentValueKind.Value)
+        {
+            builder.Append("typeof(").Append(parameter.TypeText).Append(')');
+            return;
+        }
+
+        if (parameter.TypeKind is ComponentValueKind.Text or ComponentValueKind.Any)
+        {
+            builder.Append("typeof(").Append(typeWithoutNullableAnnotation).Append(')');
+            return;
+        }
+
+        // The projection deliberately has no semantic model, so a named or generic `T?` may denote
+        // either a nullable reference or Nullable<T>. A generic type token lets the consuming compiler
+        // erase the former and preserve the latter without putting either annotation in a typeof operand.
+        builder.Append("global::Assimalign.Viu.Generated.RenderGlue.ParameterRuntimeType<")
+            .Append(parameter.TypeText).Append(">()");
+    }
+
+    private static bool HasTopLevelNullableAnnotation(string typeText)
+    {
+        for (var index = typeText.Length - 1; index >= 0; index--)
+        {
+            if (!char.IsWhiteSpace(typeText[index]))
+            {
+                return typeText[index] == '?';
+            }
+        }
+
+        return false;
+    }
+
+    private static string WithoutTopLevelNullableAnnotation(string typeText)
+    {
+        var annotationIndex = typeText.LastIndexOf('?');
+        return typeText.Substring(0, annotationIndex).TrimEnd();
     }
 
     private static void AppendContractEvents(

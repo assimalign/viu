@@ -1,0 +1,19 @@
+<template>
+    <span>{{ Label }}</span>
+</template>
+
+@script {
+    using System.Collections.Generic;
+    using Assimalign.Viu.Components;
+
+    /// <summary>Gets or sets the optional label rendered by this probe.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Gets or sets optional values used to compile the generic nullable-reference path.</summary>
+    [Parameter]
+    public List<string>? Values { get; set; }
+
+    // Pins collision safety: authored members must not collide with generator implementation details.
+    private static global::System.Type __ViuParameterRuntimeType<T>() => typeof(T);
+}

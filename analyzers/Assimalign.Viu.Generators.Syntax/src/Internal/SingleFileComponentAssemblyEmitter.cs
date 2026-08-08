@@ -154,6 +154,9 @@ internal static class SingleFileComponentAssemblyEmitter
                         ? reference.Value
                         : value;
 
+                internal static global::System.Type ParameterRuntimeType<TValue>()
+                    => typeof(TValue);
+
                 internal static bool TryReadParameter<TValue>(
                     global::System.Collections.Generic.IReadOnlyDictionary<string, object?> parameters,
                     string name,

@@ -76,6 +76,7 @@ internal sealed class CompiledFixtureAssembly
             "PatchProbe.viu",
             "TargetedTextProbe.viu",
             "InteractionProbe.viu",
+            "NullableParameterProbe.viu",
             "SlotChild.viu",
             "SlotOwner.viu",
             "MixedAuthoring.viu",

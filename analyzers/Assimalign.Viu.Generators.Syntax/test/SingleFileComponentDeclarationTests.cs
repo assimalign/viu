@@ -52,6 +52,49 @@ public sealed class SingleFileComponentDeclarationTests
     }
 
     [Theory]
+    // [CMP-26]/[SFC-CG-3] The static contract carries the parameter's runtime type. A nullable
+    // reference annotation has no runtime type identity and cannot appear as a direct typeof operand,
+    // while a nullable value type is the distinct, legal Nullable<T> runtime type.
+    [InlineData("object?", "typeof(object)")]
+    [InlineData("string?", "typeof(string)")]
+    [InlineData("int?", "typeof(int?)")]
+    [InlineData("object", "typeof(object)")]
+    [InlineData("string", "typeof(string)")]
+    [InlineData("int", "typeof(int)")]
+    [InlineData("List<string>?", "global::Assimalign.Viu.Generated.RenderGlue.ParameterRuntimeType<List<string>?>()")]
+    [InlineData("dynamic?", "typeof(object)")]
+    [InlineData("dynamic", "typeof(object)")]
+    public void ParameterType_NullableAnnotations_ProduceLegalRuntimeTypeExpressions(
+        string declaredType,
+        string runtimeTypeExpression)
+    {
+        string usingDirective = declaredType.StartsWith("List<", StringComparison.Ordinal)
+            ? "    using System.Collections.Generic;\n\n"
+            : string.Empty;
+        var generated = Generate(
+            "TypeProbe",
+            "<template>\n" +
+            "    <div></div>\n" +
+            "</template>\n" +
+            "@script {\n" +
+            usingDirective +
+            $"    [Parameter] public {declaredType} Value {{ get; set; }}\n" +
+            "}\n");
+
+        generated.ShouldContain(
+            $"ComponentParameter(\"value\", parameterType: {runtimeTypeExpression})");
+        generated.ShouldContain($"private {declaredType} __ViuParameterDefaultValue = default!;");
+        generated.ShouldNotContain("#pragma warning disable CS8639");
+        if (!string.Equals(
+                runtimeTypeExpression,
+                $"typeof({declaredType})",
+                StringComparison.Ordinal))
+        {
+            generated.ShouldNotContain($"typeof({declaredType})");
+        }
+    }
+
+    [Theory]
     // [CMP-27] The derivation is the standard camel-case rule: a leading upper-case run lower-cases
     // whole, except that its last letter stays capitalized when it begins the next word.
     [InlineData("Title", "title")]
