@@ -777,6 +777,164 @@ public sealed class TransitionRendererTests
     }
 
     [Fact]
+    public void Render_SynchronousOutgoingThenIncomingInternalMountFailure_EscapesWithoutRoutingAsTransitionHookFailure()
+    {
+        using var host = new RendererParityHost();
+        List<Exception> failures = [];
+        bool continuedAfterCompletion = false;
+        TransitionProperties properties = new()
+        {
+            Mode = "out-in",
+            OnLeave = (_, complete) =>
+            {
+                complete();
+                continuedAfterCompletion = true;
+            },
+        };
+        TransitionNode initial = Transition(
+            static () => Element("div", "outgoing"),
+            properties);
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(
+            initial,
+            host.Container,
+            Application(
+                initial,
+                errorHandler: (exception, _, _) => failures.Add(exception)));
+        host.RunScheduledFlushes();
+
+        Action replace = () => renderer.Render(
+            Transition(
+                static () => new StaticNode(MarkupFormat.Html, "<p>incoming</p>"),
+                properties),
+            host.Container);
+
+        NotSupportedException exception = replace.ShouldThrow<NotSupportedException>();
+        exception.Message.ShouldBe(
+            "The active host does not support static-content insertion.");
+        continuedAfterCompletion.ShouldBeFalse();
+        failures.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Render_SynchronousIncomingThenOutgoingInternalRemovalFailure_EscapesWithoutRoutingAsTransitionEnterHookFailure()
+    {
+        using var host = new RendererParityHost();
+        List<Exception> failures = [];
+        bool continuedAfterCompletion = false;
+        TransitionProperties properties = new()
+        {
+            Mode = "in-out",
+            OnEnter = (_, complete) =>
+            {
+                complete();
+                continuedAfterCompletion = true;
+            },
+        };
+        TransitionNode initial = Transition(
+            static () => Element("div", "outgoing"),
+            properties);
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(
+            initial,
+            host.Container,
+            Application(
+                initial,
+                errorHandler: (exception, _, _) => failures.Add(exception)));
+        host.RunScheduledFlushes();
+        var expected = new NotSupportedException("host removal failed");
+        host.RemovalFailure = expected;
+
+        Action replace = () => renderer.Render(
+            Transition(
+                static () => Element("span", "incoming"),
+                properties),
+            host.Container);
+
+        NotSupportedException exception = replace.ShouldThrow<NotSupportedException>();
+        exception.ShouldBeSameAs(expected);
+        continuedAfterCompletion.ShouldBeFalse();
+        failures.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Render_ReentrantLeaveSettlementInternalMountFailure_EscapesWithoutRoutingAsTransitionLeaveHookFailure()
+    {
+        using var host = new RendererParityHost();
+        List<Exception> failures = [];
+        Renderer<RendererParityNode>? renderer = null;
+        TransitionProperties? properties = null;
+        properties = new TransitionProperties
+        {
+            Mode = "out-in",
+            OnLeave = (_, _) => renderer!.Render(
+                Transition(
+                    static () => Element("span", "superseding"),
+                    properties!),
+                host.Container),
+        };
+        TransitionNode initial = Transition(
+            static () => Element("div", "outgoing"),
+            properties);
+        renderer = host.CreateRenderer();
+        renderer.Render(
+            initial,
+            host.Container,
+            Application(
+                initial,
+                errorHandler: (exception, _, _) => failures.Add(exception)));
+        host.RunScheduledFlushes();
+
+        Action replace = () => renderer.Render(
+            Transition(
+                static () => new StaticNode(MarkupFormat.Html, "<p>incoming</p>"),
+                properties),
+            host.Container);
+
+        NotSupportedException exception = replace.ShouldThrow<NotSupportedException>();
+        exception.Message.ShouldBe(
+            "The active host does not support static-content insertion.");
+        failures.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Render_AuthoredLeaveHookFailure_RoutesToErrorHandlerAndCompletesReplacement()
+    {
+        using var host = new RendererParityHost();
+        List<(Exception Exception, string Information)> failures = [];
+        TransitionProperties properties = new()
+        {
+            Mode = "out-in",
+            OnLeave = static (_, _) =>
+                throw new InvalidOperationException("authored leave failed"),
+        };
+        TransitionNode initial = Transition(
+            static () => Element("div", "outgoing"),
+            properties);
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        renderer.Render(
+            initial,
+            host.Container,
+            Application(
+                initial,
+                errorHandler: (exception, _, information) =>
+                    failures.Add((exception, information))));
+        host.RunScheduledFlushes();
+
+        Should.NotThrow(
+            () => renderer.Render(
+                Transition(
+                    static () => Element("span", "incoming"),
+                    properties),
+                host.Container));
+
+        failures.ShouldHaveSingleItem();
+        failures[0].Exception.Message.ShouldBe("authored leave failed");
+        failures[0].Information.ShouldBe("transition leave hook");
+        Elements(host.Container).ShouldHaveSingleItem().Description.ShouldBe("span");
+    }
+
+    [Fact]
     public void Render_TransitionHookFailure_RoutesToApplicationErrorHandlerOnce()
     {
         using var host = new RendererParityHost();

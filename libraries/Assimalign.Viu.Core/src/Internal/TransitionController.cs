@@ -106,6 +106,8 @@ internal sealed class TransitionController
             ? Properties.OnAppearCancelled ?? Properties.OnEnterCancelled
             : Properties.OnEnterCancelled;
         bool isFinished = false;
+        bool isInvokingHook = false;
+        TransitionContinuationException? continuationFailure = null;
         Action<bool>? finish = null;
         finish = cancelled =>
         {
@@ -114,26 +116,36 @@ internal sealed class TransitionController
                 return;
             }
 
-            isFinished = true;
-            if (_state.EnterCallbacks.TryGetValue(element, out Action<bool>? active)
-                && ReferenceEquals(active, finish))
+            try
             {
-                _state.EnterCallbacks.Remove(element);
-            }
+                isFinished = true;
+                if (_state.EnterCallbacks.TryGetValue(element, out Action<bool>? active)
+                    && ReferenceEquals(active, finish))
+                {
+                    _state.EnterCallbacks.Remove(element);
+                }
 
-            if (ReferenceEquals(_enterFinish, finish))
+                if (ReferenceEquals(_enterFinish, finish))
+                {
+                    _enterFinish = null;
+                    _enterElement = null;
+                }
+
+                Invoke(
+                    cancelled ? cancelledHook : afterHook,
+                    element,
+                    cancelled
+                        ? "transition enter-cancelled hook"
+                        : "transition after-enter hook");
+                completion(cancelled);
+            }
+            catch (Exception exception) when (isInvokingHook)
             {
-                _enterFinish = null;
-                _enterElement = null;
+                continuationFailure ??=
+                    exception as TransitionContinuationException
+                    ?? new TransitionContinuationException(exception);
+                throw continuationFailure;
             }
-
-            Invoke(
-                cancelled ? cancelledHook : afterHook,
-                element,
-                cancelled
-                    ? "transition enter-cancelled hook"
-                    : "transition after-enter hook");
-            completion(cancelled);
         };
         _enterElement = element;
         _enterFinish = finish;
@@ -144,9 +156,25 @@ internal sealed class TransitionController
             return;
         }
 
-        bool invoked = TryInvoke(
-            () => hook(element, () => finish(false)),
-            isAppear ? "transition appear hook" : "transition enter hook");
+        bool invoked;
+        isInvokingHook = true;
+        try
+        {
+            invoked = TryInvoke(
+                () => hook(element, () => finish(false)),
+                isAppear ? "transition appear hook" : "transition enter hook");
+        }
+        catch (TransitionContinuationException exception)
+        {
+            exception.DispatchInformation.Throw();
+            throw;
+        }
+        finally
+        {
+            isInvokingHook = false;
+        }
+
+        continuationFailure?.DispatchInformation.Throw();
         if (!invoked)
         {
             finish(false);
@@ -184,6 +212,8 @@ internal sealed class TransitionController
         Action<object>? afterHook = Properties.OnAfterLeave;
         Action<object>? cancelledHook = Properties.OnLeaveCancelled;
         bool isFinished = false;
+        bool isInvokingHook = false;
+        TransitionContinuationException? continuationFailure = null;
         Action<bool>? finish = null;
         finish = cancelled =>
         {
@@ -192,44 +222,54 @@ internal sealed class TransitionController
                 return;
             }
 
-            isFinished = true;
-            if (_state.LeaveCallbacks.TryGetValue(element, out Action<bool>? active)
-                && ReferenceEquals(active, finish))
-            {
-                _state.LeaveCallbacks.Remove(element);
-            }
-
-            if (_state.Leaving.TryGetValue(_identity, out Action<bool>? leaving)
-                && ReferenceEquals(leaving, finish))
-            {
-                _state.Leaving.Remove(_identity);
-            }
-
-            if (ReferenceEquals(_leaveFinish, finish))
-            {
-                _leaveFinish = null;
-                _leaveElement = null;
-            }
-
             try
             {
-                InvokeRemoval(removal, cancelled, routeRemovalFailure);
-            }
-            finally
-            {
+                isFinished = true;
+                if (_state.LeaveCallbacks.TryGetValue(element, out Action<bool>? active)
+                    && ReferenceEquals(active, finish))
+                {
+                    _state.LeaveCallbacks.Remove(element);
+                }
+
+                if (_state.Leaving.TryGetValue(_identity, out Action<bool>? leaving)
+                    && ReferenceEquals(leaving, finish))
+                {
+                    _state.Leaving.Remove(_identity);
+                }
+
+                if (ReferenceEquals(_leaveFinish, finish))
+                {
+                    _leaveFinish = null;
+                    _leaveElement = null;
+                }
+
                 try
                 {
-                    Invoke(
-                        cancelled ? cancelledHook : afterHook,
-                        element,
-                        cancelled
-                            ? "transition leave-cancelled hook"
-                            : "transition after-leave hook");
+                    InvokeRemoval(removal, cancelled, routeRemovalFailure);
                 }
                 finally
                 {
-                    afterCompletion?.Invoke(cancelled);
+                    try
+                    {
+                        Invoke(
+                            cancelled ? cancelledHook : afterHook,
+                            element,
+                            cancelled
+                                ? "transition leave-cancelled hook"
+                                : "transition after-leave hook");
+                    }
+                    finally
+                    {
+                        afterCompletion?.Invoke(cancelled);
+                    }
                 }
+            }
+            catch (Exception exception) when (isInvokingHook)
+            {
+                continuationFailure ??=
+                    exception as TransitionContinuationException
+                    ?? new TransitionContinuationException(exception);
+                throw continuationFailure;
             }
         };
         _leaveElement = element;
@@ -242,9 +282,25 @@ internal sealed class TransitionController
             return;
         }
 
-        bool invoked = TryInvoke(
-            () => Properties.OnLeave(element, () => finish(false)),
-            "transition leave hook");
+        bool invoked;
+        isInvokingHook = true;
+        try
+        {
+            invoked = TryInvoke(
+                () => Properties.OnLeave(element, () => finish(false)),
+                "transition leave hook");
+        }
+        catch (TransitionContinuationException exception)
+        {
+            exception.DispatchInformation.Throw();
+            throw;
+        }
+        finally
+        {
+            isInvokingHook = false;
+        }
+
+        continuationFailure?.DispatchInformation.Throw();
         if (!invoked)
         {
             finish(false);

@@ -250,7 +250,7 @@ public sealed class GeneratedComponentFixtureTests
         // two distinct mounted occurrences per row through the mounted-triggered update.
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
         ComponentFactory factory = CreateFactory(fixtures);
-        RegisterRouterView(factory);
+        RegisterRouterOutletDependencies(factory);
         ComponentNode firstRoute = new(ComponentReference.ForName("RouterFirstView"));
         ComponentNode repeatedRoute = new(
             ComponentReference.ForName("RouterRepeatedStaticView"));
@@ -341,15 +341,16 @@ public sealed class GeneratedComponentFixtureTests
     }
 
     [Fact]
-    public async Task RouterOutlet_NavigationIntoGeneratedTransitionKeepAliveView_MountsThroughBrowserHost()
+    public async Task RouterOutlet_NavigationIntoGeneratedBuiltInsView_MountsTransitionGroupKeepAliveAndTeleportThroughBrowserHost()
     {
-        // [RND-HOST-1]/[RND-BLOCK-5] This is the packaged-showcase shape: a generated
-        // out-in route transition synchronously mounts a generated view whose subtree owns
-        // another transition and KeepAlive. The Browser host must accept every renderer-owned
-        // node created during that re-entrant mount.
+        // [RND-HOST-1]/[RND-BLOCK-5] This is the packaged-showcase shape: the compiled route
+        // outlet's out-in transition synchronously mounts a generated view whose subtree owns
+        // another transition, TransitionGroup, KeepAlive, and Teleport. The Browser host must
+        // accept every renderer-owned node created during that re-entrant mount.
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
         ComponentFactory factory = CreateFactory(fixtures);
-        RegisterRouterView(factory);
+        RegisterRouterOutletDependencies(factory);
+        RegisterTransitionGroup(factory);
         ComponentNode firstRoute = new(ComponentReference.ForName("RouterFirstView"));
         ComponentNode builtInsRoute = new(ComponentReference.ForName("RouterBuiltInsView"));
         using var router = new ViuRouter(
@@ -360,18 +361,32 @@ public sealed class GeneratedComponentFixtureTests
             ]);
         (await router.PushAsync("/first")).ShouldBeNull();
         ComponentNode root = new(ComponentReference.ForName("RouterOutletShell"));
+        List<Exception> errors = [];
         ApplicationContext application = CreateApplication(
             root,
             factory,
-            new RouterServiceProvider(router));
+            new RouterServiceProvider(router),
+            (error, _, _) => errors.Add(error));
         Queue<Action> scheduledFlushes = [];
+        int teleportResolutionCount = 0;
         Scheduler.Reset();
         using IDisposable schedulerRegistration =
             Scheduler.UseFlushDispatcher(scheduledFlushes.Enqueue);
         var host = new BrowserRendererHost((_, _) => []);
         const int container = 1000;
+        const int teleportTarget = 2000;
         host.ObserveForeignHandle(container);
-        Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+        host.ObserveForeignHandle(teleportTarget);
+        RendererOptions<int> browserOptions = host.Options;
+        RendererOptions<int> options = CopyBrowserOptions(
+            browserOptions,
+            selector =>
+            {
+                selector.ShouldBe("#compiled-overlay");
+                teleportResolutionCount++;
+                return teleportTarget;
+            });
+        Renderer<int> renderer = RendererFactory.CreateRenderer(options);
 
         try
         {
@@ -392,21 +407,104 @@ public sealed class GeneratedComponentFixtureTests
                 .Select(view => view.Instance.GetType().Name)
                 .ToArray();
             mountedNames.ShouldContain("RouterBuiltInsView");
+            mountedNames.ShouldContain("TransitionGroup");
             mountedNames.ShouldContain("TargetedTextProbe");
+            teleportResolutionCount.ShouldBe(1);
+            errors.ShouldBeEmpty();
             string generated = fixtures.GeneratedSources
                 .Single(pair => pair.Key.EndsWith(
                     "RouterBuiltInsView.SingleFileComponent.g.cs",
                     StringComparison.Ordinal))
                 .Value;
             generated.ShouldContain("TransitionNode");
+            generated.ShouldContain("ComponentReference.ForName(\"TransitionGroup\")");
             generated.ShouldContain("KeepAliveNode");
+            generated.ShouldContain("TeleportNode");
 
             renderer.Render(null, container, application);
+            RunScheduledFlushes(scheduledFlushes);
+            errors.ShouldBeEmpty();
         }
         finally
         {
             Scheduler.Reset();
         }
+    }
+
+    [Fact]
+    public async Task RouterOutlet_SynchronousLeaveGeneratedMountFailure_EscapesErrorHandler()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        RegisterRouterOutletDependencies(factory);
+        RegisterTransitionGroup(factory);
+        ComponentNode firstRoute = new(ComponentReference.ForName("RouterFirstView"));
+        ComponentNode builtInsRoute = new(ComponentReference.ForName("RouterBuiltInsView"));
+        using var router = new ViuRouter(
+            RouterHistory.CreateMemory(),
+            [
+                new RouteRecord("/first", component: firstRoute),
+                new RouteRecord("/built-ins", component: builtInsRoute),
+            ]);
+        (await router.PushAsync("/first")).ShouldBeNull();
+        ComponentNode root = new(ComponentReference.ForName("RouterOutletShell"));
+        List<Exception> errors = [];
+        ApplicationContext application = CreateApplication(
+            root,
+            factory,
+            new RouterServiceProvider(router),
+            (error, _, _) => errors.Add(error));
+        Queue<Action> scheduledFlushes = [];
+        Scheduler.Reset();
+        using IDisposable schedulerRegistration =
+            Scheduler.UseFlushDispatcher(scheduledFlushes.Enqueue);
+        var host = new BrowserRendererHost((_, _) => []);
+        const int container = 3000;
+        const int teleportTarget = 4000;
+        host.ObserveForeignHandle(container);
+        host.ObserveForeignHandle(teleportTarget);
+        RendererOptions<int> browserOptions = host.Options;
+        RendererOptions<int> options = CopyBrowserOptions(
+            browserOptions,
+            _ => teleportTarget,
+            name => name.LocalName == "article"
+                ? throw new InvalidOperationException("generated incoming mount failed")
+                : browserOptions.CreateElement(name));
+        Renderer<int> renderer = RendererFactory.CreateRenderer(options);
+        Exception? cleanupFailure = null;
+
+        try
+        {
+            renderer.Render(root, container, application);
+            RunScheduledFlushes(scheduledFlushes);
+            (await router.PushAsync("/built-ins")).ShouldBeNull();
+
+            Action flush = () => RunScheduledFlushes(scheduledFlushes);
+
+            InvalidOperationException exception =
+                flush.ShouldThrow<InvalidOperationException>();
+            exception.Message.ShouldBe("generated incoming mount failed");
+            errors.ShouldBeEmpty();
+        }
+        finally
+        {
+            try
+            {
+                renderer.Render(null, container, application);
+                RunScheduledFlushes(scheduledFlushes);
+            }
+            catch (Exception exception)
+            {
+                cleanupFailure = exception;
+            }
+            finally
+            {
+                Scheduler.Reset();
+            }
+        }
+
+        cleanupFailure.ShouldBeNull();
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -559,7 +657,7 @@ public sealed class GeneratedComponentFixtureTests
         return factory;
     }
 
-    private static void RegisterRouterView(ComponentFactory factory)
+    private static void RegisterRouterOutletDependencies(ComponentFactory factory)
     {
         factory.Register(RouterView.Registration);
         factory.Register(
@@ -567,12 +665,27 @@ public sealed class GeneratedComponentFixtureTests
                 ComponentReference.ForName("RouterView"),
                 RouterView.Registration.Contract,
                 RouterView.Registration.Activator));
+        factory.Register(
+            new ComponentRegistration(
+                ComponentReference.ForName("SynchronousTransition"),
+                new ComponentContract(),
+                static _ => new SynchronousTransitionComponent()));
+    }
+
+    private static void RegisterTransitionGroup(ComponentFactory factory)
+    {
+        factory.Register(
+            new ComponentRegistration(
+                ComponentReference.ForName("TransitionGroup"),
+                TransitionGroup.Registration.Contract,
+                TransitionGroup.Registration.Activator));
     }
 
     private static ApplicationContext CreateApplication(
         ComponentNode root,
         ComponentFactory factory,
-        IServiceProvider? services = null)
+        IServiceProvider? services = null,
+        Action<Exception, ComponentContext?, string>? errorHandler = null)
     {
         var directives = new DirectiveRegistry(
         [
@@ -599,6 +712,7 @@ public sealed class GeneratedComponentFixtureTests
                 Components = factory,
                 Directives = directives,
                 Services = services,
+                ErrorHandler = errorHandler,
                 WarnHandler = warning => throw new InvalidOperationException(warning),
             });
     }
@@ -680,6 +794,25 @@ public sealed class GeneratedComponentFixtureTests
             serviceType == typeof(ViuRouter) ? _router : null;
     }
 
+    private sealed class SynchronousTransitionComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            var scope = new ComponentTransitionScope(context);
+            var properties = new TransitionProperties
+            {
+                Mode = "out-in",
+                OnLeave = static (_, complete) => complete(),
+            };
+            return _ => context.Bindings.Slots.TryGetValue(
+                "default",
+                out ComponentSlot? child)
+                    ? scope.Attach(child, properties)
+                    : null;
+        }
+    }
+
     private static void RunScheduledFlushes(Queue<Action> scheduledFlushes)
     {
         while (scheduledFlushes.Count > 0)
@@ -687,4 +820,25 @@ public sealed class GeneratedComponentFixtureTests
             scheduledFlushes.Dequeue()();
         }
     }
+
+    private static RendererOptions<int> CopyBrowserOptions(
+        RendererOptions<int> source,
+        Func<string, int> resolveTeleportTarget,
+        Func<QualifiedName, int>? createElement = null) =>
+        new()
+        {
+            Insert = source.Insert,
+            Remove = source.Remove,
+            CreateElement = createElement ?? source.CreateElement,
+            CreateText = source.CreateText,
+            CreateComment = source.CreateComment,
+            SetText = source.SetText,
+            ParentNode = source.ParentNode,
+            NextSibling = source.NextSibling,
+            PatchAttribute = source.PatchAttribute,
+            ResolveTeleportTarget = resolveTeleportTarget,
+            Commit = source.Commit,
+            InsertStaticContent = source.InsertStaticContent,
+            CreateHydrationReader = source.CreateHydrationReader,
+        };
 }

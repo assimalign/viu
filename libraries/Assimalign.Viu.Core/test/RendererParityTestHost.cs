@@ -94,6 +94,8 @@ internal sealed class RendererParityHost : IDisposable
 
     internal int TeleportResolveCount { get; private set; }
 
+    internal Exception? RemovalFailure { get; set; }
+
     internal Renderer<RendererParityNode> CreateRenderer() =>
         RendererFactory.CreateRenderer(
             new RendererOptions<RendererParityNode>
@@ -198,6 +200,11 @@ internal sealed class RendererParityHost : IDisposable
 
     private void Remove(RendererParityNode node)
     {
+        if (RemovalFailure is { } failure)
+        {
+            throw failure;
+        }
+
         if (node.Parent is not { } parent)
         {
             return;

@@ -1911,6 +1911,11 @@ public sealed partial class Renderer<TNode>
 
             return true;
         }
+        catch (TransitionContinuationException)
+        {
+            // The controller unwraps this signal after leaving the authored-hook boundary.
+            throw;
+        }
         catch (Exception exception)
         {
             if (owner is not null)

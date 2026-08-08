@@ -228,6 +228,125 @@ public sealed class BrowserRendererHostTests
         }
     }
 
+    [Fact]
+    public void Render_BlockTransitionSynchronousLeaveMountsTransitionGroupKeepAliveAndEagerTeleportWithoutErrors()
+    {
+        Scheduler.Reset();
+        Queue<Action> scheduledFlushes = [];
+        List<Exception> errors = [];
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(
+            scheduledFlushes.Enqueue);
+        try
+        {
+            int teleportResolutionCount = 0;
+            var operations = new BufferedBrowserNodeOperations(
+                (_, _) => [],
+                selector =>
+                {
+                    selector.ShouldBe(TeleportTargetSelector);
+                    teleportResolutionCount++;
+                    return TeleportTargetHandle;
+                },
+                static _ => 0,
+                static _ => 0,
+                insertStaticContent: null);
+            operations.ObserveForeignHandle(ContainerHandle);
+            operations.ObserveForeignHandle(TeleportTargetHandle);
+            Renderer<int> renderer = RendererFactory.CreateRenderer(operations.Create());
+            ComponentFactory components = CreateStorageComponentFactory(
+                includeDeferredTeleport: false,
+                includeTransitionGroup: true,
+                includeEagerTeleport: true);
+            ElementNode initial = TransitionBlock(OutgoingElement());
+            ApplicationContext application = CreateApplication(
+                initial,
+                components,
+                (exception, _, _) => errors.Add(exception));
+            renderer.Render(initial, ContainerHandle, application);
+            RunScheduledFlushes(scheduledFlushes);
+
+            Should.NotThrow(
+                () => renderer.Render(
+                    TransitionBlock(IncomingComponent()),
+                    ContainerHandle));
+            RunScheduledFlushes(scheduledFlushes);
+
+            teleportResolutionCount.ShouldBe(1);
+            renderer.GetMountedComponentViews(ContainerHandle)
+                .ShouldContain(view => view.Instance is IncomingStorageComponent);
+            renderer.GetMountedComponentViews(ContainerHandle)
+                .ShouldContain(view => view.Instance is TransitionGroup);
+            renderer.GetMountedComponentViews(ContainerHandle)
+                .ShouldContain(view => view.Instance is StorageLeafComponent);
+            errors.ShouldBeEmpty();
+            renderer.Render(null, ContainerHandle);
+            RunScheduledFlushes(scheduledFlushes);
+            errors.ShouldBeEmpty();
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
+    [Fact]
+    public void Render_BlockTransitionSynchronousLeaveInternalBrowserMountFailureEscapesErrorHandler()
+    {
+        Scheduler.Reset();
+        Queue<Action> scheduledFlushes = [];
+        List<Exception> errors = [];
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(
+            scheduledFlushes.Enqueue);
+        try
+        {
+            var host = new BrowserRendererHost((_, _) => []);
+            host.ObserveForeignHandle(ContainerHandle);
+            host.ObserveForeignHandle(TeleportTargetHandle);
+            Renderer<int> renderer = RendererFactory.CreateRenderer(
+                new RendererOptions<int>
+                {
+                    Insert = host.Options.Insert,
+                    Remove = host.Options.Remove,
+                    CreateElement = host.Options.CreateElement,
+                    CreateText = host.Options.CreateText,
+                    CreateComment = host.Options.CreateComment,
+                    SetText = host.Options.SetText,
+                    ParentNode = host.Options.ParentNode,
+                    NextSibling = host.Options.NextSibling,
+                    PatchAttribute = host.Options.PatchAttribute,
+                    ResolveTeleportTarget = _ => TeleportTargetHandle,
+                    Commit = host.Options.Commit,
+                    InsertStaticContent = host.Options.InsertStaticContent,
+                    CreateHydrationReader = host.Options.CreateHydrationReader,
+                });
+            ComponentFactory components = CreateStorageComponentFactory(
+                includeDeferredTeleport: false,
+                includeTransitionGroup: true,
+                includeEagerTeleport: true,
+                includeInvalidNamespace: true);
+            ElementNode initial = TransitionBlock(OutgoingElement());
+            ApplicationContext application = CreateApplication(
+                initial,
+                components,
+                (exception, _, _) => errors.Add(exception));
+            renderer.Render(initial, ContainerHandle, application);
+            RunScheduledFlushes(scheduledFlushes);
+
+            Action replace = () => renderer.Render(
+                TransitionBlock(IncomingComponent()),
+                ContainerHandle);
+
+            NotSupportedException exception = replace.ShouldThrow<NotSupportedException>();
+            exception.Message.ShouldBe(
+                "The Browser host does not support element namespace 'urn:invalid'.");
+            errors.ShouldBeEmpty();
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
     [Theory]
     [InlineData("div", null, null)]
     [InlineData("svg", null, "svg")]
@@ -310,30 +429,40 @@ public sealed class BrowserRendererHostTests
     }
 
     private static ComponentFactory CreateStorageComponentFactory(
-        bool includeDeferredTeleport)
+        bool includeDeferredTeleport,
+        bool includeTransitionGroup = false,
+        bool includeEagerTeleport = false,
+        bool includeInvalidNamespace = false)
     {
         var components = new ComponentFactory();
         components.Register(
             new ComponentRegistration(
                 ComponentReference.ForType(typeof(IncomingStorageComponent)),
                 new ComponentContract(),
-                _ => new IncomingStorageComponent(includeDeferredTeleport)));
+                _ => new IncomingStorageComponent(
+                    includeDeferredTeleport,
+                    includeTransitionGroup,
+                    includeEagerTeleport,
+                    includeInvalidNamespace)));
         components.Register(
             new ComponentRegistration(
                 ComponentReference.ForType(typeof(StorageLeafComponent)),
                 new ComponentContract(),
                 static _ => new StorageLeafComponent()));
+        components.Register(TransitionGroup.Registration);
         return components;
     }
 
     private static ApplicationContext CreateApplication(
         VirtualNode root,
-        ComponentFactory components) =>
+        ComponentFactory components,
+        Action<Exception, ComponentContext?, string>? errorHandler = null) =>
         new(
             new ApplicationOptions
             {
                 RootComponent = root,
                 Components = components,
+                ErrorHandler = errorHandler,
             });
 
     private static ElementNode TransitionBlock(VirtualNode child)
@@ -393,10 +522,20 @@ public sealed class BrowserRendererHostTests
     private sealed class IncomingStorageComponent : IComponent
     {
         private readonly bool _includeDeferredTeleport;
+        private readonly bool _includeTransitionGroup;
+        private readonly bool _includeEagerTeleport;
+        private readonly bool _includeInvalidNamespace;
 
-        internal IncomingStorageComponent(bool includeDeferredTeleport)
+        internal IncomingStorageComponent(
+            bool includeDeferredTeleport,
+            bool includeTransitionGroup,
+            bool includeEagerTeleport,
+            bool includeInvalidNamespace)
         {
             _includeDeferredTeleport = includeDeferredTeleport;
+            _includeTransitionGroup = includeTransitionGroup;
+            _includeEagerTeleport = includeEagerTeleport;
+            _includeInvalidNamespace = includeInvalidNamespace;
         }
 
         public ComponentRenderer Setup(ComponentContext context)
@@ -416,11 +555,37 @@ public sealed class BrowserRendererHostTests
                         isDeferred: true));
             }
 
+            if (_includeInvalidNamespace)
+            {
+                children.Add(
+                    new ElementNode(
+                        new QualifiedName("invalid", "urn:invalid")));
+            }
+
             children.Add(
                 new ElementNode(
                     new QualifiedName("p"),
                     children: [new TextNode("incoming component")]));
+            if (_includeTransitionGroup)
+            {
+                children.Add(StorageTransitionGroup());
+            }
+
             children.Add(StorageKeepAlive());
+            if (_includeEagerTeleport)
+            {
+                children.Add(
+                    new TeleportNode(
+                        TeleportTargetSelector,
+                        [
+                            SynchronousOutgoingThenIncoming(
+                                new ElementNode(
+                                    new QualifiedName("aside"),
+                                    children: [new TextNode("teleported eagerly")],
+                                    key: "teleported")),
+                        ]));
+            }
+
             return _ => new ElementNode(
                 new QualifiedName("article"),
                 children: children);
@@ -447,5 +612,31 @@ public sealed class BrowserRendererHostTests
                 key: "storage-leaf"),
         };
         return new KeepAliveNode(new ComponentInvocation(slots: slots));
+    }
+
+    private static ComponentNode StorageTransitionGroup()
+    {
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["tag"] = "div",
+            ["css"] = false,
+        };
+        var slots = new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
+        {
+            ["default"] = _ => new FragmentNode(
+                [
+                    new ElementNode(
+                        new QualifiedName("div"),
+                        children: [new TextNode("motion item 1")],
+                        key: "first"),
+                    new ElementNode(
+                        new QualifiedName("div"),
+                        children: [new TextNode("motion item 2")],
+                        key: "second"),
+                ]),
+        };
+        return new ComponentNode(
+            ComponentReference.ForType(typeof(TransitionGroup)),
+            new ComponentInvocation(arguments, slots));
     }
 }

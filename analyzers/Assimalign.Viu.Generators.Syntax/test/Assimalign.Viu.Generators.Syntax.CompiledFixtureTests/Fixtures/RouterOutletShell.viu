@@ -1,10 +1,10 @@
 <template>
 <main class="compiled-router-outlet">
-  <Transition mode="out-in">
+  <SynchronousTransition>
     <section :key="CurrentPath" class="compiled-route-frame">
       <RouterView />
     </section>
-  </Transition>
+  </SynchronousTransition>
 </main>
 </template>
 
