@@ -1,6 +1,7 @@
 namespace Assimalign.Viu.Compiler.SingleFileComponent;
 
 /// <summary>Identifies editor-neutral diagnostic severity.</summary>
+/// <remarks>Specified by <c>[SFC-DIAG-1]</c> and <c>[TOOL-5]</c>.</remarks>
 public enum SingleFileComponentDiagnosticSeverity
 {
     /// <summary>Informational guidance.</summary>

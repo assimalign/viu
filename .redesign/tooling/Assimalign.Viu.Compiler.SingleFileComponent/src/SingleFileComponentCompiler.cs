@@ -6,6 +6,7 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// <summary>
 /// Provides the stable operation-oriented facade shared by generators and editor services.
 /// </summary>
+/// <remarks>Specified by <c>[SFC-PIPE-2]</c> and <c>[TOOL-2]</c>.</remarks>
 public static class SingleFileComponentCompiler
 {
     /// <summary>Projects one source container through the shared internal pipeline.</summary>

@@ -1,39 +1,80 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu;
 
-internal sealed class RuntimeComponentContext : ComponentContext
+internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousComponentRuntime
 {
-    private readonly IReadOnlyDictionary<string, ComponentEventListener> _listeners;
+    private static RuntimeComponentContext? _current;
+
+    private readonly ComponentContract _contract;
+    private readonly Dictionary<string, ComponentEvent> _eventAliases =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, object?> _defaultValues =
+        new(StringComparer.Ordinal);
+    private readonly HashSet<string> _emittedOnceListeners =
+        new(StringComparer.Ordinal);
+    private readonly HashSet<string> _reportedBindingDiagnostics =
+        new(StringComparer.Ordinal);
     private readonly Action<Exception, ComponentContext?, string>? _errorHandler;
+    private readonly Action<string>? _warnHandler;
+    private readonly Action<ComponentContext, string, IReadOnlyList<object?>>? _eventObserver;
+    private ComponentBindings _bindings;
+    private IReadOnlyDictionary<string, ComponentEventListener> _listeners;
+    private List<Task>? _taskObservers;
     private object? _exposedValue;
 
     internal RuntimeComponentContext(
-        ComponentBindings bindings,
+        ComponentContract contract,
+        ComponentInvocation invocation,
+        MountReference? mountReference,
         IServiceProvider? services,
         ComponentLifecycle lifecycle,
-        IReadOnlyDictionary<string, ComponentEventListener> listeners,
         IReactiveEffectScope scope,
         IReactiveWatchScheduler? watchScheduler,
         ComponentContext? parent,
-        Action<Exception, ComponentContext?, string>? errorHandler)
+        Action<Exception, ComponentContext?, string>? errorHandler,
+        Action<string>? warnHandler,
+        Action<ComponentContext, string, IReadOnlyList<object?>>? eventObserver)
     {
-        Bindings = bindings;
+        ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(invocation);
+        ArgumentNullException.ThrowIfNull(lifecycle);
+        ArgumentNullException.ThrowIfNull(scope);
+
+        _contract = contract;
+        _listeners = invocation.Listeners;
+        _errorHandler = errorHandler;
+        _warnHandler = warnHandler;
+        _eventObserver = eventObserver;
+        Invocation = invocation;
+        MountReference = mountReference;
         Services = services;
         Lifecycle = lifecycle;
-        _listeners = listeners;
         Scope = scope;
         WatchScheduler = watchScheduler;
         Parent = parent;
-        _errorHandler = errorHandler;
+        SuspenseBoundary = (parent as RuntimeComponentContext)?.SuspenseBoundary;
+        _bindings = new ComponentBindings();
+
+        foreach (ComponentEvent componentEvent in contract.Events)
+        {
+            AddEventAlias(componentEvent.Name, componentEvent);
+            AddEventAlias(NameNormalization.Camelize(componentEvent.Name), componentEvent);
+            AddEventAlias(NameNormalization.Hyphenate(componentEvent.Name), componentEvent);
+        }
+
     }
 
-    public override ComponentBindings Bindings { get; }
+    internal static RuntimeComponentContext? Current => _current;
+
+    public override ComponentBindings Bindings => _bindings;
 
     public override IServiceProvider? Services { get; }
 
@@ -47,33 +88,247 @@ internal sealed class RuntimeComponentContext : ComponentContext
 
     internal object? ExposedValue => _exposedValue;
 
+    internal bool HasExposedValue { get; private set; }
+
+    internal ComponentInvocation Invocation { get; private set; }
+
+    internal SlotFlags EffectiveSlotFlags { get; private set; } = SlotFlags.Dynamic;
+
+    ComponentInvocation IAsynchronousComponentRuntime.Invocation => Invocation;
+
+    internal MountReference? MountReference { get; private set; }
+
+    MountReference? IAsynchronousComponentRuntime.MountReference => MountReference;
+
+    internal SuspenseBoundary? SuspenseBoundary { get; set; }
+
     public override void Emit(string name, params object?[] arguments)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         ArgumentNullException.ThrowIfNull(arguments);
-        if (_listeners.TryGetValue(name, out var listener))
+
+        IReadOnlyList<object?> eventArguments = Array.AsReadOnly(arguments);
+        ComponentEvent? declaration = ResolveEvent(name);
+        if (_contract.Events.Count > 0 && declaration is null)
         {
+            Warn($"Component emitted undeclared event '{name}'.");
+        }
+        else if (declaration?.Validator is not null)
+        {
+            bool isValid;
             try
             {
-                listener(Array.AsReadOnly(arguments));
+                isValid = Run(() => declaration.Validator(eventArguments));
             }
             catch (Exception exception)
             {
-                RouteError(exception, "component event listener");
+                RouteError(exception, $"component event validator '{name}'");
+                return;
+            }
+
+            if (!isValid)
+            {
+                Warn($"Invalid arguments were emitted for component event '{name}'.");
+            }
+        }
+
+        InvokeListener(name, eventArguments, isOnceName: false);
+        InvokeListener(name, eventArguments, isOnceName: true);
+
+        if (_eventObserver is not null)
+        {
+            try
+            {
+                Run(() => _eventObserver(this, name, eventArguments));
+            }
+            catch (Exception exception)
+            {
+                RouteError(exception, "application event observer");
             }
         }
     }
 
-    public override void Expose(object? value) => _exposedValue = value;
+    public override void Expose(object? value)
+    {
+        HasExposedValue = true;
+        _exposedValue = value;
+    }
 
     public override void Warn(string message)
     {
-        // The contract model has no application warning channel; the shipping runtime routes
-        // the message through application composition.
-        _ = message;
+        ArgumentException.ThrowIfNullOrEmpty(message);
+        _warnHandler?.Invoke(message);
     }
 
-    internal void RouteError(Exception exception, string diagnosticInformation)
+    internal void Update(ComponentInvocation invocation, bool isInitial = false)
+    {
+        ArgumentNullException.ThrowIfNull(invocation);
+        Invocation = invocation;
+        EffectiveSlotFlags = ResolveEffectiveSlotFlags(invocation.SlotFlags);
+
+        List<ComponentBindingDiagnostic> diagnostics = [];
+        ComponentBindings resolved = Run(
+            () => ComponentBindings.Resolve(_contract, invocation, diagnostics));
+        Dictionary<string, object?> parameters = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, object?> parameter in resolved.Parameters)
+        {
+            parameters.Add(parameter.Key, parameter.Value);
+        }
+
+        foreach (ComponentParameter parameter in _contract.Parameters)
+        {
+            if (parameters.ContainsKey(parameter.Name)
+                || parameter.DefaultFactory is null)
+            {
+                continue;
+            }
+
+            if (!_defaultValues.TryGetValue(parameter.Name, out object? defaultValue))
+            {
+                defaultValue = Run(parameter.DefaultFactory);
+                _defaultValues.Add(parameter.Name, defaultValue);
+            }
+
+            parameters.Add(parameter.Name, defaultValue);
+            if (parameter.Validator is not null
+                && !Run(() => parameter.Validator(defaultValue)))
+            {
+                diagnostics.Add(
+                    new ComponentBindingDiagnostic(
+                        ComponentBindingDiagnosticKind.ParameterValidationFailed,
+                        parameter.Name,
+                        "Invalid default value was produced for component parameter "
+                            + $"'{parameter.Name}'."));
+            }
+        }
+
+        _bindings = new ComponentBindings(
+            parameters,
+            resolved.Slots,
+            resolved.FallthroughBindings);
+        _listeners = invocation.Listeners;
+
+        foreach (ComponentBindingDiagnostic diagnostic in diagnostics)
+        {
+            if (!isInitial
+                && diagnostic.Kind == ComponentBindingDiagnosticKind.MissingRequiredParameter)
+            {
+                continue;
+            }
+
+            string diagnosticKey = string.Concat(
+                ((int)diagnostic.Kind).ToString(CultureInfo.InvariantCulture),
+                "\u001f",
+                diagnostic.Name,
+                "\u001f",
+                diagnostic.Message);
+            if (_reportedBindingDiagnostics.Add(diagnosticKey))
+            {
+                Warn(diagnostic.Message);
+            }
+        }
+    }
+
+    internal void UpdateMountReference(MountReference? mountReference) =>
+        MountReference = mountReference;
+
+    private SlotFlags ResolveEffectiveSlotFlags(SlotFlags slotFlags) => slotFlags switch
+    {
+        SlotFlags.Stable => SlotFlags.Stable,
+        SlotFlags.Dynamic => SlotFlags.Dynamic,
+        SlotFlags.Forwarded => (Parent as RuntimeComponentContext)?.EffectiveSlotFlags
+            == SlotFlags.Stable
+                ? SlotFlags.Stable
+                : SlotFlags.Dynamic,
+        _ => throw new ArgumentOutOfRangeException(nameof(slotFlags)),
+    };
+
+    internal void Run(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        RuntimeComponentContext? previous = _current;
+        _current = this;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _current = previous;
+        }
+    }
+
+    internal TResult Run<TResult>(Func<TResult> function)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        RuntimeComponentContext? previous = _current;
+        _current = this;
+        try
+        {
+            return function();
+        }
+        finally
+        {
+            _current = previous;
+        }
+    }
+
+    internal void ObserveTask(
+        Task? task,
+        string diagnosticInformation,
+        bool rethrowIfUnhandled = true)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(diagnosticInformation);
+        Task observer = ObserveTaskCoreAsync(
+            task,
+            diagnosticInformation,
+            rethrowIfUnhandled);
+        (_taskObservers ??= []).Add(observer);
+    }
+
+    public bool RegisterAsynchronousDependency(
+        Task dependency,
+        bool rethrowIfUnhandled)
+    {
+        ArgumentNullException.ThrowIfNull(dependency);
+        if (SuspenseBoundary is not null)
+        {
+            SuspenseBoundary.Register(dependency, this, rethrowIfUnhandled);
+            return true;
+        }
+
+        ObserveTask(
+            dependency,
+            "asynchronous component dependency",
+            rethrowIfUnhandled);
+        return false;
+    }
+
+    public void ObserveAsynchronousDependency(
+        Task dependency,
+        bool rethrowIfUnhandled)
+    {
+        ArgumentNullException.ThrowIfNull(dependency);
+        ObserveTask(
+            dependency,
+            "asynchronous component loader",
+            rethrowIfUnhandled);
+    }
+
+    internal async Task DrainObservedTasksAsync()
+    {
+        while (_taskObservers is { Count: > 0 })
+        {
+            Task[] observers = _taskObservers.ToArray();
+            _taskObservers.Clear();
+            await Task.WhenAll(observers).ConfigureAwait(false);
+        }
+    }
+
+    internal void RouteError(
+        Exception exception,
+        string diagnosticInformation,
+        bool rethrowIfUnhandled = true)
     {
         ArgumentNullException.ThrowIfNull(exception);
         ArgumentException.ThrowIfNullOrEmpty(diagnosticInformation);
@@ -85,10 +340,17 @@ internal sealed class RuntimeComponentContext : ComponentContext
         {
             try
             {
-                if (!ancestor.Lifecycle.InvokeErrorCaptured(
-                    exception,
-                    source,
-                    diagnosticInformation))
+                bool shouldContinue = ancestor is RuntimeComponentContext runtimeAncestor
+                    ? runtimeAncestor.Run(
+                        () => ancestor.Lifecycle.InvokeErrorCaptured(
+                            exception,
+                            source,
+                            diagnosticInformation))
+                    : ancestor.Lifecycle.InvokeErrorCaptured(
+                        exception,
+                        source,
+                        diagnosticInformation);
+                if (!shouldContinue)
                 {
                     return;
                 }
@@ -102,13 +364,118 @@ internal sealed class RuntimeComponentContext : ComponentContext
 
         if (_errorHandler is not null)
         {
-            _errorHandler(exception, source, diagnosticInformation);
+            Run(() => _errorHandler(exception, source, diagnosticInformation));
             return;
         }
 
-        ExceptionDispatchInfo.Capture(exception).Throw();
+        if (rethrowIfUnhandled)
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
     }
 
     protected override void OnWatchError(Exception exception) =>
         RouteError(exception, "component watch callback");
+
+    private ComponentEvent? ResolveEvent(string name)
+    {
+        if (_eventAliases.TryGetValue(name, out ComponentEvent? declaration))
+        {
+            return declaration;
+        }
+
+        string camelizedName = NameNormalization.Camelize(name);
+        return _eventAliases.TryGetValue(camelizedName, out declaration)
+            ? declaration
+            : null;
+    }
+
+    private void AddEventAlias(string alias, ComponentEvent componentEvent)
+    {
+        if (alias.Length > 0)
+        {
+            _eventAliases.TryAdd(alias, componentEvent);
+        }
+    }
+
+    private void InvokeListener(
+        string eventName,
+        IReadOnlyList<object?> arguments,
+        bool isOnceName)
+    {
+        if (!TryGetListener(
+            eventName,
+            isOnceName,
+            out string? listenerName,
+            out ComponentEventListener? listener))
+        {
+            return;
+        }
+
+        if (isOnceName && !_emittedOnceListeners.Add(listenerName))
+        {
+            return;
+        }
+
+        try
+        {
+            Run(() => listener(arguments));
+        }
+        catch (Exception exception)
+        {
+            RouteError(exception, $"component event listener \"{eventName}\"");
+        }
+    }
+
+    private bool TryGetListener(
+        string eventName,
+        bool isOnceName,
+        out string listenerName,
+        out ComponentEventListener listener)
+    {
+        string suffix = isOnceName ? "Once" : string.Empty;
+        string exactName = string.Concat(eventName, suffix);
+        if (_listeners.TryGetValue(exactName, out listener!))
+        {
+            listenerName = exactName;
+            return true;
+        }
+
+        string camelizedName = string.Concat(NameNormalization.Camelize(eventName), suffix);
+        if (!string.Equals(camelizedName, exactName, StringComparison.Ordinal)
+            && _listeners.TryGetValue(camelizedName, out listener!))
+        {
+            listenerName = camelizedName;
+            return true;
+        }
+
+        listenerName = string.Empty;
+        listener = null!;
+        return false;
+    }
+
+    private async Task ObserveTaskCoreAsync(
+        Task? task,
+        string diagnosticInformation,
+        bool rethrowIfUnhandled)
+    {
+        try
+        {
+            if (task is null)
+            {
+                throw new InvalidOperationException(
+                    "An observed component operation returned a null task.");
+            }
+
+            await task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (Lifecycle.CancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            RouteError(exception, diagnosticInformation, rethrowIfUnhandled);
+        }
+    }
 }

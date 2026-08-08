@@ -7,6 +7,7 @@ namespace Assimalign.Viu;
 /// <summary>
 /// Describes one host-owned component activation and render-once operation.
 /// </summary>
+/// <remarks>Specified by <c>[SSR-10]</c>.</remarks>
 public sealed class ComponentRenderRequest
 {
     /// <summary>Initializes a render request.</summary>

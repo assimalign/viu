@@ -9,6 +9,7 @@ namespace Assimalign.Viu;
 /// context, released together on disposal. Hosts consume this operation surface instead of
 /// Core's mounted engine internals.
 /// </summary>
+/// <remarks>Specified by <c>[SSR-10]</c>.</remarks>
 public interface IComponentRenderScope : IAsyncDisposable
 {
     /// <summary>Gets the fresh immutable rendered subtree, or null when nothing rendered.</summary>

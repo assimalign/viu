@@ -13,7 +13,7 @@ namespace Assimalign.Viu.ServerRenderer;
 /// </summary>
 /// <remarks>
 /// With scoped CSS deferred, the serializer reads no style-scope state and emits no scope
-/// attributes.
+/// attributes. Specified by <c>[SSR-3]</c>, <c>[SSR-4]</c>, and <c>[SSR-10]</c>.
 /// </remarks>
 public sealed class ServerRenderer
 {

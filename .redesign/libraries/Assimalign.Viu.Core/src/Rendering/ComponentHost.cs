@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -24,6 +24,22 @@ public sealed class ComponentHost
         _options = options;
     }
 
+    internal ComponentActivation ActivatePersistent(
+        ComponentNode component,
+        RuntimeComponentContext? parent,
+        IReactiveWatchScheduler watchScheduler,
+        SuspenseBoundary? suspenseBoundary)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(watchScheduler);
+        return ComponentActivation.Activate(
+            component,
+            _options,
+            parent,
+            watchScheduler,
+            suspenseBoundary: suspenseBoundary);
+    }
+
     /// <summary>
     /// Activates, sets up, prefetches, and renders one component, returning the operation scope
     /// that keeps the component's reactive lifetime alive while its tree is consumed. The render
@@ -32,7 +48,7 @@ public sealed class ComponentHost
     /// is no ambient render-helper state. Disposing or aborting the operation cancels the
     /// component-lifetime token before stopping its effect scope, drains observed lifecycle
     /// tasks, and never invokes client lifecycle phases. Specified by <c>[CMP-21]</c>,
-    /// <c>[CMP-22]</c>, and <c>[SSR-5]</c>.
+    /// <c>[CMP-22]</c>, <c>[SSR-5]</c>, and <c>[SSR-10]</c>.
     /// </summary>
     /// <param name="request">The immutable invocation and optional parent operation scope.</param>
     /// <param name="cancellationToken">Cancellation for setup-adjacent asynchronous work.</param>
@@ -44,45 +60,33 @@ public sealed class ComponentHost
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var registration = _options.Components.Resolve(request.Component.Component);
-        var instance = registration.Activator(_options.Services);
-        ArgumentNullException.ThrowIfNull(instance);
-        var scope = new EffectScope();
-        var lifecycle = new ComponentLifecycle();
-        var diagnostics = new List<ComponentBindingDiagnostic>();
-        var bindings = ComponentBindings.Resolve(
-            registration.Contract,
-            request.Component.Invocation,
-            diagnostics);
-        var context = new RuntimeComponentContext(
-            bindings,
-            _options.Services,
-            lifecycle,
-            request.Component.Invocation.Listeners,
-            scope,
-            _options.WatchScheduler,
-            request.Parent?.Context,
-            _options.ErrorHandler);
-        lifecycle.SetObservedTaskFaultHandler(context.RouteError);
+        ComponentActivation activation = await ComponentActivation.ActivateAsync(
+            request.Component,
+            _options,
+            request.Parent?.Context).ConfigureAwait(false);
 
         try
         {
-            foreach (var diagnostic in diagnostics)
+            Task prefetch = activation.Context.Run(
+                () => activation.Lifecycle.InvokeServerPrefetchAsync(cancellationToken));
+            await prefetch.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            VirtualNode? tree = activation.Render();
+            return new ComponentRenderLease(activation, tree);
+        }
+        catch (Exception exception)
+        {
+            ExceptionDispatchInfo failure = ExceptionDispatchInfo.Capture(exception);
+            try
             {
-                context.Warn(diagnostic.Message);
+                await activation.ReleaseAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Preserve the render or prefetch failure after completing best-effort teardown.
             }
 
-            var renderer = scope.Run(() => instance.Setup(context));
-            ArgumentNullException.ThrowIfNull(renderer);
-            await lifecycle.InvokeServerPrefetchAsync(cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            var frame = new ComponentRenderFrame();
-            var tree = renderer(frame);
-            return new ComponentRenderLease(instance, context, tree, scope, frame, lifecycle);
-        }
-        catch
-        {
-            await ComponentRenderLease.ReleaseAsync(instance, scope, lifecycle).ConfigureAwait(false);
+            failure.Throw();
             throw;
         }
     }

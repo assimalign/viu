@@ -9,6 +9,7 @@ namespace Assimalign.Viu.Testing;
 /// <summary>
 /// Queries refreshed mounted-component views without retaining Core's mounted engine objects.
 /// </summary>
+/// <remarks>Specified by <c>[RND-6]</c> and <c>[CONF-3]</c>.</remarks>
 public sealed class ComponentHarness
 {
     private readonly Func<IReadOnlyList<MountedComponentView<TestNode>>> _viewProvider;

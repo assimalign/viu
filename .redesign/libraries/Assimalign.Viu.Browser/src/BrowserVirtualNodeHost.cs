@@ -10,7 +10,8 @@ namespace Assimalign.Viu.Browser;
 /// </summary>
 /// <remarks>
 /// The design scaffold intentionally omits JavaScript interop. The shipping implementation batches
-/// these operations and owns every listener and handle it creates.
+/// these operations and owns every listener and handle it creates. Specified by
+/// <c>[RND-HOST-1]</c> and <c>[RND-HOST-3]</c>.
 /// </remarks>
 public sealed class BrowserVirtualNodeHost : IVirtualNodeHost<BrowserNodeHandle>
 {

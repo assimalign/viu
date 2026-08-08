@@ -15,13 +15,15 @@ public sealed class TeleportNode : CompositeVirtualNode
     /// <param name="isDisabled">Whether the children render in place instead of at the target.</param>
     /// <param name="isDeferred">Whether target resolution waits for the surrounding mount.</param>
     /// <param name="key">The optional sibling identity.</param>
+    /// <param name="renderPlan">Optional compiler patch information for teleported content.</param>
     public TeleportNode(
         string targetIdentifier,
         IEnumerable<VirtualNode>? children = null,
         bool isDisabled = false,
         bool isDeferred = false,
-        object? key = null)
-        : base(VirtualNodeKind.Teleport, children, key, null, null)
+        object? key = null,
+        RenderPlan? renderPlan = null)
+        : base(VirtualNodeKind.Teleport, children, key, null, renderPlan)
     {
         ArgumentException.ThrowIfNullOrEmpty(targetIdentifier);
         TargetIdentifier = targetIdentifier;

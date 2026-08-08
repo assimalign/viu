@@ -42,7 +42,7 @@ is intrinsic to the model; a component is a reactive render function.
 A `ComponentRenderer` receives its mount's `ComponentRenderFrame` — the per-mount render cache
 plus block assembly (`OpenBlock`/`Track`/`CloseBlock`, `CacheHandler`). There is no ambient
 render-helper state and no public static helper class in the end state: the shipping static
-render-helper surface, its `BlockToken`, and the underscore name-binding convention are
+render-helper surface, its ambient block sentinel, and the underscore name-binding convention are
 superseded, and compiled output binds through the frame parameter. Code-first components are
 `ComponentRegistration.Define(name, contract, setup)` wrapping a `ComponentSetup` delegate —
 composition-only per [ADR-0004](../../docs/adr/0004-composition-only-component-model.md), with no
@@ -77,7 +77,7 @@ diagnostics.
 ## The context seams
 
 `ComponentContext` is **public abstract** in Components; Core's `RuntimeComponentContext` is the
-single internal sealed implementation. A consumer-derived context is inert — no runtime API
+single internal sealed implementation. A consumer-derived context is inert — no runtime operation
 accepts one. Conventions reach the context only through `Services` and the ambient reactive scope:
 State's `Use(ComponentContext)` resolves `IStateStoreRegistry` from `context.Services`, then the
 ambient active registry, and otherwise throws — no cast, no bridge interface, no privileged
@@ -114,10 +114,10 @@ instead of retaining engine objects.
 
 ## Hot reload
 
-Generated code registers `ComponentDevelopmentMetadata` through the hidden
-`ComponentCompilerServices` ABI in Core. Authored components implement no public hot-reload
-metadata interface. The ABI is public only because generated consumer assemblies must call it
-without reflection. This registration ABI (shipping `ComponentHotReload`) plus Browser's
+Generated code registers development metadata through the hidden `ComponentHotReload`
+application binary interface in Core. Authored components implement no public hot-reload
+metadata interface. The application binary interface is public only because generated consumer
+assemblies must call it without reflection. This registration contract plus Browser's
 directive vocabulary are the only name-bound generated-code contracts that remain — render
 output binds through the `ComponentRenderFrame` parameter, never through statics imported by
 name.

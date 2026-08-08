@@ -10,7 +10,7 @@ using Assimalign.Viu;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 
-namespace Assimalign.Viu.Tests;
+namespace Assimalign.Viu.Core.Tests;
 
 public sealed class ComponentHostTests
 {
@@ -231,7 +231,179 @@ public sealed class ComponentHostTests
         instance.ShouldNotBeNull().Value.Value = 1;
         scope.Context.Emit("fail");
 
-        diagnostics.ShouldBe(["component watch callback", "component event listener"]);
+        diagnostics.ShouldBe(
+            ["component watch callback", "component event listener \"fail\""]);
+    }
+
+    [Fact]
+    public async Task RenderAsync_DefaultAndRequiredBindings_EvaluateAndWarnOnceForTheMount()
+    {
+        int defaultFactoryRuns = 0;
+        List<string> warnings = [];
+        ComponentReference reference = ComponentReference.ForType(typeof(GreetingComponent));
+        ComponentFactory components = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(
+                    parameters:
+                    [
+                        new ComponentParameter(
+                            "name",
+                            defaultFactory: () =>
+                            {
+                                defaultFactoryRuns++;
+                                return "default";
+                            }),
+                        new ComponentParameter("required", isRequired: true),
+                    ]),
+                _ => new GreetingComponent()));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(
+                components,
+                new ImmediateWatchScheduler(),
+                warnHandler: warnings.Add));
+
+        await using IComponentRenderScope scope = await host.RenderAsync(
+            new ComponentRenderRequest(new ComponentNode(reference)));
+
+        scope.Tree.ShouldBeOfType<TextNode>().Text.ShouldBe("Hello default");
+        scope.Context.Bindings.Parameters["name"].ShouldBe("default");
+        defaultFactoryRuns.ShouldBe(1);
+        warnings.ShouldHaveSingleItem()
+            .ShouldContain("Required parameter 'required'");
+    }
+
+    [Fact]
+    public async Task Emit_ExactCamelizedOnceValidatorAndObserver_UseMountedListenerState()
+    {
+        ComponentReference reference = ComponentReference.ForType(typeof(ContextCaptureComponent));
+        ComponentFactory components = new();
+        ContextCaptureComponent? instance = null;
+        int exactRuns = 0;
+        int ordinaryRuns = 0;
+        int onceRuns = 0;
+        int validatorRuns = 0;
+        List<string> warnings = [];
+        List<string> observedEvents = [];
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(
+                    events:
+                    [
+                        new ComponentEvent("exact"),
+                        new ComponentEvent(
+                            "saveItem",
+                            arguments =>
+                            {
+                                validatorRuns++;
+                                return arguments.Count == 1
+                                    && string.Equals(
+                                        arguments[0] as string,
+                                        "valid",
+                                        StringComparison.Ordinal);
+                            }),
+                    ]),
+                _ => instance = new ContextCaptureComponent()));
+        ComponentInvocation invocation = new(
+            listeners: new Dictionary<string, ComponentEventListener>
+            {
+                ["exact"] = _ => exactRuns++,
+                ["saveItem"] = _ => ordinaryRuns++,
+                ["saveItemOnce"] = _ => onceRuns++,
+            });
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(
+                components,
+                new ImmediateWatchScheduler(),
+                warnHandler: warnings.Add,
+                eventObserver: (_, name, _) => observedEvents.Add(name)));
+
+        await using IComponentRenderScope scope = await host.RenderAsync(
+            new ComponentRenderRequest(new ComponentNode(reference, invocation)));
+        ComponentContext context = instance.ShouldNotBeNull().Context.ShouldNotBeNull();
+
+        context.Emit("exact");
+        context.Emit("save-item", "valid");
+        context.Emit("save-item", "valid");
+        context.Emit("save-item", "invalid");
+
+        exactRuns.ShouldBe(1);
+        ordinaryRuns.ShouldBe(3);
+        onceRuns.ShouldBe(1);
+        validatorRuns.ShouldBe(3);
+        warnings.ShouldHaveSingleItem()
+            .ShouldContain("Invalid arguments were emitted");
+        observedEvents.ShouldBe(["exact", "save-item", "save-item", "save-item"]);
+    }
+
+    [Fact]
+    public async Task RenderAsync_ServerPrefetch_CompletesBeforeTheSingleRender()
+    {
+        ComponentReference reference = ComponentReference.ForType(typeof(OrderedPrefetchComponent));
+        ComponentFactory components = new();
+        List<string> order = [];
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new OrderedPrefetchComponent(order)));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(components, new ImmediateWatchScheduler()));
+
+        await using IComponentRenderScope scope = await host.RenderAsync(
+            new ComponentRenderRequest(new ComponentNode(reference)));
+
+        scope.Tree.ShouldBeOfType<TextNode>().Text.ShouldBe("ordered");
+        order.ShouldBe(["prefetch", "render"]);
+    }
+
+    [Fact]
+    public async Task RenderAsync_HandledRenderFailure_ReturnsAnEmptyTreeLease()
+    {
+        ComponentReference reference = ComponentReference.ForType(
+            typeof(ThrowingRenderComponent));
+        ComponentFactory components = new();
+        List<string> diagnostics = [];
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new ThrowingRenderComponent()));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(
+                components,
+                new ImmediateWatchScheduler(),
+                errorHandler: (_, _, diagnosticInformation) =>
+                    diagnostics.Add(diagnosticInformation)));
+
+        await using IComponentRenderScope scope = await host.RenderAsync(
+            new ComponentRenderRequest(new ComponentNode(reference)));
+
+        scope.Tree.ShouldBeNull();
+        diagnostics.ShouldBe(["component render"]);
+    }
+
+    [Fact]
+    public async Task RenderAsync_UnhandledRenderFailure_PropagatesAfterAbortingTheLease()
+    {
+        ComponentReference reference = ComponentReference.ForType(
+            typeof(ThrowingRenderComponent));
+        ComponentFactory components = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new ThrowingRenderComponent()));
+        ComponentHost host = new(
+            new ComponentRuntimeOptions(components, new ImmediateWatchScheduler()));
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            async () => await host.RenderAsync(
+                new ComponentRenderRequest(new ComponentNode(reference))));
+
+        exception.Message.ShouldBe("render failure");
     }
 
     private sealed class GreetingComponent : IComponent
@@ -240,10 +412,51 @@ public sealed class ComponentHostTests
             _ => new TextNode($"Hello {context.Bindings.Parameters["name"]}");
     }
 
+    private sealed class ContextCaptureComponent : IComponent
+    {
+        internal ComponentContext? Context { get; private set; }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            Context = context;
+            return _ => new TextNode("captured");
+        }
+    }
+
+    private sealed class OrderedPrefetchComponent : IComponent
+    {
+        private readonly List<string> _order;
+
+        internal OrderedPrefetchComponent(List<string> order)
+        {
+            _order = order;
+        }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            context.Lifecycle.OnServerPrefetch(async () =>
+            {
+                await Task.Yield();
+                _order.Add("prefetch");
+            });
+            return _ =>
+            {
+                _order.Add("render");
+                return new TextNode("ordered");
+            };
+        }
+    }
+
     private sealed class PlainComponent : IComponent
     {
         public ComponentRenderer Setup(ComponentContext context) =>
             _ => new TextNode("plain");
+    }
+
+    private sealed class ThrowingRenderComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) =>
+            _ => throw new InvalidOperationException("render failure");
     }
 
     private sealed class LifecycleComponent : IComponent, IDisposable

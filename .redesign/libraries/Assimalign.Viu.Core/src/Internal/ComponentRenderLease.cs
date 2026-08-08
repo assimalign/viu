@@ -1,114 +1,28 @@
-using System;
-using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu;
 
 internal sealed class ComponentRenderLease : IComponentRenderScope
 {
-    private readonly IComponent _instance;
-    private readonly ComponentLifecycle _lifecycle;
-    private readonly EffectScope _scope;
+    private readonly ComponentActivation _activation;
 
-    internal ComponentRenderLease(
-        IComponent instance,
-        ComponentContext context,
-        VirtualNode? tree,
-        EffectScope scope,
-        ComponentRenderFrame frame,
-        ComponentLifecycle lifecycle)
+    internal ComponentRenderLease(ComponentActivation activation, VirtualNode? tree)
     {
-        _instance = instance;
-        _lifecycle = lifecycle;
-        Context = context;
+        _activation = activation;
         Tree = tree;
-        _scope = scope;
-        Frame = frame;
     }
 
     public VirtualNode? Tree { get; }
 
-    public ComponentContext Context { get; }
+    public ComponentContext Context => _activation.Context;
 
-    // The mount's rendering surface: constructed once per mount and reused by every render of
-    // this lease, so cache slots and handler identity survive re-renders.
-    internal ComponentRenderFrame Frame { get; }
+    // The mount's rendering surface is retained by the shared activation so persistent and
+    // one-shot execution use the same per-mount cache and block state.
+    internal ComponentRenderFrame Frame => _activation.Frame;
 
-    internal bool IsDisposed { get; private set; }
+    internal bool IsDisposed => _activation.IsReleased;
 
-    public async ValueTask DisposeAsync()
-    {
-        if (IsDisposed)
-        {
-            return;
-        }
-
-        IsDisposed = true;
-        await ReleaseAsync(_instance, _scope, _lifecycle).ConfigureAwait(false);
-    }
-
-    internal static async ValueTask ReleaseAsync(
-        IComponent instance,
-        EffectScope scope,
-        ComponentLifecycle lifecycle)
-    {
-        ExceptionDispatchInfo? failure = null;
-        try
-        {
-            lifecycle.Cancel();
-        }
-        catch (Exception exception)
-        {
-            failure = ExceptionDispatchInfo.Capture(exception);
-        }
-
-        try
-        {
-            scope.Dispose();
-        }
-        catch (Exception exception)
-        {
-            failure ??= ExceptionDispatchInfo.Capture(exception);
-        }
-
-        try
-        {
-            switch (instance)
-            {
-                case IAsyncDisposable asynchronousDisposable:
-                    await asynchronousDisposable.DisposeAsync().ConfigureAwait(false);
-                    break;
-                case IDisposable disposable:
-                    disposable.Dispose();
-                    break;
-            }
-        }
-        catch (Exception exception)
-        {
-            failure ??= ExceptionDispatchInfo.Capture(exception);
-        }
-
-        try
-        {
-            await lifecycle.DrainAsync().ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            failure ??= ExceptionDispatchInfo.Capture(exception);
-        }
-
-        try
-        {
-            lifecycle.Dispose();
-        }
-        catch (Exception exception)
-        {
-            failure ??= ExceptionDispatchInfo.Capture(exception);
-        }
-
-        failure?.Throw();
-    }
+    public ValueTask DisposeAsync() => _activation.ReleaseAsync();
 }

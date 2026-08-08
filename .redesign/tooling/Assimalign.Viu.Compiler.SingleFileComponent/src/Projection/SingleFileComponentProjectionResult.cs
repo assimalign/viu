@@ -9,6 +9,7 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// <remarks>
 /// Deliberately absent: a compiler-produced style-scope identity. Scoped CSS is deferred until
 /// after the component-model arc; reintroducing it is one additive member here plus emission.
+/// Specified by <c>[SFC-PIPE-2]</c> and <c>[TOOL-2]</c>.
 /// </remarks>
 public sealed class SingleFileComponentProjectionResult
 {

@@ -1,8 +1,7 @@
-using Assimalign.Viu.Compiler.SingleFileComponent;
-
 using Shouldly;
-
 using Xunit;
+
+using Assimalign.Viu.Compiler.SingleFileComponent;
 
 namespace Assimalign.Viu.Compiler.SingleFileComponent.Tests;
 

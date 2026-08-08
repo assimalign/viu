@@ -3,6 +3,7 @@ using System;
 namespace Assimalign.Viu.Compiler.SingleFileComponent;
 
 /// <summary>Describes one stable editor-neutral compiler diagnostic.</summary>
+/// <remarks>Specified by <c>[SFC-DIAG-1]</c> and <c>[TOOL-5]</c>.</remarks>
 public sealed class SingleFileComponentDiagnostic
 {
     /// <summary>Initializes a diagnostic value.</summary>

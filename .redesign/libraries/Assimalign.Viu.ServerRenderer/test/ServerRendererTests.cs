@@ -1,13 +1,12 @@
 using System.IO;
 using System.Threading.Tasks;
 
+using Shouldly;
+using Xunit;
+
 using Assimalign.Viu;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
-
-using Shouldly;
-
-using Xunit;
 
 namespace Assimalign.Viu.ServerRenderer.Tests;
 

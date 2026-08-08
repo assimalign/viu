@@ -5,6 +5,7 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// <summary>
 /// Carries editor-neutral source and options for one deterministic component projection.
 /// </summary>
+/// <remarks>Specified by <c>[SFC-PIPE-2]</c> and <c>[SFC-PIPE-3]</c>.</remarks>
 public sealed class SingleFileComponentProjectionRequest
 {
     /// <summary>Initializes a projection request.</summary>

@@ -7,6 +7,9 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Testing;
 
 /// <summary>Provides a small DOM-free implementation of Core's genuine host operation port.</summary>
+/// <remarks>
+/// Specified by <c>[RND-HOST-1]</c>, <c>[RND-HOST-3]</c>, and <c>[CONF-3]</c>.
+/// </remarks>
 public sealed class TestVirtualNodeHost : IVirtualNodeHost<TestNode>
 {
     private readonly Dictionary<TestNode, TestNode?> _parents = new();

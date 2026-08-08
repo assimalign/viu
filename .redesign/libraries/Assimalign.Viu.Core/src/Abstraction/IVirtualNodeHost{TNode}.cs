@@ -6,6 +6,10 @@ namespace Assimalign.Viu;
 /// Supplies host-node operations used by Core's persistent renderer.
 /// </summary>
 /// <typeparam name="TNode">The opaque host node type.</typeparam>
+/// <remarks>
+/// This foundation-era adapter remains only for later Browser and Testing migration; new renderer
+/// composition uses <see cref="RendererOptions{TNode}"/>. Specified by <c>[RND-HOST-1]</c>.
+/// </remarks>
 public interface IVirtualNodeHost<TNode>
     where TNode : class
 {

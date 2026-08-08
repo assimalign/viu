@@ -1,9 +1,8 @@
+using Shouldly;
+using Xunit;
+
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Testing;
-
-using Shouldly;
-
-using Xunit;
 
 namespace Assimalign.Viu.Testing.Tests;
 

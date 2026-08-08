@@ -139,10 +139,9 @@ an API migration rather than hidden behind assembly forwarding.
 
 Standalone watches run synchronously unless a caller supplies an
 `IReactiveWatchScheduler`. Core owns the renderer scheduler adapter, component error routing, and
-the runtime-bound `ViuWatch` facade; none of those concerns introduce a Reactivity dependency on
-Core or Components.
+the runtime-bound `ComponentContext.Watch` path. Core intentionally defines no component-specific
+static facade; none of those concerns introduce a Reactivity dependency on Core or Components.
 
 `EffectScope` and `Reactive.EffectScope(...)` are the developer-facing scope APIs.
 Abstraction-facing consumers use `IReactiveEffectScopeFactory`, normally through
 `ReactiveEffectScopeFactory`, when they should not depend on the concrete scope type.
-

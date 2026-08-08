@@ -1,10 +1,9 @@
 using System;
 
-using Assimalign.Viu.Browser;
-
 using Shouldly;
-
 using Xunit;
+
+using Assimalign.Viu.Browser;
 
 namespace Assimalign.Viu.Browser.Tests;
 

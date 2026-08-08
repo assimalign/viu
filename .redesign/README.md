@@ -15,10 +15,10 @@ a context member. Scoped CSS is deferred — no style-scope identity appears any
 
 Rendering is frame-based: a `ComponentRenderer` receives its mount's `ComponentRenderFrame` — the
 per-mount render cache plus block assembly — so there is no ambient render-helper state and no
-public static helper class in the end state. The shipping static render-helper surface, its
-`BlockToken`, and the underscore name-binding convention are superseded; the only name-bound
-generated-code ABIs that remain are hot-reload registration (shipping `ComponentHotReload`,
-modeled here by `ComponentCompilerServices`) and Browser's directive vocabulary. Code-first
+public static helper class in the end state. The shipping static render-helper surface, the
+ambient block sentinel, and the underscore name-binding convention are superseded; the only
+name-bound generated-code application binary interfaces that remain are hot-reload registration
+through `ComponentHotReload` and Browser's directive vocabulary. Code-first
 components are `ComponentRegistration.Define(name, contract, setup)` — composition-only per
 [ADR-0004](../docs/adr/0004-composition-only-component-model.md), with no options-object form;
 hand-built subtrees carry `RenderPlan.None` and patch by full diff unless the author supplies
@@ -64,8 +64,8 @@ same assembly name.
 ## Non-goals
 
 - This is not an approved specification change.
-- It does not alter the current API Hardening Plan.
+- It does not alter the current public-surface hardening plan.
 - It does not implement the persistent renderer, block patcher, browser interop, or hydration.
 - It does not introduce one reactive effect per compiler block. The intended baseline remains one
   effect per mounted authored component plus block-local patching.
-- It does not preserve the current public API through compatibility shims.
+- It does not preserve the current public surface through compatibility shims.

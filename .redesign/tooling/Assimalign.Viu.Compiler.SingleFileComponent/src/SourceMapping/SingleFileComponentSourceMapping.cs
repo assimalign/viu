@@ -3,6 +3,7 @@ using System;
 namespace Assimalign.Viu.Compiler.SingleFileComponent;
 
 /// <summary>Maps one generated range back to its source range.</summary>
+/// <remarks>Specified by <c>[SFC-8]</c>.</remarks>
 public sealed class SingleFileComponentSourceMapping
 {
     /// <summary>Initializes an immutable source mapping.</summary>

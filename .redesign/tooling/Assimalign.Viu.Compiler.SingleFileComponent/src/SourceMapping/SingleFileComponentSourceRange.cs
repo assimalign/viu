@@ -3,6 +3,7 @@ using System;
 namespace Assimalign.Viu.Compiler.SingleFileComponent;
 
 /// <summary>Identifies one zero-based source range without depending on Roslyn editor types.</summary>
+/// <remarks>Specified by <c>[SFC-8]</c>.</remarks>
 public sealed class SingleFileComponentSourceRange
 {
     /// <summary>Initializes a validated source range.</summary>

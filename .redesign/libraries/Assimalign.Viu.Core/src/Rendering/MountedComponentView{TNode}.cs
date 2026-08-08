@@ -10,53 +10,39 @@ namespace Assimalign.Viu;
 /// </summary>
 /// <remarks>
 /// The engine caches one view per mounted component, so reference identity is stable across
-/// enumerations for the life of the mount.
+/// enumerations for the life of the mount. Specified by <c>[RND-6]</c>.
 /// </remarks>
 /// <typeparam name="TNode">The opaque host node type.</typeparam>
 public sealed class MountedComponentView<TNode>
-    where TNode : class
+    where TNode : notnull
 {
-    /// <summary>Initializes an engine-owned mounted-component view.</summary>
-    /// <param name="request">The component node that created this mount.</param>
-    /// <param name="instance">The activated authored instance.</param>
-    /// <param name="context">The runtime-implemented live context.</param>
-    /// <param name="firstHostNode">The first current host node, or null for a host-empty subtree.</param>
-    /// <param name="lastHostNode">The last current host node, or null for a host-empty subtree.</param>
-    /// <param name="isMounted">Whether the component is currently mounted.</param>
-    public MountedComponentView(
-        ComponentNode request,
-        IComponent instance,
-        ComponentContext context,
-        TNode? firstHostNode,
-        TNode? lastHostNode,
-        bool isMounted)
+    private readonly MountedComponent<TNode> _mounted;
+
+    internal MountedComponentView(MountedComponent<TNode> mounted)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(instance);
-        ArgumentNullException.ThrowIfNull(context);
-        Request = request;
-        Instance = instance;
-        Context = context;
-        FirstHostNode = firstHostNode;
-        LastHostNode = lastHostNode;
-        IsMounted = isMounted;
+        ArgumentNullException.ThrowIfNull(mounted);
+        _mounted = mounted;
     }
 
     /// <summary>Gets the immutable component node that created this mount.</summary>
-    public ComponentNode Request { get; }
+    public ComponentNode Request => (ComponentNode)_mounted.Value;
 
     /// <summary>Gets the actual authored instance for type-based testing queries.</summary>
-    public IComponent Instance { get; }
+    public IComponent Instance => _mounted.Instance;
 
     /// <summary>Gets the runtime-implemented live context.</summary>
-    public ComponentContext Context { get; }
+    public ComponentContext Context => _mounted.Context;
 
     /// <summary>Gets the first current host node, or null for a host-empty subtree.</summary>
-    public TNode? FirstHostNode { get; }
+    public TNode? FirstHostNode => _mounted.IsUnmounted
+        ? default
+        : _mounted.Subtree.FirstHostNode;
 
     /// <summary>Gets the last current host node, or null for a host-empty subtree.</summary>
-    public TNode? LastHostNode { get; }
+    public TNode? LastHostNode => _mounted.IsUnmounted
+        ? default
+        : _mounted.Subtree.LastHostNode;
 
     /// <summary>Gets whether the component is currently mounted.</summary>
-    public bool IsMounted { get; }
+    public bool IsMounted => !_mounted.IsUnmounted;
 }
