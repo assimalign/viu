@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Threading;
@@ -23,26 +24,28 @@ public sealed class BrowserApplication : IApplication
     internal const string DefaultMountTargetSelector = "#app";
 
     private readonly List<ApplicationMiddleware> _middleware = [];
-    private readonly CancellationTokenSource _stoppingSource = new();
     private readonly TaskCompletionSource<object?> _startupCompletion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Renderer<int> _renderer;
     private readonly ApplicationContext _context;
+    private readonly ApplicationLifetime _lifetime;
     private readonly BufferedBrowserNodeOperations? _bufferedOperations;
     private readonly bool _hydrate;
     private readonly Func<CancellationToken, Task> _initialize;
     private readonly Action<int> _clearContainer;
     private readonly Func<string, int> _resolveContainer;
+    private readonly Action _requestFullReload;
     private readonly string _mountTargetSelector;
     private CancellationTokenRegistration _startCancellationRegistration;
+    private IDisposable? _bufferedOperationsActivation;
     private Task? _pipelineExecution;
     private Task? _stopExecution;
     private Task? _initialization;
-    private ApplicationState _state;
     private int _container;
     private bool _isDirectMount;
     private bool _isDisposed;
-    private bool _isFailureReported;
+    private bool _isFullReloadRequested;
+    private bool _isHotReloadSubscribed;
 
     internal BrowserApplication(
         Renderer<int> renderer,
@@ -52,24 +55,25 @@ public sealed class BrowserApplication : IApplication
         Func<CancellationToken, Task>? initialize = null,
         Action<int>? clearContainer = null,
         Func<string, int>? resolveContainer = null,
-        string mountTargetSelector = DefaultMountTargetSelector)
+        string mountTargetSelector = DefaultMountTargetSelector,
+        Action? requestFullReload = null)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrEmpty(mountTargetSelector);
         _renderer = renderer;
         _context = context;
+        _lifetime = new ApplicationLifetime(context);
         _bufferedOperations = bufferedOperations;
         _hydrate = hydrate;
         _initialize = initialize ?? BrowserRuntime.EnsureBridgeAsync;
         _clearContainer = clearContainer ?? BrowserRuntime.ClearContainer;
         _resolveContainer = resolveContainer ?? BrowserRuntime.QuerySelector;
         _mountTargetSelector = mountTargetSelector;
-        _context.InitializeRuntime(_stoppingSource.Token);
-
+        _requestFullReload = requestFullReload ?? BrowserDomBridge.ReloadPage;
         void HandleEventError(Exception exception)
         {
-            Action<Exception, IComponentContext?, string>? handler =
+            Action<Exception, ComponentContext?, string>? handler =
                 Context.ErrorHandler;
             if (handler is not null)
             {
@@ -92,12 +96,15 @@ public sealed class BrowserApplication : IApplication
     public IApplicationContext Context => _context;
 
     /// <summary>Gets the mounted root component context, or null while unmounted.</summary>
-    public IComponentContext? RootContext { get; private set; }
+    public ComponentContext? RootContext { get; private set; }
 
     /// <summary>Gets whether this application hydrates server-rendered markup.</summary>
     public bool IsHydrating => _hydrate;
 
-    internal bool HasFailed => _state == ApplicationState.Failed;
+    /// <summary>Gets the CSS selector resolved by top-level startup.</summary>
+    public string MountTargetSelector => _mountTargetSelector;
+
+    internal bool HasFailed => _lifetime.HasFailed;
 
     /// <inheritdoc/>
     public IApplication Use(ApplicationMiddleware middleware)
@@ -105,7 +112,7 @@ public sealed class BrowserApplication : IApplication
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         ArgumentNullException.ThrowIfNull(middleware);
 
-        if (_state != ApplicationState.Created)
+        if (_lifetime.State != ApplicationState.Created)
         {
             throw new InvalidOperationException(
                 "Application middleware must be registered before execution begins.");
@@ -135,7 +142,7 @@ public sealed class BrowserApplication : IApplication
     /// <see cref="IApplication.StopAsync(CancellationToken)"/> for teardown. Specified by
     /// <c>[APP-7]</c>.
     /// </remarks>
-    public IComponentContext? Mount(int container)
+    public ComponentContext? Mount(int container)
     {
         BeginExecution(isDirectMount: true);
 
@@ -187,7 +194,7 @@ public sealed class BrowserApplication : IApplication
     /// <see cref="IApplication.StopAsync(CancellationToken)"/> for teardown. Specified by
     /// <c>[APP-7]</c>.
     /// </remarks>
-    public ValueTask<IComponentContext?> MountAsync(
+    public ValueTask<ComponentContext?> MountAsync(
         int container,
         CancellationToken cancellationToken = default)
     {
@@ -208,7 +215,7 @@ public sealed class BrowserApplication : IApplication
     /// <see cref="IApplication.StopAsync(CancellationToken)"/> for teardown. Specified by
     /// <c>[APP-7]</c>.
     /// </remarks>
-    public ValueTask<IComponentContext?> MountAsync(
+    public ValueTask<ComponentContext?> MountAsync(
         string selector,
         CancellationToken cancellationToken = default)
     {
@@ -249,52 +256,122 @@ public sealed class BrowserApplication : IApplication
         }
         finally
         {
+            UnsubscribeHotReload();
             _startCancellationRegistration.Dispose();
-            _stoppingSource.Dispose();
+            _lifetime.Dispose();
             GC.SuppressFinalize(this);
         }
     }
 
     internal static BrowserApplication Create(
         ApplicationContext context,
-        bool useCommandBuffer,
         bool hydrate,
         string mountTargetSelector)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (useCommandBuffer)
-        {
-            BufferedBrowserNodeOperations operations =
-                BufferedBrowserNodeOperations.CreateProduction();
-            Renderer<int> renderer =
-                RendererFactory.CreateRenderer(operations.Create());
-            return new BrowserApplication(
-                renderer,
-                context,
-                operations,
-                hydrate,
-                mountTargetSelector: mountTargetSelector);
-        }
-
+        BufferedBrowserNodeOperations operations =
+            BufferedBrowserNodeOperations.CreateProduction();
+        Renderer<int> renderer = RendererFactory.CreateRenderer(operations.Create());
         return new BrowserApplication(
-            RendererFactory.CreateRenderer(BrowserNodeOperations.Create()),
+            renderer,
             context,
-            bufferedOperations: null,
+            operations,
             hydrate,
             mountTargetSelector: mountTargetSelector);
     }
 
-    private ValueTask<IComponentContext?> MountResolvedAsync(
+    /// <summary>
+    /// Creates a lower-level Browser application over an explicitly supplied integer-handle
+    /// renderer and host callbacks.
+    /// </summary>
+    /// <param name="renderer">The Browser-compatible renderer that owns the mounted tree.</param>
+    /// <param name="context">The frozen application composition.</param>
+    /// <param name="hydrate">Whether the first mount adopts server-rendered nodes.</param>
+    /// <param name="initialize">The optional asynchronous host initializer.</param>
+    /// <param name="clearContainer">The optional non-hydrating container reset.</param>
+    /// <param name="resolveContainer">The optional selector resolver.</param>
+    /// <param name="requestFullReload">The optional development full-reload signal.</param>
+    /// <param name="mountTargetSelector">The top-level pipeline mount selector.</param>
+    /// <returns>A single-use persistent Browser application.</returns>
+    /// <remarks>
+    /// This embedding and test seam preserves the ordinary D5a lifetime and middleware machine;
+    /// ownership of the renderer and callbacks remains with the caller. Specified by
+    /// <c>[APP-6]</c> and <c>[APP-7]</c>.
+    /// </remarks>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static BrowserApplication CreateEmbedded(
+        Renderer<int> renderer,
+        ApplicationContext context,
+        bool hydrate = false,
+        Func<CancellationToken, Task>? initialize = null,
+        Action<int>? clearContainer = null,
+        Func<string, int>? resolveContainer = null,
+        Action? requestFullReload = null,
+        string mountTargetSelector = DefaultMountTargetSelector)
+    {
+        return new BrowserApplication(
+            renderer,
+            context,
+            bufferedOperations: null,
+            hydrate,
+            initialize,
+            clearContainer,
+            resolveContainer,
+            mountTargetSelector,
+            requestFullReload);
+    }
+
+    /// <summary>
+    /// Creates a lower-level Browser application over a DOM-less command-frame host.
+    /// </summary>
+    /// <param name="host">The host that owns the renderer operations and command boundary.</param>
+    /// <param name="context">The frozen application composition.</param>
+    /// <param name="hydrate">Whether the first mount adopts server-rendered nodes.</param>
+    /// <param name="initialize">The optional asynchronous host initializer.</param>
+    /// <param name="resolveContainer">The optional selector resolver.</param>
+    /// <param name="requestFullReload">The optional development full-reload signal.</param>
+    /// <param name="mountTargetSelector">The top-level pipeline mount selector.</param>
+    /// <returns>A single-use persistent Browser application owning the host activation lease.</returns>
+    /// <remarks>
+    /// This embedding and command-capture seam preserves the ordinary lifetime and exclusive
+    /// Browser operation routing. Specified by <c>[APP-6]</c>, <c>[APP-7]</c>, and
+    /// <c>[RND-IO-1]</c>.
+    /// </remarks>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static BrowserApplication CreateEmbedded(
+        BrowserRendererHost host,
+        ApplicationContext context,
+        bool hydrate = false,
+        Func<CancellationToken, Task>? initialize = null,
+        Func<string, int>? resolveContainer = null,
+        Action? requestFullReload = null,
+        string mountTargetSelector = DefaultMountTargetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+        return new BrowserApplication(
+            renderer,
+            context,
+            host.Operations,
+            hydrate,
+            initialize,
+            clearContainer: null,
+            resolveContainer,
+            mountTargetSelector,
+            requestFullReload);
+    }
+
+    private ValueTask<ComponentContext?> MountResolvedAsync(
         Func<CancellationToken, ValueTask<int>> resolveMountTarget,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resolveMountTarget);
         BeginExecution(isDirectMount: true);
-        Task<IComponentContext?> execution =
+        Task<ComponentContext?> execution =
             MountDirectAsync(resolveMountTarget, cancellationToken);
         _pipelineExecution = execution;
-        return new ValueTask<IComponentContext?>(execution);
+        return new ValueTask<ComponentContext?>(execution);
     }
 
     private async Task ExecutePipelineAsync()
@@ -364,12 +441,11 @@ public sealed class BrowserApplication : IApplication
             finally
             {
                 RootContext = null;
-                _context.SetIsRunning(false);
             }
         }
     }
 
-    private async Task<IComponentContext?> MountDirectAsync(
+    private async Task<ComponentContext?> MountDirectAsync(
         Func<CancellationToken, ValueTask<int>> resolveMountTarget,
         CancellationToken cancellationToken)
     {
@@ -379,16 +455,16 @@ public sealed class BrowserApplication : IApplication
         bool mountAttempted = false;
         try
         {
-            _stoppingSource.Token.ThrowIfCancellationRequested();
-            await OnInitializeAsync(_stoppingSource.Token).ConfigureAwait(false);
-            _stoppingSource.Token.ThrowIfCancellationRequested();
-            int container = await resolveMountTarget(_stoppingSource.Token)
+            _lifetime.Stopping.ThrowIfCancellationRequested();
+            await OnInitializeAsync(_lifetime.Stopping).ConfigureAwait(false);
+            _lifetime.Stopping.ThrowIfCancellationRequested();
+            int container = await resolveMountTarget(_lifetime.Stopping)
                 .ConfigureAwait(false);
-            _stoppingSource.Token.ThrowIfCancellationRequested();
+            _lifetime.Stopping.ThrowIfCancellationRequested();
             mountAttempted = true;
-            RootContext = await MountCoreAsync(container, _stoppingSource.Token)
+            RootContext = await MountCoreAsync(container, _lifetime.Stopping)
                 .ConfigureAwait(false);
-            _stoppingSource.Token.ThrowIfCancellationRequested();
+            _lifetime.Stopping.ThrowIfCancellationRequested();
             TransitionToRunning();
             return RootContext;
         }
@@ -437,11 +513,21 @@ public sealed class BrowserApplication : IApplication
             _resolveContainer(_mountTargetSelector));
     }
 
-    private IComponentContext? MountCore(int container)
+    private ComponentContext? MountCore(int container)
     {
+        if (container == default)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(container),
+                "A Browser mount container must use a nonzero host handle.");
+        }
+
+        IDisposable? bufferedOperationsActivation =
+            _bufferedOperations?.Activate();
+        _bufferedOperationsActivation = bufferedOperationsActivation;
         _container = container;
         _bufferedOperations?.ObserveForeignHandle(container);
-        IComponentContext? rootContext;
+        ComponentContext? rootContext;
         if (_hydrate)
         {
             rootContext =
@@ -449,7 +535,15 @@ public sealed class BrowserApplication : IApplication
         }
         else
         {
-            _clearContainer(container);
+            if (_bufferedOperations is null)
+            {
+                _clearContainer(container);
+            }
+            else
+            {
+                _bufferedOperations.ClearElement(container);
+            }
+
             rootContext =
                 _renderer.Render(Context.RootComponent, container, Context);
         }
@@ -458,7 +552,7 @@ public sealed class BrowserApplication : IApplication
         return rootContext;
     }
 
-    private ValueTask<IComponentContext?> MountCoreAsync(
+    private ValueTask<ComponentContext?> MountCoreAsync(
         int container,
         CancellationToken cancellationToken)
     {
@@ -473,10 +567,17 @@ public sealed class BrowserApplication : IApplication
             return;
         }
 
-        _renderer.Render(null, _container, Context);
-        _bufferedOperations?.ApplyPending();
-        _bufferedOperations?.Deactivate();
-        _container = default;
+        try
+        {
+            _renderer.Render(null, _container, Context);
+            _bufferedOperations?.ApplyPending();
+        }
+        finally
+        {
+            _bufferedOperationsActivation?.Dispose();
+            _bufferedOperationsActivation = null;
+            _container = default;
+        }
     }
 
     private ValueTask UnmountCoreAsync(CancellationToken cancellationToken)
@@ -499,7 +600,6 @@ public sealed class BrowserApplication : IApplication
         finally
         {
             RootContext = null;
-            _context.SetIsRunning(false);
         }
     }
 
@@ -510,12 +610,12 @@ public sealed class BrowserApplication : IApplication
             return _stopExecution;
         }
 
-        if (_state is ApplicationState.Starting or ApplicationState.Running)
+        if (_lifetime.State is ApplicationState.Starting or ApplicationState.Running)
         {
             RequestStopping();
         }
 
-        if (_isDirectMount && _state == ApplicationState.Stopping)
+        if (_isDirectMount && _lifetime.State == ApplicationState.Stopping)
         {
             _stopExecution = StopDirectMountAsync();
             return _stopExecution;
@@ -544,7 +644,7 @@ public sealed class BrowserApplication : IApplication
             }
         }
 
-        if (_state != ApplicationState.Stopping)
+        if (_lifetime.State != ApplicationState.Stopping)
         {
             return;
         }
@@ -587,97 +687,58 @@ public sealed class BrowserApplication : IApplication
             : default;
     }
 
-    private bool IsStoppingCancellation(OperationCanceledException exception)
-    {
-        return _stoppingSource.IsCancellationRequested &&
-            exception.CancellationToken == _stoppingSource.Token;
-    }
+    private bool IsStoppingCancellation(OperationCanceledException exception) =>
+        _lifetime.IsStoppingCancellation(exception);
 
-    private void RequestStopping()
-    {
-        if (_state is ApplicationState.Starting or ApplicationState.Running)
-        {
-            _state = ApplicationState.Stopping;
-        }
-
-        _context.SetIsRunning(false);
-        if (!_stoppingSource.IsCancellationRequested)
-        {
-            _stoppingSource.Cancel();
-        }
-    }
+    private void RequestStopping() => _lifetime.RequestStopping();
 
     private void BeginExecution(bool isDirectMount)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        if (_state != ApplicationState.Created)
-        {
-            throw new InvalidOperationException(
-                "An application instance can start only once.");
-        }
-
         _isDirectMount = isDirectMount;
-        _state = ApplicationState.Starting;
+        _isFullReloadRequested = false;
+        _lifetime.StartExecution();
+        ComponentHotReload.ScriptUpdateRequiresReset += HandleScriptUpdateRequiresReset;
+        _isHotReloadSubscribed = true;
     }
 
-    private void TransitionToRunning()
-    {
-        _stoppingSource.Token.ThrowIfCancellationRequested();
-        if (_state != ApplicationState.Starting)
-        {
-            throw new InvalidOperationException(
-                "The application cannot enter Running from its current state.");
-        }
-
-        _state = ApplicationState.Running;
-        _context.SetIsRunning(true);
-    }
+    private void TransitionToRunning() => _lifetime.SignalRunning();
 
     private void CompleteStopping()
     {
-        if (_state is ApplicationState.Starting or ApplicationState.Running)
-        {
-            _state = ApplicationState.Stopping;
-        }
-
-        _context.SetIsRunning(false);
-        if (!_stoppingSource.IsCancellationRequested)
-        {
-            _stoppingSource.Cancel();
-        }
-
-        if (_state == ApplicationState.Stopping)
-        {
-            _state = ApplicationState.Stopped;
-        }
+        _lifetime.CompleteStopping();
+        UnsubscribeHotReload();
     }
 
     private void Fail(Exception exception)
     {
-        _state = ApplicationState.Failed;
-        _context.SetIsRunning(false);
-        if (!_stoppingSource.IsCancellationRequested)
-        {
-            _stoppingSource.Cancel();
-        }
+        _lifetime.Fail(exception, RootContext);
+        UnsubscribeHotReload();
+    }
 
-        if (_isFailureReported)
+    private void HandleScriptUpdateRequiresReset(
+        string componentIdentifier,
+        Type componentType)
+    {
+        _ = componentIdentifier;
+        _ = componentType;
+        if (_isFullReloadRequested)
         {
             return;
         }
 
-        _isFailureReported = true;
-        try
+        _isFullReloadRequested = true;
+        _requestFullReload();
+    }
+
+    private void UnsubscribeHotReload()
+    {
+        if (!_isHotReloadSubscribed)
         {
-            Context.ErrorHandler?.Invoke(
-                exception,
-                RootContext,
-                "application lifetime");
+            return;
         }
-        catch (Exception handlerException)
-        {
-            Debug.WriteLine(
-                $"[Viu warn] Application error handler failed: {handlerException}");
-        }
+
+        ComponentHotReload.ScriptUpdateRequiresReset -= HandleScriptUpdateRequiresReset;
+        _isHotReloadSubscribed = false;
     }
 }

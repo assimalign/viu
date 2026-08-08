@@ -3,9 +3,10 @@ using System;
 namespace Assimalign.Viu.State;
 
 /// <summary>
-/// A removable state or action subscription. Stopping and disposing are idempotent.
+/// Controls one state or action subscription. Stopping and disposing are idempotent. Specified by
+/// <c>[STA-5]</c> and <c>[STA-8]</c>.
 /// </summary>
-/// <remarks>Not thread-safe; designed for Viu's single-threaded event-loop model.</remarks>
+/// <remarks>This type is not thread-safe and targets Viu's single-threaded event-loop model.</remarks>
 public sealed class StateStoreSubscription : IDisposable
 {
     private Action? _remove;
@@ -15,10 +16,10 @@ public sealed class StateStoreSubscription : IDisposable
         _remove = remove;
     }
 
-    /// <summary>Gets whether the subscription is still registered.</summary>
+    /// <summary>Gets whether the callback remains registered.</summary>
     public bool IsActive => _remove is not null;
 
-    /// <summary>Removes the subscription. Repeated calls do nothing.</summary>
+    /// <summary>Removes the callback. Repeated calls have no effect.</summary>
     public void Stop()
     {
         Action? remove = _remove;
@@ -31,6 +32,6 @@ public sealed class StateStoreSubscription : IDisposable
         remove();
     }
 
-    /// <summary>Removes the subscription.</summary>
+    /// <summary>Removes the callback; equivalent to <see cref="Stop"/>.</summary>
     public void Dispose() => Stop();
 }

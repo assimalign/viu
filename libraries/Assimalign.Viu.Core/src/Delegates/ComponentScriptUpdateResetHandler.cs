@@ -1,15 +1,17 @@
 using System;
+using System.ComponentModel;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Handles a Hot Reload script update that requires the owning host to reset or remount the
-/// component.
-/// </summary>
-/// <param name="componentIdentifier">
-/// The stable compiler-generated identifier for the component source file.
-/// </param>
-/// <param name="componentType">The generated component type whose script changed.</param>
+/// <summary>Handles a script update that requires a component-local reset or host reload.</summary>
+/// <remarks>
+/// This development-runtime application binary interface is hidden from ordinary application
+/// authoring. Specified by
+/// <c>[SFC-CG-2]</c> and <c>[SFC-CG-4]</c>.
+/// </remarks>
+/// <param name="componentIdentifier">The stable compiler-generated source identifier.</param>
+/// <param name="componentType">The component type whose script block changed.</param>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public delegate void ComponentScriptUpdateResetHandler(
     string componentIdentifier,
     Type componentType);

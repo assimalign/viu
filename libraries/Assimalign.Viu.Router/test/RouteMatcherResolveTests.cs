@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection;
 
 using Shouldly;
 using Xunit;
@@ -13,6 +13,18 @@ namespace Assimalign.Viu.Router.Tests;
 // matcher runs in a plain .NET host with no other Viu library ([RTR-1], [RTR-7]).
 public class RouteMatcherResolveTests
 {
+    [Fact]
+    public void RouteLocation_DebuggerDisplay_DescribesImmutableLocationState()
+    {
+        var attribute = (DebuggerDisplayAttribute?)Attribute.GetCustomAttribute(
+            typeof(RouteLocation),
+            typeof(DebuggerDisplayAttribute));
+
+        attribute.ShouldNotBeNull();
+        attribute.Value.ShouldBe(
+            "Path = {Path,nq}, Name = {Name,nq}, Parameters = {Parameters.Count}, Matched = {Matched.Count}");
+    }
+
     [Fact]
     public void Resolve_UnmatchedPath_ReturnsEmptyMatchedWithoutThrowing()
     {
@@ -69,6 +81,23 @@ public class RouteMatcherResolveTests
     }
 
     [Fact]
+    public void EqualityOperators_DistinctEqualAndNullLocations_AreNullSafe()
+    {
+        var matcher = new RouteMatcher([new RouteRecord("/users/:id", name: "user")]);
+        RouteLocation first = matcher.Resolve("/users/42");
+        RouteLocation second = matcher.Resolve("/users/42");
+        RouteLocation? missing = null;
+
+        ReferenceEquals(first, second).ShouldBeFalse();
+        (first == second).ShouldBeTrue();
+        (first != second).ShouldBeFalse();
+        (missing == null).ShouldBeTrue();
+        (first == missing).ShouldBeFalse();
+        (missing == first).ShouldBeFalse();
+        (first != missing).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Resolve_DifferentParameters_AreNotEqual()
     {
         var matcher = new RouteMatcher([new RouteRecord("/users/:id", name: "user")]);
@@ -109,9 +138,9 @@ public class RouteMatcherResolveTests
         // references the unified Components contract and standalone Reactivity library, but not
         // runtime Core. The matcher and memory-history code still uses neither reference, so it
         // stays runnable in a plain .NET host; the forbidden
-        // coupling is now the browser DOM adapter (Assimalign.Viu.Browser), because the components
-        // must render through the injected node-ops abstraction to work against the in-memory test
-        // renderer and the SSR renderer, never the DOM directly. The framework's
+        // coupling is now the browser DOM adapter (Assimalign.Viu.Browser), because components
+        // emit host-neutral virtual nodes for the Testing and SSR renderers, never DOM operations
+        // directly. The framework's
         // System.Runtime.InteropServices.JavaScript reference from the [V01.01.08.02] browser history
         // edge stays allowed (gated by [SupportedOSPlatform("browser")]).
         var referenced = typeof(RouterView).Assembly

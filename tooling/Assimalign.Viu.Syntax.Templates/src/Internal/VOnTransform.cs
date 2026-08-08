@@ -130,7 +130,10 @@ internal static class VOnTransform
                 {
                     if (expression.Content.Contains("$event"))
                     {
-                        expression = expression with { Content = expression.Content.Replace("$event", "__event") };
+                        expression = expression with
+                        {
+                            Content = CompilerText.ReplaceIdentifierToken(expression.Content, "$event", "__event"),
+                        };
                     }
 
                     context.AddIdentifiers("__event");
@@ -183,7 +186,7 @@ internal static class VOnTransform
         }
 
         // Mark keys as handler keys so prop normalization ignores dynamic handler keys.
-        var marked = new Property[result.Properties.Count];
+        var marked = new ObjectProperty[result.Properties.Count];
         for (var index = 0; index < result.Properties.Count; index++)
         {
             var property = result.Properties[index];

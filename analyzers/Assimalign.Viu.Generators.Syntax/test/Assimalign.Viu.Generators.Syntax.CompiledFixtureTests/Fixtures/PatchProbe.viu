@@ -1,0 +1,23 @@
+<template>
+<section class="probe">
+  <span>static</span>
+  <strong>{{ Message }}</strong>
+  <p v-if="Show">shown</p>
+  <ol>
+    <li v-for="item in Items" :key="item">{{ item }}</li>
+  </ol>
+  <em v-memo="[MemoKey]">{{ MemoMessage }}</em>
+</section>
+</template>
+
+@script {
+using System.Collections.Generic;
+using Assimalign.Viu.Reactivity;
+
+public Reference<string> Message = Reactive.Reference("first");
+public Reference<bool> Show = Reactive.Reference(true);
+public Reference<IReadOnlyList<string>> Items =
+    Reactive.Reference<IReadOnlyList<string>>(new[] { "alpha", "beta" });
+public Reference<int> MemoKey = Reactive.Reference(1);
+public Reference<string> MemoMessage = Reactive.Reference("memo-first");
+}

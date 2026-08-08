@@ -103,7 +103,7 @@
          from the repository's single authoritative DOM knowledge definition rather than retyped for
          the editor. It is written to the lowest-common-denominator language surface precisely so
          hosts like this one can link it; its path is frozen. -->
-    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Shared\src\Internal\DomKnowledgeData.cs"
+    <Compile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.ServerRenderer\src\Internal\DomKnowledgeData.cs"
              Link="Internal\DomKnowledgeData.cs" />
   </ItemGroup>
 

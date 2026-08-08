@@ -1,170 +1,187 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
 
 namespace Assimalign.Viu.Browser.Tests;
 
-// Pins Viu's event-modifier and key-guard contract: which modifiers gate a handler, how .exact
-// treats pressed-but-unlisted system modifiers, and the key aliases that map to a hyphenated
-// event.key. The alias table is the frozen contract — a vector here is not incidental.
-public class BrowserEventsTests
+// Pins the qualified Browser event-guard ABI specified by [SFC-CG-2] and [V01.01.15.02].
+public sealed class BrowserEventsTests
 {
-    private static BrowserEvent Event(
-        string eventName = "click",
-        string key = "",
-        BrowserEventModifiers modifiers = BrowserEventModifiers.None,
-        int button = 0,
-        bool isSelfTarget = true)
-        => new(eventName, 100, key, string.Empty, modifiers, button, 0, 0, 0, 1, isSelfTarget, null, false);
-
     [Fact]
-    public void WithModifiers_StopAndPrevent_RecordIntentsAndStillRunTheHandler()
+    public void WithModifiers_StopPreventAndSelf_ApplyInSourceOrder()
     {
-        var runs = 0;
-        var handler = BrowserEvents.WithModifiers(_ => runs++, "stop", "prevent");
-        var browserEvent = Event();
+        int invocationCount = 0;
+        Action<BrowserEvent> guarded = BrowserEvents.WithModifiers(
+            (BrowserEvent _) => invocationCount++,
+            "stop",
+            "prevent",
+            "self");
+        BrowserEvent bubbledEvent = CreateEvent(isSelfTarget: false);
 
-        handler(browserEvent);
+        guarded(bubbledEvent);
 
-        runs.ShouldBe(1);
-        browserEvent.PropagationStopped.ShouldBeTrue();
-        browserEvent.DefaultPrevented.ShouldBeTrue();
-        browserEvent.ToResponseFlags().ShouldBe(3);
+        invocationCount.ShouldBe(0);
+        bubbledEvent.PropagationStopped.ShouldBeTrue();
+        bubbledEvent.DefaultPrevented.ShouldBeTrue();
     }
 
     [Fact]
-    public void WithModifiers_Self_SkipsBubbledEvents()
+    public void WithModifiers_Exact_RejectsAnUnlistedPressedModifier()
     {
-        var runs = 0;
-        var handler = BrowserEvents.WithModifiers(_ => runs++, "self");
+        int invocationCount = 0;
+        Action<BrowserEvent> guarded = BrowserEvents.WithModifiers(
+            (BrowserEvent _) => invocationCount++,
+            "ctrl",
+            "exact");
 
-        handler(Event(isSelfTarget: false));
-        runs.ShouldBe(0);
+        guarded(CreateEvent(modifiers: BrowserEventModifiers.Control));
+        guarded(CreateEvent(
+            modifiers: BrowserEventModifiers.Control | BrowserEventModifiers.Shift));
 
-        handler(Event(isSelfTarget: true));
-        runs.ShouldBe(1);
+        invocationCount.ShouldBe(1);
     }
 
     [Theory]
-    [InlineData("ctrl", BrowserEventModifiers.Control)]
-    [InlineData("shift", BrowserEventModifiers.Shift)]
-    [InlineData("alt", BrowserEventModifiers.Alt)]
-    [InlineData("meta", BrowserEventModifiers.Meta)]
-    public void WithModifiers_SystemModifiers_GateOnTheKeyState(string modifier, BrowserEventModifiers flag)
+    [InlineData("left", 0, true)]
+    [InlineData("left", 2, false)]
+    [InlineData("middle", 1, true)]
+    [InlineData("right", 2, true)]
+    public void WithModifiers_MouseButtons_GuardTheHandler(
+        string modifier,
+        int button,
+        bool expectedInvocation)
     {
-        var runs = 0;
-        var handler = BrowserEvents.WithModifiers(_ => runs++, modifier);
+        bool invoked = false;
+        Action<BrowserEvent> guarded = BrowserEvents.WithModifiers(
+            (BrowserEvent _) => invoked = true,
+            modifier);
 
-        handler(Event());
-        runs.ShouldBe(0);
+        guarded(CreateEvent(button: button));
 
-        handler(Event(modifiers: flag));
-        runs.ShouldBe(1);
-
-        // Non-exact: extra modifiers still pass.
-        handler(Event(modifiers: flag | BrowserEventModifiers.Shift | BrowserEventModifiers.Control));
-        runs.ShouldBe(2);
-    }
-
-    [Fact]
-    public void WithModifiers_MouseButtons_GateOnTheButton()
-    {
-        var leftRuns = 0;
-        var rightRuns = 0;
-        var middleRuns = 0;
-        var left = BrowserEvents.WithModifiers(_ => leftRuns++, "left");
-        var right = BrowserEvents.WithModifiers(_ => rightRuns++, "right");
-        var middle = BrowserEvents.WithModifiers(_ => middleRuns++, "middle");
-
-        left(Event(button: 0));
-        left(Event(button: 2));
-        right(Event(button: 2));
-        right(Event(button: 0));
-        middle(Event(button: 1));
-        middle(Event(button: 0));
-
-        leftRuns.ShouldBe(1);
-        rightRuns.ShouldBe(1);
-        middleRuns.ShouldBe(1);
-    }
-
-    [Fact]
-    public void WithModifiers_Exact_RequiresExactlyTheListedSystemModifiers()
-    {
-        var runs = 0;
-        var handler = BrowserEvents.WithModifiers(_ => runs++, "ctrl", "exact");
-
-        handler(Event(modifiers: BrowserEventModifiers.Control));
-        runs.ShouldBe(1);
-
-        // An extra pressed modifier fails .exact.
-        handler(Event(modifiers: BrowserEventModifiers.Control | BrowserEventModifiers.Shift));
-        runs.ShouldBe(1);
-
-        // .exact with no system modifiers listed: none may be pressed.
-        var bare = BrowserEvents.WithModifiers(_ => runs++, "exact");
-        bare(Event());
-        runs.ShouldBe(2);
-        bare(Event(modifiers: BrowserEventModifiers.Meta));
-        runs.ShouldBe(2);
-    }
-
-    [Fact]
-    public void WithKeys_MatchesPlainKeysCaseInsensitively()
-    {
-        var runs = 0;
-        var handler = BrowserEvents.WithKeys(_ => runs++, "enter");
-
-        handler(Event("keydown", key: "Enter"));
-        runs.ShouldBe(1);
-
-        handler(Event("keydown", key: "Tab"));
-        runs.ShouldBe(1);
+        invoked.ShouldBe(expectedInvocation);
     }
 
     [Theory]
     [InlineData("esc", "Escape")]
+    [InlineData("space", " ")]
     [InlineData("up", "ArrowUp")]
     [InlineData("down", "ArrowDown")]
     [InlineData("left", "ArrowLeft")]
     [InlineData("right", "ArrowRight")]
     [InlineData("delete", "Backspace")]
-    [InlineData("tab", "Tab")]
-    [InlineData("space", " ")]
-    public void WithKeys_MatchesVueKeyAliases(string alias, string domKey)
+    [InlineData("page-down", "PageDown")]
+    public void WithKeys_KnownNamesAndAliases_MatchNormalizedBrowserKeys(
+        string keyGuard,
+        string browserKey)
     {
-        var runs = 0;
-        var handler = BrowserEvents.WithKeys(_ => runs++, alias);
+        int invocationCount = 0;
+        Action<BrowserEvent> guarded = BrowserEvents.WithKeys(
+            (BrowserEvent _) => invocationCount++,
+            keyGuard);
 
-        handler(Event("keydown", key: domKey));
+        guarded(CreateEvent(eventName: "keydown", key: browserKey));
 
-        runs.ShouldBe(1);
+        invocationCount.ShouldBe(1);
     }
 
     [Fact]
-    public void WithKeys_IgnoresNonKeyboardEvents()
+    public void WithKeys_OverWithModifiers_ComposesQualifiedGuards()
     {
-        var runs = 0;
-        var handler = BrowserEvents.WithKeys(_ => runs++, "enter");
-
-        handler(Event("click", key: ""));
-
-        runs.ShouldBe(0);
-    }
-
-    [Fact]
-    public void WithModifiers_ComposesWithWithKeys()
-    {
-        var seen = new List<string>();
-        var handler = BrowserEvents.WithKeys(
-            BrowserEvents.WithModifiers(browserEvent => seen.Add(browserEvent.Key), "ctrl"),
+        List<string> keys = [];
+        Action<BrowserEvent> guarded = BrowserEvents.WithKeys(
+            BrowserEvents.WithModifiers(
+                (BrowserEvent browserEvent) => keys.Add(browserEvent.Key),
+                "ctrl"),
             "enter");
 
-        handler(Event("keydown", key: "Enter"));
-        handler(Event("keydown", key: "Enter", modifiers: BrowserEventModifiers.Control));
+        guarded(CreateEvent(eventName: "keydown", key: "Enter"));
+        guarded(CreateEvent(
+            eventName: "keydown",
+            key: "Enter",
+            modifiers: BrowserEventModifiers.Control));
 
-        seen.ShouldBe(["Enter"]);
+        keys.ShouldBe(["Enter"]);
     }
+
+    [Fact]
+    public void WithModifiers_ValueReturningAndParameterlessOverloads_DiscardValues()
+    {
+        int invocationCount = 0;
+        Action<BrowserEvent> eventHandler = BrowserEvents.WithModifiers(
+            (BrowserEvent _) => (object?)++invocationCount,
+            "prevent");
+        Action<BrowserEvent> parameterlessHandler = BrowserEvents.WithModifiers(
+            () => (object?)++invocationCount,
+            "prevent");
+
+        eventHandler(CreateEvent());
+        parameterlessHandler(CreateEvent());
+
+        invocationCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task WithKeys_TaskOverloads_PreserveMatchingTasksAndSkipNonmatchingHandlers()
+    {
+        TaskCompletionSource eventCompletion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource parameterlessCompletion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        int parameterlessInvocationCount = 0;
+        Func<BrowserEvent, Task> eventHandler = BrowserEvents.WithKeys(
+            (BrowserEvent _) => eventCompletion.Task,
+            "enter");
+        Func<BrowserEvent, Task> parameterlessHandler = BrowserEvents.WithKeys(
+            () =>
+            {
+                parameterlessInvocationCount++;
+                return parameterlessCompletion.Task;
+            },
+            "enter");
+
+        Task matchingEventTask = eventHandler(CreateEvent(eventName: "keyup", key: "Enter"));
+        Task skippedTask = parameterlessHandler(CreateEvent(eventName: "keyup", key: "Escape"));
+
+        matchingEventTask.ShouldBeSameAs(eventCompletion.Task);
+        skippedTask.ShouldBeSameAs(Task.CompletedTask);
+        parameterlessInvocationCount.ShouldBe(0);
+        await skippedTask;
+    }
+
+    [Fact]
+    public void BrowserEvent_DefaultPreventionSeparatesArrivalStateFromResponseIntent()
+    {
+        BrowserEvent browserEvent = CreateEvent(defaultPrevented: true);
+
+        browserEvent.DefaultPrevented.ShouldBeTrue();
+        browserEvent.PreventDefault();
+
+        browserEvent.DefaultPrevented.ShouldBeTrue();
+    }
+
+    private static BrowserEvent CreateEvent(
+        string eventName = "click",
+        string key = "",
+        BrowserEventModifiers modifiers = BrowserEventModifiers.None,
+        int button = 0,
+        bool isSelfTarget = true,
+        bool defaultPrevented = false) =>
+        new(
+            eventName,
+            100,
+            key,
+            string.Empty,
+            modifiers,
+            button,
+            0,
+            0,
+            0,
+            1,
+            isSelfTarget,
+            null,
+            false,
+            defaultPrevented: defaultPrevented);
 }

@@ -166,20 +166,18 @@ breaking change for any component that already declares that member. C# literal 
 ## Render-function code generation
 
 ([V01.01.05.05], issue #52): `RenderFunctionEmitter.Emit(TransformResult)` serializes the transformed
-code-generation tree into the body of a C# render method — the asset-resolution preamble
-followed by `return <root block expression>;`. There is one `EmitXxx` on the internal
-`RenderCodeWriter` per code-generation node kind, and helper invocations use
-the underscore-prefixed alias form (`_openBlock`, `_createElementBlock`,
-`_toDisplayString`, …), the same spelling `TransformContext.HelperString` already emits into compound
-expressions. Output is deterministic (ordinal comparisons, invariant-culture numbers, LF newlines) and
-the result record is value-equatable, preserving the incremental-generator caching contract.
+code-generation tree into the statement-form body of a C# render method. The internal
+`FrameRenderCodeWriter` emits ordered statements against the method's `ComponentRenderFrame`
+parameter and constructs the closed `VirtualNode` algebra directly. Output is deterministic
+(ordinal comparisons, invariant-culture numbers, LF newlines) and the result record is
+value-equatable, preserving the incremental-generator caching contract.
 
 There is no preamble to emit: the emitter produces a method **body** and nothing more. The composition
-root — the source generator ([V01.01.06.02]) — owns the method declaration and binds every helper name
-with one file-level `using static global::Assimalign.Viu.RenderHelpers;`
-(`[SFC-CG-1]`). Neither this library nor the generator references the runtime assembly; the emitted code
-binds **by name** (`[SFC-CG-2]`), and the contract below is pinned by `RenderFunctionEmitterTests` and the generator
-snapshot tests.
+root — the source generator ([V01.01.06.02]) — owns the method declaration, its component-instance and
+frame parameters, and the enclosing partial class. Neither this library nor the generator references a
+runtime assembly; emitted runtime references are fully qualified names in consumer code, so there is no
+static-import contract. `[SFC-CG-1]` and `[SFC-CG-2]` are pinned by
+`RenderFunctionEmitterTests` and the generator snapshot tests.
 
 ### Serialization decisions C# forces
 
@@ -188,19 +186,19 @@ pinned by a snapshot test in `RenderFunctionEmitterTests`.
 
 | Described shape | Viu C# output | Why |
 | --- | --- | --- |
-| `(_openBlock(), _createElementBlock(tag, ...))` | `_createElementBlock(_openBlock(), tag, ...)` | C# has no comma operator. C# guarantees left-to-right argument evaluation, so the block opens before any child argument is evaluated and the block factory closes it — the same open/collect/close sequence. |
-| `{ id: x, onClick: h }` props/slots objects | `_createProps(("id", x), ("onClick", _withHandler(h)))` | C# has no object literals with arbitrary keys. Static keys become string literals; dynamic keys emit as (contract-typed string) expressions. |
+| `(_openBlock(), createNode(tag, ...))` | `frame.OpenBlock();` followed by node construction, `frame.Track(node)`, and `frame.CloseBlock()` | C# has no comma operator. Explicit statements preserve the open/collect/close order and keep block state on the mount-owned frame. |
+| `{ id: x, onClick: h }` property/slot objects | `ElementBinding` or `ComponentBinding` entries in an owned collection | C# has no object literals with arbitrary keys. Static keys become string literals; dynamic keys are evaluated as strings before the typed binding is constructed. |
 | `[a, b]` children/argument arrays | `new object?[] { a, b }` | A C# collection expression needs a target type, which an object-typed children argument cannot supply. The runtime helper surface accepts object-typed children and normalizes them. |
-| `["title", "id"]` dynamicProps | `["title", "id"]` (verbatim) | The dynamicProps parameter is `string[]` in the helper contract, so the stringified array is already a valid target-typed C# collection expression. |
-| `_cache[0] \|\| (_cache[0] = v)` | `(_cache[0] ??= v)` | JavaScript falsy-guarded assignment becomes null-coalescing assignment. |
-| `(setBlockTracking(-1, true), (_cache[0] = v).cacheIndex = 0, setBlockTracking(1), _cache[0])` | `_setCache(0, _setBlockTracking(-1, true), v)` | The comma sequence collapses into a helper: argument order pauses tracking before `v` is created; `_setCache` stamps the cache index, resumes tracking, and returns the value. |
-| `[...(cacheExpr)]` | `_spreadCache(cacheExpr)` | No spread operator; the helper clones the cached array. |
-| inline handler values (`$event => ...`, method refs) | wrapped in `_withHandler(...)` | A C# lambda or method group has no natural type in an object-typed position; the helper's delegate parameter supplies the target type. `_withModifiers`/`_withKeys` calls are not wrapped — their own contract signatures type the inner lambda. |
+| `["title", "id"]` dynamic properties | `["title", "id"]` (verbatim) | The dynamic-properties parameter is `string[]` in the helper contract, so the stringified array is already a valid target-typed C# collection expression. |
+| `_cache[0] \|\| (_cache[0] = v)` | `frame.GetOrAddCache(0, ...)` | The mount-owned frame provides typed cache identity without an ambient array or falsy-value ambiguity. |
+| `(setBlockTracking(-1, true), cache, setBlockTracking(1))` | balanced `frame.SetBlockTracking(-1);` / `frame.SetBlockTracking(1);` statements around the cache write | Statements preserve ordering directly and runtime recovery restores the same frame after a failed render. |
+| `[...(cacheExpr)]` | a typed array/list clone emitted at the use site | C# has no spread operator; generated code copies the cached sequence without requiring a mutable global helper ABI. |
+| inline handler values (`$event => ...`, method refs) | target-typed `ComponentEventHandler`/`BrowserEventHandler` construction or `frame.CacheHandler(...)` | Explicit runtime delegate types give lambdas and method groups a type in object-valued binding positions; cached handlers are owned by the mount frame. |
 | single-statement **call** handler (`$event => (call)`) | `__event => { call; }` (statement-block lambda) | JavaScript has no `void`; C# does, and a parenthesized void call binds no delegate. A call is the only single-statement shape that can be void, so it emits as a statement-block lambda (binds the `Action<…>` overload, discarding any value). Increments/assignments/value expressions yield a value and keep `__event => (expr)`. See the inline-handler divergence note above ([V01.01.05.05.01], issue #143). |
-| `$slots` / `$event` | `_ctx.__slots` / `__event` | `$` is not legal in C# identifiers; `__event` is the [V01.01.05.04] event-variable contract and `__slots` follows the same spelling rule. |
+| `$slots` / `$event` | component invocation slot access / `__event` | `$` is not legal in C# identifiers; the event local keeps the [V01.01.05.04] spelling while slots compile into typed lazy `ComponentSlot` closures. |
 | `undefined` / `void 0` | `null` | No `undefined` in C#. |
-| `{}` (renderSlot's empty-props placeholder) | `_createProps()` | Same object-literal rule as props. |
-| `{ trim: true }` directive-modifier bag (`withDirectives` tuple slot 3) | `_createModifiers(("trim", true))` | Same object-literal rule as props, but a **different helper**: a directive binding types its modifiers `IReadOnlyDictionary<string, bool>`, while `_createProps` yields `IReadOnlyDictionary<string, object?>`. The property helper in this slot type-checks and then reads back as *no modifiers*, silently disabling `.lazy`/`.trim`/`.number` on native `v-model` ([SFC-CG-6], [V01.01.05.03.01]). |
+| `{}` (render-slot empty-properties placeholder) | an empty typed binding collection | The generated contract distinguishes component arguments, slots, listeners, and directive modifiers rather than passing an untyped property bag. |
+| `{ trim: true }` directive-modifier bag | an `IReadOnlyDictionary<string, bool>` passed to `DirectiveInvocation` | Directive modifiers remain Boolean-valued and cannot be confused with object-valued element/component bindings ([SFC-CG-6], [V01.01.05.03.01]). |
 | `const` statements, ` === `/` !== ` (v-memo bodies) | `var`, ` == `/` != ` | Lexical bridging of the JavaScript statement spellings the v-memo transform authors as raw strings. |
 | `JSON.stringify(text)` | C# string literal (`SymbolDisplay.FormatLiteral`) | Same role, C# escaping rules. |
 | 2-space indent | 4-space indent | Repository C# convention; cosmetic. |
@@ -209,110 +207,73 @@ pinned by a snapshot test in `RenderFunctionEmitterTests`.
 (the runtime normalizes it), so the generated render method’s return type is
 `object?`.
 
-### The runtime helper name/signature contract
+### The generated runtime contract
 
-The emitted code compiles against `global::Assimalign.Viu.RenderHelpers` (imported via
-`using static` by the generator) — a static surface the runtime area provides ([V01.01.03.22], issue
-#136). Members carry the underscore-prefixed alias names on purpose — a deliberate, generated-code-only
-deviation from the repository C# naming rule, because these names ARE the by-name binding contract
-(`[SFC-CG-2]`). `HelperNames` is the single name table: transforms register its ordinary entries,
-`RenderCodeWriter` reads its fenced writer-only entries without adding them to `TransformResult.Helpers`,
-and its derived `DomHelpers` array drives the generator's conditional DOM import. What code generation
-requires of each member:
+Generated render methods take a `ComponentRenderFrame` supplied by Core and return `VirtualNode?`.
+The contract is public because compiled component assemblies and the runtime must share the same
+frame and node identities, but generated calls use ordinary qualified APIs rather than a mutable
+ambient helper surface (`[SFC-CG-2]`).
 
-- `_openBlock(bool disableTracking = false) : BlockToken` — opens a block, returns an opaque
-  `BlockToken`; every `_createBlock`/`_createElementBlock` takes it as the first argument
-  (evaluation-order sequencing).
-- `_createElementBlock(BlockToken block, object? tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null)`
-  and `_createBlock(...)` (component form) — close the block.
-  `tag` is `object?` (not `object`): `_resolveDynamicComponent` can return null, which resolves to a
-  comment placeholder.
-- `_createElementVNode(object? tag, object? props = null, object? children = null, int patchFlag = 0, string[]? dynamicProps = null)`
-  and `_createVNode(...)` — plain render nodes outside a block.
-- `_createTextVNode(object? text = null, int patchFlag = 0)`, `_createCommentVNode(string? text = "", bool asBlock = false)`,
-  `_createStaticVNode(string content, int count)` — text/comment/static vnodes.
-- `_toDisplayString(object?) : string` — interpolation stringification.
-- `_renderList(source, iterator) : TResult[]` — generic overloads whose type inference gives the
-  emitted `(item)`, `(item, index)` lambdas their parameter types (list/count/object-entry sources).
-- `_renderSlot(ComponentSlots? slots, string name, object? props = null, Func<object?[]?>? fallback = null)`.
-- `_withCtx(fn) : Slot` — slot-function wrapper (0- and 1-parameter overloads); its delegate parameters
-  type the emitted slot lambdas.
-- `_resolveComponent(string name)`, `_resolveDirective(string name)`, `_resolveDynamicComponent(object? value)`.
-- `_withDirectives(vnode, object?[] directives)` — runtime directive application. Each entry is itself an
-  `object?[]` tuple `[directive, value?, argument?, modifiers?]`; the outer array is `object?[]` (of
-  `object?[]`), which is the shape the emitter writes (`new object?[] { new object?[] { … } }`) —
-  **not** `object?[][]` (an earlier draft of this table said `object?[][]`; reconciled with the runtime
-  and the pinned emitter output in [V01.01.03.22]).
-- `_mergeProps(...)`, `_normalizeClass(...)`, `_normalizeStyle(...)`, `_normalizeProps(...)`,
-  `_guardReactiveProps(...)`, `_toHandlers(...)`, `_camelize(string)`, `_capitalize(string)`,
-  `_toHandlerKey(...) : string` — prop-normalization helpers (dynamic keys must be strings).
-- `_setBlockTracking(int value, bool inVOnce = false) : BlockToken` — returns a token accepted by `_setCache`.
-- Built-in tags as values (runtime-core): `_Fragment`, `_Teleport`, `_Suspense`, `_KeepAlive`,
-  `_BaseTransition`. `_Fragment` is fully realized; the component-like built-ins are surface markers
-  whose renderer support lands with their own work items.
-- `_unref(object?) : object?` — unwraps a reactive reference and leaves a non-reference unchanged.
-- Emitter-contract helpers, per the serialization table above: `_createProps(params (string, object?)[] entries)`,
-  `_createModifiers(params (string, bool)[] entries)`, `_withHandler(handler)` (delegate-typed overloads),
-  `_setCache(int index, BlockToken tracking, object? value)`, `_spreadCache(object?)`.
+- Blocks emit an ordered `frame.OpenBlock(...)`, descendant construction plus `frame.Track(node)`,
+  and `frame.CloseBlock()` sequence. The returned direct-dynamic-descendant snapshot is placed in the
+  owning node's `RenderPlan`; statement order supplies sequencing directly.
+- Elements, text, comments, static content, fragments, component requests, teleports, and structural
+  built-ins construct the corresponding sealed `VirtualNode` variant. A dynamic selector calls
+`DynamicComponents.Create` and still returns a node from the same closed algebra.
+- Element properties become immutable `ElementBinding` collections. Component inputs become a
+  `ComponentInvocation` containing argument, slot, listener, and directive collections; slot laziness
+  is preserved by emitted `ComponentSlot` closures.
+- `frame.GetOrAddCache`, `SetCache`, `CacheHandler`, and `Memo` own compiler cache slots for one mount.
+  Tracking suspension uses balanced `frame.SetBlockTracking(-1)` / `(1)` statements, and failed-render
+  recovery is a runtime operation on that same frame.
+- Interpolation stringification, class/style normalization, loose equality, and numeric coercion call
+  their qualified owning APIs. Lists, property sets, and slot sets dissolve into loops, dictionaries,
+  and closures emitted directly into the consumer compilation.
 
-### The DOM render-helper surface (`DomRenderHelpers`, [V01.01.04.09])
+The template compiler remains a runtime-reference-free `netstandard2.0` assembly: these type and member
+names occur only in emitted source. `FrameRenderCodeWriter`, generator snapshots, and the compiled-fixture
+suite jointly pin the contract.
 
-The DOM-directive helpers are a **separate facade for layering**: `_vShow`, `_vModelText`, `_vModelCheckbox`,
-`_vModelRadio`, `_vModelSelect`, `_vModelDynamic`, the `_withModifiers` / `_withKeys` guard wrappers, and the
-DOM built-ins `_Transition` / `_TransitionGroup` are **not** members of
-`Assimalign.Viu.Core.RenderHelpers` — their behavior lives in `Assimalign.Viu.Browser`, which the
-platform-agnostic runtime-core layer must not reference (keeping runtime-core DOM-free, and keeping a real DOM
-directive from ever mis-binding onto a runtime-core marker). They ship instead as
-`global::Assimalign.Viu.Browser.DomRenderHelpers`, and the composition-root generator ([V01.01.06.02])
-emits a **second** file-level `using static global::Assimalign.Viu.Browser.DomRenderHelpers;` alongside the
-runtime-core one whenever the render body contains an entry from `HelperNames.DomHelpers`. The array is
-derived as each DOM helper is declared in the canonical table, so a new DOM helper cannot leave this import
-decision behind. DOM-directive templates (`v-show`, `v-model`, `@click.prevent`, `@keyup.enter`) are therefore
-end-to-end compilable without making an ordinary component depend on the Browser host. `DomRenderHelpers`
-references only Browser's own machinery and Core's `IDirective`, never any
-`Assimalign.Viu.Syntax.*` assembly; the by-name contract still flows one way. Pinned by the helper-contract
-conformance tests, `Assimalign.Viu.Browser.CompiledRenderTests` (a `.viu` using every spelling below compiles
-against both facades), and `Assimalign.Viu.Browser.Tests.DomRenderHelpersTests` (facade mapping + v-show /
-`.prevent` execution through the in-memory adapter).
+### Browser directive integration ([V01.01.04.09])
+
+Browser behavior remains Browser-owned. The template compiler recognizes the structural helper tokens in
+its intermediate representation, then emits fully qualified Browser types and calls; Core stays free of DOM
+knowledge. DOM-directive templates (`v-show`, `v-model`, `@click.prevent`, `@keyup.enter`) therefore compile
+end to end without a static facade or an import injected into the consumer. The compiler itself still has no
+runtime assembly reference because those qualified names exist only in emitted source. The compiler tests,
+Browser tests, and `Assimalign.Viu.Generators.Syntax.CompiledFixtureTests` pin this one-way contract.
 
 What code generation requires of each DOM member, mapped to the runtime machinery it forwards to:
 
-- `_vShow`, `_vModelText`, `_vModelCheckbox`, `_vModelRadio`, `_vModelSelect`, `_vModelDynamic` — unresolved
-  directive markers mapped by Browser's resolver to `VShow.Instance` / `VModelText.Instance` / … . The emitter
-  writes each as a `withDirectives` tuple element. Native `v-model` values are emitted as
-  `new ViuModelBinding(exp, value => { exp = value; })`, carrying the current value and reflection-free
-  write-back action together; `RenderHelpers._withDirectives` preserves the carrier when it converts the
-  generated tuple into a component directive binding.
-- `_withModifiers(...)` / `_withKeys(...)` — the `v-on` modifier / key guard wrappers,
-  each **returning `Action<BrowserEvent>`** (the dispatchable handler the event
-  invoker registry understands) and forwarding to `BrowserEvents.WithModifiers` / `BrowserEvents.WithKeys`. The
-  handler parameter is **overloaded**, not a single `Action` — this reconciles the earlier
-  `_withModifiers(handler, string[])` pin: the emitter (`VOnTransform`) can write the handler as a value-returning
+- VShow and the VModel directive tokens lower to `DirectiveInvocation(typeof(VShow), value)` and the
+  corresponding qualified Browser directive type. Native `v-model` values are emitted as
+  `new ModelBinding(exp, value => { exp = value; })`, carrying the current value and reflection-free
+  write-back action together inside the invocation.
+- `BrowserEvents.WithModifiers(...)` / `BrowserEvents.WithKeys(...)` are the qualified `v-on`
+  modifier/key guard calls. Each returns the dispatchable `Action<BrowserEvent>` understood by the event
+  invoker registry. The handler parameter is **overloaded**, not a single `Action`: the emitter
+  (`VOnTransform`) can write the handler as a value-returning
   inline expression lambda (`__event => (expr)`), a statement-block lambda for a single-statement call
   (`__event => { call; }`, the void-capable shape — see the single-statement call-handler divergence above) or a
   multi-statement body, or a member/method-group reference (`_ctx.save`), and a parenthesized void call cannot
   bind to `Func<BrowserEvent, object?>`. The
   overload set — `Func<BrowserEvent, object?>`, `Action<BrowserEvent>`, `Func<object?>`, `Action` (each with
-  `params string[]`) — target-types every one of those, mirroring `_withHandler`'s multi-overload rationale.
+  `params string[]`) — target-types every one of those without an ambient handler helper.
   Because both return `Action<BrowserEvent>`, a stacked `@keyup.enter.prevent` nests cleanly as
-  `_withKeys(_withModifiers(handler, ["prevent"]), ["enter"])` (the outer call resolves the inner result through
-  the `Action<BrowserEvent>` arm). These are **not** wrapped in `_withHandler` — their own signatures type the
-  inner lambda.
-- `_Transition` / `_TransitionGroup` — named-template markers lowered to `TemplateComponent`
-  requests. Browser's component-factory wrapper resolves `Transition`, `TransitionGroup`, and the
-  Core `BaseTransition` dependency without service resolution. Core's keyed child-to-host-element
-  snapshots support `TransitionGroup`'s Browser-owned FLIP pass.
+  `BrowserEvents.WithKeys(BrowserEvents.WithModifiers(handler, ["prevent"]), ["enter"])`; the outer call
+  resolves the inner result through the `Action<BrowserEvent>` arm.
+- Transition lowers to the structural `TransitionNode`; TransitionGroup lowers to a
+  `ComponentNode` carrying `ComponentReference.ForName("TransitionGroup")`. Browser's composition
+  resolves the named group while Core executes the host-neutral structural transition node.
 
 The generated render method itself is the generator's contract:
-`internal static object? Render(<ComponentClass> _ctx, object?[] _cache)` plus
-`internal const int RenderCacheSize` (C# arrays cannot grow on assignment, so the runtime sizes the
-per-instance cache from the constant). `RenderCacheSize` and `Render` are reserved member names in a
-`.viu` component's partial class. `Render` returns `object?`; the runtime normalizes it into a vnode
-through `RenderHelpers.NormalizeRoot(object?)`, which turns a raw string, a null, or an already-built
-node into a render node. The runtime-side implementation of `RenderHelpers` and the end-to-end execution tests
-against the renderer landed in [V01.01.03.22] (`Assimalign.Viu.Core.CompiledRenderTests`), which
-compiles a generator-emitted render body with Roslyn and drives it through the in-memory renderer —
-delivering the integration criterion deferred from [V01.01.05.05].
+`private static global::Assimalign.Viu.Components.VirtualNode? __ViuRender(<ComponentClass> component,
+global::Assimalign.Viu.Components.ComponentRenderFrame frame)`. The generator records the emitter's
+cache-slot count in `ComponentContract.renderCacheSize`, so Core creates the mount-owned frame at exactly
+the compiled size. The method returns the closed-algebra node directly; no root-normalization shim sits
+between generated code and the renderer. The compiled-fixture suite builds generator-emitted `.viu` and
+compatible `.vue` components against the shipping packages and drives them through the runtime, providing
+the end-to-end proof deferred from [V01.01.05.05].
 
 ### Render source mapping ([V01.01.05.08])
 

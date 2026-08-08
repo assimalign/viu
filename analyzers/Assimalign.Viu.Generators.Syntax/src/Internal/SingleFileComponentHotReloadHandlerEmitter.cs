@@ -26,6 +26,7 @@ internal static class SingleFileComponentHotReloadHandlerEmitter
                 /// <summary>
                 /// Forwards consumer-assembly metadata updates to Viu's component hot-reload runtime.
                 /// </summary>
+                [global::System.CodeDom.Compiler.GeneratedCode("Assimalign.Viu.Generators.Syntax", "1.0.0.0")]
                 internal static class SingleFileComponentHotReloadMetadataUpdateHandler
                 {
                     /// <summary>

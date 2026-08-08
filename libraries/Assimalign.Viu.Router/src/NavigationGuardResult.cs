@@ -18,23 +18,36 @@ namespace Assimalign.Viu.Router;
 public sealed class NavigationGuardResult
 {
     private NavigationGuardResult(
-        NavigationGuardAction action,
-        string? redirectLocation,
-        string? redirectName,
-        RouteParameters? redirectParameters)
+        NavigationGuardOutcomeKind outcomeKind,
+        NavigationFailureType? failureReason,
+        NavigationRedirectTarget? redirectTarget)
     {
-        Action = action;
-        RedirectLocation = redirectLocation;
-        RedirectName = redirectName;
-        RedirectParameters = redirectParameters;
+        OutcomeKind = outcomeKind;
+        FailureReason = failureReason;
+        RedirectTarget = redirectTarget;
     }
+
+    /// <summary>Gets the exhaustive outcome kind for this guard decision.</summary>
+    public NavigationGuardOutcomeKind OutcomeKind { get; }
+
+    /// <summary>
+    /// Gets the reason for a <see cref="NavigationGuardOutcomeKind.Failed"/> result, or
+    /// <see langword="null"/> for an allowed or redirected result.
+    /// </summary>
+    public NavigationFailureType? FailureReason { get; }
+
+    /// <summary>
+    /// Gets the typed target for a <see cref="NavigationGuardOutcomeKind.Redirected"/> result, or
+    /// <see langword="null"/> for an allowed or failed result.
+    /// </summary>
+    public NavigationRedirectTarget? RedirectTarget { get; }
 
     /// <summary>
     /// Allow the navigation to proceed to the next guard and stage. Shared and stateless, so
     /// returning it allocates nothing.
     /// </summary>
     public static NavigationGuardResult Allow { get; } =
-        new(NavigationGuardAction.Allow, null, null, null);
+        new(NavigationGuardOutcomeKind.Allowed, null, null);
 
     /// <summary>
     /// Abort the navigation, leaving <see cref="Router.CurrentRoute"/> and history untouched and
@@ -42,7 +55,10 @@ public sealed class NavigationGuardResult
     /// returning it allocates nothing.
     /// </summary>
     public static NavigationGuardResult Abort { get; } =
-        new(NavigationGuardAction.Abort, null, null, null);
+        new(
+            NavigationGuardOutcomeKind.Failed,
+            NavigationFailureType.Aborted,
+            null);
 
     /// <summary>
     /// Redirect the navigation to the given base-stripped path, restarting the pipeline against it —
@@ -54,7 +70,13 @@ public sealed class NavigationGuardResult
     public static NavigationGuardResult RedirectTo(string location)
     {
         ArgumentNullException.ThrowIfNull(location);
-        return new NavigationGuardResult(NavigationGuardAction.Redirect, location, null, null);
+        return new NavigationGuardResult(
+            NavigationGuardOutcomeKind.Redirected,
+            null,
+            new NavigationRedirectTarget(
+                NavigationRedirectTargetKind.Location,
+                location,
+                RouteParameters.Empty));
     }
 
     /// <summary>
@@ -69,14 +91,12 @@ public sealed class NavigationGuardResult
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(parameters);
-        return new NavigationGuardResult(NavigationGuardAction.Redirect, null, name, parameters);
+        return new NavigationGuardResult(
+            NavigationGuardOutcomeKind.Redirected,
+            null,
+            new NavigationRedirectTarget(
+                NavigationRedirectTargetKind.NamedRoute,
+                name,
+                parameters));
     }
-
-    internal NavigationGuardAction Action { get; }
-
-    internal string? RedirectLocation { get; }
-
-    internal string? RedirectName { get; }
-
-    internal RouteParameters? RedirectParameters { get; }
 }

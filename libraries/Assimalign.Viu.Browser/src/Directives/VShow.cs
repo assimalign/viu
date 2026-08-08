@@ -1,29 +1,21 @@
 using System;
 using System.Collections.Generic;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// The browser <c>v-show</c> directive.
-/// </summary>
+/// <summary>Toggles Browser element visibility without destroying its mounted state.</summary>
 /// <remarks>
-/// Preserves the author-supplied inline display value, hides an initially falsy element before
-/// insertion, and restores the original value when the binding becomes truthy — so toggling
-/// visibility never destroys the element or the state attached to it, which is the whole reason to
-/// choose <c>v-show</c> over conditional rendering. Transition
-/// coordination uses <see cref="DirectiveBinding.Transition"/>: a persisted transition drives
-/// enter hooks when the element becomes visible and defers <c>display: none</c> until leave
-/// completes, and the renderer skips its own insertion/removal transition for a persisted binding
-/// so the two never both drive the same phase (<c>[BLT-10]</c>).
+/// The directive preserves the authored inline display value and coordinates a persisted
+/// <see cref="ComponentTransition"/> so visibility changes own the enter and leave phases while
+/// Core skips structural insertion and removal. Specified by <c>[SFC-CG-6]</c> and
+/// <c>[BLT-10]</c>.
 /// </remarks>
 public sealed class VShow : IDirective
 {
-    /// <summary>Gets the shared browser directive instance.</summary>
-    public static readonly VShow Instance = new();
+    /// <summary>Gets the reusable Browser visibility directive.</summary>
+    public static VShow Instance { get; } = new();
 
     private VShow()
     {
@@ -44,16 +36,14 @@ public sealed class VShow : IDirective
     private static void OnBeforeMount(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        BrowserDirectiveOperations operations =
-            BrowserDirectiveOperations.Require();
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
         int handle = BrowserModelDirective.Handle(element);
-        string originalDisplay = OriginalDisplay(component);
+        string originalDisplay = OriginalDisplay(value);
         operations.GetState(handle).OriginalDisplay = originalDisplay;
-        bool isVisible =
-            StyleAndClassNormalization.IsTruthy(binding.Value);
+        bool isVisible = StyleAndClassNormalization.IsTruthy(binding.Value);
         if (isVisible && PersistedTransition(binding) is { } transition)
         {
             transition.BeforeEnter(element);
@@ -66,8 +56,8 @@ public sealed class VShow : IDirective
     private static void OnMounted(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
         if (StyleAndClassNormalization.IsTruthy(binding.Value)
             && PersistedTransition(binding) is { } transition)
@@ -79,16 +69,14 @@ public sealed class VShow : IDirective
     private static void OnUpdated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        bool isVisible =
-            StyleAndClassNormalization.IsTruthy(binding.Value);
-        BrowserDirectiveOperations operations =
-            BrowserDirectiveOperations.Require();
+        bool isVisible = StyleAndClassNormalization.IsTruthy(binding.Value);
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
         int handle = BrowserModelDirective.Handle(element);
         BrowserModelState state = operations.GetState(handle);
-        string originalDisplay = OriginalDisplay(component);
+        string originalDisplay = OriginalDisplay(value);
         bool originalDisplayChanged = !string.Equals(
             originalDisplay,
             state.OriginalDisplay,
@@ -100,12 +88,9 @@ public sealed class VShow : IDirective
         {
             if (originalDisplayChanged)
             {
-                SetDisplay(
-                    operations,
-                    handle,
-                    isVisible,
-                    originalDisplay);
+                SetDisplay(operations, handle, isVisible, originalDisplay);
             }
+
             return;
         }
 
@@ -114,7 +99,7 @@ public sealed class VShow : IDirective
             if (isVisible)
             {
                 transition.BeforeEnter(element);
-                SetDisplay(operations, handle, true, originalDisplay);
+                SetDisplay(operations, handle, isVisible: true, originalDisplay);
                 transition.Enter(element);
             }
             else
@@ -124,27 +109,23 @@ public sealed class VShow : IDirective
                     () => SetDisplay(
                         operations,
                         handle,
-                        false,
+                        isVisible: false,
                         originalDisplay));
             }
+
             return;
         }
 
-        SetDisplay(
-            operations,
-            handle,
-            isVisible,
-            originalDisplay);
+        SetDisplay(operations, handle, isVisible, originalDisplay);
     }
 
     private static void OnBeforeUnmount(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        BrowserDirectiveOperations operations =
-            BrowserDirectiveOperations.Require();
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
         int handle = BrowserModelDirective.Handle(element);
         SetDisplay(
             operations,
@@ -154,14 +135,8 @@ public sealed class VShow : IDirective
         operations.ReleaseState(handle);
     }
 
-    private static ComponentTransition? PersistedTransition(
-        DirectiveBinding binding)
-    {
-        ComponentTransition? transition = binding.Transition;
-        return transition is { IsPersisted: true }
-            ? transition
-            : null;
-    }
+    private static ComponentTransition? PersistedTransition(DirectiveBinding binding) =>
+        binding.Transition is { IsPersisted: true } transition ? transition : null;
 
     private static void SetDisplay(
         BrowserDirectiveOperations operations,
@@ -179,51 +154,35 @@ public sealed class VShow : IDirective
         }
         else
         {
-            operations.SetStyleProperty(
-                handle,
-                "display",
-                originalDisplay,
-                false);
+            operations.SetStyleProperty(handle, "display", originalDisplay, false);
         }
     }
 
-    private static string OriginalDisplay(IElementComponent component)
+    private static string OriginalDisplay(ElementNode value)
     {
-        object? style = BrowserModelDirective.Property(component, "style");
-        if (style is null)
-        {
-            return string.Empty;
-        }
-
+        object? style = StyleAndClassNormalization.NormalizeStyle(
+            BrowserModelDirective.Property(value, "style"));
         string? display = null;
-        object? normalized = StyleAndClassNormalization.NormalizeStyle(style);
-        if (normalized is string css)
+        if (style is string css)
         {
             StyleAndClassNormalization.ParseStringStyle(css)
                 .TryGetValue("display", out object? parsed);
             display = parsed as string;
         }
-        else if (normalized
-            is IReadOnlyDictionary<string, object?> readOnlyMap
-            && readOnlyMap.TryGetValue(
-                "display",
-                out object? readOnlyDisplay))
+        else if (style is IReadOnlyDictionary<string, object?> readOnlyMap
+            && readOnlyMap.TryGetValue("display", out object? readOnlyDisplay))
         {
             display = BrowserModelDirective.FormatValue(readOnlyDisplay);
         }
-        else if (normalized
-            is IDictionary<string, object?> map
+        else if (style is IDictionary<string, object?> map
             && map.TryGetValue("display", out object? mutableDisplay))
         {
             display = BrowserModelDirective.FormatValue(mutableDisplay);
         }
 
         display ??= string.Empty;
-        return string.Equals(
-            display,
-            "none",
-            StringComparison.OrdinalIgnoreCase)
-                ? string.Empty
-                : display;
+        return string.Equals(display, "none", StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : display;
     }
 }

@@ -1,0 +1,25 @@
+<template>
+<section class="compiled-built-ins-route">
+  <Transition mode="out-in">
+    <article :key="ActiveBranch" class="compiled-nested-transition">
+      <span>nested transition content</span>
+    </article>
+  </Transition>
+  <TransitionGroup tag="ul" class="compiled-transition-group">
+    <li :key="ActiveBranch">primary transition-group row</li>
+    <li :key="SecondaryBranch">secondary transition-group row</li>
+  </TransitionGroup>
+  <KeepAlive max="1">
+    <TargetedTextProbe :key="ActiveBranch" />
+  </KeepAlive>
+  <Teleport to="#compiled-overlay">
+    <aside class="compiled-teleport">teleported route content</aside>
+  </Teleport>
+</section>
+</template>
+
+@script {
+public string ActiveBranch => "motion";
+
+public string SecondaryBranch => "motion-secondary";
+}

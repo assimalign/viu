@@ -15,7 +15,7 @@ public class DomDirectiveTransformTests
         var result = TransformTestHelpers.Transform("<div v-show=\"visible\"></div>");
 
         result.ShouldUseHelper("vShow");
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().Directives.ShouldNotBeNull();
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Directives.ShouldNotBeNull();
     }
 
     [Fact]
@@ -31,8 +31,8 @@ public class DomDirectiveTransformTests
     {
         var result = TransformTestHelpers.Transform("<div v-html=\"raw\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("innerHTML").Value.ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("raw");
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("innerHTML").Value.ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("raw");
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public class DomDirectiveTransformTests
         var result = TransformTestHelpers.Transform("<div v-html=\"raw\"><span></span></div>", out var errors);
 
         errors.ShouldContain(e => e.Code == CompilerErrorCode.XVHtmlWithChildren);
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().Children.ShouldBeNull();
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Children.ShouldBeNull();
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public class DomDirectiveTransformTests
     {
         var result = TransformTestHelpers.Transform("<div v-text=\"msg\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        var value = props.Property("textContent").Value.ShouldBeOfType<CallExpression>();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        var value = props.ObjectProperty("textContent").Value.ShouldBeOfType<CallExpression>();
         value.Callee.ShouldBe("_toDisplayString");
     }
 
@@ -68,7 +68,7 @@ public class DomDirectiveTransformTests
         var result = TransformTestHelpers.Transform("<div v-cloak></div>");
 
         // v-cloak contributes nothing at compile time; the element has no props.
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeNull();
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeNull();
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class DomDirectiveTransformTests
         // toDisplayString helper is emitted. The transform must leave it untouched.
         var result = TransformTestHelpers.Transform("<div v-pre>{{ raw }}</div>");
 
-        var codegen = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var codegen = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         codegen.Children.ShouldBeOfType<TextNode>().Content.ShouldBe("{{ raw }}");
         result.UsesHelper("toDisplayString").ShouldBeFalse();
     }

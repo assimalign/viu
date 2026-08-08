@@ -1,113 +1,66 @@
 # Assimalign.Viu.State design
 
-## Pinia-shaped surface
-
-The State package preserves the behavior previously implemented by `Assimalign.Viu.Store` while
-renaming the public surface consistently:
-
-| Previous Store name | State name |
-| --- | --- |
-| `Stores` | `StateStores` |
-| `StoreDefinition<TStore>` | `StateStoreDefinition<TStore>` |
-| `StoreRegistry` | `StateStoreRegistry` |
-| `Store<TState>` | `StateStore<TState>` |
-| `StoreMutation` | `StateStoreMutation` |
-| `StorePatchKind` | `StateStorePatchKind` |
-| `StoreSubscription` | `StateStoreSubscription` |
-| `StoreActionContext` | `StateStoreActionContext` |
-| `DuplicateStoreIdException` | `DuplicateStateStoreKeyException` |
-
-Definitions use `Key` rather than `Id`. A shared definition is reusable metadata; mutable state is
-always registry-owned.
-
 ## Registry lifetime topology
 
-The registry creates one detached root `IReactiveEffectScope` during construction. Resolving a
-definition creates a non-detached scope while the root is current, making it a child of that root:
+`StateStoreRegistry` creates one detached reactive root during construction. It creates a
+non-detached scope while that root is current for each first-use definition:
 
 ```text
 StateStoreRegistry
-  -> detached root reactive scope
-       -> state store A child scope
-       -> state store B child scope
+  -> detached root scope
+       -> store A scope
+       -> store B scope
 ```
 
-The caller's ambient component scope is never the store scope's parent. Removing one definition
-stops only its child scope. Disposing the registry stops the root, which cascades through all child
-scopes, clears the instance map, and clears `StateStores.ActiveRegistry` when it points to that
-registry.
+The caller's ambient component scope is therefore never a store scope's parent. Removing a
+definition stops only its child scope and disposes an `IDisposable` store. Disposing the registry
+does the same for every entry, stops the root, clears the ordinal-keyed map, and clears
+`StateStores.ActiveRegistry` when it points to that registry ([STA-2], [STA-3]).
 
-Setup failure stops the newly created child scope and does not add a partial registry entry.
-Resolving the same definition again is a cache hit by reference identity. Resolving a different
-definition under an owned key raises `DuplicateStateStoreKeyException`.
+The registry contract is synchronous. It deliberately does not block the single-threaded host loop
+waiting for an `IAsyncDisposable` implementation. A store with only asynchronous cleanup must keep
+that lifetime host-owned rather than relying on registry disposal.
 
-## Component and service composition
+## Setup and convention attachment
 
-`IStateContext` exposes:
+Definitions contain a diagnostic `Identifier`, its equivalent ordinal `Key`, and one explicit
+`StateStoreActivator<TStore>`. The registry invokes that delegate directly inside the store scope;
+there is no constructor inspection or reflection-backed activation ([STA-1], [EXE-4]).
 
-- the store's child `IReactiveEffectScope`;
-- the independently selected `IComponentFactory`;
-- the independently selected `IServiceProvider`;
-- the optional `IReactiveWatchScheduler`; and
-- an optional component owner for explicitly scoped feature registries.
+`IStateContext` exposes only the store scope, optional services, and optional watch scheduler. State
+does not receive a component factory or component owner. `Use(ComponentContext)` looks in
+`context.Services` for `IStateStoreRegistry`, then falls back to `StateStores.ActiveRegistry`. It
+does not type-test or retain the component context, so global setup cannot depend on the first
+component's mount order ([STA-4], [CMP-33]).
 
-The ordinary application-global `definition.Use(componentContext)` path uses
-`IStateStoreContext` only to locate the registry and deliberately records no owner. Otherwise the
-first component to resolve a global store would become its owner, making setup behavior depend on
-mount order. A caller that creates an isolated feature registry can pass an owner explicitly.
+Setup failure stops the new child scope, restores the previous ambient setup context, and adds no
+entry. A different definition claiming an existing ordinal key raises
+`DuplicateStateStoreKeyException`; case-distinct keys remain distinct.
 
-## State member model
+## Rich state-store model
 
-`StateStore<TState>` is optional. `TState` implements `IReactiveObject`, normally through the
-Reactivity source generator. The live `State` object is never replaced.
+`StateStore<TState>` is optional. It keeps one stable `IReactiveObject` instance and provides:
 
-- `Patch(Action<TState>)` batches a typed group of writes and reports `PatchFunction`.
-- `Patch(TState)` invokes a typed author-supplied state applier and reports `PatchObject`.
-- `Reset()` creates a fresh factory state and applies it to the live object in place.
-- A store constructed without a factory/applier supports mutator patches but rejects object patch
-  and reset with `NotSupportedException`.
-- `Subscribe` observes reactive state changes.
-- `OnAction` observes methods that opt in through `RunAction` or `RunActionAsync`.
+- `Patch(Action<TState>)`, which batches a typed group of changes;
+- `Patch(TState)`, which calls an author-supplied typed state copier;
+- `Reset()`, which creates fresh factory state and copies it onto the live instance;
+- `Subscribe`, backed by one lazily created deep state watch; and
+- `OnAction`, observing only methods that opt in through a protected action helper.
 
-The applier is a typed delegate because State cannot enumerate a state shape with reflection under
-Viu's trimming and NativeAOT constraints.
+A store constructed without a factory and copier supports mutator patches but rejects object patch
+and reset. This explicit boundary avoids state-shape reflection ([STA-5], [STA-6]).
 
-## Scheduler behavior
+With a scheduler, the shared state watch uses pre-flush delivery and deduplicates several writes
+into one notification. Without a scheduler, direct writes deliver synchronously; a grouped patch
+still notifies once because it executes in a reactive batch. The scheduler wrapper observes whether
+a job was actually queued so a no-op patch cannot leak its mutation kind to a later write ([STA-7]).
 
-Reactivity owns `IReactiveWatchScheduler`; State consumes it without depending on Core.
+Action completion hooks receive resolved asynchronous results. A fault runs error hooks and then
+propagates. Callback collections are snapshotted before iteration so removal during delivery does
+not corrupt the current pass ([STA-8]).
 
-When a scheduler is supplied, the store's single deep state watcher uses pre-flush delivery.
-Several direct writes before the application flush deduplicate into one callback. Grouped patches
-also produce one callback, and multiple queued mutations carry the latest patch kind, matching the
-previous Store behavior.
+## AOT boundary
 
-State wraps the scheduler only to observe whether a watch job was actually scheduled. That signal
-prevents a no-op patch from leaking its patch kind onto a later direct write without requiring
-State to construct renderer jobs or depend on Core.
-
-When no scheduler is supplied, Reactivity's documented synchronous fallback is used. Each direct
-write notifies immediately; `Patch` remains a single notification because it wraps all writes in
-`Reactive.StartBatch()` / `Reactive.EndBatch()`.
-
-## Subscription and action lifetime
-
-The shared state watcher is created lazily inside the state store's own child scope, not the scope
-of the first subscriber. A subscription created in an active caller scope removes itself when that
-scope stops unless `detached: true` is selected. Removing one callback never tears down the shared
-watcher needed by other callbacks.
-
-State and action callback lists are snapshotted before iteration so callbacks may add or remove
-subscriptions without corrupting the current pass.
-
-There is no proxy interception in .NET. Actions are observable only when their implementation
-uses a protected action helper. Async helpers await the task before running `After`, so it receives
-the resolved value; faults run `OnError` hooks and then propagate.
-
-## AOT and host boundaries
-
-- Store construction invokes `StateStoreSetup<TStore>` directly.
-- Component activation remains the responsibility of the supplied `IComponentFactory`.
-- Services are resolved only through the supplied `IServiceProvider`.
-- State copying uses an explicit typed delegate.
-- There is no `Activator.CreateInstance`, runtime constructor inspection, reflection-based state
-  traversal, dynamic code generation, DOM dependency, or browser interop dependency.
+Store activation and state copying use typed delegates. Deep watching traverses the
+source-generated `IReactiveObject` contract. State performs no dynamic code generation, runtime
+constructor discovery, or reflection-based state serialization.

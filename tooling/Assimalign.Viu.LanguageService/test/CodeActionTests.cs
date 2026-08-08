@@ -20,7 +20,7 @@ public class CodeActionTests
     public void GetCodeActions_VueScriptWithoutLanguage_InsertsCSharpLanguageAttribute()
     {
         const string source = "<script>export default {}</script>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var actions = service.GetCodeActions(
@@ -48,7 +48,7 @@ public class CodeActionTests
     {
         const string source = "<script lang=\"ts\">export default {}</script>\n";
         var optionStart = source.IndexOf("lang=\"ts\"", StringComparison.Ordinal);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var actions = service.GetCodeActions(
@@ -73,7 +73,7 @@ public class CodeActionTests
         const string source =
             "<template><div /></template>\n" +
             "<script>export default {}</script>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var actions = service.GetCodeActions(
@@ -89,7 +89,7 @@ public class CodeActionTests
     public void GetCodeActions_ViuFormatDocument_ReturnsEmpty()
     {
         // VIU1206 is Vue-format-only: a .viu @script block is always C#.
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, "@script {\n    public int Count;\n}\n", 1);
 
         var actions = service.GetCodeActions(

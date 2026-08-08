@@ -1,123 +1,93 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Runtime.ExceptionServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Exposes the host elements currently owned by a mounted component context.
+/// Executes authored components over the Components-owned model: resolve, activate, set up,
+/// prefetch, and render exactly once per operation.
 /// </summary>
-/// <remarks>
-/// This narrow bridge supports host-specific composition helpers such as browser CSS variables
-/// without adding browser concepts to <see cref="IComponentContext"/> or <see cref="IApplication"/>.
-/// A context not created by Core, a context queried before its first render, or an unmounted context
-/// returns an empty list.
-/// </remarks>
-public static class ComponentHost
+public sealed class ComponentHost
 {
-    /// <summary>Gets the outermost host elements rendered by a component.</summary>
-    /// <typeparam name="TNode">The expected host node type.</typeparam>
-    /// <param name="context">The mounted component context.</param>
-    /// <returns>The current outermost host elements.</returns>
-    public static IReadOnlyList<TNode> GetRootElements<TNode>(
-        IComponentContext context)
-        where TNode : notnull
+    private readonly ComponentRuntimeOptions _options;
+
+    /// <summary>Initializes the component host with borrowed application composition.</summary>
+    /// <param name="options">The explicit composition options.</param>
+    public ComponentHost(ComponentRuntimeOptions options)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        if (context is not ComponentContext componentContext
-            || componentContext.IsUnmounted
-            || componentContext.RootElementResolver is null)
-        {
-            return Array.Empty<TNode>();
-        }
+        ArgumentNullException.ThrowIfNull(options);
+        _options = options;
+    }
 
-        IReadOnlyList<object> nodes = componentContext.RootElementResolver();
-        if (nodes.Count == 0)
-        {
-            return Array.Empty<TNode>();
-        }
-
-        List<TNode> typed = new(nodes.Count);
-        for (int index = 0; index < nodes.Count; index++)
-        {
-            if (nodes[index] is TNode node)
-            {
-                typed.Add(node);
-            }
-        }
-
-        return typed.Count == 0
-            ? Array.Empty<TNode>()
-            : new ReadOnlyCollection<TNode>(typed);
+    internal ComponentActivation ActivatePersistent(
+        ComponentNode component,
+        RuntimeComponentContext? parent,
+        IReactiveWatchScheduler watchScheduler,
+        SuspenseBoundary? suspenseBoundary)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(watchScheduler);
+        return ComponentActivation.Activate(
+            component,
+            _options,
+            parent,
+            watchScheduler,
+            suspenseBoundary: suspenseBoundary);
     }
 
     /// <summary>
-    /// Gets the ordered direct keyed children of the component's rendered element or fragment root.
+    /// Activates, sets up, prefetches, and renders one component, returning the operation scope
+    /// that keeps the component's reactive lifetime alive while its tree is consumed. The render
+    /// runs against a <see cref="ComponentRenderFrame"/> constructed once per mount and kept on
+    /// the returned scope's lease, so repeated renders of the mount reuse the same frame — there
+    /// is no ambient render-helper state. Disposing or aborting the operation cancels the
+    /// component-lifetime token before stopping its effect scope, drains observed lifecycle
+    /// tasks, and never invokes client lifecycle phases. Specified by <c>[CMP-21]</c>,
+    /// <c>[CMP-22]</c>, <c>[SSR-5]</c>, and <c>[SSR-10]</c>.
     /// </summary>
-    /// <remarks>
-    /// Each result carries the first mounted host element below its direct child. Template and
-    /// fragment wrappers are traversed; children without a host element are omitted. Calling this
-    /// from a before-update callback observes the outgoing tree, while calling it from an updated
-    /// callback observes the patched incoming tree.
-    /// </remarks>
-    /// <typeparam name="TNode">The expected host element type.</typeparam>
-    /// <param name="context">The mounted component context.</param>
-    /// <returns>The ordered keyed child-to-element snapshots.</returns>
-    public static IReadOnlyList<KeyedComponentHostElement<TNode>>
-        GetKeyedChildElements<TNode>(IComponentContext context)
-        where TNode : notnull
+    /// <param name="request">The immutable invocation and optional parent operation scope.</param>
+    /// <param name="cancellationToken">Cancellation for setup-adjacent asynchronous work.</param>
+    /// <returns>The disposable render scope carrying the tree and live context.</returns>
+    public async ValueTask<IComponentRenderScope> RenderAsync(
+        ComponentRenderRequest request,
+        CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        if (context is not ComponentContext componentContext
-            || componentContext.IsUnmounted
-            || componentContext.KeyedChildElementResolver is null)
-        {
-            return Array.Empty<KeyedComponentHostElement<TNode>>();
-        }
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        IReadOnlyList<KeyedComponentHostElementSnapshot> snapshots =
-            componentContext.KeyedChildElementResolver();
-        if (snapshots.Count == 0)
-        {
-            return Array.Empty<KeyedComponentHostElement<TNode>>();
-        }
+        ComponentActivation activation = await ComponentActivation.ActivateAsync(
+            request.Component,
+            _options,
+            request.Parent?.Context).ConfigureAwait(false);
 
-        List<KeyedComponentHostElement<TNode>> typed =
-            new(snapshots.Count);
-        for (int index = 0; index < snapshots.Count; index++)
+        try
         {
-            KeyedComponentHostElementSnapshot snapshot =
-                snapshots[index];
-            if (snapshot.Element is TNode element)
+            Task prefetch = activation.Context.Run(
+                () => activation.Lifecycle.InvokeServerPrefetchAsync(cancellationToken));
+            await prefetch.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            VirtualNode? tree = activation.Render();
+            return new ComponentRenderLease(activation, tree);
+        }
+        catch (Exception exception)
+        {
+            ExceptionDispatchInfo failure = ExceptionDispatchInfo.Capture(exception);
+            try
             {
-                typed.Add(
-                    new KeyedComponentHostElement<TNode>(
-                        snapshot.Component,
-                        snapshot.Key,
-                        element));
+                await activation.ReleaseAsync().ConfigureAwait(false);
             }
-        }
+            catch
+            {
+                // Preserve the render or prefetch failure after completing best-effort teardown.
+            }
 
-        return typed.Count == 0
-            ? Array.Empty<KeyedComponentHostElement<TNode>>()
-            : new ReadOnlyCollection<KeyedComponentHostElement<TNode>>(
-                typed);
-    }
-
-    /// <summary>
-    /// Requests the owning renderer's host commit after a host-specific lifecycle helper has
-    /// buffered mutations.
-    /// </summary>
-    /// <param name="context">The mounted component context.</param>
-    public static void QueueHostCommit(IComponentContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        if (context is ComponentContext componentContext
-            && !componentContext.IsUnmounted)
-        {
-            componentContext.HostCommitScheduler?.Invoke();
+            failure.Throw();
+            throw;
         }
     }
 }

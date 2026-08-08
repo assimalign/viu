@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-
-using Assimalign.Viu.Components;
+using System.Collections.ObjectModel;
 
 namespace Assimalign.Viu.Router;
 
@@ -12,6 +11,7 @@ namespace Assimalign.Viu.Router;
 /// arguments independent of the route. Anything else is a hand-written
 /// <see cref="RouteComponentArgumentsResolver"/> that reads the <see cref="RouteLocation"/> directly.
 /// </summary>
+/// <remarks>Specified by <c>[RTR-4]</c>.</remarks>
 public static class RouteComponentArguments
 {
     /// <summary>
@@ -25,39 +25,41 @@ public static class RouteComponentArguments
 
     /// <summary>
     /// The same fixed arguments are passed to the component on every resolution, independent of the
-    /// route. The returned resolver hands back a single shared bag by reference, so a component with
-    /// fixed arguments never re-renders because its arguments changed.
+    /// route. The returned resolver exposes one immutable shared dictionary; each component
+    /// invocation snapshots that dictionary before mount or update, so callers cannot mutate the
+    /// route definition's fixed values.
     /// </summary>
     /// <param name="entries">The fixed argument name/value pairs.</param>
     /// <returns>A resolver returning the fixed arguments.</returns>
     public static RouteComponentArgumentsResolver FromValues(params (string Name, object? Value)[] entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        List<KeyValuePair<string, object?>> values = new(entries.Length);
+        Dictionary<string, object?> values = new(entries.Length, StringComparer.Ordinal);
         foreach ((string name, object? value) in entries)
         {
-            values.Add(new KeyValuePair<string, object?>(name, value));
+            ArgumentException.ThrowIfNullOrEmpty(name);
+            values.Add(name, value);
         }
 
-        ComponentArguments arguments = new(values);
+        IReadOnlyDictionary<string, object?> arguments =
+            new ReadOnlyDictionary<string, object?>(values);
         return _ => arguments;
     }
 
-    private static IComponentArguments? ParametersToProperties(RouteParameters parameters)
+    private static IReadOnlyDictionary<string, object?>? ParametersToProperties(
+        RouteParameters parameters)
     {
         if (parameters.Count == 0)
         {
             return null;
         }
 
-        List<KeyValuePair<string, object?>> values = new(parameters.Count);
-        foreach (var name in parameters.Names)
+        Dictionary<string, object?> values = new(parameters.Count, StringComparer.Ordinal);
+        foreach (string name in parameters.Names)
         {
-            values.Add(new KeyValuePair<string, object?>(
-                name,
-                parameters.GetString(name)));
+            values.Add(name, parameters.GetString(name));
         }
 
-        return new ComponentArguments(values);
+        return new ReadOnlyDictionary<string, object?>(values);
     }
 }

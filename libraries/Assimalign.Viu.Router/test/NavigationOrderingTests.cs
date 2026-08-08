@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ using static Assimalign.Viu.Router.Tests.RouterComponentsTestSupport;
 namespace Assimalign.Viu.Router.Tests;
 
 // Pins the full navigation resolution order and lifecycle-bound in-component guards. The redesigned
-// API passes IComponentContext and outlet depth explicitly; no ambient component or injection lookup
+// API passes ComponentContext and outlet depth explicitly; no ambient component or injection lookup
 // participates in registration.
 public class NavigationOrderingTests
 {
@@ -41,7 +42,7 @@ public class NavigationOrderingTests
                 ]),
             ]);
 
-        await router.Push("/section/a");
+        await router.PushAsync("/section/a");
         using var wrapper = MountView(router, layout, leafA, leafB);
         router.BeforeEach((_, _, _) =>
         {
@@ -56,7 +57,7 @@ public class NavigationOrderingTests
         router.AfterEach((_, _, _) => log.Add("afterEach"));
         log.Clear();
 
-        await router.Push("/section/b");
+        await router.PushAsync("/section/b");
         await wrapper.NextTickAsync();
 
         log.ShouldBe(
@@ -85,11 +86,11 @@ public class NavigationOrderingTests
                 new RouteRecord("/a", component: blocking.Request),
                 new RouteRecord("/b", component: viewB.Request),
             ]);
-        await router.Push("/a");
+        await router.PushAsync("/a");
         using var wrapper = MountView(router, blocking, viewB);
         wrapper.Html().ShouldBe("<div class=\"a\">a</div>");
 
-        NavigationFailure? failure = await router.Push("/b");
+        NavigationFailure? failure = await router.PushAsync("/b");
         await wrapper.NextTickAsync();
 
         failure.ShouldNotBeNull();
@@ -106,10 +107,10 @@ public class NavigationOrderingTests
         var router = new Router(
             RouterHistory.CreateMemory(),
             [new RouteRecord("/users/:id", component: view.Request)]);
-        await router.Push("/users/1");
+        await router.PushAsync("/users/1");
         using var wrapper = MountView(router, view);
 
-        NavigationFailure? failure = await router.Push("/users/2");
+        NavigationFailure? failure = await router.PushAsync("/users/2");
         await wrapper.NextTickAsync();
 
         failure.ShouldBeNull();
@@ -123,10 +124,10 @@ public class NavigationOrderingTests
         int leaveRuns = 0;
         var view = new TrackingComponent(
             "shared",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "shared")),
-                [ComponentTree.Text("shared")]),
+                [Text("shared")]),
             setup: context => RouterGuards.OnBeforeRouteLeave(
                 context,
                 (_, _, _) =>
@@ -140,33 +141,56 @@ public class NavigationOrderingTests
                 new RouteRecord("/a", component: view.Request),
                 new RouteRecord("/b", component: view.Request),
             ]);
-        await router.Push("/a");
+        await router.PushAsync("/a");
         using var wrapper = MountView(router, view);
-        IComponentContext? firstContext = view.Context;
+        ComponentContext? firstContext = view.Context;
 
-        await router.Push("/b");
+        await router.PushAsync("/b");
         await wrapper.NextTickAsync();
 
         leaveRuns.ShouldBe(1);
         view.SetupCount.ShouldBe(2);
         view.Context.ShouldNotBeSameAs(firstContext);
 
-        await router.Push("/a");
+        await router.PushAsync("/a");
         await wrapper.NextTickAsync();
 
         leaveRuns.ShouldBe(2);
         view.SetupCount.ShouldBe(3);
     }
 
+    [Fact]
+    public async Task RouterGuards_DepthOutsideCurrentMatchedRoute_ThrowsArgumentOutOfRangeException()
+    {
+        TrackingComponent view = LabelView("view");
+        var router = new Router(
+            RouterHistory.CreateMemory(),
+            [new RouteRecord("/view", component: view.Request)]);
+        await router.PushAsync("/view");
+        using var wrapper = MountView(router, view);
+        ComponentContext context = view.Context.ShouldNotBeNull();
+        NavigationGuard guard = static (_, _, _) =>
+            Task.FromResult(NavigationGuardResult.Allow);
+
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteLeave(context, guard, depth: -1));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteLeave(context, guard, depth: 1));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteUpdate(context, guard, depth: -1));
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => RouterGuards.OnBeforeRouteUpdate(context, guard, depth: 1));
+    }
+
     private static TrackingComponent GuardedLayout(List<string> log)
     {
         return new TrackingComponent(
             "layout",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "layout")),
                 [
-                    ComponentTree.Template<RouterView>(
+                    Component<RouterView>(
                         Arguments(("depth", 1))),
                 ]),
             setup: context => RouterGuards.OnBeforeRouteUpdate(
@@ -185,10 +209,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             label,
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", label)),
-                [ComponentTree.Text(label)]),
+                [Text(label)]),
             setup: context => RouterGuards.OnBeforeRouteLeave(
                 context,
                 (_, _, _) =>
@@ -205,10 +229,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             label,
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", label)),
-                [ComponentTree.Text(label)]),
+                [Text(label)]),
             setup: context => context.Lifecycle.OnMounted(
                 () => log.Add("mounted")));
     }
@@ -217,10 +241,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             "a",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "a")),
-                [ComponentTree.Text("a")]),
+                [Text("a")]),
             setup: context => RouterGuards.OnBeforeRouteLeave(
                 context,
                 (_, _, _) => Task.FromResult(NavigationGuardResult.Abort)));
@@ -231,10 +255,10 @@ public class NavigationOrderingTests
     {
         return new TrackingComponent(
             "user",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "user")),
-                [ComponentTree.Text("user")]),
+                [Text("user")]),
             setup: context => RouterGuards.OnBeforeRouteUpdate(
                 context,
                 (to, _, _) =>
@@ -253,7 +277,7 @@ public class NavigationOrderingTests
             _log = log;
         }
 
-        public Task<NavigationGuardResult> BeforeRouteEnter(
+        public Task<NavigationGuardResult> BeforeRouteEnterAsync(
             RouteLocation to,
             RouteLocation from,
             CancellationToken cancellationToken)

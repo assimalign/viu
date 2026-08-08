@@ -20,6 +20,7 @@ public sealed class StateStorePatchTests
             (mutation, _) => mutations.Add(mutation),
             detached: true);
 
+        // [STA-5], [STA-7] A grouped mutator is one scheduled PatchFunction notification.
         stateStore.Patch(
             state =>
             {
@@ -52,6 +53,7 @@ public sealed class StateStorePatchTests
             (mutation, _) => mutations.Add(mutation),
             detached: true);
 
+        // [STA-5], [STA-6] State copying is explicit and typed, never reflection-backed.
         stateStore.Patch(
             new CounterState
             {
@@ -79,6 +81,7 @@ public sealed class StateStorePatchTests
             (mutation, _) => mutations.Add(mutation),
             detached: true);
 
+        // [STA-7] The scheduler deduplicates several direct writes into one pre-flush job.
         stateStore.State.Count = 1;
         stateStore.State.Step = 9;
 
@@ -102,6 +105,7 @@ public sealed class StateStorePatchTests
             (mutation, _) => mutations.Add(mutation),
             detached: true);
 
+        // [STA-7] No scheduler means synchronous direct-write delivery.
         stateStore.State.Count = 1;
         mutations.Count.ShouldBe(1);
 
@@ -159,7 +163,7 @@ public sealed class StateStorePatchTests
     }
 
     [Fact]
-    public void QueuedChanges_CarryTheLatestPatchKindInTheFlush()
+    public void QueuedChanges_CarryLatestPatchKindInFlush()
     {
         TestReactiveWatchScheduler scheduler = new();
         using StateStoreRegistry registry =

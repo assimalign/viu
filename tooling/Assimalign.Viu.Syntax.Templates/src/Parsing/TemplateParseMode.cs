@@ -20,5 +20,5 @@ public enum TemplateParseMode
     /// <summary>
     /// Single-file-component: content of all root-level tags except <c>&lt;template&gt;</c> is raw text.
     /// </summary>
-    Sfc = 2,
+    SingleFileComponent = 2,
 }

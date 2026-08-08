@@ -5,317 +5,335 @@ using System.Linq;
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.Tests;
 
 namespace Assimalign.Viu.Core.Tests;
 
-public sealed class ComponentHotReloadTests : IDisposable
+public sealed class ComponentHotReloadTests
 {
-    public ComponentHotReloadTests()
+    [Fact]
+    public void Classify_RegisteredMarkerSets_UsesConservativePrecedence()
     {
-        ComponentHotReload.Reset();
+        ComponentHotReload.Register(
+            typeof(ClassificationComponent),
+            "classification-component",
+            typeof(ClassificationTemplateMarker),
+            typeof(ClassificationScriptMarker),
+            typeof(ClassificationStyleMarker));
+
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(ClassificationStyleMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.StyleOnly);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(ClassificationStyleMarker), typeof(ClassificationTemplateMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.Template);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(ClassificationTemplateMarker), typeof(ClassificationScriptMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.ScriptReset);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(ClassificationComponent)])
+            .ShouldBe(ComponentHotReloadChangeKind.ScriptReset);
+        ComponentHotReload.Classify(typeof(ClassificationComponent), null)
+            .ShouldBe(ComponentHotReloadChangeKind.ScriptReset);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(UnrelatedMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.None);
     }
 
     [Fact]
-    public void ApplyUpdates_TemplateOnlyChange_RemountsWithUpdatedGeneratedCode()
+    public void ApplyUpdates_ScriptMarker_RaisesOneResetNotificationForRegisteredComponent()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
+        ComponentHotReload.Register(
+            typeof(NotificationComponent),
+            "notification-component",
+            typeof(NotificationTemplateMarker),
+            typeof(NotificationScriptMarker),
+            typeof(NotificationStyleMarker));
+        List<(string Identifier, Type ComponentType)> notifications = [];
+        ComponentScriptUpdateResetHandler handler = (identifier, componentType) =>
+        {
+            if (componentType == typeof(NotificationComponent))
+            {
+                notifications.Add((identifier, componentType));
+            }
+        };
+        ComponentHotReload.ScriptUpdateRequiresReset += handler;
 
-        renderer.Render(request, host.Root, application);
-        pump.RunUntilIdle();
-        HotReloadTemplate previousInstance = source.Instances.Single();
-        previousInstance.State = 7;
-        source.RenderedLabel = "after";
+        try
+        {
+            ComponentHotReload.ApplyUpdates([typeof(NotificationScriptMarker)]);
+        }
+        finally
+        {
+            ComponentHotReload.ScriptUpdateRequiresReset -= handler;
+        }
 
-        ComponentHotReload.ApplyUpdates(
-        [
-            typeof(HotReloadTemplate.TemplateUpdateMarker),
-            typeof(HotReloadTemplate),
-        ]);
-        pump.RunUntilIdle();
+        notifications.ShouldHaveSingleItem();
+        notifications[0].Identifier.ShouldBe("notification-component");
+        notifications[0].ComponentType.ShouldBe(typeof(NotificationComponent));
+    }
+
+    [Fact]
+    public void ApplyUpdates_TemplateChange_RemountsWithFreshStateAndUpdatedRenderCode()
+    {
+        using var host = new RendererParityHost();
+        HotReloadProbeSource source = new();
+        ComponentNode request = CreateProbeRequest();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RegisterProbeMetadata();
+
+        renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+        HotReloadProbeComponent previous = source.Instances.Single();
+        previous.State = 7;
+        source.Label = "after";
+
+        ComponentHotReload.ApplyUpdates([typeof(ProbeTemplateMarker)]);
+        host.RunScheduledFlushes();
 
         source.Instances.Count.ShouldBe(2);
-        HotReloadTemplate nextInstance = source.Instances[1];
-        nextInstance.ShouldNotBeSameAs(previousInstance);
-        previousInstance.IsDisposed.ShouldBeTrue();
-        previousInstance.ScopeWasDisposed.ShouldBeTrue();
-        previousInstance.RenderCount.ShouldBe(1);
-        nextInstance.SetupCount.ShouldBe(1);
-        nextInstance.State.ShouldBe(0);
-        host.Text(host.Root).ShouldBe("after:0");
+        HotReloadProbeComponent next = source.Instances[1];
+        next.ShouldNotBeSameAs(previous);
+        previous.IsDisposed.ShouldBeTrue();
+        previous.ScopeWasDisposed.ShouldBeTrue();
+        previous.RenderCount.ShouldBe(1);
+        next.SetupCount.ShouldBe(1);
+        next.State.ShouldBe(0);
+        host.Container.DescendantText.ShouldBe("after:0");
 
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
+        renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public void ApplyUpdates_StyleOnlyChange_DoesNoComponentWork()
+    public void ApplyUpdates_StyleOnlyChange_DoesNoMountedComponentWork()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
+        using var host = new RendererParityHost();
+        HotReloadProbeSource source = new();
+        ComponentNode request = CreateProbeRequest();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RegisterProbeMetadata();
+        renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+        HotReloadProbeComponent instance = source.Instances.Single();
+        source.Label = "must-not-render";
 
-        renderer.Render(request, host.Root, application);
-        pump.RunUntilIdle();
-        HotReloadTemplate instance = source.Instances.Single();
-        source.RenderedLabel = "must-not-render";
+        ComponentHotReload.ApplyUpdates([typeof(ProbeStyleMarker)]);
+        host.RunScheduledFlushes();
 
-        ComponentHotReload.ApplyUpdates(
-        [
-            typeof(HotReloadTemplate.StyleUpdateMarker),
-            typeof(HotReloadTemplate),
-        ]);
-        pump.RunUntilIdle();
-
+        source.Instances.ShouldHaveSingleItem();
         instance.RenderCount.ShouldBe(1);
-        source.Instances.Count.ShouldBe(1);
-        host.Text(host.Root).ShouldBe("before:0");
+        host.Container.DescendantText.ShouldBe("before:0");
 
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
+        renderer.Render(null, host.Container);
     }
 
     [Fact]
-    public void ApplyUpdates_MixedBlockChange_ScriptResetTakesPrecedenceAndResetsInPlace()
+    public void ApplyUpdates_MixedMarkers_ScriptResetTakesPrecedenceAndNotifiesOnce()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
-        List<(string Identifier, Type Type)> resetNotifications = [];
-        ComponentHotReload.ScriptUpdateRequiresReset +=
-            (identifier, type) =>
-                resetNotifications.Add((identifier, type));
+        using var host = new RendererParityHost();
+        HotReloadProbeSource source = new();
+        ComponentNode request = CreateProbeRequest();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RegisterProbeMetadata();
+        List<(string Identifier, Type ComponentType)> notifications = [];
+        ComponentScriptUpdateResetHandler handler = (identifier, componentType) =>
+        {
+            if (componentType == typeof(HotReloadProbeComponent))
+            {
+                notifications.Add((identifier, componentType));
+            }
+        };
+        ComponentHotReload.ScriptUpdateRequiresReset += handler;
 
-        renderer.Render(request, host.Root, application);
-        pump.RunUntilIdle();
-        HotReloadTemplate previousInstance = source.Instances.Single();
-        previousInstance.State = 9;
-        source.RenderedLabel = "script-after";
+        try
+        {
+            renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+            HotReloadProbeComponent previous = source.Instances.Single();
+            previous.State = 9;
+            source.Label = "script-after";
 
-        ComponentHotReload.ApplyUpdates(
-        [
-            typeof(HotReloadTemplate.TemplateUpdateMarker),
-            typeof(HotReloadTemplate.ScriptUpdateMarker),
-            typeof(HotReloadTemplate.StyleUpdateMarker),
-            typeof(HotReloadTemplate),
-        ]);
-        pump.RunUntilIdle();
+            ComponentHotReload.ApplyUpdates(
+            [
+                typeof(ProbeStyleMarker),
+                typeof(ProbeTemplateMarker),
+                typeof(ProbeScriptMarker),
+            ]);
+            host.RunScheduledFlushes();
 
-        resetNotifications.ShouldBe(
-        [
-            ("component:test", typeof(HotReloadTemplate)),
-        ]);
-        source.Instances.Count.ShouldBe(2);
-        HotReloadTemplate nextInstance = source.Instances[1];
-        nextInstance.ShouldNotBeSameAs(previousInstance);
-        previousInstance.IsDisposed.ShouldBeTrue();
-        previousInstance.ScopeWasDisposed.ShouldBeTrue();
-        previousInstance.RenderCount.ShouldBe(1);
-        nextInstance.SetupCount.ShouldBe(1);
-        nextInstance.State.ShouldBe(0);
-        host.Text(host.Root).ShouldBe("script-after:0");
+            notifications.ShouldBe(
+            [
+                ("hot-reload-probe", typeof(HotReloadProbeComponent)),
+            ]);
+            source.Instances.Count.ShouldBe(2);
+            previous.IsDisposed.ShouldBeTrue();
+            previous.ScopeWasDisposed.ShouldBeTrue();
+            host.Container.DescendantText.ShouldBe("script-after:0");
 
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
+            renderer.Render(null, host.Container);
+        }
+        finally
+        {
+            ComponentHotReload.ScriptUpdateRequiresReset -= handler;
+        }
     }
 
     [Fact]
-    public void ApplyUpdates_HydratedScriptChange_ResetsTheRegisteredComponentInPlace()
+    public void ApplyUpdates_UnknownMarkersDoNothingAndNullConservativelyRemounts()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        FakeHostNode serverText = host.CreateServerText("before:0");
-        host.AppendServerChild(host.Root, serverText);
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
+        using var host = new RendererParityHost();
+        HotReloadProbeSource source = new();
+        ComponentNode request = CreateProbeRequest();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RegisterProbeMetadata();
+        renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+        HotReloadProbeComponent initial = source.Instances.Single();
+        source.Label = "all";
 
-        renderer.Hydrate(request, host.Root, application);
-        pump.RunUntilIdle();
-        host.Root.Children.Single().ShouldBeSameAs(serverText);
-        HotReloadTemplate previousInstance = source.Instances.Single();
-        source.RenderedLabel = "hydrated-script-after";
+        ComponentHotReload.ApplyUpdates([typeof(UnrelatedMarker)]);
+        host.RunScheduledFlushes();
 
-        ComponentHotReload.ApplyUpdates(
-        [
-            typeof(HotReloadTemplate.ScriptUpdateMarker),
-            typeof(HotReloadTemplate),
-        ]);
-        pump.RunUntilIdle();
-
-        source.Instances.Count.ShouldBe(2);
-        previousInstance.IsDisposed.ShouldBeTrue();
-        previousInstance.ScopeWasDisposed.ShouldBeTrue();
-        host.Text(host.Root).ShouldBe("hydrated-script-after:0");
-
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
-    }
-
-    [Fact]
-    public void ApplyUpdates_UnchangedAndUnknownTypes_DoNothing()
-    {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
-
-        renderer.Render(request, host.Root, application);
-        pump.RunUntilIdle();
-        HotReloadTemplate instance = source.Instances.Single();
-        source.RenderedLabel = "must-not-render";
-
-        ComponentHotReload.ApplyUpdates(
-        [
-            typeof(string),
-            typeof(int),
-        ]);
-        pump.RunUntilIdle();
-
-        instance.RenderCount.ShouldBe(1);
-        source.Instances.Count.ShouldBe(1);
-        host.Text(host.Root).ShouldBe("before:0");
-
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
-    }
-
-    [Fact]
-    public void ApplyUpdates_NullTypes_ConservativelyRemountsEveryRegisteredComponent()
-    {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
-
-        renderer.Render(request, host.Root, application);
-        pump.RunUntilIdle();
-        HotReloadTemplate previousInstance = source.Instances.Single();
-        source.RenderedLabel = "all";
+        source.Instances.ShouldHaveSingleItem();
+        initial.RenderCount.ShouldBe(1);
+        host.Container.DescendantText.ShouldBe("before:0");
 
         ComponentHotReload.ApplyUpdates(updatedTypes: null);
-        pump.RunUntilIdle();
+        host.RunScheduledFlushes();
 
         source.Instances.Count.ShouldBe(2);
-        previousInstance.IsDisposed.ShouldBeTrue();
-        source.Instances[1].ShouldNotBeSameAs(previousInstance);
-        host.Text(host.Root).ShouldBe("all:0");
+        initial.IsDisposed.ShouldBeTrue();
+        host.Container.DescendantText.ShouldBe("all:0");
 
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
+        renderer.Render(null, host.Container);
     }
 
     [Fact]
     public void ApplyUpdates_UnmountedComponent_IsNotRetainedOrRendered()
     {
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
-        HotReloadSource source = new();
-        ITemplateComponent request = ComponentTree.Template<HotReloadTemplate>();
-        IApplicationContext application = CreateApplication(source, request);
-        FakeHost host = new();
-        Renderer<FakeHostNode> renderer =
-            RendererFactory.CreateRenderer(host.Options);
+        using var host = new RendererParityHost();
+        HotReloadProbeSource source = new();
+        ComponentNode request = CreateProbeRequest();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RegisterProbeMetadata();
+        renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+        HotReloadProbeComponent instance = source.Instances.Single();
+        renderer.Render(null, host.Container);
 
-        renderer.Render(request, host.Root, application);
-        pump.RunUntilIdle();
-        HotReloadTemplate instance = source.Instances.Single();
-        renderer.Render(null, host.Root);
-        pump.RunUntilIdle();
+        ComponentHotReload.ApplyUpdates([typeof(ProbeTemplateMarker)]);
+        host.RunScheduledFlushes();
 
-        ComponentHotReload.ApplyUpdates(
-        [
-            typeof(HotReloadTemplate.TemplateUpdateMarker),
-            typeof(HotReloadTemplate),
-        ]);
-        pump.RunUntilIdle();
-
+        source.Instances.ShouldHaveSingleItem();
         instance.RenderCount.ShouldBe(1);
-        source.Instances.Count.ShouldBe(1);
-        host.Root.Children.ShouldBeEmpty();
+        host.Container.Children.ShouldBeEmpty();
     }
 
-    public void Dispose()
+    [Fact]
+    public void ApplyUpdates_HydratedScriptChange_RemountsRegisteredComponent()
     {
-        ComponentHotReload.Reset();
         Scheduler.Reset();
-    }
-
-    private static IApplicationContext CreateApplication(
-        HotReloadSource source,
-        ITemplateComponent request)
-    {
-        ComponentFactory factory = new(
-        [
-            new ComponentRegistration(
-                typeof(HotReloadTemplate),
-                source.Create),
-        ]);
-        return new ApplicationContext(
-            request,
-            factory,
-            new EmptyServiceProvider());
-    }
-
-    private sealed class HotReloadSource
-    {
-        internal string ComponentIdentifier { get; set; } = "component:test";
-
-        internal string RenderedLabel { get; set; } = "before";
-
-        internal List<HotReloadTemplate> Instances { get; } = [];
-
-        internal IComponentTemplate Create()
+        Queue<Action> scheduledFlushes = [];
+        using IDisposable registration = Scheduler.UseFlushDispatcher(scheduledFlushes.Enqueue);
+        try
         {
-            HotReloadTemplate instance = new(this);
+            HydrationWalkerFakeHost host = new();
+            HydrationWalkerHostNode serverText = host.CreateServerText("before:0");
+            host.AppendServerChild(host.Root, serverText);
+            HotReloadProbeSource source = new();
+            ComponentNode request = CreateProbeRequest();
+            Renderer<HydrationWalkerHostNode> renderer =
+                RendererFactory.CreateRenderer(host.Options);
+            RegisterProbeMetadata();
+            renderer.Hydrate(request, host.Root, CreateProbeApplication(request, source));
+            HotReloadProbeComponent previous = source.Instances.Single();
+            source.Label = "hydrated-after";
+
+            ComponentHotReload.ApplyUpdates([typeof(ProbeScriptMarker)]);
+            while (scheduledFlushes.Count > 0)
+            {
+                scheduledFlushes.Dequeue()();
+            }
+
+            source.Instances.Count.ShouldBe(2);
+            previous.IsDisposed.ShouldBeTrue();
+            previous.ScopeWasDisposed.ShouldBeTrue();
+            serverText.Parent.ShouldBeNull();
+            host.Root.Children.ShouldHaveSingleItem().Data.ShouldBe("hydrated-after:0");
+
+            renderer.Render(null, host.Root);
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
+    }
+
+    private static void RegisterProbeMetadata()
+    {
+        ComponentHotReload.Register(
+            typeof(HotReloadProbeComponent),
+            "hot-reload-probe",
+            typeof(ProbeTemplateMarker),
+            typeof(ProbeScriptMarker),
+            typeof(ProbeStyleMarker));
+    }
+
+    private static ComponentNode CreateProbeRequest() =>
+        new(ComponentReference.ForType(typeof(HotReloadProbeComponent)));
+
+    private static ApplicationContext CreateProbeApplication(
+        ComponentNode root,
+        HotReloadProbeSource source)
+    {
+        var components = new ComponentFactory();
+        components.Register(
+            new ComponentRegistration(
+                root.Component,
+                new ComponentContract(),
+                _ => source.Create()));
+        return new ApplicationContext(
+            new ApplicationOptions
+            {
+                RootComponent = root,
+                Components = components,
+            });
+    }
+
+    private sealed class ClassificationComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) => _ => null;
+    }
+
+    private sealed class NotificationComponent : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) => _ => null;
+    }
+
+    private sealed class HotReloadProbeSource
+    {
+        internal string Label { get; set; } = "before";
+
+        internal List<HotReloadProbeComponent> Instances { get; } = [];
+
+        internal HotReloadProbeComponent Create()
+        {
+            var instance = new HotReloadProbeComponent(this);
             Instances.Add(instance);
             return instance;
         }
     }
 
-    private sealed class HotReloadTemplate :
-        IComponentTemplate,
-        IComponentHotReloadMetadata,
-        IDisposable
+    private sealed class HotReloadProbeComponent : IComponent, IDisposable
     {
-        private readonly HotReloadSource _source;
-        private string? _renderedLabelCache;
+        private readonly HotReloadProbeSource _source;
 
-        internal HotReloadTemplate(HotReloadSource source)
+        internal HotReloadProbeComponent(HotReloadProbeSource source)
         {
             _source = source;
         }
-
-        public string ComponentIdentifier => _source.ComponentIdentifier;
-
-        public Type TemplateUpdateMarkerType => typeof(TemplateUpdateMarker);
-
-        public Type ScriptUpdateMarkerType => typeof(ScriptUpdateMarker);
-
-        public Type StyleUpdateMarkerType => typeof(StyleUpdateMarker);
 
         internal int State { get; set; }
 
@@ -327,44 +345,61 @@ public sealed class ComponentHotReloadTests : IDisposable
 
         internal bool ScopeWasDisposed { get; private set; }
 
-        public ComponentRenderer Setup(IComponentContext context)
+        public ComponentRenderer Setup(ComponentContext context)
         {
+            _ = context;
             SetupCount++;
             Reactive.OnScopeDispose(() => ScopeWasDisposed = true);
-            return () => (IComponent)RenderTemplate();
-        }
-
-        private object RenderTemplate()
-        {
-            RenderCount++;
-            _renderedLabelCache ??= _source.RenderedLabel;
-            return ComponentTree.Text(
-                $"{_renderedLabelCache}:{State}");
+            return _ =>
+            {
+                RenderCount++;
+                return new TextNode($"{_source.Label}:{State}");
+            };
         }
 
         public void Dispose()
         {
             IsDisposed = true;
         }
-
-        internal static class TemplateUpdateMarker
-        {
-        }
-
-        internal static class ScriptUpdateMarker
-        {
-        }
-
-        internal static class StyleUpdateMarker
-        {
-        }
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
+    private sealed class ClassificationTemplateMarker
     {
-        public object? GetService(Type serviceType)
-        {
-            return null;
-        }
+    }
+
+    private sealed class ClassificationScriptMarker
+    {
+    }
+
+    private sealed class ClassificationStyleMarker
+    {
+    }
+
+    private sealed class NotificationTemplateMarker
+    {
+    }
+
+    private sealed class NotificationScriptMarker
+    {
+    }
+
+    private sealed class NotificationStyleMarker
+    {
+    }
+
+    private sealed class UnrelatedMarker
+    {
+    }
+
+    private sealed class ProbeTemplateMarker
+    {
+    }
+
+    private sealed class ProbeScriptMarker
+    {
+    }
+
+    private sealed class ProbeStyleMarker
+    {
     }
 }

@@ -6,118 +6,111 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The route outlet. It renders the component of the matched record at its nesting depth: the
-/// outermost view renders the first entry of <see cref="RouteLocation.Matched"/>, a view nested
-/// inside that component renders the second, and so on. Because Viu has no hierarchical component
-/// dependency facility, a view cannot discover its own depth from an ancestor — nesting depth is an
-/// explicit <c>depth</c> argument (zero by default) that a nested layout passes on. The reactive
-/// <see cref="Router.CurrentRoute"/> read in the render function re-renders the view on navigation,
-/// and the renderer's component diff retains an unchanged matched template request. Specified by
-/// <c>[RTR-4]</c>.
+/// Renders the matched route subtree at one explicit outlet depth. The outermost view uses depth
+/// zero; a nested layout supplies the next depth because Viu deliberately has no hierarchical
+/// convention-injection API.
 /// </summary>
 /// <remarks>
-/// Deliberate scope decisions (see <c>docs/DESIGN.md</c>): one default view per record — there are
-/// no named views; arguments flow through the record's <see cref="RouteRecord.ArgumentsResolver"/>;
-/// and a record without a component renders a comment placeholder rather than being skipped in the
-/// depth walk, so a componentless layout record does not shift its children's depth. Not thread-safe
-/// (single-threaded JS event-loop model).
+/// The tracked <see cref="Router.CurrentRoute"/> read re-renders the outlet after navigation. A
+/// matched <see cref="ComponentNode"/> retains its component reference, slots, listeners,
+/// directives, mount reference, and render plan while route arguments override same-named authored
+/// arguments. Its effective key combines route-record identity with the authored key: the same
+/// matched record is retained across parameter-only navigation, while two records using the same
+/// component remain distinct. Non-component route nodes are returned unchanged. One default view
+/// is supported per record; named views and lazy route components remain outside this feature.
+/// Not thread-safe; Viu drives it on the host event loop. Specified by <c>[RTR-4]</c>,
+/// <c>[RTR-7]</c>, <c>[CMP-7]</c>, and <c>[CMP-33]</c>.
 /// </remarks>
-public sealed class RouterView : IComponentTemplate
+public sealed class RouterView : IComponent
 {
-    private static readonly IReadOnlyList<IComponentParameter> DeclaredParameters =
-    [
-        new ComponentParameter("depth", defaultFactory: static () => 0),
-    ];
+    private static readonly ComponentContract Contract = new(
+        renderCacheSize: 0,
+        displayName: "RouterView",
+        flags: ComponentFlags.None,
+        parameters:
+        [
+            new ComponentParameter("depth", defaultFactory: static () => 0),
+        ]);
+
+    /// <summary>Initializes one route-outlet component instance.</summary>
+    public RouterView()
+    {
+    }
+
+    /// <summary>Gets the reflection-free component registration.</summary>
+    public static ComponentRegistration Registration { get; } = new(
+        ComponentReference.ForType(typeof(RouterView)),
+        Contract,
+        static _ => new RouterView());
 
     /// <inheritdoc/>
-    public string? Name => "RouterView";
-
-    /// <inheritdoc/>
-    public IReadOnlyList<IComponentParameter>? Parameters => DeclaredParameters;
-
-    /// <inheritdoc/>
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         Router? router = RouterResolution.Resolve(context);
 
-        return () =>
+        return _ =>
         {
             if (router is null)
             {
                 return null;
             }
 
-            // Tracked read: the render effect re-runs on every completed navigation.
             RouteLocation route = router.CurrentRoute.Value;
             IReadOnlyList<RouteRecord> matched = route.Matched;
-            int depth = context.Arguments.Get<int>("depth");
+            int depth = ReadDepth(context.Bindings.Parameters);
             if (depth < 0 || depth >= matched.Count)
             {
                 return null;
             }
 
             RouteRecord record = matched[depth];
-            if (record.Component is not IComponent component)
+            if (record.Component is not ComponentNode component)
             {
-                return null;
+                return record.Component;
             }
 
-            if (component is not ITemplateComponent template)
-            {
-                return component;
-            }
-
-            IComponentArguments? routeArguments =
-                record.ArgumentsResolver?.Invoke(route);
-            IComponentArguments arguments = routeArguments is null
-                ? template.Arguments
-                : MergeArguments(template.Arguments, routeArguments);
-            return CopyTemplateForRecord(template, arguments, record);
+            IReadOnlyDictionary<string, object?> arguments = MergeArguments(
+                component.Invocation.Arguments,
+                record.ArgumentsResolver?.Invoke(route));
+            ComponentInvocation invocation = new(
+                arguments,
+                component.Invocation.Slots,
+                component.Invocation.Listeners,
+                component.Invocation.Directives,
+                component.Invocation.SlotStability);
+            return new ComponentNode(
+                component.Component,
+                invocation,
+                new MatchedRouteKey(record, component.Key),
+                component.MountReference,
+                component.RenderPlan);
         };
     }
 
-    private static IComponentArguments MergeArguments(
-        IComponentArguments existing,
-        IComponentArguments routeArguments)
+    private static int ReadDepth(IReadOnlyDictionary<string, object?> parameters)
     {
-        Dictionary<string, object?> merged = new(StringComparer.Ordinal);
-        foreach (KeyValuePair<string, object?> argument in existing)
+        return parameters.TryGetValue("depth", out object? value) && value is int depth
+            ? depth
+            : 0;
+    }
+
+    private static IReadOnlyDictionary<string, object?> MergeArguments(
+        IReadOnlyDictionary<string, object?> existing,
+        IReadOnlyDictionary<string, object?>? routeArguments)
+    {
+        if (routeArguments is null || routeArguments.Count == 0)
         {
-            merged[argument.Key] = argument.Value;
+            return existing;
         }
 
+        Dictionary<string, object?> merged = new(existing, StringComparer.Ordinal);
         foreach (KeyValuePair<string, object?> argument in routeArguments)
         {
             merged[argument.Key] = argument.Value;
         }
 
-        return new ComponentArguments(merged);
-    }
-
-    private static ITemplateComponent CopyTemplateForRecord(
-        ITemplateComponent template,
-        IComponentArguments arguments,
-        RouteRecord record)
-    {
-        MatchedRouteKey key = new(record, template.Key);
-        return template.TemplateType is Type templateType
-            ? new TemplateComponent(
-                templateType,
-                arguments,
-                template.Slots,
-                key,
-                template.Optimization,
-                template.Listeners,
-                template.Directives)
-            : new TemplateComponent(
-                template.TemplateName!,
-                arguments,
-                template.Slots,
-                key,
-                template.Optimization,
-                template.Listeners,
-                template.Directives);
+        return merged;
     }
 
     private sealed class MatchedRouteKey : IEquatable<MatchedRouteKey>

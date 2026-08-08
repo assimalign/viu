@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,142 +9,153 @@ using Assimalign.Viu.Components;
 namespace Assimalign.Viu.Router;
 
 /// <summary>
-/// The navigation anchor. It renders an <c>&lt;a&gt;</c> whose <c>href</c> is resolved through the
-/// router (base included), applies the active and exact-active classes by matching its target
-/// against the current route, and intercepts an unmodified primary-button click to navigate
-/// client-side instead of triggering a page load. A modified, middle- or right-button, or
-/// already-prevented click deliberately falls through to the browser, so open-in-new-tab and the
-/// context menu keep working.
+/// Renders a navigation anchor whose href and active classes come from the current router, and
+/// intercepts only an unmodified primary-button click for client-side navigation.
 /// </summary>
 /// <remarks>
-/// Deliberate scope decisions (see <c>docs/DESIGN.md</c>): the <c>to</c> target is a string path —
-/// there is no location-object form; there is no slot-only rendering mode that hands the resolved
-/// href to the caller instead of emitting an anchor; and the <c>target="_blank"</c> escape reads the
-/// link's own <c>target</c> attribute. Not thread-safe (single-threaded JS event-loop model).
+/// Modified, non-primary, already-prevented, and <c>target="_blank"</c> clicks remain native browser
+/// navigations. The host-neutral click carrier keeps this library independent of Browser; the
+/// Browser.Router leaf maps a live host event onto it. The router is resolved only through
+/// <see cref="ComponentContext.Services"/>. The <c>to</c> input is a string path and the component
+/// always emits an anchor; location-object targets and slot-only rendering are non-goals. Not
+/// thread-safe; Viu drives it on the host event loop. Specified by <c>[RTR-4]</c>, <c>[RTR-7]</c>,
+/// and <c>[CMP-33]</c>.
 /// </remarks>
-public sealed class RouterLink : IComponentTemplate
+public sealed class RouterLink : IComponent
 {
-    private static readonly IReadOnlyList<IComponentParameter> DeclaredParameters =
-    [
-        new ComponentParameter("to", isRequired: true),
-        new ComponentParameter("replace", defaultFactory: static () => false),
-        new ComponentParameter("activeClass"),
-        new ComponentParameter("exactActiveClass"),
-    ];
+    private static readonly IReadOnlyDictionary<string, object?> EmptySlotArguments =
+        new ReadOnlyDictionary<string, object?>(
+            new Dictionary<string, object?>(0, StringComparer.Ordinal));
+    private static readonly ComponentContract Contract = new(
+        renderCacheSize: 0,
+        displayName: "RouterLink",
+        flags: ComponentFlags.InheritFallthroughBindings,
+        parameters:
+        [
+            new ComponentParameter("to", isRequired: true),
+            new ComponentParameter("replace", defaultFactory: static () => false),
+            new ComponentParameter("activeClass"),
+            new ComponentParameter("exactActiveClass"),
+        ]);
+
+    /// <summary>Initializes one navigation-anchor component instance.</summary>
+    public RouterLink()
+    {
+    }
+
+    /// <summary>Gets the reflection-free component registration.</summary>
+    public static ComponentRegistration Registration { get; } = new(
+        ComponentReference.ForType(typeof(RouterLink)),
+        Contract,
+        static _ => new RouterLink());
 
     /// <inheritdoc/>
-    public string? Name => "RouterLink";
-
-    /// <inheritdoc/>
-    public IReadOnlyList<IComponentParameter>? Parameters => DeclaredParameters;
-
-    /// <inheritdoc/>
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         Router? router = RouterResolution.Resolve(context);
 
-        // Built once and reused, so the anchor's onClick prop is a stable reference across renders
-        // (no listener re-patch). Reads to/replace at click time — no active effect, so untracked.
         void Navigate(object? raw)
         {
             if (router is null)
             {
                 return;
             }
+
             if (raw is RouterLinkClickEvent click)
             {
-                // Modifier keys, an already-prevented event, and non-primary buttons all fall through
-                // to the browser, so open-in-new-tab and the context menu keep working.
                 if (click.HasSystemModifier || click.DefaultPrevented || click.Button != 0)
                 {
                     return;
                 }
-                // target="_blank" opens a new context — let the browser handle it (before preventDefault).
-                if (IsBlankTarget(context.Attributes))
+
+                if (IsBlankTarget(context.Bindings.FallthroughBindings))
                 {
                     return;
                 }
+
                 click.PreventDefault();
             }
-            string? to = context.Arguments.Get<string>("to");
+
+            string? to = ReadString(context.Bindings.Parameters, "to");
             if (string.IsNullOrEmpty(to))
             {
                 return;
             }
-            // Push/Replace are awaitable, but a click handler is fire-and-forget; observe the returned
-            // task so an unexpected guard exception (already routed to Router.OnError) never surfaces
-            // as an unobserved task fault.
-            Task<NavigationFailure?> navigation = context.Arguments.Get<bool>("replace")
-                ? router.Replace(to)
-                : router.Push(to);
+
+            Task<NavigationFailure?> navigation = ReadBoolean(
+                context.Bindings.Parameters,
+                "replace")
+                    ? router.ReplaceAsync(to)
+                    : router.PushAsync(to);
             ObserveNavigation(navigation);
         }
 
-        return () =>
+        return _ =>
         {
-            IReadOnlyList<IComponent>? children = RenderDefaultSlot(context);
+            IReadOnlyList<VirtualNode>? children = RenderDefaultSlot(context);
             if (router is null)
             {
-                return ComponentTree.Element("a", children: children);
+                return new ElementNode(new QualifiedName("a"), children: children);
             }
 
-            string to = context.Arguments.Get<string>("to") ?? string.Empty;
+            string to = ReadString(context.Bindings.Parameters, "to") ?? string.Empty;
             RouteLocation target = router.Resolve(to);
-            // Tracked read: the render effect re-runs on navigation so the active classes stay current.
             RouteLocation current = router.CurrentRoute.Value;
-            var (isActive, isExactActive) = ComputeActive(current, target);
+            (bool isActive, bool isExactActive) = ComputeActive(current, target);
 
             string? activeClass =
-                context.Arguments.Get<string>("activeClass") ?? router.LinkActiveClass;
+                ReadString(context.Bindings.Parameters, "activeClass") ?? router.LinkActiveClass;
             string? exactActiveClass =
-                context.Arguments.Get<string>("exactActiveClass") ?? router.LinkExactActiveClass;
+                ReadString(context.Bindings.Parameters, "exactActiveClass")
+                ?? router.LinkExactActiveClass;
             string? classValue = BuildClass(
                 isActive ? activeClass : null,
                 isExactActive ? exactActiveClass : null);
 
-            List<IComponentAttribute> anchorAttributes =
+            List<ElementBinding> anchorBindings =
             [
-                new ComponentAttribute("href", router.CreateHref(target)),
+                ElementBinding.Attribute(
+                    new QualifiedName("href"),
+                    router.CreateHref(target)),
             ];
             if (classValue is not null)
             {
-                anchorAttributes.Add(new ComponentAttribute("class", classValue));
+                anchorBindings.Add(
+                    ElementBinding.Attribute(new QualifiedName("class"), classValue));
             }
 
-            anchorAttributes.Add(
-                new ComponentAttribute("onClick", (Action<object?>)Navigate));
-            return ComponentTree.Element(
-                "a",
-                new ComponentAttributes(anchorAttributes),
+            anchorBindings.Add(ElementBinding.Event("click", (Action<object?>)Navigate));
+            return new ElementNode(
+                new QualifiedName("a"),
+                anchorBindings,
                 children);
         };
     }
 
-    private static IReadOnlyList<IComponent>? RenderDefaultSlot(IComponentContext context)
+    private static IReadOnlyList<VirtualNode>? RenderDefaultSlot(ComponentContext context)
     {
-        if (!context.Slots.TryGetValue("default", out ComponentSlot? slot))
+        if (!context.Bindings.Slots.TryGetValue("default", out ComponentSlot? slot))
         {
             return null;
         }
 
-        IComponent? content = slot(new ComponentArguments());
+        VirtualNode? content = slot(EmptySlotArguments);
         return content is null ? null : [content];
     }
 
-    // The active model: the link is active when its target's leaf record appears anywhere in the
-    // current route's matched chain (an ancestor-or-self match) and the current parameters include
-    // the target's, so a parent link stays highlighted while a child route is showing. Exact-active
-    // additionally requires that record to be the current leaf and the two parameter sets to agree.
-    private static (bool IsActive, bool IsExactActive) ComputeActive(RouteLocation current, RouteLocation target)
+    private static (bool IsActive, bool IsExactActive) ComputeActive(
+        RouteLocation current,
+        RouteLocation target)
     {
         if (target.Matched.Count == 0)
         {
             return (false, false);
         }
-        var targetLeaf = target.Matched[^1];
-        var index = -1;
-        for (var position = 0; position < current.Matched.Count; position++)
+
+        RouteRecord targetLeaf = target.Matched[^1];
+        int index = -1;
+        for (int position = 0; position < current.Matched.Count; position++)
         {
             if (ReferenceEquals(current.Matched[position], targetLeaf))
             {
@@ -151,29 +163,33 @@ public sealed class RouterLink : IComponentTemplate
                 break;
             }
         }
+
         if (index < 0)
         {
             return (false, false);
         }
-        var isActive = IncludesParameters(current.Parameters, target.Parameters);
-        var isExactActive = isActive
+
+        bool isActive = IncludesParameters(current.Parameters, target.Parameters);
+        bool isExactActive = isActive
             && index == current.Matched.Count - 1
             && current.Parameters.Equals(target.Parameters);
         return (isActive, isExactActive);
     }
 
-    // Every parameter the target carries is present in the current location with the same value.
-    // A target with no parameters is vacuously included, which is what keeps a parent link active.
     private static bool IncludesParameters(RouteParameters current, RouteParameters target)
     {
-        foreach (var name in target.Names)
+        foreach (string name in target.Names)
         {
-            if (!current.TryGetString(name, out var currentValue)
-                || !string.Equals(currentValue, target.GetString(name), StringComparison.Ordinal))
+            if (!current.TryGetString(name, out string? currentValue)
+                || !string.Equals(
+                    currentValue,
+                    target.GetString(name),
+                    StringComparison.Ordinal))
             {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -183,20 +199,48 @@ public sealed class RouterLink : IComponentTemplate
         {
             return exactActive;
         }
+
         return exactActive is null ? active : active + " " + exactActive;
     }
 
-    private static bool IsBlankTarget(IComponentAttributeCollection attributes)
+    private static bool IsBlankTarget(
+        IReadOnlyDictionary<string, object?> fallthroughBindings)
     {
-        return attributes.TryGetValue("target", out object? value)
-            && value is string target
-            && target.Contains("_blank", StringComparison.OrdinalIgnoreCase);
+        if (!fallthroughBindings.TryGetValue("target", out object? value))
+        {
+            return false;
+        }
+
+        string? target = value switch
+        {
+            string text => text,
+            ElementBinding binding => binding.Value as string,
+            _ => null,
+        };
+        return target?.Contains("_blank", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static string? ReadString(
+        IReadOnlyDictionary<string, object?> parameters,
+        string name)
+    {
+        return parameters.TryGetValue(name, out object? value) ? value as string : null;
+    }
+
+    private static bool ReadBoolean(
+        IReadOnlyDictionary<string, object?> parameters,
+        string name)
+    {
+        return parameters.TryGetValue(name, out object? value) && value is true;
     }
 
     private static void ObserveNavigation(Task<NavigationFailure?> navigation)
-        => navigation.ContinueWith(
+    {
+        _ = navigation.ContinueWith(
             static task => _ = task.Exception,
             CancellationToken.None,
-            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskContinuationOptions.OnlyOnFaulted
+                | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
+    }
 }

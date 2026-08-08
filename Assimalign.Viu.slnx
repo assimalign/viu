@@ -83,6 +83,7 @@
 	</Folder>
 	<Folder Name="/viu/analyzers/Assimalign.Viu.Generators.Syntax/test/">
 		<Project Path="analyzers/Assimalign.Viu.Generators.Syntax/test/Assimalign.Viu.Generators.Syntax.Tests.csproj" />
+		<Project Path="analyzers/Assimalign.Viu.Generators.Syntax/test/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests/Assimalign.Viu.Generators.Syntax.CompiledFixtureTests.csproj" />
 	</Folder>
 	<Folder Name="/viu/build/">
 		<File Path="build/Build.props" />
@@ -299,6 +300,12 @@
 		<Project Path="libraries/Assimalign.Viu.Browser.Router/test/Assimalign.Viu.Browser.Router.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Core/docs/">
+		<File Path="libraries/Assimalign.Viu.Core/docs/ASYNCHRONOUS-AND-DYNAMIC-COMPONENTS.md" />
+		<File Path="libraries/Assimalign.Viu.Core/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Core/docs/KEEP-ALIVE.md" />
+		<File Path="libraries/Assimalign.Viu.Core/docs/OVERVIEW.md" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Core/src/">
 		<Project Path="libraries/Assimalign.Viu.Core/src/Assimalign.Viu.Core.csproj" />
 	</Folder>
@@ -307,6 +314,7 @@
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Components/" />
 	<Folder Name="/viu/libraries/Assimalign.Viu.Components/docs/">
+		<File Path="libraries/Assimalign.Viu.Components/docs/DESIGN.md" />
 		<File Path="libraries/Assimalign.Viu.Components/docs/OVERVIEW.md" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Components/src/">
@@ -347,7 +355,6 @@
 		<Project Path="libraries/Assimalign.Viu.Browser/src/Assimalign.Viu.Browser.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Browser/test/">
-		<Project Path="libraries/Assimalign.Viu.Browser/test/Assimalign.Viu.Browser.CompiledRenderTests/Assimalign.Viu.Browser.CompiledRenderTests.csproj" />
 		<Project Path="libraries/Assimalign.Viu.Browser/test/Assimalign.Viu.Browser.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/" />
@@ -359,22 +366,18 @@
 		<Project Path="libraries/Assimalign.Viu.ServerRenderer/src/Assimalign.Viu.ServerRenderer.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.ServerRenderer/test/">
+		<Project Path="libraries/Assimalign.Viu.ServerRenderer/test/Assimalign.Viu.ServerRenderer.DomKnowledgeFixture/Assimalign.Viu.ServerRenderer.DomKnowledgeFixture.csproj" />
 		<Project Path="libraries/Assimalign.Viu.ServerRenderer/test/Assimalign.Viu.ServerRenderer.Tests.csproj" />
 	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Shared/" />
-	<Folder Name="/viu/libraries/Assimalign.Viu.Shared/src/">
-		<Project Path="libraries/Assimalign.Viu.Shared/src/Assimalign.Viu.Shared.csproj" />
-	</Folder>
-	<Folder Name="/viu/libraries/Assimalign.Viu.Shared/test/">
-		<Project Path="libraries/Assimalign.Viu.Shared/test/Assimalign.Viu.Shared.GeneratorFixture/Assimalign.Viu.Shared.GeneratorFixture.csproj" />
-		<Project Path="libraries/Assimalign.Viu.Shared/test/Assimalign.Viu.Shared.Tests.csproj" />
-	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/" />
+	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/docs/">
+		<File Path="libraries/Assimalign.Viu.Testing/docs/DESIGN.md" />
+		<File Path="libraries/Assimalign.Viu.Testing/docs/OVERVIEW.md" />
+	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/src/">
 		<Project Path="libraries/Assimalign.Viu.Testing/src/Assimalign.Viu.Testing.csproj" />
 	</Folder>
 	<Folder Name="/viu/libraries/Assimalign.Viu.Testing/test/">
-		<Project Path="libraries/Assimalign.Viu.Testing/test/Assimalign.Viu.Testing.CompiledComponentTests/Assimalign.Viu.Testing.CompiledComponentTests.csproj" />
 		<Project Path="libraries/Assimalign.Viu.Testing/test/Assimalign.Viu.Testing.Tests.csproj" />
 	</Folder>
 </Solution>

@@ -27,7 +27,7 @@ public class DocumentSymbolTests
             "<style scoped>\n" +
             ".card { }\n" +
             "</style>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var symbols = service.GetDocumentSymbols(DocumentUri);
@@ -78,7 +78,7 @@ public class DocumentSymbolTests
             "<script setup lang=\"csharp\">\n" +
             "public int Count;\n" +
             "</script>\n";
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(VueDocumentUri, source, 1);
 
         var symbols = service.GetDocumentSymbols(VueDocumentUri);
@@ -96,7 +96,7 @@ public class DocumentSymbolTests
     [Fact]
     public void GetDocumentSymbols_UnopenedDocument_ReturnsEmpty()
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
 
         service.GetDocumentSymbols(DocumentUri).ShouldBeEmpty();
     }

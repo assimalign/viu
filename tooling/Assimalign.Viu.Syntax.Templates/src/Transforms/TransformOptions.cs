@@ -79,10 +79,10 @@ public sealed class TransformOptions
     public bool HoistStatic { get; set; }
 
     /// <summary>Whether compilation targets SSR. Defaults to <see langword="false"/>.</summary>
-    public bool Ssr { get; set; }
+    public bool IsServerRendering { get; set; }
 
     /// <summary>Whether this is a nested SSR slot compilation. Defaults to <see langword="false"/>.</summary>
-    public bool InSSR { get; set; }
+    public bool IsNestedServerRendering { get; set; }
 
     /// <summary>Whether component slots inherit the parent's scope id. Defaults to <see langword="true"/>.</summary>
     public bool Slotted { get; set; } = true;

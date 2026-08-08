@@ -7,13 +7,6 @@ namespace Assimalign.Viu.Reactivity;
 public interface IReactiveObject : IReactiveTraversable, IReactiveReadOnly
 {
     /// <summary>
-    /// Returns the underlying non-reactive object. Generated objects are reactive by identity, so
-    /// this is normally the same instance.
-    /// </summary>
-    /// <returns>The raw object.</returns>
-    object ToRaw();
-
-    /// <summary>
     /// Returns the dependency backing <paramref name="propertyName"/>, or
     /// <see langword="null"/> when the property is not reactive.
     /// </summary>

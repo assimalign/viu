@@ -1,25 +1,7 @@
 #nullable enable
-Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.Build() -> Assimalign.Viu.ServerRenderer.ServerRenderApplication!
-Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.ConfigureApplication(System.Action<Assimalign.Viu.ApplicationOptions!>! configure) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-Assimalign.Viu.ServerRenderer.ServerRenderApplication
-Assimalign.Viu.ServerRenderer.ServerRenderApplication.Context.get -> Assimalign.Viu.IApplicationContext!
-Assimalign.Viu.ServerRenderer.ServerRenderApplication.ServerRenderApplication(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null) -> void
-Assimalign.Viu.ServerRenderer.ServerRenderApplication.ServerRenderApplication(Assimalign.Viu.IApplicationContext! context) -> void
-static Assimalign.Viu.ServerRenderer.ServerRenderApplication.CreateBuilder() -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-static Assimalign.Viu.ServerRenderer.ServerRenderApplication.CreateBuilder(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStreamAsync(Assimalign.Viu.ServerRenderer.ServerRenderApplication! application, System.IO.TextWriter! writer, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStringAsync(Assimalign.Viu.ServerRenderer.ServerRenderApplication! application, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.Context.get -> Assimalign.Viu.IApplicationContext!
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.IsMounted.get -> bool
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.RootContext.get -> Assimalign.Viu.Components.IComponentContext?
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.ServerApplication(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services, Assimalign.Viu.State.IStateStoreRegistry? state = null) -> void
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.ServerApplication(Assimalign.Viu.IApplicationContext! context) -> void
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.Unmount() -> void
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.UnmountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
-*REMOVED*Assimalign.Viu.ServerRenderer.ServerApplication.Use(Assimalign.Viu.IApplicationPlugin! plugin) -> Assimalign.Viu.ServerRenderer.ServerApplication!
-*REMOVED*override Assimalign.Viu.ServerRenderer.ServerApplicationBuilder.Build() -> Assimalign.Viu.ServerRenderer.ServerApplication!
-*REMOVED*static Assimalign.Viu.ServerRenderer.ServerApplication.CreateBuilder() -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-*REMOVED*static Assimalign.Viu.ServerRenderer.ServerApplication.CreateBuilder(Assimalign.Viu.Components.IComponent! rootComponent, Assimalign.Viu.Components.IComponentFactory! components, System.IServiceProvider! services) -> Assimalign.Viu.ServerRenderer.ServerApplicationBuilder!
-*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStreamAsync(Assimalign.Viu.ServerRenderer.ServerApplication! application, System.IO.TextWriter! writer, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStringAsync(Assimalign.Viu.ServerRenderer.ServerApplication! application, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttr(string! key, object? value) -> string!
+*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttrs(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ElementBinding!>? bindings, Assimalign.Viu.Components.QualifiedName? elementName = null) -> string!
+*REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderDynamicAttr(string! key, object? value, string? tag = null) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttribute(string! key, object? value) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttributes(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ElementBinding!>? bindings, Assimalign.Viu.Components.QualifiedName? elementName = null) -> string!
+static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderDynamicAttribute(string! key, object? value, string? tag = null) -> string!

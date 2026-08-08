@@ -20,7 +20,6 @@ Set-StrictMode -Version Latest
 # a packable library that exists but is missing here fails Get-ViuLibraryProject.
 $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Reactivity',
-    'Assimalign.Viu.Shared',
     'Assimalign.Viu.Components',
     'Assimalign.Viu.State',
     'Assimalign.Viu.Router',

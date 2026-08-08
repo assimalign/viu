@@ -204,9 +204,9 @@ public class ScriptUsingDirectiveCompletionTests
     private static LanguagePosition UsingDirectivePosition()
         => PositionAfter(ComponentSource, "using \n", trailingAdjustment: -1);
 
-    private static IViuLanguageService CreateService(string source, LanguageProjectContext? context)
+    private static ILanguageService CreateService(string source, LanguageProjectContext? context)
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         if (context is not null)
         {
             ((IScriptSemanticLanguageService)service).ConfigureProjectContext(DocumentUri, context);

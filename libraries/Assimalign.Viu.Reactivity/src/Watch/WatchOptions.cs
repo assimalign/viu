@@ -3,7 +3,8 @@ namespace Assimalign.Viu.Reactivity;
 /// <summary>
 /// Options for <see cref="Reactive.Watch{T}(System.Func{T},WatchCallback{T},WatchOptions)"/> and
 /// <see cref="Reactive.WatchEffect(System.Action{OnCleanup},WatchOptions)"/>: deep traversal,
-/// immediate/once firing, and flush timing.
+/// immediate/once firing, and flush timing. Specified by <c>[RCT-5]</c>, <c>[RCT-7]</c>, and
+/// <c>[RCT-12]</c>.
 /// </summary>
 public sealed class WatchOptions
 {
@@ -37,14 +38,14 @@ public sealed class WatchOptions
 
     /// <summary>
     /// When the callback runs relative to the change. Defaults to
-    /// <see cref="WatchFlushMode.Sync"/> in the standalone reactivity layer; the runtime sets
+    /// <see cref="WatchFlushMode.Synchronous"/> in the standalone reactivity layer; the runtime sets
     /// <see cref="WatchFlushMode.Pre"/> and supplies a <see cref="Scheduler"/>.
     /// </summary>
-    public WatchFlushMode Flush { get; set; } = WatchFlushMode.Sync;
+    public WatchFlushMode Flush { get; set; } = WatchFlushMode.Synchronous;
 
     /// <summary>
     /// The scheduler that delivers <see cref="WatchFlushMode.Pre"/>/<see cref="WatchFlushMode.Post"/>
-    /// callbacks. Required for those modes; ignored for <see cref="WatchFlushMode.Sync"/>. When a
+    /// callbacks. Required for those modes; ignored for <see cref="WatchFlushMode.Synchronous"/>. When a
     /// pre/post watcher has no scheduler it falls back to synchronous delivery.
     /// </summary>
     public IReactiveWatchScheduler? Scheduler { get; set; }

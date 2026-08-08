@@ -1,12 +1,12 @@
 namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
-/// A code-generation object literal, e.g. a render node's props object or a compiled slots object.
+/// A code-generation object literal, e.g. a render node's properties object or a compiled slots object.
 /// </summary>
 public sealed record ObjectExpression : TemplateSyntaxNode
 {
     /// <summary>The object's properties, in source/emit order.</summary>
-    public required SyntaxList<Property> Properties { get; init; }
+    public required SyntaxList<ObjectProperty> Properties { get; init; }
 
     /// <summary>
     /// Whether this literal is a directive-modifier bag (<c>name → true</c>) rather than a property
@@ -18,5 +18,5 @@ public sealed record ObjectExpression : TemplateSyntaxNode
     public bool IsDirectiveModifiers { get; init; }
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsObjectExpression;
+    public override NodeType NodeType => NodeType.ObjectExpression;
 }

@@ -85,19 +85,20 @@ public class ScriptSemanticCompletionTests
             PositionAfter(source, "    Context."));
 
         // The syntax-only path answers with the static catalog instance; the semantic path binds
-        // the generated Context property's IComponentContext through the real compilation.
+        // the generated Context property's ComponentContext through the real compilation.
         completions.ShouldNotBeSameAs(ViuCompletionCatalog.ContextMembers);
         completions.Single(completion => completion.Label == "Lifecycle")
             .SortText.ShouldBe("00:Lifecycle");
         // The appended Context. scaffold catalog loses the first-wins dedup to the bound member.
-        completions.Single(completion => completion.Label == "Arguments")
-            .SortText.ShouldBe("00:Arguments");
+        completions.Single(completion => completion.Label == "Bindings")
+            .SortText.ShouldBe("00:Bindings");
+        completions.ShouldNotContain(completion => completion.Label == "Arguments");
         // Keywords never follow a dot.
         completions.ShouldNotContain(completion => completion.Label == "using");
     }
 
     [Fact]
-    public void GetCompletions_EditorBrowsableNeverRenderHelperMembers_OmitsCompilerSeam()
+    public void GetCompletions_RetiredStaticFacade_IsNotImported()
     {
         const string source =
             "<template>\n  <div>x</div>\n</template>\n" +
@@ -105,11 +106,11 @@ public class ScriptSemanticCompletionTests
             "public int Count { get; set; }\n" +
             "    \n" +
             "}\n";
-        var renderHelpers = new LanguageProjectSourceDocument(
-            "C:\\workspace\\App\\RenderHelpers.cs",
+        var retiredFacade = new LanguageProjectSourceDocument(
+            "C:\\workspace\\App\\RetiredStaticFacade.cs",
             "namespace Assimalign.Viu;\n" +
             "\n" +
-            "public static class RenderHelpers\n" +
+            "public static class RetiredStaticFacade\n" +
             "{\n" +
             "    [System.ComponentModel.EditorBrowsable(" +
             "System.ComponentModel.EditorBrowsableState.Never)]\n" +
@@ -124,15 +125,15 @@ public class ScriptSemanticCompletionTests
             IsComponent: false);
         var service = CreateService(
             source,
-            ScriptSemanticFixture.CreateContext(renderHelpers));
+            ScriptSemanticFixture.CreateContext(retiredFacade));
 
         var completions = service.GetCompletions(
             DocumentUri,
             PositionAfter(source, "set; }\n    "));
 
-        // [V01.01.14.02] RenderHelpers is statically imported into the generated unit containing
-        // @script, so filtering must honor EditorBrowsable on each imported member.
-        completions.ShouldContain(completion => completion.Label == "CompletionControl");
+        // [SFC-CG-1] adopted generated units import no retired static facade; neither its
+        // public member nor its retired underscore-prefixed seam enters unqualified completion.
+        completions.ShouldNotContain(completion => completion.Label == "CompletionControl");
         completions.ShouldNotContain(
             completion => completion.Label.StartsWith("_", StringComparison.Ordinal));
     }
@@ -218,12 +219,12 @@ public class ScriptSemanticCompletionTests
         service.ResolveCompletionDocumentation(DocumentUri, "Count").ShouldBeNull();
     }
 
-    private static IViuLanguageService CreateService(
+    private static ILanguageService CreateService(
         string source,
         LanguageProjectContext? context,
         string? contextDocumentUri = null)
     {
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         if (context is not null)
         {
             ((IScriptSemanticLanguageService)service).ConfigureProjectContext(

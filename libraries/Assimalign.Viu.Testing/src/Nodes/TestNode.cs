@@ -1,23 +1,22 @@
 namespace Assimalign.Viu.Testing;
 
 /// <summary>
-/// The base of the in-memory node tree the test renderer drives. The tree fulfills the renderer's
-/// node-ops contract exactly as a real platform does, so a green test against it implies the same
-/// operation sequence against the browser DOM. Not thread-safe: tests run single-threaded, matching
-/// the JS event-loop model the runtime targets ([EXE-1]).
+/// Represents the base of the in-memory host tree driven by the production renderer contract.
+/// The node model is deliberately single-threaded, matching Viu's JavaScript event-loop model.
 /// </summary>
+/// <remarks>Specified by <c>[EXE-1]</c>, <c>[RND-HOST-3]</c>, and <c>[CONF-3]</c>.</remarks>
 public abstract class TestNode
 {
     private static int _nextIdentifier;
 
     private protected TestNode()
     {
-        Identifier = ++_nextIdentifier;
+        Identifier = checked(++_nextIdentifier);
     }
 
-    /// <summary>A process-unique id for diagnostics and op-log correlation.</summary>
+    /// <summary>Gets the process-unique identifier used for diagnostics and operation correlation.</summary>
     public int Identifier { get; }
 
-    /// <summary>The parent element, or null when detached.</summary>
+    /// <summary>Gets the parent element, or null while the node is detached.</summary>
     public TestElement? Parent { get; internal set; }
 }

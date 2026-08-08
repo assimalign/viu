@@ -22,7 +22,7 @@ internal sealed class LanguageServerHost
     // $/cancelRequest arrived while it was still in flight.
     private const int RequestCancelledCode = -32800;
 
-    private readonly IViuLanguageService languageService;
+    private readonly ILanguageService languageService;
     private readonly HashSet<string> openSupportedDocuments =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ViuProjectContextReader projectContextReader = new();
@@ -46,11 +46,11 @@ internal sealed class LanguageServerHost
     private bool shutdownRequested;
 
     internal LanguageServerHost()
-        : this(ViuLanguageServices.Create())
+        : this(LanguageServices.Create())
     {
     }
 
-    internal LanguageServerHost(IViuLanguageService languageService)
+    internal LanguageServerHost(ILanguageService languageService)
         => this.languageService = languageService ?? throw new ArgumentNullException(nameof(languageService));
 
     /// <summary>

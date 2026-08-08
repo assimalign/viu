@@ -4,77 +4,72 @@ using System.Globalization;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Contains the host-neutral hydration walk for <see cref="Renderer{TNode}"/>.
-/// </summary>
+/// <summary>Contains the host-neutral hydration walk for <see cref="Renderer{TNode}"/>.</summary>
 public sealed partial class Renderer<TNode>
+    where TNode : notnull
 {
     private const string AllowMismatchAttribute = "data-allow-mismatch";
-    private const string FragmentStartMarker = "[";
-    private const string FragmentEndMarker = "]";
-    private const string TeleportStartMarker = "teleport start";
-    private const string TeleportEndMarker = "teleport end";
-    private const string TeleportTargetMarker = "teleport anchor";
 
     private Dictionary<TNode, TNode?>? _hydrationTargetCursors;
 
     /// <summary>
-    /// Adopts server-rendered host nodes as the mounted representation of a component tree.
+    /// Adopts matching server-rendered host nodes as the mounted representation of an immutable
+    /// client tree. A mismatch removes and remounts only the smallest mismatched host range.
     /// </summary>
-    /// <remarks>
-    /// Matching nodes are retained, interactive bindings and directive hooks are attached, and
-    /// later reactive updates patch the adopted nodes. A structural mismatch is recovered at the
-    /// smallest subtree by removing that server range and mounting the client component in its
-    /// place.
-    /// </remarks>
-    /// <param name="component">The client component tree.</param>
-    /// <param name="container">The host container holding server-rendered children.</param>
-    /// <param name="application">
-    /// The application composition context required by templates and directives.
-    /// </param>
-    /// <returns>The root template context, or null when the root is not a template.</returns>
+    /// <param name="value">The non-null client root description.</param>
+    /// <param name="container">The host container holding the server-rendered children.</param>
+    /// <param name="application">Optional application composition for authored components.</param>
+    /// <returns>The root component context, or null when the root is not authored.</returns>
     /// <exception cref="NotSupportedException">
     /// The host did not supply <see cref="RendererOptions{TNode}.CreateHydrationReader"/>.
     /// </exception>
-    public IComponentContext? Hydrate(
-        IComponent component,
+    /// <exception cref="InvalidOperationException">
+    /// The container already owns a mounted tree.
+    /// </exception>
+    /// <remarks>
+    /// Structural reads come only from the host reader; Core retains no platform vocabulary.
+    /// Specified by <c>[HYD-1]</c> through <c>[HYD-5]</c>.
+    /// </remarks>
+    public ComponentContext? Hydrate(
+        VirtualNode value,
         TNode container,
         IApplicationContext? application = null)
     {
-        ArgumentNullException.ThrowIfNull(component);
-        ArgumentNullException.ThrowIfNull(container);
+        ArgumentNullException.ThrowIfNull(value);
+        RequireHostNode(container, nameof(container));
         Func<TNode, HydrationNodeReader<TNode>> createReader =
             _options.CreateHydrationReader
             ?? throw new NotSupportedException(
-                "This host does not provide CreateHydrationReader, which hydration requires.");
+                "The active host does not provide the hydration-node reader required by Hydrate.");
         if (_containerTrees.ContainsKey(container))
         {
             throw new InvalidOperationException(
-                "A container with a mounted component tree cannot be hydrated again.");
+                "A container with a mounted tree cannot be hydrated again.");
         }
 
+        Scheduler.FlushPreFlushCallbacks();
+        HydrationNodeReader<TNode> reader = createReader(container)
+            ?? throw new InvalidOperationException(
+                "The host hydration-reader factory returned null.");
         MountedTree<TNode> tree = new()
         {
             Application = application,
         };
-        HydrationNodeReader<TNode> reader = createReader(container);
-        TNode? firstChild = reader.FirstChild(container);
         _hydrationTargetCursors = new Dictionary<TNode, TNode?>(NodeComparer);
         try
         {
-            if (HasHostNode(firstChild))
+            TNode? first = reader.FirstChild(container);
+            if (HasHostNode(first))
             {
-                (MountedRenderNode<TNode> mounted, TNode? next) = HydrateNode(
+                (MountedNode<TNode> mounted, TNode? next) = HydrateNode(
                     tree,
                     reader,
-                    firstChild!,
-                    component,
+                    first!,
+                    value,
                     container,
-                    elementNamespace: null,
                     owner: null);
                 tree.Root = mounted;
                 RemoveExcessHydrationNodes(
@@ -85,17 +80,10 @@ public sealed partial class Renderer<TNode>
             }
             else
             {
-                Warn(
+                ReportHydrationWarning(
                     tree,
-                    "Attempting to hydrate existing markup, but the container is empty. "
-                    + "Performing a full client mount.");
-                tree.Root = Mount(
-                    tree,
-                    component,
-                    container,
-                    default,
-                    elementNamespace: null,
-                    owner: null);
+                    "The hydration container was empty; performing a full client mount.");
+                tree.Root = Mount(tree, value, container, default, owner: null);
             }
 
             _containerTrees.Add(container, tree);
@@ -107,338 +95,262 @@ public sealed partial class Renderer<TNode>
 
         QueueHostCommit();
         Scheduler.FlushAfterSynchronousRender();
-        return tree.Root is MountedTemplateNode<TNode> template
-            ? template.Instance.Context
+        return tree.Root is MountedComponent<TNode> component
+            ? component.Context
             : null;
     }
 
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateNode(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateNode(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        IComponent component,
+        VirtualNode value,
         TNode container,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        return component.Kind switch
+        return value switch
         {
-            ComponentKind.Element => HydrateElement(
+            ElementNode element => HydrateElement(
                 tree,
                 reader,
                 node,
-                RequireElement(component),
+                element,
                 container,
-                elementNamespace,
                 owner),
-            ComponentKind.Text => HydrateText(
+            TextNode text => HydrateText(tree, reader, node, text, container, owner),
+            CommentNode comment => HydrateComment(
                 tree,
                 reader,
                 node,
-                RequireText(component),
+                comment,
                 container,
                 owner),
-            ComponentKind.Comment => HydrateComment(
+            StaticNode staticContent => HydrateStatic(
                 tree,
                 reader,
                 node,
-                RequireComment(component),
+                staticContent,
                 container,
                 owner),
-            ComponentKind.Static => HydrateStatic(
+            FragmentNode fragment => HydrateFragment(
                 tree,
                 reader,
                 node,
-                RequireStatic(component),
+                fragment,
                 container,
-                elementNamespace,
                 owner),
-            ComponentKind.Fragment => HydrateFragment(
+            ComponentNode component => HydrateComponent(
                 tree,
                 reader,
                 node,
-                RequireFragment(component),
+                component,
                 container,
-                elementNamespace,
                 owner),
-            ComponentKind.Template => HydrateTemplate(
+            TeleportNode teleport => HydrateTeleport(
                 tree,
                 reader,
                 node,
-                RequireTemplate(component),
+                teleport,
                 container,
-                elementNamespace,
                 owner),
-            ComponentKind.Teleport => HydrateTeleport(
+            KeepAliveNode keepAlive => HydrateKeepAlive(
                 tree,
                 reader,
                 node,
-                RequireTeleport(component),
+                keepAlive,
                 container,
-                elementNamespace,
                 owner),
-            _ => throw new InvalidOperationException(
-                $"Unknown component kind: {component.Kind}."),
+            SuspenseNode => throw new NotSupportedException(
+                "Suspense hydration is not implemented; render the boundary on the client."),
+            TransitionNode transition => HydrateTransition(
+                tree,
+                reader,
+                node,
+                transition,
+                container,
+                owner),
+            _ => throw new InvalidOperationException("Unknown virtual-node variant."),
         };
     }
 
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateText(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateElement(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        ITextComponent component,
+        ElementNode value,
         TNode container,
-        ComponentContext? owner)
-    {
-        if (reader.Kind(node) != HydrationNodeKind.Text)
-        {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace: null,
-                owner);
-        }
-
-        string serverText = reader.Data(node);
-        if (!string.Equals(serverText, component.Text, StringComparison.Ordinal))
-        {
-            if (!IsMismatchAllowed(reader, node, "text"))
-            {
-                Warn(
-                    tree,
-                    $"Hydration text mismatch: the server rendered \"{serverText}\", "
-                    + $"but the client expected \"{component.Text}\".");
-            }
-
-            _options.SetText(node, component.Text);
-        }
-
-        MountedLeafNode<TNode> mounted = new(component, node, owner);
-        Register(tree, component, mounted);
-        return (mounted, reader.NextSibling(node));
-    }
-
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateComment(
-        MountedTree<TNode> tree,
-        HydrationNodeReader<TNode> reader,
-        TNode node,
-        ICommentComponent component,
-        TNode container,
-        ComponentContext? owner)
-    {
-        if (reader.Kind(node) != HydrationNodeKind.Comment
-            || IsStructuralStartMarker(reader.Data(node)))
-        {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace: null,
-                owner);
-        }
-
-        MountedLeafNode<TNode> mounted = new(component, node, owner);
-        Register(tree, component, mounted);
-        return (mounted, reader.NextSibling(node));
-    }
-
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateStatic(
-        MountedTree<TNode> tree,
-        HydrationNodeReader<TNode> reader,
-        TNode node,
-        IStaticComponent component,
-        TNode container,
-        string? elementNamespace,
-        ComponentContext? owner)
-    {
-        HydrationNodeKind kind = reader.Kind(node);
-        if (kind is not (HydrationNodeKind.Element or HydrationNodeKind.Text))
-        {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace,
-                owner);
-        }
-
-        MountedStaticNode<TNode> mounted = new(component, node, node, owner);
-        Register(tree, component, mounted);
-        return (mounted, reader.NextSibling(node));
-    }
-
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateElement(
-        MountedTree<TNode> tree,
-        HydrationNodeReader<TNode> reader,
-        TNode node,
-        IElementComponent component,
-        TNode container,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
         if (reader.Kind(node) != HydrationNodeKind.Element
             || !string.Equals(
                 reader.ElementTag(node),
-                component.Tag,
+                value.Name.LocalName,
                 StringComparison.OrdinalIgnoreCase))
         {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace,
-                owner);
-        }
-
-        string? ownNamespace = ElementNamespace(component.Tag, elementNamespace);
-        bool forceValue = string.Equals(
-                component.Tag,
-                "input",
-                StringComparison.OrdinalIgnoreCase)
-            || string.Equals(
-                component.Tag,
-                "option",
-                StringComparison.OrdinalIgnoreCase);
-        if (!forceValue
-            && component.Optimization.DynamicProperties is null
-            && component.Optimization.PatchFlags == PatchFlags.Cached)
-        {
-            MountedElementNode<TNode> cached = new(
-                component,
-                node,
-                [],
-                [],
-                owner);
-            cached.Transition = TransitionComponents.Get(component);
-            Register(tree, component, cached);
-            UpdateReference(
-                tree,
-                cached,
-                previousReference: null,
-                component.Reference,
-                node);
-            return (cached, reader.NextSibling(node));
+            return HydrateMismatch(tree, reader, node, value, container, owner);
         }
 
         List<DirectiveBinding> directiveBindings = ResolveDirectiveBindings(
             tree,
-            component.Directives,
+            value.Directives,
             owner);
-        TransitionHooks? transition = TransitionComponents.Get(component);
-        BindDirectiveTransitions(directiveBindings, transition);
+        BindActiveTransition(tree, node, directiveBindings);
         InvokeDirectiveHooks(
             tree,
             node,
             directiveBindings,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             DirectiveHookKind.Created);
 
-        bool hasChildOverride =
-            component.Attributes.TryGetValue("innerHTML", out _)
-            || component.Attributes.TryGetValue("textContent", out _);
-        List<MountedRenderNode<TNode>> children = hasChildOverride
+        bool hasChildOverride = false;
+        for (int index = 0; index < value.Bindings.Count; index++)
+        {
+            ElementBinding binding = value.Bindings[index];
+            if (string.Equals(
+                    binding.Name.LocalName,
+                    "innerHTML",
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    binding.Name.LocalName,
+                    "textContent",
+                    StringComparison.Ordinal))
+            {
+                hasChildOverride = true;
+            }
+
+            HydrateBinding(tree, reader, node, binding);
+        }
+
+        List<MountedNode<TNode>> children = hasChildOverride
             ? []
             : HydrateChildren(
                 tree,
                 reader,
                 reader.FirstChild(node),
-                component.Children,
+                value.Children,
                 node,
-                ChildrenNamespace(component.Tag, ownNamespace),
                 owner,
                 closingMarker: null);
-        HydrateAttributes(tree, reader, node, component, ownNamespace);
-        InvokeComponentNodeLifecycleHook(
+        InvokeVirtualNodeLifecycleHook(
             tree,
             owner,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             "onVnodeBeforeMount");
         InvokeDirectiveHooks(
             tree,
             node,
             directiveBindings,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             DirectiveHookKind.BeforeMount);
-
-        MountedElementNode<TNode> mounted = new(
-            component,
+        MountedElement<TNode> mounted = new(
+            value,
             node,
             children,
             directiveBindings,
             owner);
-        mounted.Transition = transition;
         BindDirectiveHostElements(mounted, directiveBindings);
-        Register(tree, component, mounted);
-        UpdateReference(
-            tree,
-            mounted,
-            previousReference: null,
-            component.Reference,
-            node);
-        QueueComponentNodeLifecycleHook(
+        Register(tree, value, mounted);
+        UpdateReference(tree, mounted, null, value.MountReference);
+        QueueVirtualNodeLifecycleHook(
             tree,
             owner,
             mounted,
-            component,
-            previousComponent: null,
+            value,
+            previousValue: null,
             "onVnodeMounted");
-        if (directiveBindings.Count > 0)
-        {
-            Scheduler.QueuePostFlushCallback(
-                new SchedulerJob(
-                    () =>
-                    {
-                        if (!mounted.IsUnmounted)
-                        {
-                            InvokeDirectiveHooks(
-                                tree,
-                                node,
-                                mounted.DirectiveBindings,
-                                RequireElement(mounted.Component),
-                                previousComponent: null,
-                                DirectiveHookKind.Mounted);
-                            QueueHostCommit();
-                        }
-                    })
-                {
-                    Name = "hydrated directive mounted lifecycle",
-                });
-        }
-
+        QueueDirectiveHooks(
+            tree,
+            mounted,
+            value,
+            previousValue: null,
+            DirectiveHookKind.Mounted);
         return (mounted, reader.NextSibling(node));
     }
 
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateFragment(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateText(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        IFragmentComponent component,
+        TextNode value,
         TNode container,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        if (!IsCommentMarker(reader, node, FragmentStartMarker))
+        if (reader.Kind(node) != HydrationNodeKind.Text)
         {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace,
-                owner);
+            return HydrateMismatch(tree, reader, node, value, container, owner);
+        }
+
+        string serverText = reader.Data(node);
+        if (!string.Equals(serverText, value.Text, StringComparison.Ordinal))
+        {
+            if (!IsMismatchAllowed(reader, node, "text"))
+            {
+                ReportHydrationWarning(
+                    tree,
+                    $"Hydration text mismatch: the server rendered '{serverText}', "
+                        + $"but the client expected '{value.Text}'.");
+            }
+
+            _options.SetText(node, value.Text);
+        }
+
+        MountedLeaf<TNode> mounted = new(value, node, owner);
+        Register(tree, value, mounted);
+        UpdateReference(tree, mounted, null, value.MountReference);
+        return (mounted, reader.NextSibling(node));
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateComment(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        CommentNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        if (reader.Kind(node) != HydrationNodeKind.Comment
+            || IsStructuralStartMarker(reader.Data(node)))
+        {
+            return HydrateMismatch(tree, reader, node, value, container, owner);
+        }
+
+        MountedLeaf<TNode> mounted = new(value, node, owner);
+        Register(tree, value, mounted);
+        return (mounted, reader.NextSibling(node));
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateStatic(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        StaticNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        if (reader.Kind(node) is not (HydrationNodeKind.Element or HydrationNodeKind.Text))
+        {
+            return HydrateMismatch(tree, reader, node, value, container, owner);
+        }
+
+        MountedStatic<TNode> mounted = new(value, node, node, owner);
+        Register(tree, value, mounted);
+        return (mounted, reader.NextSibling(node));
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateFragment(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        FragmentNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        if (!IsCommentMarker(reader, node, HydrationMarkers.FragmentStartData))
+        {
+            return HydrateMismatch(tree, reader, node, value, container, owner);
         }
 
         TNode fragmentContainer = HasHostNode(reader.ParentNode(node))
@@ -447,17 +359,16 @@ public sealed partial class Renderer<TNode>
         TNode? closing = FindClosingMarker(
             reader,
             node,
-            FragmentStartMarker,
-            FragmentEndMarker);
-        List<MountedRenderNode<TNode>> children = HydrateChildren(
+            HydrationMarkers.FragmentStartData,
+            HydrationMarkers.FragmentEndData);
+        List<MountedNode<TNode>> children = HydrateChildren(
             tree,
             reader,
             reader.NextSibling(node),
-            component.Children,
+            value.Children,
             fragmentContainer,
-            elementNamespace,
             owner,
-            FragmentEndMarker);
+            HydrationMarkers.FragmentEndData);
         TNode endAnchor;
         TNode? next;
         if (HasHostNode(closing))
@@ -467,342 +378,160 @@ public sealed partial class Renderer<TNode>
         }
         else
         {
-            endAnchor = _options.CreateComment(FragmentEndMarker);
+            endAnchor = _options.CreateComment(HydrationMarkers.FragmentEndData);
             _options.Insert(endAnchor, fragmentContainer, default);
             next = default;
-            Warn(
+            ReportHydrationWarning(
                 tree,
-                "Hydration fragment mismatch: the server fragment had no closing anchor.");
+                "Hydration fragment mismatch: the server fragment had no closing marker.");
         }
 
-        MountedFragmentNode<TNode> mounted = new(
-            component,
-            node,
-            endAnchor,
-            children,
-            owner);
-        Register(tree, component, mounted);
+        MountedRange<TNode> mounted = new(value, node, endAnchor, children, owner);
+        Register(tree, value, mounted);
         return (mounted, next);
     }
 
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateTemplate(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateComponent(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        ITemplateComponent component,
+        ComponentNode value,
         TNode container,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        if (IsSuspenseComponent(component))
-        {
-            throw new NotSupportedException(
-                "Suspense hydration is not implemented. Render the boundary on the client until "
-                + "pending-branch hydration can coordinate with server output.");
-        }
-
         IApplicationContext application = tree.Application
             ?? throw new InvalidOperationException(
-                "Template components require an application context. Supply it to Hydrate.");
-        int identifier = checked(++_nextComponentIdentifier);
-        MountedComponent instance = MountedComponent.Create(
-            application,
-            component,
+                "Hydrating an authored component requires an application context.");
+        int componentIdentifier = checked(++_nextComponentIdentifier);
+        ApplicationWatchScheduler watchScheduler = new(componentIdentifier);
+        ComponentRuntimeOptions runtimeOptions = new(
+            application.Components,
+            watchScheduler,
+            application.Services,
+            application.ErrorHandler,
+            application.WarnHandler,
+            application.EventObserver);
+        ComponentActivation activation = ComponentActivation.Activate(
+            value,
+            runtimeOptions,
             owner,
-            identifier);
-        TransitionHooks? initialTransition =
-            TransitionComponents.Get(component);
-        MountedKeepAliveState<TNode>? keepAliveState =
-            CreateKeepAliveState(instance);
-        MountedRenderNode<TNode>? subtree = null;
-        MountedTemplateNode<TNode>? mounted = null;
-        ReactiveEffect? renderEffect = null;
-        SchedulerJob? renderJob = null;
-        TNode? initialNext = default;
-        SchedulerJob mountedJob = new(instance.InvokeMounted)
-        {
-            Name = "hydrated component mounted lifecycle",
-        };
-        SchedulerJob updatedJob = new(instance.InvokeUpdated)
-        {
-            Name = "component updated lifecycle",
-        };
+            watchScheduler,
+            suspenseBoundary: _activeSuspenseBoundary);
 
+        MountedComponent<TNode>? mounted = null;
+        VirtualNode? initialTree = null;
+        ReactiveEffect? renderEffect = null;
         try
         {
-            IComponent RenderSubtree()
-            {
-                IComponent rendered = instance.Render();
-                TransitionHooks? transition =
-                    mounted?.Transition ?? initialTransition;
-                return transition is null
-                    ? rendered
-                    : TransitionComponents.Attach(rendered, transition);
-            }
-
-            void RenderComponent()
-            {
-                if (subtree is null)
-                {
-                    instance.InvokeBeforeMount();
-                    InvokeComponentNodeLifecycleHook(
-                        tree,
-                        owner,
-                        component,
-                        previousComponent: null,
-                        "onVnodeBeforeMount");
-                    IComponent initialRendered = RenderSubtree();
-                    (subtree, initialNext) = HydrateNode(
-                        tree,
-                        reader,
-                        node,
-                        initialRendered,
-                        container,
-                        elementNamespace,
-                        instance.Context);
-                    if (keepAliveState is not null)
+            renderEffect = activation.Scope.Run(
+                () => Reactive.Effect(
+                    () =>
                     {
-                        InitializeKeepAlive(
-                            tree,
-                            keepAliveState,
-                            instance,
-                            subtree);
-                    }
-
-                    QueueHostCommit();
-                    return;
-                }
-
-                instance.InvokeBeforeUpdate();
-                InvokePendingTemplateNodeBeforeUpdateHook(
-                    tree,
-                    mounted);
-                TNode fallbackContainer = mounted is null
-                    ? container
-                    : mounted.FallbackContainer;
-                TNode updateContainer = HostParentOrFallback(
-                    subtree.FirstHostNode,
-                    fallbackContainer);
-                TNode? updateAnchor = GetNextHostNode(subtree);
-                IComponent rendered = RenderSubtree();
-                subtree = keepAliveState is null
-                    ? Patch(
-                        tree,
-                        subtree,
-                        rendered,
-                        updateContainer,
-                        updateAnchor,
-                        mounted?.ElementNamespace ?? elementNamespace,
-                        instance.Context)
-                    : PatchKeepAlive(
-                        tree,
-                        keepAliveState,
-                        instance,
-                        subtree,
-                        rendered,
-                        updateContainer,
-                        updateAnchor,
-                        mounted?.ElementNamespace ?? elementNamespace);
-                if (mounted is not null)
-                {
-                    mounted.Subtree = subtree;
-                }
-
-                QueueHostCommit();
-                Scheduler.QueuePostFlushCallback(updatedJob);
-            }
-
-            renderEffect = instance.CreateRenderEffect(
-                RenderComponent,
-                () => Scheduler.QueueJob(renderJob!));
-            renderJob = new SchedulerJob(renderEffect.RunIfDirty)
-            {
-                Identifier = identifier,
-                Name = "hydrated component render",
-            };
-            renderEffect.Run();
-
-            mounted = new MountedTemplateNode<TNode>(
-                component,
-                instance,
-                subtree!,
-                renderEffect,
-                renderJob,
-                mountedJob,
-                updatedJob,
+                        VirtualNode normalized = NormalizeComponentRoot(
+                            activation,
+                            activation.Render());
+                        if (mounted is null)
+                        {
+                            initialTree = normalized;
+                        }
+                        else
+                        {
+                            mounted.PendingTree = normalized;
+                        }
+                    }));
+            activation.Context.Run(activation.Lifecycle.InvokeBeforeMount);
+            (MountedNode<TNode> subtree, TNode? next) = HydrateNode(
+                tree,
+                reader,
+                node,
+                initialTree ?? new CommentNode(string.Empty),
                 container,
-                elementNamespace,
-                owner);
-            mounted.Transition = initialTransition;
-            mounted.KeepAliveState = keepAliveState;
-            instance.Context.RootElementResolver =
-                () => GetRootElementObjects(mounted.Subtree);
-            instance.Context.KeyedChildElementResolver =
-                () => GetKeyedChildElementSnapshots(mounted.Subtree);
-            instance.Context.HostCommitScheduler = QueueHostCommit;
-            instance.RegisterHotReload(
-                () => ResetTemplateForHotReload(tree, mounted));
-            Register(tree, component, mounted);
-            UpdateReference(
-                tree,
-                mounted,
-                previousReference: null,
-                component.Reference,
-                ComponentReferenceValue(instance.Context));
-            Scheduler.QueuePostFlushCallback(mountedJob);
-            QueueComponentNodeLifecycleHook(
-                tree,
-                owner,
-                mounted,
-                component,
-                previousComponent: null,
-                "onVnodeMounted");
-            return (mounted, initialNext);
+                activation.Context);
+            mounted = new MountedComponent<TNode>(value, activation, subtree, owner)
+            {
+                RenderEffect = renderEffect,
+            };
+            SchedulerJob renderJob = new(
+                () => UpdateMountedComponent(tree, mounted, container, force: false))
+            {
+                Identifier = componentIdentifier,
+                Name = "component render",
+                AllowRecurse = true,
+            };
+            mounted.RenderJob = renderJob;
+            renderEffect.Scheduler = () => Scheduler.QueueJob(renderJob);
+            Register(tree, value, mounted);
+            UpdateReference(tree, mounted, null, value.MountReference);
+            QueueMountedLifecycle(mounted);
+            mounted.HotReloadRegistration = ComponentHotReload.RegisterMountedComponent(
+                activation.Instance.GetType(),
+                change =>
+                {
+                    if (change is ComponentHotReloadChangeKind.Template
+                        or ComponentHotReloadChangeKind.ScriptReset)
+                    {
+                        QueueComponentRemount(tree, mounted, container);
+                    }
+                });
+            return (mounted, next);
         }
         catch
         {
-            renderJob?.IsDisposed = true;
-            mountedJob.IsDisposed = true;
-            updatedJob.IsDisposed = true;
-            instance.AbortMount(
-                subtree is null
-                    ? null
-                    : () => Unmount(tree, subtree, removeHostNodes: true));
-            if (keepAliveState is not null)
-            {
-                _options.Remove(keepAliveState.StorageContainer);
-            }
-
+            renderEffect?.Stop();
+            activation.Release();
             throw;
         }
     }
 
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateTeleport(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateTeleport(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        ITeleportComponent component,
+        TeleportNode value,
         TNode container,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
-        if (!IsCommentMarker(reader, node, TeleportStartMarker))
+        if (!IsCommentMarker(reader, node, HydrationMarkers.TeleportStartData))
         {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace,
-                owner);
+            return HydrateMismatch(tree, reader, node, value, container, owner);
         }
 
-        TNode? mainEnd = FindClosingMarker(
-            reader,
-            node,
-            TeleportStartMarker,
-            TeleportEndMarker);
-        if (!HasHostNode(mainEnd))
-        {
-            return HydrateMismatch(
-                tree,
-                reader,
-                node,
-                component,
-                container,
-                elementNamespace,
-                owner);
-        }
-
-        TNode mainContainer = HasHostNode(reader.ParentNode(node))
+        TNode originContainer = HasHostNode(reader.ParentNode(node))
             ? reader.ParentNode(node)!
             : container;
-        bool hasTarget = TryResolveTeleportTarget(
-            component.Target,
-            out TNode targetContainer);
-        if (!hasTarget)
+        TNode? closing = FindClosingMarker(
+            reader,
+            node,
+            HydrationMarkers.TeleportStartData,
+            HydrationMarkers.TeleportEndData);
+        TNode endAnchor;
+        TNode? next;
+        if (HasHostNode(closing))
         {
-            WarnUnresolvedTeleportTarget(tree, component.Target);
+            endAnchor = closing!;
+            next = reader.NextSibling(endAnchor);
+        }
+        else
+        {
+            endAnchor = _options.CreateComment(HydrationMarkers.TeleportEndData);
+            _options.Insert(endAnchor, originContainer, default);
+            next = default;
+            ReportHydrationWarning(
+                tree,
+                "Hydration teleport mismatch: the server range had no closing marker.");
         }
 
-        List<MountedRenderNode<TNode>> children;
-        TNode? targetAnchor = default;
-        bool childrenMounted;
-        if (component.IsDisabled)
+        List<MountedNode<TNode>> children;
+        if (value.IsDisabled)
         {
             children = HydrateChildren(
                 tree,
                 reader,
                 reader.NextSibling(node),
-                component.Children,
-                mainContainer,
-                elementNamespace,
+                value.Children,
+                originContainer,
                 owner,
-                TeleportEndMarker);
-            childrenMounted = true;
-            if (hasTarget)
-            {
-                HydrationNodeReader<TNode> targetReader =
-                    _options.CreateHydrationReader!(targetContainer);
-                TNode? cursor = GetHydrationTargetCursor(targetReader, targetContainer);
-                targetAnchor = FindFirstMarker(
-                    targetReader,
-                    cursor,
-                    TeleportTargetMarker);
-                if (!HasHostNode(targetAnchor))
-                {
-                    targetAnchor = _options.CreateComment(TeleportTargetMarker);
-                    _options.Insert(targetAnchor, targetContainer, default);
-                }
-
-                SetHydrationTargetCursor(
-                    targetContainer,
-                    targetReader.NextSibling(targetAnchor!));
-            }
-        }
-        else if (hasTarget)
-        {
-            _ = HydrateChildren(
-                tree,
-                reader,
-                reader.NextSibling(node),
-                Array.Empty<IComponent>(),
-                mainContainer,
-                elementNamespace,
-                owner,
-                TeleportEndMarker);
-            HydrationNodeReader<TNode> targetReader =
-                _options.CreateHydrationReader!(targetContainer);
-            TNode? cursor = GetHydrationTargetCursor(targetReader, targetContainer);
-            children = HydrateChildren(
-                tree,
-                targetReader,
-                cursor,
-                component.Children,
-                targetContainer,
-                elementNamespace,
-                owner,
-                TeleportTargetMarker);
-            targetAnchor = FindFirstMarker(
-                targetReader,
-                cursor,
-                TeleportTargetMarker);
-            if (!HasHostNode(targetAnchor))
-            {
-                targetAnchor = _options.CreateComment(TeleportTargetMarker);
-                _options.Insert(targetAnchor, targetContainer, default);
-                Warn(
-                    tree,
-                    "Hydration teleport mismatch: the server target had no closing anchor.");
-            }
-
-            SetHydrationTargetCursor(
-                targetContainer,
-                HasHostNode(targetAnchor)
-                    ? targetReader.NextSibling(targetAnchor!)
-                    : default);
-            childrenMounted = true;
+                HydrationMarkers.TeleportEndData);
         }
         else
         {
@@ -810,43 +539,187 @@ public sealed partial class Renderer<TNode>
                 tree,
                 reader,
                 reader.NextSibling(node),
-                Array.Empty<IComponent>(),
-                mainContainer,
-                elementNamespace,
+                Array.Empty<VirtualNode>(),
+                originContainer,
                 owner,
-                TeleportEndMarker);
+                HydrationMarkers.TeleportEndData);
             children = [];
-            childrenMounted = false;
         }
 
-        MountedTeleportNode<TNode> mounted = new(
-            component,
+        TNode? targetContainer = default;
+        TNode? targetAnchor = default;
+        bool hasTarget = false;
+        bool childrenMounted = value.IsDisabled;
+        Func<string, TNode?>? resolveTarget = _options.ResolveTeleportTarget;
+        TNode? resolvedTarget = resolveTarget is null
+            ? default
+            : resolveTarget(value.TargetIdentifier);
+        if (HasHostNode(resolvedTarget))
+        {
+            TNode target = resolvedTarget!;
+            targetContainer = target;
+            hasTarget = true;
+            HydrationNodeReader<TNode> targetReader = _options.CreateHydrationReader!(target)
+                ?? throw new InvalidOperationException(
+                    "The host hydration-reader factory returned null for a teleport target.");
+            TNode? cursor = GetHydrationTargetCursor(targetReader, target);
+            targetAnchor = FindFirstMarker(
+                targetReader,
+                cursor,
+                HydrationMarkers.TeleportAnchorData);
+            if (!HasHostNode(targetAnchor))
+            {
+                targetAnchor = _options.CreateComment(HydrationMarkers.TeleportAnchorData);
+                _options.Insert(targetAnchor, target, default);
+                ReportHydrationWarning(
+                    tree,
+                    "Hydration teleport mismatch: the target had no anchor marker.");
+            }
+
+            if (!value.IsDisabled)
+            {
+                children = HydrateChildren(
+                    tree,
+                    targetReader,
+                    cursor,
+                    value.Children,
+                    target,
+                    owner,
+                    HydrationMarkers.TeleportAnchorData);
+                childrenMounted = true;
+            }
+
+            SetHydrationTargetCursor(target, targetReader.NextSibling(targetAnchor!));
+        }
+        else
+        {
+            ReportHydrationWarning(
+                tree,
+                $"Failed to resolve teleport target '{value.TargetIdentifier}'.");
+        }
+
+        MountedTeleport<TNode> mounted = new(
+            value,
             node,
-            mainEnd!,
-            hasTarget ? targetContainer : default,
+            endAnchor,
+            targetContainer,
             targetAnchor,
             hasTarget,
-            childrenMounted,
             children,
-            elementNamespace,
-            owner);
-        Register(tree, component, mounted);
-        return (mounted, reader.NextSibling(mainEnd!));
+            owner)
+        {
+            ChildrenMounted = childrenMounted,
+        };
+        Register(tree, value, mounted);
+        return (mounted, next);
     }
 
-    private List<MountedRenderNode<TNode>> HydrateChildren(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateKeepAlive(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        KeepAliveNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        TNode keepAliveContainer = HasHostNode(reader.ParentNode(node))
+            ? reader.ParentNode(node)!
+            : container;
+        VirtualNode childValue = EvaluateSlot(value.Invocation, "default", owner)
+            ?? new CommentNode(string.Empty);
+        (MountedNode<TNode> active, TNode? next) = HydrateNode(
+            tree,
+            reader,
+            node,
+            childValue,
+            keepAliveContainer,
+            owner);
+        TNode startAnchor = _options.CreateComment("keep-alive start");
+        TNode endAnchor = _options.CreateComment("keep-alive end");
+        _options.Insert(startAnchor, keepAliveContainer, active.FirstHostNode);
+        _options.Insert(endAnchor, keepAliveContainer, next);
+        TNode storage = _options.CreateElement(StorageContainerName);
+        MountedKeepAlive<TNode> mounted = new(
+            value,
+            startAnchor,
+            endAnchor,
+            storage,
+            active,
+            owner);
+        Register(tree, value, mounted);
+        CacheActiveKeepAlive(tree, mounted, value, active);
+        return (mounted, next);
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateTransition(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        TransitionNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        VirtualNode childValue = EvaluateSlot(value.Invocation, "default", owner)
+            ?? new CommentNode(string.Empty);
+        TransitionProperties properties = ResolveTransitionProperties(value);
+        TransitionState sharedState = ResolveTransitionState(value) ?? new TransitionState();
+        TransitionController controller = CreateTransitionController(
+            tree,
+            owner,
+            properties,
+            sharedState,
+            childValue);
+        controller.IsHydrating = true;
+        TransitionMountContext<TNode>? previous = _activeTransitionMount;
+        TransitionMountContext<TNode> hydrationContext = new(
+            controller,
+            previous,
+            shouldEnter: false,
+            isHydrating: true);
+        _activeTransitionMount = hydrationContext;
+        MountedNode<TNode> child;
+        TNode? next;
+        try
+        {
+            (child, next) = HydrateNode(
+                tree,
+                reader,
+                node,
+                childValue,
+                container,
+                owner);
+        }
+        finally
+        {
+            _activeTransitionMount = previous;
+        }
+
+        MountedTransition<TNode> mounted = new(
+            value,
+            child,
+            sharedState,
+            controller,
+            owner)
+        {
+            State = TransitionExecutionState.Entered,
+        };
+        Register(tree, value, mounted);
+        QueueTransitionMountedState(mounted, controller, sharedState);
+        return (mounted, next);
+    }
+
+    private List<MountedNode<TNode>> HydrateChildren(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode? first,
-        IReadOnlyList<IComponent> components,
+        IReadOnlyList<VirtualNode> values,
         TNode container,
-        string? elementNamespace,
-        ComponentContext? owner,
+        RuntimeComponentContext? owner,
         string? closingMarker)
     {
-        List<MountedRenderNode<TNode>> mounted = new(components.Count);
+        List<MountedNode<TNode>> mounted = new(values.Count);
         TNode? cursor = first;
-        for (int index = 0; index < components.Count; index++)
+        for (int index = 0; index < values.Count; index++)
         {
             if (!HasHostNode(cursor)
                 || (closingMarker is not null
@@ -855,25 +728,24 @@ public sealed partial class Renderer<TNode>
                 mounted.Add(
                     Mount(
                         tree,
-                        components[index],
+                        values[index],
                         container,
                         HasHostNode(cursor) ? cursor : default,
-                        elementNamespace,
                         owner));
                 continue;
             }
 
-            if (components[index] is ITextComponent
+            if (values[index] is TextNode
                 && reader.Kind(cursor!) == HydrationNodeKind.Text
-                && index + 1 < components.Count
-                && components[index + 1] is ITextComponent)
+                && index + 1 < values.Count
+                && values[index + 1] is TextNode)
             {
                 index = HydrateAdjacentTextRun(
                     tree,
                     reader,
                     cursor!,
                     container,
-                    components,
+                    values,
                     index,
                     owner,
                     mounted,
@@ -881,13 +753,12 @@ public sealed partial class Renderer<TNode>
                 continue;
             }
 
-            (MountedRenderNode<TNode> child, TNode? next) = HydrateNode(
+            (MountedNode<TNode> child, TNode? next) = HydrateNode(
                 tree,
                 reader,
                 cursor!,
-                components[index],
+                values[index],
                 container,
-                elementNamespace,
                 owner);
             mounted.Add(child);
             cursor = next;
@@ -906,10 +777,10 @@ public sealed partial class Renderer<TNode>
         {
             if (!IsMismatchAllowed(reader, container, "children"))
             {
-                Warn(
+                ReportHydrationWarning(
                     tree,
                     "Hydration children mismatch: the server rendered more child nodes "
-                    + "than the client component tree.");
+                        + "than the client tree.");
             }
 
             for (int index = 0; index < excess.Count; index++)
@@ -926,10 +797,10 @@ public sealed partial class Renderer<TNode>
         HydrationNodeReader<TNode> reader,
         TNode node,
         TNode container,
-        IReadOnlyList<IComponent> components,
+        IReadOnlyList<VirtualNode> values,
         int startIndex,
-        ComponentContext? owner,
-        List<MountedRenderNode<TNode>> mounted,
+        RuntimeComponentContext? owner,
+        List<MountedNode<TNode>> mounted,
         out TNode? cursor)
     {
         TNode? afterRun = reader.NextSibling(node);
@@ -938,40 +809,41 @@ public sealed partial class Renderer<TNode>
         int index = startIndex;
         while (true)
         {
-            ITextComponent component = RequireText(components[index]);
-            string clientText = component.Text;
-            bool hasMoreText = index + 1 < components.Count
-                && components[index + 1] is ITextComponent;
-            if (hasMoreText && currentData.Length > clientText.Length)
+            TextNode value = (TextNode)values[index];
+            bool hasMoreText = index + 1 < values.Count
+                && values[index + 1] is TextNode;
+            if (hasMoreText && currentData.Length > value.Text.Length)
             {
-                string remainingText = currentData[clientText.Length..];
+                string remainingText = currentData[value.Text.Length..];
                 TNode overflow = _options.CreateText(remainingText);
                 _options.Insert(
                     overflow,
                     container,
                     HasHostNode(afterRun) ? afterRun : default);
-                if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
+                if (!string.Equals(currentData, value.Text, StringComparison.Ordinal))
                 {
-                    _options.SetText(currentNode, clientText);
+                    _options.SetText(currentNode, value.Text);
                 }
 
-                MountedLeafNode<TNode> text = new(component, currentNode, owner);
-                mounted.Add(text);
-                Register(tree, component, text);
+                MountedLeaf<TNode> split = new(value, currentNode, owner);
+                mounted.Add(split);
+                Register(tree, value, split);
+                UpdateReference(tree, split, null, value.MountReference);
                 currentNode = overflow;
                 currentData = remainingText;
                 index++;
                 continue;
             }
 
-            if (!string.Equals(currentData, clientText, StringComparison.Ordinal))
+            if (!string.Equals(currentData, value.Text, StringComparison.Ordinal))
             {
-                _options.SetText(currentNode, clientText);
+                _options.SetText(currentNode, value.Text);
             }
 
-            MountedLeafNode<TNode> last = new(component, currentNode, owner);
+            MountedLeaf<TNode> last = new(value, currentNode, owner);
             mounted.Add(last);
-            Register(tree, component, last);
+            Register(tree, value, last);
+            UpdateReference(tree, last, null, value.MountReference);
             break;
         }
 
@@ -979,39 +851,38 @@ public sealed partial class Renderer<TNode>
         return index;
     }
 
-    private (MountedRenderNode<TNode> Mounted, TNode? Next) HydrateMismatch(
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateMismatch(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        IComponent component,
+        VirtualNode value,
         TNode fallbackContainer,
-        string? elementNamespace,
-        ComponentContext? owner)
+        RuntimeComponentContext? owner)
     {
         if (!IsMismatchAllowed(reader, node, "children"))
         {
-            Warn(
+            ReportHydrationWarning(
                 tree,
                 $"Hydration node mismatch: the server host node cannot represent "
-                + $"client component kind {component.Kind}.");
+                    + $"client node kind {value.Kind}.");
         }
 
         List<TNode> removalRange = ReadMismatchRange(reader, node);
         TNode? next = reader.NextSibling(removalRange[^1]);
-        TNode parent = HasHostNode(reader.ParentNode(node))
-            ? reader.ParentNode(node)!
+        TNode? parent = reader.ParentNode(node);
+        TNode replacementContainer = HasHostNode(parent)
+            ? parent!
             : fallbackContainer;
         for (int index = 0; index < removalRange.Count; index++)
         {
             _options.Remove(removalRange[index]);
         }
 
-        MountedRenderNode<TNode> mounted = Mount(
+        MountedNode<TNode> mounted = Mount(
             tree,
-            component,
-            parent,
+            value,
+            replacementContainer,
             HasHostNode(next) ? next : default,
-            elementNamespace,
             owner);
         return (mounted, next);
     }
@@ -1029,8 +900,8 @@ public sealed partial class Renderer<TNode>
         string start = reader.Data(first);
         string? end = start switch
         {
-            FragmentStartMarker => FragmentEndMarker,
-            TeleportStartMarker => TeleportEndMarker,
+            HydrationMarkers.FragmentStartData => HydrationMarkers.FragmentEndData,
+            HydrationMarkers.TeleportStartData => HydrationMarkers.TeleportEndData,
             _ => null,
         };
         if (end is null)
@@ -1068,139 +939,65 @@ public sealed partial class Renderer<TNode>
         return nodes;
     }
 
-    private void HydrateAttributes(
+    private void HydrateBinding(
         MountedTree<TNode> tree,
         HydrationNodeReader<TNode> reader,
         TNode node,
-        IElementComponent component,
-        string? elementNamespace)
+        ElementBinding binding)
     {
-        bool forceValue = string.Equals(
-                component.Tag,
-                "input",
-                StringComparison.OrdinalIgnoreCase)
-            || string.Equals(
-                component.Tag,
-                "option",
-                StringComparison.OrdinalIgnoreCase);
-        bool customElement = component.Tag.Contains('-', StringComparison.Ordinal);
-        for (int index = 0; index < component.Attributes.Count; index++)
-        {
-            IComponentAttribute attribute = component.Attributes[index];
-            if (IsComponentNodeLifecycleName(attribute.Name))
-            {
-                continue;
-            }
-
-            ReportHydrationAttributeMismatch(
-                tree,
-                reader,
-                node,
-                attribute);
-            if (ShouldHydrateAttribute(
-                attribute.Name,
-                forceValue,
-                customElement))
-            {
-                _options.PatchAttribute(
-                    node,
-                    component.Tag,
-                    attribute.Name,
-                    previousValue: null,
-                    attribute.Value,
-                    elementNamespace);
-            }
-        }
-    }
-
-    private static bool ShouldHydrateAttribute(
-        string name,
-        bool forceValue,
-        bool customElement)
-    {
-        if (IsEventAttribute(name) || (name.Length > 0 && name[0] == '.'))
-        {
-            return true;
-        }
-
-        if (string.Equals(name, "innerHTML", StringComparison.Ordinal)
-            || string.Equals(name, "textContent", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (forceValue
-            && (name.EndsWith("value", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(
-                    name,
-                    "checked",
-                    StringComparison.OrdinalIgnoreCase)
-                || string.Equals(
-                    name,
-                    "selected",
-                    StringComparison.OrdinalIgnoreCase)
-                || string.Equals(
-                    name,
-                    "indeterminate",
-                    StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        return customElement;
-    }
-
-    private void ReportHydrationAttributeMismatch(
-        MountedTree<TNode> tree,
-        HydrationNodeReader<TNode> reader,
-        TNode node,
-        IComponentAttribute attribute)
-    {
-        if (IsEventAttribute(attribute.Name)
-            || string.Equals(attribute.Name, "innerHTML", StringComparison.Ordinal)
-            || string.Equals(attribute.Name, "textContent", StringComparison.Ordinal)
-            || attribute.Value is null
-            || attribute.Value is bool
-            || IsMismatchAllowed(reader, node, AttributeMismatchCategory(attribute.Name)))
+        if (IsNodeLifecycleBinding(binding))
         {
             return;
         }
 
-        string? actual = reader.Attribute(node, attribute.Name);
-        string category = AttributeMismatchCategory(attribute.Name);
-        bool equivalent;
-        string expected;
-        if (string.Equals(category, "class", StringComparison.Ordinal))
+        if (binding.Kind is ElementBindingKind.Event or ElementBindingKind.Property)
         {
-            expected = StyleAndClassNormalization.NormalizeClass(attribute.Value);
-            equivalent = ClassEquivalent(actual, expected);
-        }
-        else if (string.Equals(category, "style", StringComparison.Ordinal))
-        {
-            object? normalized =
-                StyleAndClassNormalization.NormalizeStyle(attribute.Value);
-            expected = StyleAndClassNormalization.StringifyStyle(normalized);
-            equivalent = StyleEquivalent(actual, normalized);
-        }
-        else
-        {
-            expected = attribute.Value is IFormattable formattable
-                ? formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty
-                : attribute.Value.ToString() ?? string.Empty;
-            equivalent = string.Equals(actual, expected, StringComparison.Ordinal);
+            _options.PatchAttribute(node, null, binding);
+            return;
         }
 
-        if (!equivalent)
+        if (binding.Value is null or bool)
         {
-            Warn(
+            return;
+        }
+
+        string name = binding.Name.ToString();
+        string expected = binding.Value is IFormattable formattable
+            ? formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty
+            : binding.Value.ToString() ?? string.Empty;
+        string? actual = reader.Attribute(node, name);
+        bool equivalent = string.Equals(
+            binding.Name.LocalName,
+            "class",
+            StringComparison.OrdinalIgnoreCase)
+                ? ClassValuesEquivalent(actual, expected)
+                : string.Equals(
+                    binding.Name.LocalName,
+                    "style",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? StyleValuesEquivalent(actual, expected)
+                    : string.Equals(actual, expected, StringComparison.Ordinal);
+        string category = string.Equals(
+            binding.Name.LocalName,
+            "class",
+            StringComparison.OrdinalIgnoreCase)
+                ? "class"
+                : string.Equals(
+                    binding.Name.LocalName,
+                    "style",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "style"
+                    : "attribute";
+        if (!equivalent && !IsMismatchAllowed(reader, node, category))
+        {
+            ReportHydrationWarning(
                 tree,
-                $"Hydration {category} mismatch for "
-                + $"\"{attribute.Name}\": the server rendered \"{actual}\", "
-                + $"but the client expected \"{expected}\".");
+                $"Hydration {category} mismatch for '{name}': the server rendered "
+                    + $"'{actual}', but the client expected '{expected}'.");
         }
     }
 
-    private static bool ClassEquivalent(string? serverValue, string clientValue)
+    private static bool ClassValuesEquivalent(string? serverValue, string clientValue)
     {
         HashSet<string> server = TokenizeClass(serverValue);
         HashSet<string> client = TokenizeClass(clientValue);
@@ -1226,30 +1023,19 @@ public sealed partial class Renderer<TNode>
         return tokens;
     }
 
-    private static bool StyleEquivalent(
-        string? serverValue,
-        object? clientValue)
+    private static bool StyleValuesEquivalent(string? serverValue, string clientValue)
     {
-        Dictionary<string, object?> server =
-            StyleAndClassNormalization.ParseStringStyle(
-                serverValue ?? string.Empty);
-        object? normalized =
-            StyleAndClassNormalization.NormalizeStyle(clientValue);
-        Dictionary<string, object?> client =
-            StyleAndClassNormalization.ParseStringStyle(
-                StyleAndClassNormalization.StringifyStyle(normalized));
+        Dictionary<string, string> server = ParseStyle(serverValue);
+        Dictionary<string, string> client = ParseStyle(clientValue);
         if (server.Count != client.Count)
         {
             return false;
         }
 
-        foreach (KeyValuePair<string, object?> declaration in client)
+        foreach (KeyValuePair<string, string> declaration in client)
         {
-            if (!server.TryGetValue(declaration.Key, out object? actual)
-                || !string.Equals(
-                    actual?.ToString(),
-                    declaration.Value?.ToString(),
-                    StringComparison.Ordinal))
+            if (!server.TryGetValue(declaration.Key, out string? actual)
+                || !string.Equals(actual, declaration.Value, StringComparison.Ordinal))
             {
                 return false;
             }
@@ -1258,27 +1044,29 @@ public sealed partial class Renderer<TNode>
         return true;
     }
 
-    private static string AttributeMismatchCategory(string name)
+    private static Dictionary<string, string> ParseStyle(string? value)
     {
-        if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
+        Dictionary<string, string> declarations = new(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(value))
         {
-            return "class";
+            return declarations;
         }
 
-        if (string.Equals(name, "style", StringComparison.OrdinalIgnoreCase))
+        string[] segments = value.Split(';', StringSplitOptions.RemoveEmptyEntries);
+        for (int index = 0; index < segments.Length; index++)
         {
-            return "style";
+            int separator = segments[index].IndexOf(':');
+            if (separator <= 0)
+            {
+                continue;
+            }
+
+            string name = segments[index][..separator].Trim();
+            string declarationValue = segments[index][(separator + 1)..].Trim();
+            declarations[name] = declarationValue;
         }
 
-        return "attribute";
-    }
-
-    private static bool IsEventAttribute(string name)
-    {
-        return name.Length > 2
-            && name[0] == 'o'
-            && name[1] == 'n'
-            && !char.IsAsciiLetterLower(name[2]);
+        return declarations;
     }
 
     private static bool IsMismatchAllowed(
@@ -1292,9 +1080,7 @@ public sealed partial class Renderer<TNode>
             TNode current = cursor!;
             if (reader.Kind(current) == HydrationNodeKind.Element)
             {
-                string? value = reader.Attribute(
-                    current,
-                    AllowMismatchAttribute);
+                string? value = reader.Attribute(current, AllowMismatchAttribute);
                 if (value is not null)
                 {
                     if (value.Length == 0)
@@ -1334,23 +1120,22 @@ public sealed partial class Renderer<TNode>
         return false;
     }
 
-    private static bool IsStructuralStartMarker(string data)
-    {
-        return string.Equals(data, FragmentStartMarker, StringComparison.Ordinal)
-            || string.Equals(data, TeleportStartMarker, StringComparison.Ordinal);
-    }
+    private static bool IsStructuralStartMarker(string data) =>
+        string.Equals(
+            data,
+            HydrationMarkers.FragmentStartData,
+            StringComparison.Ordinal)
+        || string.Equals(
+            data,
+            HydrationMarkers.TeleportStartData,
+            StringComparison.Ordinal);
 
     private static bool IsCommentMarker(
         HydrationNodeReader<TNode> reader,
         TNode node,
-        string marker)
-    {
-        return reader.Kind(node) == HydrationNodeKind.Comment
-            && string.Equals(
-                reader.Data(node),
-                marker,
-                StringComparison.Ordinal);
-    }
+        string marker) =>
+        reader.Kind(node) == HydrationNodeKind.Comment
+        && string.Equals(reader.Data(node), marker, StringComparison.Ordinal);
 
     private static TNode? FindFirstMarker(
         HydrationNodeReader<TNode> reader,
@@ -1385,17 +1170,11 @@ public sealed partial class Renderer<TNode>
             if (reader.Kind(current) == HydrationNodeKind.Comment)
             {
                 string data = reader.Data(current);
-                if (string.Equals(
-                    data,
-                    openingMarker,
-                    StringComparison.Ordinal))
+                if (string.Equals(data, openingMarker, StringComparison.Ordinal))
                 {
                     depth++;
                 }
-                else if (string.Equals(
-                    data,
-                    closingMarker,
-                    StringComparison.Ordinal))
+                else if (string.Equals(data, closingMarker, StringComparison.Ordinal))
                 {
                     if (depth == 0)
                     {
@@ -1427,10 +1206,7 @@ public sealed partial class Renderer<TNode>
 
     private void SetHydrationTargetCursor(TNode target, TNode? cursor)
     {
-        if (_hydrationTargetCursors is not null)
-        {
-            _hydrationTargetCursors[target] = cursor;
-        }
+        _hydrationTargetCursors?[target] = cursor;
     }
 
     private void RemoveExcessHydrationNodes(
@@ -1452,14 +1228,14 @@ public sealed partial class Renderer<TNode>
             cursor = reader.NextSibling(cursor!);
         }
 
-        Warn(tree, warning);
+        ReportHydrationWarning(tree, warning);
         for (int index = 0; index < excess.Count; index++)
         {
             _options.Remove(excess[index]);
         }
     }
 
-    private static void Warn(MountedTree<TNode> tree, string message)
+    private static void ReportHydrationWarning(MountedTree<TNode> tree, string message)
     {
         tree.Application?.WarnHandler?.Invoke(message);
     }

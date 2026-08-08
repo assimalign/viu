@@ -34,25 +34,16 @@ conditional code; it omits them from the generated source.
 
 ## Generated API
 
-An enabled component implements
-`global::Assimalign.Viu.Components.IComponentHotReloadMetadata`. Its explicit properties expose a stable
-source identifier and the three compiler-generated marker types:
+An enabled component registers its stable source identifier and three compiler-generated marker types
+through the Core hot-reload registry from a generated module initializer:
 
 ```csharp
-string global::Assimalign.Viu.Components.IComponentHotReloadMetadata.ComponentIdentifier
-    => "viu-127e199bfed3754c";
-
-global::System.Type
-    global::Assimalign.Viu.Components.IComponentHotReloadMetadata.TemplateUpdateMarkerType
-        => typeof(SingleFileComponentTemplateUpdateMarker);
-
-global::System.Type
-    global::Assimalign.Viu.Components.IComponentHotReloadMetadata.ScriptUpdateMarkerType
-        => typeof(SingleFileComponentScriptUpdateMarker);
-
-global::System.Type
-    global::Assimalign.Viu.Components.IComponentHotReloadMetadata.StyleUpdateMarkerType
-        => typeof(SingleFileComponentStyleUpdateMarker);
+global::Assimalign.Viu.ComponentHotReload.Register(
+    typeof(Counter),
+    "viu-127e199bfed3754c",
+    typeof(SingleFileComponentTemplateUpdateMarker),
+    typeof(SingleFileComponentScriptUpdateMarker),
+    typeof(SingleFileComponentStyleUpdateMarker));
 ```
 
 Each marker owns one method whose body contains only its block hash:

@@ -104,6 +104,59 @@ internal static class CompilerText
         return true;
     }
 
+    /// <summary>
+    /// Replaces complete identifier tokens without changing longer authored identifiers that merely contain
+    /// <paramref name="identifier"/>.
+    /// </summary>
+    /// <param name="text">The text containing identifier tokens.</param>
+    /// <param name="identifier">The complete compiler-owned identifier to replace.</param>
+    /// <param name="replacement">The replacement text.</param>
+    /// <param name="replaceMemberAccess">
+    /// Whether an identifier immediately following a member-access dot may be replaced.
+    /// </param>
+    /// <returns>The original text when no complete token matches; otherwise, the rewritten text.</returns>
+    public static string ReplaceIdentifierToken(
+        string text,
+        string identifier,
+        string replacement,
+        bool replaceMemberAccess = true)
+    {
+        var searchStart = 0;
+        var copyStart = 0;
+        StringBuilder? builder = null;
+        while (searchStart < text.Length)
+        {
+            var index = text.IndexOf(identifier, searchStart, System.StringComparison.Ordinal);
+            if (index < 0)
+            {
+                break;
+            }
+
+            var end = index + identifier.Length;
+            var hasIdentifierBefore = index > 0 &&
+                (IsIdentifierCharacter(text[index - 1]) || text[index - 1] == '@');
+            var hasIdentifierAfter = end < text.Length && IsIdentifierCharacter(text[end]);
+            var isMemberAccess = index > 0 && text[index - 1] == '.';
+            if (!hasIdentifierBefore && !hasIdentifierAfter && (replaceMemberAccess || !isMemberAccess))
+            {
+                builder ??= new StringBuilder(text.Length + replacement.Length);
+                builder.Append(text, copyStart, index - copyStart);
+                builder.Append(replacement);
+                copyStart = end;
+            }
+
+            searchStart = end;
+        }
+
+        if (builder is null)
+        {
+            return text;
+        }
+
+        builder.Append(text, copyStart, text.Length - copyStart);
+        return builder.ToString();
+    }
+
     private static bool IsWordCharacter(char character)
         => (character >= 'a' && character <= 'z') ||
            (character >= 'A' && character <= 'Z') ||

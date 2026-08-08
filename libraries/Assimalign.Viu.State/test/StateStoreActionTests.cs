@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using Assimalign.Viu.Reactivity;
-
 using Shouldly;
 using Xunit;
+
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.State.Tests;
 
@@ -32,6 +32,7 @@ public sealed class StateStoreActionTests
             },
             detached: true);
 
+        // [STA-8] Actions are observable only through protected action helpers.
         int returned = stateStore.IncrementBy(5);
 
         returned.ShouldBe(5);
@@ -54,6 +55,7 @@ public sealed class StateStoreActionTests
             context => context.After(value => result = value),
             detached: true);
 
+        // [STA-8] Completion hooks observe the resolved value rather than the Task object.
         int returned = await stateStore.IncrementByAsync(7);
 
         returned.ShouldBe(7);
@@ -85,6 +87,7 @@ public sealed class StateStoreActionTests
                 exception => observed = exception),
             detached: true);
 
+        // [STA-8] Async faults run error hooks and remain observable to the caller.
         await Should.ThrowAsync<InvalidOperationException>(
             stateStore.ExplodeAsync);
 

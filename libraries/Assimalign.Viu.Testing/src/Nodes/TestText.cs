@@ -1,9 +1,7 @@
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// An in-memory text node. Its content is set through the node-ops text operation, so a text patch
-/// is one recorded operation exactly as it is one host call in a real adapter.
-/// </summary>
+/// <summary>Represents mutable in-memory character data created as a text host node.</summary>
+/// <remarks>Specified by <c>[RND-HOST-1]</c> and <c>[CONF-3]</c>.</remarks>
 public sealed class TestText : TestNode
 {
     internal TestText(string text)
@@ -11,12 +9,9 @@ public sealed class TestText : TestNode
         Text = text;
     }
 
-    /// <summary>The text content.</summary>
+    /// <summary>Gets the current text content.</summary>
     public string Text { get; internal set; }
 
-    /// <summary>
-    /// Whether this node holds a raw static-markup chunk from <c>insertStaticContent</c> rather
-    /// than plain text — the serializer emits it verbatim.
-    /// </summary>
+    /// <summary>Gets whether this node contains compiler-trusted static markup.</summary>
     public bool IsStaticContent { get; internal init; }
 }

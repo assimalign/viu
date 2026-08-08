@@ -7,17 +7,18 @@ namespace Assimalign.Viu.Router;
 /// <summary>
 /// The two in-component navigation guard registrations that need a live component instance. Call
 /// them during a route component's <c>Setup</c>, passing its explicit
-/// <see cref="IComponentContext"/>, to bind a guard to the record at that outlet depth. The guard
+/// <see cref="ComponentContext"/>, to bind a guard to the record at that outlet depth. The guard
 /// runs while the record is <b>leaving</b> or being <b>reused</b> and is removed automatically when
 /// the component unmounts.
 /// </summary>
 /// <remarks>
 /// <b>Registration hooks the component lifecycle, not reflection.</b> Each call resolves the router
-/// from <see cref="IComponentContext.Services"/>, selects the current matched record at the explicit
-/// depth, and registers teardown through <see cref="IComponentLifecycle.OnUnmounted(Action)"/>.
-/// There is no hierarchical component-dependency fallback ([CMP-24]), which is why the depth is
+/// from <see cref="ComponentContext.Services"/>, selects the current matched record at the explicit
+/// depth, and registers teardown through <see cref="ComponentLifecycle.OnUnmounted(Action)"/>.
+/// There is no hierarchical component-dependency fallback (<c>[CMP-24]</c>), which is why the depth is
 /// explicit. The before-enter guard, which has no mounted instance to hook, is supplied explicitly on
 /// <see cref="RouteRecord.RouteEnterGuard"/> instead.
+/// Specified by <c>[RTR-4]</c> and <c>[RTR-5]</c>.
 /// </remarks>
 public static class RouterGuards
 {
@@ -31,9 +32,11 @@ public static class RouterGuards
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context"/> or <paramref name="guard"/> is null.
     /// </exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="depth"/> is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="depth"/> does not identify a record in the current matched route chain.
+    /// </exception>
     public static void OnBeforeRouteLeave(
-        IComponentContext context,
+        ComponentContext context,
         NavigationGuard guard,
         int depth = 0)
     {
@@ -50,9 +53,11 @@ public static class RouterGuards
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context"/> or <paramref name="guard"/> is null.
     /// </exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="depth"/> is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="depth"/> does not identify a record in the current matched route chain.
+    /// </exception>
     public static void OnBeforeRouteUpdate(
-        IComponentContext context,
+        ComponentContext context,
         NavigationGuard guard,
         int depth = 0)
     {
@@ -60,7 +65,7 @@ public static class RouterGuards
     }
 
     private static void Register(
-        IComponentContext context,
+        ComponentContext context,
         NavigationGuard guard,
         int depth,
         bool leaving)
@@ -78,7 +83,10 @@ public static class RouterGuards
         var matched = router.CurrentRoute.Value.Matched;
         if (depth >= matched.Count)
         {
-            return;
+            throw new ArgumentOutOfRangeException(
+                nameof(depth),
+                depth,
+                "The guard depth must identify a record in the current matched route chain.");
         }
 
         RouteRecord record = matched[depth];

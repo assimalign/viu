@@ -1,227 +1,320 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
+
+using Assimalign.Viu;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
-/// <summary>
-/// Parses a server-rendered HTML fragment into the in-memory <see cref="TestNode"/> tree the
-/// hydration walker adopts — the DOM-free stand-in for a browser parsing SSR output into real DOM
-/// before <c>CreateSSRApp(...).Mount</c>. It understands exactly the vocabulary
-/// <c>Assimalign.Viu.ServerRenderer</c> emits: elements with double/single-quoted or bare
-/// attributes, void elements (no closing tag), text, and comments — including the hydration markers
-/// <c>&lt;!--[--&gt;</c>, <c>&lt;!--]--&gt;</c>, <c>&lt;!----&gt;</c>, and the teleport anchors. Whitespace is
-/// preserved verbatim, and the server renderer emits none between nodes, so write fragments as a
-/// single line to match real output. Intended for hydration tests ([V01.01.07.03]).
-/// </summary>
+/// <summary>Parses server-rendered fragments into the host tree consumed by hydration tests.</summary>
+/// <remarks>
+/// The parser consumes Core's public <see cref="HydrationMarkers"/> vocabulary and preserves its
+/// comment data exactly. It is a focused parser for ServerRenderer output, not a general browser
+/// HTML parser. Specified by <c>[SSR-6]</c>, <c>[SSR-MARKERS-3]</c>, and <c>[HYD-2]</c>.
+/// </remarks>
 public static class TestServerMarkup
 {
-    // The WHATWG void elements the SSR renderer emits with no closing tag and no children.
-    private static readonly HashSet<string> VoidElements = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr",
-    };
+    private static readonly HashSet<string> VoidElements =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr",
+        };
 
-    /// <summary>
-    /// Parses <paramref name="markup"/> into the children of a fresh container element and returns the
-    /// container, ready to hand to <see cref="TestRenderer.Hydrate"/>.
-    /// </summary>
-    /// <param name="markup">The server-rendered HTML fragment.</param>
-    /// <param name="containerTag">The container element's tag (default <c>"root"</c>).</param>
-    /// <returns>The container holding the parsed server tree.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="markup"/> is null.</exception>
-    /// <exception cref="FormatException">The markup is malformed (an unbalanced or unexpected close tag).</exception>
+    private static readonly string[] KnownMarkers =
+    [
+        HydrationMarkers.FragmentStart,
+        HydrationMarkers.FragmentEnd,
+        HydrationMarkers.EmptyComment,
+        HydrationMarkers.TeleportStart,
+        HydrationMarkers.TeleportEnd,
+        HydrationMarkers.TeleportAnchor,
+    ];
+
+    /// <summary>Parses a server fragment beneath a fresh test container.</summary>
+    /// <param name="markup">The WHATWG-serialized fragment.</param>
+    /// <param name="containerTag">The diagnostic container tag.</param>
+    /// <returns>The populated test container.</returns>
     public static TestElement Parse(string markup, string containerTag = "root")
     {
         ArgumentNullException.ThrowIfNull(markup);
-        var container = new TestElement(containerTag, null);
-        var stack = new Stack<TestElement>();
+        ArgumentException.ThrowIfNullOrEmpty(containerTag);
+        TestElement container = new(new QualifiedName(containerTag));
+        Stack<TestElement> stack = new();
         stack.Push(container);
-        var position = 0;
+        int position = 0;
         while (position < markup.Length)
         {
-            if (markup[position] == '<')
+            if (markup[position] != '<')
             {
-                if (StartsWith(markup, position, "<!--"))
-                {
-                    position = ParseComment(markup, position, stack.Peek());
-                }
-                else if (position + 1 < markup.Length && markup[position + 1] == '/')
-                {
-                    position = ParseCloseTag(markup, position, stack);
-                }
-                else
-                {
-                    position = ParseOpenTag(markup, position, stack);
-                }
+                position = ParseText(markup, position, stack.Peek());
+                continue;
+            }
+
+            if (StartsWith(markup, position, "<!--"))
+            {
+                position = ParseComment(markup, position, stack.Peek());
+            }
+            else if (position + 1 < markup.Length && markup[position + 1] == '/')
+            {
+                position = ParseCloseTag(markup, position, stack);
             }
             else
             {
-                position = ParseText(markup, position, stack.Peek());
+                position = ParseOpenTag(markup, position, stack);
             }
         }
+
         if (stack.Count != 1)
         {
-            throw new FormatException($"Unbalanced markup: {stack.Count - 1} element(s) left open.");
+            throw new FormatException(
+                $"Unbalanced markup: {stack.Count - 1} element(s) remain open.");
         }
+
         return container;
     }
 
     private static int ParseComment(string markup, int position, TestElement parent)
     {
-        var end = markup.IndexOf("-->", position + 4, StringComparison.Ordinal);
+        int end = markup.IndexOf("-->", position + 4, StringComparison.Ordinal);
         if (end < 0)
         {
             throw new FormatException("Unterminated comment.");
         }
-        var content = markup[(position + 4)..end];
+
+        string serialized = markup[position..(end + 3)];
+        string content = serialized[("<!--".Length)..^3];
+        for (int index = 0; index < KnownMarkers.Length; index++)
+        {
+            string marker = KnownMarkers[index];
+            if (string.Equals(serialized, marker, StringComparison.Ordinal))
+            {
+                content = marker[("<!--".Length)..^3];
+                break;
+            }
+        }
+
         Append(parent, new TestComment(content));
         return end + 3;
     }
 
-    private static int ParseCloseTag(string markup, int position, Stack<TestElement> stack)
+    private static int ParseCloseTag(
+        string markup,
+        int position,
+        Stack<TestElement> stack)
     {
-        var end = markup.IndexOf('>', position);
+        int end = markup.IndexOf('>', position + 2);
         if (end < 0)
         {
             throw new FormatException("Unterminated close tag.");
         }
-        var tag = markup[(position + 2)..end].Trim();
+
+        string tag = markup[(position + 2)..end].Trim();
         if (stack.Count <= 1)
         {
             throw new FormatException($"Unexpected close tag </{tag}>.");
         }
-        var open = stack.Pop();
+
+        TestElement open = stack.Pop();
         if (!string.Equals(open.Tag, tag, StringComparison.OrdinalIgnoreCase))
         {
-            throw new FormatException($"Mismatched close tag: expected </{open.Tag}>, found </{tag}>.");
+            throw new FormatException(
+                $"Mismatched close tag: expected </{open.Tag}>, found </{tag}>.");
         }
+
         return end + 1;
     }
 
-    private static int ParseOpenTag(string markup, int position, Stack<TestElement> stack)
+    private static int ParseOpenTag(
+        string markup,
+        int position,
+        Stack<TestElement> stack)
     {
-        var end = markup.IndexOf('>', position);
-        if (end < 0)
+        int end = FindOpenTagEnd(markup, position + 1);
+        bool selfClosing = IsSelfClosing(markup, position + 1, end);
+        int contentEnd = selfClosing ? PreviousNonWhitespace(markup, end - 1) : end;
+        string inner = markup[(position + 1)..contentEnd].Trim();
+        int spaceIndex = IndexOfWhitespace(inner);
+        string tag = spaceIndex < 0 ? inner : inner[..spaceIndex];
+        if (tag.Length == 0)
         {
-            throw new FormatException("Unterminated open tag.");
+            throw new FormatException("An open tag must have a name.");
         }
-        var selfClosing = markup[end - 1] == '/';
-        var inner = markup[(position + 1)..(selfClosing ? end - 1 : end)].Trim();
-        var spaceIndex = IndexOfWhitespace(inner);
-        var tag = spaceIndex < 0 ? inner : inner[..spaceIndex];
-        var element = new TestElement(tag, null);
+
+        TestElement element = new(new QualifiedName(tag));
         if (spaceIndex >= 0)
         {
             ParseAttributes(inner[spaceIndex..], element);
         }
+
         Append(stack.Peek(), element);
         if (!selfClosing && !VoidElements.Contains(tag))
         {
             stack.Push(element);
         }
+
         return end + 1;
     }
 
     private static int ParseText(string markup, int position, TestElement parent)
     {
-        var next = markup.IndexOf('<', position);
-        var end = next < 0 ? markup.Length : next;
-        Append(parent, new TestText(markup[position..end]));
+        int next = markup.IndexOf('<', position);
+        int end = next < 0 ? markup.Length : next;
+        Append(parent, new TestText(WebUtility.HtmlDecode(markup[position..end])));
         return end;
     }
 
     private static void ParseAttributes(string attributes, TestElement element)
     {
-        var position = 0;
+        int position = 0;
         while (position < attributes.Length)
         {
-            while (position < attributes.Length && char.IsWhiteSpace(attributes[position]))
-            {
-                position++;
-            }
+            SkipWhitespace(attributes, ref position);
             if (position >= attributes.Length)
             {
-                break;
+                return;
             }
-            var nameStart = position;
+
+            int nameStart = position;
             while (position < attributes.Length
                 && !char.IsWhiteSpace(attributes[position])
                 && attributes[position] != '=')
             {
                 position++;
             }
-            var name = attributes[nameStart..position];
+
+            string name = attributes[nameStart..position];
             if (name.Length == 0)
             {
-                break;
+                throw new FormatException("An attribute must have a name.");
             }
-            while (position < attributes.Length && char.IsWhiteSpace(attributes[position]))
-            {
-                position++;
-            }
+
+            SkipWhitespace(attributes, ref position);
             if (position < attributes.Length && attributes[position] == '=')
             {
                 position++;
-                while (position < attributes.Length && char.IsWhiteSpace(attributes[position]))
-                {
-                    position++;
-                }
-                element.Properties[name] = ParseAttributeValue(attributes, ref position);
+                SkipWhitespace(attributes, ref position);
+                element.SetProperty(
+                    name,
+                    WebUtility.HtmlDecode(ParseAttributeValue(attributes, ref position)));
             }
             else
             {
-                // A bare boolean attribute: the server renderer emits these by presence, with no value.
-                element.Properties[name] = string.Empty;
+                element.SetProperty(name, string.Empty);
             }
         }
     }
 
     private static string ParseAttributeValue(string attributes, ref int position)
     {
-        if (position < attributes.Length && (attributes[position] == '"' || attributes[position] == '\''))
+        if (position >= attributes.Length)
         {
-            var quote = attributes[position];
+            return string.Empty;
+        }
+
+        char quote = attributes[position];
+        if (quote is '"' or '\'')
+        {
             position++;
-            var valueStart = position;
+            int valueStart = position;
             while (position < attributes.Length && attributes[position] != quote)
             {
                 position++;
             }
-            var value = attributes[valueStart..position];
-            if (position < attributes.Length)
+
+            if (position >= attributes.Length)
             {
-                position++;
+                throw new FormatException("Unterminated quoted attribute value.");
             }
+
+            string value = attributes[valueStart..position];
+            position++;
             return value;
         }
-        var unquotedStart = position;
+
+        int unquotedStart = position;
         while (position < attributes.Length && !char.IsWhiteSpace(attributes[position]))
         {
             position++;
         }
+
         return attributes[unquotedStart..position];
+    }
+
+    private static int FindOpenTagEnd(string markup, int position)
+    {
+        char quote = '\0';
+        for (int index = position; index < markup.Length; index++)
+        {
+            char character = markup[index];
+            if (quote != '\0')
+            {
+                if (character == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if (character is '"' or '\'')
+            {
+                quote = character;
+            }
+            else if (character == '>')
+            {
+                return index;
+            }
+        }
+
+        throw new FormatException("Unterminated open tag.");
+    }
+
+    private static bool IsSelfClosing(string markup, int start, int end)
+    {
+        int index = PreviousNonWhitespace(markup, end - 1);
+        return index >= start && markup[index] == '/';
+    }
+
+    private static int PreviousNonWhitespace(string value, int position)
+    {
+        while (position >= 0 && char.IsWhiteSpace(value[position]))
+        {
+            position--;
+        }
+
+        return position;
+    }
+
+    private static void SkipWhitespace(string value, ref int position)
+    {
+        while (position < value.Length && char.IsWhiteSpace(value[position]))
+        {
+            position++;
+        }
     }
 
     private static void Append(TestElement parent, TestNode child)
     {
         child.Parent = parent;
-        parent.Children.Add(child);
+        parent.AddChild(child);
     }
 
     private static int IndexOfWhitespace(string value)
     {
-        for (var index = 0; index < value.Length; index++)
+        for (int index = 0; index < value.Length; index++)
         {
             if (char.IsWhiteSpace(value[index]))
             {
                 return index;
             }
         }
+
         return -1;
     }
 
-    private static bool StartsWith(string value, int position, string token)
-        => position + token.Length <= value.Length
-            && string.CompareOrdinal(value, position, token, 0, token.Length) == 0;
+    private static bool StartsWith(string value, int position, string token) =>
+        position + token.Length <= value.Length
+        && string.CompareOrdinal(value, position, token, 0, token.Length) == 0;
 }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -79,7 +79,7 @@ internal static class TransformText
                     callArguments.Add(child);
                 }
 
-                if (!context.Ssr && ConstantAnalysis.GetConstantType(child) == ConstantType.NotConstant)
+                if (!context.IsServerRendering && ConstantAnalysis.GetConstantType(child) == ConstantType.NotConstant)
                 {
                     callArguments.Add(((int)PatchFlags.Text).ToString(CultureInfo.InvariantCulture));
                 }

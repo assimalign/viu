@@ -45,6 +45,9 @@ public static class CssBindingRewriter
     /// <param name="localHashSalt">The component-scoped salt (the short <c>data-v-</c> scope id).</param>
     /// <returns>The rewritten stylesheet, the collected bindings, and any malformed-usage diagnostics.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> or <paramref name="localHashSalt"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The stylesheet contains an externally derived CSS rule variant that this rewriter cannot process.
+    /// </exception>
     public static CssBindingRewriteResult Rewrite(CssStylesheetNode stylesheet, string localHashSalt)
     {
         if (stylesheet is null)
@@ -94,7 +97,7 @@ public static class CssBindingRewriter
                         Declarations = RewriteDeclarations(keyframe.Declarations),
                     },
                     CssDeclarationNode declaration => RewriteDeclaration(declaration),
-                    var other => other,
+                    var unsupported => throw UnsupportedNode(unsupported),
                 };
             }
 
@@ -367,4 +370,7 @@ public static class CssBindingRewriter
 
         return index;
     }
+
+    private static InvalidOperationException UnsupportedNode(SyntaxNode node) =>
+        new($"Unsupported CSS syntax node '{node.GetType().FullName}'.");
 }

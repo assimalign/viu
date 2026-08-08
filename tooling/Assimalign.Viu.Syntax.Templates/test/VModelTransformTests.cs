@@ -22,7 +22,7 @@ public class VModelTransformTests
         var result = TransformTestHelpers.Transform(template);
 
         result.ShouldUseHelper(expectedHelper);
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().Directives.ShouldNotBeNull();
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Directives.ShouldNotBeNull();
     }
 
     [Fact]
@@ -30,8 +30,8 @@ public class VModelTransformTests
     {
         var result = TransformTestHelpers.Transform("<input v-model=\"text\"/>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("onUpdate:modelValue").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("onUpdate:modelValue").ShouldNotBeNull();
         // native v-model does not carry the modelValue prop; it is passed as binding.value.
         props.Properties.Any(p => p.Key is SimpleExpressionNode { Content: "modelValue" }).ShouldBeFalse();
     }
@@ -41,9 +41,9 @@ public class VModelTransformTests
     {
         var result = TransformTestHelpers.Transform("<MyInput v-model=\"value\"></MyInput>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("modelValue").ShouldNotBeNull();
-        props.Property("onUpdate:modelValue").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("modelValue").ShouldNotBeNull();
+        props.ObjectProperty("onUpdate:modelValue").ShouldNotBeNull();
     }
 
     [Fact]
@@ -51,10 +51,10 @@ public class VModelTransformTests
     {
         var result = TransformTestHelpers.Transform("<MyInput v-model:title.trim=\"value\"></MyInput>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("title").ShouldNotBeNull();
-        props.Property("onUpdate:title").ShouldNotBeNull();
-        props.Property("titleModifiers").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("title").ShouldNotBeNull();
+        props.ObjectProperty("onUpdate:title").ShouldNotBeNull();
+        props.ObjectProperty("titleModifiers").ShouldNotBeNull();
     }
 
     [Fact]

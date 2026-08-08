@@ -6,29 +6,23 @@ using Assimalign.Viu.Reactivity;
 namespace Assimalign.Viu;
 
 /// <summary>
-/// Routes reactive pre-flush and post-flush watcher jobs through the application scheduler.
+/// Routes component watcher jobs through the application scheduler's pre- and post-flush phases.
 /// </summary>
 /// <remarks>
-/// One instance may serve any number of watchers. Each <see cref="WatchJob"/> maps by reference to
-/// one stable <see cref="SchedulerJob"/>, preserving queue deduplication across repeated
-/// invalidations. The weak-key mapping does not retain stopped watchers. Not thread-safe by
-/// design; Viu runs on the browser's single-threaded event loop.
+/// Each reactive job maps by reference to one stable scheduler job, preserving instance
+/// deduplication. This scheduler is single-threaded. Specified by <c>[SCH-2]</c>, <c>[SCH-3]</c>,
+/// and <c>[SCH-5]</c>.
 /// </remarks>
 public sealed class ApplicationWatchScheduler : IReactiveWatchScheduler
 {
     private readonly ConditionalWeakTable<WatchJob, SchedulerJob> _schedulerJobs = new();
     private readonly int? _componentIdentifier;
 
-    /// <summary>
-    /// Creates an application-level scheduler whose watchers have no component ordering
-    /// identifier.
-    /// </summary>
+    /// <summary>Initializes an application-level scheduler with no component ordering identifier.</summary>
     public ApplicationWatchScheduler()
     {
     }
 
-    /// <summary>Creates a scheduler whose jobs order with one mounted component.</summary>
-    /// <param name="componentIdentifier">The mounted component's scheduler identifier.</param>
     internal ApplicationWatchScheduler(int componentIdentifier)
     {
         _componentIdentifier = componentIdentifier;
@@ -54,13 +48,11 @@ public sealed class ApplicationWatchScheduler : IReactiveWatchScheduler
         }
     }
 
-    private SchedulerJob CreateSchedulerJob(WatchJob job)
-    {
-        return new SchedulerJob(job.Invoke)
+    private SchedulerJob CreateSchedulerJob(WatchJob job) =>
+        new(job.Invoke)
         {
             Identifier = _componentIdentifier,
             IsPreFlush = job.Flush == WatchFlushMode.Pre,
             Name = "reactive watcher",
         };
-    }
 }

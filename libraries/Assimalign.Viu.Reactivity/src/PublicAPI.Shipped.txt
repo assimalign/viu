@@ -16,11 +16,16 @@ Assimalign.Viu.Reactivity.EffectScope
 Assimalign.Viu.Reactivity.EffectScope.Dispose() -> void
 Assimalign.Viu.Reactivity.EffectScope.EffectScope(bool detached = false) -> void
 Assimalign.Viu.Reactivity.EffectScope.IsActive.get -> bool
+Assimalign.Viu.Reactivity.EffectScope.IsStopped.get -> bool
+Assimalign.Viu.Reactivity.EffectScope.Own(System.IDisposable! resource) -> void
 Assimalign.Viu.Reactivity.EffectScope.Pause() -> void
 Assimalign.Viu.Reactivity.EffectScope.Resume() -> void
 Assimalign.Viu.Reactivity.EffectScope.Run(System.Action! action) -> void
 Assimalign.Viu.Reactivity.EffectScope.Run<TResult>(System.Func<TResult>! function) -> TResult
 Assimalign.Viu.Reactivity.EffectScope.Stop() -> void
+Assimalign.Viu.Reactivity.ImmediateWatchScheduler
+Assimalign.Viu.Reactivity.ImmediateWatchScheduler.ImmediateWatchScheduler() -> void
+Assimalign.Viu.Reactivity.ImmediateWatchScheduler.Schedule(Assimalign.Viu.Reactivity.WatchJob! job) -> void
 Assimalign.Viu.Reactivity.IReactiveEffectScope
 Assimalign.Viu.Reactivity.IReactiveEffectScope.IsActive.get -> bool
 Assimalign.Viu.Reactivity.IReactiveEffectScope.Run(System.Action! action) -> void
@@ -180,6 +185,9 @@ Assimalign.Viu.Reactivity.WatchJob
 Assimalign.Viu.Reactivity.WatchJob.Flush.get -> Assimalign.Viu.Reactivity.WatchFlushMode
 Assimalign.Viu.Reactivity.WatchJob.Invoke() -> void
 Assimalign.Viu.Reactivity.WatchJob.IsActive.get -> bool
+Assimalign.Viu.Reactivity.WatchJob.Run() -> void
+Assimalign.Viu.Reactivity.WatchJob.Sequence.get -> long
+Assimalign.Viu.Reactivity.WatchJob.WatchJob(long sequence, System.Action! callback) -> void
 Assimalign.Viu.Reactivity.WatchOptions
 Assimalign.Viu.Reactivity.WatchOptions.Deep.get -> bool
 Assimalign.Viu.Reactivity.WatchOptions.Deep.set -> void

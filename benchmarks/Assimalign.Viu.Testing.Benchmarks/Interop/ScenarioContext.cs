@@ -10,6 +10,7 @@ namespace Assimalign.Viu.Testing.Benchmarks;
 /// source, and the current row list. A scenario's prepare step mounts a baseline tree through
 /// <see cref="Render"/>; its measured step renders the next tree, which the renderer diffs against the
 /// mounted one, landing every node operation in the renderer's op log (the interop-crossing proxy).
+/// The log's commit marker delimits a render and is not itself counted as a node mutation.
 /// Not thread-safe (single-threaded benchmark host).
 /// </summary>
 public sealed class ScenarioContext

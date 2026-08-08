@@ -1,20 +1,15 @@
 using System;
 using System.Runtime.Versioning;
 
-using Assimalign.Viu;
-
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
-/// The production <see cref="RendererOptions{TNode}"/> over the DOM bridge: the browser's
-/// implementation of the host primitives Core's renderer needs — node creation, insertion, removal,
-/// text and property patching — and nothing about the tree walk itself ([RND-HOST-1]). Handles
-/// are ints (see the marshaling ADR in <c>libraries/Assimalign.Viu.Browser/docs/</c>); 0 is the
-/// "no node" sentinel. Node removal releases the removed subtree's JS handles and DOM
-/// listeners deterministically, and the returned handle list purges the invoker registry in
-/// the same call — no leaks on either side of the boundary ([V01.01.04.01]). Event handling
-/// goes through the invoker registry ([V01.01.04.03]): handler changes between renders swap a
-/// delegate with zero listener-management interop.
+/// Owns the synchronous Browser bridge primitives used around the command-frame renderer: event
+/// dispatch, directive and transition callbacks, pre-mount cleanup, and handle diagnostics.
+/// Renderer writes themselves always flow through <see cref="BufferedBrowserNodeOperations"/>.
+/// Handles are integers and zero is the no-node sentinel. Event handling uses an invoker registry,
+/// so a rerendered handler swaps a managed delegate without listener-management interop. Specified
+/// by <c>[EXE-12]</c>, <c>[RND-IO-1]</c>, <c>[RND-IO-2]</c>, and <c>[EXE-14]</c>.
 /// </summary>
 [SupportedOSPlatform("browser")]
 internal static class BrowserNodeOperations
@@ -96,6 +91,8 @@ internal static class BrowserNodeOperations
                     deltaY),
             ClearMoveStyles = static element =>
                 BrowserDomBridge.ClearMoveStyles(element),
+            ParentNode = static element =>
+                BrowserDomBridge.ParentNode(element),
             HasCssTransform = static (element, root, moveClass) =>
                 BrowserDomBridge.HasCssTransform(
                     element,
@@ -106,42 +103,14 @@ internal static class BrowserNodeOperations
         };
     }
 
-    internal static RendererOptions<int> Create() => new()
-    {
-        Insert = static (child, parent, anchor) => BrowserDomBridge.Insert(parent, child, anchor),
-        Remove = static child => Invokers.PurgeReleasedHandles(BrowserDomBridge.Remove(child)),
-        CreateElement = static (tag, elementNamespace) => BrowserDomBridge.CreateElement(tag, elementNamespace),
-        CreateText = static text => BrowserDomBridge.CreateText(text),
-        CreateComment = static text => BrowserDomBridge.CreateComment(text),
-        SetText = static (node, text) => BrowserDomBridge.SetText(node, text),
-        ParentNode = static node => BrowserDomBridge.ParentNode(node),
-        NextSibling = static node => BrowserDomBridge.NextSibling(node),
-        PatchAttribute = static (element, elementTag, propertyName, previousValue, nextValue, elementNamespace) =>
-            BrowserPropertyPatcher.Patch(LeafOperations, element, elementTag, propertyName, previousValue, nextValue, elementNamespace),
-        SetScopeIdentifier = static (element, scopeIdentifier) =>
-            BrowserDomBridge.SetAttribute(element, scopeIdentifier, string.Empty),
-        ResolveTeleportTarget = static target =>
-            target is string selector
-                ? BrowserDomBridge.QuerySelector(selector)
-                : default,
-        InsertStaticContent = static (content, parent, anchor, elementNamespace) =>
-        {
-            var span = BrowserDomBridge.InsertStaticContent(content, parent, anchor, elementNamespace);
-            return (span[0], span[1]);
-        },
-        CreateHydrationReader = static container =>
-            new BrowserHydrationReader(
-                BrowserDomBridge.SnapshotHydration(container)),
-    };
-
     /// <summary>
     /// Overrides the invoker registry used by the single <c>[JSExport]</c> dispatch entry
     /// (<see cref="BrowserEventDispatch"/>) and registry diagnostics. Buffered mode
     /// ([V01.01.04.05]) sets this to its own registry — whose add/remove callbacks encode listener
     /// operations into the command buffer rather than call the bridge directly — so live events and
-    /// diagnostics both address the handlers registered on the buffered renderer. Null selects the
-    /// direct-path registry. Ambient static (single active renderer per process, single-threaded JS
-    /// event-loop model).
+    /// diagnostics both address the handlers registered on the active command-frame renderer. Null
+    /// selects the bridge fallback registry. Ambient static (single active renderer per process,
+    /// single-threaded JavaScript event-loop model).
     /// </summary>
     internal static BrowserEventInvokerRegistry? OverrideInvokerRegistry;
 
@@ -151,10 +120,7 @@ internal static class BrowserNodeOperations
     /// <summary>The number of listeners in the registry selected by the active renderer.</summary>
     internal static int ActiveInvokerCount => ActiveInvokerRegistry.InvokerCount;
 
-    /// <summary>The number of listeners in the direct renderer's registry.</summary>
-    internal static int DirectInvokerCount => Invokers.InvokerCount;
-
-    /// <summary>Routes direct-mode event faults to an application-owned error handler.</summary>
+    /// <summary>Routes Browser event faults to an application-owned error handler.</summary>
     internal static Action<Exception> ErrorSink
     {
         set => Invokers.ErrorSink = value;
@@ -162,10 +128,10 @@ internal static class BrowserNodeOperations
 
     /// <summary>Clears an element's content (pre-mount container reset), purging released handles.</summary>
     internal static void ClearElement(int nodeHandle)
-        => Invokers.PurgeReleasedHandles(BrowserDomBridge.SetElementText(nodeHandle, string.Empty));
+        => PurgeReleasedHandles(BrowserDomBridge.SetElementText(nodeHandle, string.Empty));
 
     /// <summary>Registry sizes for leak diagnostics: JS nodes, JS listener maps, .NET invokers.</summary>
-    internal static (int JsNodes, int JsListenerMaps, int DotnetListeners) GetRegistryDiagnostics()
+    internal static (int JavaScriptNodes, int JavaScriptListenerMaps, int ManagedListeners) GetRegistryDiagnostics()
     {
         var sizes = BrowserDomBridge.GetRegistrySizes();
         return (sizes[0], sizes[1], ActiveInvokerCount);
@@ -173,4 +139,7 @@ internal static class BrowserNodeOperations
 
     private static BrowserEventInvokerRegistry ActiveInvokerRegistry
         => OverrideInvokerRegistry ?? Invokers;
+
+    private static void PurgeReleasedHandles(int[] releasedHandles) =>
+        Invokers.PurgeReleasedHandles(releasedHandles);
 }

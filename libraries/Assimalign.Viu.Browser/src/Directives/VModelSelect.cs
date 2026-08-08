@@ -1,27 +1,23 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// The <c>v-model</c> directive for <c>&lt;select&gt;</c>, single and multiple.
-/// </summary>
+/// <summary>Provides Browser single- and multiple-select two-way model behavior.</summary>
 /// <remarks>
-/// The directive uses <see cref="DirectiveBinding.GetDescendantElements(string)"/> to pair each
-/// immutable option component with its mounted browser handle. Raw bound option values therefore
-/// retain object identity without reflection or a browser read.
+/// Descendant option snapshots pair immutable raw values with mounted handles, so object values
+/// round-trip and every selection write uses event payload data instead of follow-up browser
+/// reads. Multiple selection preserves list-versus-set shape. Specified by <c>[SFC-CG-6]</c> and
+/// <c>[SFC-CG-7]</c>.
 /// </remarks>
 public sealed class VModelSelect : IDirective
 {
-    /// <summary>The shared directive instance the compiler references.</summary>
-    public static readonly VModelSelect Instance = new();
+    /// <summary>Gets the reusable Browser select-model directive.</summary>
+    public static VModelSelect Instance { get; } = new();
 
     private VModelSelect()
     {
@@ -45,67 +41,48 @@ public sealed class VModelSelect : IDirective
     private static void OnCreated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        BrowserDirectiveOperations operations =
-            BrowserDirectiveOperations.Require();
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
         int handle = BrowserModelDirective.Handle(element);
-        operations.GetState(handle).Assign =
-            BrowserModelDirective.Carrier(binding)?.Setter;
-        bool multiple = IsMultiple(component);
-        bool isSetModel =
-            BrowserModelDirective.IsSet(
-                BrowserModelDirective.Carrier(binding)?.Value);
-        bool castToNumber =
-            BrowserModelDirective.HasModifier(binding, "number");
-        operations.SetModelListener(
-            handle,
-            "onChange",
-            (Action<BrowserEvent>)(
-                browserEvent =>
-                    OnChange(
-                        operations,
-                        handle,
-                        browserEvent,
-                        multiple,
-                        isSetModel,
-                        castToNumber)));
+        operations.GetState(handle).Assign = BrowserModelDirective.Carrier(binding)?.Setter;
+        ConfigureListener(operations, handle, binding, value);
     }
 
     private static void OnMounted(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
         SetSelected(
             BrowserDirectiveOperations.Require(),
             BrowserModelDirective.Handle(element),
             binding,
-            component,
+            value,
             BrowserModelDirective.Carrier(binding)?.Value);
     }
 
     private static void OnBeforeUpdate(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        BrowserDirectiveOperations.Require()
-            .GetState(BrowserModelDirective.Handle(element))
-            .Assign = BrowserModelDirective.Carrier(binding)?.Setter;
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        operations.GetState(handle).Assign = BrowserModelDirective.Carrier(binding)?.Setter;
+        ConfigureListener(operations, handle, binding, value);
     }
 
     private static void OnUpdated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        BrowserDirectiveOperations operations =
-            BrowserDirectiveOperations.Require();
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
         int handle = BrowserModelDirective.Handle(element);
         BrowserModelState state = operations.GetState(handle);
         if (state.Assigning)
@@ -118,18 +95,41 @@ public sealed class VModelSelect : IDirective
             operations,
             handle,
             binding,
-            component,
+            value,
             BrowserModelDirective.Carrier(binding)?.Value);
     }
 
     private static void OnBeforeUnmount(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        BrowserDirectiveOperations.Require()
-            .ReleaseState(BrowserModelDirective.Handle(element));
+        BrowserDirectiveOperations.Require().ReleaseState(
+            BrowserModelDirective.Handle(element));
+    }
+
+    private static void ConfigureListener(
+        BrowserDirectiveOperations operations,
+        int handle,
+        DirectiveBinding binding,
+        ElementNode value)
+    {
+        bool multiple = IsMultiple(value);
+        bool isSetModel = BrowserModelDirective.IsSet(
+            BrowserModelDirective.Carrier(binding)?.Value);
+        bool castToNumber = BrowserModelDirective.HasModifier(binding, "number");
+        operations.SetModelListener(
+            handle,
+            "onChange",
+            (Action<BrowserEvent>)(browserEvent =>
+                OnChange(
+                    operations,
+                    handle,
+                    browserEvent,
+                    multiple,
+                    isSetModel,
+                    castToNumber)));
     }
 
     private static void OnChange(
@@ -154,30 +154,21 @@ public sealed class VModelSelect : IDirective
             {
                 for (int index = 0; index < selectedValues.Count; index++)
                 {
-                    selected.Add(
-                        MapSelected(
-                            state.OptionValues,
-                            selectedValues[index],
-                            castToNumber));
+                    selected.Add(MapSelected(
+                        state.OptionValues,
+                        selectedValues[index],
+                        castToNumber));
                 }
             }
 
-            if (isSetModel)
-            {
-                assign(new HashSet<object?>(selected));
-            }
-            else
-            {
-                assign(selected);
-            }
+            assign(isSetModel ? new HashSet<object?>(selected) : selected);
         }
         else
         {
-            assign(
-                MapSelected(
-                    state.OptionValues,
-                    browserEvent.TargetValue ?? string.Empty,
-                    castToNumber));
+            assign(MapSelected(
+                state.OptionValues,
+                browserEvent.TargetValue ?? string.Empty,
+                castToNumber));
         }
 
         state.Assigning = true;
@@ -187,50 +178,41 @@ public sealed class VModelSelect : IDirective
         BrowserDirectiveOperations operations,
         int handle,
         DirectiveBinding binding,
-        IElementComponent component,
-        object? value)
+        ElementNode value,
+        object? model)
     {
-        IReadOnlyList<DirectiveHostElement> optionElements =
+        IReadOnlyList<DirectiveHostElement> options =
             binding.GetDescendantElements("option");
-        List<KeyValuePair<string, object?>> snapshot =
-            new(optionElements.Count);
-        for (int index = 0; index < optionElements.Count; index++)
+        List<KeyValuePair<string, object?>> snapshot = new(options.Count);
+        for (int index = 0; index < options.Count; index++)
         {
-            object? rawValue =
-                OptionRawValue(optionElements[index].Component);
-            snapshot.Add(
-                new KeyValuePair<string, object?>(
-                    BrowserModelDirective.FormatValue(rawValue),
-                    rawValue));
+            object? rawValue = OptionRawValue(options[index].Value);
+            snapshot.Add(new KeyValuePair<string, object?>(
+                BrowserModelDirective.FormatValue(rawValue),
+                rawValue));
         }
 
         operations.GetState(handle).OptionValues = snapshot;
-        bool multiple = IsMultiple(component);
-        bool isListValue = BrowserModelDirective.IsList(value);
-        bool isSetValue = BrowserModelDirective.IsSet(value);
-        if (multiple && !isListValue && !isSetValue)
+        bool multiple = IsMultiple(value);
+        bool isListModel = BrowserModelDirective.IsList(model);
+        bool isSetModel = BrowserModelDirective.IsSet(model);
+        if (multiple && !isListModel && !isSetModel)
         {
-            Debug.WriteLine(
-                "[Viu warn] <select multiple v-model> expects an Array or Set value for its binding.");
+            binding.Context?.Warn(
+                "<select multiple v-model> expects a list or set model value.");
             return;
         }
 
-        for (int index = 0; index < optionElements.Count; index++)
+        for (int index = 0; index < options.Count; index++)
         {
-            DirectiveHostElement option = optionElements[index];
             object? rawValue = snapshot[index].Value;
-            bool selected =
-                multiple
-                    ? isListValue
-                        ? LooseEquality.LooseIndexOf(
-                            (IList)value!,
-                            rawValue) > -1
-                        : BrowserModelDirective.SetContains(
-                            (IEnumerable)value!,
-                            rawValue)
-                    : LooseEquality.LooseEqual(rawValue, value);
+            bool selected = multiple
+                ? isListModel
+                    ? LooseEquality.LooseIndexOf((IList)model!, rawValue) >= 0
+                    : BrowserModelDirective.SetContains((IEnumerable)model!, rawValue)
+                : LooseEquality.LooseEqual(rawValue, model);
             operations.SetBooleanProperty(
-                BrowserModelDirective.Handle(option.Element),
+                BrowserModelDirective.Handle(options[index].Element),
                 "selected",
                 selected);
         }
@@ -238,33 +220,29 @@ public sealed class VModelSelect : IDirective
 
     private static object? MapSelected(
         List<KeyValuePair<string, object?>>? optionValues,
-        string domValue,
+        string browserValue,
         bool castToNumber)
     {
-        object? rawValue = domValue;
+        object? rawValue = browserValue;
         if (optionValues is not null)
         {
             for (int index = 0; index < optionValues.Count; index++)
             {
-                KeyValuePair<string, object?> optionValue =
-                    optionValues[index];
                 if (string.Equals(
-                    optionValue.Key,
-                    domValue,
+                    optionValues[index].Key,
+                    browserValue,
                     StringComparison.Ordinal))
                 {
-                    rawValue = optionValue.Value;
+                    rawValue = optionValues[index].Value;
                     break;
                 }
             }
         }
 
-        return castToNumber
-            ? NumberCoercion.LooseToNumber(rawValue)
-            : rawValue;
+        return castToNumber ? NumberCoercion.LooseToNumber(rawValue) : rawValue;
     }
 
-    private static object? OptionRawValue(IElementComponent option)
+    private static object? OptionRawValue(ElementNode option)
     {
         if (BrowserModelDirective.HasProperty(option, "value"))
         {
@@ -277,35 +255,34 @@ public sealed class VModelSelect : IDirective
     }
 
     private static void AppendText(
-        IReadOnlyList<IComponent> components,
+        IReadOnlyList<VirtualNode> nodes,
         StringBuilder text)
     {
-        for (int index = 0; index < components.Count; index++)
+        for (int index = 0; index < nodes.Count; index++)
         {
-            switch (components[index])
+            switch (nodes[index])
             {
-                case ITextComponent textComponent:
-                    text.Append(textComponent.Text);
+                case TextNode textNode:
+                    text.Append(textNode.Text);
                     break;
-                case IElementComponent elementComponent:
-                    AppendText(elementComponent.Children, text);
+                case ElementNode elementNode:
+                    AppendText(elementNode.Children, text);
                     break;
-                case IFragmentComponent fragmentComponent:
-                    AppendText(fragmentComponent.Children, text);
+                case FragmentNode fragmentNode:
+                    AppendText(fragmentNode.Children, text);
                     break;
             }
         }
     }
 
-    private static bool IsMultiple(IElementComponent component)
+    private static bool IsMultiple(ElementNode value)
     {
-        if (!component.Attributes.TryGetValue(
-            "multiple",
-            out object? value))
+        if (!BrowserModelDirective.HasProperty(value, "multiple"))
         {
             return false;
         }
 
-        return value is not bool booleanValue || booleanValue;
+        return BrowserModelDirective.Property(value, "multiple") is not bool booleanValue
+            || booleanValue;
     }
 }

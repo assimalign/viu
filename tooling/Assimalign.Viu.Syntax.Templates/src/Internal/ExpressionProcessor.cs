@@ -242,7 +242,7 @@ internal static class ExpressionProcessor
             // A destructured prop whose real name differs: resolve through the alias table.
             BindingType.PropertyAliased => "_ctx." + (context.BindingMetadata.GetPropertyAlias(raw) ?? raw),
 
-            // Props, options-API members, and plain data are component-instance members reached through _ctx.
+            // Properties, options-API members, and plain data are component-instance members reached through _ctx.
             _ => "_ctx." + raw,
         };
     }

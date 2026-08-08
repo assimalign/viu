@@ -7,6 +7,7 @@ namespace Assimalign.Viu.Reactivity;
 /// or pauses and resumes callback delivery. Watchers created inside an <see cref="EffectScope"/>
 /// also stop when the scope stops, so an explicit <see cref="Stop"/> is only needed for
 /// independently created watchers. Implements <see cref="IDisposable"/> for <c>using</c> support.
+/// Specified by <c>[RCT-5]</c>, <c>[RCT-10]</c>, and <c>[RCT-12]</c>.
 /// </summary>
 public sealed class WatchHandle : IDisposable
 {
@@ -18,7 +19,10 @@ public sealed class WatchHandle : IDisposable
     public bool IsActive => _watcher.IsActive;
 
     /// <summary>Stops the watcher, unlinking its dependencies and running the pending cleanup. Idempotent.</summary>
-    public void Stop() => _watcher.Stop();
+    public void Stop()
+    {
+        _watcher.Stop();
+    }
 
     /// <summary>Defers callbacks until <see cref="Resume"/>; a change while paused delivers one trailing callback.</summary>
     public void Pause() => _watcher.Pause();
@@ -27,6 +31,5 @@ public sealed class WatchHandle : IDisposable
     public void Resume() => _watcher.Resume();
 
     /// <summary>Stops the watcher; equivalent to <see cref="Stop"/> for <c>using</c> support.</summary>
-    public void Dispose() => _watcher.Stop();
+    public void Dispose() => Stop();
 }
-

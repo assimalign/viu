@@ -67,15 +67,7 @@ internal static class ScriptSemanticFixture
             }
         }
 
-        paths.Add(typeof(Assimalign.Viu.Components.IComponentContext).Assembly.Location);
-        var sharedAssemblyPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "Assimalign.Viu.Shared.dll");
-        if (File.Exists(sharedAssemblyPath))
-        {
-            paths.Add(sharedAssemblyPath);
-        }
-
+        paths.Add(typeof(Assimalign.Viu.Components.ComponentContext).Assembly.Location);
         return paths;
     }
 }

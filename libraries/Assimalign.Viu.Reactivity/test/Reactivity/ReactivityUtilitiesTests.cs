@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 using Shouldly;
 using Xunit;
@@ -6,9 +8,9 @@ using Xunit;
 namespace Assimalign.Viu.Reactivity.Tests;
 
 /// <summary>
-/// Pins the reactivity inspection surface (<c>IsRef</c>, <c>IsReactive</c>, <c>IsReadonly</c>,
-/// <c>Unref</c>, <c>ToRef</c>) and the escape hatches out of reactivity (<c>ToRaw</c>,
-/// <c>MarkRaw</c>) — the ratified member list in <c>[RCT-5]</c>. Track/trigger claims are pinned
+/// Pins the reactivity inspection surface (<c>IsRef</c>, <c>IsReactive</c>, <c>IsReadOnly</c>,
+    /// <c>Unref</c>, <c>ToRef</c>) and the collection/raw-value escape hatches
+    /// (<c>ToRaw</c>, <c>MarkRaw</c>) — the ratified member list in <c>[RCT-5]</c>. Track/trigger claims are pinned
 /// with run counts.
 /// The generated-object shapes (<see cref="ReactivePerson"/>, <see cref="ReactiveOrder"/>) are declared
 /// in <c>GeneratedReactiveObjectTests</c>.
@@ -16,7 +18,16 @@ namespace Assimalign.Viu.Reactivity.Tests;
 public sealed class ReactivityUtilitiesTests
 {
     [Fact]
-    public void IsRef_TrueForEveryRefKind_FalseForReactiveObjectsAndValues()
+    public void DebuggerDisplays_UseNonTrackingValueAndBackingCounts()
+    {
+        DebuggerDisplay(typeof(ReactiveValue<>)).ShouldBe("Value = {Peek(),nq}");
+        DebuggerDisplay(typeof(ReactiveList<>)).ShouldBe("Count = {_items.Count}");
+        DebuggerDisplay(typeof(ReactiveDictionary<,>)).ShouldBe("Count = {_items.Count}");
+        DebuggerDisplay(typeof(ReactiveSet<>)).ShouldBe("Count = {_items.Count}");
+    }
+
+    [Fact]
+    public void IsRef_TrueForEveryReferenceKind_FalseForReactiveObjectsAndValues()
     {
         Reactive.IsRef(Reactive.Reference(1)).ShouldBeTrue();
         Reactive.IsRef(Reactive.ShallowReference(1)).ShouldBeTrue();
@@ -47,26 +58,27 @@ public sealed class ReactivityUtilitiesTests
     }
 
     [Fact]
-    public void IsReadonly_TrueForGetterOnlyComputed_FalseForWritableComputedAndRefs()
+    public void IsReadOnly_TrueForGetterOnlyComputed_FalseForWritableComputedAndReferences()
     {
-        Reactive.IsReadonly(Reactive.Computed(() => 1)).ShouldBeTrue(); // no setter -> readonly
+        Reactive.IsReadOnly(Reactive.Computed(() => 1)).ShouldBeTrue(); // no setter -> readonly
 
-        Reactive.IsReadonly(Reactive.Computed(() => 1, _ => { })).ShouldBeFalse(); // writable
-        Reactive.IsReadonly(Reactive.Reference(1)).ShouldBeFalse();
-        Reactive.IsReadonly(new ReactivePerson { Name = "A" }).ShouldBeFalse(); // mutable reactive object
-        Reactive.IsReadonly(null).ShouldBeFalse();
+        Reactive.IsReadOnly(Reactive.Computed(() => 1, _ => { })).ShouldBeFalse(); // writable
+        Reactive.IsReadOnly(Reactive.Reference(1)).ShouldBeFalse();
+        Reactive.IsReadOnly(new ReactivePerson { Name = "A" }).ShouldBeFalse(); // mutable reactive object
+        Reactive.IsReadOnly(null).ShouldBeFalse();
     }
 
     [Fact]
     public void Unref_UnwrapsRefsWithoutBoxing_AndPassesValuesThrough()
     {
-        // Concrete ref types must unwrap (overload resolution picks the concrete-ref overload, not the
-        // value passthrough) — the guard against Unref(someRef) returning the ref itself.
+        // Concrete reference types must unwrap (overload resolution picks the concrete-reference
+        // overload, not the value passthrough) — the guard against Unref(reference) returning the
+        // reference itself.
         Reactive.Unref(Reactive.Reference(7)).ShouldBe(7);
         Reactive.Unref(Reactive.ShallowReference(8)).ShouldBe(8);
         Reactive.Unref(Reactive.Computed(() => 9)).ShouldBe(9);
 
-        // Non-refs pass through unchanged (struct value never boxed by the generic passthrough).
+        // Non-reference values pass through unchanged (a struct is never boxed by the generic passthrough).
         Reactive.Unref(5).ShouldBe(5);
         Reactive.Unref("hello").ShouldBe("hello");
     }
@@ -99,7 +111,7 @@ public sealed class ReactivityUtilitiesTests
         Reactive.IsRef(nameRef).ShouldBeTrue();
         nameRef.Value.ShouldBe("Ada");
 
-        // Source -> ref: mutating the object triggers a reader of the ref.
+        // Source -> reference: mutating the object triggers a reader of the reference.
         var runs = 0;
         string? seen = null;
         Reactive.Effect(() =>
@@ -114,7 +126,7 @@ public sealed class ReactivityUtilitiesTests
         runs.ShouldBe(2);
         seen.ShouldBe("Grace");
 
-        // Ref -> source: writing the ref mutates the object and triggers its dependency.
+        // Reference -> source: writing the reference mutates the object and triggers its dependency.
         nameRef.Value = "Hopper";
         person.Name.ShouldBe("Hopper");
         runs.ShouldBe(3);
@@ -122,7 +134,7 @@ public sealed class ReactivityUtilitiesTests
     }
 
     [Fact]
-    public void ToRef_GetterOnly_IsReadonly()
+    public void ToReference_GetterOnly_IsReadOnly()
     {
         var person = new ReactivePerson { Name = "Ada", Age = 30 };
         var ageRef = Reactive.ToRef(() => person.Age);
@@ -131,13 +143,6 @@ public sealed class ReactivityUtilitiesTests
         // No setter: the write is a warned no-op, the source is unchanged.
         ageRef.Value = 99;
         person.Age.ShouldBe(30);
-    }
-
-    [Fact]
-    public void ToRaw_OfGeneratedObject_ReturnsTheSameInstance()
-    {
-        var person = new ReactivePerson { Name = "Ada" };
-        Reactive.ToRaw(person).ShouldBeSameAs(person);
     }
 
     [Fact]
@@ -180,7 +185,7 @@ public sealed class ReactivityUtilitiesTests
         runs.ShouldBe(1);
         seen.ShouldBe(10);
 
-        list[0] = 20; // reactive write triggers the index dep, but the effect never subscribed
+        list[0] = 20; // reactive write triggers the index dependency, but the effect never subscribed
         runs.ShouldBe(1);
     }
 
@@ -272,5 +277,9 @@ public sealed class ReactivityUtilitiesTests
         list.Add(new ReactivePerson { Name = "C" }); // structural change fires
         runs.ShouldBe(1);
     }
-}
 
+    private static string? DebuggerDisplay(Type type) =>
+        ((DebuggerDisplayAttribute?)Attribute.GetCustomAttribute(
+            type,
+            typeof(DebuggerDisplayAttribute)))?.Value;
+}

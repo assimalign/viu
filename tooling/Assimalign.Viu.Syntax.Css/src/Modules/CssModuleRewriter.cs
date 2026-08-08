@@ -39,6 +39,10 @@ public static class CssModuleRewriter
     /// <param name="localHashSalt">The component-scoped salt (the short <c>data-v-</c> scope id).</param>
     /// <returns>The rewritten stylesheet and the original → hashed class map.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> or <paramref name="localHashSalt"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The stylesheet contains an externally derived CSS rule or selector-part variant that this
+    /// rewriter cannot process.
+    /// </exception>
     public static CssModuleRewriteResult Rewrite(CssStylesheetNode stylesheet, string localHashSalt)
     {
         if (stylesheet is null)
@@ -74,7 +78,9 @@ public static class CssModuleRewriter
                 // selectors inside them are renamed too. @keyframes/@font-face bodies carry no class
                 // selectors, so recursion is a structural copy there.
                 CssAtRuleNode atRule => atRule with { Body = RewriteRules(atRule.Body, salt, classes) },
-                var other => other,
+                CssKeyframeRuleNode keyframe => keyframe,
+                CssDeclarationNode declaration => declaration,
+                var unsupported => throw UnsupportedNode(unsupported),
             };
         }
 
@@ -104,9 +110,15 @@ public static class CssModuleRewriter
         for (var index = 0; index < complex.Parts.Count; index++)
         {
             var part = complex.Parts[index];
-            parts[index] = part is CssSimpleSelectorNode { Selector: CssSimpleSelectorKind.Class } classSelector
-                ? classSelector with { Text = RenameClass(classSelector.Text, salt, classes) }
-                : part;
+            parts[index] = part switch
+            {
+                CssSimpleSelectorNode { Selector: CssSimpleSelectorKind.Class } classSelector =>
+                    classSelector with { Text = RenameClass(classSelector.Text, salt, classes) },
+                CssSimpleSelectorNode => part,
+                CssCombinatorNode => part,
+                CssPseudoSelectorNode => part,
+                _ => throw UnsupportedNode(part),
+            };
         }
 
         return complex with { Parts = new SyntaxList<CssSelectorPartNode>(parts) };
@@ -132,4 +144,7 @@ public static class CssModuleRewriter
 
         return "." + hashed;
     }
+
+    private static InvalidOperationException UnsupportedNode(SyntaxNode node) =>
+        new($"Unsupported CSS syntax node '{node.GetType().FullName}'.");
 }

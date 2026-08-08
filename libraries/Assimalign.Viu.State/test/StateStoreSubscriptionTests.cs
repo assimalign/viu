@@ -1,9 +1,9 @@
 using System;
 
-using Assimalign.Viu.Reactivity;
-
 using Shouldly;
 using Xunit;
+
+using Assimalign.Viu.Reactivity;
 
 namespace Assimalign.Viu.State.Tests;
 
@@ -74,7 +74,7 @@ public sealed class StateStoreSubscriptionTests
     }
 
     [Fact]
-    public void Subscribe_CallbackRemovalDuringNotificationDoesNotCorruptIteration()
+    public void Subscribe_CallbackRemovalDuringNotification_DoesNotCorruptIteration()
     {
         TestReactiveWatchScheduler scheduler = new();
         using StateStoreRegistry registry =
@@ -121,6 +121,7 @@ public sealed class StateStoreSubscriptionTests
         stateStore.State.Count = 1;
         scheduler.PendingCount.ShouldBe(1);
 
+        // [STA-2], [STA-7] A queued job becomes inert when registry disposal stops the watch.
         registry.Dispose();
         scheduler.RunUntilIdle();
 

@@ -34,9 +34,9 @@ detailed in [DESIGN.md](DESIGN.md); this page is the surface map.
 
 ## Boundaries
 
-- Roots on **`Assimalign.Viu.Syntax`** only. It does **not** reference the runtime: the emitted
-  render method binds to `Assimalign.Viu.Core`'s `RenderHelpers` (and the DOM directive
-  helpers in `Assimalign.Viu.Browser`) **by name**, so the contract flows one way (see
+- Roots on **`Assimalign.Viu.Syntax`** only. It does **not** reference the runtime: emitted render
+  statements name the Components frame/node contracts and typed Browser operations directly, so the
+  contract flows one way (see
   [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../Assimalign.Viu.Core/docs/OVERVIEW.md)).
 - Build-time library on the netstandard2.0 analyzer TFM; runs in Roslyn generator hosts.
 - Everything a parse or transform produces is value-equatable to preserve the incremental-generator

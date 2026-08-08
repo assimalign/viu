@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -104,9 +104,9 @@ public static class Transformer
                 element.ElementType != ElementType.Slot &&
                 context.GetCodegenNode(element) is { } elementCodegen)
             {
-                if (elementCodegen is VNodeCall vnodeCall)
+                if (elementCodegen is VirtualNodeCall virtualNodeCall)
                 {
-                    var block = TransformUtilities.ConvertToBlock(vnodeCall, context);
+                    var block = TransformUtilities.ConvertToBlock(virtualNodeCall, context);
                     context.SetCodegenNode(element, block);
                     return block;
                 }
@@ -123,10 +123,10 @@ public static class Transformer
             var patchFlag = PatchFlags.StableFragment;
             if (CountNonComment(children) == 1)
             {
-                patchFlag |= PatchFlags.DevRootFragment;
+                patchFlag |= PatchFlags.DevelopmentRootFragment;
             }
 
-            return context.CreateVNodeCall(
+            return context.CreateVirtualNodeCall(
                 context.Helper(HelperNames.Fragment),
                 null,
                 TransformFreeze.FreezeChildren(children),

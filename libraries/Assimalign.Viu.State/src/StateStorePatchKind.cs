@@ -1,8 +1,8 @@
 namespace Assimalign.Viu.State;
 
 /// <summary>
-/// Describes how a state-store mutation reached its subscribers, corresponding to Pinia's
-/// <c>MutationType</c>.
+/// Describes how a state-store mutation reached subscribers. Specified by <c>[STA-5]</c> and
+/// <c>[STA-7]</c>.
 /// </summary>
 public enum StateStorePatchKind
 {

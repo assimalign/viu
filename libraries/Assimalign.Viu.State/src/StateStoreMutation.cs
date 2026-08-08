@@ -2,10 +2,13 @@ using System;
 
 namespace Assimalign.Viu.State;
 
-/// <summary>Metadata delivered for one state-store subscription notification.</summary>
+/// <summary>
+/// Carries typed metadata for one state-store subscription notification. Specified by
+/// <c>[STA-5]</c> and <c>[STA-7]</c>.
+/// </summary>
 public readonly struct StateStoreMutation
 {
-    /// <summary>Creates mutation metadata.</summary>
+    /// <summary>Creates immutable mutation metadata.</summary>
     /// <param name="stateStoreKey">The key of the state store that changed.</param>
     /// <param name="kind">How the change reached the store.</param>
     public StateStoreMutation(

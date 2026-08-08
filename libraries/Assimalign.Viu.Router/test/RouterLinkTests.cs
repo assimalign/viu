@@ -47,7 +47,7 @@ public class RouterLinkTests
     public void RouterLink_AppliesActiveClass_OnInclusivePrefixMatch()
     {
         var router = LinkRouter();
-        _ = router.Push("/users/1");
+        _ = router.PushAsync("/users/1");
         using var wrapper = MountLink(router, Arguments(("to", "/users")), TextSlot("Users"));
 
         // /users is an ancestor of the current /users/1 -> active, but not the exact current route.
@@ -58,7 +58,7 @@ public class RouterLinkTests
     public void RouterLink_AppliesExactActiveClass_OnExactMatch()
     {
         var router = LinkRouter();
-        _ = router.Push("/users/1");
+        _ = router.PushAsync("/users/1");
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active router-link-exact-active");
@@ -68,7 +68,7 @@ public class RouterLinkTests
     public void RouterLink_AppliesNoActiveClass_WhenNotMatched()
     {
         var router = LinkRouter();
-        _ = router.Push("/users/1");
+        _ = router.PushAsync("/users/1");
         using var wrapper = MountLink(router, Arguments(("to", "/")), TextSlot("Home"));
 
         wrapper.Get("a").Attribute("class").ShouldBeNull();
@@ -80,7 +80,7 @@ public class RouterLinkTests
         var router = LinkRouter();
         router.LinkActiveClass = "is-active";
         router.LinkExactActiveClass = "is-exact";
-        _ = router.Push("/users/1");
+        _ = router.PushAsync("/users/1");
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("is-active is-exact");
@@ -90,7 +90,7 @@ public class RouterLinkTests
     public void RouterLink_PerLinkClassProps_OverrideTheGlobalDefaults()
     {
         var router = LinkRouter();
-        _ = router.Push("/users/1");
+        _ = router.PushAsync("/users/1");
         var properties = Arguments(
             ("to", "/users/1"),
             ("activeClass", "link-on"),
@@ -104,13 +104,13 @@ public class RouterLinkTests
     public async Task RouterLink_ActiveClass_UpdatesReactivelyOnNavigation()
     {
         var router = LinkRouter();
-        _ = router.Push("/users/1");
+        _ = router.PushAsync("/users/1");
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
         (wrapper.Get("a").Attribute("class") as string).ShouldBe("router-link-active router-link-exact-active");
 
         // A different param than the link's target: the reactive route drives a re-render that drops
         // the active classes.
-        _ = router.Push("/users/2");
+        _ = router.PushAsync("/users/2");
         await wrapper.NextTickAsync();
 
         wrapper.Find(".router-link-active").ShouldBeNull();
@@ -124,7 +124,7 @@ public class RouterLinkTests
         router.CurrentRoute.Value.Path.ShouldBe("/");
 
         var click = new RouterLinkClickEvent();
-        await wrapper.Trigger("click", click);
+        await wrapper.TriggerAsync("click", click);
 
         router.CurrentRoute.Value.Path.ShouldBe("/users/1");
         click.DefaultPrevented.ShouldBeTrue();
@@ -136,8 +136,8 @@ public class RouterLinkTests
         var router = LinkRouter();
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
-        var click = new RouterLinkClickEvent(controlKey: true);
-        await wrapper.Trigger("click", click);
+        var click = new RouterLinkClickEvent(modifiers: RouterLinkModifiers.Control);
+        await wrapper.TriggerAsync("click", click);
 
         router.CurrentRoute.Value.Path.ShouldBe("/");
         click.DefaultPrevented.ShouldBeFalse();
@@ -149,7 +149,7 @@ public class RouterLinkTests
         var router = LinkRouter();
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
-        await wrapper.Trigger("click", new RouterLinkClickEvent(button: 1));
+        await wrapper.TriggerAsync("click", new RouterLinkClickEvent(button: 1));
 
         router.CurrentRoute.Value.Path.ShouldBe("/");
     }
@@ -160,7 +160,7 @@ public class RouterLinkTests
         var router = LinkRouter();
         using var wrapper = MountLink(router, Arguments(("to", "/users/1")), TextSlot("User 1"));
 
-        await wrapper.Trigger("click", new RouterLinkClickEvent(button: 2));
+        await wrapper.TriggerAsync("click", new RouterLinkClickEvent(button: 2));
 
         router.CurrentRoute.Value.Path.ShouldBe("/");
     }
@@ -173,7 +173,7 @@ public class RouterLinkTests
 
         var click = new RouterLinkClickEvent();
         click.PreventDefault();
-        await wrapper.Trigger("click", click);
+        await wrapper.TriggerAsync("click", click);
 
         router.CurrentRoute.Value.Path.ShouldBe("/");
     }
@@ -186,7 +186,7 @@ public class RouterLinkTests
         using var wrapper = MountLink(router, properties, TextSlot("User 1"));
 
         var click = new RouterLinkClickEvent();
-        await wrapper.Trigger("click", click);
+        await wrapper.TriggerAsync("click", click);
 
         router.CurrentRoute.Value.Path.ShouldBe("/");
         click.DefaultPrevented.ShouldBeFalse();
@@ -208,7 +208,7 @@ public class RouterLinkTests
         var properties = Arguments(("to", "/users/1"), ("replace", true));
         using var wrapper = MountLink(router, properties, TextSlot("User 1"));
 
-        await wrapper.Trigger("click", new RouterLinkClickEvent());
+        await wrapper.TriggerAsync("click", new RouterLinkClickEvent());
 
         router.CurrentRoute.Value.Path.ShouldBe("/users/1");
         history.State.Replaced.ShouldBeTrue();

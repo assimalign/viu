@@ -17,5 +17,5 @@ public enum ElementNamespace
     Svg = 1,
 
     /// <summary>The MathML namespace.</summary>
-    MathML = 2,
+    MathMl = 2,
 }

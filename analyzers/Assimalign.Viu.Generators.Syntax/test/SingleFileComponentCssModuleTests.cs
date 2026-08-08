@@ -13,8 +13,8 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// <summary>
 /// End-to-end tests for the CSS Modules and <c>v-bind()</c> generator emission ([V01.01.06.06], issue #62):
 /// a <c>&lt;style module&gt;</c> block produces the hashed CSS plus the typed <c>$style</c>-equivalent accessor,
-/// a <c>v-bind()</c> block produces the custom-property CSS plus the <c>ApplyCssVariables</c> seam the
-/// <c>UseCssVariables</c> runtime consumes, both compose with <c>scoped</c>, malformed <c>v-bind()</c> surfaces a
+/// a <c>v-bind()</c> block produces custom-property CSS while its former runtime seam remains deferred,
+/// both compose with <c>scoped</c>, malformed <c>v-bind()</c> surfaces a
 /// style diagnostic on the <c>.viu</c> coordinates, and the additions stay strictly cached. The rewrite
 /// semantics themselves are pinned in the Css library's rewriter tests; these pin the generator wiring.
 /// </summary>
@@ -55,7 +55,7 @@ public sealed class SingleFileComponentCssModuleTests
     }
 
     [Fact]
-    public void VBindStyle_RewritesToCustomProperty_AndEmitsApplyCssVariablesSeam()
+    public void VBindStyle_RewritesToCustomProperty_WithoutDeferredRuntimeSeam()
     {
         const string source =
             "@script {\n    public string color = \"red\";\n}\n" +
@@ -65,12 +65,10 @@ public sealed class SingleFileComponentCssModuleTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
-        // The CSS references a hashed custom property, and the seam wires the UseCssVariables runtime with a
-        // getter that evaluates the original expression (resolved against the merged @script member `color`).
+        // The CSS asset retains the hashed custom property, while runtime CSS-variable binding is deferred.
         generated.ShouldContain("color: var(--");
-        generated.ShouldContain("internal void ApplyCssVariables()");
-        generated.ShouldContain("global::Assimalign.Viu.Browser.CssVariables.UseCssVariables(Context,");
-        generated.ShouldContain("(object?)(color)");
+        generated.ShouldNotContain("ApplyCssVariables");
+        generated.ShouldNotContain("CssVariables.UseCssVariables");
     }
 
     [Fact]
@@ -127,7 +125,7 @@ public sealed class SingleFileComponentCssModuleTests
     }
 
     [Fact]
-    public void VBind_ReferenceMember_UnwrapsToValue_InGetter()
+    public void VBind_ReferenceMember_DoesNotEmitDeferredRuntimeGetter()
     {
         // [V01.01.06.06.01] `v-bind(count)` with a script IReactiveReference<T> member unwraps to
         // `count.Value` in the
@@ -142,12 +140,13 @@ public sealed class SingleFileComponentCssModuleTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
-        generated.ShouldContain("(object?)(count.Value)");
-        generated.ShouldNotContain("count.Value.Value"); // not double-unwrapped
+        generated.ShouldContain("width: var(--");
+        generated.ShouldNotContain("ApplyCssVariables");
+        generated.ShouldNotContain("count.Value");
     }
 
     [Fact]
-    public void VBind_NonReferenceMember_StaysBare_InGetter()
+    public void VBind_NonReferenceMember_DoesNotEmitDeferredRuntimeGetter()
     {
         // A non-reference @script member is provably non-reactive, so it is read bare (no `.Value`, no unref).
         const string source =
@@ -158,7 +157,8 @@ public sealed class SingleFileComponentCssModuleTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
-        generated.ShouldContain("(object?)(color)");
+        generated.ShouldContain("color: var(--");
+        generated.ShouldNotContain("ApplyCssVariables");
     }
 
     [Fact]
@@ -190,13 +190,13 @@ public sealed class SingleFileComponentCssModuleTests
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
         // All three compose: the class is hashed, the scope attribute lands on it, and the value is a
-        // custom property — plus the module accessor, the v-bind seam, and the scope id are all emitted.
-        generated.ShouldContain("internal const string ScopeId = \"data-v-");
+        // custom property, while only extracted styles and the module accessor are emitted at runtime.
+        generated.ShouldNotContain("internal const string ScopeId");
         generated.ShouldContain(".box_");
         generated.ShouldContain("[data-v-");
         generated.ShouldContain("color: var(--");
         generated.ShouldContain("internal static class Style");
-        generated.ShouldContain("internal void ApplyCssVariables()");
+        generated.ShouldNotContain("ApplyCssVariables");
     }
 
     [Fact]

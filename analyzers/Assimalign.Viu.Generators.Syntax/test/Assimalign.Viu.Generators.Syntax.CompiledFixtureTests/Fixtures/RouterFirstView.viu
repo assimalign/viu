@@ -1,0 +1,8 @@
+<template>
+<section class="compiled-first-route">
+  <h1>first compiled route</h1>
+</section>
+</template>
+
+@script {
+}

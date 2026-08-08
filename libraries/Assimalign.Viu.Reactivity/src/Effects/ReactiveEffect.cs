@@ -6,12 +6,13 @@ namespace Assimalign.Viu.Reactivity;
 /// <summary>
 /// The subscriber primitive underneath render effects and watchers — Viu's
 /// <c>ReactiveEffect</c>. <see cref="Run"/> executes the function with this effect installed as
-/// the ambient active subscriber, re-collecting dependencies with version-based cleanup (deps not
+/// the ambient active subscriber, re-collecting dependencies with version-based cleanup (dependencies not
 /// read in the latest run are unlinked). When a tracked dependency triggers, the effect either
 /// invokes its <see cref="Scheduler"/> (exactly once per batch) or re-runs synchronously.
-/// Not thread-safe: designed for the single-threaded JS event-loop model.
+/// Not thread-safe: designed for the single-threaded JS event-loop model. Specified by
+/// <c>[RCT-2]</c>, <c>[RCT-5]</c>, <c>[RCT-9]</c>, and <c>[RCT-10]</c>.
 /// </summary>
-public sealed class ReactiveEffect : Subscriber
+public sealed class ReactiveEffect : Subscriber, IDisposable
 {
     private readonly Action _function;
     private bool _pendingWhilePaused;
@@ -23,7 +24,7 @@ public sealed class ReactiveEffect : Subscriber
     /// </summary>
     /// <param name="function">The reactive function to track.</param>
     /// <exception cref="ArgumentNullException"><paramref name="function"/> is null.</exception>
-    public ReactiveEffect(Action function)
+    internal ReactiveEffect(Action function)
     {
         ArgumentNullException.ThrowIfNull(function);
         _function = function;
@@ -116,6 +117,13 @@ public sealed class ReactiveEffect : Subscriber
         OnStop?.Invoke();
     }
 
+    /// <summary>
+    /// Stops this effect and releases every dependency subscription. Disposal is idempotent and is
+    /// exactly equivalent to <see cref="Stop"/>, so an effect can participate in ordinary owned
+    /// lifetime scopes without a second teardown protocol.
+    /// </summary>
+    public void Dispose() => Stop();
+
     /// <summary>Defers invalidations: while paused, triggers are remembered but not delivered.</summary>
     public void Pause() => Flags |= SubscriberFlags.Paused;
 
@@ -182,4 +190,3 @@ public sealed class ReactiveEffect : Subscriber
         return false;
     }
 }
-

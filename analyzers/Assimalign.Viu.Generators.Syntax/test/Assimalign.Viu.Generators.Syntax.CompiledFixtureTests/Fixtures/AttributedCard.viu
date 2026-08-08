@@ -1,0 +1,16 @@
+<template>
+    <article>
+        <span>{{ Eyebrow }}</span>
+        <h2>{{ Title }}</h2>
+    </article>
+</template>
+
+@script {
+    using Assimalign.Viu.Components;
+
+    [Parameter(IsRequired = true)]
+    public string Title { get; set; } = "Untitled";
+
+    [Parameter]
+    public string Eyebrow { get; set; } = "Feature";
+}

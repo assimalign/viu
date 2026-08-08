@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -53,7 +53,7 @@ internal static class TransformTestHelpers
     extension(ObjectExpression obj)
     {
         /// <summary>Asserts the property list contains a property whose static key equals <paramref name="key"/> and returns it.</summary>
-        public Property Property(string key)
+        public ObjectProperty ObjectProperty(string key)
             => obj.Properties.FirstOrDefault(p => p.Key is SimpleExpressionNode { IsStatic: true } k && k.Content == key)
                 .ShouldNotBeNull($"expected property '{key}'");
     }
@@ -65,7 +65,7 @@ internal static class TransformTestHelpers
             => node.ShouldBeOfType<SimpleExpressionNode>().Content;
     }
 
-    extension(VNodeCall call)
+    extension(VirtualNodeCall call)
     {
         /// <summary>Asserts a patch flag is present on a vnode call.</summary>
         public void ShouldHavePatchFlag(PatchFlags flag)

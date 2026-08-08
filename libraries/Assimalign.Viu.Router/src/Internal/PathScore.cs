@@ -52,7 +52,7 @@ internal static class PathScore
     /// Fractional bonus applied once to the last score when strict matching is on; kept under 1 so
     /// it only breaks ties.
     /// </summary>
-    public const double BonusStrict = 0.07 * Multiplier;
+    public const double BonusTrailingSlashSensitive = 0.07 * Multiplier;
 
     /// <summary>
     /// Fractional bonus per segment when case-sensitive matching is on; kept under 1 so it only

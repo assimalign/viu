@@ -120,7 +120,7 @@ Assimalign.Viu.Router.Router.LinkExactActiveClass.get -> string!
 Assimalign.Viu.Router.Router.LinkExactActiveClass.set -> void
 Assimalign.Viu.Router.Router.OnError(Assimalign.Viu.Router.NavigationErrorHandler! handler) -> System.Action!
 Assimalign.Viu.Router.Router.Push(string! location) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
-Assimalign.Viu.Router.Router.ReadyAsync() -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
+Assimalign.Viu.Router.Router.ReadyAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
 Assimalign.Viu.Router.Router.Replace(string! location) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationFailure?>!
 Assimalign.Viu.Router.Router.Resolve(string! location) -> Assimalign.Viu.Router.RouteLocation!
 Assimalign.Viu.Router.Router.ResolveNamed(string! name, Assimalign.Viu.Router.RouteParameters! parameters) -> Assimalign.Viu.Router.RouteLocation!
@@ -130,12 +130,12 @@ Assimalign.Viu.Router.RouteRecord
 Assimalign.Viu.Router.RouteRecord.ArgumentsResolver.get -> Assimalign.Viu.Router.RouteComponentArgumentsResolver?
 Assimalign.Viu.Router.RouteRecord.BeforeEnter.get -> Assimalign.Viu.Router.NavigationGuard?
 Assimalign.Viu.Router.RouteRecord.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Router.RouteRecord!>!
-Assimalign.Viu.Router.RouteRecord.Component.get -> Assimalign.Viu.Components.IComponent?
+Assimalign.Viu.Router.RouteRecord.Component.get -> Assimalign.Viu.Components.VirtualNode?
 Assimalign.Viu.Router.RouteRecord.Meta.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!
 Assimalign.Viu.Router.RouteRecord.Name.get -> string?
 Assimalign.Viu.Router.RouteRecord.Path.get -> string!
 Assimalign.Viu.Router.RouteRecord.RouteEnterGuard.get -> Assimalign.Viu.Router.IRouteEnterGuard?
-Assimalign.Viu.Router.RouteRecord.RouteRecord(string! path, string? name = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Router.RouteRecord!>? children = null, System.Collections.Generic.IReadOnlyDictionary<string!, object?>? meta = null, Assimalign.Viu.Components.IComponent? component = null, Assimalign.Viu.Router.RouteComponentArgumentsResolver? argumentsResolver = null, Assimalign.Viu.Router.NavigationGuard? beforeEnter = null, Assimalign.Viu.Router.IRouteEnterGuard? routeEnterGuard = null) -> void
+Assimalign.Viu.Router.RouteRecord.RouteRecord(string! path, string? name = null, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Router.RouteRecord!>? children = null, System.Collections.Generic.IReadOnlyDictionary<string!, object?>? meta = null, Assimalign.Viu.Components.VirtualNode? component = null, Assimalign.Viu.Router.RouteComponentArgumentsResolver? argumentsResolver = null, Assimalign.Viu.Router.NavigationGuard? beforeEnter = null, Assimalign.Viu.Router.IRouteEnterGuard? routeEnterGuard = null) -> void
 Assimalign.Viu.Router.RouterGuards
 Assimalign.Viu.Router.RouterHistory
 Assimalign.Viu.Router.RouterHistoryState
@@ -156,10 +156,8 @@ Assimalign.Viu.Router.RouterHistoryState.RouterHistoryState(string? Back, string
 Assimalign.Viu.Router.RouterHistoryState.Scroll.get -> Assimalign.Viu.Router.ScrollPosition?
 Assimalign.Viu.Router.RouterHistoryState.Scroll.init -> void
 Assimalign.Viu.Router.RouterLink
-Assimalign.Viu.Router.RouterLink.Name.get -> string?
-Assimalign.Viu.Router.RouterLink.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
 Assimalign.Viu.Router.RouterLink.RouterLink() -> void
-Assimalign.Viu.Router.RouterLink.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
+Assimalign.Viu.Router.RouterLink.Setup(Assimalign.Viu.Components.ComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
 Assimalign.Viu.Router.RouterLinkClickEvent
 Assimalign.Viu.Router.RouterLinkClickEvent.AltKey.get -> bool
 Assimalign.Viu.Router.RouterLinkClickEvent.Button.get -> int
@@ -171,10 +169,8 @@ Assimalign.Viu.Router.RouterLinkClickEvent.PreventDefault() -> void
 Assimalign.Viu.Router.RouterLinkClickEvent.RouterLinkClickEvent(int button = 0, bool controlKey = false, bool shiftKey = false, bool altKey = false, bool metaKey = false) -> void
 Assimalign.Viu.Router.RouterLinkClickEvent.ShiftKey.get -> bool
 Assimalign.Viu.Router.RouterView
-Assimalign.Viu.Router.RouterView.Name.get -> string?
-Assimalign.Viu.Router.RouterView.Parameters.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.IComponentParameter!>?
 Assimalign.Viu.Router.RouterView.RouterView() -> void
-Assimalign.Viu.Router.RouterView.Setup(Assimalign.Viu.Components.IComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
+Assimalign.Viu.Router.RouterView.Setup(Assimalign.Viu.Components.ComponentContext! context) -> Assimalign.Viu.Components.ComponentRenderer!
 Assimalign.Viu.Router.ScrollPosition
 Assimalign.Viu.Router.ScrollPosition.Deconstruct(out double Left, out double Top) -> void
 Assimalign.Viu.Router.ScrollPosition.Equals(Assimalign.Viu.Router.ScrollPosition other) -> bool
@@ -204,21 +200,23 @@ static Assimalign.Viu.Router.RouteComponentArguments.FromParameters() -> Assimal
 static Assimalign.Viu.Router.RouteComponentArguments.FromValues(params (string! Name, object? Value)[]! entries) -> Assimalign.Viu.Router.RouteComponentArgumentsResolver!
 static Assimalign.Viu.Router.RouteLocation.Start.get -> Assimalign.Viu.Router.RouteLocation!
 static Assimalign.Viu.Router.RouteParameters.Empty.get -> Assimalign.Viu.Router.RouteParameters!
-static Assimalign.Viu.Router.RouterGuards.OnBeforeRouteLeave(Assimalign.Viu.Components.IComponentContext! context, Assimalign.Viu.Router.NavigationGuard! guard, int depth = 0) -> void
-static Assimalign.Viu.Router.RouterGuards.OnBeforeRouteUpdate(Assimalign.Viu.Components.IComponentContext! context, Assimalign.Viu.Router.NavigationGuard! guard, int depth = 0) -> void
+static Assimalign.Viu.Router.RouterGuards.OnBeforeRouteLeave(Assimalign.Viu.Components.ComponentContext! context, Assimalign.Viu.Router.NavigationGuard! guard, int depth = 0) -> void
+static Assimalign.Viu.Router.RouterGuards.OnBeforeRouteUpdate(Assimalign.Viu.Components.ComponentContext! context, Assimalign.Viu.Router.NavigationGuard! guard, int depth = 0) -> void
 static Assimalign.Viu.Router.RouterHistory.CreateMemory(string? basePath = null) -> Assimalign.Viu.Router.IRouterHistory!
 static Assimalign.Viu.Router.RouterHistory.CreateWeb(string? basePath = null) -> Assimalign.Viu.Router.IRouterHistory!
 static Assimalign.Viu.Router.RouterHistory.CreateWebHash(string? basePath = null) -> Assimalign.Viu.Router.IRouterHistory!
 static Assimalign.Viu.Router.RouterHistory.InitializeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 static Assimalign.Viu.Router.RouterHistoryState.operator !=(Assimalign.Viu.Router.RouterHistoryState? left, Assimalign.Viu.Router.RouterHistoryState? right) -> bool
 static Assimalign.Viu.Router.RouterHistoryState.operator ==(Assimalign.Viu.Router.RouterHistoryState? left, Assimalign.Viu.Router.RouterHistoryState? right) -> bool
+static Assimalign.Viu.Router.RouterLink.Registration.get -> Assimalign.Viu.Components.ComponentRegistration!
+static Assimalign.Viu.Router.RouterView.Registration.get -> Assimalign.Viu.Components.ComponentRegistration!
 static Assimalign.Viu.Router.ScrollPosition.operator !=(Assimalign.Viu.Router.ScrollPosition left, Assimalign.Viu.Router.ScrollPosition right) -> bool
 static Assimalign.Viu.Router.ScrollPosition.operator ==(Assimalign.Viu.Router.ScrollPosition left, Assimalign.Viu.Router.ScrollPosition right) -> bool
 virtual Assimalign.Viu.Router.AfterNavigationHook.Invoke(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, Assimalign.Viu.Router.NavigationFailure? failure) -> void
 virtual Assimalign.Viu.Router.NavigationCallback.Invoke(string! to, string! from, Assimalign.Viu.Router.NavigationInformation information) -> void
 virtual Assimalign.Viu.Router.NavigationErrorHandler.Invoke(System.Exception! error, Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from) -> void
 virtual Assimalign.Viu.Router.NavigationGuard.Invoke(Assimalign.Viu.Router.RouteLocation! to, Assimalign.Viu.Router.RouteLocation! from, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Assimalign.Viu.Router.NavigationGuardResult!>!
-virtual Assimalign.Viu.Router.RouteComponentArgumentsResolver.Invoke(Assimalign.Viu.Router.RouteLocation! route) -> Assimalign.Viu.Components.IComponentArguments?
+virtual Assimalign.Viu.Router.RouteComponentArgumentsResolver.Invoke(Assimalign.Viu.Router.RouteLocation! route) -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>?
 ~override Assimalign.Viu.Router.NavigationInformation.Equals(object obj) -> bool
 ~override Assimalign.Viu.Router.NavigationInformation.ToString() -> string
 ~override Assimalign.Viu.Router.ScrollPosition.Equals(object obj) -> bool

@@ -26,6 +26,12 @@ public static class CssStylesheetWriter
     /// <param name="stylesheet">The stylesheet to serialize.</param>
     /// <returns>The deterministic CSS text.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The stylesheet contains an externally derived CSS node variant that this writer cannot serialize.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// A selector contains an unsupported <see cref="CssCombinatorKind"/> value.
+    /// </exception>
     public static string Write(CssStylesheetNode stylesheet)
     {
         if (stylesheet is null)
@@ -56,6 +62,8 @@ public static class CssStylesheetWriter
                 case CssDeclarationNode declaration:
                     WriteDeclaration(declaration, indent, builder);
                     break;
+                default:
+                    throw UnsupportedNode(rule);
             }
         }
     }
@@ -152,6 +160,8 @@ public static class CssStylesheetWriter
                     // is still faithful.
                     builder.Append(pseudo.Location.Source);
                     break;
+                default:
+                    throw UnsupportedNode(part);
             }
         }
     }
@@ -159,11 +169,15 @@ public static class CssStylesheetWriter
     private static string RenderCombinator(CssCombinatorKind kind)
         => kind switch
         {
+            CssCombinatorKind.Descendant => " ",
             CssCombinatorKind.Child => " > ",
             CssCombinatorKind.NextSibling => " + ",
             CssCombinatorKind.SubsequentSibling => " ~ ",
-            _ => " ",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported CSS combinator kind."),
         };
+
+    private static InvalidOperationException UnsupportedNode(SyntaxNode node) =>
+        new($"Unsupported CSS syntax node '{node.GetType().FullName}'.");
 
     private static void AppendIndent(StringBuilder builder, int levels)
     {

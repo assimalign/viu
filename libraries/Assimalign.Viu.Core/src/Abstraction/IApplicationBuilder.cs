@@ -2,21 +2,19 @@ using System;
 
 namespace Assimalign.Viu;
 
-/// <summary>
-/// Configures one application composition and builds its platform-selected persistent host.
-/// </summary>
+/// <summary>Configures one application composition and builds its platform-selected host.</summary>
 /// <remarks>
-/// <see cref="ApplicationOptions"/> is the single composition surface. A build snapshots the
-/// options into an immutable <see cref="IApplicationContext"/>. Specified by <c>[APP-2]</c>.
+/// The builder exposes composition only; runtime behavior is registered on the built application.
+/// Specified by <c>[APP-2]</c>.
 /// </remarks>
 public interface IApplicationBuilder
 {
-    /// <summary>Configures the composition and diagnostics to snapshot at build time.</summary>
-    /// <param name="configure">The options configuration action.</param>
+    /// <summary>Mutates the options that the next build snapshots.</summary>
+    /// <param name="configure">The configuration action.</param>
     /// <returns>This builder.</returns>
     IApplicationBuilder ConfigureApplication(Action<ApplicationOptions> configure);
 
-    /// <summary>Builds an application over the configured options snapshot.</summary>
-    /// <returns>The built persistent application host.</returns>
+    /// <summary>Builds the platform application from the current options snapshot.</summary>
+    /// <returns>The built persistent application.</returns>
     IApplication Build();
 }

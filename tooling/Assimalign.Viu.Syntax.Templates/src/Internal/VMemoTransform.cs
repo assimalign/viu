@@ -38,13 +38,18 @@ internal static class VMemoTransform
 
         return () =>
         {
-            if (context.GetCodegenNode(element) is not VNodeCall codegenNode)
+            // Identifier rewriting can replace the immutable element record after this transform's entry
+            // callback ran. Resolve the final current record on exit so the memo wrapper encloses the
+            // code-generation node installed for that record and carries its rewritten dependencies.
+            ElementNode target = context.CurrentNode as ElementNode ?? element;
+            DirectiveNode targetDirective = TransformUtilities.FindDirective(target, "memo") ?? directive;
+            if (context.GetCodegenNode(target) is not VirtualNodeCall codegenNode)
             {
                 return;
             }
 
             // A non-component subtree must be turned into a block.
-            var subtree = element.ElementType != ElementType.Component
+            var subtree = target.ElementType != ElementType.Component
                 ? TransformUtilities.ConvertToBlock(codegenNode, context)
                 : codegenNode;
 
@@ -52,13 +57,13 @@ internal static class VMemoTransform
                 context.Helper(HelperNames.WithMemo),
                 new object[]
                 {
-                    directive.Expression!,
+                    targetDirective.Expression!,
                     Ir.FunctionExpression(null, subtree),
                     "_cache",
                     context.CacheCount.ToString(CultureInfo.InvariantCulture),
                 });
 
-            context.SetCodegenNode(element, memoCall);
+            context.SetCodegenNode(target, memoCall);
             context.AppendEmptyCacheSlot();
         };
     }

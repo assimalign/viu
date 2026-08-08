@@ -214,14 +214,14 @@ public class InitialNavigationTests
         var beforeEachRuns = 0;
         var router = new Router(RouterHistory.CreateMemory(), Routes());
         await router.ReadyAsync();
-        await router.Push("/a");
+        await router.PushAsync("/a");
         router.BeforeEach((_, _, _) =>
         {
             beforeEachRuns++;
             return Task.FromResult(NavigationGuardResult.Allow);
         });
 
-        var failure = await router.Push("/a");
+        var failure = await router.PushAsync("/a");
 
         failure.ShouldNotBeNull();
         failure.Type.ShouldBe(NavigationFailureType.Duplicated);
@@ -258,7 +258,7 @@ public class InitialNavigationTests
 
         public EnterGuardComponent(List<string> log) => _log = log;
 
-        public Task<NavigationGuardResult> BeforeRouteEnter(RouteLocation to, RouteLocation from, CancellationToken cancellationToken)
+        public Task<NavigationGuardResult> BeforeRouteEnterAsync(RouteLocation to, RouteLocation from, CancellationToken cancellationToken)
         {
             _log.Add("beforeRouteEnter");
             return Task.FromResult(NavigationGuardResult.Allow);

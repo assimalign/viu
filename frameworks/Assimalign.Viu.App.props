@@ -20,7 +20,7 @@
         this file, so additional framework families (e.g. a future
         Assimalign.Viu.App.Server for SSR) can share this manifest file.
 
-        Two parallel item types are recognized per framework:
+        Three item types are recognized per framework:
 
           @(ViuFrameworkAssembly)        - PUBLIC. Listed in the Ref pack's
                                            FrameworkList.xml AND shipped in
@@ -32,6 +32,14 @@
                                            only and enumerated in
                                            RuntimeList.xml so the host
                                            resolves them. (Empty today.)
+
+          @(ViuFrameworkPackageOverride) - STANDALONE PACKAGE whose lib/
+                                           assets duplicate an assembly in
+                                           this framework. Listed in the Ref
+                                           pack's data/PackageOverrides.txt
+                                           at the effective package version
+                                           so framework assets win conflict
+                                           resolution on the SDK path.
 
         @(ViuFrameworkAnalyzer) entries name Roslyn source generators (by
         analyzers/**/*.csproj filename) shipped INSIDE the Ref pack at
@@ -56,12 +64,24 @@
          ================================================================ -->
     <ItemGroup Condition="'$(ViuFrameworkName)' == 'Assimalign.Viu.App'">
         <ViuFrameworkAssembly Include="Assimalign.Viu.App" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.Shared" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Components" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Reactivity" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.State" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Core" />
         <ViuFrameworkAssembly Include="Assimalign.Viu.Browser" />
+
+        <!--
+            These assemblies also ship as standalone packages for consumers
+            that cannot adopt the Viu SDK. Keep this list explicit: the empty
+            Assimalign.Viu.App umbrella has no standalone package, while
+            opt-in packages such as Router and Testing are not framework
+            members. Specified by [PKG-2] and [V01.01.14].
+        -->
+        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Components" />
+        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Reactivity" />
+        <ViuFrameworkPackageOverride Include="Assimalign.Viu.State" />
+        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Core" />
+        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Browser" />
 
         <ViuFrameworkAnalyzer Include="Assimalign.Viu.Generators.Reactivity" />
         <ViuFrameworkAnalyzer Include="Assimalign.Viu.Generators.Syntax" />

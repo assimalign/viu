@@ -6,7 +6,38 @@
     <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
   </PropertyGroup>
   <ItemGroup>
+    <!--
+      Deliberately overlap the App shared framework with its five standalone
+      packages. data/PackageOverrides.txt in App.Ref must make the framework
+      assets authoritative so none of these lib/ assets survives conflict
+      resolution on the SDK path. Specified by [PKG-2] and [V01.01.14].
+    -->
+    <PackageReference Include="Assimalign.Viu.Components" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Reactivity" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.State" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Core" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="Assimalign.Viu.Browser" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Browser.Router" Version="$(ViuConsumerVersion)" />
   </ItemGroup>
+
+  <!--
+    Capture the post-conflict item sets for the package-consumer script. This
+    pins both halves of the contract: ResolveTargetingPackAssets consumed the
+    override manifest, and ResolvePackageFileConflicts removed the overlapping
+    standalone lib/ assets before compilation/copy-local selection.
+  -->
+  <Target Name="WriteViuFrameworkConflictResolutionEvidence"
+          AfterTargets="_HandlePackageFileConflicts">
+    <WriteLinesToFile File="$(BaseIntermediateOutputPath)viu-package-conflict-overrides.txt"
+                      Lines="@(PackageConflictOverrides->'%(Identity)|%(OverriddenPackages)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true"
+                      Encoding="UTF-8" />
+    <WriteLinesToFile File="$(BaseIntermediateOutputPath)viu-resolved-package-references.txt"
+                      Lines="@(Reference->'%(FullPath)|%(NuGetPackageId)');@(ReferenceCopyLocalPaths->'%(FullPath)|%(NuGetPackageId)')"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true"
+                      Encoding="UTF-8" />
+  </Target>
 </Project>

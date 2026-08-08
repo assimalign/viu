@@ -21,16 +21,18 @@ internal sealed class BrowserRouterHistory : IRouterHistory
 {
     private readonly IBrowserHistoryInterop interop;
     private readonly List<NavigationCallback> listeners = [];
+    private readonly string normalizedBase;
 
     private string currentLocation;
     private RouterHistoryState currentState;
+    private bool isDisposed;
     // The location a silent Go() is leaving, so the popstate it provokes is swallowed.
     private string? pausedLocation;
 
     internal BrowserRouterHistory(IBrowserHistoryInterop interop, string normalizedBase)
     {
         this.interop = interop;
-        Base = normalizedBase;
+        this.normalizedBase = normalizedBase;
 
         var snapshot = interop.ReadSnapshot();
         currentLocation = HistoryPathNormalization.CreateCurrentLocation(
@@ -48,46 +50,72 @@ internal sealed class BrowserRouterHistory : IRouterHistory
             interop.Replace(BuildUrl(currentLocation), currentState);
         }
 
-        // One popstate listener per history instance; torn down in Destroy.
+        // One popstate listener per history instance; torn down in Dispose.
         interop.Subscribe(OnPopState);
     }
 
     /// <inheritdoc/>
-    public string Base { get; }
-
-    /// <inheritdoc/>
-    public string Location => currentLocation;
-
-    /// <inheritdoc/>
-    public RouterHistoryState State => currentState;
-
-    /// <inheritdoc/>
-    public void Push(string location, RouterHistoryState? data = null)
+    public string Base
     {
+        get
+        {
+            ThrowIfDisposed();
+            return normalizedBase;
+        }
+    }
+
+    /// <inheritdoc/>
+    public string Location
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return currentLocation;
+        }
+    }
+
+    /// <inheritdoc/>
+    public RouterHistoryState State
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return currentState;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Push(string location, RouterHistoryEntryOptions options = default)
+    {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         // Rewrite the leaving entry to point forward at `location` (the interop fills its live scroll
         // anchor), then push the new entry — both in a single interop crossing.
         var amendedCurrent = currentState with { Forward = location, Scroll = null };
-        var newState = RouterHistoryStateBuilder.BuildForPush(currentState, location, data?.Scroll);
+        var newState = RouterHistoryStateBuilder.BuildForPush(currentState, location, options.Scroll);
         interop.Push(BuildUrl(currentLocation), amendedCurrent, BuildUrl(location), newState);
         currentState = newState;
         currentLocation = location;
     }
 
     /// <inheritdoc/>
-    public void Replace(string location, RouterHistoryState? data = null)
+    public void Replace(string location, RouterHistoryEntryOptions options = default)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
-        var newState = RouterHistoryStateBuilder.BuildForReplace(currentState, location, data?.Scroll);
+        var newState = RouterHistoryStateBuilder.BuildForReplace(currentState, location, options.Scroll);
         interop.Replace(BuildUrl(location), newState);
         currentState = newState;
         currentLocation = location;
     }
 
     /// <inheritdoc/>
-    public void Go(int delta, bool triggerListeners = true)
+    public void Go(
+        int delta,
+        RouterHistoryNavigationOptions options = RouterHistoryNavigationOptions.None)
     {
-        if (!triggerListeners)
+        ThrowIfDisposed();
+        if ((options & RouterHistoryNavigationOptions.SuppressListeners) != 0)
         {
             // Swallow the popstate this Go() will provoke, so a silent reposition is invisible.
             pausedLocation = currentLocation;
@@ -98,6 +126,7 @@ internal sealed class BrowserRouterHistory : IRouterHistory
     /// <inheritdoc/>
     public Action Listen(NavigationCallback callback)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(callback);
         listeners.Add(callback);
         return () => listeners.Remove(callback);
@@ -106,13 +135,20 @@ internal sealed class BrowserRouterHistory : IRouterHistory
     /// <inheritdoc/>
     public string CreateHref(string location)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(location);
         return HistoryPathNormalization.CreateHref(Base, location);
     }
 
     /// <inheritdoc/>
-    public void Destroy()
+    public void Dispose()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        isDisposed = true;
         listeners.Clear();
         interop.Unsubscribe();
     }
@@ -133,7 +169,7 @@ internal sealed class BrowserRouterHistory : IRouterHistory
             currentState = arrivedState;
             if (pausedLocation is not null && string.Equals(pausedLocation, from, StringComparison.Ordinal))
             {
-                // A silent go(delta, triggerListeners: false) — state is reconciled, listeners are not.
+                // A silent go(delta, SuppressListeners) — state is reconciled, listeners are not.
                 pausedLocation = null;
                 return;
             }
@@ -171,4 +207,6 @@ internal sealed class BrowserRouterHistory : IRouterHistory
         var hashIndex = Base.IndexOf('#');
         return hashIndex >= 0 ? Base[hashIndex..] + location : Base + location;
     }
+
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(isDisposed, this);
 }

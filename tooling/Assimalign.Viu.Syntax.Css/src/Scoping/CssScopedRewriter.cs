@@ -34,6 +34,13 @@ public static class CssScopedRewriter
     /// <param name="scopeId">The scope id — the attribute name stamped on scoped elements.</param>
     /// <returns>The deterministic scoped CSS text.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="stylesheet"/> or <paramref name="scopeId"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The stylesheet contains an externally derived CSS rule or selector-part variant that this
+    /// rewriter cannot process.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// A selector contains an unsupported <see cref="CssCombinatorKind"/> value.
+    /// </exception>
     public static string Rewrite(CssStylesheetNode stylesheet, string scopeId)
     {
         if (stylesheet is null)
@@ -65,6 +72,11 @@ public static class CssScopedRewriter
         {
             if (rule is not CssAtRuleNode atRule)
             {
+                if (rule is not (CssQualifiedRuleNode or CssKeyframeRuleNode or CssDeclarationNode))
+                {
+                    throw UnsupportedNode(rule);
+                }
+
                 continue;
             }
 
@@ -103,6 +115,8 @@ public static class CssScopedRewriter
                 case CssDeclarationNode declaration:
                     SerializeDeclaration(declaration, context, indent, builder);
                     break;
+                default:
+                    throw UnsupportedNode(rule);
             }
         }
     }
@@ -132,10 +146,12 @@ public static class CssScopedRewriter
             builder.Append(' ').Append(mappedName).Append(" {\n");
             foreach (var child in atRule.Body)
             {
-                if (child is CssKeyframeRuleNode keyframe)
+                if (child is not CssKeyframeRuleNode keyframe)
                 {
-                    SerializeKeyframeRule(keyframe, context, indent + 1, builder);
+                    throw UnsupportedNode(child);
                 }
+
+                SerializeKeyframeRule(keyframe, context, indent + 1, builder);
             }
 
             AppendIndent(builder, indent);
@@ -339,8 +355,7 @@ public static class CssScopedRewriter
                     continue;
 
                 default:
-                    index++;
-                    continue;
+                    throw UnsupportedNode(part);
             }
         }
 
@@ -366,11 +381,15 @@ public static class CssScopedRewriter
     private static string RenderCombinator(CssCombinatorKind kind)
         => kind switch
         {
+            CssCombinatorKind.Descendant => " ",
             CssCombinatorKind.Child => " > ",
             CssCombinatorKind.NextSibling => " + ",
             CssCombinatorKind.SubsequentSibling => " ~ ",
-            _ => " ",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported CSS combinator kind."),
         };
+
+    private static InvalidOperationException UnsupportedNode(SyntaxNode node) =>
+        new($"Unsupported CSS syntax node '{node.GetType().FullName}'.");
 
     private static bool IsKeyframes(string name)
         => string.Equals(DeVendorPrefix(name), "keyframes", StringComparison.OrdinalIgnoreCase);

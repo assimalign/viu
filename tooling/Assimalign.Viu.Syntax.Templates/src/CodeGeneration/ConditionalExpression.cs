@@ -14,7 +14,7 @@ public sealed record ConditionalExpression : TemplateSyntaxNode
 
     /// <summary>
     /// The value when <see cref="Test"/> is falsy: the next branch's <see cref="ConditionalExpression"/>, a
-    /// block, or a comment vnode call terminating the chain.
+    /// block, or a comment virtual-node call terminating the chain.
     /// </summary>
     public required TemplateSyntaxNode Alternate { get; init; }
 
@@ -22,5 +22,5 @@ public sealed record ConditionalExpression : TemplateSyntaxNode
     public bool Newline { get; init; } = true;
 
     /// <inheritdoc />
-    public override NodeType NodeType => NodeType.JsConditionalExpression;
+    public override NodeType NodeType => NodeType.ConditionalExpression;
 }

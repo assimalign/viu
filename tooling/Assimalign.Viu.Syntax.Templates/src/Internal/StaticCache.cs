@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
 
@@ -19,10 +19,9 @@ namespace Assimalign.Viu.Syntax.Templates;
 /// Deliberate scope decisions, pinned by tests (see <c>docs/DESIGN.md</c>):
 /// </para>
 /// <list type="bullet">
-/// <item>Both cached subtrees and cached props objects route through the single per-instance
-/// <c>_cache</c> seam, rather than splitting per-type values into a module-level scope. The C# generator
-/// model has no module-const scope without a new field-emission contract, and per-instance caching
-/// already achieves the goal: each value is created once per instance and reused across re-renders.</item>
+/// <item>Both cached subtrees and cached property objects route through the single per-mount
+/// <c>ComponentRenderFrame</c> cache, rather than splitting values into module-level state. This keeps
+/// ownership explicit while creating each value once per mount and reusing it across re-renders.</item>
 /// <item>The whole-children-array cache and text-call caching are
 /// omitted; each eligible static sibling is cached individually. A fully static text run is a single
 /// <see cref="TextNode"/> folded into its element's cached subtree, so the <c>TEXT_CALL</c> path is
@@ -70,7 +69,7 @@ internal static class StaticCache
                 {
                     if (constantType >= ConstantType.CanCache)
                     {
-                        if (context.GetCodegenNode(element) is VNodeCall codegenNode)
+                        if (context.GetCodegenNode(element) is VirtualNodeCall codegenNode)
                         {
                             context.SetCodegenNode(element, codegenNode with { PatchFlag = PatchFlags.Cached });
                         }
@@ -82,13 +81,13 @@ internal static class StaticCache
                 else
                 {
                     // The element may have dynamic children, but its props can still be eligible for caching.
-                    if (context.GetCodegenNode(element) is VNodeCall { Props: { } props } codegenNode)
+                    if (context.GetCodegenNode(element) is VirtualNodeCall { Properties: { } props } codegenNode)
                     {
                         var flag = codegenNode.PatchFlag;
                         if ((flag is null or PatchFlags.NeedPatch or PatchFlags.Text) &&
                             ConstantAnalysis.GetGeneratedPropsConstantType(element, context) >= ConstantType.CanCache)
                         {
-                            context.SetCodegenNode(element, codegenNode with { Props = context.Cache(props) });
+                            context.SetCodegenNode(element, codegenNode with { Properties = context.Cache(props) });
                         }
                     }
                 }
@@ -146,7 +145,7 @@ internal static class StaticCache
 
         // The DOM stringification hook, gated to non-SSR: contiguous stringifiable cached runs above the
         // thresholds collapse into a single static insert ([SFC-OPT-2]).
-        if (toCache.Count > 0 && !context.Ssr && !context.InSSR)
+        if (toCache.Count > 0 && !context.IsServerRendering && !context.IsNestedServerRendering)
         {
             StaticStringifier.Run(node, context);
         }

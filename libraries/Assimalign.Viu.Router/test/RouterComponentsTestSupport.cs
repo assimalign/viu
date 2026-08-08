@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 
 using Assimalign.Viu.Components;
@@ -7,38 +8,65 @@ using Assimalign.Viu.Testing;
 
 namespace Assimalign.Viu.Router.Tests;
 
-// Shared fixtures for RouterView/RouterLink against the unified component tree. Router resolution is
-// exclusively through the explicit IServiceProvider on IComponentContext; there is no hierarchical
-// component-dependency test path.
+// Shared DOM-free fixtures for the adopted component model. Router resolution is exclusively
+// through ComponentContext.Services; no hierarchical convention lookup or context cast exists.
 internal static class RouterComponentsTestSupport
 {
     public static ComponentWrapper MountView(
         Router router,
         params TrackingComponent[] components)
     {
-        return ViuTest.Mount(
-            new RouterView(),
-            OptionsFor(router, components));
+        return ComponentTest.Mount(RouterView.Registration, OptionsFor(router, components));
+    }
+
+    public static ComponentWrapper MountRegisteredView(
+        Router router,
+        params ComponentRegistration[] registrations)
+    {
+        return ComponentTest.Mount(
+            RouterView.Registration,
+            OptionsForRegistrations(router, registrations));
     }
 
     public static ComponentWrapper MountLink(
         Router router,
-        IComponentArguments arguments,
+        IReadOnlyDictionary<string, object?> arguments,
         IReadOnlyDictionary<string, ComponentSlot>? slots = null)
     {
         ComponentMountOptions options = OptionsFor(router);
         options.Arguments = arguments;
         options.Slots = slots;
-        return ViuTest.Mount(new RouterLink(), options);
+        return ComponentTest.Mount(RouterLink.Registration, options);
     }
 
     public static ComponentMountOptions OptionsFor(
         Router router,
         params TrackingComponent[] components)
     {
+        ComponentRegistration[] registrations = new ComponentRegistration[components.Length];
+        for (int index = 0; index < components.Length; index++)
+        {
+            registrations[index] = components[index].Registration;
+        }
+
+        return OptionsForRegistrations(router, registrations);
+    }
+
+    public static ComponentMountOptions OptionsForRegistrations(
+        Router router,
+        params ComponentRegistration[] registrations)
+    {
+        ComponentFactory componentFactory = new();
+        componentFactory.Register(RouterView.Registration);
+        componentFactory.Register(RouterLink.Registration);
+        for (int index = 0; index < registrations.Length; index++)
+        {
+            componentFactory.Register(registrations[index]);
+        }
+
         return new ComponentMountOptions
         {
-            Components = new RouterTestComponentFactory(components),
+            Components = componentFactory,
             Services = new RouterServiceProvider(router),
         };
     }
@@ -47,22 +75,27 @@ internal static class RouterComponentsTestSupport
     {
         return new TrackingComponent(
             label,
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", label)),
-                [ComponentTree.Text(label)]));
+                [Text(label)]));
     }
 
     public static TrackingComponent PropView(string parameterName)
     {
         return new TrackingComponent(
             "parameter-" + parameterName,
-            context => ComponentTree.Element(
+            context => Element(
                 "span",
                 Attributes(("class", "value")),
-                [ComponentTree.Text(
-                    context.Arguments.Get<string>(parameterName)
-                    ?? string.Empty)]),
+                [
+                    Text(
+                        context.Bindings.Parameters.TryGetValue(
+                            parameterName,
+                            out object? value)
+                                ? value as string ?? string.Empty
+                                : string.Empty),
+                ]),
             [new ComponentParameter(parameterName)]);
     }
 
@@ -70,45 +103,64 @@ internal static class RouterComponentsTestSupport
     {
         return new TrackingComponent(
             "layout",
-            _ => ComponentTree.Element(
+            _ => Element(
                 "div",
                 Attributes(("class", "layout")),
-                [
-                    ComponentTree.Template<RouterView>(
-                        Arguments(("depth", outletDepth))),
-                ]));
+                [Component<RouterView>(Arguments(("depth", outletDepth)))]));
     }
 
     public static IReadOnlyDictionary<string, ComponentSlot> TextSlot(string text)
     {
         return new Dictionary<string, ComponentSlot>(StringComparer.Ordinal)
         {
-            ["default"] = _ => ComponentTree.Text(text),
+            ["default"] = _ => Text(text),
         };
     }
 
-    public static ComponentArguments Arguments(
+    public static IReadOnlyDictionary<string, object?> Arguments(
         params (string Name, object? Value)[] entries)
     {
-        List<KeyValuePair<string, object?>> values = new(entries.Length);
+        Dictionary<string, object?> values = new(entries.Length, StringComparer.Ordinal);
         foreach ((string name, object? value) in entries)
         {
-            values.Add(new KeyValuePair<string, object?>(name, value));
+            values.Add(name, value);
         }
 
-        return new ComponentArguments(values);
+        return values;
     }
 
-    public static ComponentAttributes Attributes(
+    public static IReadOnlyList<ElementBinding> Attributes(
         params (string Name, object? Value)[] entries)
     {
-        List<IComponentAttribute> attributes = new(entries.Length);
+        List<ElementBinding> attributes = new(entries.Length);
         foreach ((string name, object? value) in entries)
         {
-            attributes.Add(new ComponentAttribute(name, value));
+            attributes.Add(ElementBinding.Attribute(new QualifiedName(name), value));
         }
 
-        return new ComponentAttributes(attributes);
+        return attributes;
+    }
+
+    public static ElementNode Element(
+        string name,
+        IEnumerable<ElementBinding>? bindings = null,
+        IEnumerable<VirtualNode>? children = null)
+    {
+        return new ElementNode(new QualifiedName(name), bindings, children);
+    }
+
+    public static TextNode Text(string value)
+    {
+        return new TextNode(value);
+    }
+
+    public static ComponentNode Component<TComponent>(
+        IReadOnlyDictionary<string, object?>? arguments = null)
+        where TComponent : class, IComponent
+    {
+        return new ComponentNode(
+            ComponentReference.ForType(typeof(TComponent)),
+            new ComponentInvocation(arguments));
     }
 
     private sealed class RouterServiceProvider : IServiceProvider
@@ -125,93 +177,56 @@ internal static class RouterComponentsTestSupport
             return serviceType == typeof(Router) ? _router : null;
         }
     }
-
-    private sealed class RouterTestComponentFactory : IComponentFactory
-    {
-        private readonly Dictionary<string, TrackingComponent> _components =
-            new(StringComparer.Ordinal);
-
-        internal RouterTestComponentFactory(
-            IReadOnlyList<TrackingComponent> components)
-        {
-            for (int index = 0; index < components.Count; index++)
-            {
-                TrackingComponent component = components[index];
-                _components.Add(component.RegistrationName, component);
-            }
-        }
-
-        public IComponentTemplate Create(Type componentType)
-        {
-            if (componentType == typeof(RouterView))
-            {
-                return new RouterView();
-            }
-
-            if (componentType == typeof(RouterLink))
-            {
-                return new RouterLink();
-            }
-
-            throw new InvalidOperationException(
-                $"Component type \"{componentType}\" is not registered for the router test.");
-        }
-
-        public IComponentTemplate Create(string name)
-        {
-            return _components.TryGetValue(name, out TrackingComponent? component)
-                ? component
-                : throw new InvalidOperationException(
-                    $"Component name \"{name}\" is not registered for the router test.");
-        }
-    }
 }
 
-internal sealed class TrackingComponent : IComponentTemplate
+internal sealed class TrackingComponent : IComponent
 {
     private static int _nextIdentifier;
-    private readonly Func<IComponentContext, IComponent?> _render;
-    private readonly Action<IComponentContext>? _setup;
+    private readonly Func<ComponentContext, VirtualNode?> _render;
+    private readonly Action<ComponentContext>? _setup;
 
     public TrackingComponent(
         string name,
-        Func<IComponentContext, IComponent?> render,
-        IReadOnlyList<IComponentParameter>? parameters = null,
-        Action<IComponentContext>? setup = null)
+        Func<ComponentContext, VirtualNode?> render,
+        IReadOnlyList<ComponentParameter>? parameters = null,
+        Action<ComponentContext>? setup = null)
     {
-        Name = name;
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(render);
         _render = render;
         _setup = setup;
-        Parameters = parameters;
-        RegistrationName =
+        string registrationName =
             name + "-" + Interlocked.Increment(ref _nextIdentifier).ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
-        Request = ComponentTree.Template(RegistrationName);
+                CultureInfo.InvariantCulture);
+        Registration = new ComponentRegistration(
+            ComponentReference.ForName(registrationName),
+            new ComponentContract(
+                renderCacheSize: 0,
+                displayName: name,
+                parameters: parameters),
+            _ => this);
+        Request = new ComponentNode(Registration.Reference);
     }
 
-    public string? Name { get; }
+    public ComponentRegistration Registration { get; }
 
-    public IReadOnlyList<IComponentParameter>? Parameters { get; }
-
-    public string RegistrationName { get; }
-
-    public ITemplateComponent Request { get; }
+    public ComponentNode Request { get; }
 
     public int SetupCount { get; private set; }
 
     public int RenderCount { get; private set; }
 
-    public IComponentContext? Context { get; private set; }
+    public ComponentContext? Context { get; private set; }
 
     public bool IsUnmounted { get; private set; }
 
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         SetupCount++;
         Context = context;
         context.Lifecycle.OnUnmounted(() => IsUnmounted = true);
         _setup?.Invoke(context);
-        return () =>
+        return _ =>
         {
             RenderCount++;
             return _render(context);

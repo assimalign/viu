@@ -4,14 +4,18 @@ internal sealed class KeepAliveCacheEntry<TNode>
     where TNode : notnull
 {
     internal KeepAliveCacheEntry(
-        MountedRenderNode<TNode> node,
+        object key,
+        MountedNode<TNode> node,
         string? componentName)
     {
+        Key = key;
         Node = node;
         ComponentName = componentName;
     }
 
-    internal MountedRenderNode<TNode> Node;
+    internal object Key;
+
+    internal MountedNode<TNode> Node;
 
     internal string? ComponentName;
 }

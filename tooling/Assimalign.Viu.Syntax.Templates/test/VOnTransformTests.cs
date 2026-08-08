@@ -13,8 +13,8 @@ public class VOnTransformTests
     {
         var result = TransformTestHelpers.Transform("<div @click=\"handler\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        var handler = props.Property("onClick");
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        var handler = props.ObjectProperty("onClick");
         handler.Value.ShouldBeOfType<SimpleExpressionNode>().Content.ShouldBe("handler");
     }
 
@@ -23,8 +23,8 @@ public class VOnTransformTests
     {
         var result = TransformTestHelpers.Transform("<div @click=\"count++\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        var compound = props.Property("onClick").Value.ShouldBeOfType<CompoundExpressionNode>();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        var compound = props.ObjectProperty("onClick").Value.ShouldBeOfType<CompoundExpressionNode>();
         compound.Parts[0].ShouldBe("$event => (");
     }
 
@@ -33,8 +33,8 @@ public class VOnTransformTests
     {
         var result = TransformTestHelpers.Transform("<div @click.stop=\"fn\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        var call = props.Property("onClick").Value.ShouldBeOfType<CallExpression>();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        var call = props.ObjectProperty("onClick").Value.ShouldBeOfType<CallExpression>();
         call.Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("withModifiers");
         call.Arguments[1].ShouldBe("[\"stop\"]");
         result.ShouldUseHelper("withModifiers");
@@ -45,8 +45,8 @@ public class VOnTransformTests
     {
         var result = TransformTestHelpers.Transform("<input @keyup.enter=\"fn\"/>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        var call = props.Property("onKeyup").Value.ShouldBeOfType<CallExpression>();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        var call = props.ObjectProperty("onKeyup").Value.ShouldBeOfType<CallExpression>();
         call.Callee.ShouldBeOfType<RuntimeHelper>().Name.ShouldBe("withKeys");
         call.Arguments[1].ShouldBe("[\"enter\"]");
     }
@@ -56,8 +56,8 @@ public class VOnTransformTests
     {
         var result = TransformTestHelpers.Transform("<div @click.once=\"fn\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("onClickOnce").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("onClickOnce").ShouldNotBeNull();
     }
 
     [Fact]
@@ -65,8 +65,8 @@ public class VOnTransformTests
     {
         var result = TransformTestHelpers.Transform("<div @click.right=\"fn\"></div>");
 
-        var props = result.CodegenNode.ShouldBeOfType<VNodeCall>().Props.ShouldBeOfType<ObjectExpression>();
-        props.Property("onContextmenu").ShouldNotBeNull();
+        var props = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().Properties.ShouldBeOfType<ObjectExpression>();
+        props.ObjectProperty("onContextmenu").ShouldNotBeNull();
     }
 
     [Fact]

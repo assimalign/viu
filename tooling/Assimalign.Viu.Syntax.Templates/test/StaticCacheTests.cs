@@ -3,7 +3,7 @@ using System.Linq;
 
 using Microsoft.CodeAnalysis.CSharp;
 
-using Assimalign.Viu.Shared;
+using Assimalign.Viu.Components;
 
 using Shouldly;
 
@@ -33,7 +33,7 @@ public class StaticCacheTests
         var result = Transform("<div><span>static</span></div>");
 
         var cachedSpan = ChildCodegen(result, 0).ShouldBeOfType<CacheExpression>();
-        var vnode = cachedSpan.Value.ShouldBeOfType<VNodeCall>();
+        var vnode = cachedSpan.Value.ShouldBeOfType<VirtualNodeCall>();
         vnode.PatchFlag.ShouldBe(PatchFlags.Cached);
         result.Cached.Count.ShouldBe(1);
     }
@@ -45,11 +45,11 @@ public class StaticCacheTests
         // live block even when fully static.
         var result = Transform("<div><span>static</span></div>");
 
-        result.CodegenNode.ShouldBeOfType<VNodeCall>().IsBlock.ShouldBeTrue();
+        result.CodegenNode.ShouldBeOfType<VirtualNodeCall>().IsBlock.ShouldBeTrue();
     }
 
     [Fact]
-    public void StaticProps_OnDynamicChildElement_AreCached()
+    public void StaticProperties_OnDynamicChildElement_AreCached()
     {
         // The element has a dynamic child (TEXT flag) so its subtree is not cached, but its static props
         // object is: both cached subtrees and cached props objects route through the same per-instance
@@ -57,9 +57,9 @@ public class StaticCacheTests
         // are eligible even though the root vnode is not.
         var result = Transform("<div class=\"card\">{{ msg }}</div>", prefixIdentifiers: true);
 
-        var vnode = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var vnode = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         vnode.PatchFlag.ShouldBe(PatchFlags.Text);
-        vnode.Props.ShouldBeOfType<CacheExpression>();
+        vnode.Properties.ShouldBeOfType<CacheExpression>();
         result.Cached.Count.ShouldBe(1);
     }
 
@@ -71,7 +71,7 @@ public class StaticCacheTests
         // A :key makes the element a block; a block (that is not svg/foreignObject/math) is never constant.
         var result = Transform("<div><span :key=\"k\">x</span></div>", prefixIdentifiers: true);
 
-        ChildCodegen(result, 0).ShouldBeOfType<VNodeCall>().IsBlock.ShouldBeTrue();
+        ChildCodegen(result, 0).ShouldBeOfType<VirtualNodeCall>().IsBlock.ShouldBeTrue();
         result.Cached.Count.ShouldBe(0);
     }
 
@@ -82,7 +82,7 @@ public class StaticCacheTests
         var result = Transform("<div><span ref=\"r\">x</span></div>");
 
         var codegen = ChildCodegen(result, 0);
-        codegen.ShouldBeOfType<VNodeCall>().PatchFlag.ShouldBe(PatchFlags.NeedPatch);
+        codegen.ShouldBeOfType<VirtualNodeCall>().PatchFlag.ShouldBe(PatchFlags.NeedPatch);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class StaticCacheTests
         // A component is not a plain element, so it is never cached as a static subtree.
         var result = Transform("<div><Comp></Comp></div>");
 
-        ChildCodegen(result, 0).ShouldBeOfType<VNodeCall>().IsComponent.ShouldBeTrue();
+        ChildCodegen(result, 0).ShouldBeOfType<VirtualNodeCall>().IsComponent.ShouldBeTrue();
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class StaticCacheTests
         // An interpolation child poisons the parent's constant type, so the parent is not cached.
         var result = Transform("<div><span>{{ dynamic }}</span></div>", prefixIdentifiers: true);
 
-        ChildCodegen(result, 0).ShouldBeOfType<VNodeCall>().PatchFlag.ShouldBe(PatchFlags.Text);
+        ChildCodegen(result, 0).ShouldBeOfType<VirtualNodeCall>().PatchFlag.ShouldBe(PatchFlags.Text);
         result.Cached.Count.ShouldBe(0);
     }
 
@@ -124,9 +124,9 @@ public class StaticCacheTests
         var optimized = Emit("<div><span>static</span></div>", hoistStatic: true);
         var unoptimized = Emit("<div><span>static</span></div>", hoistStatic: false);
 
-        optimized.Code.ShouldContain("_cache[0] ??=");
-        optimized.Code.ShouldContain("-1 /* CACHED */");
-        unoptimized.Code.ShouldNotContain("_cache");
+        optimized.Code.ShouldContain("frame.GetOrAddCache<");
+        optimized.Code.ShouldContain("(-1) /* CACHED */");
+        unoptimized.Code.ShouldNotContain("frame.GetOrAddCache<");
         unoptimized.Code.ShouldNotContain("CACHED");
         unoptimized.CacheSlotCount.ShouldBe(0);
     }
@@ -137,12 +137,12 @@ public class StaticCacheTests
     public void ContiguousStaticRun_AtNodeThreshold_CollapsesToOneStaticVNode()
     {
         // 20 contiguous static nodes reach StringifyThresholds.NODE_COUNT and collapse into a single
-        // createStaticVNode carrying the serialized HTML, created once (per the run-count pin below).
+        // StaticNode carrying the serialized HTML, created once (per the run-count pin below).
         var code = Emit(Wrapped("<div></div>", 20)).Code;
 
         StaticVNodeCount(code).ShouldBe(1);
-        code.ShouldContain("_createStaticVNode(");
-        code.ShouldContain(", 20)");
+        code.ShouldContain("new global::Assimalign.Viu.Components.StaticNode(");
+        code.ShouldContain("MarkupFormat.Html");
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class StaticCacheTests
         var result = TransformSource(Wrapped("<div></div>", 19));
         var code = RenderFunctionEmitter.Emit(result).Code;
 
-        code.ShouldNotContain("_createStaticVNode");
+        code.ShouldNotContain(".StaticNode(");
         result.Cached.Count.ShouldBe(19);
     }
 
@@ -165,14 +165,14 @@ public class StaticCacheTests
         var code = Emit(Wrapped("<div id=\"x\"></div>", 5)).Code;
 
         StaticVNodeCount(code).ShouldBe(1);
-        code.ShouldContain(", 5)");
+        code.ShouldContain("MarkupFormat.Html");
     }
 
     [Fact]
     public void FourElementsWithBindings_StayBelowBindingThreshold()
     {
         // 4 elements with bindings is under the threshold; nothing stringifies.
-        Emit(Wrapped("<div id=\"x\"></div>", 4)).Code.ShouldNotContain("_createStaticVNode");
+        Emit(Wrapped("<div id=\"x\"></div>", 4)).Code.ShouldNotContain(".StaticNode(");
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class StaticCacheTests
         // Void elements serialize with no end tag.
         var code = Emit(Wrapped("<br>", 20)).Code;
 
-        code.ShouldContain("_createStaticVNode(");
+        code.ShouldContain("new global::Assimalign.Viu.Components.StaticNode(");
         code.ShouldNotContain("</br>");
     }
 
@@ -233,7 +233,7 @@ public class StaticCacheTests
     {
         // Stringification bails inside a slot scope: a component's slot content is not folded
         // into an innerHTML string.
-        Emit(WrappedComponent("<div></div>", 20)).Code.ShouldNotContain("_createStaticVNode");
+        Emit(WrappedComponent("<div></div>", 20)).Code.ShouldNotContain(".StaticNode(");
     }
 
     // ---- emitter snapshots ----
@@ -241,31 +241,31 @@ public class StaticCacheTests
     [Fact]
     public void CachedSubtree_EmitsRenderCacheAssignmentWithCachedFlag()
     {
-        Emit("<div><span>static</span></div>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "div", null, new object?[] { (_cache[0] ??= _createElementVNode("span", null, "static", -1 /* CACHED */)) });
+        string code = Emit("<div><span>static</span></div>").Code;
 
-""");
+        code.ShouldContain("frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>");
+        code.ShouldContain("(-1) /* CACHED */");
+        code.ShouldContain("new global::Assimalign.Viu.Components.ElementNode(");
     }
 
     [Fact]
     public void TwoStaticSiblings_BelowThreshold_EmitTwoCacheSlots()
     {
-        Emit("<section><p>a</p><p>b</p></section>").Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "section", null, new object?[] { (_cache[0] ??= _createElementVNode("p", null, "a", -1 /* CACHED */)), (_cache[1] ??= _createElementVNode("p", null, "b", -1 /* CACHED */)) });
+        RenderFunctionEmitterResult emitted = Emit("<section><p>a</p><p>b</p></section>");
 
-""");
+        emitted.Code.ShouldContain("frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>(0");
+        emitted.Code.ShouldContain("frame.GetOrAddCache<global::Assimalign.Viu.Components.VirtualNode?>(1");
+        emitted.CacheSlotCount.ShouldBe(2);
     }
 
     [Fact]
-    public void CachedStaticProps_EmitRenderCacheAssignment()
+    public void CachedStaticProperties_EmitRenderCacheAssignment()
     {
-        Emit("<div class=\"card\">{{ msg }}</div>", prefixIdentifiers: true).Code.ShouldBeCode(
-"""
-return _createElementBlock(_openBlock(), "div", (_cache[0] ??= _createProps(("class", "card"))), _toDisplayString(_ctx.msg), 1 /* TEXT */);
+        string code = Emit("<div class=\"card\">{{ msg }}</div>", prefixIdentifiers: true).Code;
 
-""");
+        code.ShouldContain("frame.GetOrAddCache<global::System.Collections.Generic.IReadOnlyDictionary<string, object?>>(0");
+        code.ShouldContain("[\"class\"] = \"card\"");
+        code.ShouldContain("DisplayStringFormatter.ToDisplayString(component.msg)");
     }
 
     // ---- the optimized output is valid C# ----
@@ -283,7 +283,7 @@ return _createElementBlock(_openBlock(), "div", (_cache[0] ??= _createProps(("cl
         // well-formed literal).
         var code = Emit(source, prefixIdentifiers: true).Code;
         var unit =
-            "internal static class RenderProbe { internal static object? Render(object _ctx, object?[] _cache) {\n" +
+            "internal static class RenderProbe { internal static object? Render(object component, object frame) {\n" +
             code +
             "} }";
 
@@ -299,7 +299,7 @@ return _createElementBlock(_openBlock(), "div", (_cache[0] ??= _createProps(("cl
         // A run whose serialized HTML carries quotes and ampersands still produces a valid C# string literal.
         var code = Emit(Wrapped("<p class=\"lead\">Hi &amp; bye</p>", 20)).Code;
         var unit =
-            "internal static class RenderProbe { internal static object? Render(object _ctx, object?[] _cache) {\n" +
+            "internal static class RenderProbe { internal static object? Render(object component, object frame) {\n" +
             code +
             "} }";
 
@@ -359,7 +359,7 @@ return _createElementBlock(_openBlock(), "div", (_cache[0] ??= _createProps(("cl
     // The codegen node of the index-th child of the single root element.
     private static TemplateSyntaxNode? ChildCodegen(TransformResult result, int index)
     {
-        var root = result.CodegenNode.ShouldBeOfType<VNodeCall>();
+        var root = result.CodegenNode.ShouldBeOfType<VirtualNodeCall>();
         var children = (SyntaxList<TemplateChildNode>)root.Children!;
         return result.GetCodegenNode(children[index]);
     }
@@ -374,10 +374,11 @@ return _createElementBlock(_openBlock(), "div", (_cache[0] ??= _createProps(("cl
     {
         var occurrences = 0;
         var index = 0;
-        while ((index = code.IndexOf("_createStaticVNode(", index, System.StringComparison.Ordinal)) >= 0)
+        const string marker = "new global::Assimalign.Viu.Components.StaticNode(";
+        while ((index = code.IndexOf(marker, index, System.StringComparison.Ordinal)) >= 0)
         {
             occurrences++;
-            index += "_createStaticVNode(".Length;
+            index += marker.Length;
         }
 
         return occurrences;

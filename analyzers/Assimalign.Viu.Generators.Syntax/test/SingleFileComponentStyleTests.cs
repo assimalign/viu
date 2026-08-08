@@ -13,7 +13,7 @@ namespace Assimalign.Viu.Generators.Syntax.Tests;
 /// <summary>
 /// End-to-end tests for the style registration seam ([V01.01.06.04]): the composition root routes
 /// style block content to the CSS parser, scoped blocks are rewritten with the component's stable
-/// <c>data-v-&lt;hash&gt;</c> scope id and surface as the <c>ScopeId</c>/<c>ExtractedStyles</c> constants,
+/// <c>data-v-&lt;hash&gt;</c> scope id and surface through the extracted style asset,
 /// non-scoped blocks pass through unmodified, and CSS parse diagnostics flow through the style-origin
 /// envelope onto exact <c>.viu</c> coordinates. The scoped-selector semantics themselves are pinned in the
 /// Css library's <c>CssScopedRewriterTests</c>; these tests pin the generator wiring.
@@ -24,7 +24,7 @@ public sealed class SingleFileComponentStyleTests
     private const string RootNamespace = "Demo";
 
     [Fact]
-    public void ScopedStyle_EmitsScopeIdAndRewrittenCss()
+    public void ScopedStyle_EmitsRewrittenCssWithoutRuntimeScopeSurface()
     {
         const string source =
             "<template>\n" +
@@ -39,7 +39,8 @@ public sealed class SingleFileComponentStyleTests
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Card.SingleFileComponent.g.cs");
-        generated.ShouldContain("internal const string ScopeId = \"data-v-");
+        generated.ShouldNotContain("internal const string ScopeId");
+        generated.ShouldNotContain("Scope" + "Identifier");
         // The scoped rewrite lands the attribute on the last compound only, so a descendant selector still
         // matches through untagged intermediate elements instead of requiring every level to be scoped.
         generated.ShouldContain(".box .inner[data-v-");
@@ -47,30 +48,30 @@ public sealed class SingleFileComponentStyleTests
     }
 
     [Fact]
-    public void ScopeId_IsStableAcrossRuns_ForTheSamePath()
+    public void ScopedStyleAttribute_IsStableAcrossRuns_ForTheSamePath()
     {
         const string source = "<style scoped>\n    .a { color: red; }\n</style>\n";
 
         var first = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
         var second = GeneratorTestHarness.Run($"{ProjectDirectory}/Card.viu", source, RootNamespace, ProjectDirectory);
 
-        var firstScope = ScopeIdOf(GeneratorTestHarness.GeneratedSource(first, "Card.SingleFileComponent.g.cs"));
-        var secondScope = ScopeIdOf(GeneratorTestHarness.GeneratedSource(second, "Card.SingleFileComponent.g.cs"));
+        var firstScope = ScopeAttributeOf(GeneratorTestHarness.GeneratedSource(first, "Card.SingleFileComponent.g.cs"));
+        var secondScope = ScopeAttributeOf(GeneratorTestHarness.GeneratedSource(second, "Card.SingleFileComponent.g.cs"));
         firstScope.ShouldNotBeNull();
         // Deterministic and path-based: the same .viu path yields the same scope id (asset-caching contract).
         secondScope.ShouldBe(firstScope);
     }
 
     [Fact]
-    public void ScopeId_DiffersByComponentPath()
+    public void ScopedStyleAttribute_DiffersByComponentPath()
     {
         const string source = "<style scoped>\n    .a { color: red; }\n</style>\n";
 
         var a = GeneratorTestHarness.Run($"{ProjectDirectory}/A.viu", source, RootNamespace, ProjectDirectory);
         var b = GeneratorTestHarness.Run($"{ProjectDirectory}/B.viu", source, RootNamespace, ProjectDirectory);
 
-        ScopeIdOf(GeneratorTestHarness.GeneratedSource(a, "A.SingleFileComponent.g.cs"))
-            .ShouldNotBe(ScopeIdOf(GeneratorTestHarness.GeneratedSource(b, "B.SingleFileComponent.g.cs")));
+        ScopeAttributeOf(GeneratorTestHarness.GeneratedSource(a, "A.SingleFileComponent.g.cs"))
+            .ShouldNotBe(ScopeAttributeOf(GeneratorTestHarness.GeneratedSource(b, "B.SingleFileComponent.g.cs")));
     }
 
     [Fact]
@@ -158,17 +159,17 @@ public sealed class SingleFileComponentStyleTests
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
-    private static string? ScopeIdOf(string generated)
+    private static string? ScopeAttributeOf(string generated)
     {
-        const string marker = "internal const string ScopeId = \"";
+        const string marker = "[data-v-";
         var start = generated.IndexOf(marker, System.StringComparison.Ordinal);
         if (start < 0)
         {
             return null;
         }
 
-        start += marker.Length;
-        var end = generated.IndexOf('"', start);
+        start++;
+        var end = generated.IndexOf(']', start);
         return generated.Substring(start, end - start);
     }
 }

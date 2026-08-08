@@ -1,0 +1,48 @@
+using System.Collections.Generic;
+
+namespace Assimalign.Viu.Reactivity;
+
+/// <summary>
+/// A reactive single-value container, and the PRIMARY reactivity primitive in Viu: with no
+/// object-proxy interception layer ([RCT-6]), explicit reference cells carry most of the work that
+/// implicit deep reactivity would otherwise do. There is no deep conversion:
+/// <see cref="Reference{T}"/> tracks the <see cref="Value"/> cell only — mutations inside the held
+/// object are not observed unless that object itself uses reactive primitives.
+/// Change detection uses <see cref="EqualityComparer{T}.Default"/>. Consequently, NaN values are
+/// self-equal and <c>+0.0</c> and <c>-0.0</c> compare equal. Setting an equal value does not
+/// trigger. These equality semantics are stable across Viu's reference and collection primitives.
+/// Not thread-safe: designed for the single-threaded JS event-loop model.
+/// </summary>
+/// <typeparam name="T">The type of the contained value (never boxed for struct types).</typeparam>
+public sealed class Reference<T> : ReactiveValue<T>
+{
+    private T _value;
+
+    /// <summary>Creates a reference holding <paramref name="value"/>.</summary>
+    /// <param name="value">The initial value.</param>
+    internal Reference(T value)
+    {
+        _value = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the contained value. Reads track the ambient subscriber; writes trigger
+    /// subscribers only when the new value differs per <see cref="EqualityComparer{T}.Default"/>.
+    /// </summary>
+    public override T Value
+    {
+        get
+        {
+            _dependency.Track();
+            return _value;
+        }
+        set
+        {
+            if (!EqualityComparer<T>.Default.Equals(_value, value))
+            {
+                _value = value;
+                _dependency.Trigger();
+            }
+        }
+    }
+}

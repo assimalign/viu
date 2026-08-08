@@ -90,7 +90,8 @@ public sealed class InteropScenario
     {
         var context = Prepare(variant);
         _measured(context);
-        return context.Renderer.OperationLog.Operations.Count;
+        return context.Renderer.OperationLog.Operations.Count
+            - context.Renderer.OperationLog.Count(TestNodeOperationType.Commit);
     }
 
     /// <summary>Returns <see cref="Name"/> so BenchmarkDotNet labels the parameter with the scenario id.</summary>

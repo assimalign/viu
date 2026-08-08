@@ -28,6 +28,7 @@ public sealed class StateStoreResetTests
             (mutation, _) => mutations.Add(mutation),
             detached: true);
 
+        // [STA-5], [STA-6] Reset copies fresh values onto the stable live instance.
         stateStore.Reset();
         scheduler.RunUntilIdle();
 

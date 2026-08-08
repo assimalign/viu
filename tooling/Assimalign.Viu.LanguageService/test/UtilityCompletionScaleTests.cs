@@ -23,7 +23,7 @@ public class UtilityCompletionScaleTests
         const string templateLine = "    <div class=\"\"></div>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf("\"\"", StringComparison.Ordinal) + 1;
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument(DocumentUri, source, 1);
 
         var completions = service.GetCompletions(
@@ -42,7 +42,7 @@ public class UtilityCompletionScaleTests
         var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
         var position = new LanguagePosition(1, caret);
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         var utilityCssLanguageService =
             service.ShouldBeAssignableTo<IUtilityCssLanguageService>();
 
@@ -77,7 +77,7 @@ public class UtilityCompletionScaleTests
         const string templateLine = "    <div class=\"gap-\"></div>";
         var source = $"<template>\n{templateLine}\n</template>\n";
         var caret = templateLine.IndexOf("gap-", StringComparison.Ordinal) + "gap-".Length;
-        var service = ViuLanguageServices.Create();
+        var service = LanguageServices.Create();
         service.OpenDocument("file:///c:/workspace/Card.viu", source, 1);
 
         // The server host tracks open documents case-insensitively, so the workspace must agree or a

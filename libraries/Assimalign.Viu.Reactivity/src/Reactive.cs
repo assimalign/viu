@@ -18,7 +18,7 @@ public static class Reactive
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
-    /// <returns>The new ref.</returns>
+    /// <returns>The new reference.</returns>
     public static Reference<T> Reference<T>(T value) => new(value);
 
     /// <summary>
@@ -28,7 +28,7 @@ public static class Reactive
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="value">The initial value.</param>
-    /// <returns>The new shallow ref.</returns>
+    /// <returns>The new shallow reference.</returns>
     public static ShallowReference<T> ShallowReference<T>(T value) => new(value);
 
     /// <summary>
@@ -38,7 +38,7 @@ public static class Reactive
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="factory">Receives track/trigger delegates and returns the getter/setter pair.</param>
-    /// <returns>The new custom ref.</returns>
+    /// <returns>The new custom reference.</returns>
     public static CustomReference<T> CustomReference<T>(CustomReferenceFactory<T> factory) => new(factory);
 
     /// <summary>
@@ -61,7 +61,10 @@ public static class Reactive
     /// </summary>
     /// <param name="action">The reactive function to track.</param>
     /// <param name="scheduler">Optional scheduler invoked on invalidation instead of a re-run.</param>
-    /// <returns>The effect handle (use <see cref="ReactiveEffect.Run"/>/<see cref="ReactiveEffect.Stop"/>).</returns>
+    /// <returns>
+    /// The effect handle. Use <see cref="ReactiveEffect.Run"/> to execute explicitly and
+    /// <see cref="ReactiveEffect.Stop"/> or <see cref="ReactiveEffect.Dispose"/> for idempotent teardown.
+    /// </returns>
     public static ReactiveEffect Effect(Action action, Action? scheduler = null)
     {
         var effect = new ReactiveEffect(action) { Scheduler = scheduler };
@@ -86,6 +89,10 @@ public static class Reactive
     public static EffectScope EffectScope(bool detached = false) => new(detached);
 
     /// <summary>The ambient scope new effects register with, or null when none is active.</summary>
+    /// <remarks>
+    /// This is the single public scope accessor so construction and inspection remain discoverable
+    /// through the sanctioned reactivity facade. Specified by <c>[RCT-5]</c>.
+    /// </remarks>
     public static EffectScope? CurrentScope => global::Assimalign.Viu.Reactivity.EffectScope.Current;
 
     /// <summary>
@@ -118,7 +125,7 @@ public static class Reactive
     /// cached value is unchanged, because a forced trigger asserts that the value's meaning
     /// changed even when its identity did not.
     /// </summary>
-    /// <param name="reference">The ref to force-trigger.</param>
+    /// <param name="reference">The reference to force-trigger.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
     public static void TriggerReference(IReactiveTrackedReference reference)
     {
@@ -138,14 +145,15 @@ public static class Reactive
     public static void ResetTracking() => ReactivityState.ResetTracking();
 
     /// <summary>
-    /// Opens a batch: triggers are queued and coalesced until the matching <see cref="EndBatch"/>,
-    /// so multiple writes produce at most one run per effect.
+    /// Opens a batch whose queued triggers are coalesced until the returned scope is disposed.
+    /// Nested scopes flush only when the outermost scope is disposed.
     /// </summary>
-    public static void StartBatch() => ReactivityState.StartBatch();
-
-    /// <summary>Closes the innermost batch, flushing queued effects when it is the outermost one.</summary>
-    /// <exception cref="InvalidOperationException">There is no open batch to close.</exception>
-    public static void EndBatch() => ReactivityState.EndBatch();
+    /// <returns>
+    /// An idempotent scope that closes exactly one batch level. The disposable shape ensures that a
+    /// <c>using</c> statement restores effect delivery when its body exits through an exception.
+    /// </returns>
+    /// <remarks>Specified by <c>[RCT-5]</c>.</remarks>
+    public static IDisposable Batch() => new BatchScope();
 
     /// <summary>
     /// Watches a reference and invokes <paramref name="callback"/> with the new and previous values
@@ -153,7 +161,7 @@ public static class Reactive
     /// a nested reactive change also fires the callback.
     /// </summary>
     /// <typeparam name="T">The watched value type.</typeparam>
-    /// <param name="source">The ref to watch.</param>
+    /// <param name="source">The reference to watch.</param>
     /// <param name="callback">Receives <c>(newValue, oldValue, onCleanup)</c>.</param>
     /// <param name="options">Immediate/once/deep/flush options.</param>
     /// <returns>A handle to stop or pause the watcher.</returns>
@@ -235,7 +243,7 @@ public static class Reactive
     /// Watches several references at once; the callback receives arrays of the new and previous
     /// values, with each source's own previous value preserved at its index.
     /// </summary>
-    /// <param name="sources">The refs to watch.</param>
+    /// <param name="sources">The references to watch.</param>
     /// <param name="callback">Receives <c>(newValues, oldValues, onCleanup)</c>.</param>
     /// <param name="options">Immediate/once/deep/flush options.</param>
     /// <returns>A handle to stop or pause the watcher.</returns>
@@ -304,7 +312,7 @@ public static class Reactive
     public static WatchHandle WatchEffect(Action<OnCleanup> effect, WatchOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(effect);
-        var watcher = new EffectWatcher(effect, options?.Flush ?? WatchFlushMode.Sync, options?.Scheduler);
+        var watcher = new EffectWatcher(effect, options?.Flush ?? WatchFlushMode.Synchronous, options?.Scheduler);
         return new WatchHandle(watcher);
     }
 
@@ -339,7 +347,7 @@ public static class Reactive
     /// <see cref="ToRef{T}(Func{T}, Action{T})"/>/<c>ToReferences()</c> projection.
     /// </summary>
     /// <param name="value">The value to test.</param>
-    /// <returns><see langword="true"/> when <paramref name="value"/> is a ref.</returns>
+    /// <returns><see langword="true"/> when <paramref name="value"/> is a reference.</returns>
     public static bool IsRef(object? value) => value is IReactiveReference;
 
     /// <summary>
@@ -358,13 +366,13 @@ public static class Reactive
 
     /// <summary>
     /// Whether <paramref name="value"/> is a read-only reactive view — a getter-only
-    /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(Readonly = true)]</c>/
-    /// <c>[ShallowReactive(Readonly = true)]</c> object. Keys on
+    /// <see cref="Computed{T}"/> or a source-generated <c>[Reactive(ReadOnly = true)]</c>/
+    /// <c>[ShallowReactive(ReadOnly = true)]</c> object. Keys on
     /// <see cref="IReactiveReadOnly.IsReadOnly"/> for references and generated reactive objects.
     /// </summary>
     /// <param name="value">The value to test.</param>
     /// <returns><see langword="true"/> when <paramref name="value"/> rejects writes.</returns>
-    public static bool IsReadonly(object? value)
+    public static bool IsReadOnly(object? value)
         => value is IReactiveReadOnly reactiveReadOnly && reactiveReadOnly.IsReadOnly;
 
     /// <summary>
@@ -373,8 +381,8 @@ public static class Reactive
     /// <see cref="IReactiveReference{T}"/> without boxing <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="reference">The ref to unwrap.</param>
-    /// <returns>The ref's current value (a tracked read).</returns>
+    /// <param name="reference">The reference to unwrap.</param>
+    /// <returns>The reference's current value (a tracked read).</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reference"/> is null.</exception>
     public static T Unref<T>(ReactiveValue<T> reference)
     {
@@ -447,30 +455,15 @@ public static class Reactive
     /// reference comes from a generated object's <c>ToReferences()</c> instead.
     /// </summary>
     /// <typeparam name="T">The projected value type.</typeparam>
-    /// <param name="getter">Invoked on read; its reactive reads become the ref's dependencies.</param>
-    /// <param name="setter">Invoked on write, or <see langword="null"/> for a read-only ref.</param>
-    /// <returns>A ref backed by the delegates.</returns>
+    /// <param name="getter">Invoked on read; its reactive reads become the reference's dependencies.</param>
+    /// <param name="setter">Invoked on write, or <see langword="null"/> for a read-only reference.</param>
+    /// <returns>A reference backed by the delegates.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="getter"/> is null.</exception>
     public static ReactiveValue<T> ToRef<T>(Func<T> getter, Action<T>? setter = null)
     {
         ArgumentNullException.ThrowIfNull(getter);
         return new AccessorReference<T>(getter, setter);
     }
-
-    /// <summary>
-    /// Returns the raw, non-reactive view of <paramref name="value"/>. Viu wraps nothing, so a
-    /// source-generated <c>[Reactive]</c> object (or any non-collection value) is its own raw and is
-    /// returned by identity — reads through the returned instance still track, because it <em>is</em>
-    /// the reactive instance. That is a direct consequence of having no proxy layer
-    /// (<c>[RCT-6]</c>) and is stated plainly because it means this overload cannot hand back an
-    /// untracked view. For one, use the reactive-collection overloads (which return the underlying
-    /// storage) or a generated object's <c>ToRawValues()</c> view (emitted per <c>[Reactive]</c>
-    /// class straight over the raw backing fields).
-    /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="value">The value to unwrap.</param>
-    /// <returns><paramref name="value"/> itself.</returns>
-    public static T ToRaw<T>(T value) => value;
 
     /// <summary>
     /// Returns the untracked underlying <see cref="List{T}"/> of <paramref name="list"/>. It is the
@@ -552,7 +545,7 @@ public static class Reactive
             alwaysCallback,
             unsetOldValue,
             options?.Immediate ?? false,
-            options?.Flush ?? WatchFlushMode.Sync,
+            options?.Flush ?? WatchFlushMode.Synchronous,
             options?.Scheduler,
             options?.Once ?? false);
         return new WatchHandle(watcher);

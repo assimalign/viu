@@ -1,65 +1,73 @@
 # Developer consumption examples
 
-These examples describe the APIs implemented in `.redesign`. They are written from the
-application developer's point of view and use the separated Components, Reactivity, State, Core,
-and Browser packages.
+These examples use the shipping `[V01.01.15]` APIs from the separated Components, Reactivity,
+State, Core, and Browser packages. They are written from the application developer's point of view;
+the examples therefore consume public contracts rather than runtime implementation details.
 
 ## 1. Mental model
 
 | Developer concern | Main API | Lifetime |
 | --- | --- | --- |
-| Immutable render description | `IComponent` / `ComponentTree` | One render |
-| Authored component behavior | `IComponentTemplate` | One mounted template |
-| Mounted component inputs and capabilities | `IComponentContext` | One mounted template |
-| Component activation | `IComponentFactory` | Application-owned |
+| Immutable render description | `VirtualNode` and sealed variants | One render |
+| Static identity and contract | `ComponentReference`, `ComponentContract`, `ComponentRegistration` | One registration |
+| Authored component behavior | `IComponent` | One mounted invocation |
+| Mounted inputs and capabilities | `ComponentContext` | One mounted invocation |
+| Registration resolution | `IComponentFactory` | Application-owned |
 | Reactive values and subscriptions | `Reactive`, `IReactiveReference<T>`, `IReactiveEffectScope` | Explicit or component-owned |
 | Shared state | `StateStoreDefinition<TStore>`, `IStateStoreRegistry` | One registry |
 | Top-level host lifetime | `IApplication`, `IApplicationContext` | One single-use host application |
 
-`IComponent` is the one public render-tree vocabulary. Core still keeps internal mounted-node
-bookkeeping because an immutable render description and a live host node have different lifetimes.
+`VirtualNode` is the closed public render-tree vocabulary. Core keeps internal mounted bookkeeping
+because an immutable description and a live host node have different lifetimes.
 
 There is no component-tree `provide`/`inject` API. A component receives explicit inputs through
-arguments and slots, application services through `IComponentContext.Services`, and application
-state through the State-owned context capability.
+arguments and slots, application services through nullable `ComponentContext.Services`, and
+application state through that service seam or the ambient active registry.
 
 ## 2. Context inside a `.viu` component
 
 For a `.viu` file with a template, the source generator emits the following bridge conceptually:
 
 ```csharp
-partial class UserCard : IComponentTemplate
+partial class UserCard : ComponentBase, IComponent
 {
-    private IComponentContext Context { get; set; } = null!;
-
     partial void OnSetup();
 
-    ComponentRenderer IComponentTemplate.Setup(IComponentContext context)
+    ComponentRenderer IComponent.Setup(ComponentContext context)
     {
         Context = context;
+        // Generated assignments from context.Bindings.Parameters run here.
         OnSetup();
-        return () => RenderGeneratedTemplate();
+        return frame =>
+        {
+            // The same generated assignments run again before every render.
+            return RenderGeneratedTemplate(frame);
+        };
     }
 }
 ```
 
 The developer does not write that bridge. Code inside `@script { }` is merged into the same partial
-class, so it can use the generated private `Context` member and implement the generated
+class, so it can use `ComponentBase`'s protected `Context` member and implement the generated
 `partial void OnSetup()` hook.
 
-`Context` is assigned immediately before `OnSetup` runs. Do not use it from a field initializer or
-constructor, and do not declare another member named `Context` or `OnSetup`.
+`ComponentBase.Context` is nullable because construction precedes setup. Generated setup assigns it
+immediately before parameter binding and `OnSetup`; script code uses `Context!` after that boundary
+or performs its own guard. Do not use it from a field initializer or constructor, and do not declare
+another member named `Context` or `OnSetup`.
 
 The mounted context exposes:
 
-- `Arguments` for declared component parameters;
-- `Slots` for current parent-provided slots;
-- `Attributes` for undeclared fallthrough attributes;
-- `Components` for application-selected component resolution;
-- `Services` for the independently supplied `IServiceProvider`;
+- `Bindings.Parameters` for resolved component parameters;
+- `Bindings.Slots` for current parent-provided slots;
+- `Bindings.FallthroughBindings` for undeclared fallthrough values;
+- nullable `Services` for the independently supplied `IServiceProvider`;
 - `Lifecycle` for callbacks and the component-lifetime cancellation token;
+- `Scope`, `WatchScheduler`, and `Watch(...)` for component-owned reactive work;
+- `Parent` for the runtime-provided parent context;
 - `Emit(...)` for declared component events; and
-- `Expose(...)` for the value assigned to a parent template reference.
+- `Expose(...)` for the value assigned to a parent template reference; and
+- `Warn(...)` for the application warning channel.
 
 ### 2.1 Component-local state
 
@@ -88,10 +96,10 @@ The mounted context exposes:
 }
 ```
 
-`OnMounted` and its siblings are protected members of `ComponentTemplateBase`, the base class the
-generator puts under a component with a template block. Each one registers exactly what the longer
-`Context.Lifecycle.OnMounted(...)` form registers, into the same list in the same order, so a
-component may write either or mix them
+`OnMounted` and its siblings are generator-provided root conveniences; `ComponentBase` itself stores
+only `Context`. Each convenience registers exactly what the longer
+`Context!.Lifecycle.OnMounted(...)` form registers, into the same list in the same order, so a
+component may write either form or mix them
 ([`[CMP-32]`](SPECIFICATION.md#410-root-level-lifecycle-registration)).
 
 Each mount receives a fresh generated component instance, so `Count` is component-local. The
@@ -110,46 +118,36 @@ and assigning `Count.Value` schedules the necessary patch.
 
 @script {
     using System;
-    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     using Assimalign.Viu.Components;
 
-    public IReadOnlyList<IComponentParameter> Parameters { get; } =
-    [
-        new ComponentParameter("title", isRequired: true),
-    ];
+    [Parameter(IsRequired = true)]
+    public string Title { get; set; } = string.Empty;
 
-    public IReadOnlyList<IComponentEvent> Events { get; } =
-    [
-        new ComponentEvent("saved"),
-    ];
-
-    public string Title =>
-        Context.Arguments.Get<string>("title")
-        ?? throw new InvalidOperationException("title is required");
+    [Event]
+    partial void Saved(string identifier);
 
     private async Task SaveAsync()
     {
         ISaveClient client =
-            (ISaveClient?)Context.Services.GetService(typeof(ISaveClient))
+            (ISaveClient?)Context!.Services?.GetService(typeof(ISaveClient))
             ?? throw new InvalidOperationException(
                 "The application did not supply ISaveClient.");
 
         string identifier = await client.SaveAsync(
-            Context.Lifecycle.CancellationToken);
-        Context.Emit("saved", identifier);
+            Context!.Lifecycle.CancellationToken);
+        Saved(identifier);
     }
 }
 ```
 
 The parent may spell a declared camel-case parameter in camel case or kebab case. Parameter
 defaults and validators run in Core, while undeclared values remain available in
-`Context.Attributes` for fallthrough.
+`Context!.Bindings.FallthroughBindings`.
 
-`Context.Emit` supports zero or more arguments. Parent listeners can be synchronous or return
-`Task`; Core observes asynchronous listeners and routes faults through component and application
-error handling.
+`Context!.Emit` supports zero or more arguments and delivers an immutable ordered argument snapshot
+through `ComponentEventListener`. The generated `Saved` method is the strongly typed authoring form.
 
 ### 2.3 Asynchronous loading with lifecycle hooks
 
@@ -184,7 +182,7 @@ with the lifecycle that owns that work:
         Reactive.Reference(false);
 
     private HttpClient Http =>
-        (HttpClient?)Context.Services.GetService(typeof(HttpClient))
+        (HttpClient?)Context!.Services?.GetService(typeof(HttpClient))
         ?? throw new InvalidOperationException(
             "The application did not supply HttpClient.");
 
@@ -195,7 +193,7 @@ with the lifecycle that owns that work:
 
     private Task RefreshAsync()
     {
-        return LoadAsync(Context.Lifecycle.CancellationToken);
+        return LoadAsync(Context!.Lifecycle.CancellationToken);
     }
 
     private async Task LoadAsync(CancellationToken cancellationToken)
@@ -238,8 +236,9 @@ Lifecycle task behavior is:
 - `OnServerPrefetch` is the exception to non-blocking lifecycle progression: ServerRenderer awaits
   those callbacks before serializing the component.
 
-When pending content must be replaced by a fallback as one coordinated branch, use the Core
-`Suspense` built-in with an asynchronous component. Server rendering awaits the default branch and
+When pending content must be replaced by a fallback as one coordinated branch, use the
+`<Suspense>` template built-in, which compiles to a Components-owned `SuspenseNode` whose executor
+is internal to Core. Server rendering awaits the default branch and
 does not serialize the fallback. Suspense client hydration is currently unsupported; a hydration
 attempt fails explicitly rather than partially claiming the server DOM. Boundary timeout/events,
 fallback-to-reveal transition choreography, and delaying mounted/post-render effects from the
@@ -267,12 +266,12 @@ public sealed class CounterStore
     public void Increment() => Count.Value++;
 }
 
-public static class ApplicationState
+public static class CounterState
 {
     public static StateStoreDefinition<CounterStore> Counter { get; } =
-        StateStores.Define(
+        new(
             "counter",
-            static () => new CounterStore());
+            static context => new CounterStore());
 }
 ```
 
@@ -292,7 +291,7 @@ Consume the application registry from a mounted component:
 
     partial void OnSetup()
     {
-        Counter = ApplicationState.Counter.Use(Context);
+        Counter = CounterState.Counter.Use(Context!);
     }
 
     private void Increment()
@@ -302,158 +301,152 @@ Consume the application registry from a mounted component:
 }
 ```
 
-`Use(Context)` locates the application's configured `IStateStoreRegistry`. Every component in that
+`Use(Context!)` locates the application's configured `IStateStoreRegistry`. Every component in that
 application receives the same `CounterStore` instance. Resolving the store does not itself
 subscribe the component; the generated render subscribes when it reads `Count` and `Double`.
 
-## 3. Pure C# components and trees
+## 3. Pure C# components and virtual nodes
 
-### 3.1 An authored component template
+### 3.1 An authored component
 
 ```csharp
 using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 
-public sealed class CounterCard : IComponentTemplate
+public sealed class CounterCard : IComponent
 {
+    public static ComponentReference Reference { get; } =
+        ComponentReference.ForType(typeof(CounterCard));
+
+    public static ComponentContract Contract { get; } = new(
+        displayName: nameof(CounterCard),
+        parameters:
+        [
+            new ComponentParameter(
+                "step",
+                defaultFactory: static () => 1,
+                validator: static value => value is int step && step > 0,
+                parameterType: typeof(int)),
+        ],
+        events:
+        [
+            new ComponentEvent(
+                "changed",
+                static arguments =>
+                    arguments.Count == 1 && arguments[0] is int),
+        ]);
+
     private readonly Reference<int> _count = Reactive.Reference(0);
-    private IComponentContext _context = null!;
+    private ComponentContext _context = null!;
 
-    public string? Name => nameof(CounterCard);
-
-    public IReadOnlyList<IComponentParameter> Parameters { get; } =
-    [
-        new ComponentParameter(
-            "step",
-            defaultFactory: static () => 1,
-            validator: static value => value is int step && step > 0),
-    ];
-
-    public IReadOnlyList<IComponentEvent> Events { get; } =
-    [
-        new ComponentEvent(
-            "changed",
-            static arguments =>
-                arguments.Count == 1 && arguments[0] is int),
-    ];
-
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         _context = context;
-        context.Lifecycle.OnMounted(LogMountedAsync);
+        context.Lifecycle.OnMounted(LogMounted);
         return Render;
     }
 
-    private IComponent Render()
+    private VirtualNode Render(ComponentRenderFrame frame)
     {
-        return ComponentTree.Element(
-            "button",
-            new ComponentAttributes(
+        return new ElementNode(
+            new QualifiedName("button"),
+            bindings:
             [
-                new ComponentAttribute("type", "button"),
-                new ComponentAttribute(
-                    "onClick",
-                    (Func<object?, Task>)HandleClickAsync),
-            ]),
-            [ComponentTree.Text($"Count: {_count.Value}")]);
+                ElementBinding.Attribute(new QualifiedName("type"), "button"),
+                ElementBinding.Event("click", (Action)HandleClick),
+            ],
+            children: [new TextNode($"Count: {_count.Value}")]);
     }
 
-    private Task LogMountedAsync(CancellationToken cancellationToken)
+    private void LogMounted()
     {
         IAuditLog audit =
-            (IAuditLog?)_context.Services.GetService(typeof(IAuditLog))
+            (IAuditLog?)_context.Services?.GetService(typeof(IAuditLog))
             ?? throw new InvalidOperationException(
                 "The application did not supply IAuditLog.");
-        return audit.WriteAsync("Counter mounted.", cancellationToken);
+        audit.Write("Counter mounted.");
     }
 
-    private async Task HandleClickAsync(object? browserEvent)
+    private void HandleClick()
     {
-        await Task.Yield();
-        int step = _context.Arguments.Get<int>("step");
+        int step = (int)_context.Bindings.Parameters["step"]!;
         _count.Value += step;
         _context.Emit("changed", _count.Value);
     }
 }
 ```
 
-`Setup` runs once per mount. The returned `ComponentRenderer` may run many times. The render
-description is recreated, while `_count`, `_context`, and registered callbacks belong to the
-mounted template instance.
+`ComponentRegistration` carries `Reference` and `Contract`, so Core can resolve inputs before it
+activates `CounterCard`. `Setup` runs once for each mounted invocation. The returned renderer may run
+many times and receives that mount's `ComponentRenderFrame`; `_count`, `_context`, and lifecycle
+registrations remain on the authored instance.
 
 ### 3.2 Creating the parent request
 
 ```csharp
-IComponent counter = ComponentTree.Template<CounterCard>(
-    arguments: new ComponentArguments(
-    [
-        new KeyValuePair<string, object?>("step", 2),
-    ]),
-    listeners: new Dictionary<string, ComponentEventListener>
-    {
-        ["changed"] = new ComponentEventListener(
-            value => Console.WriteLine($"New count: {value}")),
-    });
-```
-
-For a listener that needs every emitted argument:
-
-```csharp
-ComponentEventListener listener =
-    ComponentEventListener.ForAsynchronousArguments(
-        async arguments =>
+VirtualNode counter = new ComponentNode(
+    CounterCard.Reference,
+    new ComponentInvocation(
+        arguments: new Dictionary<string, object?>
         {
-            await audit.WriteAsync(
-                $"Received {arguments.Count} arguments.",
-                CancellationToken.None);
+            ["step"] = 2,
         },
-        isOnce: true);
+        listeners: new Dictionary<string, ComponentEventListener>
+        {
+            ["changed"] = arguments =>
+                Console.WriteLine($"New count: {arguments[0]}"),
+        }));
 ```
 
-### 3.3 Elements, fragments, slots, and named templates
+`ComponentInvocation` is the immutable, raw parent request. Core resolves it against the static
+contract into `ComponentBindings` for the mounted context; the two types deliberately share no
+interface. A `ComponentEventListener` receives one immutable ordered argument list and returns
+`void`; application code starts and observes longer asynchronous work through an owned lifetime.
+
+### 3.3 Elements, fragments, slots, and named components
 
 ```csharp
-ComponentSlots slots = new()
-{
-    ["default"] = _ =>
-        ComponentTree.Element(
-            "strong",
-            children: [ComponentTree.Text("Slot content")]),
-};
+IReadOnlyDictionary<string, ComponentSlot> slots =
+    new Dictionary<string, ComponentSlot>
+    {
+        ["default"] = _ =>
+            new ElementNode(
+                new QualifiedName("strong"),
+                children: [new TextNode("Slot content")]),
+    };
 
-IComponent tree = ComponentTree.Fragment(
+VirtualNode tree = new FragmentNode(
 [
-    ComponentTree.Element(
-        "h1",
-        children: [ComponentTree.Text("Dashboard")]),
-    ComponentTree.Template<Panel>(
-        slots: slots,
+    new ElementNode(
+        new QualifiedName("h1"),
+        children: [new TextNode("Dashboard")]),
+    new ComponentNode(
+        Panel.Reference,
+        new ComponentInvocation(slots: slots),
         key: "main-panel"),
 ]);
 ```
 
-`ComponentTree.Template("Panel")` creates a request for a statically known registered name. In a
-dynamic `:is`-style expression, a plain string deliberately means an element tag because
-`IComponentFactory` has no registration-probe API. Select a registered name explicitly:
+Dynamic selection stays explicit. A string used as a qualified name creates an element; a
+registered component name becomes a `ComponentReference`:
 
 ```csharp
-IComponent dynamicPanel = DynamicComponents.DynamicComponent(
-    DynamicComponents.Named("Panel"));
+VirtualNode dynamicElement = new ElementNode(new QualifiedName(selectedName));
+VirtualNode dynamicPanel =
+    new ComponentNode(ComponentReference.ForName(selectedName));
 ```
 
-The compiler emits `ComponentOptimization` and block tracking for `.viu` templates. That metadata
-survives the unified component tree, so compatible block roots patch their dynamic descendants
-without revisiting static siblings. Most application code should not hand-author those compiler
-hints.
+Hand-built nodes carry `RenderPlan.None` by default and use the correct full diff. Generated `.viu`
+templates emit `RenderPlan` values through statement-form calls to
+`ComponentRenderFrame.OpenBlock`, `Track`, and `CloseBlock`, allowing compatible block roots to
+patch their dynamic descendants without revisiting static siblings.
 
-## 4. Component factories and application services
+## 4. Component registrations and application services
 
-`IComponentFactory` is not an `IServiceProvider`. The application chooses both independently.
+`IComponentFactory` resolves `ComponentReference` values to complete `ComponentRegistration`
+values. It is not an `IServiceProvider`; application composition chooses both independently.
 
 ### 4.1 Explicit activation and a small service provider
 
@@ -490,33 +483,44 @@ public sealed class ApplicationServices : IServiceProvider, IDisposable
 }
 
 ApplicationServices services = new();
+ComponentFactory components = new();
 
-IComponentFactory components = new ComponentFactory(
-[
+components.Register(
     new ComponentRegistration(
-        typeof(App),
-        static () => new App(),
-        "App"),
+        App.Reference,
+        App.Contract,
+        static _ => new App()));
+components.Register(
     new ComponentRegistration(
-        typeof(CounterCard),
-        static () => new CounterCard(),
-        "CounterCard"),
+        CounterCard.Reference,
+        CounterCard.Contract,
+        static _ => new CounterCard()));
+components.Register(
     new ComponentRegistration(
-        typeof(ServiceConstructedPanel),
-        () => new ServiceConstructedPanel(
-            (IAuditLog)services.GetService(typeof(IAuditLog))!),
-        "ServiceConstructedPanel"),
-]);
+        ServiceConstructedPanel.Reference,
+        ServiceConstructedPanel.Contract,
+        provider => new ServiceConstructedPanel(
+            (IAuditLog?)provider?.GetService(typeof(IAuditLog))
+            ?? throw new InvalidOperationException(
+                "The application did not supply IAuditLog."))));
 ```
 
-All activators are explicit delegates, so activation is trimming- and AOT-safe. An activator may
-close over an application container, a generated resolver, or hand-written values. Viu does not
-perform constructor discovery or call `Activator.CreateInstance`.
+Each activator is an explicit delegate receiving the nullable application provider, so activation
+is trimming- and AOT-safe. Viu does not perform constructor discovery or call
+`Activator.CreateInstance`. A per-component dependency-injection scope can be owned by an
+`IComponent` wrapper that also implements `IDisposable`; Core disposes that activated instance
+after unmount but never creates scopes or disposes the borrowed application provider.
 
-If an application wants a per-component dependency-injection scope, its activator can create that
-scope and return an `IComponentTemplate` wrapper that implements `IDisposable`. Core owns the
-returned template for that mount and disposes it after unmount. Core does not create service scopes
-or dispose the application provider.
+`ComponentRegistration.Define` is the composition-only alternative for a small code-first
+component:
+
+```csharp
+components.Register(
+    ComponentRegistration.Define(
+        "StatusBadge",
+        new ComponentContract(displayName: "StatusBadge"),
+        context => frame => new TextNode("Ready")));
+```
 
 ### 4.2 Browser application composition
 
@@ -524,30 +528,29 @@ or dispose the application provider.
 using Assimalign.Viu;
 using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.State;
 
 using ApplicationServices services = new();
+ComponentFactory components = new();
 
-IComponentFactory components = new ComponentFactory(
-[
-    new ComponentRegistration(typeof(App), static () => new App(), "App"),
+ComponentRegistration appRegistration = new(
+    App.Reference,
+    App.Contract,
+    static _ => new App());
+components.Register(appRegistration);
+components.Register(
     new ComponentRegistration(
-        typeof(CounterCard),
-        static () => new CounterCard(),
-        "CounterCard"),
-]);
+        CounterCard.Reference,
+        CounterCard.Contract,
+        static _ => new CounterCard()));
 
-using StateStoreRegistry state = StateStores.CreateRegistry(
-    components,
-    services,
-    new ReactiveEffectScopeFactory());
+using IStateStoreRegistry state = StateStores.CreateRegistry(services);
 
 BrowserApplicationBuilder builder = new();
 builder.ConfigureApplication(
     options =>
     {
-        options.RootComponent = ComponentTree.Template<App>();
+        options.RootComponent = new ComponentNode(appRegistration.Reference);
         options.Components = components;
         options.Services = services;
         options.State = state;
@@ -561,17 +564,10 @@ await using IApplication application = builder.Build();
 await application.RunAsync();
 ```
 
-The application borrows `components`, `services`, and `state`. Disposing the browser application
-unmounts its tree; the composition root still disposes the registry and provider it created.
-
-`BrowserApplication` implements `IApplication` directly and keeps its opaque integer DOM handles out
-of Core. The interface owns the single-use `StartAsync`/`StopAsync` contract, middleware, and
-asynchronous disposal; `RunAsync` is the extension that starts, waits for shutdown, and stops. The
-read-only `IApplicationContext.IsRunning` and `Stopping` members expose runtime state to callers and
-middleware. Browser's lower-level `Mount` and `MountAsync` methods remain available for embedding
-and tests and explicitly bypass top-level middleware [APP-7]. A WebView2 host can implement
-`IApplication` directly and supply its own mount surface and renderer operations without changing
-component, reactivity, or state APIs.
+The host borrows the factory, provider, and registry; disposing the application unmounts the tree
+but does not dispose those application-owned values. `IApplication` remains single-use,
+`ApplicationLifetime.State` exposes the current `ApplicationState` value, and that lifetime owns the common
+transition machine. Middleware wraps the complete mounted lifetime.
 
 ## 5. Reactivity
 
@@ -591,15 +587,10 @@ ReactiveEffect effect = Reactive.Effect(
         Console.WriteLine($"{count.Value} -> {doubled.Value}");
     });
 
-Reactive.StartBatch();
-try
+using (Reactive.Batch())
 {
     count.Value = 2;
     count.Value = 3;
-}
-finally
-{
-    Reactive.EndBatch();
 }
 
 effect.Stop();
@@ -676,23 +667,26 @@ listEffect.Stop();
 
 ### 6.1 Application/global state
 
-An application composition root owns one `StateStoreRegistry`, passes it to the application
-builder, and resolves static definitions through that registry:
+An application composition root owns one `IStateStoreRegistry`, makes it reachable through its
+service provider or explicitly passes it to consumers, and resolves static definitions through
+that registry:
 
 ```csharp
-CounterStore first = ApplicationState.Counter.Use(state);
-CounterStore second = ApplicationState.Counter.Use(state);
+CounterStore first = CounterState.Counter.Use(state);
+CounterStore second = CounterState.Counter.Use(state);
 
 Console.WriteLine(ReferenceEquals(first, second)); // True
 ```
 
-Every store definition runs once per registry. The registry creates a detached root reactive scope
-and one child scope per initialized store. Removing a store stops that child scope; disposing the
-registry stops all store-owned effects and cleanup callbacks.
+Each definition has one materialized store per registry at a time and remains a cache hit until it
+is removed. Each materialized store receives one registry-owned reactive scope. Removing a store
+stops its scope; a later use activates it again. Disposing the registry stops every store-owned
+effect and cleanup callback.
 
-`StateStores.ActiveRegistry` and parameterless `definition.Use()` are available for browser
-bootstrap and tests. Server and multi-request hosts should pass the request-owned registry
-explicitly.
+`StateStores.ActiveRegistry` is the optional fallback used by `definition.Use(context)` when
+`context.Services` does not expose `IStateStoreRegistry`. Outside a mounted component, call
+`definition.Use(registry)` explicitly. Server and multi-request hosts pass the request-owned
+registry rather than relying on ambient state.
 
 ### 6.2 Explicit isolated feature state
 
@@ -707,28 +701,25 @@ using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.State;
 
-public sealed class CheckoutShell : IComponentTemplate, IDisposable
+public sealed class CheckoutShell : IComponent, IDisposable
 {
-    private StateStoreRegistry? _featureState;
+    private IStateStoreRegistry? _featureState;
     private CheckoutStore? _checkout;
 
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
         _featureState = StateStores.CreateRegistry(
-            context.Components,
             context.Services,
-            new ReactiveEffectScopeFactory());
-        _checkout = CheckoutState.Definition.Use(
-            _featureState,
-            context);
+            context.WatchScheduler);
+        _checkout = CheckoutState.Definition.Use(_featureState);
 
-        return () => ComponentTree.Template<CheckoutSummary>(
-            arguments: new ComponentArguments(
-            [
-                new KeyValuePair<string, object?>(
-                    "store",
-                    _checkout),
-            ]));
+        return frame => new ComponentNode(
+            CheckoutSummary.Reference,
+            new ComponentInvocation(
+                arguments: new Dictionary<string, object?>
+                {
+                    ["store"] = _checkout,
+                }));
     }
 
     public void Dispose()
@@ -737,24 +728,36 @@ public sealed class CheckoutShell : IComponentTemplate, IDisposable
     }
 }
 
-public sealed class CheckoutSummary : IComponentTemplate
+public sealed class CheckoutSummary : IComponent
 {
-    public IReadOnlyList<IComponentParameter> Parameters { get; } =
-    [
-        new ComponentParameter("store", isRequired: true),
-    ];
+    public static ComponentReference Reference { get; } =
+        ComponentReference.ForType(typeof(CheckoutSummary));
 
-    public ComponentRenderer Setup(IComponentContext context)
+    public static ComponentContract Contract { get; } = new(
+        displayName: nameof(CheckoutSummary),
+        parameters:
+        [
+            new ComponentParameter(
+                "store",
+                isRequired: true,
+                parameterType: typeof(CheckoutStore)),
+        ]);
+
+    public ComponentRenderer Setup(ComponentContext context)
     {
         CheckoutStore store =
-            context.Arguments.Get<CheckoutStore>("store")
+            context.Bindings.Parameters["store"] as CheckoutStore
             ?? throw new InvalidOperationException("store is required");
 
-        return () => ComponentTree.Text(
+        return frame => new TextNode(
             $"Items: {store.Items.Count}");
     }
 }
 ```
+
+Application composition registers `CheckoutSummary.Reference` with `CheckoutSummary.Contract` and
+an explicit activator before this tree can mount; otherwise factory resolution fails rather than
+falling back to constructor discovery.
 
 Core disposes `CheckoutShell` after unmount, which disposes its isolated registry. A sibling
 `CheckoutShell` creates a different `CheckoutStore`. A child receives the selected store through a
@@ -766,32 +769,32 @@ resolve the application's global registry.
 Use ordinary reactive values when state belongs to exactly one component instance:
 
 ```csharp
-public sealed class SearchBox : IComponentTemplate
+public sealed class SearchBox : IComponent
 {
     private readonly Reference<string> _text =
         Reactive.Reference(string.Empty);
 
-    public ComponentRenderer Setup(IComponentContext context)
+    public ComponentRenderer Setup(ComponentContext context)
     {
-        Reactive.Watch(
-            _text,
-            (value, previous, onCleanup) =>
+        context.Watch(
+            () => _text.Value,
+            (value, previous) =>
                 Console.WriteLine($"Search changed to {value}"));
 
-        return () => ComponentTree.Element(
-            "input",
-            new ComponentAttributes(
+        return frame => new ElementNode(
+            new QualifiedName("input"),
+            bindings:
             [
-                new ComponentAttribute("value", _text.Value),
-            ]));
+                ElementBinding.Property("value", _text.Value),
+            ]);
     }
 }
 ```
 
-Core runs setup inside the component's reactive effect scope, so setup-created watchers are stopped
-on unmount. A component-local store object may also contain several references, computeds, and
-methods; it does not need an `IStateStoreRegistry` unless registry identity and isolated teardown
-are useful.
+Core runs setup inside the component's reactive scope. `context.Watch(...)` explicitly owns the
+watch in that scope, so it stops on unmount. A component-local store object may also contain several
+references, computed values, and methods; it does not need an `IStateStoreRegistry` unless registry
+identity and isolated teardown are useful.
 
 For Pinia-shaped member APIs, State also provides `StateStore<TState>` with typed, reflection-free
 `Patch`, `Reset`, `Subscribe`, and `OnAction` support over a source-generated
@@ -799,9 +802,10 @@ For Pinia-shaped member APIs, State also provides `StateStore<TState>` with type
 
 ## 7. Boundaries to remember
 
-- Components do not depend on Reactivity, State, Core, or Browser.
-- `IComponentFactory` resolves component templates; `IServiceProvider` resolves application
-  services. Neither contract implies the other.
+- Components owns the virtual-node and authored-component vocabulary and depends only on
+  Reactivity. State, Core, and Browser point inward toward it.
+- `IComponentFactory` resolves component references to registrations; `IServiceProvider` resolves
+  opt-in application services. Neither contract implies the other.
 - Core never performs reflection-based activation and never owns the supplied application
   provider.
 - `ConfigureApplication` composes components, directives, services, state, and diagnostics through
@@ -810,8 +814,8 @@ For Pinia-shaped member APIs, State also provides `StateStore<TState>` with type
 - State replaces the previous Store package. One definition produces one store instance per
   registry.
 - Effect scopes stop subscriptions; they do not make descendants subscribe automatically.
-- Plain dynamic strings are element tags. Use `DynamicComponents.Named(...)` for a component
-  registration selected by name.
+- Dynamic selection is explicit: construct an `ElementNode` for an element name or a
+  `ComponentNode(ComponentReference.ForName(...))` for a registered component.
 - Suspense mount/update behavior is implemented, including fallback and nested-boundary
   coordination. Suspense hydration, boundary timeout/events, fallback-to-reveal transition
   choreography, and hidden-branch post-effect delay are not implemented.

@@ -85,6 +85,22 @@ public class RouteParametersTests
     }
 
     [Fact]
+    public void EqualityOperators_DistinctEqualAndNullParameterSets_AreNullSafe()
+    {
+        RouteParameters left = RouteParameters.Empty.With("a", "1").With("b", "2");
+        RouteParameters right = RouteParameters.Empty.With("b", "2").With("a", "1");
+        RouteParameters? missing = null;
+
+        ReferenceEquals(left, right).ShouldBeFalse();
+        (left == right).ShouldBeTrue();
+        (left != right).ShouldBeFalse();
+        (missing == null).ShouldBeTrue();
+        (left == missing).ShouldBeFalse();
+        (missing == left).ShouldBeFalse();
+        (left != missing).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Equality_DistinguishesSingleFromRepeatable()
     {
         var single = RouteParameters.Empty.With("id", "42");

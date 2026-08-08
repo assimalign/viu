@@ -12,10 +12,10 @@ editor) — run one implementation and cannot drift. Specified by
 The rationale, the netstandard2.0 / no-I/O constraints, and the `DocumentationMode` seam are in
 [DESIGN.md](DESIGN.md).
 
-## Surface (all internal, IVT-scoped)
+## Surface
 
-The library is deliberately **all-internal**; the sanctioned consumers are declared as
-`InternalsVisibleTo` (the two hosts and their test assemblies) in `src/Properties/AssemblyInfo.cs`.
+The generator and language service consume explicit public build-time contracts. Implementation-only
+types remain internal, and only the projection core's own tests receive friend access.
 
 - **`SingleFileComponentProjection`** — the facade: `Project(input, cancellationToken)` takes a
   value-equatable `SingleFileComponentProjectionInput` (format, path, text, resolved names, scope id,

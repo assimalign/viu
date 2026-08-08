@@ -29,7 +29,7 @@ public sealed record ForNode : TemplateChildNode
     /// <summary>The repeated children (the <c>&lt;template v-for&gt;</c> contents, or the single element).</summary>
     public required SyntaxList<TemplateChildNode> Children { get; init; }
 
-    /// <summary>The compiled fragment-block vnode call, or <see langword="null"/> before code generation.</summary>
+    /// <summary>The compiled fragment-block virtual-node call, or <see langword="null"/> before code generation.</summary>
     public TemplateSyntaxNode? CodegenNode { get; init; }
 
     /// <inheritdoc />

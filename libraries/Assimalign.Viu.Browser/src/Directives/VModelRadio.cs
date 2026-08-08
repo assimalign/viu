@@ -1,22 +1,19 @@
 using System;
 
-using Assimalign.Viu;
 using Assimalign.Viu.Components;
-using Assimalign.Viu.Shared;
 
 namespace Assimalign.Viu.Browser;
 
-/// <summary>
-/// The <c>v-model</c> directive for radio buttons. The element is <c>checked</c> when the
-/// model loosely equals the radio's bound <c>:value</c>, so object
-/// values round-trip without string coercion; on change the model is assigned the radio's raw
-/// <c>:value</c>. Stateless singleton (<see cref="Instance"/>); per-element state lives in
-/// <see cref="BrowserModelState"/>.
-/// </summary>
+/// <summary>Provides Browser radio-control two-way model behavior.</summary>
+/// <remarks>
+/// Checked state uses form-value loose equality while change assigns the raw bound
+/// <c>value</c>, preserving object identity without reflection. Specified by <c>[SFC-CG-6]</c>
+/// and <c>[SFC-CG-7]</c>.
+/// </remarks>
 public sealed class VModelRadio : IDirective
 {
-    /// <summary>The shared directive instance the compiler references.</summary>
-    public static readonly VModelRadio Instance = new();
+    /// <summary>Gets the reusable Browser radio-model directive.</summary>
+    public static VModelRadio Instance { get; } = new();
 
     private VModelRadio()
     {
@@ -34,46 +31,62 @@ public sealed class VModelRadio : IDirective
     private static void OnCreated(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        var operations = BrowserDirectiveOperations.Require();
-        var handle = BrowserModelDirective.Handle(element);
-        var state = operations.GetState(handle);
-        state.ElementValue = BrowserModelDirective.Property(component, "value");
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        BrowserModelState state = operations.GetState(handle);
+        state.ElementValue = BrowserModelDirective.Property(value, "value");
         state.Assign = BrowserModelDirective.Carrier(binding)?.Setter;
-        // Checked state is derived, never read back: the model decides, loosely compared.
-        operations.SetBooleanProperty(handle, "checked",
-            LooseEquality.LooseEqual(BrowserModelDirective.Carrier(binding)?.Value, state.ElementValue));
-        operations.SetModelListener(handle, "onChange",
-            (Action)(() => operations.GetState(handle).Assign?.Invoke(operations.GetState(handle).ElementValue)));
+        operations.SetBooleanProperty(
+            handle,
+            "checked",
+            LooseEquality.LooseEqual(
+                BrowserModelDirective.Carrier(binding)?.Value,
+                state.ElementValue));
+        operations.SetModelListener(
+            handle,
+            "onChange",
+            (Action)(() =>
+            {
+                BrowserModelState current = operations.GetState(handle);
+                current.Assign?.Invoke(current.ElementValue);
+            }));
     }
 
     private static void OnBeforeUpdate(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
+        ElementNode value,
+        ElementNode? previousValue)
     {
-        var operations = BrowserDirectiveOperations.Require();
-        var handle = BrowserModelDirective.Handle(element);
-        var state = operations.GetState(handle);
-        state.Assign = BrowserModelDirective.Carrier(binding)?.Setter; // refresh assigner
-        state.ElementValue = BrowserModelDirective.Property(component, "value");
-        var value = BrowserModelDirective.Carrier(binding)?.Value;
-        // Only re-derive checked state when the model actually changed.
-        if (!Equals(
-            value,
-            BrowserModelDirective.ModelValue(binding.PreviousValue)))
+        BrowserDirectiveOperations operations = BrowserDirectiveOperations.Require();
+        int handle = BrowserModelDirective.Handle(element);
+        BrowserModelState state = operations.GetState(handle);
+        state.Assign = BrowserModelDirective.Carrier(binding)?.Setter;
+        state.ElementValue = BrowserModelDirective.Property(value, "value");
+        object? model = BrowserModelDirective.Carrier(binding)?.Value;
+        object? previousElementValue = previousValue is null
+            ? null
+            : BrowserModelDirective.Property(previousValue, "value");
+        if (!Equals(model, BrowserModelDirective.ModelValue(binding.PreviousValue))
+            || !Equals(state.ElementValue, previousElementValue))
         {
-            operations.SetBooleanProperty(handle, "checked", LooseEquality.LooseEqual(value, state.ElementValue));
+            operations.SetBooleanProperty(
+                handle,
+                "checked",
+                LooseEquality.LooseEqual(model, state.ElementValue));
         }
     }
 
     private static void OnBeforeUnmount(
         object element,
         DirectiveBinding binding,
-        IElementComponent component,
-        IElementComponent? previousComponent)
-        => BrowserDirectiveOperations.Require().ReleaseState(BrowserModelDirective.Handle(element));
+        ElementNode value,
+        ElementNode? previousValue)
+    {
+        BrowserDirectiveOperations.Require().ReleaseState(
+            BrowserModelDirective.Handle(element));
+    }
 }
