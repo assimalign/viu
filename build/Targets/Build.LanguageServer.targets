@@ -58,7 +58,7 @@
       single VSIX past the Marketplace size gate.
 
       A caller opts into the full set with ViuLanguageServerPublishAllRuntimeIdentifiers=true (see
-      extensions\Assimalign.Viu.VisualStudioCode\Build.ps1), or narrows to an explicit subset by
+      extensions\VisualStudioCode\Build.ps1), or narrows to an explicit subset by
       passing ViuLanguageServerRuntimeIdentifiers directly. The list lives here so no script owns a
       second copy of it.
     -->
@@ -244,7 +244,7 @@
                                        Condition="!Exists('%(_ViuLanguageServerExpectedPayload.Identity)')" />
     </ItemGroup>
     <Error Condition="'@(_ViuLanguageServerAbsentPayload)' != ''"
-           Text="The Viu language-server payload is missing at: @(_ViuLanguageServerAbsentPayload, ', '). It is normally produced automatically by the ViuPublishLanguageServer target; if you set ViuSkipLanguageServerPublish=true, run extensions\VisualStudio\Build.ps1 (or extensions\Assimalign.Viu.VisualStudioCode\Build.ps1) first." />
+           Text="The Viu language-server payload is missing at: @(_ViuLanguageServerAbsentPayload, ', '). It is normally produced automatically by the ViuPublishLanguageServer target; if you set ViuSkipLanguageServerPublish=true, run extensions\VisualStudio\Build.ps1 (or extensions\VisualStudioCode\Build.ps1) first." />
   </Target>
 
   <!-- Backstop 2: staleness. The same Inputs/Outputs pair the producer uses is handed to MSBuild's

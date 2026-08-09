@@ -173,7 +173,7 @@ function resolveLanguageServer(
             message:
                 `The Viu language-server payload for ${runtimeIdentifier} is missing at ${executablePath}. ` +
                 `This extension package was built without it. Run ` +
-                `extensions/Assimalign.Viu.VisualStudioCode/Build.ps1 to publish and stage the server, ` +
+                `extensions/VisualStudioCode/Build.ps1 to publish and stage the server, ` +
                 `or install the extension package built for this platform.`
         };
     }

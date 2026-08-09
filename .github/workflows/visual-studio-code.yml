@@ -1,7 +1,7 @@
 # Type-check lane for the Visual Studio Code extension client ([V01.01.12.02.02]).
 #
 # NEW COVERAGE: none of the fifteen retired per-area workflows watched
-# extensions/Assimalign.Viu.VisualStudioCode at all, so its TypeScript client could break without CI
+# extensions/VisualStudioCode at all, so its TypeScript client could break without CI
 # noticing. This is deliberately the cheap half of Build.ps1 — `npm ci` plus the project's own
 # `check` script (tsc --noEmit). The expensive half, publishing the language-server payload for five
 # runtime identifiers, is already proven by the Visual Studio lane, which drives the SAME shared
@@ -15,12 +15,12 @@ on:
     push:
         branches: [main]
         paths:
-            - "extensions/Assimalign.Viu.VisualStudioCode/**"
+            - "extensions/VisualStudioCode/**"
             - ".github/workflows/visual-studio-code.yml"
     pull_request:
         branches: [main]
         paths:
-            - "extensions/Assimalign.Viu.VisualStudioCode/**"
+            - "extensions/VisualStudioCode/**"
             - ".github/workflows/visual-studio-code.yml"
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
         runs-on: ubuntu-24.04
         defaults:
             run:
-                working-directory: extensions/Assimalign.Viu.VisualStudioCode
+                working-directory: extensions/VisualStudioCode
         steps:
             - name: Checkout
               # actions/checkout v4

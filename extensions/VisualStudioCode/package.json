@@ -10,7 +10,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/assimalign/viu.git",
-    "directory": "extensions/Assimalign.Viu.VisualStudioCode"
+    "directory": "extensions/VisualStudioCode"
   },
   "engines": {
     "vscode": "^1.85.0"

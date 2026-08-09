@@ -101,14 +101,14 @@ self-contained and single-file per runtime identifier by
 the same shared target the Visual Studio extension uses.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\extensions\Assimalign.Viu.VisualStudioCode\Build.ps1
+powershell -ExecutionPolicy Bypass -File .\extensions\VisualStudioCode\Build.ps1
 ```
 
 That script:
 
 1. publishes the server for every packaged runtime identifier, into
    `_out/extensions/VisualStudioCode/<configuration>/LanguageServer/<rid>/`;
-2. stages each payload into `extensions/Assimalign.Viu.VisualStudioCode/server/<rid>/`;
+2. stages each payload into `extensions/VisualStudioCode/server/<rid>/`;
 3. runs `npm install` and `npm run compile`.
 
 Useful switches:
