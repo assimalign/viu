@@ -10,6 +10,11 @@ component invocations, teleports, and the built-in control nodes — `KeepAliveN
 `SuspenseNode`, and `TransitionNode` each carry a `ComponentInvocation` whose slots stay lazy at
 description time. External renderer-unknown virtual-node subclasses are deliberately unsupported.
 
+`IElementEvent` is the narrow read-only event payload shared by host implementations. Authored
+handlers can read the event name, key, target value, checked state, and multiple-selection values
+through one delegate shape while each host preserves its concrete event identity
+(`[V01.01.11.06]`). Components defines the data contract but no propagation or modifier policy.
+
 The authored contract is `IComponent { ComponentRenderer Setup(ComponentContext) }` with the
 public abstract `ComponentContext` (Bindings, Services, Lifecycle, Scope, WatchScheduler, Parent,
 Emit, Expose, Warn, concrete Watch), `ComponentBase`, `ComponentBindings` and its pure static

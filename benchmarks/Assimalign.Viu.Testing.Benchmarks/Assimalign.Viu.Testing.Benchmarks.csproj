@@ -13,8 +13,9 @@
          is exact and machine-independent — the metric the regression gate compares to a reviewed
          baseline (benchmarks/baselines/InteropCounts.json).
 
-    Real-browser wall-clock, live interop-crossing counts, and per-assembly payload size need the
-    Playwright end-to-end harness ([V01.01.11.03], #87) and are deferred honestly (see
+    The packaged-consumer Playwright harness ([V01.01.11.03], #87) now supplies real-browser
+    publish/serve/drive plumbing. Benchmark-specific wall-clock, live interop-crossing, and
+    per-assembly payload instrumentation remains deferred under #88 (see
     Browser/DeferredBrowserBenchmarks.cs and .github/workflows/benchmarks.yml), never faked.
   -->
   <PropertyGroup>

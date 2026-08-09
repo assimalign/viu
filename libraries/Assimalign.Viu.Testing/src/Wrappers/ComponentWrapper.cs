@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -19,7 +20,7 @@ public sealed class ComponentWrapper : IDisposable
     private readonly MountedComponentView<TestNode>? _mountedView;
     private readonly EmittedEvents _emitted;
     private readonly ScheduledFlush _flush;
-    private readonly Renderer<TestNode> _renderer;
+    private readonly TestRenderer _testRenderer;
     private readonly TestElement _container;
     private readonly bool _ownsMount;
     private bool _isDisposed;
@@ -30,7 +31,7 @@ public sealed class ComponentWrapper : IDisposable
         MountedComponentView<TestNode>? mountedView,
         EmittedEvents emitted,
         ScheduledFlush flush,
-        Renderer<TestNode> renderer,
+        TestRenderer testRenderer,
         TestElement container,
         bool ownsMount)
     {
@@ -40,7 +41,7 @@ public sealed class ComponentWrapper : IDisposable
         Context = mountedView?.Context;
         _emitted = emitted;
         _flush = flush;
-        _renderer = renderer;
+        _testRenderer = testRenderer;
         _container = container;
         _ownsMount = ownsMount;
     }
@@ -146,7 +147,7 @@ public sealed class ComponentWrapper : IDisposable
         where TComponent : class, IComponent
     {
         IReadOnlyList<MountedComponentView<TestNode>> views =
-            _renderer.GetMountedComponentViews(_container);
+            _testRenderer.Renderer.GetMountedComponentViews(_container);
         for (int index = 0; index < views.Count; index++)
         {
             MountedComponentView<TestNode> candidate = views[index];
@@ -159,7 +160,7 @@ public sealed class ComponentWrapper : IDisposable
                     candidate,
                     _emitted,
                     _flush,
-                    _renderer,
+                    _testRenderer,
                     _container,
                     ownsMount: false);
             }
@@ -191,31 +192,66 @@ public sealed class ComponentWrapper : IDisposable
     public IReadOnlyDictionary<string, IReadOnlyList<IReadOnlyList<object?>>> Emitted() =>
         _emitted.All(Context);
 
-    /// <summary>Triggers an event on the first rendered element and drains the scheduler.</summary>
+    /// <summary>Triggers an event without a payload on the first rendered element and drains the scheduler.</summary>
     /// <param name="eventName">The event binding's local name.</param>
-    /// <param name="payload">The optional event payload.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task TriggerAsync(string eventName, object? payload = null)
+    public Task TriggerAsync(string eventName)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
         TestElement element = RootElement()
             ?? throw new InvalidOperationException(
                 "The wrapped host range has no element to trigger.");
-        await TestEventDispatcher.TriggerAsync(element, eventName, payload).ConfigureAwait(false);
-        await _flush.RunAsync().ConfigureAwait(false);
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(element, eventName));
+    }
+
+    /// <summary>Triggers an object payload on the first rendered element and drains the scheduler.</summary>
+    /// <param name="eventName">The event binding's local name.</param>
+    /// <param name="payload">The event payload, which may be null.</param>
+    /// <returns>A task completing after the flush chain.</returns>
+    public Task TriggerAsync(string eventName, object? payload)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(eventName);
+        TestElement element = RootElement()
+            ?? throw new InvalidOperationException(
+                "The wrapped host range has no element to trigger.");
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(element, eventName, payload));
+    }
+
+    /// <summary>
+    /// Dispatches an exact typed portable-event payload and drains deterministic asynchronous work.
+    /// </summary>
+    /// <typeparam name="TEvent">The concrete portable event type.</typeparam>
+    /// <param name="eventName">The event binding's normalized local name.</param>
+    /// <param name="payload">The exact payload delivered to the declared listener.</param>
+    /// <returns>A task completing after the flush chain.</returns>
+    public Task TriggerAsync<TEvent>(string eventName, TEvent payload)
+        where TEvent : IElementEvent
+    {
+        ArgumentException.ThrowIfNullOrEmpty(eventName);
+        ArgumentNullException.ThrowIfNull(payload);
+        TestElement element = RootElement()
+            ?? throw new InvalidOperationException(
+                "The wrapped host range has no element to trigger.");
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(element, eventName, payload));
     }
 
     /// <summary>Sets the first rendered element's value, dispatches input, and drains the scheduler.</summary>
     /// <param name="value">The new host value.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task SetValueAsync(object? value)
+    public Task SetValueAsync(object? value)
     {
         TestElement element = RootElement()
             ?? throw new InvalidOperationException(
                 "The wrapped host range has no element to update.");
         element.SetProperty("value", value);
-        await TestEventDispatcher.TriggerAsync(element, "input", value).ConfigureAwait(false);
-        await _flush.RunAsync().ConfigureAwait(false);
+        TestElementEvent payload = new(
+            "input",
+            Convert.ToString(value, CultureInfo.InvariantCulture));
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(element, "input", payload, value));
     }
 
     /// <summary>Drains the deterministic scheduler through the current next-tick boundary.</summary>
@@ -234,7 +270,7 @@ public sealed class ComponentWrapper : IDisposable
             return;
         }
 
-        _renderer.Render(null, _container);
+        _testRenderer.Render(null, _container);
         _isMounted = false;
     }
 
@@ -252,9 +288,15 @@ public sealed class ComponentWrapper : IDisposable
         }
         finally
         {
-            _flush.Dispose();
-            Scheduler.Reset();
-            _isDisposed = true;
+            try
+            {
+                _flush.Dispose();
+            }
+            finally
+            {
+                Scheduler.Reset();
+                _isDisposed = true;
+            }
         }
     }
 
@@ -300,7 +342,7 @@ public sealed class ComponentWrapper : IDisposable
     private bool IsMounted(MountedComponentView<TestNode> view)
     {
         IReadOnlyList<MountedComponentView<TestNode>> views =
-            _renderer.GetMountedComponentViews(_container);
+            _testRenderer.Renderer.GetMountedComponentViews(_container);
         for (int index = 0; index < views.Count; index++)
         {
             if (ReferenceEquals(views[index], view))

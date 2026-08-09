@@ -59,7 +59,7 @@ runs:
   steps:
     # The single point of CI environment setup stays in setup-dotnet-wasm so the SDK pin, the NuGet
     # cache key, and the wasm-tools workload cannot drift between this action and the workflows that
-    # still call it directly (release.yml, visual-studio.yml, and the parked budget-gates.yml).
+    # still call it directly (release.yml, visual-studio.yml, and budget-gates.yml).
     - name: Set up .NET
       uses: ./.github/actions/setup-dotnet-wasm
       with:

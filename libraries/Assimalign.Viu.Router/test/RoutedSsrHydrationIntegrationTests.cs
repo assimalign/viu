@@ -77,7 +77,7 @@ public sealed class RoutedSsrHydrationIntegrationTests
             Services = services,
         };
         ApplicationContext clientApplication = new(options);
-        TestRenderer renderer = new(
+        using TestRenderer renderer = new(
             new TestRendererOptions
             {
                 SnapshotSemantics = true,

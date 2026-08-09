@@ -37,3 +37,9 @@ static Assimalign.Viu.Components.HydrationStrategy.OnIdle(int? timeoutMillisecon
 static Assimalign.Viu.Components.HydrationStrategy.OnInteraction(params string![]! eventNames) -> Assimalign.Viu.Components.HydrationStrategy!
 static Assimalign.Viu.Components.HydrationStrategy.OnMediaQuery(string! mediaQuery) -> Assimalign.Viu.Components.HydrationStrategy!
 static Assimalign.Viu.Components.HydrationStrategy.OnVisible(string? rootMargin = null) -> Assimalign.Viu.Components.HydrationStrategy!
+Assimalign.Viu.Components.IElementEvent
+Assimalign.Viu.Components.IElementEvent.EventName.get -> string!
+Assimalign.Viu.Components.IElementEvent.Key.get -> string!
+Assimalign.Viu.Components.IElementEvent.SelectedValues.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Assimalign.Viu.Components.IElementEvent.TargetChecked.get -> bool
+Assimalign.Viu.Components.IElementEvent.TargetValue.get -> string?

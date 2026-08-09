@@ -74,9 +74,16 @@ plan proves the relevant structure (`[RND-FLAGS-1]` through `[RND-FLAGS-6]`, `[R
 through `[RND-BLOCK-7]`). Hand-authored trees default to `RenderPlan.None` and remain correct through
 full diff (`[CMP-34]`).
 
+`IElementEvent` is the portable payload boundary between an authored event handler and a concrete
+host. It contains only read-only values available from both Browser and DOM-free Testing; the host
+passes its existing concrete payload through the interface without conversion or reflection.
+Browser-only response intents and modifier policy remain outside Components
+(`[V01.01.11.06]`).
+
 ## Non-goals
 
 Components does not mount or patch trees, schedule updates, implement built-ins, serialize HTML,
-interpret DOM events, own application lifetime, discover constructors, or provide an ambient
-hierarchical dependency API. Scoped style identity is absent from the component contract; generated
-native elements carry an ordinary static attribute instead (`[CMP-24]`, `[STY-1]`).
+interpret event propagation or browser modifiers, own application lifetime, discover constructors,
+or provide an ambient hierarchical dependency API. Scoped style identity is absent from the
+component contract; generated native elements carry an ordinary static attribute instead
+(`[CMP-24]`, `[STY-1]`).

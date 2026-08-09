@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu.Browser;
 
 /// <summary>
@@ -139,15 +141,19 @@ internal sealed class BrowserEventInvokerRegistry
         {
             // Reflection-free dispatch; a multicast delegate of either shape invokes every
             // merged target natively (MergeProperties chains same-typed handlers). The
-            // Action<object?> case MUST precede Action<BrowserEvent>: Action<T> is contravariant, so
-            // Action<object?> is a *subtype* of Action<BrowserEvent> (an object-taking handler can
-            // stand in for a BrowserEvent-taking one) — ordering it after would make it unreachable
-            // and silently feed RouterLink the BrowserEvent instead of its RouterLinkClickEvent.
+            // Wider Action<T> and Func<T, Task> cases MUST precede the concrete BrowserEvent cases:
+            // their input is contravariant. Object handlers also retain the renderer-agnostic
+            // bridge payload, while IElementEvent handlers receive this exact BrowserEvent.
             switch (handler)
             {
                 case Func<object?, Task> asynchronousObjectHandler:
                     InvokeAsynchronousObjectHandler(
                         asynchronousObjectHandler,
+                        browserEvent);
+                    break;
+                case Func<IElementEvent, Task> asynchronousElementEventHandler:
+                    InvokeAsynchronousElementEventHandler(
+                        asynchronousElementEventHandler,
                         browserEvent);
                     break;
                 case Func<BrowserEvent, Task> asynchronousTypedHandler:
@@ -177,6 +183,9 @@ internal sealed class BrowserEventInvokerRegistry
                             + "component events.");
                     }
                     break;
+                case Action<IElementEvent> elementEventHandler:
+                    elementEventHandler(browserEvent);
+                    break;
                 case Action<BrowserEvent> typedHandler:
                     typedHandler(browserEvent);
                     break;
@@ -187,7 +196,8 @@ internal sealed class BrowserEventInvokerRegistry
                     throw new NotSupportedException(
                         $"Event handler for '{browserEvent.EventName}' is a "
                         + $"{handler.GetType().Name}; handlers must be Action, "
-                        + "Action<BrowserEvent>, Action<object?>, Func<Task>, "
+                        + "Action<IElementEvent>, Action<BrowserEvent>, Action<object?>, "
+                        + "Func<Task>, Func<IElementEvent, Task>, "
                         + "Func<BrowserEvent, Task>, or Func<object?, Task>.");
             }
         }
@@ -230,6 +240,16 @@ internal sealed class BrowserEventInvokerRegistry
         foreach (Delegate invocation in handler.GetInvocationList())
         {
             ObserveTask(((Func<BrowserEvent, Task>)invocation)(browserEvent));
+        }
+    }
+
+    private void InvokeAsynchronousElementEventHandler(
+        Func<IElementEvent, Task> handler,
+        BrowserEvent browserEvent)
+    {
+        foreach (Delegate invocation in handler.GetInvocationList())
+        {
+            ObserveTask(((Func<IElementEvent, Task>)invocation)(browserEvent));
         }
     }
 

@@ -1,0 +1,118 @@
+<template>
+    <main id="home-view" data-testid="home-view">
+        <h1 data-testid="route-heading">Home route</h1>
+        <RouterLink to="/second" data-testid="route-second">Open second route</RouterLink>
+
+        <section aria-label="Reactive update">
+            <p data-testid="count-value">{{ Count }}</p>
+            <button type="button" data-testid="increment" @click="Increment">Increment</button>
+        </section>
+
+        <section aria-label="Model round trip">
+            <label for="model-input">Model value</label>
+            <input id="model-input" data-testid="model-input" v-model="Model" />
+            <p data-testid="model-output">{{ ModelText }}</p>
+        </section>
+
+        <section aria-label="Keyed list">
+            <button type="button" data-testid="reorder" @click="Reorder">Reverse keyed items</button>
+            <ol data-testid="keyed-list">
+                <li v-for="item in Items" :key="item" :data-item="item">{{ item }}</li>
+            </ol>
+        </section>
+
+        <section aria-label="Component cleanup">
+            <button type="button" data-testid="toggle-child" @click="ToggleChild">
+                Toggle mounted child
+            </button>
+            <CleanupProbe v-if="ShowChild" />
+            <button type="button" data-testid="capture-diagnostics" @click="CaptureDiagnostics">
+                Capture registry diagnostics
+            </button>
+            <p data-testid="registry-diagnostics">{{ RegistryDiagnostics }}</p>
+            <p data-testid="registry-capture-generation">{{ RegistryCaptureGeneration }}</p>
+        </section>
+
+        <section aria-label="Scheduler ordering">
+            <button type="button" data-testid="next-tick" @click="VerifyNextTick">
+                Verify NextTick ordering
+            </button>
+            <p data-testid="next-tick-result">{{ NextTickResult }}</p>
+        </section>
+    </main>
+</template>
+
+@script {
+    using System.Collections.Generic;
+    using System.Threading.Tasks;
+
+    using Assimalign.Viu;
+    using Assimalign.Viu.Browser;
+    using Assimalign.Viu.Reactivity;
+
+    private readonly Reference<int> CountReference = Reactive.Reference(0);
+    private readonly Reference<object?> ModelReference = Reactive.Reference<object?>("initial");
+    private readonly Reference<bool> ShowChildReference = Reactive.Reference(true);
+    private readonly Reference<string> NextTickResultReference =
+        Reactive.Reference("not-run");
+    private readonly Reference<string> RegistryDiagnosticsReference =
+        Reactive.Reference("not-captured");
+    private readonly Reference<int> RegistryCaptureGenerationReference =
+        Reactive.Reference(0);
+    private readonly ReactiveList<string> ItemList = new(["alpha", "beta", "gamma"]);
+    private int LastCommittedCount;
+
+    public int Count => CountReference.Value;
+
+    public Reference<object?> Model => ModelReference;
+
+    public string ModelText => ModelReference.Value?.ToString() ?? string.Empty;
+
+    public IReadOnlyList<string> Items => ItemList;
+
+    public bool ShowChild => ShowChildReference.Value;
+
+    public string NextTickResult => NextTickResultReference.Value;
+
+    public string RegistryDiagnostics => RegistryDiagnosticsReference.Value;
+
+    public int RegistryCaptureGeneration => RegistryCaptureGenerationReference.Value;
+
+    partial void OnSetup()
+    {
+        Context!.Lifecycle.OnUpdated(
+            () => LastCommittedCount = CountReference.Value);
+    }
+
+    private void Increment() => CountReference.Value++;
+
+    private void Reorder()
+    {
+        using (Reactive.Batch())
+        {
+            string first = ItemList[0];
+            ItemList[0] = ItemList[2];
+            ItemList[2] = first;
+        }
+    }
+
+    private void ToggleChild() => ShowChildReference.Value = !ShowChildReference.Value;
+
+    private void CaptureDiagnostics()
+    {
+        (int javaScriptNodes, int javaScriptListenerMaps, int managedListeners) =
+            BrowserRuntime.GetRegistryDiagnostics();
+        RegistryDiagnosticsReference.Value =
+            $"{javaScriptNodes}|{javaScriptListenerMaps}|{managedListeners}";
+        RegistryCaptureGenerationReference.Value++;
+    }
+
+    private async Task VerifyNextTick()
+    {
+        CountReference.Value++;
+        await Scheduler.NextTickAsync();
+        NextTickResultReference.Value = LastCommittedCount == CountReference.Value
+            ? "rendered-before-next-tick"
+            : "next-tick-before-render";
+    }
+}

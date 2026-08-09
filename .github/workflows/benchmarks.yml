@@ -10,9 +10,9 @@
 #   - timings: BenchmarkDotNet wall-clock numbers are environment-relative and noisy, so this lane is
 #     opt-in (workflow_dispatch or the 'benchmark-run' label), never a gate — the AOT-lane cost-control
 #     pattern. It publishes results as artifacts.
-#   - browser: WIRED-BUT-SKIPPED. Real-browser wall-clock, live command-buffer crossings, and per-assembly
-#     payload size need the Playwright e2e harness ([V01.01.11.03], #87); enabled by the repository
-#     variable ENABLE_BROWSER_BENCHMARKS once it lands (never faked).
+#   - browser: WIRED-BUT-SKIPPED. The packaged-consumer Playwright harness exists, but #88 still needs
+#     benchmark-specific timing, live command-buffer, and per-assembly payload instrumentation before
+#     this lane can produce reviewed measurements. ENABLE_BROWSER_BENCHMARKS remains the explicit guard.
 name: benchmarks
 
 on:
@@ -144,13 +144,13 @@ jobs:
           if-no-files-found: ignore
 
   browser:
-    name: real-browser benchmarks (deferred, #87)
-    # WIRED-BUT-SKIPPED. The real-browser axes (wall-clock incl. interop init, live command-buffer
-    # boundary-crossing counts, per-assembly published payload size) depend on the Playwright e2e harness
-    # ([V01.01.11.03], #87). No measurement is faked; the lane turns on once that harness lands by setting
-    # the repository variable ENABLE_BROWSER_BENCHMARKS=true (the startup-gate pattern from the parked budget-gates.yml).
-    # TODO([V01.01.11.03], #87): publish the benchmark app trimmed, serve wwwroot, drive it headless in
-    # Chromium/Firefox/WebKit measuring per-scenario time + command-buffer crossings + payload size.
+    name: real-browser benchmarks (instrumentation deferred, #88)
+    # WIRED-BUT-SKIPPED. [V01.01.11.03]/#87 now supplies packaged publication, serving, headless
+    # Chromium/Firefox/WebKit execution, and diagnostics. #88 still must adapt the benchmark app and
+    # define reviewed collection/reporting for scenario time, command-buffer crossings, and payload size.
+    # No measurement is faked; enable only after that instrumentation lands.
+    # TODO([V01.01.11.04], #88): connect the benchmark scenarios to the real-browser harness and emit
+    # the timing, crossing-count, and per-assembly payload result models.
     if: ${{ vars.ENABLE_BROWSER_BENCHMARKS == 'true' }}
     runs-on: ubuntu-24.04
     steps:

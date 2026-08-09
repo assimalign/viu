@@ -1886,9 +1886,10 @@ it move together.
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
 | `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
 | `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; a Browser-SDK app consumes and mounts the packed component, flows its stylesheet, and passes Build, trimmed publish, and AOT publish |
-| `scripts/Measure-PublishBudget.ps1` + `scripts/budgets/PublishBudgets.json` | WASM publish size and startup budgets |
+| `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
-| `.github/workflows/area-*.yml`, `benchmarks.yml` | Per-area CI (`budget-gates.yml` is parked under `.github/workflows-disabled/`) |
+| `.github/workflows/area-*.yml` and `benchmarks.yml` | Live per-area CI plus the interop budget gate |
+| `.github/workflows/budget-gates.yml` | Live pull-request trimmed-publish/size and trim-warning checks, with scheduled/on-demand WebAssembly AOT and real-browser `boot-to-interactive` startup lanes |
 
 `[CONF-3]` Unit tests are **DOM-free by default**. The runtime is exercised through
 `Assimalign.Viu.Testing`'s in-memory host; real-browser coverage is a separate end-to-end harness.

@@ -111,11 +111,14 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
    bag. Components use setup closures; conventions attach through services and the ambient reactive
    scope. Recorded as a founding ADR and refined by `[V01.01.15]`.
 6. **Trimming/AOT-safe everywhere.** No reflection-based serialization, no dynamic codegen, and no
-   linker-unfriendly activation. Representative build, trimming, AOT, size, and startup checks
-   remain part of the delivery contract, but the budget workflow is currently parked at
-   [`.github/workflows-disabled/budget-gates.yml`](../.github/workflows-disabled/budget-gates.yml)
-   and does not gate CI. Published-size and trim-warning regressions are therefore unguarded today;
-   restoring the gates is tracked as a Documentation/Tooling work item.
+   linker-unfriendly activation. The publish budgets are live CI gates in
+   [`budget-gates.yml`](../.github/workflows/budget-gates.yml): trimmed payload size and trim
+   warnings on relevant pull requests, WebAssembly AOT publication and real-browser
+   `boot-to-interactive` startup on scheduled/on-demand lanes — all enforced against the measured
+   `EndToEndBrowserApp` baselines and reviewed ceilings in `scripts/budgets/PublishBudgets.json`
+   (re-baselined 2026-08-09 under `[V01.01.12.26]`/#320 and `[V01.01.12.06.01]`/#182; CI never
+   rewrites the manifest). Deterministic interop counts remain a per-PR gate in `benchmarks.yml`
+   under [RND-IO-5].
 7. **Cohesion integration at MVP.** Viu will integrate with the Cohesion platform
    (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process
    (tracked as `V01.01.12.08`, #104, now narrowed to the hosting integration — the packaging half
@@ -168,14 +171,14 @@ Work is tracked exactly like the sibling Cohesion repo:
 | --- | --- | --- |
 | **W01** | Rendering, reactivity, browser-host, testing, solution, and CI foundations are delivered; every planned feature row is closed | No planned feature row remains |
 | **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
-| **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered | Complete deferred compiler optimizations and diagnostic source attribution, then restore publish-size, trimming, and startup budget enforcement; startup timing still depends on the browser harness |
+| **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered; the size/startup budget gates are live against measured `EndToEndBrowserApp` baselines | Complete deferred compiler optimizations and diagnostic source attribution |
 | **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; generated trees and compiled SSR now share static scoped-style attributes | Close built-in edge cases, generated State/source-map work, hosted and multi-bundle CSS delivery, and the deferred reactive scoped-CSS runtime |
-| **W05** | Host-neutral component-library and Browser SDK/framework segments, browser packaging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, editor hot-reload metadata, and a working `dotnet watch` CSS/component path exist | Finish lazy routing, runtime inspection, the browser harness, templates and the productized development loop, release automation, payload accounting, compatibility/conformance gates, Cohesion hosting integration, and automatic server-profile selection once a server SDK topology exists |
+| **W05** | Host-neutral component-library and Browser SDK/framework segments, browser packaging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, editor hot-reload metadata, a working `dotnet watch` CSS/component path, the real-browser end-to-end harness, and live size/startup budget gates exist | Finish lazy routing, runtime inspection, templates and the productized development loop, release automation, compatibility/conformance gates, Cohesion hosting integration, and automatic server-profile selection once a server SDK topology exists |
 | **W06** | Utility composition and semantic `@script` language-server work have begun | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
-This snapshot reconciles the plan with live issue state on 2026-08-09. Newly tracked follow-ups for
-scoped CSS, budget-gate restoration, and deferred compiler optimization are grouped with their
-closest delivery themes here; Project #15 remains authoritative for their Wave custom fields.
+This snapshot reconciles the plan with live issue state on 2026-08-09. The budget-gate activation,
+scoped-CSS follow-ups, and deferred compiler optimization are grouped with their closest delivery
+themes here; Project #15 remains authoritative for their Wave custom fields.
 
 ### [V01.01.14] API hardening — complete
 

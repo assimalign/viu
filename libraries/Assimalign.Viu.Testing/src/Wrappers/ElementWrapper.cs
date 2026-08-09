@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
+
+using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Testing;
 
@@ -91,24 +94,53 @@ public sealed class ElementWrapper
         return matches;
     }
 
-    /// <summary>Dispatches a host event and drains the deterministic scheduler.</summary>
+    /// <summary>Dispatches a host event without a payload and drains the deterministic scheduler.</summary>
     /// <param name="eventName">The event binding's local name.</param>
-    /// <param name="payload">The optional event payload.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task TriggerAsync(string eventName, object? payload = null)
+    public Task TriggerAsync(string eventName)
     {
         ArgumentException.ThrowIfNullOrEmpty(eventName);
-        await TestEventDispatcher.TriggerAsync(_element, eventName, payload).ConfigureAwait(false);
-        await _flush.RunAsync().ConfigureAwait(false);
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(_element, eventName));
+    }
+
+    /// <summary>Dispatches an object payload and drains the deterministic scheduler.</summary>
+    /// <param name="eventName">The event binding's local name.</param>
+    /// <param name="payload">The event payload, which may be null.</param>
+    /// <returns>A task completing after the flush chain.</returns>
+    public Task TriggerAsync(string eventName, object? payload)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(eventName);
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(_element, eventName, payload));
+    }
+
+    /// <summary>
+    /// Dispatches an exact typed portable-event payload and drains deterministic asynchronous work.
+    /// </summary>
+    /// <typeparam name="TEvent">The concrete portable event type.</typeparam>
+    /// <param name="eventName">The event binding's normalized local name.</param>
+    /// <param name="payload">The exact payload delivered to the declared listener.</param>
+    /// <returns>A task completing after the flush chain.</returns>
+    public Task TriggerAsync<TEvent>(string eventName, TEvent payload)
+        where TEvent : IElementEvent
+    {
+        ArgumentException.ThrowIfNullOrEmpty(eventName);
+        ArgumentNullException.ThrowIfNull(payload);
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(_element, eventName, payload));
     }
 
     /// <summary>Sets the host value property, dispatches input, and drains the scheduler.</summary>
     /// <param name="value">The new host value.</param>
     /// <returns>A task completing after the flush chain.</returns>
-    public async Task SetValueAsync(object? value)
+    public Task SetValueAsync(object? value)
     {
         _element.SetProperty("value", value);
-        await TestEventDispatcher.TriggerAsync(_element, "input", value).ConfigureAwait(false);
-        await _flush.RunAsync().ConfigureAwait(false);
+        TestElementEvent payload = new(
+            "input",
+            Convert.ToString(value, CultureInfo.InvariantCulture));
+        return _flush.RunAsync(
+            () => TestEventDispatcher.TriggerAsync(_element, "input", payload, value));
     }
 }

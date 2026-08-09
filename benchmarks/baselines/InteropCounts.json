@@ -28,7 +28,14 @@
     "CreateText + Insert, and the benchmark rows carry two text cells. Every update scenario",
     "(update-every-10th, swap-rows, select-row, remove-row, clear-1000) is unchanged, so diff",
     "precision is intact. Whether a fast-text mount path should return is tracked as discovered work",
-    "under the RuntimeCore area rather than silently absorbed here."
+    "under the RuntimeCore area rather than silently absorbed here.",
+    "",
+    "Restoration verification 2026-08-09 ([V01.01.12.26], #320): the current working tree was first",
+    "built in Release with the .NET SDK 10.0.302, then the exact emitted executable ran 'interop",
+    "--gate --results _out/benchmarks/interop-w53-current-results.json' with --no-build. All nine",
+    "Optimized scenarios measured exactly at their reviewed ceilings (delta +0), so no count or",
+    "ceiling changed. The build used only scoped local-gate suppressions for the sandbox's cached",
+    "NU1900 audit replay and the pre-existing RS0026 optional-overload warning."
   ],
   "scenarios": [
     {

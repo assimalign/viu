@@ -1,0 +1,60 @@
+# Packaged-consumer, real-browser coverage ([V01.01.11.03], #87). The matrix is
+# intentionally scheduled/on-demand because three trimmed WebAssembly publications and
+# three browser engines are too expensive for the pull-request critical path.
+name: end-to-end browsers
+
+on:
+  workflow_dispatch:
+    inputs:
+      browser_engine:
+        description: Browser engine to exercise
+        required: true
+        default: All
+        type: choice
+        options:
+          - All
+          - Chromium
+          - Firefox
+          - WebKit
+  schedule:
+    - cron: '17 7 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  packaged-browser:
+    name: packaged browser (${{ github.event_name == 'workflow_dispatch' && inputs.browser_engine || 'All' }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET and wasm-tools
+        uses: ./.github/actions/setup-dotnet-wasm
+        with:
+          install-wasm-tools: 'true'
+
+      - name: Run packaged browser scenarios
+        shell: pwsh
+        run: |
+          ./scripts/Test-EndToEnd.ps1 `
+            -BrowserEngine '${{ github.event_name == 'workflow_dispatch' && inputs.browser_engine || 'All' }}' `
+            -Configuration Release
+
+      - name: Upload traces, screenshots, and result summaries
+        if: always()
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: end-to-end-browser-results
+          path: _out/test-results/end-to-end/**
+          if-no-files-found: warn

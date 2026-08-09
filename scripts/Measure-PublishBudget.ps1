@@ -7,11 +7,13 @@
 .DESCRIPTION
     Every published byte is network payload for a WebAssembly app, so a
     per-sample brotli budget is the enforcement mechanism for the framework's
-    source-generator-first, reflection-free architecture ([V01.01.12.06], #95).
+    source-generator-first, reflection-free architecture ([V01.01.12.06], #95;
+    restored by [V01.01.12.26], #320).
 
     The gate is deterministic and cross-platform (Windows local + GitHub Actions
-    ubuntu runners): it shells out to `dotnet publish` and computes brotli sizes
-    with the in-box .NET compression APIs, so it needs no external tooling beyond
+    ubuntu runners): it uses the sample's isolated publish script when the manifest
+    declares one, otherwise it shells out to `dotnet publish`, then computes brotli
+    sizes with the in-box .NET compression APIs. It needs no external tooling beyond
     the .NET SDK and the wasm-tools workload.
 
     Trimming is configured by each packaged-consumer sample project rather than a
@@ -57,6 +59,12 @@
     When supplied, a prior results JSON (typically the base branch) whose per-sample
     sizes are shown as a delta column in the report.
 
+.PARAMETER BaselineManifestPath
+    When supplied, reads baselineCompressedPublishSizeBytes from another revision's
+    budget manifest. This lets pull-request CI report a base-branch delta without
+    publishing the base revision a second time. A measured BaselineResultsPath takes
+    precedence. The current manifest's reviewed baseline is the fallback.
+
 .PARAMETER NoGate
     Measure and report only; never set a failing exit code. Used for the base-branch
     measurement, which is informational, not a gate.
@@ -78,6 +86,7 @@ param(
     [string] $RepositoryRoot,
     [string] $ResultsPath,
     [string] $BaselineResultsPath,
+    [string] $BaselineManifestPath,
     [switch] $NoGate,
     [string] $PublishOutputRoot
 )
@@ -89,12 +98,20 @@ $scriptRoot = $PSScriptRoot
 if (-not $RepositoryRoot) {
     $RepositoryRoot = Split-Path $scriptRoot -Parent
 }
-$RepositoryRoot = (Resolve-Path $RepositoryRoot).Path
+$RepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 if (-not $ManifestPath) {
     $ManifestPath = Join-Path $scriptRoot 'budgets/PublishBudgets.json'
 }
 if (-not $PublishOutputRoot) {
     $PublishOutputRoot = Join-Path $RepositoryRoot '_out/budgets'
+}
+$repositoryOutputRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $RepositoryRoot '_out'))
+$pathComparison = if ([System.OperatingSystem]::IsWindows()) {
+    [System.StringComparison]::OrdinalIgnoreCase
+}
+else {
+    [System.StringComparison]::Ordinal
 }
 
 # Files the browser never downloads on its own: pre-compressed duplicates the SDK
@@ -131,6 +148,128 @@ function Format-SignedBytes {
     return ($sign + (Format-Bytes ([Math]::Abs($Bytes))))
 }
 
+function Test-IsPathChildOf {
+    param(
+        [string] $Path,
+        [string] $ParentPath)
+    $parentPrefix = $ParentPath.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) +
+        [System.IO.Path]::DirectorySeparatorChar
+    return $Path.StartsWith(
+        $parentPrefix,
+        $pathComparison)
+}
+
+function Assert-NoReparsePointInDirectoryTree {
+    param([string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $root = Get-Item -LiteralPath $Path -Force
+    if (-not $root.PSIsContainer) {
+        Exit-WithError "Publish output target is not a directory: $Path"
+    }
+    $pending = [System.Collections.Generic.Stack[System.IO.DirectoryInfo]]::new()
+    $pending.Push($root)
+    while ($pending.Count -gt 0) {
+        $directory = $pending.Pop()
+        if (($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            Exit-WithError "Publish output cannot contain a reparse point: $($directory.FullName)"
+        }
+        foreach ($child in Get-ChildItem -LiteralPath $directory.FullName -Force) {
+            if (($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                Exit-WithError "Publish output cannot contain a reparse point: $($child.FullName)"
+            }
+            if ($child.PSIsContainer) {
+                $pending.Push($child)
+            }
+        }
+    }
+}
+
+function Resolve-SafePublishOutputDirectory {
+    param([string] $SampleName)
+    $repositoryRootItem = Get-Item -LiteralPath $RepositoryRoot -Force
+    if (-not $repositoryRootItem.PSIsContainer -or
+        ($repositoryRootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        Exit-WithError "RepositoryRoot must be a normal directory: $RepositoryRoot"
+    }
+
+    $publishRootPath = [System.IO.Path]::GetFullPath($PublishOutputRoot)
+    if (-not (Test-IsPathChildOf -Path $publishRootPath -ParentPath $repositoryOutputRoot)) {
+        Exit-WithError "PublishOutputRoot must be a child of repository _out: $publishRootPath"
+    }
+
+    $currentPath = $publishRootPath
+    while ($currentPath -and
+        (Test-IsPathChildOf -Path $currentPath -ParentPath $repositoryOutputRoot)) {
+        if (Test-Path -LiteralPath $currentPath) {
+            $currentItem = Get-Item -LiteralPath $currentPath -Force
+            if (-not $currentItem.PSIsContainer) {
+                Exit-WithError "Publish output ancestor is not a directory: $currentPath"
+            }
+            if (($currentItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                Exit-WithError "Publish output ancestor cannot be a reparse point: $currentPath"
+            }
+        }
+        $currentPath = [System.IO.Path]::GetDirectoryName($currentPath)
+    }
+    if (Test-Path -LiteralPath $repositoryOutputRoot) {
+        $repositoryOutputItem = Get-Item -LiteralPath $repositoryOutputRoot -Force
+        if (-not $repositoryOutputItem.PSIsContainer -or
+            ($repositoryOutputItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            Exit-WithError "Repository _out must be a normal directory: $repositoryOutputRoot"
+        }
+    }
+
+    $outputDirectory = [System.IO.Path]::GetFullPath(
+        (Join-Path $publishRootPath $SampleName))
+    if (-not (Test-IsPathChildOf -Path $outputDirectory -ParentPath $publishRootPath)) {
+        Exit-WithError "Sample name resolves outside PublishOutputRoot: $SampleName"
+    }
+    return $outputDirectory
+}
+
+function Resolve-SafeFileWritePath {
+    param(
+        [string] $Path,
+        [string] $ParameterName)
+    $resolvedPath = [System.IO.Path]::GetFullPath($Path)
+    if (Test-Path -LiteralPath $resolvedPath) {
+        $targetItem = Get-Item -LiteralPath $resolvedPath -Force
+        if ($targetItem.PSIsContainer) {
+            Exit-WithError "$ParameterName is a directory, not a file: $resolvedPath"
+        }
+        if (($targetItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            Exit-WithError "$ParameterName cannot be a reparse point: $resolvedPath"
+        }
+    }
+
+    $currentDirectory = [System.IO.Path]::GetDirectoryName($resolvedPath)
+    while (-not [string]::IsNullOrWhiteSpace($currentDirectory)) {
+        if (Test-Path -LiteralPath $currentDirectory) {
+            $directoryItem = Get-Item -LiteralPath $currentDirectory -Force
+            if (-not $directoryItem.PSIsContainer) {
+                Exit-WithError "$ParameterName ancestor is not a directory: $currentDirectory"
+            }
+            if (($directoryItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                Exit-WithError "$ParameterName ancestor cannot be a reparse point: $currentDirectory"
+            }
+        }
+        $parentDirectory = [System.IO.Path]::GetDirectoryName($currentDirectory)
+        if ([string]::Equals(
+                $parentDirectory,
+                $currentDirectory,
+                $pathComparison)) {
+            break
+        }
+        $currentDirectory = $parentDirectory
+    }
+    return $resolvedPath
+}
+
 function Get-BrotliByteCount {
     param([string] $Path)
     # Model the bytes on the wire: each asset is compressed independently, at the
@@ -159,7 +298,7 @@ function Measure-PayloadDirectory {
     $compressed = [long] 0
     $raw = [long] 0
     $fileCount = 0
-    $files = Get-ChildItem -Path $PayloadRoot -Recurse -File
+    $files = Get-ChildItem -LiteralPath $PayloadRoot -Recurse -File
     foreach ($file in $files) {
         if ($excludedPayloadExtensions -contains $file.Extension.ToLowerInvariant()) {
             continue
@@ -180,7 +319,7 @@ function Resolve-PayloadRoot {
     # WebAssembly publish output places the browser payload under wwwroot; if a
     # sample ever publishes a flat payload we fall back to the publish root.
     $wwwroot = Join-Path $PublishRoot 'wwwroot'
-    if (Test-Path $wwwroot) {
+    if (Test-Path -LiteralPath $wwwroot -PathType Container) {
         return $wwwroot
     }
     return $PublishRoot
@@ -189,11 +328,27 @@ function Resolve-PayloadRoot {
 function Invoke-SamplePublish {
     param(
         [string] $ProjectPath,
-        [string] $OutputDirectory)
-    if (Test-Path $OutputDirectory) {
-        Remove-Item -Recurse -Force $OutputDirectory
+        [string] $OutputDirectory,
+        [string] $PublishScriptPath)
+
+    if ($PublishScriptPath) {
+        # Browser SDK fixtures need an isolated global.json, NuGet configuration,
+        # and package cache. Their tracked project must not be evaluated under the
+        # repository's build root, so the end-to-end harness owns that boundary.
+        Write-Report "  publishing $ProjectPath through $PublishScriptPath (trimmed, $Configuration)"
+        & $PublishScriptPath `
+            -PublishOnly `
+            -PublishDirectory $OutputDirectory `
+            -Configuration $Configuration
+        return
     }
-    New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
+
+    if (Test-Path -LiteralPath $OutputDirectory) {
+        Assert-NoReparsePointInDirectoryTree -Path $OutputDirectory
+        Write-Report "  clearing validated publish output $OutputDirectory"
+        Remove-Item -LiteralPath $OutputDirectory -Recurse -Force
+    }
+    [System.IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
 
     # Trimming is enabled by the packaged-consumer project. -warnaserror doubles
     # as the trimming-validation gate: any ILLink/trim-analyzer warning fails here.
@@ -209,10 +364,10 @@ function Invoke-SamplePublish {
 
 # --- Load the manifest ----------------------------------------------------------
 
-if (-not (Test-Path $ManifestPath)) {
+if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
     Exit-WithError "Budget manifest not found: $ManifestPath"
 }
-$manifest = Get-Content -Raw $ManifestPath | ConvertFrom-Json
+$manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
 $samples = @($manifest.samples)
 if ($SampleName) {
     $samples = @($samples | Where-Object { $SampleName -contains $_.name })
@@ -228,8 +383,18 @@ if ($PublishDirectory -and $samples.Count -gt 1) {
 }
 
 $baseline = $null
-if ($BaselineResultsPath -and (Test-Path $BaselineResultsPath)) {
-    $baseline = Get-Content -Raw $BaselineResultsPath | ConvertFrom-Json
+if ($BaselineResultsPath) {
+    if (-not (Test-Path -LiteralPath $BaselineResultsPath -PathType Leaf)) {
+        Exit-WithError "Baseline results not found: $BaselineResultsPath"
+    }
+    $baseline = Get-Content -Raw -LiteralPath $BaselineResultsPath | ConvertFrom-Json
+}
+$baselineManifest = $null
+if ($BaselineManifestPath) {
+    if (-not (Test-Path -LiteralPath $BaselineManifestPath -PathType Leaf)) {
+        Exit-WithError "Baseline manifest not found: $BaselineManifestPath"
+    }
+    $baselineManifest = Get-Content -Raw -LiteralPath $BaselineManifestPath | ConvertFrom-Json
 }
 
 # --- Measure --------------------------------------------------------------------
@@ -242,12 +407,24 @@ foreach ($sample in $samples) {
     }
     else {
         $projectPath = Join-Path $RepositoryRoot $sample.project
-        if (-not (Test-Path $projectPath)) {
+        if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
             Exit-WithError "Sample project not found: $projectPath"
         }
-        $outputDirectory = Join-Path $PublishOutputRoot $sample.name
+        $publishScriptPath = $null
+        $publishScriptProperty = $sample.PSObject.Properties['publishScript']
+        if ($publishScriptProperty -and
+            -not [string]::IsNullOrWhiteSpace([string] $publishScriptProperty.Value)) {
+            $publishScriptPath = Join-Path $RepositoryRoot ([string] $publishScriptProperty.Value)
+            if (-not (Test-Path -LiteralPath $publishScriptPath -PathType Leaf)) {
+                Exit-WithError "Sample publish script not found: $publishScriptPath"
+            }
+        }
+        $outputDirectory = Resolve-SafePublishOutputDirectory -SampleName $sample.name
         try {
-            Invoke-SamplePublish -ProjectPath $projectPath -OutputDirectory $outputDirectory
+            Invoke-SamplePublish `
+                -ProjectPath $projectPath `
+                -OutputDirectory $outputDirectory `
+                -PublishScriptPath $publishScriptPath
         }
         catch {
             Exit-WithError "$($_.Exception.Message)"
@@ -255,11 +432,34 @@ foreach ($sample in $samples) {
         $payloadRoot = Resolve-PayloadRoot $outputDirectory
     }
 
+    if (-not (Test-Path -LiteralPath $payloadRoot -PathType Container)) {
+        Exit-WithError "Published payload directory not found: $payloadRoot"
+    }
     $measurement = Measure-PayloadDirectory $payloadRoot
     $actualBytes = [long] $measurement.CompressedPublishSizeBytes
     $withinBudget = $actualBytes -le $budgetBytes
 
-    $baselineBytes = $null
+    $sampleBaselineProperty = $sample.PSObject.Properties['baselineCompressedPublishSizeBytes']
+    $baselineBytes = if ($sampleBaselineProperty -and $null -ne $sampleBaselineProperty.Value) {
+        [long] $sample.baselineCompressedPublishSizeBytes
+    }
+    else {
+        $null
+    }
+    if ($baselineManifest) {
+        $baselineManifestSample = $baselineManifest.samples |
+            Where-Object { $_.name -eq $sample.name } |
+            Select-Object -First 1
+        $baselineManifestProperty = if ($baselineManifestSample) {
+            $baselineManifestSample.PSObject.Properties['baselineCompressedPublishSizeBytes']
+        }
+        else {
+            $null
+        }
+        if ($baselineManifestProperty -and $null -ne $baselineManifestProperty.Value) {
+            $baselineBytes = [long] $baselineManifestSample.baselineCompressedPublishSizeBytes
+        }
+    }
     if ($baseline) {
         $baselineSample = $baseline.samples | Where-Object { $_.name -eq $sample.name } | Select-Object -First 1
         if ($baselineSample) {
@@ -274,6 +474,7 @@ foreach ($sample in $samples) {
             budgetBytes                = $budgetBytes
             withinBudget               = $withinBudget
             headroomBytes              = ($budgetBytes - $actualBytes)
+            deltaOverBudgetBytes       = [Math]::Max(0, $actualBytes - $budgetBytes)
             fileCount                  = $measurement.FileCount
             baselineBytes              = $baselineBytes
         }) | Out-Null
@@ -311,7 +512,23 @@ $passedCount = $measuredCount - $overCount
 Write-Report ("Result: {0} ({1}/{2} within budget)" -f (($overCount -eq 0) ? 'PASS' : 'FAIL'), $passedCount, $measuredCount)
 if ($overCount -gt 0) {
     Write-Report ''
-    Write-Report 'A sample exceeded its budget. This is a deliberate-decision gate:'
+    foreach ($result in $results | Where-Object { -not $_.withinBudget }) {
+        $baselineDelta = 'n/a'
+        if ($null -ne $result.baselineBytes) {
+            $baselineDelta = Format-SignedBytes `
+                ($result.compressedPublishSizeBytes - $result.baselineBytes)
+        }
+        $failure = '{0} compressedPublishSizeBytes exceeded by {1} (actual {2}; budget {3}; delta vs base {4})' -f `
+            $result.name,
+            (Format-Bytes $result.deltaOverBudgetBytes),
+            (Format-Bytes $result.compressedPublishSizeBytes),
+            (Format-Bytes $result.budgetBytes),
+            $baselineDelta
+        Write-Report "::error title=Publish budget exceeded::$failure"
+        Write-Report "ERROR: $failure"
+    }
+    Write-Report ''
+    Write-Report 'A sample exceeded its reviewed budget. This is a deliberate-decision gate:'
     Write-Report '  - reduce the payload, or'
     Write-Report "  - raise the budget in $ManifestPath as a reviewed change (no silent ratcheting)."
 }
@@ -319,15 +536,18 @@ if ($overCount -gt 0) {
 # --- Machine-readable results ---------------------------------------------------
 
 if ($ResultsPath) {
-    $resultsDirectory = Split-Path $ResultsPath -Parent
-    if ($resultsDirectory -and -not (Test-Path $resultsDirectory)) {
-        New-Item -ItemType Directory -Force $resultsDirectory | Out-Null
+    $ResultsPath = Resolve-SafeFileWritePath `
+        -Path $ResultsPath `
+        -ParameterName 'ResultsPath'
+    $resultsDirectory = [System.IO.Path]::GetDirectoryName($ResultsPath)
+    if ($resultsDirectory -and -not (Test-Path -LiteralPath $resultsDirectory)) {
+        [System.IO.Directory]::CreateDirectory($resultsDirectory) | Out-Null
     }
     [pscustomobject]@{
         configuration = $Configuration
         generatedUtc  = (Get-Date).ToUniversalTime().ToString('o')
         samples       = $results
-    } | ConvertTo-Json -Depth 6 | Set-Content -Path $ResultsPath -Encoding utf8
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ResultsPath -Encoding utf8
     Write-Report "Wrote results: $ResultsPath"
 }
 

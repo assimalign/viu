@@ -50,9 +50,17 @@ public sealed class InteropScenario
     public ScenarioContext Prepare(ScenarioVariant variant)
     {
         var context = new ScenarioContext(new TestRenderer(), variant);
-        _prepare(context);
-        context.Renderer.OperationLog.Reset();
-        return context;
+        try
+        {
+            _prepare(context);
+            context.Renderer.OperationLog.Reset();
+            return context;
+        }
+        catch
+        {
+            context.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Runs the measured step against a context returned by <see cref="Prepare"/>.</summary>
@@ -72,7 +80,7 @@ public sealed class InteropScenario
     /// <returns>The measured interop counts.</returns>
     public InteropCountResult Measure(ScenarioVariant variant)
     {
-        var context = Prepare(variant);
+        using ScenarioContext context = Prepare(variant);
         _measured(context);
         return InteropCountResult.From(Name, context.Renderer.OperationLog);
     }
@@ -88,7 +96,7 @@ public sealed class InteropScenario
     /// <returns>The total node operations the scenario performed.</returns>
     public int Run(ScenarioVariant variant)
     {
-        var context = Prepare(variant);
+        using ScenarioContext context = Prepare(variant);
         _measured(context);
         return context.Renderer.OperationLog.Operations.Count
             - context.Renderer.OperationLog.Count(TestNodeOperationType.Commit);

@@ -15,6 +15,8 @@ public sealed class TestElement : TestNode
     private readonly Dictionary<string, object?> _properties = new(StringComparer.Ordinal);
     private readonly List<TestNode> _children = [];
     private readonly Dictionary<string, Delegate> _eventListeners = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TestEventListener> _eventListenerRegistrations =
+        new(StringComparer.Ordinal);
 
     internal TestElement(QualifiedName name)
     {
@@ -42,7 +44,7 @@ public sealed class TestElement : TestNode
     public IReadOnlyList<TestNode> Children { get; }
 
     /// <summary>
-    /// Gets a read-only live view of event listeners keyed by the event binding's local name.
+    /// Gets a read-only live view of event listeners keyed by normalized event name.
     /// </summary>
     public IReadOnlyDictionary<string, Delegate> EventListeners { get; }
 
@@ -58,7 +60,37 @@ public sealed class TestElement : TestNode
 
     internal void RemoveProperty(string name) => _properties.Remove(name);
 
-    internal void SetEventListener(string name, Delegate listener) => _eventListeners[name] = listener;
+    internal void SetEventListener(TestEventName name, Delegate listener)
+    {
+        _eventListeners[name.EventName] = listener;
+        _eventListenerRegistrations[name.EventName] = new TestEventListener(listener, name.Once);
+    }
 
-    internal void RemoveEventListener(string name) => _eventListeners.Remove(name);
+    internal void RemoveEventListener(string name)
+    {
+        string eventName = TestEventName.Parse(name).EventName;
+        _eventListeners.Remove(eventName);
+        _eventListenerRegistrations.Remove(eventName);
+    }
+
+    internal bool TryTakeEventListener(string name, out Delegate? listener)
+    {
+        string eventName = TestEventName.Parse(name).EventName;
+        if (!_eventListenerRegistrations.TryGetValue(
+                eventName,
+                out TestEventListener? registration))
+        {
+            listener = null;
+            return false;
+        }
+
+        listener = registration.Listener;
+        if (registration.Once)
+        {
+            _eventListeners.Remove(eventName);
+            _eventListenerRegistrations.Remove(eventName);
+        }
+
+        return true;
+    }
 }

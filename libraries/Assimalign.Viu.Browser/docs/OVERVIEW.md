@@ -13,6 +13,12 @@ handle allocation advances past handles discovered through selectors and hydrati
 event handlers use delegate-swapping invokers. These guarantees are specified by `[RND-IO-1]`
 through `[RND-IO-4]` and `[EXE-13]` through `[EXE-14]`.
 
+`BrowserEvent` implements Components' portable `IElementEvent` contract. The invoker passes the
+same `BrowserEvent` instance to portable handlers, so input value, keyboard key, checked state, and
+multiple selections use the same authored handler shape as the in-memory Testing host. Concrete
+`BrowserEvent` handlers remain available for browser-only modifier and response-intent behavior
+(`[V01.01.11.06]`).
+
 `BrowserApplication` uses Core's public `ApplicationLifetime` for the platform-invariant state
 machine and keeps only Browser initialization, selector resolution, mounting, hydration, and
 full-page hot-reload signaling. Browser directives are available through the default application

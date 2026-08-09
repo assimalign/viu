@@ -47,6 +47,10 @@ public sealed class MeasurePublishBudgetTests : IDisposable
 
         run.ExitCode.ShouldBe(1);
         run.Output.ShouldContain("OVER BUDGET");
+        run.Output.ShouldContain($"{SampleName} compressedPublishSizeBytes exceeded by");
+        run.Output.ShouldContain("actual");
+        run.Output.ShouldContain("budget");
+        run.Output.ShouldContain("delta vs base n/a");
     }
 
     [Fact]
@@ -122,6 +126,112 @@ public sealed class MeasurePublishBudgetTests : IDisposable
     }
 
     [Fact]
+    public void Gate_WithBaselineManifest_ReportsBaseRevisionDeltaWithoutRepublishingBase()
+    {
+        var payload = CreatePayload(("app.wasm", CompressibleBytes(4_096)));
+        var manifest = CreateManifest(budgetBytes: 100_000_000);
+        const long baselineBytes = 123_456;
+        var baselineManifest = CreateManifest(
+            budgetBytes: 100_000_000,
+            baselineBytes: baselineBytes);
+        var resultsPath = ReserveResultsPath();
+
+        var run = RunGate(
+            manifest,
+            "-PublishDirectory",
+            payload,
+            "-NoGate",
+            "-BaselineManifestPath",
+            baselineManifest,
+            "-ResultsPath",
+            resultsPath);
+
+        run.ExitCode.ShouldBe(0);
+        var measured = ReadFirstSample(resultsPath);
+        measured.BaselineBytes.ShouldBe(baselineBytes);
+    }
+
+    [Fact]
+    public void Gate_WithPublishScript_UsesIsolatedProducerInsteadOfEvaluatingTrackedProject()
+    {
+        var repositoryRoot = CreateTemporaryDirectory();
+        File.WriteAllText(Path.Combine(repositoryRoot, "Sample.csproj"), "not a buildable project");
+        const string publishScript = """
+            [CmdletBinding()]
+            param(
+                [switch] $PublishOnly,
+                [string] $PublishDirectory,
+                [string] $Configuration)
+            $wwwroot = Join-Path $PublishDirectory 'wwwroot'
+            New-Item -ItemType Directory -Force -Path $wwwroot | Out-Null
+            [System.IO.File]::WriteAllBytes(
+                (Join-Path $wwwroot 'app.wasm'),
+                [byte[]]@(65, 65, 65, 65))
+            """;
+        File.WriteAllText(Path.Combine(repositoryRoot, "Publish.ps1"), publishScript, Encoding.UTF8);
+        var manifest = CreateManifest(
+            budgetBytes: 100_000_000,
+            project: "Sample.csproj",
+            publishScript: "Publish.ps1");
+
+        var run = RunGate(
+            manifest,
+            "-RepositoryRoot",
+            repositoryRoot,
+            "-PublishOutputRoot",
+            Path.Combine(repositoryRoot, "_out", "publish"));
+
+        run.ExitCode.ShouldBe(0, run.Output);
+        run.Output.ShouldContain("through");
+        run.Output.ShouldContain("PASS");
+    }
+
+    [Fact]
+    public void Gate_PublishOutputRootOutsideRepositoryOutput_FailsBeforePublishing()
+    {
+        var repositoryRoot = CreateTemporaryDirectory();
+        File.WriteAllText(Path.Combine(repositoryRoot, "Sample.csproj"), "not a buildable project");
+        var manifest = CreateManifest(
+            budgetBytes: 100_000_000,
+            project: "Sample.csproj");
+
+        var run = RunGate(
+            manifest,
+            "-RepositoryRoot",
+            repositoryRoot,
+            "-PublishOutputRoot",
+            Path.Combine(repositoryRoot, "outside"));
+
+        run.ExitCode.ShouldBe(2);
+        run.Output.ShouldContain("PublishOutputRoot must be a child of repository _out");
+    }
+
+    [Fact]
+    public void Gate_CaseOnlyRepositoryOutputSiblingOnCaseSensitiveSystem_FailsBeforePublishing()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var repositoryRoot = CreateTemporaryDirectory();
+        File.WriteAllText(Path.Combine(repositoryRoot, "Sample.csproj"), "not a buildable project");
+        var manifest = CreateManifest(
+            budgetBytes: 100_000_000,
+            project: "Sample.csproj");
+
+        var run = RunGate(
+            manifest,
+            "-RepositoryRoot",
+            repositoryRoot,
+            "-PublishOutputRoot",
+            Path.Combine(repositoryRoot, "_OUT", "publish"));
+
+        run.ExitCode.ShouldBe(2);
+        run.Output.ShouldContain("PublishOutputRoot must be a child of repository _out");
+    }
+
+    [Fact]
     public void Gate_MissingManifest_ExitsTwoForConfigurationError()
     {
         var payload = CreatePayload(("app.wasm", CompressibleBytes(1_024)));
@@ -165,7 +275,11 @@ public sealed class MeasurePublishBudgetTests : IDisposable
         return root;
     }
 
-    private string CreateManifest(long budgetBytes)
+    private string CreateManifest(
+        long budgetBytes,
+        long? baselineBytes = null,
+        string project = "unused-in-publish-directory-mode.csproj",
+        string? publishScript = null)
     {
         var manifestPath = Path.Combine(CreateTemporaryDirectory(), "PublishBudgets.json");
         var manifest = new
@@ -175,8 +289,10 @@ public sealed class MeasurePublishBudgetTests : IDisposable
                 new
                 {
                     name = SampleName,
-                    project = "unused-in-publish-directory-mode.csproj",
+                    project,
+                    publishScript,
                     compressedPublishSizeBytes = budgetBytes,
+                    baselineCompressedPublishSizeBytes = baselineBytes,
                     startupBudgetMilliseconds = 1_000,
                 },
             },

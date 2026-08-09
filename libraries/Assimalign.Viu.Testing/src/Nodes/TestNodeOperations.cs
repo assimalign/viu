@@ -225,7 +225,9 @@ public static class TestNodeOperations
 
         if (nextBinding.Value is Delegate listener)
         {
-            element.SetEventListener(nextBinding.Name.LocalName, listener);
+            element.SetEventListener(
+                TestEventName.Parse(nextBinding.Name.LocalName),
+                listener);
         }
         else
         {

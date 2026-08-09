@@ -11,12 +11,14 @@ namespace Assimalign.Viu.Testing.Benchmarks;
 /// <see cref="Render"/>; its measured step renders the next tree, which the renderer diffs against the
 /// mounted one, landing every node operation in the renderer's op log (the interop-crossing proxy).
 /// The log's commit marker delimits a render and is not itself counted as a node mutation.
-/// Not thread-safe (single-threaded benchmark host).
+/// The context owns the renderer supplied to its constructor and disposes it so every benchmark run
+/// verifies that no deterministic continuation was forgotten. Not thread-safe (single-threaded
+/// benchmark host).
 /// </summary>
-public sealed class ScenarioContext
+public sealed class ScenarioContext : IDisposable
 {
-    /// <summary>Creates a context over a fresh renderer, container, and (seeded) row source.</summary>
-    /// <param name="renderer">The in-memory renderer whose op log is measured.</param>
+    /// <summary>Creates a context over an owned renderer, container, and seeded row source.</summary>
+    /// <param name="renderer">The in-memory renderer whose operation log is measured and which this context owns.</param>
     /// <param name="variant">The tree shape the scenario renders.</param>
     /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is null.</exception>
     public ScenarioContext(TestRenderer renderer, ScenarioVariant variant)
@@ -59,4 +61,9 @@ public sealed class ScenarioContext
         Rows = rows;
         Renderer.Render(RowTableBuilder.Build(rows, SelectedIdentifier, Variant), Container);
     }
+
+    /// <summary>
+    /// Disposes the owned renderer and propagates its forgotten-continuation diagnostics.
+    /// </summary>
+    public void Dispose() => Renderer.Dispose();
 }

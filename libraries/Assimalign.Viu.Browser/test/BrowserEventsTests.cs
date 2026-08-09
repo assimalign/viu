@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu.Components;
+
 namespace Assimalign.Viu.Browser.Tests;
 
 // Pins the qualified Browser event-guard ABI specified by [SFC-CG-2] and [V01.01.15.02].
@@ -160,6 +162,25 @@ public sealed class BrowserEventsTests
         browserEvent.PreventDefault();
 
         browserEvent.DefaultPrevented.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void EventRegistry_PortableHandler_ReceivesExactBrowserEventIdentity()
+    {
+        BrowserEventInvokerRegistry registry = new(
+            static (_, _, _, _, _) => { },
+            static (_, _, _) => { });
+        IElementEvent? received = null;
+        registry.SetListener(
+            1,
+            "onInput",
+            (Action<IElementEvent>)(elementEvent => received = elementEvent));
+        BrowserEvent payload = CreateEvent(eventName: "input");
+
+        int responseFlags = registry.Dispatch(1, capture: false, payload);
+
+        responseFlags.ShouldBe(0);
+        received.ShouldBeSameAs(payload);
     }
 
     private static BrowserEvent CreateEvent(

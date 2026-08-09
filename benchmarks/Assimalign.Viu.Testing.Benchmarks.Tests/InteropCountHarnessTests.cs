@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 using Shouldly;
 using Xunit;
 
+using Assimalign.Viu.Testing;
 using Assimalign.Viu.Testing.Benchmarks;
 
 namespace Assimalign.Viu.Testing.Benchmarks.Tests;
@@ -39,6 +41,17 @@ public class InteropCountHarnessTests
         var second = ToTotals(InteropCountHarness.MeasureAll(ScenarioVariant.Optimized));
 
         second.ShouldBe(first);
+    }
+
+    [Fact]
+    public void Dispose_ReleasesTheOwnedRendererSynchronizationContext()
+    {
+        var renderer = new TestRenderer();
+        var context = new ScenarioContext(renderer, ScenarioVariant.Optimized);
+
+        context.Dispose();
+
+        Should.Throw<ObjectDisposedException>(() => renderer.Drain());
     }
 
     [Theory]
