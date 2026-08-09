@@ -52,7 +52,7 @@ A Viu app project uses the Viu MSBuild SDK instead of a plain `Microsoft.NET.Sdk
 ```
 
 That one line chains `Microsoft.NET.Sdk.WebAssembly`, references the `Assimalign.Viu.App` shared
-framework (the core and runtime-dom libraries), and turns on `.viu` single-file
+framework (Components, Reactivity, State, Core, and Browser), and turns on `.viu` single-file
 component compilation and CSS bundling — with no per-project wiring. The full consumer surface,
 including every opt-out property, is documented in [`sdks/README.md`](../../sdks/README.md); the
 packaging model is [founding decision 8](../PLAN.md#founding-design-decisions-cwasm-divergences).
@@ -394,8 +394,8 @@ is in [`FORMAT.md`](../../tooling/Assimalign.Viu.Syntax.SingleFileComponent/docs
 `@template`/`@style` `@`-blocks still parse with a migration warning). A `.viu` with a
 `<template>`/`@script` compiles to a **mountable component** (see the note below,
 [#216](https://github.com/assimalign/viu/issues/216)); a `.viu` also serves as a **bundled CSS** unit.
-Per-component scope identifiers are deferred until the `[V01.01.15]` component-model arc completes;
-their later addition is additive to `ComponentContract` and does not change the file format.
+Per-component scope identifiers remain deferred under `[V01.01.06.12]`; their later addition is
+additive to `ComponentContract` and does not change the file format.
 
 > **`.vue` files compile too.** Viu ships a `.vue` single-file-component compatibility parser as a
 > product feature ([V01.01.06.09], [#250](https://github.com/assimalign/viu/issues/250)). The SDK globs
@@ -469,7 +469,7 @@ intact. You write no manual link tag. This is why `index.html` above has none; t
 > }
 > ```
 >
-> The `[V01.01.15]` migration changes the generated runtime bridge, not this authoring experience:
+> The completed `[V01.01.15]` migration changed the generated runtime bridge, not this authoring experience:
 > template events still call the named C# member, reactive reads still drive re-render, and parameters,
 > events, lifecycle declarations, and fallthrough behavior retain their specified source forms.
 > Hand-authored `IComponent` components use the same registration and rendering vocabulary.
@@ -532,9 +532,8 @@ That folder is a static site — host it on any static web host.
 
 ## Not yet available
 
-The component examples in this guide describe the adopted `[V01.01.15]` standard. The documentation
-lands before the atomic implementation swap on `feature/V01.01.15-component-model`; until that swap
-completes, packaged consumers still see the preceding public names. Other planned work includes:
+The component examples in this guide describe the shipping `[V01.01.15]` surface. Remaining
+documentation and project-creation work includes:
 
 - **A `dotnet new` project template** — [V01.01.12.04] (W05); until then, create the project by hand as
   above.
@@ -543,6 +542,5 @@ completes, packaged consumers still see the preceding public names. Other planne
 
 ---
 
-This guide follows the repo's [documentation conventions](../CONTRIBUTING.md). Component-model code
-blocks are specification examples until the `[V01.01.15]` swap completes; packaging and command
-examples continue to describe the existing SDK workflow.
+This guide follows the repo's [documentation conventions](../CONTRIBUTING.md). Its component-model,
+packaging, and command examples describe the current SDK workflow.

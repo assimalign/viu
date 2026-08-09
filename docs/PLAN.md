@@ -7,67 +7,65 @@ document is the narrative companion to the executable backlog in the org GitHub 
 living plan; this file records the architecture mapping, the founding design decisions, and the wave
 strategy behind it.
 
-## Where the POC stands
+## Where Viu stands
 
-The current code proves the rendering seam end to end and nothing more:
+The proof-of-concept stage is complete. On 2026-08-08 this checkout built with **0 warnings and
+0 errors**, and its 27 solution test assemblies passed **2,632 tests with 0 failures**. The tree now
+contains the host-neutral Application Model and renderer, explicit reactivity, the authored
+component model and closed virtual-node algebra, compiler-informed block patching, keyed
+reconciliation, browser/server/testing hosts, routing and state conventions, the build-time
+template and single-file-component pipeline, packaging, and editor tooling.
 
-- `Assimalign.Viu.CoreLib/VirtualDom` — an immutable VNode tree (`VElement`/`VText`/`VFragment`,
-  keyed), a generic `VirtualDomRenderer<TNode>` over an `IVirtualDomAdapter<TNode>` (mount /
-  in-place patch / unmount, fragments via comment markers), a standalone diff producing patch
-  records, and an HTML string renderer.
-- The original in-repository browser WASM stopwatch proved the handle-based DOM bridge
-  (`JSImport` node operations and callbacks dispatched through `JSExport`). Current packaged SDK
-  behavior is exercised by the separate
-  [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) showcase.
+A developer can manually create an external `<Project Sdk="Assimalign.Viu.Sdk">` application;
+author code-first, `.viu`, or compatible `.vue` components; compose services, state, registrations,
+and lifetime middleware; run a reactive browser application; use the router and state libraries;
+render HTML or test components without a browser; and publish a trimmed static WebAssembly site.
+The sibling [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) repository is the
+packaged-consumer showcase for those paths.
 
-What it validates: the host-adapter renderer design and C#-driven DOM patching through interop. What it
-lacks: reactivity (the demo polls every 100 ms), a component model, a scheduler, keyed diffing with
-minimal moves, compiler-informed patching, and every ecosystem piece. The child reconciliation is
-index-based (no LIS), the diff/patch path is duplicated in two implementations, and naming was split
-between `Assimalign.Vue.*` and `Assimalign.Vuecs.*` (standardized on `Assimalign.Vue.*` 2026-07-16,
-then renamed to `Assimalign.Viu.*` with the product rename — see the architecture note below).
+The SDK also has a real Debug `dotnet watch` path: stylesheet changes regenerate CSS and refresh
+links without discarding browser state, while generated metadata remounts affected components for
+template or C# changes. That path is not yet a separate Viu development-server command, and Visual
+Studio's ordinary Hot Reload command does not invoke the SDK watch-list contract.
+
+The remaining developer-experience gaps are concrete: there is no `dotnet new` application
+template, no `Assimalign.Viu.DevTools` library or inspection user interface, and no generated API
+reference or template-language reference site. The current behavioral limits are maintained in
+[`SPECIFICATION.md` §17](SPECIFICATION.md#17-non-goals-and-current-limits); the board remains the
+authority for delivery status.
 
 ## Architecture: Viu library map
 
 Package boundaries map 1:1 to .NET class libraries using the inverted layout
-`{libraries,tooling}/Assimalign.Viu.<Name>/{src|test}` — runtime projects live in `libraries/`,
-compiler/editor projects live in `tooling/`, and the folder name is the assembly/package id with no
-area wrapper folders (project decisions, 2026-07-16 and [V01.01.14.05]). The product name is **Viu** and the package
-root is **`Assimalign.Viu.*`** (renamed from Vue/Vuecs 2026-07-19, `V01.01.12.18`/#173, aligning
-the brand with the `.viu` single-file-component extension; the GitHub repo slug is now
-`assimalign/viu`, renamed from `assimalign/vuecs`). The live `vue:` template prefix and `.vue`
-compatibility input remain deliberate product syntax; external package names in the table below
-record only the July 2026 scoping history:
+`{libraries,tooling}/Assimalign.Viu.<Name>/{src|test}`. Runtime projects live in `libraries/`,
+compiler/editor projects live in `tooling/`, and the folder name is the assembly/package identifier
+with no area wrapper folders. The following table is the exact shipping-library set under
+`libraries/`; the final column lists each consumer's direct Viu project dependencies.
 
-| Area (WBS) | Viu library | Initial July 2026 scope (historical) |
-| --- | --- | --- |
-| Common primitives (`V01.01.01`) | Dissolved into owning libraries ([V01.01.15]) | Flags in Components, normalization in Core/Browser, DOM tables in ServerRenderer |
-| Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` → merged into `Assimalign.Viu.Core` ([V01.01.12.21]) | `@vue/reactivity` — deps, Ref/Computed, effects, scopes, watch |
-| RuntimeCore (`V01.01.03`) | `Assimalign.Viu.RuntimeCore` → renamed `Assimalign.Viu.Core`, root namespace `Assimalign.Viu` ([V01.01.12.21]) | `@vue/runtime-core` — vnodes, renderer, scheduler, component model, built-ins |
-| RuntimeDom (`V01.01.04`) | `Assimalign.Viu.RuntimeDom` → renamed `Assimalign.Viu.Browser` ([V01.01.12.22]) | `@vue/runtime-dom` — JS-interop DOM bridge, patchProp, events, v-model/v-show |
-| Compiler (`V01.01.05`) | `Assimalign.Viu.Syntax.Templates` (+ source generators) | `@vue/compiler-core` + `compiler-dom` (roots on the shared `Assimalign.Viu.Syntax` base) |
-| SingleFileComponent (`V01.01.06`) | `Assimalign.Viu.Syntax.SingleFileComponent` (+ `Assimalign.Viu.Compiler.SingleFileComponent`, the shared build/editor projection core extracted with [V01.01.06.11]) | `@vue/compiler-sfc` — `.viu` single-file components (hybrid container syntax since `V01.01.06.10`: `<template>`/`<style>` tags + the `@script` block; the inner template language stays Vue markup; roots on the shared `Assimalign.Viu.Syntax` base) |
-| ServerRenderer (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | `@vue/server-renderer` + `compiler-ssr` — SSR, hydration, SSG |
-| Router (`V01.01.08`) | `Assimalign.Viu.Router` (+ `Assimalign.Viu.Browser.Router`, formerly `Assimalign.Viu.Router.RuntimeDom` — renamed through [V01.01.12.22] and [V01.01.14.09] — the browser click-dispatch bridge — vue-router touches the DOM directly; Viu's DOM-free Router cannot, so the glue is its own leaf package outside the shared framework) | `vue-router` |
-| Store (`V01.01.09`) | `Assimalign.Viu.Store` | `pinia` |
-| DevTools (`V01.01.10`) | `Assimalign.Viu.DevTools` | `vue-devtools` protocol + UI |
-| Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | `@vue/runtime-test` + `@vue/test-utils` |
-| Tooling (`V01.01.12`) | build/CI/templates/dev loop | Vite + `create-vue` + monorepo infra |
-| Documentation (`V01.01.13`) | docs + samples | documentation and examples |
+| Area | Shipping library | Role | Direct Viu dependencies |
+| --- | --- | --- | --- |
+| Reactivity (`V01.01.02`) | `Assimalign.Viu.Reactivity` | Single-threaded dependency tracking, reference cells, effects, scopes, watch, and reactive collections; the runtime leaf | None |
+| Components (`V01.01.15`) | `Assimalign.Viu.Components` | The closed `VirtualNode` algebra, compiler/runtime flags, authored-component model, contracts, bindings, and activation registrations | Reactivity |
+| State (`V01.01.09`) | `Assimalign.Viu.State` | State-management convention above the component model, attached through its public seams | Components, Reactivity |
+| Core (`V01.01.03`) | `Assimalign.Viu.Core` | The Application Model: composition root, lifetime and middleware, renderer/scheduler engine, mounted bookkeeping, and public operations; its root namespace is `Assimalign.Viu` | Components, Reactivity, State |
+| Browser (`V01.01.04`) | `Assimalign.Viu.Browser` | Browser host: batched DOM interop, bindings, events, directives, transitions, and application bootstrap | Components, Core, Reactivity |
+| Server rendering (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | One-shot WHATWG HTML serialization host and hydration-marker protocol | Components, Core |
+| Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | DOM-free in-memory host and component test surface over the production renderer | Components, Core |
+| Router (`V01.01.08`) | `Assimalign.Viu.Router` | Host-free navigation convention: matching, history, route components, and guard pipeline | Components, Reactivity |
+| Browser router (`V01.01.08`) | `Assimalign.Viu.Browser.Router` | Leaf integration between Browser click dispatch and Router navigation | Core, Router, Browser |
 
-The parsing side of the map is the **`Assimalign.Viu.Syntax` cluster**: the shared base defines the
-node/diagnostic primitives and a registration-based parser pipeline (`SyntaxParser`,
-`AggregateSyntaxParser` — the seam build tooling uses to attach a parser to a block name, `lang`
-  option, or file type), and one library per language roots on it:
-  `Assimalign.Viu.Syntax.Templates` (Viu's template language), `.SingleFileComponent` (the
-`.viu` container), and the browser-language scaffolds `.Css`, `.Html`, and `.JavaScript` (raw-root
-parsers today; rule/element/statement-level parsing lands with their work items, starting with scoped
-CSS [V01.01.06.04]). Composition roots sit beside the cluster as compiler libraries:
-`Assimalign.Viu.Compiler.Css` ([V01.01.12.12]) is the shared style compilation/bundling both
-build-time hosts run, and `Assimalign.Viu.Compiler.SingleFileComponent` ([V01.01.06.11]) is the ONE
-`.viu`/`.vue` → C# projection pipeline the `Assimalign.Viu.Generators.Syntax` source generator and
-the Visual Studio language service both consume, so build output and editor understanding cannot
-  drift.
+Vocabulary lives low, composition lives high, and optional conventions attach through designed
+seams. Reactivity is independent; Components owns descriptions and authored behavior; State and
+Router are conventions; Core composes and executes applications; Browser, ServerRenderer, and
+Testing adapt that model to hosts. The adopted rationale and complete dependency graph are recorded
+in [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md).
+
+The build/editor side contains exactly ten projects under `tooling/`: the `Assimalign.Viu.Syntax`
+base; its Templates, SingleFileComponent, Css, and Html language libraries; the Css and
+SingleFileComponent compiler composition roots; UtilityCss; LanguageService; and LanguageServer.
+The Reactivity and Syntax generators live under `analyzers/`. The single-file-component compiler is
+the shared `.viu`/`.vue` to C# projection used by both build and editor hosts, preserving the
+shipping `.vue` compatibility input while keeping Viu's runtime independent of JavaScript execution.
 
 ## Founding design decisions (C#/WASM divergences)
 
@@ -108,9 +106,12 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
 5. **Composition-only component model.** No options-object authoring, mixins, or global-properties
    bag. Components use setup closures; conventions attach through services and the ambient reactive
    scope. Recorded as a founding ADR and refined by `[V01.01.15]`.
-6. **Trimming/AOT-safe everywhere.** No reflection-based serialization, no dynamic codegen, no
-   linker-unfriendly activation. Every area publishes a representative WASM consumer with trimming
-   validation; size and startup budgets gate CI from W03.
+6. **Trimming/AOT-safe everywhere.** No reflection-based serialization, no dynamic codegen, and no
+   linker-unfriendly activation. Representative build, trimming, AOT, size, and startup checks
+   remain part of the delivery contract, but the budget workflow is currently parked at
+   [`.github/workflows-disabled/budget-gates.yml`](../.github/workflows-disabled/budget-gates.yml)
+   and does not gate CI. Published-size and trim-warning regressions are therefore unguarded today;
+   restoring the gates is tracked as a Documentation/Tooling work item.
 7. **Cohesion integration at MVP.** Viu will integrate with the Cohesion platform
    (`assimalign/cohesion`) as MVP approaches — apps served by Cohesion Web, SSR hosted in-process
    (tracked as `V01.01.12.08`, #104, now narrowed to the hosting integration — the packaging half
@@ -157,27 +158,44 @@ Work is tracked exactly like the sibling Cohesion repo:
 
 ### Wave narrative
 
-| Wave | Theme | Exit demo |
+| Wave | Delivered position | Remaining board work |
 | --- | --- | --- |
-| **W01** | Rendering foundation — shared contracts, reactivity core (deps/Ref/effect/computed/scope), VNode v2 + renderer + scheduler + render effects, hardened DOM bridge + patchProp + events, in-memory test renderer, solution restructure + CI | The stopwatch re-renders reactively (no polling) through the new pipeline, tested DOM-free |
-| **W02** | Component model — instance/setup, props, emits, slots, lifecycle, app API, directives, refs, dynamic components, watch, `[Reactive]` source-gen, reactive collections, LIS keyed diff, browser bootstrap, test utils | TodoMVC built from components with `h()` render functions |
-| **W03** | Compiler — template parser → transforms → C# codegen source generator, patch flags + block tree end-to-end, static hoisting, diagnostics, `.viu` SFC format + MSBuild, interop command buffer, v-model/v-show, size budgets | TodoMVC rewritten as `.viu` components; interop calls measurably collapse |
-| **W04** | Ecosystem — router, store, built-ins (Teleport/KeepAlive/Transition/async), scoped CSS + CSS modules, HackerNews sample, getting-started guide | HackerNews client: routed, stored, styled |
-| **W05** | Server + DX — SSR renderer + SSR codegen + hydration + the host-agnostic server adaptor, packaging/NuGet, `dotnet new` templates, dev loop, e2e harness, benchmarks, devtools protocol, SFC hot-reload metadata | Server-rendered, hydrated sample; `dotnet new viu-app` works from NuGet |
-| **W06** | Enterprise polish — Suspense, devtools UI + reactivity timeline, store plugins, custom elements, prerendering (SSG), API reference, docs site, `.viu` editor support | Docs site built by Viu itself |
+| **W01** | Rendering, reactivity, browser-host, testing, solution, and CI foundations are delivered; every planned feature row is closed | No planned feature row remains |
+| **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
+| **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered | Complete deferred compiler optimizations and diagnostic source attribution, then restore publish-size, trimming, and startup budget enforcement; startup timing still depends on the browser harness |
+| **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries | Close built-in edge cases, generated State/source-map work, hosted and multi-bundle CSS delivery, and the deferred scoped-CSS runtime |
+| **W05** | Browser packaging, hydration foundations, editor hot-reload metadata, and a working `dotnet watch` CSS/component path exist | Finish server compiler/hosting and state hydration, lazy routing, runtime inspection, the browser harness, templates and the productized development loop, release automation, payload accounting, compatibility/conformance gates, and Cohesion hosting integration |
+| **W06** | Utility composition and semantic `@script` language-server work have begun | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
-### Completed component-model and API-hardening arcs
+This snapshot reconciles the plan with live issue state on 2026-08-08. Newly tracked follow-ups for
+scoped CSS, budget-gate restoration, and deferred compiler optimization are grouped with their
+closest delivery themes here; Project #15 remains authoritative for their Wave custom fields.
 
-`[V01.01.15]` ([epic #313](https://github.com/assimalign/viu/issues/313);
-[plan of record](COMPONENT-MODEL-PLAN.md)) replaces the outgoing component representation with the
-adopted four-lifetime model: immutable `VirtualNode` descriptions, static registration identity and
-contract, activated authored `IComponent` instances, and Core-owned mounted bookkeeping. It also
-establishes frame-based render emission and the designed host, service/reactive, generated-code, and
-application-composition seams. The swap is complete. [#316](https://github.com/assimalign/viu/issues/316)
-then reevaluated and closed the remaining `[V01.01.14]` API-hardening work against the adopted
-surface, including final PublicAPI baselines and contract gates. The D6 SDK/framework platform split
-remains an accepted decision but is deliberately deferred until the first non-browser host exists;
-it is not unfinished work in either completed arc.
+### [V01.01.14] API hardening — complete
+
+`[V01.01.14]` ([epic #284](https://github.com/assimalign/viu/issues/284)) hardened the package-visible
+surface after the framework reshape: public naming and visibility, application lifetime and
+middleware, safe batching and reactive inspection, typed Router and Testing contracts, parser
+closure, package overrides, XML documentation enforcement, and PublicAPI baselines. All eleven
+child features are closed, and every row in the
+[`API-HARDENING-PLAN.md`](API-HARDENING-PLAN.md) completion record is terminal.
+
+The D6 SDK/framework platform segmentation decision is intentionally deferred until a first
+non-browser host provides a second real topology to test. That trigger is outside this completed
+arc; it is not an open API-hardening requirement.
+
+### [V01.01.15] Component model — complete
+
+`[V01.01.15]` ([epic #313](https://github.com/assimalign/viu/issues/313)) delivered the adopted
+four-lifetime model: immutable `VirtualNode` descriptions, static registration identity and
+contracts, activated authored `IComponent` instances, and Core-owned mounted bookkeeping. The arc
+moved the closed virtual-node algebra and authored model into Components, established frame-based
+render emission and explicit AOT-safe activation, dissolved the common-primitives package into
+purpose-owned homes, and closed the host, service/reactive, generated-code, and application seams.
+
+The migration and all four child features are closed. The design rationale, type disposition,
+completed P0–P6 sequence, and verification record remain in
+[`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md) rather than being duplicated here.
 
 ## The planned backlog
 
@@ -191,8 +209,9 @@ it is not unfinished work in either completed arc.
 
 ### [V01.01.02] Framework - Reactivity (W01, P001)
 
-> Merged into `Assimalign.Viu.Core` by the .NET reshape (R2, [V01.01.12.21], `docs/NET-RESHAPE-PLAN.md`).
-> The epic and its feature history stay; the shipping code now lives in the consolidated core library.
+> The .NET reshape briefly consolidated this area, but that decision was superseded on 2026-08-02.
+> `Assimalign.Viu.Reactivity` is a separate shipping leaf library; the dated reconciliation note in
+> [`NET-RESHAPE-PLAN.md`](NET-RESHAPE-PLAN.md) preserves the intervening history.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
@@ -206,10 +225,11 @@ it is not unfinished work in either completed arc.
 | `V01.01.02.08` | Implement reactive collection types (ReactiveList, ReactiveDictionary, ReactiveSet) | W02 | P002 |
 | `V01.01.02.09` | Implement reactivity escape hatches and introspection | W02 | P003 |
 
-### [V01.01.03] Framework - RuntimeCore (W01, P001)
+### [V01.01.03] Framework - Core (W01, P001)
 
-> Renamed to `Assimalign.Viu.Core` (root namespace `Assimalign.Viu`), with the Reactivity area merged in,
-> by the .NET reshape (R2, [V01.01.12.21], `docs/NET-RESHAPE-PLAN.md`). The epic and its feature history stay.
+> The area now ships as `Assimalign.Viu.Core`, rooted at namespace `Assimalign.Viu`. Reactivity and
+> Components are separate lower libraries; Core owns the Application Model, engine, and public
+> operations. The epic and its feature history stay under their original WBS codes.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
@@ -235,12 +255,11 @@ it is not unfinished work in either completed arc.
 | `V01.01.03.20` | Implement Suspense | W06 | P006 |
 | `V01.01.03.21` | Implement dynamic component resolution | W02 | P002 |
 
-### [V01.01.04] Framework - RuntimeDom (W01, P001)
+### [V01.01.04] Framework - Browser (W01, P001)
 
 > Renamed to `Assimalign.Viu.Browser` by the .NET reshape (R3, [V01.01.12.22], `docs/NET-RESHAPE-PLAN.md`);
-> the consequence bridge `Assimalign.Viu.Router.RuntimeDom` is now `Assimalign.Viu.Browser.Router`
-> after [V01.01.14.09]. The epic
-> and its feature history stay; the shipping code now lives in the browser library.
+> the navigation bridge is `Assimalign.Viu.Browser.Router` after [V01.01.14.09]. The epic and its
+> feature history stay; the shipping code lives in the Browser host.
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |
@@ -300,7 +319,7 @@ it is not unfinished work in either completed arc.
 | `V01.01.08.04` | Implement navigation guards and async navigation flows | W04 | P004 |
 | `V01.01.08.05` | Implement lazy route components and scroll behavior | W05 | P005 |
 
-### [V01.01.09] Framework - Store (W04, P003)
+### [V01.01.09] Framework - State (W04, P003)
 
 | Code | Feature | Wave | Priority |
 | --- | --- | --- | --- |

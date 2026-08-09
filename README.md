@@ -89,7 +89,7 @@ one independently published tooling package, and the last two projects form the 
 | [`Assimalign.Viu.LanguageService`](tooling/Assimalign.Viu.LanguageService) | The editor-neutral language features — document state, completion, hover, symbols, folding, code actions, and the `@script` semantic engine — with no protocol or editor dependency | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
 | [`Assimalign.Viu.LanguageServer`](tooling/Assimalign.Viu.LanguageServer) | The standalone Language Server Protocol executable over the language service; published self-contained and single-file per runtime identifier, and shipped inside both editor extensions | [DESIGN](extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md) |
 
-### Source generators and build tasks (`analyzers/`)
+### Source generators and SDK build tools (`analyzers/`, `sdks/`)
 
 These are build-time (netstandard2.0) components. They are the sanctioned metaprogramming mechanism:
 because WASM forbids runtime code generation, everything a dynamic language would do at run time
@@ -100,6 +100,7 @@ happens here instead. They never ship in the runtime assemblies.
 | `Assimalign.Viu.Generators.Reactivity` | Emits the tracking/triggering property bodies for `[Reactive]`/`[ShallowReactive]` partial classes, so a plain object becomes reactive with no reflection and no runtime interception. |
 | `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
 | `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `<style>` output to a physical stylesheet outside the analyzer sandbox. |
+| `Assimalign.Viu.Sdk.CssHotReload` | The SDK-internal Debug `dotnet watch` worker that regenerates component and utility stylesheets; it is a build tool and is never copied into the application or runtime framework. |
 
 ### Editor extensions (`extensions/`)
 
@@ -138,18 +139,16 @@ the language-server process. See
 ### Packaged SDK showcase
 
 [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) contains the complete
-browser showcase. It consumes `Assimalign.Viu.Sdk` and `Assimalign.Viu.Router` from a local NuGet
-feed. Its browser-router package reference must be migrated separately to
-`Assimalign.Viu.Browser.Router` for [V01.01.14.09]; after that follow-up, it will exercise the renamed
-package boundary as an external application rather than relying on project references into this
-repository.
+browser showcase. It consumes `Assimalign.Viu.Sdk`, `Assimalign.Viu.Router`, and
+`Assimalign.Viu.Browser.Router` from a local NuGet feed, exercising the packaged navigation boundary
+as an external application rather than relying on project references into this repository.
 
 ### Packaging (`sdks/`, `frameworks/`)
 
 External apps consume Viu through an MSBuild project SDK, not project references — a complete app
 csproj is `<Project Sdk="Assimalign.Viu.Sdk">`. The SDK chains `Microsoft.NET.Sdk.WebAssembly` and
 delivers the framework as the `Assimalign.Viu.App` shared framework (the
-`Microsoft.AspNetCore.App.Ref`/`.Runtime.<rid>` model, mirrored from `assimalign/cohesion`). See
+`Microsoft.AspNetCore.App.Ref`/`.Runtime.<rid>` targeting-pack and per-runtime-pack shape). See
 [`sdks/README.md`](sdks/README.md) for the full consumer surface and the local development loop.
 
 | Path | Produces | Role |

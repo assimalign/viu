@@ -11,22 +11,22 @@ moment it is moved back. Leave it alone.
 
 ## `budget-gates.yml`
 
-Parked 2026-08-06, pending the SDK and framework segmentation recorded as **D6** in
+Parked 2026-08-06. The original blockers were the API migration in the packaged-consumer showcase
+and the anticipated SDK/framework segmentation recorded as **D6** in
 [`docs/API-HARDENING-PLAN.md`](../../docs/API-HARDENING-PLAN.md).
 
-**Why.** Its `publish-size + trimming gate` job publishes the packaged-consumer showcase from the
-sibling `viu-examples` repository and enforces `scripts/budgets/PublishBudgets.json`. That showcase
-currently does not build: it carries a pre-existing `CS8618` in `Components/Shared/FeatureCard.viu`,
-and the `[V01.01.14]` arc changed the API it consumes — `IApplicationPlugin` was deleted, the
-application entry point became `new BrowserApplicationBuilder()`, and `Assimalign.Viu.Router.Browser`
-was renamed to `Assimalign.Viu.Browser.Router`. The gate has therefore been red on every commit for
-reasons that live outside this repository, which trains everyone to ignore a failing lane — the worst
-state for a gate to be in.
+**Original reason.** Its `publish-size + trimming gate` job publishes the packaged-consumer showcase
+from the sibling `viu-examples` repository and enforces `scripts/budgets/PublishBudgets.json`. At the
+time it was parked, that showcase did not build: it carried a `CS8618` in
+`Components/Shared/FeatureCard.viu`, and the `[V01.01.14]` arc had changed the application and router
+APIs it consumed. The lane was red for failures outside the measurement it was meant to protect.
 
-**Why parked rather than fixed now.** D6 splits `Assimalign.Viu.Sdk`/`Assimalign.Viu.App` into
-platform-agnostic and browser-specific halves. Publish size, trimming behaviour, and the AOT lane are
-all measured against the browser app, so the budgets and the pack step this workflow performs will need
-rewriting once that split lands. Repointing it at the current shape would be work done twice.
+**Current position (2026-08-08).** The showcase now consumes the hardened application and
+`Assimalign.Viu.Browser.Router` surfaces, both `[V01.01.14]` and `[V01.01.15]` are complete, and D6 is
+deliberately deferred until a first non-browser host exists. Those conditions no longer justify
+waiting to restore the current browser budget. The workflow remains parked while its package step,
+budget baselines, and consumer validation are reconciled; restoration is tracked as a
+Documentation/Tooling work item.
 
 **What it covers, and what is unguarded while it is parked.**
 
@@ -37,5 +37,7 @@ rewriting once that split lands. Repointing it at the current shape would be wor
 | `AOT compilation lane (optional)` | Was already optional. |
 | `startup-time gate (deferred)` | Was already skipped, pending the Playwright harness. |
 
-**To restore:** migrate `viu-examples` to the current API, settle D6, revisit the budget values in
-`scripts/budgets/PublishBudgets.json` against the segmented framework, then move the file back.
+**To restore:** validate the current packaged showcase, revisit
+`scripts/budgets/PublishBudgets.json` against the shipping browser framework, repair the package and
+consumer lanes, then move the file back. D6 is not a prerequisite for restoring the current browser
+gate; a later platform split can rebaseline it again when a second host exists.
