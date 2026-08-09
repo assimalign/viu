@@ -6,5 +6,6 @@
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Components" />
     <ViuProjectReference Include="Assimalign.Viu.Core" />
+    <ViuProjectReference Include="Assimalign.Viu.State" />
   </ItemGroup>
 </Project>

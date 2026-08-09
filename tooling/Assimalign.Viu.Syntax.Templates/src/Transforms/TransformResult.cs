@@ -59,6 +59,22 @@ public sealed record TransformResult
     public IReadOnlyList<CacheExpression?> Cached { get; }
 
     /// <summary>
+    /// Gets whether the transform omitted client-only operations for a server-markup target.
+    /// </summary>
+    /// <remarks>
+    /// The server render emitter requires this mode so any virtual-node fallback remains free of
+    /// browser-only event and directive dependencies. Specified by
+    /// <c>[SSR-COMPILE-1]</c> and <c>[SSR-COMPILE-2]</c>.
+    /// </remarks>
+    public bool IsServerRendering => context.IsServerRendering;
+
+    /// <summary>
+    /// Gets the scoped-style attribute stamped on every directly rendered native element, or null.
+    /// </summary>
+    /// <remarks>Specified by <c>[V01.01.06.04]</c> and <c>[SSR-COMPILE-3]</c>.</remarks>
+    public string? ScopeId => context.ScopeId;
+
+    /// <summary>
     /// Resolves the code-generation node of <paramref name="node"/>: a container carries it directly, while an
     /// element's node is looked up from the transform's side table.
     /// </summary>
@@ -70,4 +86,21 @@ public sealed record TransformResult
         TextCallNode textCall => textCall.CodegenNode,
         _ => context.GetCodegenNode(node),
     };
+
+    /// <summary>
+    /// Returns the transform's current child list for an element instead of its immutable parse-time
+    /// snapshot. The server writer consumes this list so expression-prefix and structural replacements
+    /// are identical to the virtual-node writer's inputs.
+    /// </summary>
+    /// <param name="element">The transformed element.</param>
+    /// <returns>The element's frozen transformed children.</returns>
+    internal IReadOnlyList<TemplateChildNode> GetTransformedChildren(ElementNode element)
+    {
+        if (!context.TryGetWorkingChildren(element, out List<TemplateSyntaxNode>? children))
+        {
+            return element.Children;
+        }
+
+        return TransformFreeze.FreezeChildren(children);
+    }
 }

@@ -9,7 +9,8 @@
 *REMOVED*Assimalign.Viu.Components.SlotFlags.Dynamic = 2 -> Assimalign.Viu.Components.SlotFlags
 *REMOVED*Assimalign.Viu.Components.SlotFlags.Forwarded = 3 -> Assimalign.Viu.Components.SlotFlags
 *REMOVED*Assimalign.Viu.Components.SlotFlags.Stable = 1 -> Assimalign.Viu.Components.SlotFlags
-Assimalign.Viu.Components.ComponentInvocation.ComponentInvocation(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, Assimalign.Viu.Components.SlotStability slotStability = Assimalign.Viu.Components.SlotStability.Stable) -> void
+Assimalign.Viu.Components.ComponentInvocation.ComponentInvocation(System.Collections.Generic.IReadOnlyDictionary<string!, object?>? arguments = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentSlot!>? slots = null, System.Collections.Generic.IReadOnlyDictionary<string!, Assimalign.Viu.Components.ComponentEventListener!>? listeners = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, Assimalign.Viu.Components.SlotStability slotStability = Assimalign.Viu.Components.SlotStability.Stable, Assimalign.Viu.Components.HydrationStrategy? hydrationStrategy = null) -> void
+Assimalign.Viu.Components.ComponentInvocation.HydrationStrategy.get -> Assimalign.Viu.Components.HydrationStrategy?
 Assimalign.Viu.Components.ComponentInvocation.SlotStability.get -> Assimalign.Viu.Components.SlotStability
 Assimalign.Viu.Components.PatchFlags.DevelopmentRootFragment = 2048 -> Assimalign.Viu.Components.PatchFlags
 Assimalign.Viu.Components.PatchFlags.FullProperties = 16 -> Assimalign.Viu.Components.PatchFlags
@@ -19,3 +20,20 @@ Assimalign.Viu.Components.SlotStability
 Assimalign.Viu.Components.SlotStability.Dynamic = 2 -> Assimalign.Viu.Components.SlotStability
 Assimalign.Viu.Components.SlotStability.Forwarded = 3 -> Assimalign.Viu.Components.SlotStability
 Assimalign.Viu.Components.SlotStability.Stable = 1 -> Assimalign.Viu.Components.SlotStability
+Assimalign.Viu.Components.HydrationStrategy
+Assimalign.Viu.Components.HydrationStrategy.IdleTimeoutMilliseconds.get -> int?
+Assimalign.Viu.Components.HydrationStrategy.InteractionEvents.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Assimalign.Viu.Components.HydrationStrategy.Kind.get -> Assimalign.Viu.Components.HydrationStrategyKind
+Assimalign.Viu.Components.HydrationStrategy.MediaQuery.get -> string?
+Assimalign.Viu.Components.HydrationStrategy.VisibilityRootMargin.get -> string?
+Assimalign.Viu.Components.HydrationStrategyKind
+Assimalign.Viu.Components.HydrationStrategyKind.Idle = 1 -> Assimalign.Viu.Components.HydrationStrategyKind
+Assimalign.Viu.Components.HydrationStrategyKind.Immediate = 0 -> Assimalign.Viu.Components.HydrationStrategyKind
+Assimalign.Viu.Components.HydrationStrategyKind.Interaction = 4 -> Assimalign.Viu.Components.HydrationStrategyKind
+Assimalign.Viu.Components.HydrationStrategyKind.MediaQuery = 3 -> Assimalign.Viu.Components.HydrationStrategyKind
+Assimalign.Viu.Components.HydrationStrategyKind.Visible = 2 -> Assimalign.Viu.Components.HydrationStrategyKind
+static Assimalign.Viu.Components.HydrationStrategy.Immediate.get -> Assimalign.Viu.Components.HydrationStrategy!
+static Assimalign.Viu.Components.HydrationStrategy.OnIdle(int? timeoutMilliseconds = null) -> Assimalign.Viu.Components.HydrationStrategy!
+static Assimalign.Viu.Components.HydrationStrategy.OnInteraction(params string![]! eventNames) -> Assimalign.Viu.Components.HydrationStrategy!
+static Assimalign.Viu.Components.HydrationStrategy.OnMediaQuery(string! mediaQuery) -> Assimalign.Viu.Components.HydrationStrategy!
+static Assimalign.Viu.Components.HydrationStrategy.OnVisible(string? rootMargin = null) -> Assimalign.Viu.Components.HydrationStrategy!

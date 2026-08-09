@@ -188,7 +188,14 @@ public static class SingleFileComponentProjection
         };
 
         var cssModules = BuildCssModuleAccessors(moduleClasses, moduleTemplateNames);
-        var render = CompileRenderFunction(input, parse, bindingMetadata, cssModules, diagnostics, cancellationToken);
+        var render = CompileRenderFunction(
+            input,
+            parse,
+            bindingMetadata,
+            cssModules,
+            scopeId,
+            diagnostics,
+            cancellationToken);
         model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
 
         var array = diagnostics.Count == 0
@@ -423,6 +430,7 @@ public static class SingleFileComponentProjection
         AggregateSyntaxParserResult<SingleFileComponentBlock> parse,
         BindingMetadata bindingMetadata,
         CssModuleAccessors cssModules,
+        string? scopeId,
         List<DiagnosticInfo> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -440,6 +448,10 @@ public static class SingleFileComponentProjection
             var transformOptions = TransformOptions.CreateDom();
             transformOptions.PrefixIdentifiers = true;
             transformOptions.BindingMetadata = bindingMetadata;
+            // Scoped styles ([V01.01.06.04], [V01.01.07.02]): the style compiler and render compiler share
+            // one path-derived identifier, so every client-rendered element carries the same attribute that
+            // the server-markup target emits for hydration.
+            transformOptions.ScopeId = scopeId;
             // CSS Modules accessors ([V01.01.05.04.01]): resolve `$style.<class>` (and named-module) references
             // against the emitted accessor class. The map is complete (every declared class), so an access to an
             // undeclared member is reported on the .viu coordinate.

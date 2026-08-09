@@ -30,6 +30,8 @@ Assimalign.Viu.Testing.TestRendererOptions.SnapshotSemantics.get -> bool
 Assimalign.Viu.Testing.TestRendererOptions.SnapshotSemantics.init -> void
 Assimalign.Viu.Testing.TestRendererOptions.StrictRemoval.get -> bool
 Assimalign.Viu.Testing.TestRendererOptions.StrictRemoval.init -> void
+Assimalign.Viu.Testing.TestRendererOptions.HydrationTriggers.get -> Assimalign.Viu.Testing.TestHydrationTriggers?
+Assimalign.Viu.Testing.TestRendererOptions.HydrationTriggers.init -> void
 Assimalign.Viu.Testing.TestRendererOptions.TestRendererOptions() -> void
 override Assimalign.Viu.Testing.TestRendererOptions.Equals(object? obj) -> bool
 override Assimalign.Viu.Testing.TestRendererOptions.GetHashCode() -> int
@@ -40,3 +42,12 @@ static Assimalign.Viu.Testing.ComponentTest.Mount(Assimalign.Viu.Components.Virt
 static Assimalign.Viu.Testing.TestNodeOperations.Create(Assimalign.Viu.Testing.TestNodeOperationLog! operationLog, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Testing.TestElement!>? queryRoots = null, Assimalign.Viu.Testing.TestRendererOptions? options = null) -> Assimalign.Viu.RendererOptions<Assimalign.Viu.Testing.TestNode!>!
 static Assimalign.Viu.Testing.TestRendererOptions.operator !=(Assimalign.Viu.Testing.TestRendererOptions? left, Assimalign.Viu.Testing.TestRendererOptions? right) -> bool
 static Assimalign.Viu.Testing.TestRendererOptions.operator ==(Assimalign.Viu.Testing.TestRendererOptions? left, Assimalign.Viu.Testing.TestRendererOptions? right) -> bool
+Assimalign.Viu.Testing.TestHydrationTriggers
+Assimalign.Viu.Testing.TestHydrationTriggers.CompletedCount.get -> int
+Assimalign.Viu.Testing.TestHydrationTriggers.PendingCount.get -> int
+Assimalign.Viu.Testing.TestHydrationTriggers.ReplayedInteractionCount.get -> int
+Assimalign.Viu.Testing.TestHydrationTriggers.TestHydrationTriggers() -> void
+Assimalign.Viu.Testing.TestHydrationTriggers.TriggerIdle() -> void
+Assimalign.Viu.Testing.TestHydrationTriggers.TriggerInteraction(string! eventName) -> void
+Assimalign.Viu.Testing.TestHydrationTriggers.TriggerMediaQuery(string! mediaQuery) -> void
+Assimalign.Viu.Testing.TestHydrationTriggers.TriggerVisible() -> void

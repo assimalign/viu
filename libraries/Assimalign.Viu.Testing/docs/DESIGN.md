@@ -41,6 +41,12 @@ models browser-visible text and attribute values. `TestHydrationReader` exposes 
 `FrozenTestHydrationReader` captures a complete immutable pre-walk so recovery remains readable
 after host mutations, matching the browser's one-snapshot read budget (`[HYD-2]`, `[RND-IO-1]`).
 
+`TestHydrationTriggers` implements the same optional capability Browser supplies, but exposes
+explicit idle, visibility, media-query, and interaction trigger methods. Firing one invokes Core's
+request callback; the scheduler pump still controls the post-flush activation. Disposal removes a
+dormant registration, and completion counters distinguish activation from replay
+(`[HYD-LAZY-3]` through `[HYD-LAZY-5]`).
+
 ## Non-goals
 
 - Browser event propagation, layout, accessibility-tree, and CSS-engine simulation.

@@ -103,6 +103,70 @@ public sealed class ServerRendererTests
     }
 
     [Fact]
+    public async Task RenderToStringAsync_DeferredHydrationStrategies_EmitStableMarkerBoundaries()
+    {
+        ComponentReference reference = ComponentReference.ForName("lazy-markers");
+        ComponentFactory components = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new InlineComponent(
+                    _ => _ => Element("button", children: [new TextNode("ready")]))));
+        HydrationStrategy[] strategies =
+        [
+            HydrationStrategy.OnIdle(),
+            HydrationStrategy.OnVisible(),
+            HydrationStrategy.OnMediaQuery("(min-width: 1px)"),
+            HydrationStrategy.OnInteraction("click"),
+        ];
+
+        foreach (HydrationStrategy strategy in strategies)
+        {
+            ComponentNode root = new(
+                reference,
+                new ComponentInvocation(hydrationStrategy: strategy));
+
+            string html = await ServerRenderer.RenderToStringAsync(
+                new ServerRenderApplication(root, components));
+
+            html.ShouldBe(
+                HydrationMarkers.GetLazyHydrationStart(strategy.Kind)
+                + "<button>ready</button>"
+                + HydrationMarkers.LazyHydrationEnd);
+        }
+    }
+
+    [Fact]
+    public async Task RenderToStringAsync_LazyAsynchronousDefinition_EmitsOneBoundary()
+    {
+        AsynchronousComponentDefinition definition =
+            AsynchronousComponents.Define<AsynchronousWrapperIdentity>(
+                new AsynchronousComponentOptions
+                {
+                    Loader = _ => Task.FromResult(
+                        AsynchronousComponentTarget.From<AsynchronousTargetIdentity>()),
+                    HydrationStrategy = HydrationStrategy.OnIdle(),
+                });
+        ComponentFactory components = new();
+        components.Register(definition.Registration);
+        components.Register(
+            new ComponentRegistration(
+                ComponentReference.ForType(typeof(AsynchronousTargetIdentity)),
+                new ComponentContract(),
+                _ => new InlineComponent(
+                    _ => _ => Element("button", children: [new TextNode("ready")]))));
+
+        string html = await ServerRenderer.RenderToStringAsync(
+            new ServerRenderApplication(definition.CreateComponent(), components));
+
+        html.ShouldBe(
+            HydrationMarkers.GetLazyHydrationStart(HydrationStrategyKind.Idle)
+            + "<button>ready</button>"
+            + HydrationMarkers.LazyHydrationEnd);
+    }
+
+    [Fact]
     public async Task RenderToStringAsync_ServerPrefetch_CompletesBeforeSingleRender()
     {
         ComponentReference reference = ComponentReference.ForName("prefetch");
@@ -233,5 +297,15 @@ public sealed class ServerRendererTests
         }
 
         public ComponentRenderer Setup(ComponentContext context) => _setup(context);
+    }
+
+    private sealed class AsynchronousWrapperIdentity : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) => static _ => null;
+    }
+
+    private sealed class AsynchronousTargetIdentity : IComponent
+    {
+        public ComponentRenderer Setup(ComponentContext context) => static _ => null;
     }
 }

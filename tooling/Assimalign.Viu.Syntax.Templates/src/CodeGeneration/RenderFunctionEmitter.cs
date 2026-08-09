@@ -5,17 +5,18 @@ namespace Assimalign.Viu.Syntax.Templates;
 
 /// <summary>
 /// Serializes a <see cref="TransformResult"/>'s code-generation tree into a C# render-function body.
-/// Every render node becomes ordered statements against a caller-provided component instance and
-/// <c>ComponentRenderFrame</c>, with direct construction of the closed virtual-node algebra. This
-/// analyzer-host library still does not reference runtime assemblies: adopted runtime types are written
-/// as fully qualified names into consumer code. Specified by <c>[SFC-CG-1]</c> and <c>[SFC-CG-2]</c>.
+/// The selected target either constructs the closed virtual-node algebra against a
+/// <c>ComponentRenderFrame</c> or writes server markup directly with subtree-local virtual-node
+/// fallbacks. This analyzer-host library does not reference runtime assemblies: runtime type names are
+/// written as fully qualified names into consumer code. Specified by <c>[SFC-CG-1]</c>,
+/// <c>[SFC-CG-2]</c>, and <c>[SSR-COMPILE-1]</c>.
 /// </summary>
 /// <remarks>
 /// The emission is deterministic — ordinal string handling, invariant-culture numbers, LF newlines — and
-/// pure: equal input produces an equal <see cref="RenderFunctionEmitterResult"/>. Block assembly is an
-/// explicit sequence: <c>frame.OpenBlock()</c>, descendant construction and tracking, then
-/// <c>frame.CloseBlock()</c> in the owning node's render plan. This makes lifetime and nesting visible
-/// without ambient state. Specified by <c>[RND-BLOCK-3]</c>.
+/// pure: equal input produces an equal <see cref="RenderFunctionEmitterResult"/>. Virtual-node block
+/// assembly remains an explicit open, descendant construction/tracking, and close sequence; the server
+/// target preserves that sequence only in fallback regions and emits ordered buffer writes elsewhere.
+/// Specified by <c>[RND-BLOCK-3]</c> and <c>[SSR-COMPILE-2]</c>.
 /// </remarks>
 public static class RenderFunctionEmitter
 {
@@ -43,9 +44,33 @@ public static class RenderFunctionEmitter
             throw new ArgumentNullException(nameof(options));
         }
 
-        var writer = new FrameRenderCodeWriter(result, options.IndentLevel, options.IndentText);
-        var code = writer.EmitRenderBody();
-        var mappings = writer.SourceMappings;
+        string code;
+        IReadOnlyList<RenderSourceMapping> mappings;
+        switch (options.TargetProfile)
+        {
+            case RenderFunctionTargetProfile.VirtualNodeTree:
+                var frameWriter = new FrameRenderCodeWriter(result, options.IndentLevel, options.IndentText);
+                code = frameWriter.EmitRenderBody();
+                mappings = frameWriter.SourceMappings;
+                break;
+            case RenderFunctionTargetProfile.ServerMarkup:
+                if (!result.IsServerRendering)
+                {
+                    throw new InvalidOperationException(
+                        "The server-markup target requires a transform with IsServerRendering enabled.");
+                }
+
+                var serverWriter = new ServerRenderCodeWriter(result, options.IndentLevel, options.IndentText);
+                code = serverWriter.EmitRenderBody();
+                mappings = serverWriter.SourceMappings;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.TargetProfile,
+                    "Unknown render-function target profile.");
+        }
+
         return new RenderFunctionEmitterResult
         {
             Code = code,

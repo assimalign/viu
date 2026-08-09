@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -282,6 +283,43 @@ public sealed class SchedulerTests : IDisposable
         _pump.RunUntilIdle();
 
         runs.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task FlushAfterSynchronousRender_ThreadPoolFlushOwnsFlow_WaitsWithoutQueueRace()
+    {
+        Action? scheduledFlush = null;
+        using ManualResetEventSlim callbackEntered = new();
+        using ManualResetEventSlim releaseCallback = new();
+        int callbackRuns = 0;
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(
+            flush => scheduledFlush = flush);
+        Scheduler.QueuePostFlushCallback(
+            new SchedulerJob(() =>
+            {
+                callbackEntered.Set();
+                releaseCallback.Wait(TimeSpan.FromSeconds(5));
+                callbackRuns++;
+            }));
+        scheduledFlush.ShouldNotBeNull();
+
+        Task backgroundFlush = Task.Run(scheduledFlush!);
+        callbackEntered.Wait(TimeSpan.FromSeconds(5)).ShouldBeTrue();
+        Task synchronousFlush = Task.Run(Scheduler.FlushAfterSynchronousRender);
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(20));
+            synchronousFlush.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            releaseCallback.Set();
+        }
+
+        await Task.WhenAll(backgroundFlush, synchronousFlush)
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        callbackRuns.ShouldBe(1);
+        Scheduler.IsFlushing.ShouldBeFalse();
     }
 
     [Fact]

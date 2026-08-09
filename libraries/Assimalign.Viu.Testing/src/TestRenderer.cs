@@ -29,6 +29,7 @@ public sealed class TestRenderer
                 {
                     SnapshotSemantics = options.SnapshotSemantics,
                     StrictRemoval = options.StrictRemoval || options.SnapshotSemantics,
+                    HydrationTriggers = options.HydrationTriggers,
                 }));
     }
 

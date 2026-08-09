@@ -48,6 +48,12 @@ normalizes aliases, classifies listeners and fallthrough, validates values, and 
 Core owns default-value caching, warning timing, once-listener state, and fallthrough application
 (`[CMP-12]` through `[CMP-19]`).
 
+An invocation may also carry a `HydrationStrategy`. The strategy is a sealed data value rather than
+a callback: this keeps the component description immutable and host-neutral while allowing Core to
+ask the active host for an idle, visibility, media-query, or interaction trigger. An asynchronous
+definition may provide a default strategy, and an explicit invocation remains authoritative
+(`[HYD-LAZY-1]`).
+
 `ComponentContext` exposes only cross-cutting component operations: bindings, nullable services,
 lifecycle, reactive scope, watch scheduling, explicit parent context, emit, expose, warn, and scoped
 watch. Core supplies the live implementation. State, routing, styling, and host integrations attach
@@ -72,5 +78,5 @@ full diff (`[CMP-34]`).
 
 Components does not mount or patch trees, schedule updates, implement built-ins, serialize HTML,
 interpret DOM events, own application lifetime, discover constructors, or provide an ambient
-hierarchical dependency API. Scoped style identity is absent while scoped CSS is deferred
-(`[CMP-24]`, `[STY-1]`).
+hierarchical dependency API. Scoped style identity is absent from the component contract; generated
+native elements carry an ordinary static attribute instead (`[CMP-24]`, `[STY-1]`).

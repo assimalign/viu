@@ -13,3 +13,17 @@ static Assimalign.Viu.AsynchronousComponents.Define<TComponent>(Assimalign.Viu.A
 static Assimalign.Viu.DynamicComponents.Create(object? source, Assimalign.Viu.Components.ComponentInvocation? invocation = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.ElementBinding!>? bindings = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.VirtualNode!>? children = null, System.Collections.Generic.IEnumerable<Assimalign.Viu.Components.DirectiveInvocation!>? directives = null, object? key = null, Assimalign.Viu.Components.MountReference? mountReference = null, Assimalign.Viu.Components.RenderPlan? renderPlan = null) -> Assimalign.Viu.Components.VirtualNode!
 static Assimalign.Viu.DynamicComponents.Resolve(object? source) -> object?
 static Assimalign.Viu.Scheduler.NextTickAsync() -> System.Threading.Tasks.Task!
+Assimalign.Viu.HydrationTriggerRequest<TNode>
+Assimalign.Viu.HydrationTriggerRequest<TNode>.EndAnchor.get -> TNode
+Assimalign.Viu.HydrationTriggerRequest<TNode>.HydrationTriggerRequest(Assimalign.Viu.Components.HydrationStrategy! strategy, TNode startAnchor, TNode endAnchor, System.Action! trigger) -> void
+Assimalign.Viu.HydrationTriggerRequest<TNode>.StartAnchor.get -> TNode
+Assimalign.Viu.HydrationTriggerRequest<TNode>.Strategy.get -> Assimalign.Viu.Components.HydrationStrategy!
+Assimalign.Viu.HydrationTriggerRequest<TNode>.Trigger.get -> System.Action!
+Assimalign.Viu.IHydrationTriggerRegistration
+Assimalign.Viu.IHydrationTriggerRegistration.Complete() -> void
+Assimalign.Viu.AsynchronousComponentOptions.HydrationStrategy.get -> Assimalign.Viu.Components.HydrationStrategy!
+Assimalign.Viu.AsynchronousComponentOptions.HydrationStrategy.init -> void
+Assimalign.Viu.RendererOptions<TNode>.ScheduleHydrationTrigger.get -> System.Func<Assimalign.Viu.HydrationTriggerRequest<TNode>!, Assimalign.Viu.IHydrationTriggerRegistration!>?
+Assimalign.Viu.RendererOptions<TNode>.ScheduleHydrationTrigger.init -> void
+const Assimalign.Viu.HydrationMarkers.LazyHydrationEnd = "<!--lazy hydration end-->" -> string!
+static Assimalign.Viu.HydrationMarkers.GetLazyHydrationStart(Assimalign.Viu.Components.HydrationStrategyKind kind) -> string!

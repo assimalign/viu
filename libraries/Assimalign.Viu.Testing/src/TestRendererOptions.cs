@@ -12,4 +12,7 @@ public sealed record TestRendererOptions
 
     /// <summary>Gets whether removing the same host node more than once throws.</summary>
     public bool StrictRemoval { get; init; }
+
+    /// <summary>Gets the optional deterministic deferred-hydration trigger host.</summary>
+    public TestHydrationTriggers? HydrationTriggers { get; init; }
 }

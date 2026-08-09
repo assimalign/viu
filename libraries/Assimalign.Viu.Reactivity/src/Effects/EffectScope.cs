@@ -12,14 +12,11 @@ namespace Assimalign.Viu.Reactivity;
 /// values after <see cref="Stop()"/>; its cleanup is automatic, driven by the subscriber count
 /// (losing the last subscriber soft-detaches it from its sources). Nested scopes register with
 /// (and stop with) their parent unless created detached. The ambient
-/// <see cref="Reactive.CurrentScope"/> scope
-/// is a plain static field: NOT thread-safe by design, per the single-threaded JS event-loop
-/// model.
+/// <see cref="Reactive.CurrentScope"/> scope uses shared state on the single-threaded Browser event
+/// loop and execution-flow-local state in request-oriented hosts.
 /// </summary>
 public sealed class EffectScope : IReactiveEffectScope
 {
-    private static EffectScope? _current;
-
     private readonly bool _detached;
     private readonly List<ReactiveEffect> _effects = new();
     private readonly List<Action> _cleanups = new();
@@ -38,16 +35,17 @@ public sealed class EffectScope : IReactiveEffectScope
     internal EffectScope(bool detached = false)
     {
         _detached = detached;
-        _parent = _current;
-        if (!detached && _current is not null)
+        ReactivityExecutionState executionState = ReactivityExecutionIsolation.Current;
+        _parent = executionState.CurrentScope;
+        if (!detached && executionState.CurrentScope is not null)
         {
-            _index = (_current._scopes ??= new List<EffectScope>()).Count;
-            _current._scopes.Add(this);
+            _index = (executionState.CurrentScope._scopes ??= new List<EffectScope>()).Count;
+            executionState.CurrentScope._scopes.Add(this);
         }
     }
 
     /// <summary>The ambient scope that new effects and computeds register with, if any.</summary>
-    internal static EffectScope? Current => _current;
+    internal static EffectScope? Current => ReactivityExecutionIsolation.Current.CurrentScope;
 
     /// <summary>Whether the scope has not been stopped.</summary>
     public bool IsActive => _active;
@@ -79,10 +77,11 @@ public sealed class EffectScope : IReactiveEffectScope
     public void Run(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        var previous = _current;
+        ReactivityExecutionState executionState = ReactivityExecutionIsolation.Current;
+        EffectScope? previous = executionState.CurrentScope;
         if (_active)
         {
-            _current = this;
+            executionState.CurrentScope = this;
         }
         try
         {
@@ -90,7 +89,7 @@ public sealed class EffectScope : IReactiveEffectScope
         }
         finally
         {
-            _current = previous;
+            executionState.CurrentScope = previous;
         }
     }
 
@@ -105,10 +104,11 @@ public sealed class EffectScope : IReactiveEffectScope
     public TResult Run<TResult>(Func<TResult> function)
     {
         ArgumentNullException.ThrowIfNull(function);
-        var previous = _current;
+        ReactivityExecutionState executionState = ReactivityExecutionIsolation.Current;
+        EffectScope? previous = executionState.CurrentScope;
         if (_active)
         {
-            _current = this;
+            executionState.CurrentScope = this;
         }
         try
         {
@@ -116,7 +116,7 @@ public sealed class EffectScope : IReactiveEffectScope
         }
         finally
         {
-            _current = previous;
+            executionState.CurrentScope = previous;
         }
     }
 

@@ -50,6 +50,11 @@ start/stop/failure state machine. `Scheduler` orders component and watcher jobs,
 and drains pre-flush, commit, and post-flush phases [APP-1] through [APP-7] and [SCH-1] through
 [SCH-12].
 
+Browser uses one shared single-event-loop execution state. ServerRenderer enters a fresh internal
+Core/Reactivity/State execution state for every runtime-tree or compiled render, so independently
+owned request graphs do not share the current component, scope, tracking/batching state, active
+registry, or scheduler queues [EXE-1]. Individual graphs remain single-event-loop and not thread-safe.
+
 ## Hydration and development updates
 
 `HydrationMarkers` is the single marker vocabulary shared with serialization and hosts.
@@ -57,6 +62,12 @@ and drains pre-flush, commit, and post-flush phases [APP-1] through [APP-7] and 
 smallest mismatched range is remounted. Class and style comparison is semantic, and
 `data-allow-mismatch` suppresses expected divergence [SSR-MARKERS-1] through [SSR-MARKERS-3] and
 [HYD-1] through [HYD-7].
+
+For a deferred component marker range, Core adopts the existing host nodes immediately but leaves
+setup, effects, rendering, and descendant discovery dormant. It asks the host for one trigger,
+queues activation post-flush, reschedules when strategy data changes, and cancels registrations and
+queued work on unmount. Pending asynchronous definitions preserve adopted markup until their target
+or terminal error presentation is ready (`[HYD-LAZY-1]` through `[HYD-LAZY-5]`).
 
 Generated development builds call the hidden `ComponentHotReload.Register` binary interface with
 stable component and marker type identities. `ApplyUpdates` classifies marker sets without

@@ -16,7 +16,8 @@ Emit, Expose, Warn, concrete Watch), `ComponentBase`, `ComponentBindings` and it
 `Resolve`, `ComponentLifecycle`, `ComponentRegistration (Reference, Contract, Activator)`, and
 `IComponentFactory`/`ComponentFactory`. The runtime provides the single context implementation;
 conventions such as State attach only through `Services` and the ambient reactive scope and never
-earn a context member. Deliberately absent: any style-scope identity — scoped CSS is deferred.
+earn a context member. The model deliberately carries no style-scope identity; compiled trees stamp
+their static scope id as an ordinary element attribute (`[STY-1]`).
 
 `ComponentBindings.Resolve` performs the full pure resolution step: exact, camelized, and
 hyphenated parameter aliases; declared-listener and node-lifecycle filtering; fallthrough splitting;
@@ -41,6 +42,11 @@ Code-first components are `ComponentRegistration.Define(name, contract, setup)` 
 [ADR-0004](../../../../docs/adr/0004-composition-only-component-model.md); no options-object
 form); hand-built subtrees carry `RenderPlan.None` and patch by full diff unless plans are
 supplied.
+
+`ComponentInvocation.HydrationStrategy` is immutable, host-neutral metadata for adopting a
+server-rendered component now and activating it later. Immediate is the default; idle, visible,
+media-query, and interaction strategies carry only timing or matching data. Components never owns a
+browser observer, event listener, or scheduler callback (`[HYD-LAZY-1]`).
 
 Adopted disposition:
 [`../../../../docs/COMPONENT-MODEL-PLAN.md`](../../../../docs/COMPONENT-MODEL-PLAN.md) §2/§2a.

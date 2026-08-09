@@ -39,9 +39,8 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// </param>
 /// <param name="ScopeId">
 /// The scoped-CSS scope id (<c>data-v-&lt;hash&gt;</c>) when the component declares at least one
-/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]). Retained as style-
-/// compilation metadata; runtime scope-identifier emission is deferred during the component-model
-/// migration.
+/// <c>scoped</c> style block, otherwise <see langword="null"/> ([V01.01.06.04]). The template transform
+/// stamps this identifier on every emitted native element, keeping client and server output aligned.
 /// </param>
 /// <param name="ExtractedStyles">
 /// The component's compiled CSS — scoped style blocks rewritten with <see cref="ScopeId"/> and

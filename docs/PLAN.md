@@ -9,8 +9,8 @@ strategy behind it.
 
 ## Where Viu stands
 
-The proof-of-concept stage is complete. On 2026-08-08 this checkout built with **0 warnings and
-0 errors**, and its 27 solution test assemblies passed **2,632 tests with 0 failures**. The tree now
+The proof-of-concept stage is complete. On 2026-08-09 this checkout built with **0 warnings and
+0 errors**, and its 27 solution test assemblies passed **2,717 tests with 0 failures**. The tree now
 contains the host-neutral Application Model and renderer, explicit reactivity, the authored
 component model and closed virtual-node algebra, compiler-informed block patching, keyed
 reconciliation, browser/server/testing hosts, routing and state conventions, the build-time
@@ -52,8 +52,8 @@ with no area wrapper folders. The following table is the exact shipping-library 
 | Components (`V01.01.15`) | `Assimalign.Viu.Components` | The closed `VirtualNode` algebra, compiler/runtime flags, authored-component model, contracts, bindings, and activation registrations | Reactivity |
 | State (`V01.01.09`) | `Assimalign.Viu.State` | State-management convention above the component model, attached through its public seams | Components, Reactivity |
 | Core (`V01.01.03`) | `Assimalign.Viu.Core` | The Application Model: composition root, lifetime and middleware, renderer/scheduler engine, mounted bookkeeping, and public operations; its root namespace is `Assimalign.Viu` | Components, Reactivity, State |
-| Browser (`V01.01.04`) | `Assimalign.Viu.Browser` | Browser host: batched DOM interop, bindings, events, directives, transitions, and application bootstrap | Components, Core, Reactivity |
-| Server rendering (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | One-shot WHATWG HTML serialization host and hydration-marker protocol | Components, Core |
+| Browser (`V01.01.04`) | `Assimalign.Viu.Browser` | Browser host: batched DOM interop, bindings, events, directives, transitions, state restore, lazy-hydration triggers, and application bootstrap | Components, Core, Reactivity, State |
+| Server rendering (`V01.01.07`) | `Assimalign.Viu.ServerRenderer` | WHATWG HTML serialization, direct compiled markup, hydration markers, state islands, and host-neutral request adaptation | Components, Core, State |
 | Testing (`V01.01.11`) | `Assimalign.Viu.Testing` | DOM-free in-memory host and component test surface over the production renderer | Components, Core |
 | Router (`V01.01.08`) | `Assimalign.Viu.Router` | Host-free navigation convention: matching, history, route components, and guard pipeline | Components, Reactivity |
 | Browser router (`V01.01.08`) | `Assimalign.Viu.Browser.Router` | Leaf integration between Browser click dispatch and Router navigation | Core, Router, Browser |
@@ -169,8 +169,8 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W01** | Rendering, reactivity, browser-host, testing, solution, and CI foundations are delivered; every planned feature row is closed | No planned feature row remains |
 | **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered | Complete deferred compiler optimizations and diagnostic source attribution, then restore publish-size, trimming, and startup budget enforcement; startup timing still depends on the browser harness |
-| **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries | Close built-in edge cases, generated State/source-map work, hosted and multi-bundle CSS delivery, and the deferred scoped-CSS runtime |
-| **W05** | Host-neutral component-library and Browser SDK/framework segments, browser packaging, hydration foundations, editor hot-reload metadata, and a working `dotnet watch` CSS/component path exist | Finish server compiler/hosting and state hydration, lazy routing, runtime inspection, the browser harness, templates and the productized development loop, release automation, payload accounting, compatibility/conformance gates, and Cohesion hosting integration |
+| **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries; generated trees and compiled SSR now share static scoped-style attributes | Close built-in edge cases, generated State/source-map work, hosted and multi-bundle CSS delivery, and the deferred reactive scoped-CSS runtime |
+| **W05** | Host-neutral component-library and Browser SDK/framework segments, browser packaging, hydration foundations plus lazy activation, direct server compiler output, host-neutral SSR adaptation, SSR state round-tripping, editor hot-reload metadata, and a working `dotnet watch` CSS/component path exist | Finish lazy routing, runtime inspection, the browser harness, templates and the productized development loop, release automation, payload accounting, compatibility/conformance gates, Cohesion hosting integration, and automatic server-profile selection once a server SDK topology exists |
 | **W06** | Utility composition and semantic `@script` language-server work have begun | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
 This snapshot reconciles the plan with live issue state on 2026-08-09. Newly tracked follow-ups for
@@ -313,6 +313,7 @@ completed P0–P6 sequence, and verification record remain in
 | `V01.01.07.01` | Implement the SSR string renderer and helper library | W05 | P004 |
 | `V01.01.07.02` | Implement SSR compiler transforms for string-concatenation codegen | W05 | P005 |
 | `V01.01.07.03` | Implement the hydration walker | W05 | P004 |
+| `V01.01.07.03.01` | Implement lazy hydration strategies for idle, visibility, media, and interaction triggers | W05 | P005 |
 | `V01.01.07.04` | Implement the host-agnostic server adaptor for SSR hosting | W05 | P005 |
 | `V01.01.07.05` | Implement static prerendering (SSG) | W06 | P006 |
 

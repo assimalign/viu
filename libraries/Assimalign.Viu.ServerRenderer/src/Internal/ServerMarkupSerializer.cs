@@ -149,6 +149,15 @@ internal static class ServerMarkupSerializer
         ComponentNode component,
         IComponentRenderScope? parent)
     {
+        HydrationStrategyKind hydrationStrategy =
+            component.Invocation.HydrationStrategy?.Kind
+            ?? HydrationStrategyKind.Immediate;
+        bool isDeferredHydration = hydrationStrategy != HydrationStrategyKind.Immediate;
+        if (isDeferredHydration)
+        {
+            state.Push(HydrationMarkers.GetLazyHydrationStart(hydrationStrategy));
+        }
+
         await using IComponentRenderScope scope = await state.ComponentHost.RenderAsync(
             new ComponentRenderRequest(component, parent),
             state.CancellationToken).ConfigureAwait(false);
@@ -160,6 +169,11 @@ internal static class ServerMarkupSerializer
         else
         {
             await RenderAsync(state, scope.Tree, scope).ConfigureAwait(false);
+        }
+
+        if (isDeferredHydration)
+        {
+            state.Push(HydrationMarkers.LazyHydrationEnd);
         }
 
         // A complete component subtree is the streaming boundary required by [SSR-1].

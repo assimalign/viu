@@ -64,3 +64,26 @@ not corrupt the current pass ([STA-8]).
 Store activation and state copying use typed delegates. Deep watching traverses the
 source-generated `IReactiveObject` contract. State performs no dynamic code generation, runtime
 constructor discovery, or reflection-based state serialization.
+
+## Server payload and pre-mount restore
+
+Payload participation is definition-local and explicit. `IStateStoreSerializer<TStore>` writes one
+state value to a registry-owned `Utf8JsonWriter` and restores one `JsonElement` value. The standard
+`StateStoreJsonSerializer<TStore,TState>` reaches only the caller's `JsonTypeInfo<TState>` plus
+typed access and restore delegates, so trimming cannot select a reflection overload
+([V01.01.09.03], [STA-6], [EXE-4]).
+
+`StateStoreRegistry.CapturePayload()` serializes the current ordinal entry map. Definitions never
+resolved in that registry are absent; a resolved definition without a serializer is an actionable
+error instead of a silent omission. The resulting schema is exactly:
+
+```json
+{"version":1,"stores":{"store-key":{"shape":"belongs to the registered serializer"}}}
+```
+
+`RestorePayload` applies matching live entries immediately and retains the immutable payload for
+later definitions. `GetOrCreate` constructs the store in its ordinary registry-owned scope, applies
+the matching value before adding or returning the entry, and disposes the new store plus its scope
+if restoration fails. Browser invokes this operation after its bridge initializes but before mount;
+ServerRenderer also selects request-local setup and active-registry ambient state, so separately
+owned payload maps and reactive lifetimes cannot cross concurrent requests [EXE-1].

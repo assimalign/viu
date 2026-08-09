@@ -63,15 +63,34 @@ public sealed class AsynchronousComponentDefinition
         MountReference? mountReference = null,
         RenderPlan? renderPlan = null)
     {
+        ComponentInvocation resolvedInvocation = ResolveHydrationStrategy(invocation);
         return new ComponentNode(
             Reference,
-            invocation,
+            resolvedInvocation,
             key,
             mountReference,
             renderPlan);
     }
 
     internal AsynchronousComponentOptions Options => _options;
+
+    private ComponentInvocation ResolveHydrationStrategy(ComponentInvocation? invocation)
+    {
+        ComponentInvocation resolved = invocation ?? ComponentInvocation.Empty;
+        if (resolved.HydrationStrategy is not null
+            || _options.HydrationStrategy.Kind == HydrationStrategyKind.Immediate)
+        {
+            return resolved;
+        }
+
+        return new ComponentInvocation(
+            resolved.Arguments,
+            resolved.Slots,
+            resolved.Listeners,
+            resolved.Directives,
+            resolved.SlotStability,
+            _options.HydrationStrategy);
+    }
 
     internal AsynchronousComponentLoadLease AcquireLoad()
     {

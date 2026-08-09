@@ -1,4 +1,5 @@
 #nullable enable
+Assimalign.Viu.Browser.BrowserRendererHost.BrowserRendererHost(Assimalign.Viu.Browser.BrowserCommandFrameApplier! applyCommandFrame, System.Func<int, int>? parentNode, System.Func<int, int>? nextSibling, System.Func<int, string!>? snapshotHydration, System.Func<Assimalign.Viu.HydrationTriggerRequest<int>!, Assimalign.Viu.IHydrationTriggerRegistration!>? scheduleHydrationTrigger) -> void
 *REMOVED*Assimalign.Viu.Browser.ViuModelBinding
 *REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyList<string!>!
 *REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Setter.get -> System.Action<object?>!

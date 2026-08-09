@@ -172,6 +172,9 @@ namespace Demo
         generated.ShouldContain("public string Message = \"Hello\";");
         generated.ShouldContain("internal const string ExtractedStyles =");
         generated.ShouldContain(".box[data-v-");
+        generated.ShouldContain(
+            "ElementBinding.Attribute(new global::Assimalign.Viu.Components.QualifiedName(\"data-v-9d968641\"), " +
+            "string.Empty)");
         generated.ShouldNotContain("Scope" + "Identifier");
         generated.ShouldNotContain("internal const string ScopeId");
         _ = legacySnapshot;

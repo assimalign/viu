@@ -64,4 +64,11 @@ public sealed class RendererOptions<TNode>
 
     /// <summary>Gets the optional existing-subtree reader factory used for hydration.</summary>
     public Func<TNode, HydrationNodeReader<TNode>>? CreateHydrationReader { get; init; }
+
+    /// <summary>
+    /// Gets the optional host scheduler for marker-bounded deferred hydration. A host that omits
+    /// this capability rejects non-immediate strategies. Specified by <c>[HYD-LAZY-3]</c>.
+    /// </summary>
+    public Func<HydrationTriggerRequest<TNode>, IHydrationTriggerRegistration>?
+        ScheduleHydrationTrigger { get; init; }
 }

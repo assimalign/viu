@@ -54,6 +54,8 @@ internal sealed class BufferedBrowserNodeOperations
     private readonly Func<int, int> _nextSibling;
     private readonly Func<string, int, int, string?, (int First, int Last)>? _insertStaticContent;
     private readonly Func<int, string>? _snapshotHydration;
+    private readonly Func<HydrationTriggerRequest<int>, IHydrationTriggerRegistration>?
+        _scheduleHydrationTrigger;
 
     private BrowserEventInvokerRegistry? _previousInvokerRegistry;
     private BrowserDirectiveOperations? _previousDirectiveOperations;
@@ -67,7 +69,9 @@ internal sealed class BufferedBrowserNodeOperations
         Func<int, int> parentNode,
         Func<int, int> nextSibling,
         Func<string, int, int, string?, (int First, int Last)>? insertStaticContent,
-        Func<int, string>? snapshotHydration = null)
+        Func<int, string>? snapshotHydration = null,
+        Func<HydrationTriggerRequest<int>, IHydrationTriggerRegistration>?
+            scheduleHydrationTrigger = null)
     {
         _applier = applier;
         _querySelector = querySelector;
@@ -75,6 +79,7 @@ internal sealed class BufferedBrowserNodeOperations
         _nextSibling = nextSibling;
         _insertStaticContent = insertStaticContent;
         _snapshotHydration = snapshotHydration;
+        _scheduleHydrationTrigger = scheduleHydrationTrigger;
         _invokers = new BrowserEventInvokerRegistry(
             (handle, eventName, once, capture, passive) => _buffer.WriteAddEventListener(handle, eventName, once, capture, passive),
             (handle, eventName, capture) => _buffer.WriteRemoveEventListener(handle, eventName, capture));
@@ -154,6 +159,7 @@ internal sealed class BufferedBrowserNodeOperations
         CreateHydrationReader = _snapshotHydration is null
             ? null
             : CreateHydrationReader,
+        ScheduleHydrationTrigger = _scheduleHydrationTrigger,
     };
 
     /// <summary>
@@ -357,7 +363,8 @@ internal sealed class BufferedBrowserNodeOperations
                 var span = BrowserDomBridge.InsertStaticContent(content, parent, anchor, elementNamespace);
                 return (span[0], span[1]);
             },
-            static container => BrowserDomBridge.SnapshotHydration(container));
+            static container => BrowserDomBridge.SnapshotHydration(container),
+            BrowserLazyHydrationTriggerRegistration.Schedule);
         return operations;
     }
 

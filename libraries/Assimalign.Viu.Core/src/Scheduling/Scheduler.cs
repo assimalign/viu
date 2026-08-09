@@ -10,31 +10,99 @@ namespace Assimalign.Viu;
 /// Coalesces application work into ordered pre-flush, render, and post-flush phases.
 /// </summary>
 /// <remarks>
-/// The scheduler is ambient and deliberately single-threaded for the JavaScript event-loop model.
-/// Jobs queued during one synchronous turn share one continuation. Specified by <c>[SCH-1]</c>
+/// The scheduler is ambient and single-threaded within one logical execution flow. Browser work
+/// shares its JavaScript event-loop state; request-oriented hosts use isolated queues. Jobs queued
+/// during one synchronous turn share one continuation. A per-flow gate prevents a thread-pool
+/// fallback continuation from racing a synchronous renderer flush; callers still must not mutate
+/// one graph from several threads. Specified by <c>[EXE-1]</c>, <c>[EXE-3]</c>, and <c>[SCH-1]</c>
 /// through <c>[SCH-12]</c>.
 /// </remarks>
 public static class Scheduler
 {
     private const int RecursionLimit = 100;
 
-    private static readonly List<SchedulerJob> _queue = [];
-    private static readonly List<SchedulerJob> _pendingPostFlushCallbacks = [];
-    private static readonly List<Action> _pendingHostCommits = [];
-    private static List<SchedulerJob>? _activePostFlushCallbacks;
-    private static List<SchedulerJob>? _executedInFlushChain;
-    private static Action<Action>? _flushDispatcher;
-    private static int _flushIndex = -1;
-    private static bool _isFlushing;
-    private static bool _isFlushPending;
-    private static TaskCompletionSource? _flushCompletion;
-    private static long _nextInsertionSequence;
+    private static SchedulerExecutionState State => CoreExecutionIsolation.Current.Scheduler;
+
+    private static List<SchedulerJob> _queue => State.Queue;
+
+    private static List<SchedulerJob> _pendingPostFlushCallbacks =>
+        State.PendingPostFlushCallbacks;
+
+    private static List<Action> _pendingHostCommits => State.PendingHostCommits;
+
+    private static List<SchedulerJob>? _activePostFlushCallbacks
+    {
+        get => State.ActivePostFlushCallbacks;
+        set => State.ActivePostFlushCallbacks = value;
+    }
+
+    private static List<SchedulerJob>? _executedInFlushChain
+    {
+        get => State.ExecutedInFlushChain;
+        set => State.ExecutedInFlushChain = value;
+    }
+
+    private static Action<Action>? _flushDispatcher
+    {
+        get => State.FlushDispatcher;
+        set => State.FlushDispatcher = value;
+    }
+
+    private static int _flushIndex
+    {
+        get => State.FlushIndex;
+        set => State.FlushIndex = value;
+    }
+
+    private static bool _isFlushing
+    {
+        get => State.IsFlushing;
+        set => State.IsFlushing = value;
+    }
+
+    private static bool _isFlushPending
+    {
+        get => State.IsFlushPending;
+        set => State.IsFlushPending = value;
+    }
+
+    private static TaskCompletionSource? _flushCompletion
+    {
+        get => State.FlushCompletion;
+        set => State.FlushCompletion = value;
+    }
+
+    private static long _nextInsertionSequence
+    {
+        get => State.NextInsertionSequence;
+        set => State.NextInsertionSequence = value;
+    }
 
     /// <summary>Gets whether a flush is executing.</summary>
-    public static bool IsFlushing => _isFlushing;
+    public static bool IsFlushing
+    {
+        get
+        {
+            SchedulerExecutionState state = State;
+            lock (state.Synchronization)
+            {
+                return state.IsFlushing;
+            }
+        }
+    }
 
     /// <summary>Gets whether a continuation has been scheduled for pending work.</summary>
-    public static bool IsFlushPending => _isFlushPending;
+    public static bool IsFlushPending
+    {
+        get
+        {
+            SchedulerExecutionState state = State;
+            lock (state.Synchronization)
+            {
+                return state.IsFlushPending;
+            }
+        }
+    }
 
     /// <summary>
     /// Installs a deterministic continuation dispatcher and returns a lease that restores the
@@ -48,9 +116,16 @@ public static class Scheduler
     public static IDisposable UseFlushDispatcher(Action<Action> dispatcher)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
-        var registration = new FlushDispatcherRegistration(_flushDispatcher, dispatcher);
-        _flushDispatcher = dispatcher;
-        return registration;
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
+        {
+            var registration = new FlushDispatcherRegistration(
+                state,
+                state.FlushDispatcher,
+                dispatcher);
+            state.FlushDispatcher = dispatcher;
+            return registration;
+        }
     }
 
     /// <summary>
@@ -61,24 +136,28 @@ public static class Scheduler
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static void Reset()
     {
-        ClearQueuedFlag(_queue);
-        ClearQueuedFlag(_pendingPostFlushCallbacks);
-        if (_activePostFlushCallbacks is not null)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            ClearQueuedFlag(_activePostFlushCallbacks);
-        }
+            ClearQueuedFlag(_queue);
+            ClearQueuedFlag(_pendingPostFlushCallbacks);
+            if (_activePostFlushCallbacks is not null)
+            {
+                ClearQueuedFlag(_activePostFlushCallbacks);
+            }
 
-        _queue.Clear();
-        _pendingPostFlushCallbacks.Clear();
-        _pendingHostCommits.Clear();
-        _activePostFlushCallbacks = null;
-        _flushIndex = -1;
-        _isFlushing = false;
-        _isFlushPending = false;
-        _nextInsertionSequence = 0;
-        ResetExecutionCounters();
-        _flushCompletion?.TrySetResult();
-        _flushCompletion = null;
+            _queue.Clear();
+            _pendingPostFlushCallbacks.Clear();
+            _pendingHostCommits.Clear();
+            _activePostFlushCallbacks = null;
+            _flushIndex = -1;
+            _isFlushing = false;
+            _isFlushPending = false;
+            _nextInsertionSequence = 0;
+            ResetExecutionCounters();
+            _flushCompletion?.TrySetResult();
+            _flushCompletion = null;
+        }
     }
 
     /// <summary>
@@ -89,14 +168,18 @@ public static class Scheduler
     public static void QueueJob(SchedulerJob job)
     {
         ArgumentNullException.ThrowIfNull(job);
-        if ((job.Flags & SchedulerJobFlags.Queued) != 0)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            return;
-        }
+            if ((job.Flags & SchedulerJobFlags.Queued) != 0)
+            {
+                return;
+            }
 
-        _queue.Insert(FindInsertionIndex(job.OrderKey), job);
-        job.Flags |= SchedulerJobFlags.Queued;
-        ScheduleFlush();
+            _queue.Insert(FindInsertionIndex(job.OrderKey), job);
+            job.Flags |= SchedulerJobFlags.Queued;
+            ScheduleFlush();
+        }
     }
 
     /// <summary>
@@ -107,15 +190,19 @@ public static class Scheduler
     public static void QueuePostFlushCallback(SchedulerJob callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
-        if ((callback.Flags & SchedulerJobFlags.Queued) != 0)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            return;
-        }
+            if ((callback.Flags & SchedulerJobFlags.Queued) != 0)
+            {
+                return;
+            }
 
-        callback.InsertionSequence = _nextInsertionSequence++;
-        _pendingPostFlushCallbacks.Add(callback);
-        callback.Flags |= SchedulerJobFlags.Queued;
-        ScheduleFlush();
+            callback.InsertionSequence = _nextInsertionSequence++;
+            _pendingPostFlushCallbacks.Add(callback);
+            callback.Flags |= SchedulerJobFlags.Queued;
+            ScheduleFlush();
+        }
     }
 
     /// <summary>
@@ -123,41 +210,52 @@ public static class Scheduler
     /// from post-flush callbacks. Specified by <c>[SCH-9]</c>.
     /// </summary>
     /// <returns>The current flush completion, or a completed task when no work is queued.</returns>
-    public static Task NextTickAsync() => _flushCompletion?.Task ?? Task.CompletedTask;
+    public static Task NextTickAsync()
+    {
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
+        {
+            return state.FlushCompletion?.Task ?? Task.CompletedTask;
+        }
+    }
 
     /// <summary>Runs pending pre-flush jobs immediately in order-key order.</summary>
     /// <remarks>Used by a synchronous renderer before it patches its tree.</remarks>
     public static void FlushPreFlushCallbacks()
     {
-        for (int index = _isFlushing ? _flushIndex + 1 : 0; index < _queue.Count; index++)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            SchedulerJob job = _queue[index];
-            if (!job.IsPreFlush)
+            for (int index = _isFlushing ? _flushIndex + 1 : 0; index < _queue.Count; index++)
             {
-                continue;
-            }
+                SchedulerJob job = _queue[index];
+                if (!job.IsPreFlush)
+                {
+                    continue;
+                }
 
-            _queue.RemoveAt(index);
-            index--;
-            if (job.IsDisposed)
-            {
-                job.Flags &= ~SchedulerJobFlags.Queued;
-                continue;
-            }
+                _queue.RemoveAt(index);
+                index--;
+                if (job.IsDisposed)
+                {
+                    job.Flags &= ~SchedulerJobFlags.Queued;
+                    continue;
+                }
 
-            CheckRecursiveUpdates(job);
-            if (job.AllowRecurse)
-            {
-                job.Flags &= ~SchedulerJobFlags.Queued;
-            }
+                CheckRecursiveUpdates(job);
+                if (job.AllowRecurse)
+                {
+                    job.Flags &= ~SchedulerJobFlags.Queued;
+                }
 
-            try
-            {
-                job.Invoke();
-            }
-            finally
-            {
-                job.Flags &= ~SchedulerJobFlags.Queued;
+                try
+                {
+                    job.Invoke();
+                }
+                finally
+                {
+                    job.Flags &= ~SchedulerJobFlags.Queued;
+                }
             }
         }
     }
@@ -168,64 +266,72 @@ public static class Scheduler
     /// </summary>
     public static void FlushPostFlushCallbacks()
     {
-        if (_activePostFlushCallbacks is not null)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            return;
-        }
-
-        while (_pendingPostFlushCallbacks.Count > 0)
-        {
-            var callbacks = new List<SchedulerJob>(_pendingPostFlushCallbacks);
-            _pendingPostFlushCallbacks.Clear();
-            callbacks.Sort(static (left, right) =>
+            if (_activePostFlushCallbacks is not null)
             {
-                int orderComparison = left.OrderKey.CompareTo(right.OrderKey);
-                return orderComparison != 0
-                    ? orderComparison
-                    : left.InsertionSequence.CompareTo(right.InsertionSequence);
-            });
-            _activePostFlushCallbacks = callbacks;
+                return;
+            }
 
-            try
+            while (_pendingPostFlushCallbacks.Count > 0)
             {
-                for (int index = 0; index < callbacks.Count; index++)
+                var callbacks = new List<SchedulerJob>(_pendingPostFlushCallbacks);
+                _pendingPostFlushCallbacks.Clear();
+                callbacks.Sort(static (left, right) =>
                 {
-                    SchedulerJob callback = callbacks[index];
-                    if (callback.IsDisposed)
-                    {
-                        callback.Flags &= ~SchedulerJobFlags.Queued;
-                        continue;
-                    }
+                    int orderComparison = left.OrderKey.CompareTo(right.OrderKey);
+                    return orderComparison != 0
+                        ? orderComparison
+                        : left.InsertionSequence.CompareTo(right.InsertionSequence);
+                });
+                _activePostFlushCallbacks = callbacks;
 
-                    CheckRecursiveUpdates(callback);
-                    if (callback.AllowRecurse)
+                try
+                {
+                    for (int index = 0; index < callbacks.Count; index++)
                     {
+                        SchedulerJob callback = callbacks[index];
+                        if (callback.IsDisposed)
+                        {
+                            callback.Flags &= ~SchedulerJobFlags.Queued;
+                            continue;
+                        }
+
+                        CheckRecursiveUpdates(callback);
+                        if (callback.AllowRecurse)
+                        {
+                            callback.Flags &= ~SchedulerJobFlags.Queued;
+                        }
+
+                        callback.Invoke();
                         callback.Flags &= ~SchedulerJobFlags.Queued;
                     }
-
-                    callback.Invoke();
-                    callback.Flags &= ~SchedulerJobFlags.Queued;
                 }
-            }
-            catch
-            {
-                ClearQueuedFlag(callbacks);
-                throw;
-            }
-            finally
-            {
-                _activePostFlushCallbacks = null;
+                catch
+                {
+                    ClearQueuedFlag(callbacks);
+                    throw;
+                }
+                finally
+                {
+                    _activePostFlushCallbacks = null;
+                }
             }
         }
     }
 
     internal static void InvalidateJob(SchedulerJob job)
     {
-        int index = _queue.IndexOf(job);
-        if (index > _flushIndex)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            _queue.RemoveAt(index);
-            job.Flags &= ~SchedulerJobFlags.Queued;
+            int index = _queue.IndexOf(job);
+            if (index > _flushIndex)
+            {
+                _queue.RemoveAt(index);
+                job.Flags &= ~SchedulerJobFlags.Queued;
+            }
         }
     }
 
@@ -236,42 +342,50 @@ public static class Scheduler
             return;
         }
 
-        for (int index = 0; index < _pendingHostCommits.Count; index++)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            if (ReferenceEquals(_pendingHostCommits[index], commit))
+            for (int index = 0; index < _pendingHostCommits.Count; index++)
             {
-                return;
+                if (ReferenceEquals(_pendingHostCommits[index], commit))
+                {
+                    return;
+                }
             }
-        }
 
-        _pendingHostCommits.Add(commit);
+            _pendingHostCommits.Add(commit);
+        }
     }
 
     internal static void FlushAfterSynchronousRender()
     {
-        if (_isFlushing)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            return;
-        }
-
-        try
-        {
-            FlushPreFlushCallbacks();
-            FlushHostCommits();
-            FlushPostFlushCallbacks();
-            FlushHostCommits();
-
-            if (_isFlushPending && _queue.Count == 0 && _pendingPostFlushCallbacks.Count == 0)
+            if (_isFlushing)
             {
-                _isFlushPending = false;
-                CompleteFlushChain();
+                return;
             }
-        }
-        catch
-        {
-            AbandonFlush();
-            CompleteFlushChain();
-            throw;
+
+            try
+            {
+                FlushPreFlushCallbacks();
+                FlushHostCommits();
+                FlushPostFlushCallbacks();
+                FlushHostCommits();
+
+                if (_isFlushPending && _queue.Count == 0 && _pendingPostFlushCallbacks.Count == 0)
+                {
+                    _isFlushPending = false;
+                    CompleteFlushChain();
+                }
+            }
+            catch
+            {
+                AbandonFlush();
+                CompleteFlushChain();
+                throw;
+            }
         }
     }
 
@@ -306,71 +420,90 @@ public static class Scheduler
         _flushCompletion ??= new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
+        Action flush = CreateFlushAction();
         if (_flushDispatcher is not null)
         {
-            _flushDispatcher(static () => FlushJobs());
+            _flushDispatcher(flush);
             return;
         }
 
         SynchronizationContext? context = SynchronizationContext.Current;
         if (context is not null)
         {
-            context.Post(static _ => FlushJobs(), null);
+            context.Post(static state => ((Action)state!).Invoke(), flush);
             return;
         }
 
-        ThreadPool.UnsafeQueueUserWorkItem(static _ => FlushJobs(), null);
+        ThreadPool.UnsafeQueueUserWorkItem(static state => ((Action)state!).Invoke(), flush);
+    }
+
+    private static Action CreateFlushAction()
+    {
+        ExecutionContext? executionContext = ExecutionContext.Capture();
+        if (executionContext is null)
+        {
+            return FlushJobs;
+        }
+
+        return () => ExecutionContext.Run(
+            executionContext.CreateCopy(),
+            static _ => FlushJobs(),
+            null);
     }
 
     private static void FlushJobs()
     {
-        if (!_isFlushPending)
+        SchedulerExecutionState state = State;
+        lock (state.Synchronization)
         {
-            return;
-        }
-
-        _isFlushPending = false;
-        _isFlushing = true;
-        try
-        {
-            do
+            if (!_isFlushPending)
             {
-                for (_flushIndex = 0; _flushIndex < _queue.Count; _flushIndex++)
-                {
-                    SchedulerJob job = _queue[_flushIndex];
-                    if (job.IsDisposed)
-                    {
-                        job.Flags &= ~SchedulerJobFlags.Queued;
-                        continue;
-                    }
-
-                    CheckRecursiveUpdates(job);
-                    if (job.AllowRecurse)
-                    {
-                        job.Flags &= ~SchedulerJobFlags.Queued;
-                    }
-
-                    job.Invoke();
-                    job.Flags &= ~SchedulerJobFlags.Queued;
-                }
-
-                _queue.Clear();
-                _flushIndex = -1;
-                FlushHostCommits();
-                FlushPostFlushCallbacks();
-                FlushHostCommits();
+                return;
             }
-            while (_queue.Count > 0 || _pendingPostFlushCallbacks.Count > 0);
 
-            _isFlushing = false;
-            CompleteFlushChain();
-        }
-        catch
-        {
-            AbandonFlush();
-            _isFlushing = false;
-            CompleteFlushChain();
-            throw;
+            _isFlushPending = false;
+            _isFlushing = true;
+            try
+            {
+                do
+                {
+                    for (_flushIndex = 0; _flushIndex < _queue.Count; _flushIndex++)
+                    {
+                        SchedulerJob job = _queue[_flushIndex];
+                        if (job.IsDisposed)
+                        {
+                            job.Flags &= ~SchedulerJobFlags.Queued;
+                            continue;
+                        }
+
+                        CheckRecursiveUpdates(job);
+                        if (job.AllowRecurse)
+                        {
+                            job.Flags &= ~SchedulerJobFlags.Queued;
+                        }
+
+                        job.Invoke();
+                        job.Flags &= ~SchedulerJobFlags.Queued;
+                    }
+
+                    _queue.Clear();
+                    _flushIndex = -1;
+                    FlushHostCommits();
+                    FlushPostFlushCallbacks();
+                    FlushHostCommits();
+                }
+                while (_queue.Count > 0 || _pendingPostFlushCallbacks.Count > 0);
+
+                _isFlushing = false;
+                CompleteFlushChain();
+            }
+            catch
+            {
+                AbandonFlush();
+                _isFlushing = false;
+                CompleteFlushChain();
+                throw;
+            }
         }
     }
 
@@ -454,13 +587,16 @@ public static class Scheduler
 
     private sealed class FlushDispatcherRegistration : IDisposable
     {
+        private readonly SchedulerExecutionState _state;
         private readonly Action<Action>? _previous;
         private Action<Action>? _installed;
 
         internal FlushDispatcherRegistration(
+            SchedulerExecutionState state,
             Action<Action>? previous,
             Action<Action> installed)
         {
+            _state = state;
             _previous = previous;
             _installed = installed;
         }
@@ -472,14 +608,17 @@ public static class Scheduler
                 return;
             }
 
-            if (!ReferenceEquals(_flushDispatcher, _installed))
+            lock (_state.Synchronization)
             {
-                throw new InvalidOperationException(
-                    "Flush dispatcher leases must be disposed in reverse installation order.");
-            }
+                if (!ReferenceEquals(_state.FlushDispatcher, _installed))
+                {
+                    throw new InvalidOperationException(
+                        "Flush dispatcher leases must be disposed in reverse installation order.");
+                }
 
-            _flushDispatcher = _previous;
-            _installed = null;
+                _state.FlushDispatcher = _previous;
+                _installed = null;
+            }
         }
     }
 }

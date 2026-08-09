@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ViuProjectReference Include="Assimalign.Viu.Browser" />
+    <ViuProjectReference Include="Assimalign.Viu.State" />
   </ItemGroup>
 </Project>

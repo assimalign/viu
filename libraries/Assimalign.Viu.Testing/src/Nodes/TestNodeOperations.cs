@@ -177,6 +177,9 @@ public static class TestNodeOperations
             CreateHydrationReader = options.SnapshotSemantics
                 ? root => new FrozenTestHydrationReader(root)
                 : _ => TestHydrationReader.Instance,
+            ScheduleHydrationTrigger = options.HydrationTriggers is null
+                ? null
+                : options.HydrationTriggers.Schedule,
         };
     }
 

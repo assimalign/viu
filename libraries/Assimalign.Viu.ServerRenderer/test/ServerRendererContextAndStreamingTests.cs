@@ -68,16 +68,14 @@ public sealed class ServerRendererContextAndStreamingTests
     }
 
     [Fact]
-    public async Task SsrContext_StateBag_RemainsApplicationOwnedAndUninterpreted()
+    public async Task SsrContext_NoComposedStateRegistry_LeavesPayloadAbsent()
     {
         SsrContext context = new();
-        object state = new();
-        context.State["application"] = state;
 
         string html = await ServerRenderer.RenderToStringAsync(new TextNode("content"), context);
 
         html.ShouldBe("content");
-        context.State["application"].ShouldBeSameAs(state);
+        context.State.ShouldBeNull();
         context.Teleports.ShouldBeEmpty();
     }
 

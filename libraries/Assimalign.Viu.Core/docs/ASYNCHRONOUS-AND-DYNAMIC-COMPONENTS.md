@@ -63,6 +63,14 @@ renderer therefore waits for a successful or handled failed load before serializ
 resolved or error tree. This uses the ordinary component lifecycle contract rather than adding an
 HTTP, browser, or server-renderer dependency to Core.
 
+When an asynchronous definition declares deferred hydration, ServerRenderer emits one marker range
+around the wrapper. Core adopts that range without replacing its nodes, activates the wrapper only
+after the host trigger, and then waits for either the resolved target or a terminal timeout/error
+presentation before hydrating inside the range. The strategy is removed from the invocation
+forwarded to the resolved target, preventing a duplicate boundary and second trigger. Navigation or
+unmount cancels the registration, pending activation, and captured interaction (`[HYD-LAZY-2]`,
+`[HYD-LAZY-3]`).
+
 The wrapper forwards the latest raw arguments, slots, listeners, directives, key, and template
 reference to the resolved template request. The reference stays unset while loading, error, or
 empty presentation content is active, then receives the resolved component's exposed surface (or

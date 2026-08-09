@@ -2,16 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+using Assimalign.Viu.State;
+
 namespace Assimalign.Viu.ServerRenderer;
 
 /// <summary>
-/// Carries per-render teleport output and free-form state handed from server application code to
-/// the surrounding document host.
+/// Carries per-render teleport output and the versioned state-store payload handed to the
+/// surrounding document host.
 /// </summary>
 /// <remarks>
-/// One instance belongs to one render and is not thread-safe. The renderer never interprets or
-/// serializes <see cref="State"/> itself. Specified by <c>[SSR-7]</c>,
-/// <c>[SSR-MARKERS-2]</c>, and <c>[HYD-6]</c>.
+/// One instance belongs to one render and is not thread-safe. Store state is captured only through
+/// explicit serializers after component traversal, then emitted through the inert state island.
+/// Specified by <c>[SSR-7]</c>, <c>[SSR-MARKERS-2]</c>, <c>[HYD-6]</c>, and
+/// <c>[STA-9]</c>.
 /// </remarks>
 public sealed class SsrContext
 {
@@ -27,10 +30,16 @@ public sealed class SsrContext
     /// </remarks>
     public IReadOnlyDictionary<string, string> Teleports => _teleports;
 
-    /// <summary>Gets the deliberately unschematized per-render state handoff bag.</summary>
-    /// <remarks>The renderer leaves values untouched as required by <c>[SSR-7]</c>.</remarks>
-    public IDictionary<string, object?> State { get; } =
-        new Dictionary<string, object?>(StringComparer.Ordinal);
+    /// <summary>
+    /// Gets the versioned payload captured from the request's materialized state stores, or
+    /// <see langword="null"/> when the application has no payload-capable state registry.
+    /// </summary>
+    /// <remarks>
+    /// The payload schema is <c>{"version":1,"stores":{"store-key":state}}</c>. Values are
+    /// produced by each definition's explicit serializer and are safe to embed in a JSON island.
+    /// Specified by <c>[SSR-7]</c> and <c>[STA-9]</c>; constrained by <c>[EXE-4]</c>.
+    /// </remarks>
+    public StateStorePayload? State { get; internal set; }
 
     internal void AppendTeleport(string target, string content)
     {

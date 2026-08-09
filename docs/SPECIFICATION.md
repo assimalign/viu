@@ -125,15 +125,21 @@ Every later section depends on this one.
 
 ### 3.1 Threading
 
-`[EXE-1]` The Viu runtime targets **a single event loop and is not thread-safe**. Ambient `static`
-state — the scheduler's queues, the reactivity engine's tracking and batching stack — is a
-deliberate consequence of that model, not an oversight.
+`[EXE-1]` Each Viu application graph targets **one event loop and is not thread-safe**. Browser
+applications use one shared ambient execution state. A request-oriented host that runs independent
+graphs concurrently MUST enter a fresh logical execution flow for Core's current component and
+scheduler queues, Reactivity's tracking/batching/scope state, and State's setup/active-registry
+state. ServerRenderer establishes that boundary for every runtime-tree and compiled render. Values,
+scopes, registries, or scheduler jobs MUST NOT be shared across concurrent flows.
 
 `[EXE-2]` Every non-thread-safe public type MUST say so in its XML documentation.
 
-`[EXE-3]` A host MAY dispatch the scheduler's flush through a `SynchronizationContext`. When none is
-installed the flush falls back to the thread pool; on single-threaded browser WebAssembly that still
-lands on the main thread through the JavaScript event loop.
+`[EXE-3]` A host MAY dispatch the current logical flow's scheduler flush through a
+`SynchronizationContext`. When none is installed the flush falls back to the thread pool and carries
+that flow's execution context. A per-flow scheduler gate serializes the fallback continuation with a
+synchronous renderer flush; this prevents Viu from racing its own queues and does not authorize a
+caller to mutate one graph from several threads. On single-threaded browser WebAssembly dispatch
+still lands on the main thread through the JavaScript event loop.
 
 ### 3.2 AOT and trimming
 
@@ -907,12 +913,14 @@ exception is rethrown to the host.
 `[RND-HOST-1]` `RendererOptions<TNode>` is the complete host contract. Required operations:
 `Insert`, `Remove`, `CreateElement`, `CreateText`, `CreateComment`, `SetText`, `ParentNode`,
 `NextSibling`, `PatchAttribute`. Optional operations: `ResolveTeleportTarget`, `Commit`,
-`InsertStaticContent`, `CreateHydrationReader`. Style-scope stamping is absent while [STY-1] is
-Deferred; reintroduction is additive.
+`InsertStaticContent`, `CreateHydrationReader`, `ScheduleHydrationTrigger`. A generated static
+style-scope identifier is an ordinary element attribute under [STY-1]; no separate host stamping
+operation exists.
 
 `[RND-HOST-2]` A capability whose operation is absent is **unavailable, not degraded**. Rendering an
-`StaticNode` requires `InsertStaticContent`; hydration requires `CreateHydrationReader` and
-throws `NotSupportedException` without it.
+`StaticNode` requires `InsertStaticContent`; hydration requires `CreateHydrationReader`; and a
+non-immediate hydration strategy requires `ScheduleHydrationTrigger`. Each throws
+`NotSupportedException` when its capability is absent.
 
 `[RND-HOST-3]` **Core contains no host handles and no interop.** A host that uses a value-type
 handle reserves its default value for "no node". `Assimalign.Viu.Browser` is one adapter
@@ -1380,13 +1388,14 @@ compatibility", "Generator compatibility contract"; `docs/UTILITY-CSS-DESIGN.md`
 
 ### 10.1 Scoped CSS
 
-`[STY-1]` **Deferred under `[V01.01.06.12]`.** The `[V01.01.15]` arc is complete, but runtime
-style-scope identifiers remain parked. The adopted `ComponentContract`, `ComponentContext`,
-`VirtualNode` algebra, host contract, server serializer, and generated registration carry no
-style-scope state or stamping operation.
-Reintroduction is additive: it MAY add one contract/context value plus compiler, serializer, and host
-emission without changing the four-lifetime model. Until that work lands, this clause imposes no
-runtime scope-identifier requirement.
+`[STY-1]` A single-file component with a scoped style computes one stable
+`data-v-<path-derived-hash>` identifier. The template transform emits that identifier as an ordinary
+empty attribute binding on **every native element** in the interactive virtual-node tree, and the
+`ServerMarkup` profile writes the same attribute directly [SSR-COMPILE-3]. This static compiler
+stamping requires no `ComponentContract`, `ComponentContext`, `VirtualNode`, renderer-host, or
+server-serializer scope field. Hand-authored trees receive no implicit identifier. Runtime root
+restamping and reactive style-variable application remain deferred under `[V01.01.06.12]` and
+[STY-6].
 
 ### 10.2 CSS Modules
 
@@ -1460,7 +1469,9 @@ boundary:
 
 `[SSR-1]` `ServerRenderer.RenderToStringAsync` renders a configured `ServerRenderApplication` to a string;
 `RenderToStreamAsync` writes **completed component subtrees** to a `TextWriter` and awaits the
-writer's `FlushAsync`, so the destination controls backpressure.
+writer's `FlushAsync`. The host adaptor exposes the same write/flush boundary as
+`IServerRenderOutput`, so a `PipeWriter`, response body, or other host destination controls its own
+buffering and backpressure without entering ServerRenderer's dependency graph.
 
 `[SSR-2]` `ServerRenderApplication` is a plain per-render composition object carrying an immutable
 `IApplicationContext` **without a host node type**. It does not implement `IApplication`, owns no
@@ -1488,8 +1499,33 @@ style; renders boolean attributes by presence; preserves SVG and custom-element 
 an unsafe dynamic attribute name rather than attempting to escape it. `innerHTML` is the explicit
 raw-HTML path; `textContent` and a textarea's `value` are escaped and suppress child serialization.
 
-`[SSR-7]` `SsrContext` carries per-render teleport output and a free-form state handoff bag. Enabled
-teleport children belong to another target and are **buffered** until the render resolves.
+`[SSR-7]` `SsrContext` carries per-render teleport output and an optional, versioned
+`StateStorePayload`. Enabled teleport children belong to another target and are **buffered** until
+the render resolves. After traversal, a payload-capable application state registry captures only
+materialized stores into `{"version":1,"stores":{"key":state}}`; ServerRenderer stores that payload
+on the context and appends one inert `<script type="application/json" data-viu-state>` island. The
+island contains normalized JSON with HTML-sensitive characters escaped and never executable script.
+
+`[SSR-COMPILE-1]` `RenderFunctionTargetProfile.ServerMarkup` is the explicit build-time SSR target
+on the public Templates compiler facade. It accepts only a transform produced with
+`TransformOptions.IsServerRendering`; the default profile remains `VirtualNodeTree`, so selecting
+SSR cannot alter Browser code generation.
+
+`[SSR-COMPILE-2]` The server-markup profile coalesces provably serializable native markup into
+ordered `SsrRenderState.Push` calls and uses public ServerRenderer helpers for dynamic values. A
+static structure with interpolations allocates **zero `VirtualNode` instances**. Components and
+unsupported subtrees use a subtree-local virtual-node fallback and rejoin the same render state.
+
+`[SSR-COMPILE-3]` Direct output obeys [SSR-6]: interpolation and attributes escape identically;
+class and style use the shared normalizers; model directives emit `value`, `checked`, or `selected`;
+show directives append `display:none`; and every native element receives the transformed scope
+identifier. Suspense renders its default content, Transition is a markup pass-through, and Teleport
+uses the ordinary context target buffer and unchanged marker protocol.
+
+`[SSR-COMPILE-4]` `CompiledServerRender` and `ServerRender.RenderCompiledTo{String,Stream}Async`
+create renderer-owned request state, preserve cancellation, component-fallback flushes, teleports,
+state capture, and the final flush. Executed differential fixtures MUST byte-match the runtime-tree
+serializer, including escaping, normalization, fallback regions, and hydration markers.
 
 ### 11.2 The hydration marker protocol
 
@@ -1505,6 +1541,7 @@ to the hydration protocol.
 | Void element | `<tag attributes>` |
 | Fragment | `<!--[-->children<!--]-->` |
 | Component | the rendered subtree, with no wrapper |
+| Deferred component | `<!--lazy hydration idle\|visible\|media query\|interaction-->` + rendered subtree + `<!--lazy hydration end-->` |
 | Enabled teleport | `<!--teleport start--><!--teleport end-->` |
 | Disabled teleport | `<!--teleport start-->children<!--teleport end-->` |
 
@@ -1547,6 +1584,43 @@ already carries the trailing `<!--teleport anchor-->` the walker requires.
 
 `[HYD-7]` **Limit.** Suspense hydration throws [BLT-12].
 
+`[HYD-8]` A hydrating Browser application with composed state initializes the bridge, consumes and
+removes the single `script[data-viu-state]` island, validates schema version 1, and restores the
+payload-capable registry **before mount-target resolution, component setup, or first render**.
+Removing the island before the hydration snapshot keeps an island placed inside the mount container
+from becoming an extra root sibling. A missing island or incompatible registry fails before
+rendering rather than silently hydrating from default state.
+
+`[HYD-LAZY-1]` `ComponentInvocation.HydrationStrategy` is immutable invocation metadata. Immediate
+is the default. Idle, visible, media-query, and interaction strategies carry only host-neutral data;
+an asynchronous component definition may supply a default that an explicit invocation overrides.
+
+`[HYD-LAZY-2]` ServerRenderer surrounds a deferred component with the fixed markers in
+[SSR-MARKERS-1]. During the initial walk Core validates and adopts that complete marker-bounded
+range as opaque markup: host nodes retain identity, while component activation, setup, rendering,
+effects, and descendant lazy-boundary discovery remain deferred. Nested boundaries therefore
+register only after their deferred parent activates; an eager parent discovers its lazy child during
+the ordinary walk. An asynchronous definition owns exactly one outer boundary: its resolved target
+does not inherit the strategy, and Core waits for either target readiness or the wrapper's terminal
+error presentation before walking the adopted subtree.
+
+`[HYD-LAZY-3]` Core requests a trigger through `ScheduleHydrationTrigger` and schedules activation
+as a post-flush job. The host delivers a trigger asynchronously after registration, and each trigger
+activates at most once. Patching retains the latest dormant invocation, a change to Immediate
+activates, and any strategy-data change replaces the registration. Unmount or navigation before
+activation cancels the job and disposes every observer/listener.
+
+`[HYD-LAZY-4]` Browser maps idle to `requestIdleCallback` with a timer fallback, visible to
+`IntersectionObserver` over every top-level element in the marker range, media-query to `matchMedia`,
+and interaction to capture listeners scoped to the marker range. Testing supplies
+`TestHydrationTriggers`, whose explicit trigger methods enter the same Core post-flush path without a
+DOM or clock.
+
+`[HYD-LAZY-5]` **Interaction decision.** Browser captures only the first configured interaction
+inside a dormant boundary, prevents its premature delivery, and replays an equivalent event after
+Core activates and schedules the host commit. Cancellation before activation drops the captured
+event. Later interactions use the ordinary mounted listeners.
+
 ### 11.4 The hosting boundary
 
 `[SSR-8]` **No `Assimalign.Viu.*` library may reference a web framework.** Hosting is a downstream
@@ -1554,8 +1628,12 @@ adapter over a host-agnostic contract. ServerRenderer references Components and 
 has no DOM, Browser, WebView2, or JavaScript-interop dependency.
 
 `[SSR-9]` A server host SHOULD create **one server-render application per request** when services or
-state are request-scoped. The supplied factory, service provider, and state registry are borrowed
-and are never disposed by ServerRenderer [CMP-9], [APP-6].
+state are request-scoped. `ServerRenderAdaptor<TContext>` requires a structurally new
+`ServerRenderApplication` and `SsrContext` identity for every request and rejects reuse. Its factory,
+service provider, component factory, and state registry are borrowed and are never disposed by
+ServerRenderer [CMP-9], [APP-6]; the adaptor always disposes the request scope. Both identities are
+consumed before root validation because a rejected scope is still disposed and cannot safely
+reappear. Each render enters the independent logical execution state required by [EXE-1].
 
 `[SSR-10]` `ComponentHost.RenderAsync(ComponentRenderRequest, CancellationToken = default)` returns an
 `IComponentRenderScope` exposing exactly `VirtualNode? Tree` and `ComponentContext Context`.
@@ -1563,6 +1641,15 @@ The operation resolves and activates one registration, runs setup inside the com
 server prefetch, and invokes the renderer once. `DisposeAsync` aborts and releases the lease without
 client mount, update, or unmount hooks. A nested `ComponentRenderRequest` carries the active parent
 scope; Core uses that scope's still-valid `Context` as the nested component's parent.
+
+`[SSR-11]` `ServerRenderAdaptor<TContext>` creates exactly one typed request scope, validates that
+its application root is the request root, streams through `IServerRenderOutput`, awaits every flush,
+and disposes the scope on success, render/output failure, cancellation, and partial response. It has
+no HTTP status, header, route, or framework policy.
+
+`[SSR-12]` Ordinary adaptor failures return `ServerRenderResult` with the failure and whether output
+had started, allowing the downstream host to choose its response policy. Request cancellation
+propagates as `OperationCanceledException`; it is never converted into an ordinary failure result.
 
 *Authority: `libraries/Assimalign.Viu.ServerRenderer/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Assimalign.Viu.Core/src/Rendering/{Renderer.Hydration.cs,HydrationNodeReader{TNode}.cs,HydrationNodeKind.cs}`;
@@ -1680,6 +1767,14 @@ remains a single notification because it wraps its writes in a batch.
 `[STA-8]` Actions are observable **only** when their implementation uses the protected action
 helper — there is no interception layer [RCT-6]. Asynchronous helpers await the task before running
 the after-hook, so it receives the resolved value; faults run error hooks and then propagate.
+
+`[STA-9]` SSR persistence is explicit and reflection-free. A serializable definition registers an
+`IStateStoreSerializer<TStore>` (the supplied JSON implementation requires `JsonTypeInfo<TState>`).
+Capture includes only stores materialized in that registry and fails actionably when one lacks a
+serializer. Restore applies immediately to an existing store or stages state until its first
+`GetOrCreate`; either path applies before the caller observes the store. Keys are non-empty,
+request-local, ordinal strings, schema version 1 is strict, and normalized JSON is safe for the inert
+state island [SSR-7], [EXE-4].
 
 *Authority: `libraries/Assimalign.Viu.State/{src,docs/{OVERVIEW,DESIGN}.md}`;
 `docs/COMPONENT-MODEL-PLAN.md` §2a.*

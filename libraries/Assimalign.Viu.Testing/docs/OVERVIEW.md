@@ -24,6 +24,10 @@ plain CoreCLR test host with no DOM, browser, WASM toolchain, or JavaScript inte
   pre-walk matching a one-read browser snapshot.
 - `TestSchedulerPump` installs through `Scheduler.UseFlushDispatcher` and restores through its
   returned lease. `ComponentTest` also uses `Scheduler.Reset` at mount boundaries.
+- `TestHydrationTriggers` is the deterministic host seam for idle, visible, media-query, and
+  interaction activation. Trigger methods enter Core's ordinary post-flush path; counters expose
+  completion and interaction replay without a DOM or wall clock (`[HYD-LAZY-3]` through
+  `[HYD-LAZY-5]`).
 
 ## Public-seam boundary
 

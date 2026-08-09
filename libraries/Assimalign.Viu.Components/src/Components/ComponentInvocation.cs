@@ -8,8 +8,9 @@ namespace Assimalign.Viu.Components;
 /// </summary>
 /// <remarks>
 /// Arguments, slots, listeners, and directives are copied when the invocation is constructed and
-/// are never contract-resolved in place. Specified by <c>[CMP-2]</c>, <c>[CMP-7]</c>, and
-/// <c>[CMP-18]</c>.
+/// are never contract-resolved in place. Hydration policy remains data-only invocation metadata.
+/// Specified by <c>[CMP-2]</c>, <c>[CMP-7]</c>, <c>[CMP-18]</c>, and
+/// <c>[HYD-LAZY-1]</c>.
 /// </remarks>
 public sealed class ComponentInvocation
 {
@@ -31,12 +32,17 @@ public sealed class ComponentInvocation
     /// <see cref="Components.SlotStability.Stable"/>; callers whose slot structure can change must
     /// explicitly select <see cref="Components.SlotStability.Dynamic"/>.
     /// </param>
+    /// <param name="hydrationStrategy">
+    /// The optional invocation-local activation policy for adopted server markup. A null value
+    /// lets an asynchronous definition supply its default; ordinary invocations hydrate eagerly.
+    /// </param>
     public ComponentInvocation(
         IReadOnlyDictionary<string, object?>? arguments = null,
         IReadOnlyDictionary<string, ComponentSlot>? slots = null,
         IReadOnlyDictionary<string, ComponentEventListener>? listeners = null,
         IEnumerable<DirectiveInvocation>? directives = null,
-        SlotStability slotStability = SlotStability.Stable)
+        SlotStability slotStability = SlotStability.Stable,
+        HydrationStrategy? hydrationStrategy = null)
     {
         if (slotStability is not SlotStability.Stable
             and not SlotStability.Dynamic
@@ -54,6 +60,7 @@ public sealed class ComponentInvocation
         Listeners = CollectionSnapshot.CopyNonNullDictionary(listeners, nameof(listeners));
         Directives = CollectionSnapshot.CopyNonNull(directives, nameof(directives));
         SlotStability = slotStability;
+        HydrationStrategy = hydrationStrategy;
     }
 
     /// <summary>Gets raw named arguments before contract resolution.</summary>
@@ -74,4 +81,10 @@ public sealed class ComponentInvocation
     /// component by Core. Specified by <c>[CMP-18]</c> and <c>[CMP-19]</c>.
     /// </summary>
     public SlotStability SlotStability { get; }
+
+    /// <summary>
+    /// Gets the invocation-local hydration strategy, or null when the definition supplies the
+    /// default eager behavior. Specified by <c>[HYD-LAZY-1]</c>.
+    /// </summary>
+    public HydrationStrategy? HydrationStrategy { get; }
 }

@@ -23,4 +23,16 @@ restores the ambient setup context even when setup fails. Removing a definition 
 lifetime; disposing the registry ends every store lifetime and clears the ambient registry when it
 points to that registry ([STA-2], [STA-3]).
 
+SSR state uses an explicit `IStateStoreSerializer<TStore>` on each participating definition.
+`StateStoreJsonSerializer<TStore,TState>` accepts state-access and restore delegates plus a
+source-generated `JsonTypeInfo<TState>`; no reflection serializer fallback exists. A capture
+contains only materialized stores and fails actionably if one lacks registration. Restore updates
+an already materialized store immediately and stages unmatched keys so a later `GetOrCreate`
+applies server state before returning the store ([V01.01.09.03], [EXE-4]).
+
+`StateStorePayload` uses the fixed schema
+`{"version":1,"stores":{"store-key":state}}`. It validates version, member shape, and ordinal
+store-key uniqueness, then exposes normalized JSON with HTML-sensitive characters and Unicode line
+separators escaped for inert script-island transport.
+
 See [DESIGN.md](DESIGN.md) for lifetime, scheduler, and AOT boundaries.

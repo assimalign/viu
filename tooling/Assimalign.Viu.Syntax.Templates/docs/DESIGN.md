@@ -234,6 +234,45 @@ The template compiler remains a runtime-reference-free `netstandard2.0` assembly
 names occur only in emitted source. `FrameRenderCodeWriter`, generator snapshots, and the compiled-fixture
 suite jointly pin the contract.
 
+### Direct server-markup target ([V01.01.07.02])
+
+`RenderFunctionEmitterOptions.TargetProfile` selects a second build-time lowering over the same parsed
+template. `VirtualNodeTree` remains the default and preserves the interactive contract. `ServerMarkup`
+requires a transform with `IsServerRendering=true`, then emits an asynchronous method body over the
+enclosing method's `state`, `component`, `frame`, and `parent` parameters.
+
+`ServerRenderCodeWriter` keeps native, provably serializable structure on a direct path:
+
+- literal markup is HTML-escaped at compile time and coalesced into `state.Push(...)` calls;
+- interpolations and dynamic attributes call the public ServerRenderer normalizers, preserving the
+  current WHATWG escaping, Boolean-attribute, class, style, and property rules;
+- `v-model` writes input values/check state, textarea content, and option selection; `v-show` composes
+  `display:none;` into the authored style position; a scoped-style id is written on every native
+  element;
+- fragments and structural branches use Core's named `HydrationMarkers`, never duplicated marker
+  literals; Teleport, Suspense, and Transition lower to the ServerRenderer helper protocol, default
+  content, and pass-through children respectively.
+
+A dynamic component or property shape the direct writer cannot prove serializable invokes a local
+`FrameRenderCodeWriter` body and passes its resulting subtree to `SsrRenderComponentAsync`. The fallback
+therefore shares one `SsrRenderState` with adjacent direct output: cancellation, component ownership,
+escaping, markers, streaming, state handoff, and teleport resolution stay in the renderer-owned
+protocol. The compiler assembly still references no runtime assembly; all runtime names exist only in
+the emitted consumer source.
+
+`ServerRenderFunctionEmitterTests` snapshot the allocation-free direct body, form/show/scope transforms,
+built-ins, and fallback source. `CompiledServerRenderDifferentialTests` compile the emitted body in the
+test host and execute it through the production compiled-body seam against equivalent virtual trees,
+including escaping, attribute order, forms, scope ids, structural markers, and both dynamic-component
+and property-spread fallbacks.
+
+The profile is currently an explicit compiler facade rather than the default single-file-component
+projection. Automatic dual emission needs a server-targeting SDK/reference contract first: the base and
+Browser targeting frameworks intentionally do not expose `Assimalign.Viu.ServerRenderer`, so emitting
+server helper references unconditionally would break otherwise valid component libraries and add the
+server serializer to Browser applications. That integration must select the server profile only where
+the generated runtime helper contract is present.
+
 ### Browser directive integration ([V01.01.04.09])
 
 Browser behavior remains Browser-owned. The template compiler recognizes the structural helper tokens in

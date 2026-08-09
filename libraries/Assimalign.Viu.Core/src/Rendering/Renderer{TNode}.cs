@@ -168,6 +168,10 @@ public sealed partial class Renderer<TNode>
                 views.Add(component.View);
                 CollectMountedComponentViews(component.Subtree, views);
                 break;
+            case MountedLazyHydration<TNode> lazyHydration
+                when lazyHydration.ActivatedComponent is { } activated:
+                CollectMountedComponentViews(activated, views);
+                break;
             case MountedElement<TNode> element:
                 CollectMountedComponentViews(element.Children, views);
                 break;
@@ -254,6 +258,9 @@ public sealed partial class Renderer<TNode>
                 break;
             case (MountedComponent<TNode> component, ComponentNode componentValue):
                 PatchComponent(tree, component, componentValue, container);
+                break;
+            case (MountedLazyHydration<TNode> lazyHydration, ComponentNode componentValue):
+                PatchLazyHydration(tree, lazyHydration, componentValue, container);
                 break;
             case (MountedTeleport<TNode> teleport, TeleportNode teleportValue):
                 PatchTeleport(tree, teleport, teleportValue, container);
@@ -986,6 +993,16 @@ public sealed partial class Renderer<TNode>
                 }
 
                 return ReplaceMountedNodeReference(component.Subtree, current, replacement);
+            case MountedLazyHydration<TNode> lazyHydration
+                when lazyHydration.ActivatedComponent is { } activated:
+                if (ReferenceEquals(activated, current)
+                    && replacement is MountedComponent<TNode> replacementComponent)
+                {
+                    lazyHydration.ActivatedComponent = replacementComponent;
+                    return true;
+                }
+
+                return ReplaceMountedNodeReference(activated, current, replacement);
             case MountedElement<TNode> element:
                 return ReplaceMountedNodeReference(element.Children, current, replacement);
             case MountedRange<TNode> range:
@@ -1267,6 +1284,10 @@ public sealed partial class Renderer<TNode>
                 break;
             case MountedComponent<TNode> component:
                 CollectDirectiveHostElements(component.Subtree, localName, elements);
+                break;
+            case MountedLazyHydration<TNode> lazyHydration
+                when lazyHydration.ActivatedComponent is { } activated:
+                CollectDirectiveHostElements(activated, localName, elements);
                 break;
             case MountedRange<TNode> range:
                 for (int index = 0; index < range.Children.Count; index++)
@@ -1712,6 +1733,13 @@ public sealed partial class Renderer<TNode>
             case MountedComponent<TNode> component:
                 Move(component.Subtree, container, anchor);
                 break;
+            case MountedLazyHydration<TNode> lazyHydration:
+                MoveRange(
+                    lazyHydration.StartAnchor,
+                    lazyHydration.EndAnchor,
+                    container,
+                    anchor);
+                break;
             case MountedElement<TNode> element:
                 _options.Insert(element.HostNode, container, anchor);
                 break;
@@ -1767,11 +1795,17 @@ public sealed partial class Renderer<TNode>
         }
 
         UnmountVisitCount++;
-        ClearReference(tree, mounted);
+        if (mounted is not MountedLazyHydration<TNode>)
+        {
+            ClearReference(tree, mounted);
+        }
         switch (mounted)
         {
             case MountedComponent<TNode> component:
                 UnmountComponent(tree, component, removeHostNodes);
+                break;
+            case MountedLazyHydration<TNode> lazyHydration:
+                UnmountLazyHydration(tree, lazyHydration, removeHostNodes);
                 break;
             case MountedElement<TNode> element:
                 ElementNode elementValue = (ElementNode)element.Value;
@@ -2026,6 +2060,7 @@ public sealed partial class Renderer<TNode>
         }
 
         return mounted is MountedComponent<TNode>
+            or MountedLazyHydration<TNode>
             or MountedTeleport<TNode>
             or MountedKeepAlive<TNode>
             or MountedSuspense<TNode>
@@ -2163,6 +2198,9 @@ public sealed partial class Renderer<TNode>
             MountedComponent<TNode> component when component.Context.HasExposedValue =>
                 component.Context.ExposedValue,
             MountedComponent<TNode> component => component.Instance,
+            MountedLazyHydration<TNode> lazyHydration
+                when lazyHydration.ActivatedComponent is { } activated =>
+                ReferenceValue(activated),
             MountedElement<TNode> element => element.HostNode,
             MountedLeaf<TNode> leaf => leaf.HostNode,
             _ => mounted.FirstHostNode,

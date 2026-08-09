@@ -1,3 +1,25 @@
 #nullable enable
 *REMOVED*Assimalign.Viu.State.StateStoreDefinition<TStore>.Dispose(Assimalign.Viu.State.IStateStoreRegistry! registry) -> bool
+Assimalign.Viu.State.IStateStorePayloadRegistry
+Assimalign.Viu.State.IStateStorePayloadRegistry.CapturePayload() -> Assimalign.Viu.State.StateStorePayload!
+Assimalign.Viu.State.IStateStorePayloadRegistry.RestorePayload(Assimalign.Viu.State.StateStorePayload! payload) -> void
+Assimalign.Viu.State.IStateStoreSerializer<TStore>
+Assimalign.Viu.State.IStateStoreSerializer<TStore>.Restore(TStore! stateStore, System.Text.Json.JsonElement state) -> void
+Assimalign.Viu.State.IStateStoreSerializer<TStore>.Serialize(System.Text.Json.Utf8JsonWriter! writer, TStore! stateStore) -> void
 Assimalign.Viu.State.StateStoreDefinition<TStore>.Remove(Assimalign.Viu.State.IStateStoreRegistry! registry) -> bool
+Assimalign.Viu.State.StateStoreDefinition<TStore>.Serializer.get -> Assimalign.Viu.State.IStateStoreSerializer<TStore!>?
+Assimalign.Viu.State.StateStoreDefinition<TStore>.StateStoreDefinition(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer) -> void
+Assimalign.Viu.State.StateStoreJsonSerializer<TStore, TState>
+Assimalign.Viu.State.StateStoreJsonSerializer<TStore, TState>.Restore(TStore! stateStore, System.Text.Json.JsonElement state) -> void
+Assimalign.Viu.State.StateStoreJsonSerializer<TStore, TState>.Serialize(System.Text.Json.Utf8JsonWriter! writer, TStore! stateStore) -> void
+Assimalign.Viu.State.StateStoreJsonSerializer<TStore, TState>.StateStoreJsonSerializer(System.Func<TStore!, TState>! getState, System.Action<TStore!, TState>! restoreState, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TState>! jsonTypeInformation) -> void
+Assimalign.Viu.State.StateStorePayload
+Assimalign.Viu.State.StateStorePayload.Json.get -> string!
+Assimalign.Viu.State.StateStorePayload.StoreKeys.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Assimalign.Viu.State.StateStorePayload.Version.get -> int
+Assimalign.Viu.State.StateStoreRegistry.CapturePayload() -> Assimalign.Viu.State.StateStorePayload!
+Assimalign.Viu.State.StateStoreRegistry.RestorePayload(Assimalign.Viu.State.StateStorePayload! payload) -> void
+const Assimalign.Viu.State.StateStorePayload.CurrentVersion = 1 -> int
+static Assimalign.Viu.State.StateStorePayload.Parse(string! json) -> Assimalign.Viu.State.StateStorePayload!
+static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, Assimalign.Viu.State.StateStoreActivator<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!
+static Assimalign.Viu.State.StateStores.Define<TStore>(string! key, System.Func<TStore!>! setup, Assimalign.Viu.State.IStateStoreSerializer<TStore!>! serializer) -> Assimalign.Viu.State.StateStoreDefinition<TStore!>!

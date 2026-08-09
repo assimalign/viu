@@ -13,9 +13,11 @@ namespace Assimalign.Viu.ServerRenderer;
 /// JavaScript interop boundary.
 /// </summary>
 /// <remarks>
-/// Each call owns its write state and component render leases. Applications should be composed per
-/// request when their borrowed services or state are request-scoped. Specified by
-/// <c>[SSR-1]</c> through <c>[SSR-10]</c>.
+/// Each call owns its write state and component render leases and selects fresh logical Core,
+/// Reactivity, State, and scheduler execution state. Distinct request-owned application graphs may
+/// therefore render concurrently, but an individual graph remains single-event-loop and must not be
+/// shared. Applications should be composed per request when their borrowed services or state are
+/// request-scoped. Specified by <c>[EXE-1]</c> and <c>[SSR-1]</c> through <c>[SSR-10]</c>.
 /// </remarks>
 public static class ServerRenderer
 {
@@ -128,8 +130,10 @@ public static class ServerRenderer
         SsrContext context,
         CancellationToken cancellationToken)
     {
+        using IDisposable executionIsolation = CoreExecutionIsolation.Enter();
         cancellationToken.ThrowIfCancellationRequested();
         IApplicationContext applicationContext = application.Context;
+        ServerRenderStatePayload.PrepareContext(context);
         ComponentHost componentHost = new(
             new ComponentRuntimeOptions(
                 applicationContext.Components,
@@ -149,6 +153,7 @@ public static class ServerRenderer
             state,
             applicationContext.RootComponent,
             null).ConfigureAwait(false);
+        ServerRenderStatePayload.CaptureAndAppend(state);
         await state.FlushAsync().ConfigureAwait(false);
         context.ResolveTeleports();
     }
