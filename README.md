@@ -99,8 +99,9 @@ happens here instead. They never ship in the runtime assemblies.
 | --- | --- |
 | `Assimalign.Viu.Generators.Reactivity` | Emits the tracking/triggering property bodies for `[Reactive]`/`[ShallowReactive]` partial classes, so a plain object becomes reactive with no reflection and no runtime interception. |
 | `Assimalign.Viu.Generators.Syntax` | The incremental generator that compiles `.viu` single-file components and templates to C# render methods (the composition root that registers the template and style parsers). |
-| `Assimalign.Viu.Sdk.Tasks` | The SDK's MSBuild tasks, including `ViuBundleCss`, which writes compiled `.viu` `<style>` output to a physical stylesheet outside the analyzer sandbox. |
-| `Assimalign.Viu.Sdk.CssHotReload` | The SDK-internal Debug `dotnet watch` worker that regenerates component and utility stylesheets; it is a build tool and is never copied into the application or runtime framework. |
+| `Assimalign.Viu.Sdk.Tasks` | The base SDK's host-neutral MSBuild tasks, including `ViuBundleCss`, which extracts physical `.viu.css` for component-library packages and Browser application bundles outside the analyzer sandbox. |
+| `Assimalign.Viu.Sdk.Browser.Tasks` | Browser-only MSBuild tasks for utility CSS, host-page link injection, and CSS hot-reload worker launch. |
+| `Assimalign.Viu.Sdk.CssHotReload` | The Browser SDK's internal Debug `dotnet watch` worker; it regenerates component and utility stylesheets and is never copied into the application or runtime framework. |
 
 ### Editor extensions (`extensions/`)
 
@@ -139,27 +140,31 @@ the language-server process. See
 ### Packaged SDK showcase
 
 [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) contains the complete
-browser showcase. It consumes `Assimalign.Viu.Sdk`, `Assimalign.Viu.Router`, and
+browser showcase. It consumes `Assimalign.Viu.Sdk.Browser`, `Assimalign.Viu.Router`, and
 `Assimalign.Viu.Browser.Router` from a local NuGet feed, exercising the packaged navigation boundary
 as an external application rather than relying on project references into this repository.
 
 ### Packaging (`sdks/`, `frameworks/`)
 
-External apps consume Viu through an MSBuild project SDK, not project references — a complete app
-csproj is `<Project Sdk="Assimalign.Viu.Sdk">`. The SDK chains `Microsoft.NET.Sdk.WebAssembly` and
-delivers the framework as the `Assimalign.Viu.App` shared framework (the
-`Microsoft.AspNetCore.App.Ref`/`.Runtime.<rid>` targeting-pack and per-runtime-pack shape). See
-[`sdks/README.md`](sdks/README.md) for the full consumer surface and the local development loop.
+External consumers use one of two MSBuild project SDKs, never project references. A component
+library uses `<Project Sdk="Assimalign.Viu.Sdk">`, which chains `Microsoft.NET.Sdk`, supplies the
+generators and style-packing path, and references targeting-only `Assimalign.Viu.App`. A browser
+application uses `<Project Sdk="Assimalign.Viu.Sdk.Browser">`; it imports the base SDK, chains
+`Microsoft.NET.Sdk.WebAssembly`, and adds `Assimalign.Viu.App.Browser`, browser assets, CSS delivery,
+hot reload, and publish hooks. See [`sdks/README.md`](sdks/README.md) for both consumer scenarios and
+the local development loop.
 
 | Path | Produces | Role |
 | --- | --- | --- |
-| `sdks/Assimalign.Viu.Sdk` | `Assimalign.Viu.Sdk` | The project SDK: chains the WebAssembly SDK, registers the `Assimalign.Viu.App` framework reference, and ships the `.viu`/CSS build wiring and the `viu-dom.js` bridge. |
-| `frameworks/Assimalign.Viu.App.Refs` | `Assimalign.Viu.App.Ref` | The targeting pack: reference assemblies, `FrameworkList.xml`, and the generators (delivered as analyzers). |
-| `frameworks/Assimalign.Viu.App.Runtime` | `Assimalign.Viu.App.Runtime.browser-wasm` | The per-RID runtime pack: implementation assemblies for `browser-wasm`. |
+| `sdks/Assimalign.Viu.Sdk` | `Assimalign.Viu.Sdk` | Host-neutral component-library SDK: base .NET SDK, generators, targeting-only App reference, and pack-carried component styles. |
+| `sdks/Assimalign.Viu.Sdk.Browser` | `Assimalign.Viu.Sdk.Browser` | Browser application SDK: imports the base, adds WebAssembly, browser assets, CSS/hot-reload delivery, and publish hooks. |
+| `frameworks/Assimalign.Viu.App.Refs` | `Assimalign.Viu.App.Ref` | Base targeting pack: Reactivity, Components, State, Core, the generator closure, and four package overrides; no runtime peer. |
+| `frameworks/Assimalign.Viu.App.Browser.Refs` | `Assimalign.Viu.App.Browser.Ref` | Browser-only targeting pack: the Browser reference and its package override; the Browser SDK composes it with the base targeting pack. |
+| `frameworks/Assimalign.Viu.App.Browser.Runtime` | `Assimalign.Viu.App.Browser.Runtime.browser-wasm` | Browser runtime pack: the base-plus-Browser implementation closure for `browser-wasm`. |
 
 In-repo projects dogfood the framework through `ViuProjectReference` (see
-[`.claude/rules/build-system.md`](.claude/rules/build-system.md)); the SDK is the external-consumer
-surface.
+[`.claude/rules/build-system.md`](.claude/rules/build-system.md)); the SDKs are the external-consumer
+surfaces.
 
 ## Getting started
 
@@ -211,7 +216,7 @@ Pack the local SDK and framework, then follow the
 - [Documentation conventions](docs/CONTRIBUTING.md) — where `OVERVIEW.md`, `DESIGN.md`, and ADRs
   live, what belongs in each, and when they must be updated.
 - [Getting started guide](docs/guide/getting-started.md) — build, run, and publish a Viu app with the
-  packaged `Assimalign.Viu.Sdk` (prerequisites → first component → reactivity → publish).
+  packaged `Assimalign.Viu.Sdk.Browser` (prerequisites → first component → reactivity → publish).
 - [Release guide](docs/RELEASING.md) — beta and stable package channels, NuGet trusted publishing,
   GitHub Packages, and the Visual Studio Marketplace preview.
 - [Project board](https://github.com/orgs/assimalign/projects/15) — the authoritative backlog

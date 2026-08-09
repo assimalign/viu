@@ -614,7 +614,8 @@ separate halves.**
   decision rather than a side effect of shipping Viu colors.
 - **Language-service support is currently unreachable, not refused.** The server's own `.vue`
   admission rules are untouched and fully live: before admitting a `.vue` document it performs a
-  deliberately narrow nearest-owning-project check for `Assimalign.Viu.Sdk` or the explicit
+  deliberately narrow nearest-owning-project check for `Assimalign.Viu.Sdk`,
+  `Assimalign.Viu.Sdk.Browser`, or the explicit
   `ViuVisualStudioLanguageServiceEnabled` marker, stopping at the first directory containing a project
   so an unrelated nested Vue project is not claimed by a Viu ancestor; an explicit literal `false`
   marker overrides SDK-name detection; the check repeats for document changes, diagnostics,
@@ -717,7 +718,8 @@ Project-aware IntelliSense requires one authoritative `.viu`/`.vue` to C# projec
    against the declared `packageFolders` order using NuGet's `.nupkg.metadata` restore-success
    marker; `Microsoft.NETCore.App` reference assemblies from the installed SDK's targeting pack
    (dotnet root pinned by the restore's `runtimeIdentifierGraphPath`, then `DOTNET_ROOT*`, then
-   `%ProgramFiles%\dotnet`); every other shared framework (`Assimalign.Viu.App`) from its pinned
+   `%ProgramFiles%\dotnet`); every other shared framework (`Assimalign.Viu.App` or
+   `Assimalign.Viu.App.Browser`) from its pinned
    `<name>.Ref` `downloadDependencies` package; project references from built outputs
    (newest wins, missing outputs dropped with a named remedy). No `MSBuildWorkspace`, no BuildHost
    processes, and no muxer/`global.json`/arm64 resolution exposure. The consumer prerequisite is
@@ -848,7 +850,8 @@ extension selects the executable matching `RuntimeInformation.ProcessArchitectur
 
 Self-contained packaging is the current implementation, **not an invariant**. Recorded decision
 (2026-08-02, [V01.01.12.23] #259): the fully shipped product is expected to require a locally
-installed .NET SDK and the `Assimalign.Viu.Sdk` package for complete end-to-end functionality —
+installed .NET SDK and the project's base or Browser Viu SDK package for complete end-to-end
+functionality —
 in particular the Roslyn-workspace semantic features, whose project evaluation cannot be frozen
 into the VSIX because it must match the SDK the consumer's project builds with. The boundary is:
 baseline features (container parsing, diagnostics, utility IntelliSense) keep working with no

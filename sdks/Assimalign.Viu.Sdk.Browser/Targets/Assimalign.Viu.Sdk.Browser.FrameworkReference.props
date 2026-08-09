@@ -1,0 +1,20 @@
+<Project>
+    <PropertyGroup>
+        <ViuBrowserAppFrameworkVersion Condition="'$(ViuBrowserAppFrameworkVersion)' == ''">$(ViuAppFrameworkVersion)</ViuBrowserAppFrameworkVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <KnownFrameworkReference Include="Assimalign.Viu.App.Browser"
+            TargetFramework="net10.0"
+            RuntimeFrameworkName="Assimalign.Viu.App.Browser"
+            DefaultRuntimeFrameworkVersion="$(ViuBrowserAppFrameworkVersion)"
+            LatestRuntimeFrameworkVersion="$(ViuBrowserAppFrameworkVersion)"
+            TargetingPackName="Assimalign.Viu.App.Browser.Ref"
+            TargetingPackVersion="$(ViuBrowserAppFrameworkVersion)"
+            RuntimePackNamePatterns="Assimalign.Viu.App.Browser.Runtime.**RID**"
+            RuntimePackRuntimeIdentifiers="browser-wasm"
+            IsTrimmable="true" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(ViuAutoIncludeBrowserAppFramework)' != 'false'">
+        <FrameworkReference Include="Assimalign.Viu.App.Browser" />
+    </ItemGroup>
+</Project>

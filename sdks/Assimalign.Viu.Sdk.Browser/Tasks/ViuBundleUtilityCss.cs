@@ -12,7 +12,7 @@ using Microsoft.Build.Utilities;
 using Assimalign.Viu.Syntax.SingleFileComponent;
 using Assimalign.Viu.UtilityCss;
 
-namespace Assimalign.Viu.Sdk.Tasks;
+namespace Assimalign.Viu.Sdk.Browser.Tasks;
 
 /// <summary>
 /// Compiles the literal utility candidates discovered in supported markup sources into the

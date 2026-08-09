@@ -1,0 +1,11 @@
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Import Sdk="Assimalign.Viu.Sdk" Project="Sdk.targets" />
+    <Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.targets" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.FrameworkReference.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.FrameworkReference.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.WebAssembly.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.WebAssembly.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.Css.Bundling.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.Css.Bundling.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.ComponentStyles.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.ComponentStyles.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.UtilityCss.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.UtilityCss.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.Css.HotReload.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.Css.HotReload.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets')" />
+</Project>

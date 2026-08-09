@@ -10,9 +10,9 @@
         <ViuVisualStudioLanguageServiceEnabled Condition="'$(ViuVisualStudioLanguageServiceEnabled)' == ''">true</ViuVisualStudioLanguageServiceEnabled>
 
         <!--
-            Single-file components on by default: <Project Sdk="Assimalign.Viu.Sdk">
-            plus App.viu files is a working app with zero wiring. Consumers can
-            set either property to false in their csproj body - property
+            Single-file components are on by default: a component-library project
+            using Assimalign.Viu.Sdk compiles .viu/.vue files with zero wiring.
+            Consumers can set either property to false in their csproj body - property
             evaluation is document-ordered, so the body assignment wins over
             these defaults.
         -->
@@ -21,24 +21,11 @@
         <!--
             The ViuBundleCss MSBuild task ships inside this SDK package at
             Tasks/ (with its parser dependency closure alongside). Presetting
-            the assembly path here keeps the packed Css.Bundling.targets'
+            the assembly path here keeps the packed ComponentStyles.targets'
             in-repo default path (which needs $(ViuRepositoryDirectory))
             dormant.
         -->
         <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuBundleCssTaskAssembly>
-        <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(MSBuildThisFileDirectory)..\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
-
-        <!--
-            Microsoft.NET.Sdk.WebAssembly defaults PublishTrimmed to true for every
-            configuration. Microsoft.NET.ILLink consequently defaults metadata updates
-            off even though the base SDK deliberately leaves the Debug default enabled,
-            which leaves MetadataUpdater.IsSupported false under dotnet watch. Keep the Debug
-            interpreter updateable while preserving the WebAssembly SDK's trimmed
-            Release and AOT defaults. A consumer assignment in the project body remains
-            authoritative because it is evaluated after this SDK prop.
-        -->
-        <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>
-
         <LangVersion Condition="'$(LangVersion)' == ''">preview</LangVersion>
         <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     </PropertyGroup>

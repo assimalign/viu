@@ -11,8 +11,9 @@ Area workflows only build and test their part of the repository; they never publ
 | Published stable GitHub Release | Every package listed in `package-order.txt` publishes to nuget.org as the stable release version | No publication |
 | Draft or prerelease GitHub Release | No publication | No publication |
 
-The two source generators remain embedded in the SDK and targeting pack. Their projects are
-intentionally non-packable and are not separate release packages.
+The two source generators remain embedded in the base `Assimalign.Viu.Sdk` and
+`Assimalign.Viu.App.Ref` targeting pack; the Browser segments compose that base. Generator projects
+are intentionally non-packable and are not separate release packages.
 
 The workflow uses a merged `pull_request_target` event so unmerged and directly pushed commits
 cannot publish betas. It checks out the merged commit and verifies that commit is reachable from

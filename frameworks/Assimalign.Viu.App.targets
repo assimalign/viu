@@ -4,8 +4,8 @@
         the Viu port of cohesion's frameworks/Assimalign.Cohesion.App.targets).
 
         Imported by:
-          Assimalign.Viu.App.Runtime/src/...csproj  (per-RID runtime pack)
-          Assimalign.Viu.App.Refs/src/...csproj     (targeting pack)
+          Assimalign.Viu.App.Browser.Runtime/src/...csproj  (per-RID runtime pack)
+          Assimalign.Viu.App*.Refs/src/...csproj            (targeting packs)
 
         Branches on the $(ViuFrameworkKind) property the consumer csproj sets:
 
@@ -22,15 +22,6 @@
     -->
 
     <PropertyGroup>
-        <!--
-            Each framework family has its own Runtime project at
-            frameworks/<FrameworkName>.Runtime/src/. The Refs project for
-            the same framework reads bin/ from there to collect assemblies.
-            Computed from $(ViuFrameworkName) so the same targets file can
-            serve additional framework families without per-family branches.
-        -->
-        <_ViuRuntimeProjectDir>$(ViuRepositoryDirectory)frameworks\$(ViuFrameworkName).Runtime\src\</_ViuRuntimeProjectDir>
-
         <!--
             _ViuFrameworkSourceDir and the manifest paths are computed
             inside ViuCollectFrameworkPack below, NOT at file scope:
@@ -93,7 +84,7 @@
         know the private bucket exists.
     -->
     <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Runtime'">
-        <ViuProjectReference Include="@(ViuFrameworkPrivateAssembly)"
+        <ViuProjectReference Include="@(ViuFrameworkRuntimeAssembly);@(ViuFrameworkPrivateAssembly)"
                              Exclude="$(AssemblyName)" />
     </ItemGroup>
 
@@ -186,14 +177,14 @@
 
         <!--
             Resolve the source directory at execution time:
-              Ref kind     -> Runtime project's RID-less bin/ (built via the
-                              build-order ProjectReference from App.Refs).
+              Ref kind     -> this targeting-pack project's output, populated
+                              by its by-name framework project references.
               Runtime kind -> this project's $(OutputPath), which is
                               bin/<cfg>/<tfm>/<rid>/ when -p:RuntimeIdentifier
                               is set on `dotnet pack`.
         -->
         <PropertyGroup>
-            <_ViuFrameworkSourceDir Condition="'$(ViuFrameworkKind)' == 'Ref'">$(_ViuRuntimeProjectDir)bin\$(Configuration)\$(TargetFrameworkLatest)\</_ViuFrameworkSourceDir>
+            <_ViuFrameworkSourceDir Condition="'$(ViuFrameworkKind)' == 'Ref'">$(OutputPath)</_ViuFrameworkSourceDir>
             <_ViuFrameworkSourceDir Condition="'$(ViuFrameworkKind)' == 'Runtime'">$(OutputPath)</_ViuFrameworkSourceDir>
 
             <!-- Forward slashes for cross-platform safety (Linux CI). -->
@@ -222,7 +213,7 @@
         </ItemGroup>
 
         <Error Condition="'$(ViuFrameworkKind)' == 'Ref' and !Exists('%(_ViuExpectedAssembly.Identity)')"
-               Text="Framework assembly declared in @(ViuFrameworkAssembly) but missing on disk: %(_ViuExpectedAssembly.Identity). Confirm the library has a project under libraries/ that ViuProjectReference can resolve, and that the Runtime project builds successfully." />
+               Text="Framework assembly declared in @(ViuFrameworkAssembly) but missing on disk: %(_ViuExpectedAssembly.Identity). Confirm the library has a project under libraries/ that ViuProjectReference can resolve and copy to the targeting-pack output." />
 
         <!--
             Analyzer DLLs are collected BEFORE the manifest writer runs so the
@@ -303,14 +294,14 @@
         <!-- Only when an RID is explicitly set; RID-less design-time builds
              skip pack. Iterates the UNION of public + private assemblies. -->
         <ItemGroup Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != ''">
-            <_ViuExpectedAssembly Include="@(ViuFrameworkAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll');@(ViuFrameworkPrivateAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll')" />
+            <_ViuExpectedAssembly Include="@(ViuFrameworkRuntimeAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll');@(ViuFrameworkPrivateAssembly->'$(_ViuFrameworkSourceDir)%(Identity).dll')" />
         </ItemGroup>
 
         <Error Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != '' and !Exists('%(_ViuExpectedAssembly.Identity)')"
                Text="Framework assembly declared in @(ViuFrameworkAssembly) or @(ViuFrameworkPrivateAssembly) but missing on disk: %(_ViuExpectedAssembly.Identity). Build must run before pack and every entry needs a ViuProjectReference that CopyLocals into bin." />
 
         <ViuWriteFrameworkList Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != ''"
-            AssemblyNames="@(ViuFrameworkAssembly);@(ViuFrameworkPrivateAssembly)"
+            AssemblyNames="@(ViuFrameworkRuntimeAssembly);@(ViuFrameworkPrivateAssembly)"
             FrameworkName="$(ViuFrameworkName)"
             FrameworkVersion="$(ViuVersionPrefix)"
             TargetFrameworkVersion="$(_ViuTargetFrameworkVersion)"

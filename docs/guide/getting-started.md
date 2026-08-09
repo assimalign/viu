@@ -2,7 +2,8 @@
 
 Viu is a standalone C#/.NET user-interface framework that runs in the browser through the .NET
 WebAssembly build tools. This guide takes you from an empty folder to a running, publishable Viu app
-using the packaged **`Assimalign.Viu.Sdk`** — the surface an external consumer uses.
+using the packaged **`Assimalign.Viu.Sdk.Browser`**. Host-neutral component libraries use the base
+`Assimalign.Viu.Sdk`; browser applications use the Browser SDK shown throughout this guide.
 
 Three decisions shape everything below (they are the
 [founding design decisions](../PLAN.md#founding-design-decisions-cwasm-divergences), and
@@ -45,17 +46,18 @@ guarantees):
 
 ## How a Viu app is packaged
 
-A Viu app project uses the Viu MSBuild SDK instead of a plain `Microsoft.NET.Sdk`:
+A Viu browser app project uses the Browser MSBuild SDK instead of the host-neutral base SDK:
 
 ```xml
-<Project Sdk="Assimalign.Viu.Sdk">
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
 ```
 
-That one line chains `Microsoft.NET.Sdk.WebAssembly`, references the `Assimalign.Viu.App` shared
-framework (Components, Reactivity, State, Core, and Browser), and turns on `.viu` single-file
-component compilation and CSS bundling — with no per-project wiring. The full consumer surface,
-including every opt-out property, is documented in [`sdks/README.md`](../../sdks/README.md); the
-packaging model is [founding decision 8](../PLAN.md#founding-design-decisions-cwasm-divergences).
+That one line imports `Assimalign.Viu.Sdk`, chains `Microsoft.NET.Sdk.WebAssembly`, references the
+targeting-only `Assimalign.Viu.App` base plus `Assimalign.Viu.App.Browser`, and turns on `.viu`
+single-file-component compilation and Browser CSS delivery with no per-project wiring. The full
+component-library and application surfaces, including every opt-out property, are documented in
+[`sdks/README.md`](../../sdks/README.md); the packaging model is
+[founding decision 8](../PLAN.md#founding-design-decisions-cwasm-divergences).
 
 While Viu is pre-release you consume it from a **repo-local NuGet feed**. From a clone of
 [`assimalign/viu`](https://github.com/assimalign/viu), pack the SDK and framework into `_out/packages`:
@@ -64,8 +66,9 @@ While Viu is pre-release you consume it from a **repo-local NuGet feed**. From a
 pwsh scripts/Install-Local.ps1
 ```
 
-This produces `Assimalign.Viu.Sdk`, `Assimalign.Viu.App.Ref`, and
-`Assimalign.Viu.App.Runtime.browser-wasm` packages (see the
+This produces both project SDKs, `Assimalign.Viu.App.Ref`,
+`Assimalign.Viu.App.Browser.Ref`, and
+`Assimalign.Viu.App.Browser.Runtime.browser-wasm` (see the
 [local development loop](../../sdks/README.md#local-development-loop)). Your app points a
 `nuget.config` at that folder, shown below.
 
@@ -84,7 +87,8 @@ package version produced by `Install-Local.ps1` (it tracks the repo's
         "rollForward": "latestFeature"
     },
     "msbuild-sdks": {
-        "Assimalign.Viu.Sdk": "10.0.1-preview.2"
+        "Assimalign.Viu.Sdk": "10.0.1-preview.2",
+        "Assimalign.Viu.Sdk.Browser": "10.0.1-preview.2"
     }
 }
 ```
@@ -107,7 +111,7 @@ pattern):
 **`HelloViu.csproj`** — the whole project file:
 
 ```xml
-<Project Sdk="Assimalign.Viu.Sdk">
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -543,4 +547,4 @@ documentation and project-creation work includes:
 ---
 
 This guide follows the repo's [documentation conventions](../CONTRIBUTING.md). Its component-model,
-packaging, and command examples describe the current SDK workflow.
+packaging, and command examples describe the current Browser SDK workflow.

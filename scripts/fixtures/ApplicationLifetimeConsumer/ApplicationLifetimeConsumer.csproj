@@ -1,16 +1,17 @@
-<Project Sdk="Assimalign.Viu.Sdk">
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ViuBundleSingleFileComponentCss>false</ViuBundleSingleFileComponentCss>
     <ViuBundleUtilityCss>false</ViuBundleUtilityCss>
     <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
+    <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
   </PropertyGroup>
   <ItemGroup>
     <!--
-      Deliberately overlap the App shared framework with its five standalone
-      packages. data/PackageOverrides.txt in App.Ref must make the framework
-      assets authoritative so none of these lib/ assets survives conflict
-      resolution on the SDK path. Specified by [PKG-2] and [V01.01.14].
+      Deliberately overlap the segmented App frameworks with their five
+      standalone packages. The base and Browser PackageOverrides.txt files
+      must make framework assets authoritative so none of these lib/ assets
+      survives conflict resolution. Specified by [PKG-2] and [V01.01.14].
     -->
     <PackageReference Include="Assimalign.Viu.Components" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Reactivity" Version="$(ViuConsumerVersion)" />
@@ -19,6 +20,7 @@
     <PackageReference Include="Assimalign.Viu.Browser" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Router" Version="$(ViuConsumerVersion)" />
     <PackageReference Include="Assimalign.Viu.Browser.Router" Version="$(ViuConsumerVersion)" />
+    <PackageReference Include="ComponentLibraryConsumer" Version="$(ComponentLibraryConsumerVersion)" />
   </ItemGroup>
 
   <!--

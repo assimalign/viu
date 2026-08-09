@@ -1,0 +1,7 @@
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <!-- Browser application SDK ([V01.01.12.27], #323). -->
+    <Import Sdk="Assimalign.Viu.Sdk" Project="Sdk.props" />
+    <Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.props" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.Common.props" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.Browser.FrameworkReference.props" />
+</Project>

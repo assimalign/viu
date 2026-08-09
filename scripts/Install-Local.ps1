@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
     Packs the complete Viu package set — every independently published library plus
-    the SDK and shared-framework chain — into the repo-local NuGet feed
-    (_out/packages), exercising SDK resolution -> framework reference ->
-    targeting pack -> runtime pack end-to-end for local consumers.
+    the base/Browser SDK and shared-framework chains — into the repo-local NuGet
+    feed (_out/packages), exercising both targeting-only component-library
+    consumption and Browser application runtime-pack resolution end-to-end.
     ([V01.01.12.19], #174.)
 
 .DESCRIPTION
@@ -25,10 +25,10 @@
     Skip the independently published libraries.
 
 .PARAMETER SkipSdk
-    Skip the SDK package.
+    Skip both SDK packages.
 
 .PARAMETER SkipFramework
-    Skip the targeting pack and runtime packs.
+    Skip both targeting packs and the Browser runtime packs.
 
 .PARAMETER ConsumerRoot
     Extra directories to search for a consumer nuget.config, for consumers outside
@@ -36,6 +36,10 @@
 
 .PARAMETER SkipCachePrune
     Leave cached package extracts alone. Only safe when the version was bumped.
+
+.PARAMETER BaseOnly
+    Pack only the host-neutral SDK/framework path (plus standalone libraries).
+    This path does not require the WebAssembly workload.
 
 .PARAMETER Configuration
     Build configuration (default Release).
@@ -48,6 +52,7 @@ param(
     [switch] $SkipFramework,
     [string[]] $ConsumerRoot = @(),
     [switch] $SkipCachePrune,
+    [switch] $BaseOnly,
     [string] $Configuration = 'Release'
 )
 
@@ -126,19 +131,36 @@ if (-not $SkipSdk) {
     if ($LASTEXITCODE -ne 0) { throw 'SDK clean failed.' }
 
     Invoke-ViuPack -Project $sdkProject
+
+    if (-not $BaseOnly) {
+        Write-Host '[sdk] Packing Assimalign.Viu.Sdk.Browser' -ForegroundColor Green
+        $browserSdkProject = Join-Path $repoRoot 'sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj'
+        dotnet clean $browserSdkProject --configuration $Configuration
+        if ($LASTEXITCODE -ne 0) { throw 'Browser SDK clean failed.' }
+
+        Invoke-ViuPack -Project $browserSdkProject
+    }
 }
 
 if (-not $SkipFramework) {
-    foreach ($rid in $Rids) {
-        Write-Host "[framework] Packing Assimalign.Viu.App.Runtime.$rid" -ForegroundColor Green
-        Invoke-ViuPack `
-            -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Runtime\src\Assimalign.Viu.App.Runtime.csproj') `
-            -AdditionalArguments @("-p:RuntimeIdentifier=$rid")
+    if (-not $BaseOnly) {
+        foreach ($rid in $Rids) {
+            Write-Host "[framework] Packing Assimalign.Viu.App.Browser.Runtime.$rid" -ForegroundColor Green
+            Invoke-ViuPack `
+                -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Browser.Runtime\src\Assimalign.Viu.App.Browser.Runtime.csproj') `
+                -AdditionalArguments @("-p:RuntimeIdentifier=$rid")
+        }
     }
 
     Write-Host '[framework] Packing Assimalign.Viu.App.Ref' -ForegroundColor Green
     Invoke-ViuPack `
         -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Refs\src\Assimalign.Viu.App.Refs.csproj')
+
+    if (-not $BaseOnly) {
+        Write-Host '[framework] Packing Assimalign.Viu.App.Browser.Ref' -ForegroundColor Green
+        Invoke-ViuPack `
+            -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Browser.Refs\src\Assimalign.Viu.App.Browser.Refs.csproj')
+    }
 }
 
 Write-Host "Done. Packages in $feed :" -ForegroundColor Cyan

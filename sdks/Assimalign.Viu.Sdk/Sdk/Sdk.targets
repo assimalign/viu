@@ -1,22 +1,7 @@
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.targets" />
-	<!-- WASM runtime-pack selection shim + implicit browser platform identity. -->
-	<Import Project="..\Targets\Assimalign.Viu.Sdk.WebAssembly.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.WebAssembly.targets')" />
-	<!-- .viu -> AdditionalFiles glob (evaluated after the consumer's items and
-	     default excludes are known). -->
-	<Import Project="..\Targets\Assimalign.Viu.Generators.Syntax.targets" Condition="Exists('..\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
-	<!-- CSS bundling for .viu style blocks (canonical <style> tags; legacy @style in the migration window): the in-repo
-	     build/Targets/Build.Css.Bundling.targets packed verbatim;
-	     Assimalign.Viu.Sdk.Common.props preset $(ViuBundleCssTaskAssembly) to
-	     the packaged Tasks/ copy of the ViuBundleCss task. -->
-	<Import Project="..\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets')" />
-	<!-- Standalone Viu Utilities candidate discovery, compilation, static-web-asset registration,
-	     link injection, and watch graph. Its switch and output are independent of component CSS. -->
-	<Import Project="..\Targets\Assimalign.Viu.Sdk.UtilityCss.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.UtilityCss.targets')" />
-	<!-- Development-only dotnet-watch regeneration sidecar. Generated component and utility bundles
-	     are static Watch items; the worker and target never flow into application output. -->
-	<Import Project="..\Targets\Assimalign.Viu.Sdk.Css.HotReload.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.Css.HotReload.targets')" />
-	<!-- Flow the framework's static web assets (viu-dom.js) into the
-	     consumer's wwwroot/_content/. -->
-	<Import Project="..\Targets\Assimalign.Viu.Sdk.StaticWebAssets.targets" Condition="Exists('..\Targets\Assimalign.Viu.Sdk.StaticWebAssets.targets')" />
+    <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+    <Import Project="..\Targets\Assimalign.Viu.Generators.Syntax.targets"
+            Condition="Exists('..\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets"
+            Condition="Exists('..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets')" />
 </Project>

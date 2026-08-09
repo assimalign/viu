@@ -1,0 +1,11 @@
+<Project>
+    <PropertyGroup>
+        <_ViuBrowserSdk>true</_ViuBrowserSdk>
+        <ViuBrowserTaskAssembly Condition="'$(ViuBrowserTaskAssembly)' == ''">$(MSBuildThisFileDirectory)..\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuBrowserTaskAssembly>
+        <ViuInjectCssBundleLinkTaskAssembly Condition="'$(ViuInjectCssBundleLinkTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuInjectCssBundleLinkTaskAssembly>
+        <ViuUtilityCssTaskAssembly Condition="'$(ViuUtilityCssTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuUtilityCssTaskAssembly>
+        <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuBrowserTaskAssembly)</ViuCssHotReloadTaskAssembly>
+        <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(MSBuildThisFileDirectory)..\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
+        <MetadataUpdaterSupport Condition="'$(MetadataUpdaterSupport)' == '' and '$(Configuration)' == 'Debug' and '$(WasmEnableHotReload)' != 'false'">true</MetadataUpdaterSupport>
+    </PropertyGroup>
+</Project>

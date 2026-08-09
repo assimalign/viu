@@ -59,9 +59,10 @@ So the split is:
   on `onLanguage:viu`, that pattern can only ever apply inside a session where a `.viu` document was
   already opened — which means a Viu project.
 - The **server decides.** It performs a per-document owning-project check and declines any `.vue`
-  file whose nearest owning project neither uses `Assimalign.Viu.Sdk` nor sets
-  `ViuVisualStudioLanguageServiceEnabled` to `true`; an explicit `false` wins even in a Viu SDK
-  project. Non-Viu `.vue` files in a mixed workspace are functionally untouched.
+  file whose nearest owning project uses neither `Assimalign.Viu.Sdk` nor
+  `Assimalign.Viu.Sdk.Browser` and does not set `ViuVisualStudioLanguageServiceEnabled` to `true`;
+  an explicit `false` wins even in a Viu SDK project. Non-Viu `.vue` files in a mixed workspace are
+  functionally untouched.
 
 ## The grammar approach
 

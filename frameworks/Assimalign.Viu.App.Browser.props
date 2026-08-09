@@ -1,0 +1,16 @@
+<Project>
+    <!--
+        Browser framework extension ([V01.01.12.27], #323). The targeting
+        pack adds only Assimalign.Viu.Browser because the Browser SDK also
+        references the base targeting framework. The runtime pack must carry
+        the complete host-neutral + Browser implementation closure because the
+        base framework intentionally has no runtime pack.
+    -->
+    <Import Project="Assimalign.Viu.App.props" />
+
+    <ItemGroup Condition="'$(ViuFrameworkName)' == 'Assimalign.Viu.App.Browser'">
+        <ViuFrameworkAssembly Include="Assimalign.Viu.Browser" />
+        <ViuFrameworkRuntimeAssembly Include="@(ViuBaseFrameworkAssembly);Assimalign.Viu.Browser" />
+        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Browser" />
+    </ItemGroup>
+</Project>

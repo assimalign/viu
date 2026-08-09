@@ -8,6 +8,8 @@ namespace Assimalign.Viu.LanguageServer;
 internal static class ViuDocumentSupport
 {
     private const string ViuSoftwareDevelopmentKitName = "Assimalign.Viu.Sdk";
+    private const string ViuBrowserSoftwareDevelopmentKitName =
+        "Assimalign.Viu.Sdk.Browser";
 
     internal static bool IsSupported(string documentUri)
     {
@@ -155,18 +157,30 @@ internal static class ViuDocumentSupport
         foreach (var item in value.Split(';'))
         {
             var name = item.Trim();
-            if (string.Equals(
+            if (MatchesSoftwareDevelopmentKit(
                     name,
-                    ViuSoftwareDevelopmentKitName,
-                    StringComparison.OrdinalIgnoreCase) ||
-                name.StartsWith(
-                    ViuSoftwareDevelopmentKitName + "/",
-                    StringComparison.OrdinalIgnoreCase))
+                    ViuSoftwareDevelopmentKitName) ||
+                MatchesSoftwareDevelopmentKit(
+                    name,
+                    ViuBrowserSoftwareDevelopmentKitName))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool MatchesSoftwareDevelopmentKit(
+        string value,
+        string softwareDevelopmentKitName)
+    {
+        return string.Equals(
+                value,
+                softwareDevelopmentKitName,
+                StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith(
+                softwareDevelopmentKitName + "/",
+                StringComparison.OrdinalIgnoreCase);
     }
 }

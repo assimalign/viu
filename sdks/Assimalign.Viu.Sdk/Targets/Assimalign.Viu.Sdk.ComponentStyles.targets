@@ -1,0 +1,55 @@
+<Project>
+    <!-- Host-neutral component-style extraction and package carriage ([V01.01.12.27], #323). -->
+    <PropertyGroup>
+        <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == '' and '$(ViuUseSingleFileComponents)' == 'true'">true</ViuBundleSingleFileComponentCss>
+        <ViuBundleSingleFileComponentCss Condition="'$(ViuBundleSingleFileComponentCss)' == ''">false</ViuBundleSingleFileComponentCss>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);ViuCollectComponentStylePackage</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuBundleCss"
+               AssemblyFile="$(ViuBundleCssTaskAssembly)"
+               Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'" />
+
+    <Target Name="_ViuExtractComponentLibraryStyles"
+            Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(_ViuBrowserSdk)' != 'true' and Exists('$(ViuBundleCssTaskAssembly)')">
+        <PropertyGroup>
+            <_ViuComponentStyleDirectory>$([MSBuild]::NormalizeDirectory('$(IntermediateOutputPath)', 'viu', 'component-library'))</_ViuComponentStyleDirectory>
+            <_ViuComponentStylePath>$(_ViuComponentStyleDirectory)$(PackageId).viu.css</_ViuComponentStylePath>
+        </PropertyGroup>
+        <ViuBundleCss SingleFileComponents="@(ViuSingleFileComponent)"
+                      ProjectDirectory="$(ProjectDir)"
+                      BundleOutputPath="$(_ViuComponentStylePath)"
+                      PreserveEmptyBundleOnRemoval="false">
+            <Output TaskParameter="BundleExists" PropertyName="_ViuComponentStyleExists" />
+        </ViuBundleCss>
+    </Target>
+
+    <Target Name="ViuCollectComponentStylePackage"
+            Condition="'$(_ViuBrowserSdk)' != 'true'"
+            DependsOnTargets="_ViuExtractComponentLibraryStyles">
+        <PropertyGroup>
+            <_ViuComponentStyleRegistrationPath>$(_ViuComponentStyleDirectory)$(PackageId).props</_ViuComponentStyleRegistrationPath>
+            <_ViuDollar>$</_ViuDollar>
+        </PropertyGroup>
+        <ItemGroup Condition="'$(_ViuComponentStyleExists)' == 'true' and Exists('$(_ViuComponentStylePath)')">
+            <_ViuComponentStyleRegistrationLine Include="&lt;Project&gt;" />
+            <_ViuComponentStyleRegistrationLine Include="  &lt;ItemGroup&gt;" />
+            <_ViuComponentStyleRegistrationLine Include="    &lt;ViuComponentLibraryStyle Include=&quot;$(_ViuDollar)(MSBuildThisFileDirectory)../viu/styles/$(PackageId).viu.css&quot; PackageId=&quot;$(PackageId)&quot; /&gt;" />
+            <_ViuComponentStyleRegistrationLine Include="  &lt;/ItemGroup&gt;" />
+            <_ViuComponentStyleRegistrationLine Include="&lt;/Project&gt;" />
+        </ItemGroup>
+        <WriteLinesToFile Condition="'@(_ViuComponentStyleRegistrationLine)' != ''"
+                          File="$(_ViuComponentStyleRegistrationPath)"
+                          Lines="@(_ViuComponentStyleRegistrationLine)"
+                          Overwrite="true"
+                          Encoding="UTF-8" />
+        <ItemGroup Condition="'$(_ViuComponentStyleExists)' == 'true' and Exists('$(_ViuComponentStylePath)')">
+            <TfmSpecificPackageFile Include="$(_ViuComponentStylePath)">
+                <PackagePath>viu/styles/$(PackageId).viu.css</PackagePath>
+            </TfmSpecificPackageFile>
+            <TfmSpecificPackageFile Include="$(_ViuComponentStyleRegistrationPath)">
+                <PackagePath>buildTransitive/$(PackageId).props</PackagePath>
+            </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+</Project>

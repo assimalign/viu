@@ -32,8 +32,9 @@ Viu.
   `Assimalign.Viu.LanguageServer`. None enters a Viu app's runtime; UtilityCss is the one independently
   published tooling package.
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
-  `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
-  shared-framework pack producers live in `frameworks/` (see [build-system.md](build-system.md)).
+  `docs/`; the base and Browser consumer-facing MSBuild SDKs live in `sdks/`, and the
+  `Assimalign.Viu.App` / `Assimalign.Viu.App.Browser` shared-framework pack producers live in
+  `frameworks/` (see [build-system.md](build-system.md)).
 
 ## Namespaces
 

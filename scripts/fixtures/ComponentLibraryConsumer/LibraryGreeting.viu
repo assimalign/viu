@@ -1,0 +1,11 @@
+<template>
+  <main class="library-greeting">
+    Component library package
+  </main>
+</template>
+
+<style>
+.library-greeting {
+  display: block;
+}
+</style>

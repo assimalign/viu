@@ -7,7 +7,7 @@ using System.Threading;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
-namespace Assimalign.Viu.Sdk.Tasks;
+namespace Assimalign.Viu.Sdk.Browser.Tasks;
 
 /// <summary>
 /// The MSBuild task that writes a copy of a WebAssembly app's host page (<c>wwwroot/index.html</c>) with a

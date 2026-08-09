@@ -1356,10 +1356,11 @@ follows the host filesystem — case-insensitive on Windows, ordinal elsewhere. 
 bundler applies the identical shadowing rule, so a shadowed peer can never contribute a duplicate or
 contradictory stylesheet segment.
 
-`[VUE-8]` The SDK targets glob `**/*.viu` and `**/*.vue` into one `ViuSingleFileComponent`,
-`AdditionalFiles`, and `Watch` graph. `.vue` is discovered only for Viu projects, and the Visual
-Studio language server re-checks the owning project before accepting a compatibility document
-([§14](#14-the-tooling-and-editor-contract)).
+`[VUE-8]` The base `Assimalign.Viu.Sdk` targets glob `**/*.viu` and `**/*.vue` into one
+`ViuSingleFileComponent`, `AdditionalFiles`, and `Watch` graph; `Assimalign.Viu.Sdk.Browser`
+inherits that graph by importing the base SDK. `.vue` is discovered only for projects using either
+Viu SDK, and the Visual Studio language server re-checks the owning project before accepting a
+compatibility document ([§14](#14-the-tooling-and-editor-contract)).
 
 `[VUE-9]` Everything downstream of the container parse is **shared with `.viu`**: template code
 generation, scoped styles, CSS Modules, `v-bind()` in CSS, `@reference`, `@apply`, source mapping,
@@ -1715,10 +1716,10 @@ project context — an **artifact-fed `CSharpCompilation`** answered through `Se
 (catalog descriptor + location + message) and each host materializes it at its own edge.
 
 `[TOOL-6]` **`.vue` documents are admitted conservatively.** The language-server host performs a
-narrow nearest-owning-project check for the Viu SDK or an explicit enablement marker, stops at the
-first directory containing a project so an unrelated nested project is not claimed, treats a literal
-`false` marker as an override, and **fails closed** when ownership is ambiguous. The check repeats
-for document changes, diagnostics, completion, and hover.
+narrow nearest-owning-project check for `Assimalign.Viu.Sdk`, `Assimalign.Viu.Sdk.Browser`, or an
+explicit enablement marker, stops at the first directory containing a project so an unrelated nested
+project is not claimed, treats a literal `false` marker as an override, and **fails closed** when
+ownership is ambiguous. The check repeats for document changes, diagnostics, completion, and hover.
 
 *Authority: `extensions/VisualStudio/Assimalign.Viu.VisualStudio/docs/DESIGN.md`;
 `tooling/Assimalign.Viu.Compiler.SingleFileComponent/docs/DESIGN.md`.*
@@ -1727,33 +1728,47 @@ for document changes, diagnostics, completion, and hover.
 
 ## 15. Packaging and the consumer surface
 
-`[PKG-1]` A consumer project is `<Project Sdk="Assimalign.Viu.Sdk">`. The SDK chains
-`Microsoft.NET.Sdk.WebAssembly` and is resolved by NuGet's built-in MSBuild SDK resolver — no
-installer, no admin rights.
+`[PKG-1]` Viu has two compositional consumer SDKs, both resolved by NuGet's built-in MSBuild SDK
+resolver with no installer or administrative rights. `<Project Sdk="Assimalign.Viu.Sdk">` chains
+`Microsoft.NET.Sdk` and is the host-neutral component-library surface: no WebAssembly workload,
+browser assets, `wwwroot` bundling, or publish hooks.
+`<Project Sdk="Assimalign.Viu.Sdk.Browser">` imports that base, declares an exact-version package
+dependency on it, chains `Microsoft.NET.Sdk.WebAssembly`, and adds the browser application payload.
+This is a direct package split with no compatibility shim.
 
-`[PKG-2]` The framework ships as the **`Assimalign.Viu.App` shared framework**: a
-`KnownFrameworkReference` registration resolving to the `Assimalign.Viu.App.Ref` targeting pack
-(compile references + `data/FrameworkList.xml` + `data/PackageOverrides.txt`) and per-RID
-`Assimalign.Viu.App.Runtime.<rid>` runtime packs (`browser-wasm` today). The targeting pack's
-package-override manifest lists every framework assembly that is also published as a standalone
-package at the effective NuGet package version, so the framework copy wins conflict resolution when
-an SDK-path consumer also references that package. Runtime packs do not carry the targeting-only
-override manifest.
+`[PKG-2]` The framework is segmented along the same boundary. `Assimalign.Viu.App` is
+**targeting-only**: `Assimalign.Viu.App.Ref` carries the Reactivity, Components, State, and Core
+reference assemblies, generator closure, `data/FrameworkList.xml`, and
+`data/PackageOverrides.txt`; there is no base runtime pack. `Assimalign.Viu.App.Browser.Ref` carries
+only the Browser reference and Browser override; the Browser SDK composes that targeting pack with
+the base framework and resolves the only Viu runtime pack,
+`Assimalign.Viu.App.Browser.Runtime.browser-wasm`, which carries the base-plus-Browser implementation
+closure. Each targeting pack's override manifest lists exactly the standalone packages in its
+segment at the effective NuGet package version, so framework assets win same-version conflict
+resolution. The Browser runtime pack does not carry a targeting-only override manifest.
+`Assimalign.Viu.ServerRenderer` remains opt-in and is not a framework segment.
 
-`[PKG-3]` **Generators are delivered as analyzers through the ref pack** — `analyzers/dotnet/cs`
-with `<File Type="Analyzer">` manifest entries — so an SDK consumer gets `[Reactive]` and
-`.viu`/`.vue` compilation with **zero wiring**.
+`[PKG-3]` **Generators are delivered as analyzers through the base ref pack** —
+`analyzers/dotnet/cs` with `<File Type="Analyzer">` manifest entries — so base and Browser SDK
+consumers get `[Reactive]` and `.viu`/`.vue` compilation with **zero wiring**. The base SDK owns the
+shared `AdditionalFiles` graph; the Browser SDK inherits it rather than duplicating it.
 
-`[PKG-4]` MSBuild tasks perform the physical writes a generator legally cannot [EXE-10]:
-`ViuBundleCss` writes the component stylesheet, `ViuBundleUtilityCss` writes the utility stylesheet,
-and a link-injection task splices the `<link>` into the host page **before** the SDK's compression
-pipeline so content negotiation stays intact. Both links can be opted out of.
+`[PKG-4]` MSBuild tasks perform the physical writes a generator legally cannot [EXE-10]. The base
+SDK extracts `.viu.css` when a component library is packed and carries it with generated
+`buildTransitive` registration, but does not itself register browser static assets or write to
+`wwwroot`. The Browser SDK consumes that transitive registration as an additional browser static web
+asset and owns application bundling: `ViuBundleCss` writes the app's component stylesheet,
+`ViuBundleUtilityCss` writes the utility stylesheet, and a link-injection task splices each enabled
+app `<link>` into the host page **before** the WebAssembly SDK's compression pipeline so content
+negotiation stays intact. Both app links can be opted out of. The Browser SDK also owns the CSS
+hot-reload worker and publish-budget hooks.
 
-`[PKG-5]` In-repo projects **dogfood via `ViuProjectReference`**; the SDK is the *external consumer*
-surface. The in-repo build deliberately does not consume the SDK, so the framework can be developed
-without a pack/restore cycle in the loop.
+`[PKG-5]` In-repo projects **dogfood via `ViuProjectReference`**; the two SDKs are the *external
+consumer* surfaces. The in-repo build deliberately does not consume either SDK, so the framework can
+be developed without a pack/restore cycle in the loop.
 
-*Authority: `sdks/README.md`; `sdks/Assimalign.Viu.Sdk/`; `frameworks/`;
+*Authority: `sdks/README.md`; `sdks/Assimalign.Viu.Sdk/`;
+`sdks/Assimalign.Viu.Sdk.Browser/`; `frameworks/`;
 `.claude/rules/build-system.md`; `docs/RELEASING.md`.*
 
 ---
@@ -1775,6 +1790,7 @@ it move together.
 | `SingleFileComponentProjectionConformanceTests` | Build/editor projection equality [SFC-PIPE-2] |
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
 | `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
+| `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; a Browser-SDK app consumes and mounts the packed component, flows its stylesheet, and passes Build, trimmed publish, and AOT publish |
 | `scripts/Measure-PublishBudget.ps1` + `scripts/budgets/PublishBudgets.json` | WASM publish size and startup budgets |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
 | `.github/workflows/area-*.yml`, `benchmarks.yml` | Per-area CI (`budget-gates.yml` is parked under `.github/workflows-disabled/`) |

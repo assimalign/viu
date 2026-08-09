@@ -1,0 +1,32 @@
+<Project>
+    <!-- Flow styles extracted by base-SDK component-library packages into Browser output. -->
+    <Target Name="ViuFlowComponentLibraryStyles"
+            BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
+            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true' and '@(ViuComponentLibraryStyle)' != ''">
+        <ItemGroup>
+            <_ViuComponentLibraryStyle Include="@(ViuComponentLibraryStyle)" />
+            <_ViuComponentLibraryStyleDestination Include="@(_ViuComponentLibraryStyle->'wwwroot/_content/%(PackageId)/%(Filename)%(Extension)')" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuComponentLibraryStyle)"
+              DestinationFiles="@(_ViuComponentLibraryStyleDestination->'%(FullPath)')"
+              SkipUnchangedFiles="true" />
+        <ItemGroup>
+            <!--
+                A preceding Build leaves the copied file under wwwroot, so the
+                next Publish evaluation discovers it through the SDK's default
+                Content glob with an OS-native item identity. Match on FullPath
+                rather than item identity to replace that entry deterministically
+                on Windows and Unix and avoid duplicate static-web-asset keys.
+            -->
+            <Content Remove="@(_ViuComponentLibraryStyleDestination)"
+                     MatchOnMetadata="FullPath"
+                     MatchOnMetadataOptions="PathLike" />
+            <Content Include="@(_ViuComponentLibraryStyleDestination)">
+                <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+                <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+            </Content>
+            <_ViuComponentLibraryStyle Remove="@(_ViuComponentLibraryStyle)" />
+            <_ViuComponentLibraryStyleDestination Remove="@(_ViuComponentLibraryStyleDestination)" />
+        </ItemGroup>
+    </Target>
+</Project>

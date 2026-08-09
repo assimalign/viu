@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>Assimalign.Viu.Browser</RootNamespace>
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <GenerateDependencyFile>false</GenerateDependencyFile>
+        <IsAotCompatible>true</IsAotCompatible>
+        <PackageId Condition="'$(RuntimeIdentifier)' != ''">Assimalign.Viu.App.Browser.Runtime.$(RuntimeIdentifier)</PackageId>
+        <PackageId Condition="'$(RuntimeIdentifier)' == ''">Assimalign.Viu.App.Browser.Runtime</PackageId>
+        <IsPackable>true</IsPackable>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <NoWarn>$(NoWarn);NU5128;NU5100;NU5131;CS2008</NoWarn>
+        <ViuFrameworkName>Assimalign.Viu.App.Browser</ViuFrameworkName>
+        <ViuFrameworkKind>Runtime</ViuFrameworkKind>
+    </PropertyGroup>
+
+    <Import Project="..\..\Assimalign.Viu.App.Browser.props" />
+    <Import Project="..\..\Assimalign.Viu.App.targets" />
+</Project>

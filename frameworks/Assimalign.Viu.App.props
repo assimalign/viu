@@ -1,89 +1,31 @@
 <Project>
     <!--
-        Authoritative list of assemblies that ship in the Viu shared framework
-        (Assimalign.Viu.App), mirroring the sibling Cohesion repo's
-        frameworks/Assimalign.Cohesion.App.props model ([V01.01.12.19], #174).
+        Host-neutral targeting-framework manifest ([V01.01.12.27], #323).
 
-        Multiple consumers read this file:
-
-          1. frameworks/Assimalign.Viu.App.Runtime/src/...csproj
-             Generates <ViuProjectReference> items so each library is built
-             and CopyLocal'd into the Runtime project's bin folder.
-
-          2. frameworks/Assimalign.Viu.App.Refs/src/...csproj
-             (together with Assimalign.Viu.App.targets) drives
-             FrameworkList.xml and RuntimeList.xml generation - no DLL
-             inspection needed.
-
-        The ItemGroups below are conditioned on $(ViuFrameworkName), which
-        every Refs/Runtime csproj sets in its PropertyGroup BEFORE importing
-        this file, so additional framework families (e.g. a future
-        Assimalign.Viu.App.Server for SSR) can share this manifest file.
-
-        Three item types are recognized per framework:
-
-          @(ViuFrameworkAssembly)        - PUBLIC. Listed in the Ref pack's
-                                           FrameworkList.xml AND shipped in
-                                           the Runtime pack. Visible to
-                                           consumers at compile time.
-
-          @(ViuFrameworkPrivateAssembly) - PRIVATE. NOT listed on the Ref
-                                           pack. Shipped in the Runtime pack
-                                           only and enumerated in
-                                           RuntimeList.xml so the host
-                                           resolves them. (Empty today.)
-
-          @(ViuFrameworkPackageOverride) - STANDALONE PACKAGE whose lib/
-                                           assets duplicate an assembly in
-                                           this framework. Listed in the Ref
-                                           pack's data/PackageOverrides.txt
-                                           at the effective package version
-                                           so framework assets win conflict
-                                           resolution on the SDK path.
-
-        @(ViuFrameworkAnalyzer) entries name Roslyn source generators (by
-        analyzers/**/*.csproj filename) shipped INSIDE the Ref pack at
-        analyzers/dotnet/cs/. SDK-path consumers pick these up via the .NET
-        SDK's ResolveTargetingPackAssets, so `[Reactive]` classes and .viu
-        single-file components compile with zero per-project wiring. The
-        Syntax generator's parser closure travels with it (its GetTargetPath
-        is extended by build/Targets/Build.References.Analyzers.targets when
-        ViuAnalyzerBundlesProjectReferenceOutputs=true), and every collected
-        DLL is listed as an Analyzer entry so Roslyn can resolve the
-        generator's dependencies among the registered analyzer paths.
+        Assimalign.Viu.App is deliberately targeting-only: component libraries
+        compile against these four assemblies and receive the generator closure,
+        but do not restore or publish a Viu runtime pack. The Browser framework
+        imports this file to reuse the runtime assembly inventory while keeping
+        its own targeting pack limited to the Browser assembly.
     -->
+    <ItemGroup>
+        <ViuBaseFrameworkAssembly Include="Assimalign.Viu.Reactivity" />
+        <ViuBaseFrameworkAssembly Include="Assimalign.Viu.Components" />
+        <ViuBaseFrameworkAssembly Include="Assimalign.Viu.State" />
+        <ViuBaseFrameworkAssembly Include="Assimalign.Viu.Core" />
 
-    <!-- ================================================================
-         Assimalign.Viu.App: the browser framework. Bundled with every Viu
-         app via Assimalign.Viu.Sdk. Compile-time-only libraries (the
-         Syntax.* parsers, Compiler.Css, Compiler.SingleFileComponent) are
-         deliberately NOT framework assemblies - they reach consumers only
-         inside analyzers/dotnet/cs of the Ref pack.
-         Assimalign.Viu.Testing is a dev-time harness, not
-         a runtime framework member.
-         ================================================================ -->
+        <ViuBaseFrameworkPackageOverride Include="Assimalign.Viu.Reactivity" />
+        <ViuBaseFrameworkPackageOverride Include="Assimalign.Viu.Components" />
+        <ViuBaseFrameworkPackageOverride Include="Assimalign.Viu.State" />
+        <ViuBaseFrameworkPackageOverride Include="Assimalign.Viu.Core" />
+
+        <ViuBaseFrameworkAnalyzer Include="Assimalign.Viu.Generators.Reactivity" />
+        <ViuBaseFrameworkAnalyzer Include="Assimalign.Viu.Generators.Syntax" />
+    </ItemGroup>
+
     <ItemGroup Condition="'$(ViuFrameworkName)' == 'Assimalign.Viu.App'">
-        <ViuFrameworkAssembly Include="Assimalign.Viu.App" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.Components" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.Reactivity" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.State" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.Core" />
-        <ViuFrameworkAssembly Include="Assimalign.Viu.Browser" />
-
-        <!--
-            These assemblies also ship as standalone packages for consumers
-            that cannot adopt the Viu SDK. Keep this list explicit: the empty
-            Assimalign.Viu.App umbrella has no standalone package, while
-            opt-in packages such as Router and Testing are not framework
-            members. Specified by [PKG-2] and [V01.01.14].
-        -->
-        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Components" />
-        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Reactivity" />
-        <ViuFrameworkPackageOverride Include="Assimalign.Viu.State" />
-        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Core" />
-        <ViuFrameworkPackageOverride Include="Assimalign.Viu.Browser" />
-
-        <ViuFrameworkAnalyzer Include="Assimalign.Viu.Generators.Reactivity" />
-        <ViuFrameworkAnalyzer Include="Assimalign.Viu.Generators.Syntax" />
+        <ViuFrameworkAssembly Include="@(ViuBaseFrameworkAssembly)" />
+        <ViuFrameworkPackageOverride Include="@(ViuBaseFrameworkPackageOverride)" />
+        <ViuFrameworkAnalyzer Include="@(ViuBaseFrameworkAnalyzer)" />
     </ItemGroup>
 </Project>

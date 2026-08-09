@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <PackageId>Assimalign.Viu.Sdk.Browser</PackageId>
+        <TargetFramework>$(TargetFrameworkForAnalyzers)</TargetFramework>
+        <GenerateDependencyFile>true</GenerateDependencyFile>
+        <OutDir>$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Tasks</OutDir>
+        <ViuSdkBrowserPackage>true</ViuSdkBrowserPackage>
+    </PropertyGroup>
+    <ItemGroup>
+        <ViuPrivateProjectReference Include="Assimalign.Viu.UtilityCss" />
+        <ViuPrivateProjectReference Include="Assimalign.Viu.Syntax.SingleFileComponent" />
+        <ViuPrivateProjectReference Include="Assimalign.Viu.Syntax" />
+        <ViuPrivateProjectReference Include="Assimalign.Viu.Sdk.CssHotReload"
+                                    ReferenceOutputAssembly="false"
+                                    SkipGetTargetFrameworkProperties="true"
+                                    Private="false" />
+        <ViuProjectReference Include="Assimalign.Viu.Sdk.Tasks" Private="false" />
+    </ItemGroup>
+    <ItemGroup>
+        <ViuPackageReference Include="Microsoft.Build.Utilities.Core" />
+        <ViuPackageReference Include="Microsoft.Build.Framework" />
+        <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="Microsoft.CodeAnalysis.Common" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Buffers" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Collections.Immutable" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Memory" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Numerics.Vectors" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Reflection.Metadata" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Runtime.CompilerServices.Unsafe" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Text.Encoding.CodePages" PrivateAssets="all" ExcludeAssets="runtime" />
+        <ViuPackageReference Include="System.Threading.Tasks.Extensions" PrivateAssets="all" ExcludeAssets="runtime" />
+    </ItemGroup>
+</Project>

@@ -25,18 +25,6 @@
          byte-identical to the generated ExtractedStyles constant. Its transitive parser closure
          (Syntax / SingleFileComponent / Templates / Css) copies to the task output for MSBuild to load. -->
 		<ViuPrivateProjectReference Include="Assimalign.Viu.Compiler.Css" />
-		<!-- The standalone utility candidate scanner/compiler ([V01.01.12.16], #159). Its output remains
-		     separate from component @style CSS and it brings no Tailwind, Node, or runtime dependency. -->
-		<ViuPrivateProjectReference Include="Assimalign.Viu.UtilityCss" />
-	</ItemGroup>
-	<ItemGroup>
-		<!-- Build-order-only edge: the development worker is packaged beside the netstandard2.0
-		     tasks but must not enter their compile/runtime dependency closure. The central by-name
-		     resolver preserves this explicit metadata when it emits the ProjectReference. -->
-		<ViuPrivateProjectReference Include="Assimalign.Viu.Sdk.CssHotReload"
-		                            ReferenceOutputAssembly="false"
-		                            SkipGetTargetFrameworkProperties="true"
-		                            Private="false" />
 	</ItemGroup>
 	 <ItemGroup>
     <!-- MSBuild task API. Centrally versioned with ExcludeAssets=runtime (see
