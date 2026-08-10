@@ -19,6 +19,7 @@
     <ViuProjectReference Include="Assimalign.Viu.Core" />
     <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
+    <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
   </ItemGroup>
   <ItemGroup>
     <ViuPrivateProjectReference Include="Assimalign.Viu.Generators.Syntax" />

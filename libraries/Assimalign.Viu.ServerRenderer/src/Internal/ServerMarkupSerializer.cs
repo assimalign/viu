@@ -158,17 +158,65 @@ internal static class ServerMarkupSerializer
             state.Push(HydrationMarkers.GetLazyHydrationStart(hydrationStrategy));
         }
 
-        await using IComponentRenderScope scope = await state.ComponentHost.RenderAsync(
-            new ComponentRenderRequest(component, parent),
-            state.CancellationToken).ConfigureAwait(false);
-
-        if (scope.Tree is null)
+        ComponentRegistration componentRegistration =
+            state.Application.Components.Resolve(component.Component);
+        if (state.ServerRenders is not null
+            && state.ServerRenders.TryResolve(
+                componentRegistration.Reference,
+                out ServerRenderRegistration? serverRegistration))
         {
-            state.Push(HydrationMarkers.EmptyComment);
+            ComponentActivation activation = await state.ComponentHost.ActivateForServerAsync(
+                new ComponentRenderRequest(component, parent),
+                state.CancellationToken).ConfigureAwait(false);
+            await using ComponentRenderLease compiledScope =
+                new(activation, tree: null);
+            SsrWriter compiledWriter = new(recordFlushBoundaries: true);
+            SsrContext compiledContext = state.Context.CreateRenderTransaction();
+            SsrRenderState compiledState = state.CreateBuffer(
+                compiledWriter,
+                compiledContext);
+            bool completed = false;
+            try
+            {
+                await serverRegistration!.Render(
+                    compiledState,
+                    compiledScope.Instance,
+                    compiledScope.Frame,
+                    compiledScope).ConfigureAwait(false);
+                completed = true;
+            }
+            catch (Exception exception)
+            {
+                activation.Context.RouteError(exception, "component render");
+                state.Push(HydrationMarkers.EmptyComment);
+            }
+
+            if (completed)
+            {
+                state.Context.CommitRenderTransaction(compiledContext);
+                foreach (string chunk in compiledWriter.RecordedFlushChunks)
+                {
+                    state.Push(chunk);
+                    await state.FlushAsync().ConfigureAwait(false);
+                }
+
+                state.Push(compiledWriter.ToStringResult());
+            }
         }
         else
         {
-            await RenderAsync(state, scope.Tree, scope).ConfigureAwait(false);
+            await using IComponentRenderScope scope = await state.ComponentHost.RenderAsync(
+                new ComponentRenderRequest(component, parent),
+                state.CancellationToken).ConfigureAwait(false);
+
+            if (scope.Tree is null)
+            {
+                state.Push(HydrationMarkers.EmptyComment);
+            }
+            else
+            {
+                await RenderAsync(state, scope.Tree, scope).ConfigureAwait(false);
+            }
         }
 
         if (isDeferredHydration)

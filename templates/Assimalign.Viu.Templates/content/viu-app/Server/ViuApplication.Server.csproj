@@ -1,0 +1,20 @@
+<Project Sdk="Assimalign.Viu.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>ViuApplication.Server</RootNamespace>
+    <AssemblyName>ViuApplication.Server</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <ViuServerRendering>true</ViuServerRendering>
+    <!--#if (nullable) -->
+    <Nullable>enable</Nullable>
+    <!--#else -->
+    <Nullable>disable</Nullable>
+    <!--#endif -->
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\Components\__VIU_PROJECT_FILE_NAME__.Components.csproj" />
+  </ItemGroup>
+</Project>

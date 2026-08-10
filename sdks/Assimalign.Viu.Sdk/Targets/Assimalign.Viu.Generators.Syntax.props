@@ -25,5 +25,7 @@
     <CompilerVisibleProperty Include="ProjectDir" />
     <CompilerVisibleProperty Include="Configuration" />
     <CompilerVisibleProperty Include="ViuEmitHotReloadMetadata" />
+    <!-- [SSR-TARGET-1] One project-level declaration selects dual client/server emission. -->
+    <CompilerVisibleProperty Include="ViuServerRendering" />
   </ItemGroup>
 </Project>

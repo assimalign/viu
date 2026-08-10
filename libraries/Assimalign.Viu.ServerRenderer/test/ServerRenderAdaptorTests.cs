@@ -22,6 +22,64 @@ namespace Assimalign.Viu.ServerRenderer.Tests;
 public sealed class ServerRenderAdaptorTests
 {
     [Fact]
+    public async Task RenderAsync_GeneratedRegistry_UsesCompiledBodyWithoutClientTreeRender()
+    {
+        ComponentReference componentReference = ComponentReference.ForName("compiled-root");
+        int setupCount = 0;
+        int prefetchCount = 0;
+        int clientRenderCount = 0;
+        int compiledRenderCount = 0;
+        int disposalCount = 0;
+        ComponentFactory components = new();
+        components.Register(new ComponentRegistration(
+            componentReference,
+            new ComponentContract(),
+            _ => new InlineComponent(
+                context =>
+                {
+                    setupCount++;
+                    context.Lifecycle.OnServerPrefetch(() => prefetchCount++);
+                    return _ =>
+                    {
+                        clientRenderCount++;
+                        return new TextNode("client fallback");
+                    };
+                },
+                () => disposalCount++)));
+        ServerRenderRegistry serverRenders = new();
+        serverRenders.Register(new ServerRenderRegistration(
+            componentReference,
+            (state, component, frame, scope) =>
+            {
+                component.ShouldBeOfType<InlineComponent>();
+                frame.ShouldNotBeNull();
+                scope.Context.ShouldNotBeNull();
+                compiledRenderCount++;
+                state.Push("<strong>compiled</strong>");
+                return Task.CompletedTask;
+            }));
+        DelegateRequestScopeFactory<string> factory = new(
+            (request, _) => CreateScope(request, components));
+        FakeServerHost<string> host = new(factory, serverRenders);
+        RecordingServerRenderOutput output = new();
+
+        ServerRenderResult result = await host.RenderAsync(
+            new ServerRenderRequest<string>(
+                new ComponentNode(componentReference),
+                "compiled"),
+            output);
+
+        result.Succeeded.ShouldBeTrue();
+        output.Text.ShouldBe("<strong>compiled</strong>");
+        setupCount.ShouldBe(1);
+        prefetchCount.ShouldBe(1);
+        compiledRenderCount.ShouldBe(1);
+        clientRenderCount.ShouldBe(0);
+        disposalCount.ShouldBe(1);
+        factory.CreatedScopes.ShouldHaveSingleItem().DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task RenderAsync_ParallelRequests_FreshScopesKeepReactiveAndSsrContextStateIsolated()
     {
         ComponentReference componentReference = ComponentReference.ForName("request-root");
@@ -557,6 +615,13 @@ public sealed class ServerRenderAdaptorTests
         internal FakeServerHost(IServerRenderRequestScopeFactory<TContext> requestScopeFactory)
         {
             _adaptor = new ServerRenderAdaptor<TContext>(requestScopeFactory);
+        }
+
+        internal FakeServerHost(
+            IServerRenderRequestScopeFactory<TContext> requestScopeFactory,
+            IServerRenderRegistry serverRenders)
+        {
+            _adaptor = new ServerRenderAdaptor<TContext>(requestScopeFactory, serverRenders);
         }
 
         internal ValueTask<ServerRenderResult> RenderAsync(

@@ -33,9 +33,12 @@ delegates, preserving contravariant delegate ordering and exact payload identity
 
 ## Application lifetime
 
-`BrowserApplication` owns browser initialization, mount-target resolution, mount or hydration, and
-full-page development reload. Core's `ApplicationLifetime` owns the host-independent state machine,
-middleware nesting, shutdown signal, and failure reporting (`[APP-1]` through `[APP-5]`).
+`BrowserApplication` owns browser initialization, mount-target resolution, and mount or hydration.
+Core remounts affected component instances in the post-flush phase for accepted template and script
+metadata updates; Browser retains the current document so the applied managed delta remains loaded.
+The .NET watch host owns rebuild, restart, and browser refresh for rude edits rejected by metadata
+update. Core's `ApplicationLifetime` owns the host-independent state machine, middleware nesting,
+shutdown signal, and failure reporting (`[APP-1]` through `[APP-5]`).
 
 Startup is asynchronous. Middleware wraps the complete interval from pre-mount initialization
 through unmount; lower-level mount APIs deliberately bypass that pipeline for embedding and tests.

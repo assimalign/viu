@@ -32,7 +32,9 @@ detailed in [DESIGN.md](DESIGN.md); this page is the surface map.
   `RenderFunctionTargetProfile` (`VirtualNodeTree` or `ServerMarkup`), `RenderSourceMapping` (the
   `#line` correspondence), and the code-generation IR. The server profile writes static structure and
   interpolations directly to `SsrRenderState`; subtrees it cannot prove safe retain a local
-  virtual-node fallback.
+  virtual-node fallback. Tooling callers select the profile explicitly; the single-file-component
+  generator selects both profiles project-wide when `ViuServerRendering=true` under a Viu SDK
+  (`[SSR-TARGET-1]`, `[SSR-TARGET-2]`).
 - **Diagnostics** (`Diagnostics/`) — `CompilerError` and `CompilerErrorCode`, whose numeric bands are
   a frozen contract.
 

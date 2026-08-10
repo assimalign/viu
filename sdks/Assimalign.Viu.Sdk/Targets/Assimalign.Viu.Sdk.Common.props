@@ -17,6 +17,12 @@
             these defaults.
         -->
         <ViuUseSingleFileComponents Condition="'$(ViuUseSingleFileComponents)' == ''">true</ViuUseSingleFileComponents>
+        <!--
+            [SSR-TARGET-1] Server rendering is an explicit project topology, never inferred from
+            source files. A project body may set this to true; the final value is visible to the
+            generator and the paired targets add the exact ServerRenderer package.
+        -->
+        <ViuServerRendering Condition="'$(ViuServerRendering)' == ''">false</ViuServerRendering>
 
         <!--
             The ViuBundleCss MSBuild task ships inside this SDK package at

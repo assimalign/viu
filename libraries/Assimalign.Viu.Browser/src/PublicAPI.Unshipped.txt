@@ -1,5 +1,7 @@
 #nullable enable
 Assimalign.Viu.Browser.BrowserRendererHost.BrowserRendererHost(Assimalign.Viu.Browser.BrowserCommandFrameApplier! applyCommandFrame, System.Func<int, int>? parentNode, System.Func<int, int>? nextSibling, System.Func<int, string!>? snapshotHydration, System.Func<Assimalign.Viu.HydrationTriggerRequest<int>!, Assimalign.Viu.IHydrationTriggerRegistration!>? scheduleHydrationTrigger) -> void
+*REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateEmbedded(Assimalign.Viu.Browser.BrowserRendererHost! host, Assimalign.Viu.ApplicationContext! context, bool hydrate = false, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? initialize = null, System.Func<string!, int>? resolveContainer = null, System.Action? requestFullReload = null, string! mountTargetSelector = "#app") -> Assimalign.Viu.Browser.BrowserApplication!
+*REMOVED*static Assimalign.Viu.Browser.BrowserApplication.CreateEmbedded(Assimalign.Viu.Renderer<int>! renderer, Assimalign.Viu.ApplicationContext! context, bool hydrate = false, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? initialize = null, System.Action<int>? clearContainer = null, System.Func<string!, int>? resolveContainer = null, System.Action? requestFullReload = null, string! mountTargetSelector = "#app") -> Assimalign.Viu.Browser.BrowserApplication!
 *REMOVED*Assimalign.Viu.Browser.ViuModelBinding
 *REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyList<string!>!
 *REMOVED*Assimalign.Viu.Browser.ViuModelBinding.Setter.get -> System.Action<object?>!
@@ -11,4 +13,6 @@ Assimalign.Viu.Browser.ModelBinding.ModelBinding(object? value, System.Action<ob
 Assimalign.Viu.Browser.ModelBinding.Modifiers.get -> System.Collections.Generic.IReadOnlyList<string!>!
 Assimalign.Viu.Browser.ModelBinding.Setter.get -> System.Action<object?>!
 Assimalign.Viu.Browser.ModelBinding.Value.get -> object?
+static Assimalign.Viu.Browser.BrowserApplication.CreateEmbedded(Assimalign.Viu.Browser.BrowserRendererHost! host, Assimalign.Viu.ApplicationContext! context, bool hydrate = false, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? initialize = null, System.Func<string!, int>? resolveContainer = null, string! mountTargetSelector = "#app") -> Assimalign.Viu.Browser.BrowserApplication!
+static Assimalign.Viu.Browser.BrowserApplication.CreateEmbedded(Assimalign.Viu.Renderer<int>! renderer, Assimalign.Viu.ApplicationContext! context, bool hydrate = false, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? initialize = null, System.Action<int>? clearContainer = null, System.Func<string!, int>? resolveContainer = null, string! mountTargetSelector = "#app") -> Assimalign.Viu.Browser.BrowserApplication!
 static Assimalign.Viu.Browser.BrowserRuntime.GetRegistryDiagnostics() -> (int JavaScriptNodes, int JavaScriptListenerMaps, int ManagedListeners)

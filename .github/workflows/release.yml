@@ -1,16 +1,17 @@
 # Official Viu release pipeline.
 #
-# main merge -> uniquely versioned beta packages in GitHub Packages, plus a
-#               Marketplace preview when the Visual Studio extension or one of its embedded
-#               language-engine dependencies changed.
-# GitHub
-# Release    -> stable packages in nuget.org through OIDC trusted publishing.
+# A published GitHub Release is the only package-publication trigger. The release tag must match
+# the complete centrally declared ViuVersion, including any prerelease suffix. The validated set is
+# staged automatically in GitHub Packages; promotion of that same artifact to nuget.org pauses at
+# the protected nuget-org environment ([V01.01.12.03]).
 name: release
 
 on:
-  pull_request_target:
+  push:
     branches: [main]
-    types: [closed]
+    paths:
+      - 'extensions/VisualStudio/**'
+      - 'tooling/**'
   release:
     types: [published]
 
@@ -18,61 +19,54 @@ permissions:
   contents: read
 
 jobs:
-  detect-visual-studio-changes:
-    name: detect Visual Studio changes
-    if: >-
-      github.event_name == 'pull_request_target' &&
-      github.event.pull_request.merged == true
+  validate-release:
+    name: validate ${{ matrix.area }} / ${{ matrix.project }}
+    if: github.event_name == 'release'
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      changed: ${{ steps.changes.outputs.changed }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { area: libraries, project: Assimalign.Viu.Browser }
+          - { area: libraries, project: Assimalign.Viu.Browser.Router }
+          - { area: libraries, project: Assimalign.Viu.Components }
+          - { area: libraries, project: Assimalign.Viu.Core }
+          - { area: libraries, project: Assimalign.Viu.Reactivity }
+          - { area: libraries, project: Assimalign.Viu.Router }
+          - { area: libraries, project: Assimalign.Viu.ServerRenderer }
+          - { area: libraries, project: Assimalign.Viu.State }
+          - { area: libraries, project: Assimalign.Viu.Testing }
+          - { area: tooling, project: Assimalign.Viu.Compiler.Css }
+          - { area: tooling, project: Assimalign.Viu.Compiler.SingleFileComponent }
+          - { area: tooling, project: Assimalign.Viu.LanguageServer }
+          - { area: tooling, project: Assimalign.Viu.LanguageService }
+          - { area: tooling, project: Assimalign.Viu.Syntax }
+          - { area: tooling, project: Assimalign.Viu.Syntax.Css }
+          - { area: tooling, project: Assimalign.Viu.Syntax.Html }
+          - { area: tooling, project: Assimalign.Viu.Syntax.SingleFileComponent }
+          - { area: tooling, project: Assimalign.Viu.Syntax.Templates }
+          - { area: tooling, project: Assimalign.Viu.UtilityCss }
+          - { area: analyzers, project: Assimalign.Viu.Generators.Reactive }
+          - { area: analyzers, project: Assimalign.Viu.Generators.Syntax }
     steps:
-      - name: Detect extension changes
-        id: changes
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VIU_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          $changedFiles = @(
-            & gh api `
-              --paginate `
-              "repos/$($env:GITHUB_REPOSITORY)/pulls/$($env:VIU_PULL_REQUEST_NUMBER)/files?per_page=100" `
-              --jq '.[].filename'
-          )
-          if ($LASTEXITCODE -ne 0) {
-            throw "Reading pull request files failed with exit code $LASTEXITCODE."
-          }
+      - name: Checkout release tag
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.release.tag_name }}
 
-          $visualStudioChanged = @(
-            $changedFiles |
-              Where-Object {
-                $_.StartsWith(
-                  'extensions/VisualStudio/',
-                  [System.StringComparison]::Ordinal) -or
-                $_.StartsWith(
-                  'tooling/Assimalign.Viu.Syntax',
-                  [System.StringComparison]::Ordinal) -or
-                $_.StartsWith(
-                  'tooling/',
-                  [System.StringComparison]::Ordinal)
-              }
-          ).Count -gt 0
-          "changed=$($visualStudioChanged.ToString().ToLowerInvariant())" |
-            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "Visual Studio extension changed: $visualStudioChanged"
+      - name: Run canonical area build and tests
+        uses: ./.github/actions/build
+        with:
+          area: ${{ matrix.area }}
+          project: ${{ matrix.project }}
 
   pack-packages:
     name: pack all NuGet packages
-    if: >-
-      (github.event_name == 'pull_request_target' &&
-      github.event.pull_request.merged == true) ||
-      (github.event_name == 'release' &&
-      github.event.release.draft == false &&
-      github.event.release.prerelease == false)
+    needs: validate-release
+    if: github.event_name == 'release' && github.event.release.draft == false
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -84,7 +78,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Validate checked-out commit
         shell: pwsh
@@ -112,42 +106,31 @@ jobs:
         id: version
         shell: pwsh
         env:
-          VIU_EVENT_NAME: ${{ github.event_name }}
           VIU_RELEASE_TAG: ${{ github.event.release.tag_name }}
-          VIU_RUN_NUMBER: ${{ github.run_number }}
         run: |
           $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
           $canonicalVersion = (
-            & dotnet msbuild $sdkProject -nologo -getProperty:ViuVersionPrefix
+            & dotnet msbuild $sdkProject -nologo -getProperty:ViuVersion
           ) -join [System.Environment]::NewLine
           if ($LASTEXITCODE -ne 0) {
             throw "Reading the canonical Viu version failed with exit code $LASTEXITCODE."
           }
           $canonicalVersion = $canonicalVersion.Trim()
-          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
-            throw "Canonical Viu version '$canonicalVersion' is not a three-part numeric version."
+          if ($canonicalVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
+            throw "Canonical Viu version '$canonicalVersion' is not supported SemVer."
           }
 
-          if ($env:VIU_EVENT_NAME -eq 'pull_request_target') {
-            $releaseVersion = "$canonicalVersion-beta.$($env:VIU_RUN_NUMBER)"
+          $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
+            $env:VIU_RELEASE_TAG,
+            '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?)$',
+            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
+          if (-not $tagMatch.Success) {
+            throw 'GitHub releases must use a vMAJOR.MINOR.PATCH[-PRERELEASE] tag.'
           }
-          elseif ($env:VIU_EVENT_NAME -eq 'release') {
-            $tagMatch = [System.Text.RegularExpressions.Regex]::Match(
-              $env:VIU_RELEASE_TAG,
-              '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$',
-              [System.Text.RegularExpressions.RegexOptions]::CultureInvariant)
-            if (-not $tagMatch.Success) {
-              throw 'Stable GitHub releases must use a vMAJOR.MINOR.PATCH tag.'
-            }
 
-            $releaseVersion = $tagMatch.Groups['version'].Value
-            if ($releaseVersion -ne $canonicalVersion) {
-              throw "Release tag version $releaseVersion does not match canonical Viu version $canonicalVersion."
-            }
-
-          }
-          else {
-            throw "Unsupported release event '$($env:VIU_EVENT_NAME)'."
+          $releaseVersion = $tagMatch.Groups['version'].Value
+          if ($releaseVersion -ne $canonicalVersion) {
+            throw "Release tag version $releaseVersion does not match canonical Viu version $canonicalVersion."
           }
 
           "version=$releaseVersion" |
@@ -159,6 +142,22 @@ jobs:
         env:
           VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/Pack-Release.ps1 -Version $env:VIU_PACKAGE_VERSION
+
+      - name: Validate fresh package-only consumers
+        shell: pwsh
+        env:
+          VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: >-
+          ./scripts/Test-ApplicationLifetimeConsumer.ps1
+          -PackageDirectory _out/release/packages
+          -Version $env:VIU_PACKAGE_VERSION
+
+      - name: Validate installed template matrix
+        shell: pwsh
+        run: >-
+          ./scripts/Test-Templates.ps1
+          -PackageDirectory _out/release/packages
+          -SkipPack
 
       # The publish jobs assert the artifact they download still carries every
       # package this job produced. They cannot compute that themselves - they
@@ -215,17 +214,15 @@ jobs:
           retention-days: 14
 
   publish-github-packages:
-    name: publish beta packages to GitHub Packages
-    if: >-
-      github.event_name == 'pull_request_target' &&
-      github.event.pull_request.merged == true
+    name: stage packages in GitHub Packages
+    if: github.event_name == 'release'
     needs: pack-packages
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     concurrency:
-      group: viu-github-packages-beta
+      group: viu-github-packages-release
       cancel-in-progress: false
     steps:
       - name: Download validated packages
@@ -240,7 +237,7 @@ jobs:
         working-directory: _release/packages
         run: sha256sum --check checksums.sha256
 
-      - name: Publish beta packages
+      - name: Stage validated packages
         shell: pwsh
         env:
           GITHUB_PACKAGES_TOKEN: ${{ github.token }}
@@ -263,6 +260,7 @@ jobs:
             & dotnet nuget push $packagePath `
               --source 'https://nuget.pkg.github.com/assimalign/index.json' `
               --api-key $env:GITHUB_PACKAGES_TOKEN `
+              --no-symbols `
               --skip-duplicate
             if ($LASTEXITCODE -ne 0) {
               throw "Publishing $packageFile to GitHub Packages failed with exit code $LASTEXITCODE."
@@ -270,21 +268,22 @@ jobs:
           }
 
           @"
-          ## Published beta packages
+          ## Staged release packages
 
-          Published all $($packageFiles.Count) Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to the
-          Assimalign GitHub Packages feed.
+          Staged all $($packageFiles.Count) validated Viu packages at version ``$($env:VIU_PACKAGE_VERSION)``
+          in the Assimalign GitHub Packages feed. Symbol packages remain in the validated artifact
+          for nuget.org promotion.
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
   publish-nuget:
-    name: publish stable packages to nuget.org
-    if: >-
-      github.event_name == 'release' &&
-      github.event.release.draft == false &&
-      github.event.release.prerelease == false
-    needs: pack-packages
+    name: promote packages to nuget.org
+    if: github.event_name == 'release'
+    needs: [pack-packages, publish-github-packages]
     runs-on: ubuntu-24.04
+    environment:
+      name: nuget-org
+      url: https://www.nuget.org/profiles/Assimalign
     permissions:
       contents: read
       id-token: write
@@ -311,7 +310,7 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Publish stable packages
+      - name: Promote validated packages
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
@@ -341,9 +340,10 @@ jobs:
           }
 
           @"
-          ## Published stable packages
+          ## Promoted release packages
 
-          Published all $($packageFiles.Count) Viu packages at version ``$($env:VIU_PACKAGE_VERSION)`` to
+          Promoted all $($packageFiles.Count) Viu packages and their symbol packages at version
+          ``$($env:VIU_PACKAGE_VERSION)`` to
           [nuget.org](https://www.nuget.org/profiles/Assimalign).
           "@ |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -351,11 +351,9 @@ jobs:
   publish-visual-studio-preview:
     name: publish Visual Studio Marketplace preview
     if: >-
-      github.event_name == 'pull_request_target' &&
-      github.event.pull_request.merged == true &&
-      needs.detect-visual-studio-changes.outputs.changed == 'true' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
       vars.VIU_PUBLISH_MARKETPLACE == 'true'
-    needs: detect-visual-studio-changes
     runs-on: windows-latest
     environment:
       name: visual-studio-marketplace
@@ -369,7 +367,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up .NET
         uses: ./.github/actions/setup-dotnet-wasm

@@ -132,6 +132,80 @@ public sealed class ServerRendererContextAndStreamingTests
     }
 
     [Fact]
+    public async Task RenderToStreamAsync_CompiledTransaction_ReplaysSuccessfulFlushBoundaries()
+    {
+        ComponentReference reference = ComponentReference.ForName("compiled-streaming");
+        ComponentFactory components = new();
+        components.Register(Registration(reference, _ => new TextNode("unused")));
+        ServerRenderRegistry serverRenders = new();
+        serverRenders.Register(new ServerRenderRegistration(
+            reference,
+            async (state, _, _, _) =>
+            {
+                state.Push("<span>first</span>");
+                await state.FlushAsync();
+                state.Push("<span>second</span>");
+                await state.FlushAsync();
+                state.Push("<span>tail</span>");
+            }));
+        TaskCompletionSource releaseFirstFlush = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingTextWriter writer = new(releaseFirstFlush);
+
+        Task rendering = ServerRenderer.RenderToStreamAsync(
+            new ServerRenderApplication(new ComponentNode(reference), components),
+            writer,
+            serverRenders);
+        await writer.FirstWrite.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        writer.Text.ShouldBe("<span>first</span>");
+        writer.FlushCount.ShouldBe(1);
+        rendering.IsCompleted.ShouldBeFalse();
+
+        releaseFirstFlush.SetResult();
+        await rendering.WaitAsync(TimeSpan.FromSeconds(5));
+
+        writer.Text.ShouldBe(
+            "<span>first</span><span>second</span><span>tail</span>");
+        writer.Chunks.ShouldBe(
+        [
+            "<span>first</span>",
+            "<span>second</span>",
+            "<span>tail</span>",
+        ]);
+        writer.FlushCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task RenderToStreamAsync_CompiledTransactionEmptyFlush_ObservesRequestCancellation()
+    {
+        ComponentReference reference = ComponentReference.ForName("compiled-cancellation");
+        ComponentFactory components = new();
+        components.Register(Registration(reference, _ => new TextNode("unused")));
+        using CancellationTokenSource cancellationSource = new();
+        ServerRenderRegistry serverRenders = new();
+        serverRenders.Register(new ServerRenderRegistration(
+            reference,
+            async (state, _, _, _) =>
+            {
+                cancellationSource.Cancel();
+                await state.FlushAsync();
+            }));
+        using StringWriter writer = new();
+
+        OperationCanceledException exception =
+            await Should.ThrowAsync<OperationCanceledException>(
+                async () => await ServerRenderer.RenderToStreamAsync(
+                    new ServerRenderApplication(new ComponentNode(reference), components),
+                    writer,
+                    serverRenders,
+                    cancellationToken: cancellationSource.Token));
+
+        exception.CancellationToken.ShouldBe(cancellationSource.Token);
+        writer.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task ServerApplicationBuilder_SnapshotsServicesAndDoesNotDisposeThem()
     {
         ComponentReference reference = ComponentReference.ForName("service");
@@ -208,10 +282,20 @@ public sealed class ServerRendererContextAndStreamingTests
     private sealed class RecordingTextWriter : TextWriter
     {
         private readonly StringBuilder _all = new();
+        private readonly TaskCompletionSource? _releaseFirstFlush;
+        private int _flushCount;
+
+        internal RecordingTextWriter(TaskCompletionSource? releaseFirstFlush = null)
+        {
+            _releaseFirstFlush = releaseFirstFlush;
+        }
 
         internal List<string> Chunks { get; } = [];
 
-        internal int FlushCount { get; private set; }
+        internal TaskCompletionSource FirstWrite { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal int FlushCount => Volatile.Read(ref _flushCount);
 
         internal string Text => _all.ToString();
 
@@ -224,12 +308,18 @@ public sealed class ServerRendererContextAndStreamingTests
             string chunk = buffer.ToString();
             Chunks.Add(chunk);
             _all.Append(chunk);
+            FirstWrite.TrySetResult();
             return Task.CompletedTask;
         }
 
         public override Task FlushAsync(CancellationToken cancellationToken)
         {
-            FlushCount++;
+            int count = Interlocked.Increment(ref _flushCount);
+            if (count == 1 && _releaseFirstFlush is not null)
+            {
+                return _releaseFirstFlush.Task.WaitAsync(cancellationToken);
+            }
+
             return Task.CompletedTask;
         }
     }

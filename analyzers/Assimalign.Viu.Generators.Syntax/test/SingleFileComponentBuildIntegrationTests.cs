@@ -20,10 +20,11 @@ public sealed class SingleFileComponentBuildIntegrationTests
 {
     /// <summary>
     /// The packaged props surface both the Configuration default and the explicit
-    /// ViuEmitHotReloadMetadata override through Roslyn's analyzer-config bridge.
+    /// ViuEmitHotReloadMetadata override and server-target declaration through Roslyn's
+    /// analyzer-config bridge.
     /// </summary>
     [Fact]
-    public async Task CompilerVisibleProperties_ExposeHotReloadMetadataGates()
+    public async Task CompilerVisibleProperties_ExposeGenerationGates()
     {
         var repositoryDirectory = FindRepositoryDirectory();
         var propsPath = Path.Combine(
@@ -47,6 +48,7 @@ public sealed class SingleFileComponentBuildIntegrationTests
             var properties = File.ReadAllLines(Path.Combine(temporaryDirectory, "properties.txt"));
             properties.ShouldContain("Configuration");
             properties.ShouldContain("ViuEmitHotReloadMetadata");
+            properties.ShouldContain("ViuServerRendering");
         }
         finally
         {

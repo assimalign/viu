@@ -27,6 +27,28 @@
     <PropertyGroup Condition="'$(IsPackable)' != 'false'">
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <DocumentationFile Condition="'$(DocumentationFile)' == ''">$(OutputPath)$(AssemblyName).xml</DocumentationFile>
+
+        <!--
+            Portable PDBs are published as NuGet.org-compatible .snupkg files. A custom-layout
+            container that opts into public symbols contributes them through
+            TargetsForTfmSpecificDebugSymbolsInPackage in its owning targets file.
+        -->
+        <IncludeSymbols Condition="'$(IncludeSymbols)' == ''">true</IncludeSymbols>
+        <SymbolPackageFormat Condition="'$(IncludeSymbols)' == 'true' and '$(SymbolPackageFormat)' == ''">snupkg</SymbolPackageFormat>
+
+        <!--
+            The .NET 10 SDK contains Microsoft.DotNet.PackageValidation and ApiCompat. This validates
+            the produced archive on every pack without adding a package dependency. PublicAPI
+            baselines below remain the source-level API-break gate; release builds may additionally
+            set ViuPackageValidationBaselineVersion to compare against a published package.
+        -->
+        <!-- SDK/targeting containers set IncludeBuildOutput=false; the runtime pack retains it only
+             for symbol collection. These packages intentionally use Sdk/, ref/, runtime-pack, and
+             manifest layouts that the ordinary lib/-asset rule reports as PKV004.
+             Assert-ViuReleasePackageSet validates those physical layouts instead. -->
+        <EnablePackageValidation Condition="'$(ViuContainerPackage)' != 'true'">true</EnablePackageValidation>
+        <RunApiCompat Condition="'$(EnablePackageValidation)' == 'true'">true</RunApiCompat>
+        <PackageValidationBaselineVersion Condition="'$(EnablePackageValidation)' == 'true' and '$(ViuPackageValidationBaselineVersion)' != ''">$(ViuPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
     </PropertyGroup>
 
     <!--
@@ -75,17 +97,47 @@
     </ItemGroup>
 
     <!--
-        NuGet recommends a package README. Individual package families can set
-        PackageReadmeFile and pack their own file before this targets-phase
-        fallback runs; the SDK does so with sdks/README.md.
+        NuGet recommends a package README. Every package uses the repository README through this
+        central item; individual projects may override only Description and PackageTags, never
+        readme or repository metadata.
     -->
     <PropertyGroup Condition="'$(IsPackable)' != 'false' and '$(PackageReadmeFile)' == ''">
-        <_ViuUseRepositoryPackageReadme>true</_ViuUseRepositoryPackageReadme>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
-    <ItemGroup Condition="'$(_ViuUseRepositoryPackageReadme)' == 'true'">
-        <None Include="$(ViuRepositoryDirectory)README.md"
+    <PropertyGroup Condition="'$(IsPackable)' != 'false' and '$(ViuPackageReadmeSource)' == ''">
+        <ViuPackageReadmeSource>$(ViuRepositoryDirectory)README.md</ViuPackageReadmeSource>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(IsPackable)' != 'false'">
+        <None Include="$(ViuPackageReadmeSource)"
               Pack="true"
               PackagePath="\" />
     </ItemGroup>
+
+    <!-- Every package embeds the repository license named by PackageLicenseFile. -->
+    <ItemGroup Condition="'$(IsPackable)' != 'false'">
+        <None Include="$(ViuRepositoryDirectory)LICENSE"
+              Pack="true"
+              PackagePath="\" />
+    </ItemGroup>
+
+    <!--
+        Standalone Viu packages follow compatible-major SemVer ranges. The composed SDK and shared
+        framework packs override this target to exact lockstep because their manifests and assets
+        are one versioned product surface. Bare NuGet versions are deliberately avoided: they mean
+        an unbounded minimum range and can silently cross a future major version.
+    -->
+    <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+        <_ViuNextMajorVersion>$([MSBuild]::Add($(ViuMajorVersion), 1)).0.0</_ViuNextMajorVersion>
+        <ViuPackageDependencyVersionRange Condition="'$(ViuPackageDependencyVersionRange)' == ''">[$(ViuVersion),$(_ViuNextMajorVersion))</ViuPackageDependencyVersionRange>
+    </PropertyGroup>
+    <Target Name="ApplyViuPackageDependencyRanges"
+            BeforeTargets="GenerateNuspec"
+            Condition="'$(IsPackable)' != 'false'">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)"
+                                            Condition="$([System.String]::Copy('%(Filename)').StartsWith('Assimalign.Viu.'))">
+                <ProjectVersion>$(ViuPackageDependencyVersionRange)</ProjectVersion>
+            </_ProjectReferencesWithVersions>
+        </ItemGroup>
+    </Target>
 </Project>

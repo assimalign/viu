@@ -37,4 +37,13 @@ public readonly record struct SingleFileComponentProjectionInput(
     string HintName,
     string ScopeId,
     string? HotReloadComponentIdentifier,
-    bool HasCanonicalPeer);
+    bool HasCanonicalPeer)
+{
+    /// <summary>
+    /// Whether the consuming project explicitly targets server rendering and therefore requires a
+    /// second, direct-markup render body in addition to the ordinary virtual-node render body.
+    /// The value is project-scoped so individual component files cannot select divergent profiles.
+    /// Specified by <c>[SSR-TARGET-1]</c> and <c>[SSR-TARGET-2]</c>.
+    /// </summary>
+    public bool EmitServerRendering { get; init; }
+}

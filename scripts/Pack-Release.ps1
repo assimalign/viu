@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Strictly packs every public Viu library plus both SDKs, both targeting
-    packs, and the Browser browser-wasm runtime pack into
+    packs, the Browser browser-wasm runtime pack, and the dotnet-new template pack into
     _out/release/packages. The generated package-order.txt records
     dependency-safe publication order.
 
@@ -14,6 +14,10 @@
 
 .PARAMETER Configuration
     Build configuration (default Release).
+
+.PARAMETER PackageValidationBaselineVersion
+    Optional previously published version used by the .NET SDK package-validation
+    baseline. PublicAPI baselines and physical package validation always run.
 #>
 [CmdletBinding()]
 param(
@@ -21,7 +25,9 @@ param(
     [string] $Version,
 
     [ValidateSet('Debug', 'Release')]
-    [string] $Configuration = 'Release'
+    [string] $Configuration = 'Release',
+
+    [string] $PackageValidationBaselineVersion
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,8 +84,10 @@ New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
 Get-ChildItem -LiteralPath $packageDirectory -File |
     Where-Object {
         $_.Name.EndsWith('.nupkg', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $_.Name.EndsWith('.snupkg', [System.StringComparison]::OrdinalIgnoreCase) -or
         $_.Name -eq 'checksums.sha256' -or
-        $_.Name -eq 'package-order.txt'
+        $_.Name -eq 'package-order.txt' -or
+        $_.Name -eq 'symbol-package-order.txt'
     } |
     ForEach-Object {
         Remove-Item -LiteralPath $_.FullName -Force
@@ -107,6 +115,9 @@ $buildProperties = @(
     "-p:RepositoryCommit=$repositoryCommit",
     "-p:PackageOutputPath=$packageDirectory"
 )
+if (-not [string]::IsNullOrWhiteSpace($PackageValidationBaselineVersion)) {
+    $buildProperties += "-p:ViuPackageValidationBaselineVersion=$PackageValidationBaselineVersion"
+}
 
 # The library inventory and its drift guard live in the shared packaging module, so the
 # release set and the local dogfooding feed (scripts/Install-Local.ps1) cannot disagree
@@ -125,6 +136,7 @@ function Invoke-PackageBuild {
     Write-Host "Packing $Project" -ForegroundColor Green
     & dotnet pack $Project `
         --configuration $Configuration `
+        -warnaserror `
         @buildProperties `
         @AdditionalArguments
     if ($LASTEXITCODE -ne 0) {
@@ -169,18 +181,32 @@ if ($LASTEXITCODE -ne 0) {
 }
 Invoke-PackageBuild -Project $browserSdkProject
 
+$templateProject = Join-Path $repositoryDirectory `
+    'templates/Assimalign.Viu.Templates/Assimalign.Viu.Templates.csproj'
+Invoke-PackageBuild -Project $templateProject
+
 $packageIds = $libraryPackageIds + @(
     'Assimalign.Viu.App.Ref',
     'Assimalign.Viu.App.Browser.Runtime.browser-wasm',
     'Assimalign.Viu.App.Browser.Ref',
     'Assimalign.Viu.Sdk',
-    'Assimalign.Viu.Sdk.Browser'
+    'Assimalign.Viu.Sdk.Browser',
+    'Assimalign.Viu.Templates'
 )
 $expectedPackageFiles = @(
     $packageIds |
         ForEach-Object {
             "$_.$Version.nupkg"
         }
+)
+$expectedSymbolPackageFiles = @(
+    $packageIds |
+        Where-Object {
+            Test-ViuPackageRequiresSymbolPackage `
+                -PackageId $_ `
+                -PackagePath (Join-Path $packageDirectory "$($_).$Version.nupkg")
+        } |
+        ForEach-Object { "$_.$Version.snupkg" }
 )
 $actualPackageFiles = @(
     Get-ChildItem -LiteralPath $packageDirectory -Filter '*.nupkg' -File |
@@ -193,6 +219,18 @@ $packageDifference = @(
 )
 if ($packageDifference.Count -ne 0) {
     throw "The release package set is incomplete: $($packageDifference | Out-String)"
+}
+$actualSymbolPackageFiles = @(
+    Get-ChildItem -LiteralPath $packageDirectory -Filter '*.snupkg' -File |
+        ForEach-Object Name
+)
+$symbolPackageDifference = @(
+    Compare-Object `
+        ($expectedSymbolPackageFiles | Sort-Object) `
+        ($actualSymbolPackageFiles | Sort-Object)
+)
+if ($symbolPackageDifference.Count -ne 0) {
+    throw "The release symbol package set is incomplete: $($symbolPackageDifference | Out-String)"
 }
 
 $baseFrameworkAssemblies = @(
@@ -225,12 +263,21 @@ Assert-ViuFrameworkPackage `
     -ExpectedFrameworkAssembly @($baseFrameworkAssemblies + $browserFrameworkAssemblies)
 Write-Host 'Validated base and Browser framework package manifests.' -ForegroundColor Green
 
+Assert-ViuReleasePackageSet `
+    -PackageDirectory $packageDirectory `
+    -Version $Version `
+    -ExpectedPackageId $packageIds
+
 $packageOrderPath = Join-Path $packageDirectory 'package-order.txt'
 $expectedPackageFiles |
     Set-Content -LiteralPath $packageOrderPath -Encoding utf8
 
+$symbolPackageOrderPath = Join-Path $packageDirectory 'symbol-package-order.txt'
+$expectedSymbolPackageFiles |
+    Set-Content -LiteralPath $symbolPackageOrderPath -Encoding utf8
+
 $checksumPath = Join-Path $packageDirectory 'checksums.sha256'
-$checksumLines = foreach ($packageFile in $expectedPackageFiles) {
+$checksumLines = foreach ($packageFile in @($expectedPackageFiles + $expectedSymbolPackageFiles)) {
     $packagePath = Join-Path $packageDirectory $packageFile
     $packageHash = Get-FileHash -LiteralPath $packagePath -Algorithm SHA256
     "$($packageHash.Hash.ToLowerInvariant())  $packageFile"
@@ -238,5 +285,6 @@ $checksumLines = foreach ($packageFile in $expectedPackageFiles) {
 $checksumLines |
     Set-Content -LiteralPath $checksumPath -Encoding ascii
 
-Write-Host "Created $($expectedPackageFiles.Count) packages in $packageDirectory" -ForegroundColor Cyan
+Write-Host "Created $($expectedPackageFiles.Count) packages and $($expectedSymbolPackageFiles.Count) symbol packages in $packageDirectory" -ForegroundColor Cyan
 $expectedPackageFiles | ForEach-Object { Write-Host "  $_" }
+$expectedSymbolPackageFiles | ForEach-Object { Write-Host "  $_" }

@@ -2,6 +2,8 @@
     <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
     <Import Project="..\Targets\Assimalign.Viu.Generators.Syntax.targets"
             Condition="Exists('..\Targets\Assimalign.Viu.Generators.Syntax.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.ServerRendering.targets"
+            Condition="Exists('..\Targets\Assimalign.Viu.Sdk.ServerRendering.targets')" />
     <Import Project="..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets"
             Condition="Exists('..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets')" />
 </Project>

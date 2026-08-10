@@ -713,6 +713,36 @@ $browserRestoreProperties = @(
         throw 'The Browser publish did not contain the fingerprinted application boot module.'
     }
 
+    if ($Configuration -eq 'Release') {
+        $developmentArtifactFiles = @(
+            Get-ChildItem -LiteralPath $browserPublishDirectory -Recurse -File |
+                Where-Object {
+                    $_.Name -match
+                        '(?i)(Assimalign\.Viu\.Sdk\.CssHotReload|browser[-.]?refresh|dotnet[-.]?watch)'
+                })
+        if ($developmentArtifactFiles.Count -ne 0) {
+            $relativeDevelopmentArtifactFiles = @(
+                $developmentArtifactFiles |
+                    ForEach-Object {
+                        [System.IO.Path]::GetRelativePath(
+                            $browserPublishDirectory,
+                            $_.FullName)
+                    })
+            throw (
+                'The Release Browser publish contains development-loop files: ' +
+                ($relativeDevelopmentArtifactFiles -join ', '))
+        }
+
+        $publishedHostPage = Get-Content -Raw -LiteralPath (Join-Path $browserWebRoot 'index.html')
+        if ($publishedHostPage -match
+            '(?i)(aspnetcore-browser-refresh|browser-refresh|dotnet-watch|ViuCssHotReloadWorker)') {
+            throw 'The Release Browser host page contains a development-loop transport reference.'
+        }
+
+        Write-Host 'Release publish contains no development-loop worker or browser-refresh transport.' `
+            -ForegroundColor Green
+    }
+
     if ($PublishOnly) {
         Write-Host `
             "VIU_END_TO_END_PUBLISH_DIRECTORY=$browserPublishDirectory" `

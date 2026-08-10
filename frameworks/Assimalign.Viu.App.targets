@@ -35,11 +35,23 @@
 
         <!-- "net10.0" -> "10.0" for the manifest TargetFrameworkVersion. -->
         <_ViuTargetFrameworkVersion>$(TargetFrameworkLatest.TrimStart('net'))</_ViuTargetFrameworkVersion>
+
+        <!--
+            Ref packs are compile-time targeting containers, not application runtime payloads. Keep
+            targeting/analyzer implementation debugging at the repository/build-diagnostic boundary,
+            while the Browser runtime pack owns the executable framework copies and their symbols. Do
+            not publish Ref .snupkg files. Runtime PDBs remain useful and BuildOutputTargetFolder
+            makes NuGet place them beside the runtime-pack DLLs.
+        -->
+        <IncludeSymbols Condition="'$(ViuFrameworkKind)' == 'Ref'">false</IncludeSymbols>
+        <IncludeBuildOutput Condition="'$(ViuFrameworkKind)' == 'Ref'">false</IncludeBuildOutput>
+        <BuildOutputTargetFolder Condition="'$(ViuFrameworkKind)' == 'Runtime' and '$(RuntimeIdentifier)' != ''">runtimes/$(RuntimeIdentifier)/lib</BuildOutputTargetFolder>
     </PropertyGroup>
 
     <!-- Hook into NuGet's standard extension point for dynamic pack content. -->
     <PropertyGroup>
         <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);ViuCollectFrameworkPack</TargetsForTfmSpecificContentInPackage>
+        <TargetsForTfmSpecificDebugSymbolsInPackage Condition="'$(ViuFrameworkKind)' == 'Runtime'">$(TargetsForTfmSpecificDebugSymbolsInPackage);ViuCollectFrameworkSymbols</TargetsForTfmSpecificDebugSymbolsInPackage>
     </PropertyGroup>
 
     <!--
@@ -172,6 +184,55 @@
             ]]></Code>
         </Task>
     </UsingTask>
+
+    <!--
+        Targeting and runtime packs are composed products: their manifests, package overrides, and
+        copied assemblies all describe one exact Viu release. Override the compatible-major default
+        used by independently consumable libraries so NuGet cannot mix framework-pack versions.
+    -->
+    <Target Name="PinViuFrameworkPackageDependencies"
+            BeforeTargets="GenerateNuspec"
+            AfterTargets="ApplyViuPackageDependencyRanges">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)"
+                                            Condition="$([System.String]::Copy('%(Filename)').StartsWith('Assimalign.Viu.'))">
+                <ProjectVersion>[$(ViuVersion)]</ProjectVersion>
+            </_ProjectReferencesWithVersions>
+        </ItemGroup>
+    </Target>
+
+    <!-- IncludeBuildOutput remains true for runtime packs solely so NuGet executes the symbol
+         collection graph. The producer assembly is not a framework asset; remove its default
+         package contribution. Ref packs set IncludeBuildOutput=false above. -->
+    <Target Name="RemoveViuFrameworkProducerBuildOutput"
+            AfterTargets="_WalkEachTargetPerFramework"
+            BeforeTargets="GenerateNuspec">
+        <ItemGroup>
+            <_BuildOutputInPackage Remove="@(_BuildOutputInPackage)" />
+        </ItemGroup>
+    </Target>
+
+    <!--
+        Runtime package projects copy framework assemblies into a custom layout. Strip the empty
+        producer project's PDB from NuGet's default stream, then teach its symbol-pack extension
+        point where the payload PDBs live. BuildOutputTargetFolder above supplies the exact
+        runtimes/<rid>/lib/<tfm>/ prefix used by the corresponding DLLs. Ref packs deliberately do
+        not publish symbol packages, as recorded above.
+    -->
+    <Target Name="ViuCollectFrameworkSymbols" DependsOnTargets="ViuCollectFrameworkPack">
+        <ItemGroup>
+            <DebugSymbolsProjectOutputGroupOutput Remove="@(DebugSymbolsProjectOutputGroupOutput)" />
+            <_ViuFrameworkSymbolCandidate Include="@(ViuFrameworkRuntimeAssembly->'$(MSBuildProjectDirectory)\$(_ViuFrameworkSourceDir)%(Identity).pdb');@(ViuFrameworkPrivateAssembly->'$(MSBuildProjectDirectory)\$(_ViuFrameworkSourceDir)%(Identity).pdb')" />
+            <TfmSpecificDebugSymbolsFile Include="@(_ViuFrameworkSymbolCandidate)"
+                                         Condition="Exists('%(Identity)')">
+                <TargetFramework>$(TargetFramework)</TargetFramework>
+                <FinalOutputPath>%(FullPath)</FinalOutputPath>
+                <TargetPath>%(Filename)%(Extension)</TargetPath>
+            </TfmSpecificDebugSymbolsFile>
+        </ItemGroup>
+        <Error Condition="!Exists('%(_ViuFrameworkSymbolCandidate.Identity)')"
+               Text="The runtime framework package symbol is missing on disk: %(_ViuFrameworkSymbolCandidate.Identity)." />
+    </Target>
 
     <Target Name="ViuCollectFrameworkPack" DependsOnTargets="ResolveProjectReferences">
 

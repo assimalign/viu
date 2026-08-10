@@ -74,13 +74,18 @@ internal static class GeneratorTestHarness
     /// <param name="emitHotReloadMetadata">
     /// The explicit <c>ViuEmitHotReloadMetadata</c> build property, or <see langword="null"/>.
     /// </param>
+    /// <param name="serverRendering">
+    /// The explicit project-level <c>ViuServerRendering</c> build property, or
+    /// <see langword="null"/>.
+    /// </param>
     /// <returns>The driver.</returns>
     internal static GeneratorDriver CreateDriver(
         ImmutableArray<AdditionalText> files,
         string? rootNamespace,
         string? projectDirectory,
         string? configuration = null,
-        string? emitHotReloadMetadata = null)
+        string? emitHotReloadMetadata = null,
+        string? serverRendering = null)
     {
         var globalOptions = new Dictionary<string, string>(StringComparer.Ordinal);
         if (rootNamespace is not null)
@@ -99,6 +104,10 @@ internal static class GeneratorTestHarness
         {
             globalOptions["build_property.ViuEmitHotReloadMetadata"] = emitHotReloadMetadata;
         }
+        if (serverRendering is not null)
+        {
+            globalOptions["build_property.ViuServerRendering"] = serverRendering;
+        }
 
         return CSharpGeneratorDriver.Create(
             generators: new[] { new SingleFileComponentGenerator().AsSourceGenerator() },
@@ -115,6 +124,7 @@ internal static class GeneratorTestHarness
     /// <param name="projectDirectory">The <c>ProjectDir</c> build property.</param>
     /// <param name="configuration">The <c>Configuration</c> build property.</param>
     /// <param name="emitHotReloadMetadata">The explicit hot-reload metadata build property.</param>
+    /// <param name="serverRendering">The explicit project-level server-rendering property.</param>
     /// <returns>The generated sources and reported diagnostics.</returns>
     internal static GeneratorOutcome Run(
         string path,
@@ -122,7 +132,8 @@ internal static class GeneratorTestHarness
         string? rootNamespace = null,
         string? projectDirectory = null,
         string? configuration = null,
-        string? emitHotReloadMetadata = null)
+        string? emitHotReloadMetadata = null,
+        string? serverRendering = null)
     {
         var file = new InMemoryAdditionalText(path, content);
         var driver = CreateDriver(
@@ -130,7 +141,8 @@ internal static class GeneratorTestHarness
                 rootNamespace,
                 projectDirectory,
                 configuration,
-                emitHotReloadMetadata)
+                emitHotReloadMetadata,
+                serverRendering)
             .RunGenerators(CreateCompilation());
         var result = driver.GetRunResult().Results[0];
         return new GeneratorOutcome(result.GeneratedSources, result.Diagnostics);

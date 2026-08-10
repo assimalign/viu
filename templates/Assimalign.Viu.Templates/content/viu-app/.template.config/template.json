@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Assimalign",
+  "classifications": [
+    "Viu",
+    "Web",
+    "WebAssembly"
+  ],
+  "identity": "Assimalign.Viu.Templates.BrowserApplication",
+  "name": "Viu Browser WebAssembly application",
+  "shortName": "viu-app",
+  "sourceName": "ViuApplication",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "nullable": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "displayName": "Enable nullable reference types",
+      "description": "Enables nullable reference type analysis in the generated project."
+    },
+    "ssr": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "displayName": "Add a server-rendering host",
+      "description": "Moves the component into a dual-target library and adds an ASP.NET server-rendering host."
+    },
+    "projectFileName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "identity",
+      "replaces": "__VIU_PROJECT_FILE_NAME__"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(!ssr)",
+          "exclude": [
+            "Components/**",
+            "Server/**"
+          ]
+        },
+        {
+          "condition": "(ssr)",
+          "exclude": [
+            "Counter.viu"
+          ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    {
+      "path": "ViuApplication.csproj"
+    }
+  ]
+}

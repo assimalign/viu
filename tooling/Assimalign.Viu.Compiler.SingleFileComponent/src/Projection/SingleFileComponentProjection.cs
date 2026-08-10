@@ -195,8 +195,25 @@ public static class SingleFileComponentProjection
             cssModules,
             scopeId,
             diagnostics,
-            cancellationToken);
-        model = model with { RenderBody = render.Body, RenderCacheSize = render.CacheSize };
+            cancellationToken,
+            RenderFunctionTargetProfile.VirtualNodeTree);
+        var serverRender = input.EmitServerRendering
+            ? CompileRenderFunction(
+                input,
+                parse,
+                bindingMetadata,
+                cssModules,
+                scopeId,
+                diagnostics,
+                cancellationToken,
+                RenderFunctionTargetProfile.ServerMarkup)
+            : default;
+        model = model with
+        {
+            RenderBody = render.Body,
+            RenderCacheSize = render.CacheSize,
+            ServerRenderBody = serverRender.Body,
+        };
 
         var array = diagnostics.Count == 0
             ? EquatableArray<DiagnosticInfo>.Empty
@@ -432,7 +449,8 @@ public static class SingleFileComponentProjection
         CssModuleAccessors cssModules,
         string? scopeId,
         List<DiagnosticInfo> diagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RenderFunctionTargetProfile targetProfile)
     {
         foreach (var sourceResult in parse.SourceResults)
         {
@@ -448,6 +466,8 @@ public static class SingleFileComponentProjection
             var transformOptions = TransformOptions.CreateDom();
             transformOptions.PrefixIdentifiers = true;
             transformOptions.BindingMetadata = bindingMetadata;
+            transformOptions.IsServerRendering =
+                targetProfile == RenderFunctionTargetProfile.ServerMarkup;
             // Scoped styles ([V01.01.06.04], [V01.01.07.02]): the style compiler and render compiler share
             // one path-derived identifier, so every client-rendered element carries the same attribute that
             // the server-markup target emits for hydration.
@@ -463,8 +483,18 @@ public static class SingleFileComponentProjection
             // CacheHandlers stays off: the cached member-expression wrapper form has no C# spelling yet;
             // handler caching is runtime-binding follow-up work. v-once caching is independent of this
             // switch and fully emitted.
-            transformOptions.OnError = error => diagnostics.Add(
-                SingleFileComponentDiagnostics.Create(input.FilePath, error, fromTemplate: true, blockContentStart));
+            transformOptions.OnError = error =>
+            {
+                DiagnosticInfo diagnostic = SingleFileComponentDiagnostics.Create(
+                    input.FilePath,
+                    error,
+                    fromTemplate: true,
+                    blockContentStart);
+                if (!diagnostics.Contains(diagnostic))
+                {
+                    diagnostics.Add(diagnostic);
+                }
+            };
 
             // [SFC-USE-1] The component-usage manifest is collected from the PARSED tree, before the
             // transform rewrites it into codegen nodes, so it describes what the developer authored.
@@ -476,6 +506,7 @@ public static class SingleFileComponentProjection
             {
                 // namespace + class + method-body nesting, or class + method-body without a namespace.
                 IndentLevel = string.IsNullOrEmpty(input.Namespace) ? 2 : 3,
+                TargetProfile = targetProfile,
             });
 
             // [V01.01.05.08] Inject #line span directives over the emitted render body so a C# error inside

@@ -8,7 +8,6 @@
         <PackageId Condition="'$(RuntimeIdentifier)' != ''">Assimalign.Viu.App.Browser.Runtime.$(RuntimeIdentifier)</PackageId>
         <PackageId Condition="'$(RuntimeIdentifier)' == ''">Assimalign.Viu.App.Browser.Runtime</PackageId>
         <IsPackable>true</IsPackable>
-        <IncludeBuildOutput>false</IncludeBuildOutput>
         <NoWarn>$(NoWarn);NU5128;NU5100;NU5131;CS2008</NoWarn>
         <ViuFrameworkName>Assimalign.Viu.App.Browser</ViuFrameworkName>
         <ViuFrameworkKind>Runtime</ViuFrameworkKind>

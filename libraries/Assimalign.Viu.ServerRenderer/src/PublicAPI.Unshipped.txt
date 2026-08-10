@@ -1,5 +1,6 @@
 #nullable enable
 Assimalign.Viu.ServerRenderer.CompiledServerRender
+Assimalign.Viu.ServerRenderer.CompiledServerComponentRender
 *REMOVED*Assimalign.Viu.ServerRenderer.SsrContext.State.get -> System.Collections.Generic.IDictionary<string!, object?>!
 *REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttr(string! key, object? value) -> string!
 *REMOVED*static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttrs(System.Collections.Generic.IReadOnlyList<Assimalign.Viu.Components.ElementBinding!>? bindings, Assimalign.Viu.Components.QualifiedName? elementName = null) -> string!
@@ -13,6 +14,9 @@ static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderAttributes(System.Col
 static Assimalign.Viu.ServerRenderer.ServerRender.SsrRenderDynamicAttribute(string! key, object? value, string? tag = null) -> string!
 Assimalign.Viu.ServerRenderer.SsrContext.State.get -> Assimalign.Viu.State.StateStorePayload?
 virtual Assimalign.Viu.ServerRenderer.CompiledServerRender.Invoke(Assimalign.Viu.ServerRenderer.SsrRenderState! state) -> System.Threading.Tasks.Task!
+virtual Assimalign.Viu.ServerRenderer.CompiledServerComponentRender.Invoke(Assimalign.Viu.ServerRenderer.SsrRenderState! state, Assimalign.Viu.Components.IComponent! component, Assimalign.Viu.Components.ComponentRenderFrame! frame, Assimalign.Viu.IComponentRenderScope! scope) -> System.Threading.Tasks.Task!
+Assimalign.Viu.ServerRenderer.IServerRenderRegistry
+Assimalign.Viu.ServerRenderer.IServerRenderRegistry.TryResolve(Assimalign.Viu.Components.ComponentReference! reference, out Assimalign.Viu.ServerRenderer.ServerRenderRegistration? registration) -> bool
 Assimalign.Viu.ServerRenderer.IServerRenderOutput
 Assimalign.Viu.ServerRenderer.IServerRenderOutput.FlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 Assimalign.Viu.ServerRenderer.IServerRenderOutput.WriteAsync(System.ReadOnlyMemory<char> content, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
@@ -24,6 +28,15 @@ Assimalign.Viu.ServerRenderer.IServerRenderRequestScopeFactory<TContext>.CreateA
 Assimalign.Viu.ServerRenderer.ServerRenderAdaptor<TContext>
 Assimalign.Viu.ServerRenderer.ServerRenderAdaptor<TContext>.RenderAsync(Assimalign.Viu.ServerRenderer.ServerRenderRequest<TContext>! request, Assimalign.Viu.ServerRenderer.IServerRenderOutput! output, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.ServerRenderer.ServerRenderResult!>
 Assimalign.Viu.ServerRenderer.ServerRenderAdaptor<TContext>.ServerRenderAdaptor(Assimalign.Viu.ServerRenderer.IServerRenderRequestScopeFactory<TContext>! requestScopeFactory) -> void
+Assimalign.Viu.ServerRenderer.ServerRenderAdaptor<TContext>.ServerRenderAdaptor(Assimalign.Viu.ServerRenderer.IServerRenderRequestScopeFactory<TContext>! requestScopeFactory, Assimalign.Viu.ServerRenderer.IServerRenderRegistry! serverRenders) -> void
+Assimalign.Viu.ServerRenderer.ServerRenderRegistration
+Assimalign.Viu.ServerRenderer.ServerRenderRegistration.Reference.get -> Assimalign.Viu.Components.ComponentReference!
+Assimalign.Viu.ServerRenderer.ServerRenderRegistration.Render.get -> Assimalign.Viu.ServerRenderer.CompiledServerComponentRender!
+Assimalign.Viu.ServerRenderer.ServerRenderRegistration.ServerRenderRegistration(Assimalign.Viu.Components.ComponentReference! reference, Assimalign.Viu.ServerRenderer.CompiledServerComponentRender! render) -> void
+Assimalign.Viu.ServerRenderer.ServerRenderRegistry
+Assimalign.Viu.ServerRenderer.ServerRenderRegistry.Register(Assimalign.Viu.ServerRenderer.ServerRenderRegistration! registration) -> void
+Assimalign.Viu.ServerRenderer.ServerRenderRegistry.ServerRenderRegistry() -> void
+Assimalign.Viu.ServerRenderer.ServerRenderRegistry.TryResolve(Assimalign.Viu.Components.ComponentReference! reference, out Assimalign.Viu.ServerRenderer.ServerRenderRegistration? registration) -> bool
 Assimalign.Viu.ServerRenderer.ServerRenderRequest<TContext>
 Assimalign.Viu.ServerRenderer.ServerRenderRequest<TContext>.RequestContext.get -> TContext
 Assimalign.Viu.ServerRenderer.ServerRenderRequest<TContext>.RootComponent.get -> Assimalign.Viu.Components.VirtualNode!
@@ -33,6 +46,8 @@ Assimalign.Viu.ServerRenderer.ServerRenderResult.Context.get -> Assimalign.Viu.S
 Assimalign.Viu.ServerRenderer.ServerRenderResult.Failure.get -> System.Exception?
 Assimalign.Viu.ServerRenderer.ServerRenderResult.ResponseStarted.get -> bool
 Assimalign.Viu.ServerRenderer.ServerRenderResult.Succeeded.get -> bool
+static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStreamAsync(Assimalign.Viu.ServerRenderer.ServerRenderApplication! application, System.IO.TextWriter! writer, Assimalign.Viu.ServerRenderer.IServerRenderRegistry! serverRenders, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Assimalign.Viu.ServerRenderer.ServerRenderer.RenderToStringAsync(Assimalign.Viu.ServerRenderer.ServerRenderApplication! application, Assimalign.Viu.ServerRenderer.IServerRenderRegistry! serverRenders, Assimalign.Viu.ServerRenderer.SsrContext? context = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
 Assimalign.Viu.ServerRenderer.SsrStateIsland
 const Assimalign.Viu.ServerRenderer.SsrStateIsland.Selector = "script[data-viu-state]" -> string!
 static Assimalign.Viu.ServerRenderer.SsrStateIsland.CreateMarkup(string! json) -> string!

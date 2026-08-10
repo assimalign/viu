@@ -22,6 +22,8 @@ internal sealed class ComponentRenderLease : IComponentRenderScope
     // one-shot execution use the same per-mount cache and block state.
     internal ComponentRenderFrame Frame => _activation.Frame;
 
+    internal IComponent Instance => _activation.Instance;
+
     internal bool IsDisposed => _activation.IsReleased;
 
     public ValueTask DisposeAsync() => _activation.ReleaseAsync();

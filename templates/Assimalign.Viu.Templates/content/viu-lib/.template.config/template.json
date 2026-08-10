@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Assimalign",
+  "classifications": [
+    "Viu",
+    "Library",
+    "Components"
+  ],
+  "identity": "Assimalign.Viu.Templates.ComponentLibrary",
+  "name": "Viu component library",
+  "shortName": "viu-lib",
+  "sourceName": "ViuComponentLibrary",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "nullable": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "displayName": "Enable nullable reference types",
+      "description": "Enables nullable reference type analysis in the generated library and test projects."
+    },
+    "projectFileName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "identity",
+      "replaces": "__VIU_PROJECT_FILE_NAME__"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "ViuComponentLibrary.slnx"
+    },
+    {
+      "path": "ViuComponentLibrary.csproj"
+    },
+    {
+      "path": "test/ViuComponentLibrary.Tests/ViuComponentLibrary.Tests.csproj"
+    }
+  ]
+}

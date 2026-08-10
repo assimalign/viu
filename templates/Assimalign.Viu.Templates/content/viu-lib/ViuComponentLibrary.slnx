@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="__VIU_PROJECT_FILE_NAME__.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/__VIU_PROJECT_FILE_NAME__.Tests/__VIU_PROJECT_FILE_NAME__.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -638,7 +638,7 @@ public sealed partial class Renderer<TNode>
         MountedComponent<TNode> mounted,
         TNode fallbackContainer)
     {
-        Scheduler.QueueJob(
+        Scheduler.QueuePostFlushCallback(
             new SchedulerJob(
                 () =>
                 {

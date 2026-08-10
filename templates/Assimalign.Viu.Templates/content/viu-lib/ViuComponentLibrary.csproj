@@ -1,0 +1,17 @@
+<Project Sdk="Assimalign.Viu.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ViuComponentLibrary</RootNamespace>
+    <AssemblyName>ViuComponentLibrary</AssemblyName>
+    <PackageId>ViuComponentLibrary</PackageId>
+    <Description>Reusable Viu components from ViuComponentLibrary.</Description>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <DefaultItemExcludes>$(DefaultItemExcludes);test\**</DefaultItemExcludes>
+    <!--#if (nullable) -->
+    <Nullable>enable</Nullable>
+    <!--#else -->
+    <Nullable>disable</Nullable>
+    <!--#endif -->
+  </PropertyGroup>
+</Project>

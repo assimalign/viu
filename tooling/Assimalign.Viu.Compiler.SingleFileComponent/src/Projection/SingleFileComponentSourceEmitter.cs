@@ -123,6 +123,7 @@ public static class SingleFileComponentSourceEmitter
             builder.Append("}\n");
 
             AppendComponentDefinitionBridge(builder, bodyIndent, model);
+            AppendServerRenderBridge(builder, bodyIndent, model);
         }
         else
         {
@@ -145,6 +146,54 @@ public static class SingleFileComponentSourceEmitter
         }
 
         return builder.ToString();
+    }
+
+    // [SSR-TARGET-2]/[SSR-TARGET-3] A server-targeted project carries a second statically generated
+    // body and an explicit registration. The delegate casts the already-activated IComponent to this
+    // compiler-known partial type; neither the generated assembly catalog nor ServerRenderer scans an
+    // assembly or reflectively activates a component.
+    private static void AppendServerRenderBridge(
+        StringBuilder builder,
+        int indent,
+        in SingleFileComponentModel model)
+    {
+        if (model.ServerRenderBody is not { } serverRenderBody)
+        {
+            return;
+        }
+
+        builder.Append('\n');
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>The compiler-produced direct server-markup render body.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("private static async global::System.Threading.Tasks.Task __ViuRenderServerAsync(\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("global::Assimalign.Viu.ServerRenderer.SsrRenderState state,\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append(model.ClassName).Append(" component,\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append(ComponentsNamespace).Append(".ComponentRenderFrame frame,\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("global::Assimalign.Viu.IComponentRenderScope? parent)\n");
+        AppendIndent(builder, indent);
+        builder.Append("{\n");
+        builder.Append(serverRenderBody);
+        AppendIndent(builder, indent + 1);
+        builder.Append("await global::System.Threading.Tasks.Task.CompletedTask;\n");
+        AppendIndent(builder, indent);
+        builder.Append("}\n\n");
+
+        AppendIndent(builder, indent);
+        builder.Append("/// <summary>The reflection-free server registration consumed by the generated catalog.</summary>\n");
+        AppendIndent(builder, indent);
+        builder.Append("internal static readonly global::Assimalign.Viu.ServerRenderer.ServerRenderRegistration ")
+            .Append("__ViuServerRenderRegistration = new(\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("__ViuRegistration.Reference,\n");
+        AppendIndent(builder, indent + 1);
+        builder.Append("static (state, component, frame, parent) => __ViuRenderServerAsync(\n");
+        AppendIndent(builder, indent + 2);
+        builder.Append("state, (").Append(model.ClassName).Append(")component, frame, parent));\n");
     }
 
     // [V01.01.06.05]/[SFC-CG-4] Development metadata is emit-time gated. The module initializer

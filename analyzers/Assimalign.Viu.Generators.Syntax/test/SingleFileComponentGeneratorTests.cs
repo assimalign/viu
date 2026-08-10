@@ -181,6 +181,66 @@ namespace Demo
     }
 
     [Fact]
+    public void ClientProject_OmitsEveryServerRenderSurface()
+    {
+        GeneratorOutcome outcome = GeneratorTestHarness.Run(
+            $"{ProjectDirectory}/Counter.viu",
+            CounterSource,
+            RootNamespace,
+            ProjectDirectory);
+
+        string component = GeneratorTestHarness.GeneratedSource(
+            outcome,
+            "Counter.SingleFileComponent.g.cs");
+        string assembly = GeneratorTestHarness.GeneratedSource(
+            outcome,
+            SingleFileComponentAssemblyEmitter.HintName);
+
+        component.ShouldNotContain("ServerRenderer");
+        component.ShouldNotContain("__ViuRenderServerAsync");
+        assembly.ShouldNotContain("GeneratedViuServerRenders");
+    }
+
+    [Fact]
+    public void ServerTargetedProject_EmitsDeterministicClientAndServerProfilesWithCatalog()
+    {
+        GeneratorOutcome first = GeneratorTestHarness.Run(
+            $"{ProjectDirectory}/Counter.viu",
+            CounterSource,
+            RootNamespace,
+            ProjectDirectory,
+            serverRendering: "true");
+        GeneratorOutcome second = GeneratorTestHarness.Run(
+            $"{ProjectDirectory}/Counter.viu",
+            CounterSource,
+            RootNamespace,
+            ProjectDirectory,
+            serverRendering: "true");
+
+        first.Diagnostics.ShouldBeEmpty();
+        string component = GeneratorTestHarness.GeneratedSource(
+            first,
+            "Counter.SingleFileComponent.g.cs");
+        string assembly = GeneratorTestHarness.GeneratedSource(
+            first,
+            SingleFileComponentAssemblyEmitter.HintName);
+        component.ShouldContain("VirtualNode? __ViuRender(");
+        component.ShouldContain("Task __ViuRenderServerAsync(");
+        component.ShouldContain("ServerRenderRegistration __ViuServerRenderRegistration");
+        assembly.ShouldContain("public static class GeneratedViuComponents");
+        assembly.ShouldContain("public static class GeneratedViuServerRenders");
+        assembly.ShouldContain("registry.Register(global::Demo.Counter.__ViuServerRenderRegistration)");
+        GeneratorTestHarness.GeneratedSource(
+                second,
+                "Counter.SingleFileComponent.g.cs")
+            .ShouldBe(component);
+        GeneratorTestHarness.GeneratedSource(
+                second,
+                SingleFileComponentAssemblyEmitter.HintName)
+            .ShouldBe(assembly);
+    }
+
+    [Fact]
     public void ComponentWithoutTemplate_EmitsNoRenderFunction()
     {
         // The render seam degrades gracefully: no template block means no render method, no cache

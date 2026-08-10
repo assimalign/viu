@@ -11,10 +11,12 @@ namespace Assimalign.Viu.ServerRenderer;
 /// surrounding document host.
 /// </summary>
 /// <remarks>
-/// One instance belongs to one render and is not thread-safe. Store state is captured only through
-/// explicit serializers after component traversal, then emitted through the inert state island.
-/// Specified by <c>[SSR-7]</c>, <c>[SSR-MARKERS-2]</c>, <c>[HYD-6]</c>, and
-/// <c>[STA-9]</c>.
+/// One request-owned instance carries the committed render result and is not thread-safe. A
+/// registry-selected direct-markup body receives a child transaction initialized from that
+/// instance; its teleport and state contributions merge into the request context only after the
+/// body succeeds. Store state is captured only through explicit serializers after component
+/// traversal, then emitted through the inert state island. Specified by <c>[SSR-7]</c>,
+/// <c>[SSR-MARKERS-2]</c>, <c>[HYD-6]</c>, <c>[STA-9]</c>, and <c>[SSR-TARGET-3]</c>.
 /// </remarks>
 public sealed class SsrContext
 {
@@ -51,6 +53,23 @@ public sealed class SsrContext
         }
 
         builder.Append(content);
+    }
+
+    internal SsrContext CreateRenderTransaction() => new()
+    {
+        State = State,
+    };
+
+    internal void CommitRenderTransaction(SsrContext transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        transaction.ResolveTeleports();
+        foreach (KeyValuePair<string, string> teleport in transaction._teleports)
+        {
+            AppendTeleport(teleport.Key, teleport.Value);
+        }
+
+        State = transaction.State;
     }
 
     internal void ResolveTeleports()

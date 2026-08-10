@@ -1,0 +1,9 @@
+{
+  "sdk": {
+    "version": "10.0.301",
+    "rollForward": "latestPatch"
+  },
+  "msbuild-sdks": {
+    "Assimalign.Viu.Sdk": "__VIU_VERSION__"
+  }
+}

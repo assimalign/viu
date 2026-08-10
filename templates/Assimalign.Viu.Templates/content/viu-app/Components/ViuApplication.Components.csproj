@@ -1,0 +1,15 @@
+<Project Sdk="Assimalign.Viu.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ViuApplication</RootNamespace>
+    <AssemblyName>ViuApplication.Components</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <ViuServerRendering>true</ViuServerRendering>
+    <!--#if (nullable) -->
+    <Nullable>enable</Nullable>
+    <!--#else -->
+    <Nullable>disable</Nullable>
+    <!--#endif -->
+  </PropertyGroup>
+</Project>

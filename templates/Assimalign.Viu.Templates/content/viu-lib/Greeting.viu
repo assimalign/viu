@@ -1,0 +1,17 @@
+<template>
+    <section class="library-greeting">
+        <h2>Hello from ViuComponentLibrary</h2>
+        <p>{{ Message }}</p>
+    </section>
+</template>
+
+@script {
+    public string Message => "This component was compiled from a host-neutral Viu library.";
+}
+
+<style>
+.library-greeting {
+    border-inline-start: 0.25rem solid currentColor;
+    padding-inline-start: 1rem;
+}
+</style>

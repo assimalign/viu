@@ -64,6 +64,53 @@ internal static class SingleFileComponentAssemblyEmitter
 
         builder.Append(indent).Append("    }\n")
             .Append(indent).Append("}\n");
+
+        bool hasServerRenders = false;
+        foreach (var registration in ordered)
+        {
+            if (registration.HasServerRender)
+            {
+                hasServerRenders = true;
+                break;
+            }
+        }
+
+        if (hasServerRenders)
+        {
+            builder.Append('\n')
+                .Append(indent)
+                .Append("/// <summary>Registers every compiler-produced server render in this assembly.</summary>\n")
+                .Append(indent)
+                .Append("[global::System.CodeDom.Compiler.GeneratedCode(\"Assimalign.Viu.Generators.Syntax\", \"1.0.0.0\")]\n")
+                .Append(indent)
+                .Append("public static class GeneratedViuServerRenders\n")
+                .Append(indent)
+                .Append("{\n")
+                .Append(indent)
+                .Append("    /// <summary>Adds every generated server registration to the supplied registry.</summary>\n")
+                .Append(indent)
+                .Append("    /// <param name=\"registry\">The server-host-owned render registry.</param>\n")
+                .Append(indent)
+                .Append("    public static void Register(global::Assimalign.Viu.ServerRenderer.ServerRenderRegistry registry)\n")
+                .Append(indent)
+                .Append("    {\n")
+                .Append(indent)
+                .Append("        global::System.ArgumentNullException.ThrowIfNull(registry);\n");
+
+            foreach (var registration in ordered)
+            {
+                if (registration.HasServerRender)
+                {
+                    builder.Append(indent).Append("        registry.Register(")
+                        .Append(QualifiedTypeName(registration))
+                        .Append(".__ViuServerRenderRegistration);\n");
+                }
+            }
+
+            builder.Append(indent).Append("    }\n")
+                .Append(indent).Append("}\n");
+        }
+
         if (hasNamespace)
         {
             builder.Append("}\n");

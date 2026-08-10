@@ -32,11 +32,8 @@ on:
             - ".github/actions/**"
             - ".github/workflows/libraries.yml"
 
-# packages:write is needed because every project in this root is packable and a main push publishes
-# it. A superseded pull-request run is cancelled; a main run is never cancelled mid-publish.
 permissions:
     contents: read
-    packages: write
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
@@ -74,5 +71,3 @@ jobs:
               with:
                   area: "libraries"
                   project: ${{ matrix.projects }}
-                  publish-packages: "true"
-                  github-token: ${{ secrets.GITHUB_TOKEN }}

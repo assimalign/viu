@@ -1,9 +1,10 @@
 <#
 .SYNOPSIS
     Packs the complete Viu package set — every independently published library plus
-    the base/Browser SDK and shared-framework chains — into the repo-local NuGet
-    feed (_out/packages), exercising both targeting-only component-library
-    consumption and Browser application runtime-pack resolution end-to-end.
+    the base/Browser SDK and shared-framework chains, plus the dotnet-new template
+    pack — into the repo-local NuGet feed (_out/packages), exercising both
+    targeting-only component-library consumption and Browser application
+    runtime-pack resolution end-to-end.
     ([V01.01.12.19], #174.)
 
 .DESCRIPTION
@@ -140,6 +141,7 @@ function Invoke-ViuPack {
 
     dotnet pack $Project `
         --configuration $Configuration `
+        -warnaserror `
         -p:PackageOutputPath=$feed `
         @packRestoreArguments `
         @AdditionalArguments
@@ -210,6 +212,12 @@ if (-not $SkipFramework) {
         Invoke-ViuPack `
             -Project (Join-Path $repoRoot 'frameworks\Assimalign.Viu.App.Browser.Refs\src\Assimalign.Viu.App.Browser.Refs.csproj')
     }
+}
+
+if (-not $BaseOnly) {
+    Write-Host '[templates] Packing Assimalign.Viu.Templates' -ForegroundColor Green
+    Invoke-ViuPack `
+        -Project (Join-Path $repoRoot 'templates\Assimalign.Viu.Templates\Assimalign.Viu.Templates.csproj')
 }
 
 Write-Host "Done. Packages in $feed :" -ForegroundColor Cyan

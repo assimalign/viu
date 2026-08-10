@@ -57,6 +57,38 @@ public sealed class ComponentHost
         ComponentRenderRequest request,
         CancellationToken cancellationToken = default)
     {
+        ComponentActivation activation = await ActivateForServerAsync(
+            request,
+            cancellationToken).ConfigureAwait(false);
+        try
+        {
+            VirtualNode? tree = activation.Render();
+            return new ComponentRenderLease(activation, tree);
+        }
+        catch (Exception exception)
+        {
+            ExceptionDispatchInfo failure = ExceptionDispatchInfo.Capture(exception);
+            try
+            {
+                await activation.ReleaseAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Preserve the render failure after completing best-effort teardown.
+            }
+
+            failure.Throw();
+            throw;
+        }
+    }
+
+    // ServerRenderer is a friend assembly and consumes the activation directly when a generated
+    // direct-markup body exists. Keeping this seam internal avoids widening Core's public API while
+    // preserving the exact setup, prefetch, cancellation, and teardown contract of RenderAsync.
+    internal async ValueTask<ComponentActivation> ActivateForServerAsync(
+        ComponentRenderRequest request,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -71,8 +103,7 @@ public sealed class ComponentHost
                 () => activation.Lifecycle.InvokeServerPrefetchAsync(cancellationToken));
             await prefetch.ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            VirtualNode? tree = activation.Render();
-            return new ComponentRenderLease(activation, tree);
+            return activation;
         }
         catch (Exception exception)
         {
@@ -83,7 +114,7 @@ public sealed class ComponentHost
             }
             catch
             {
-                // Preserve the render or prefetch failure after completing best-effort teardown.
+                // Preserve the activation or prefetch failure after best-effort teardown.
             }
 
             failure.Throw();
