@@ -43,3 +43,5 @@ Assimalign.Viu.Components.IElementEvent.Key.get -> string!
 Assimalign.Viu.Components.IElementEvent.SelectedValues.get -> System.Collections.Generic.IReadOnlyList<string!>?
 Assimalign.Viu.Components.IElementEvent.TargetChecked.get -> bool
 Assimalign.Viu.Components.IElementEvent.TargetValue.get -> string?
+Assimalign.Viu.Components.IComponentInspectionStateProvider
+Assimalign.Viu.Components.IComponentInspectionStateProvider.GetInspectionState() -> System.Collections.Generic.IReadOnlyDictionary<string!, object?>!

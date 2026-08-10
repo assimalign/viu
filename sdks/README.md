@@ -80,6 +80,7 @@ work in Visual Studio, Rider, and the dotnet CLI with no installer and no admini
 | Standalone utility CSS | The Browser SDK runs `ViuBundleUtilityCss` over `.viu`/`.vue` template regions and host `.html`/`.htm`, producing a separate `<PackageId>.utilities.css` asset with no Tailwind, Node, CLI, or PostCSS dependency |
 | CSS watch inputs and hot reload | The Browser SDK owns the project-scoped worker, watch graph, stable link replacement, and utility/component regeneration |
 | `viu-dom.js` interop bridge | The Browser SDK packs the asset and copies it to `wwwroot/_content/Assimalign.Viu.Browser/` at build |
+| Runtime inspection | An application explicitly references `Assimalign.Viu.DevTools` and sets `ViuEnableDevTools=true`; the base SDK fixes Core's linker feature switch and the package conditionally flows its postMessage asset |
 | Publish budgets | Browser-only publish hooks measure trimmed/AOT payload; base component libraries do not load them |
 
 The two framework references resolve through three framework packages:
@@ -92,6 +93,27 @@ The two framework references resolve through three framework packages:
 
 The base framework is deliberately targeting-only and has no runtime package.
 `Assimalign.Viu.ServerRenderer` remains an ordinary opt-in package, not another framework segment.
+
+### Runtime-inspection opt-in
+
+Runtime inspection is an ordinary package, not part of either shared framework. Enable it only in
+the application that owns the diagnostic session:
+
+```xml
+<PropertyGroup>
+    <ViuEnableDevTools>true</ViuEnableDevTools>
+</PropertyGroup>
+<ItemGroup>
+    <PackageReference Include="Assimalign.Viu.DevTools" Version="10.0.1-preview.2" />
+</ItemGroup>
+```
+
+`ViuEnableDevTools` defaults to `false`. In that state the SDK writes a trim-time feature-switch
+value that folds Core's guarded inspection hooks away; even if the package remains referenced, a
+trimmed Browser publish contains no DevTools assembly or browser asset. Setting it to `true` keeps
+the hooks and conditionally flows `viu-devtools.js` to
+`_content/Assimalign.Viu.DevTools/viu-devtools.js`. DevTools stays outside
+`Assimalign.Viu.App` and `Assimalign.Viu.App.Browser` in both modes.
 
 ### Server-targeted and dual-target projects
 

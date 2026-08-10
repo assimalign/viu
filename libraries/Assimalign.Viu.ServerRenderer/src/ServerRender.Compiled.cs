@@ -136,7 +136,7 @@ public static partial class ServerRender
         SsrContext context,
         CancellationToken cancellationToken)
     {
-        using IDisposable executionIsolation = CoreExecutionIsolation.Enter();
+        using IDisposable executionIsolation = RuntimeExecution.EnterExecutionFlow();
         cancellationToken.ThrowIfCancellationRequested();
         IApplicationContext applicationContext = application.Context;
         ServerRenderStatePayload.PrepareContext(context);

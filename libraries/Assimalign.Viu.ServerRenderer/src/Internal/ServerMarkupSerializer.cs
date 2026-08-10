@@ -165,36 +165,34 @@ internal static class ServerMarkupSerializer
                 componentRegistration.Reference,
                 out ServerRenderRegistration? serverRegistration))
         {
-            ComponentActivation activation = await state.ComponentHost.ActivateForServerAsync(
+            SsrWriter? compiledWriter = null;
+            SsrContext? compiledContext = null;
+            ComponentRenderOperationOutcome outcome = await state.ComponentHost.ExecuteAsync(
                 new ComponentRenderRequest(component, parent),
+                (instance, frame, scope) =>
+                {
+                    compiledWriter = new SsrWriter(recordFlushBoundaries: true);
+                    compiledContext = state.Context.CreateRenderTransaction();
+                    SsrRenderState compiledState = state.CreateBuffer(
+                        compiledWriter,
+                        compiledContext);
+                    return new ValueTask(
+                        serverRegistration!.Render(
+                            compiledState,
+                            instance,
+                            frame,
+                            scope));
+                },
                 state.CancellationToken).ConfigureAwait(false);
-            await using ComponentRenderLease compiledScope =
-                new(activation, tree: null);
-            SsrWriter compiledWriter = new(recordFlushBoundaries: true);
-            SsrContext compiledContext = state.Context.CreateRenderTransaction();
-            SsrRenderState compiledState = state.CreateBuffer(
-                compiledWriter,
-                compiledContext);
-            bool completed = false;
-            try
+
+            if (outcome == ComponentRenderOperationOutcome.HandledFailure)
             {
-                await serverRegistration!.Render(
-                    compiledState,
-                    compiledScope.Instance,
-                    compiledScope.Frame,
-                    compiledScope).ConfigureAwait(false);
-                completed = true;
-            }
-            catch (Exception exception)
-            {
-                activation.Context.RouteError(exception, "component render");
                 state.Push(HydrationMarkers.EmptyComment);
             }
-
-            if (completed)
+            else
             {
-                state.Context.CommitRenderTransaction(compiledContext);
-                foreach (string chunk in compiledWriter.RecordedFlushChunks)
+                state.Context.CommitRenderTransaction(compiledContext!);
+                foreach (string chunk in compiledWriter!.RecordedFlushChunks)
                 {
                     state.Push(chunk);
                     await state.FlushAsync().ConfigureAwait(false);

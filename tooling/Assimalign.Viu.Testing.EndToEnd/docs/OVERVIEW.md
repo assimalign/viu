@@ -12,7 +12,8 @@ hydration applications, generates hydration markup through the packaged
 `ServerRenderAdaptor<TContext>`, installs the selected Playwright browsers, serves both published
 `wwwroot` trees, and runs the same scenarios in Chromium, Firefox, and WebKit.
 
-Scenarios cover clean boot, router navigation, click and input dispatch, a `v-model` round trip,
+Scenarios cover clean boot, router navigation with manual saved-position restoration, click and
+input dispatch, a `v-model` round trip,
 keyed DOM moves, component unmount cleanup with Browser node and listener-registry recovery,
 scheduler/`NextTickAsync` ordering, Browser adoption of server-rendered nodes, and visible lazy
 hydration through `IntersectionObserver`. A failed scenario records its engine and name and retains

@@ -25,6 +25,8 @@ $script:ViuLibraryPackageIds = @(
     'Assimalign.Viu.Router',
     'Assimalign.Viu.UtilityCss',
     'Assimalign.Viu.Core',
+    # [V01.01.10.01] is an opt-in package and deliberately stays outside both App frameworks.
+    'Assimalign.Viu.DevTools',
     'Assimalign.Viu.Browser',
     'Assimalign.Viu.ServerRenderer',
     'Assimalign.Viu.Testing',

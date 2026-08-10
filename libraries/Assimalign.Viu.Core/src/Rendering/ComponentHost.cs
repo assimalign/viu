@@ -82,9 +82,50 @@ public sealed class ComponentHost
         }
     }
 
-    // ServerRenderer is a friend assembly and consumes the activation directly when a generated
-    // direct-markup body exists. Keeping this seam internal avoids widening Core's public API while
-    // preserving the exact setup, prefetch, cancellation, and teardown contract of RenderAsync.
+    /// <summary>
+    /// Activates and prefetches one component, invokes <paramref name="operation"/> exactly once
+    /// with its instance, frame, and live public scope, then releases the component lifetime.
+    /// </summary>
+    /// <param name="request">The immutable invocation and optional parent operation scope.</param>
+    /// <param name="operation">The host-specific operation to execute after server prefetch.</param>
+    /// <param name="cancellationToken">Cancellation for setup-adjacent asynchronous work.</param>
+    /// <returns>
+    /// <see cref="ComponentRenderOperationOutcome.Succeeded"/> when the operation completes, or
+    /// <see cref="ComponentRenderOperationOutcome.HandledFailure"/> when the component error chain
+    /// handles its failure. An unhandled failure propagates unchanged.
+    /// </returns>
+    /// <remarks>
+    /// The callback shape keeps activation, error routing, and lifetime ownership inside Core. The
+    /// supplied scope is valid only until the callback completes; callers must not retain it.
+    /// Disposing the operation cancels the component-lifetime token before stopping its effect
+    /// scope and never invokes client lifecycle phases. Specified by <c>[SSR-10]</c> and
+    /// <c>[SSR-TARGET-3]</c>.
+    /// </remarks>
+    public async ValueTask<ComponentRenderOperationOutcome> ExecuteAsync(
+        ComponentRenderRequest request,
+        ComponentRenderOperation operation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        ComponentActivation activation = await ActivateForServerAsync(
+            request,
+            cancellationToken).ConfigureAwait(false);
+        await using ComponentRenderLease scope = new(activation, tree: null);
+        try
+        {
+            await operation(scope.Instance, scope.Frame, scope).ConfigureAwait(false);
+            return ComponentRenderOperationOutcome.Succeeded;
+        }
+        catch (Exception exception)
+        {
+            activation.Context.RouteError(exception, "component render");
+            return ComponentRenderOperationOutcome.HandledFailure;
+        }
+    }
+
+    // Shared activation keeps traversal and direct-render operations on the exact same setup,
+    // prefetch, cancellation, and teardown contract without exposing activation state publicly.
     internal async ValueTask<ComponentActivation> ActivateForServerAsync(
         ComponentRenderRequest request,
         CancellationToken cancellationToken)

@@ -19,6 +19,13 @@ An effect scope owns effects, watchers, child scopes, and cleanup callbacks. Sto
 idempotent and unlinks dependencies even when user code throws. `WatchHandle` always represents an
 actual watcher and controls only that watcher's stop/pause/resume state (`[RCT-10]`, `[RCT-12]`).
 
+`Reactive.EnterExecutionFlow()` installs fresh ambient dependency-tracking, batching, and
+effect-scope bookkeeping for a request-oriented host. Its idempotent lease restores the previous
+flow when nested leases are disposed in last-in, first-out order. The seam isolates engine
+bookkeeping, not caller-owned reactive values or lifetimes; each request must still own its graph.
+Keeping the operation on the public facade lets Core compose the lifecycle without cross-library
+friend access (`[EXE-1]`, `[CMP-33]`).
+
 Watch scheduling is a caller-supplied cold seam. Core adapts it to application flush phases; State
 can borrow it for store notifications. Reactivity remains unaware of components and hosts.
 

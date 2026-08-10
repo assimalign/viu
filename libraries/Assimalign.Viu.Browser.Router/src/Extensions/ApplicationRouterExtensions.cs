@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 using Assimalign.Viu;
 
@@ -35,7 +36,18 @@ public static class ApplicationRouterExtensions
                 try
                 {
                     await router.ReadyAsync(context.Stopping).ConfigureAwait(false);
-                    await next(context).ConfigureAwait(false);
+                    Task applicationLifetime = next(context).AsTask();
+                    while (!context.IsRunning && !applicationLifetime.IsCompleted)
+                    {
+                        await Task.Yield();
+                    }
+
+                    if (context.IsRunning)
+                    {
+                        await router.CompleteInitialScrollAsync().ConfigureAwait(false);
+                    }
+
+                    await applicationLifetime.ConfigureAwait(false);
                 }
                 finally
                 {

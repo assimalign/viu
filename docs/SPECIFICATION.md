@@ -31,9 +31,9 @@ exists, or records an observable consequence of one.
 ### 0.2 The implemented-behavior rule
 
 **This specification describes implemented behavior only.** Anything not yet implemented appears
-solely in [§17 (Non-goals and current limits)](#17-non-goals-and-current-limits) — never in the body
+solely in [§18 (Non-goals and current limits)](#18-non-goals-and-current-limits) — never in the body
 as though it exists. A section that describes a partially implemented capability MUST state its
-current limit inline and cross-reference §17. The temporary owner-authorized document-status note
+current limit inline and cross-reference §18. The temporary owner-authorized document-status note
 after [DOC-2] identifies the sole migration exception.
 
 ### 0.3 Clause identifiers
@@ -86,7 +86,8 @@ The principal runtime, compiler, and editor assemblies and their responsibilitie
 | `Assimalign.Viu.Core` | The Application Model, renderer and scheduler engine, hydration, internal built-in executors, and host-facing operations |
 | `Assimalign.Viu.Browser` | The browser host adapter: interop bridge, DOM directives, transitions |
 | `Assimalign.Viu.ServerRenderer` | HTML serialization and the hydration marker protocol |
-| `Assimalign.Viu.Router` / `Assimalign.Viu.Browser.Router` | The DOM-free router core and its browser click/history bridge |
+| `Assimalign.Viu.Router` / `Assimalign.Viu.Browser.Router` | The DOM-free router core and its browser click, history, and scroll bridge |
+| `Assimalign.Viu.DevTools` | The opt-in, versioned runtime-inspection protocol and its transports |
 | `Assimalign.Viu.Testing` | The in-memory host and component test wrappers |
 | `Assimalign.Viu.Syntax*` | The build-time parser cluster: templates, `.viu`/`.vue` containers, CSS, and HTML |
 | `Assimalign.Viu.Compiler.*` | Build-time composition roots for CSS and single-file-component projection |
@@ -108,7 +109,7 @@ The principal runtime, compiler, and editor assemblies and their responsibilitie
 | `{libraries,tooling}/**/docs/OVERVIEW.md` | What each library is; its public surface. | Non-normative elaboration. MUST NOT contradict this document. |
 | `{libraries,tooling}/**/docs/DESIGN.md` | Why each library is shaped that way; local deltas. | Non-normative rationale. |
 | `docs/PLAN.md` | Delivery narrative — waves, WBS map, sequencing. | Non-normative. Describes *when*, not *what*. Its "Founding design decisions" section is superseded by this document for anything semantic. |
-| `docs/PERFORMANCE-RESEARCH.md` | The external performance-research ledger. | **Explicitly non-normative by construction** ([§18](#18-performance-research-policy)). |
+| `docs/PERFORMANCE-RESEARCH.md` | The external performance-research ledger. | **Explicitly non-normative by construction** ([§19](#19-performance-research-policy)). |
 
 `[DOC-1]` **Precedence.** `SPECIFICATION.md` → `FORMAT.md` / `UTILITY-CSS-DESIGN.md` (within their
 declared scopes) → ADRs → library `DESIGN.md` → `PLAN.md`. A lower-precedence document that
@@ -127,10 +128,13 @@ Every later section depends on this one.
 
 `[EXE-1]` Each Viu application graph targets **one event loop and is not thread-safe**. Browser
 applications use one shared ambient execution state. A request-oriented host that runs independent
-graphs concurrently MUST enter a fresh logical execution flow for Core's current component and
-scheduler queues, Reactivity's tracking/batching/scope state, and State's setup/active-registry
-state. ServerRenderer establishes that boundary for every runtime-tree and compiled render. Values,
-scopes, registries, or scheduler jobs MUST NOT be shared across concurrent flows.
+graphs concurrently MUST call `RuntimeExecution.EnterExecutionFlow()`, which composes
+`Reactive.EnterExecutionFlow()` and `StateStores.EnterExecutionFlow()`, to enter fresh state for
+Core's current component and scheduler queues, Reactivity's tracking/batching/scope state, and
+State's setup/active-registry state. Each method returns an idempotent disposable that restores the
+immediately preceding flow. ServerRenderer establishes that boundary for every runtime-tree and
+compiled render. Values, scopes, registries, or scheduler jobs MUST NOT be shared across concurrent
+flows.
 
 `[EXE-2]` Every non-thread-safe public type MUST say so in its XML documentation.
 
@@ -170,7 +174,7 @@ cluster: immutable records, `SyntaxList<T>`, value-equal descriptors and diagnos
 
 `[EXE-10]` Generators run in `netstandard2.0` analyzer hosts with **no file or network I/O**
 (`EnforceExtendedAnalyzerRules=true`, RS1035). Work that legally requires writing a file — emitting
-a physical stylesheet — is performed by an MSBuild task, not a generator ([§15](#15-packaging-and-the-consumer-surface)).
+a physical stylesheet — is performed by an MSBuild task, not a generator ([§16](#16-packaging-and-the-consumer-surface)).
 
 ### 3.4 The interop boundary is the performance budget
 
@@ -373,7 +377,7 @@ explicit:
 - the ambient reactive scope for scope-bound conventions; and
 - `ComponentReference` values for deliberate registration resolution at mount.
 
-This is a decision, not a deferral (see [§17](#17-non-goals-and-current-limits)). It has visible
+This is a decision, not a deferral (see [§18](#18-non-goals-and-current-limits)). It has visible
 consequences elsewhere: `RouterView` takes its nesting depth as an explicit argument
 ([§12](#12-routing)) precisely because no ambient hierarchical channel exists.
 
@@ -564,7 +568,7 @@ dependency access (forced triggering, graph inspection) additionally require
 
 ### 5.2 The public surface
 
-`[RCT-5]` `Reactive` is the static facade: `Reference`, `ShallowReference`, `CustomReference`,
+`[RCT-5]` `Reactive` is the static facade: `EnterExecutionFlow`; `Reference`, `ShallowReference`, `CustomReference`,
 `Computed`; `Effect`; `EffectScope`, `CurrentScope`, `OnScopeDispose`; `Watch`, `WatchEffect`;
 `TriggerReference`; `PauseTracking`, `ResetTracking`, `Batch`; and the inspection
 and escape hatches `IsRef`, `Unref`, `ToRef`, `IsReactive`, `IsReadOnly`, collection-specific
@@ -952,7 +956,7 @@ collide.
 
 `[RND-IO-5]` Interop-call counts are a **gated budget**, not an aspiration:
 `benchmarks/baselines/InteropCounts.json` records the expected counts and a delta fails CI
-([§16](#16-conformance-and-how-behavior-is-pinned)).
+([§17](#17-conformance-and-how-behavior-is-pinned)).
 
 *Authority: `libraries/Assimalign.Viu.Core/src/Rendering/Renderer{TNode}.cs` (`Patch`, `Mount`,
 `PatchElement`, `PatchFragment`, `TryPatchBlockChildren`, `PatchChildren`, `PatchUnkeyedChildren`,
@@ -1041,7 +1045,7 @@ claim of server-rendered pending/fallback branches. Render the boundary on the c
 
 `[BLT-13]` **Limit.** Boundary timeout and events, fallback-to-reveal transition choreography, and
 delaying mounted/post-render effects from the hidden default branch are not implemented; those
-effects run when the detached branch mounts. See [§17](#17-non-goals-and-current-limits).
+effects run when the detached branch mounts. See [§18](#18-non-goals-and-current-limits).
 
 ### 7.5 Asynchronous and dynamic components
 
@@ -1400,7 +1404,7 @@ contradictory stylesheet segment.
 `ViuSingleFileComponent`, `AdditionalFiles`, and `Watch` graph; `Assimalign.Viu.Sdk.Browser`
 inherits that graph by importing the base SDK. `.vue` is discovered only for projects using either
 Viu SDK, and the Visual Studio language server re-checks the owning project before accepting a
-compatibility document ([§14](#14-the-tooling-and-editor-contract)).
+compatibility document ([§15](#15-the-tooling-and-editor-contract)).
 
 `[VUE-9]` Everything downstream of the container parse is **shared with `.viu`**: template code
 generation, scoped styles, CSS Modules, `v-bind()` in CSS, `@reference`, `@apply`, source mapping,
@@ -1574,9 +1578,12 @@ scan, method discovery, dynamic activation, or reflection. A project that does n
 
 `[SSR-TARGET-3]` A server host explicitly populates a `ServerRenderRegistry` from the generated
 catalog and supplies it to `ServerRenderAdaptor<TContext>`. After the ordinary component factory
-resolves a node reference, the renderer activates and prefetches the component once, invokes the
-registered direct-markup body inside the same lease, and preserves subtree-local virtual-node
-fallback, teardown, teleport, hydration, and error-routing semantics. The body writes through a
+resolves a node reference, the renderer calls public `ComponentHost.ExecuteAsync` to activate and
+prefetch the component once and invoke the registered direct-markup body with only the activated
+`IComponent`, `ComponentRenderFrame`, and public `IComponentRenderScope` during the live operation.
+Core retains activation, error routing, and disposal and returns a named
+`ComponentRenderOperationOutcome`; the renderer preserves subtree-local virtual-node fallback,
+teardown, teleport, hydration, and error-routing semantics. The body writes through a
 transaction-local `SsrRenderState` and child `SsrContext`. On success, the renderer commits context
 changes and replays every requested flush boundary in order while awaiting destination backpressure;
 no direct-body output reaches the destination before that commit. An exception routes through the
@@ -1701,6 +1708,14 @@ server prefetch, and invokes the renderer once. `DisposeAsync` aborts and releas
 client mount, update, or unmount hooks. A nested `ComponentRenderRequest` carries the active parent
 scope; Core uses that scope's still-valid `Context` as the nested component's parent.
 
+`ComponentHost.ExecuteAsync(ComponentRenderRequest, ComponentRenderOperation, CancellationToken =
+default)` follows the same activation, setup, server-prefetch, parent-context, and teardown contract
+without invoking the component's client-tree renderer. It invokes the operation exactly once with
+the activated `IComponent`, its `ComponentRenderFrame`, and an `IComponentRenderScope` valid only
+during the callback. Core routes callback failures through the component error chain and returns
+`ComponentRenderOperationOutcome.HandledFailure` when handled or rethrows an unhandled exception
+unchanged; success returns `ComponentRenderOperationOutcome.Succeeded`.
+
 `[SSR-11]` `ServerRenderAdaptor<TContext>` creates exactly one typed request scope, validates that
 its application root is the request root, streams through `IServerRenderOutput`, awaits every flush,
 and disposes the scope on success, render/output failure, cancellation, and partial response. It has
@@ -1733,10 +1748,12 @@ replace the current location.
 (`GetString`/`TryGetString`, `GetInteger`/`TryGetInteger`, `GetStrings`), with immutable
 `With`/`WithMany` builders.
 
-`[RTR-3]` Three histories ship behind the `RouterHistory` factory: **memory** (pure; no
-initialization), **web** (HTML5 History API), and **hash**. Web and hash lazily initialize their
-browser-history bridge when `Router.ReadyAsync` first needs it; `RouterHistory.InitializeAsync`
-remains an optional prewarming call. `UseRouter` awaits readiness with
+`[RTR-3]` Three histories ship across the host boundary: `RouterHistory.CreateMemory` is pure and
+requires no initialization; `BrowserRouterHistory.CreateWeb` and `CreateWebHash` own the HTML
+History API integration. Web and hash lazily initialize their browser-history bridge when
+`Router.ReadyAsync` first needs it; histories needing the same lifecycle opt into the public
+`IInitializableRouterHistory` capability, while `BrowserRouterHistory.InitializeAsync` remains an
+optional prewarming call. `UseRouter` awaits readiness with
 `IApplicationContext.Stopping` before the host terminal mounts and removes the DOM bridge during
 reverse-order application cleanup [APP-4], [APP-5]. History state marshals as a **flat,
 primitives-only** payload. Every history is an idempotent, terminal `IDisposable`: after disposal
@@ -1773,12 +1790,49 @@ history after a newer navigation owns the pipeline. A guard-redirect chain that 
 cap throws `NavigationRedirectException`.
 
 `[RTR-7]` **Boundary.** `Assimalign.Viu.Router` references Components and Reactivity but **not Core
-and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` is the
-click-dispatch bridge that maps browser modifier flags onto `RouterLinkModifiers`, and the browser
-history edge is gated by `[SupportedOSPlatform("browser")]`.
+and not Browser** — a boundary the test suite asserts. `Assimalign.Viu.Browser.Router` owns the
+click-dispatch bridge, web/hash history, and CSSOM View scroll effects; its browser edges are gated
+by `[SupportedOSPlatform("browser")]`. Optional host integration crosses through the public
+`IInitializableRouterHistory` and `IRouterScrollController` capabilities in Router's `Abstraction/`
+surface; Router grants no downstream shipping library friend access. State-building and
+path-normalization helpers remain internal to each history implementation rather than becoming
+cross-package utility APIs.
 
-`[RTR-8]` **Limit.** Lazy route components and scroll behavior are not implemented
-([V01.01.08.05]); every route component resolves eagerly. See [§17](#17-non-goals-and-current-limits).
+`[RTR-8]` A route record MAY supply a `RouteComponentFactory` returning
+`Task<ComponentNode>`. Navigation awaits that factory after newly entered records' `BeforeEnter`
+guards and before their `IRouteEnterGuard` guards. The returned immutable request then follows the
+ordinary component activation path. Only a successful result is cached; cancellation, a null
+result, or a fault leaves the record retryable. A fault aborts confirmation and is delivered to
+`Router.OnError`, exactly like another unexpected navigation-pipeline failure. Specified by
+[V01.01.08.05].
+
+`[RTR-9]` `ScrollBehavior(to, from, savedPosition)` runs only for a confirmed navigation and only
+after the render scheduler's next-tick flush. Push and replace supply no saved position; back and
+forward supply the offset saved under the arriving history-position counter. The behavior MAY
+asynchronously delay its answer. A null result preserves the current offset; an absolute position
+or selector-plus-offset result is applied in one browser interop call, with optional smooth motion.
+Router reports every confirmed navigation to `IRouterScrollController`, even when its current
+behavior is null, so a newer confirmation invalidates deferred work for an older route. Initial
+scroll work remains deferred until the host calls `Router.CompleteInitialScrollAsync` after mount;
+that signal is idempotent. An aborted, redirected, duplicated, or cancelled navigation performs no
+scroll effect. Specified by [V01.01.08.05].
+
+`[RTR-10]` The browser history edge batches both coordinates when recording a leaving entry during
+push and pop transitions, keyed by the monotonic history-position counter. Browser.Router resolves
+selectors and performs scroll writes; the host-free Router carries only values and delegates.
+While any browser-history subscription owns that ledger, the edge sets
+[`history.scrollRestoration`](https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-history-scroll-restoration-dev)
+to `manual` so native restoration cannot race the deliberate CSSOM View scroll or corrupt the
+leaving offset. The first subscription captures the previous value, and only disposal of the last
+subscription restores it. Memory history therefore remains DOM-free and performs no scroll effect.
+
+`[RTR-11]` **Lazy-assembly platform boundary.** The .NET 10 WebAssembly SDK can place a statically
+declared `BlazorWebAssemblyLazyLoad` item in the lazy boot-resource manifest even for a non-Blazor
+application, but its supported managed loader belongs to Blazor and the plain WebAssembly runtime
+exposes only an undocumented internal JavaScript loader. Viu depends on neither. Until the plain SDK
+offers a public linker-analyzable loader, `RouteComponentFactory` resolves an in-application
+`Task<ComponentNode>` source; it MUST NOT activate a type from a string or call an internal runtime
+hook.
 
 *Authority: `libraries/Assimalign.Viu.Router/docs/{OVERVIEW,DESIGN}.md`;
 `libraries/Assimalign.Viu.Browser.Router/docs/{OVERVIEW,DESIGN}.md`.*
@@ -1840,7 +1894,60 @@ state island [SSR-7], [EXE-4].
 
 ---
 
-## 14. The tooling and editor contract
+## 14. Runtime inspection
+
+`[DVT-1]` `Assimalign.Viu.DevTools` is an **opt-in** diagnostics package, never a member of
+`Assimalign.Viu.App` or `Assimalign.Viu.App.Browser`. `ViuEnableDevTools` defaults to false and sets
+the linker feature switch guarding Core's inspection calls. A disabled trimmed Browser publish
+MUST contain neither the DevTools assembly nor its browser asset.
+
+`[DVT-2]` The standalone protocol is versioned JSON. Every batch names the protocol, every message
+envelope carries a version and type, and a handshake negotiates one mutually supported version
+before ordinary requests are served. A receiver ignores unknown message types without faulting the
+session. Serialization uses only the package's source-generated `JsonSerializerContext`; runtime
+reflection-based serialization is forbidden [EXE-4].
+
+`[DVT-3]` Core exposes one narrow `IRuntimeInspectionHook` seam for component mount, update,
+unmount, keyed reorder, and event observations. Core never references DevTools. One linker-foldable
+enabled check guards construction of inspection views, and hook failures cannot alter rendering.
+DevTools reads snapshot and event values with dependency collection suspended, so observation never
+joins the application's reactive dependency graph. DevTools assigns stable integer identities
+through `ConditionalWeakTable` and retains live instances only through weak references. Its tree
+messages track the live authored instance hierarchy and sibling order.
+
+`[DVT-4]` Snapshot requests return the component's current parameters, explicitly exposed state,
+reflection-free inspection state, and event metadata. Reactive-reference values, including computed
+references, are read through `IReactiveReference`; nested dictionaries and sequences expand only to
+the requested, configured depth. Cycles, unavailable values, collection limits, and shapes that
+cannot be serialized degrade to typed placeholders rather than faulting the session.
+
+`[DVT-5]` Renderer observations enqueue into a bounded oldest-first buffer and schedule at most one
+post-flush drain. A drain batches envelopes before crossing a transport boundary. The hook never
+blocks, performs interop, or re-enters the renderer; overload drops the oldest buffered envelopes
+rather than growing without bound, and the next drain reports the number lost in one
+`telemetry.dropped` marker. Handshake responses, requested snapshots and expansions, inspector
+responses, and inspector or timeline registration changes use a separate reliable queue and are
+never evicted by renderer-telemetry pressure. Both queues share a monotonic enqueue sequence, and a
+drain MUST stable-merge them in that order. The loss marker occupies the first evicted envelope's
+position, so it precedes the oldest retained telemetry it summarizes without moving a later control
+response ahead of earlier retained telemetry.
+
+`[DVT-6]` `IDevToolsTransport` carries the identical complete JSON batch corpus over either the
+browser `postMessage` bridge or a WebSocket. The postMessage integration remains inside the opt-in
+DevTools leaf package beside its browser asset; this avoids a DevTools dependency in Browser while
+preserving the same host/runtime dependency direction as Browser.Router [RTR-7]. Both transports
+MUST pass one shared protocol-conformance suite.
+
+`[DVT-7]` Plugins MAY register named inspectors that supply a custom tree and per-node state, and
+MAY register custom timeline-layer metadata. Timeline event capture and the inspection user
+interface are not part of [V01.01.10.01]; they remain [V01.01.10.02] and [V01.01.10.03].
+
+*Authority: `libraries/Assimalign.Viu.DevTools/docs/PROTOCOL.md`;
+`libraries/Assimalign.Viu.DevTools/{src,test}`.*
+
+---
+
+## 15. The tooling and editor contract
 
 `[TOOL-1]` Editor support is a **thin editor client** plus a **standalone Language Server Protocol
 process**. The client is in process in Visual Studio, because the editor surfaces a Viu palette needs
@@ -1880,7 +1987,7 @@ ownership is ambiguous. The check repeats for document changes, diagnostics, com
 
 ---
 
-## 15. Packaging and the consumer surface
+## 16. Packaging and the consumer surface
 
 `[PKG-1]` Viu has two compositional consumer SDKs, both resolved by NuGet's built-in MSBuild SDK
 resolver with no installer or administrative rights. `<Project Sdk="Assimalign.Viu.Sdk">` chains
@@ -1932,7 +2039,7 @@ be developed without a pack/restore cycle in the loop.
 
 ---
 
-## 16. Conformance and how behavior is pinned
+## 17. Conformance and how behavior is pinned
 
 `[CONF-1]` **Behavior is pinned by tests in this repository, and the test is the authority.** There
 is no external conformance suite and no external reference implementation. A change to a behavior
@@ -1950,7 +2057,8 @@ it move together.
 | `SingleFileComponentProjectionLineMappingTests` | That a `@script` type error maps to the real `.viu` line and column |
 | `Assimalign.Viu.Sdk.Browser.Tasks.Tests` | Pure host-page stylesheet injection: close-tag placement, href idempotency, comment handling, newline preservation, and missing-head behavior |
 | `tooling/Assimalign.Viu.UtilityCss/conformance/` | The frozen Tailwind CSS v4.3.3 manifest and golden CSS vectors |
-| `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; isolated Browser-SDK consumers pin library-only and library-before-app link delivery, both `OverrideHtmlAssetPlaceholders` states in Build and Publish, labeled fingerprint resolution plus explicit-href precedence, and byte-equivalent identity/gzip/brotli outputs through trimmed and AOT publish |
+| `Assimalign.Viu.DevTools.Tests` | Handshake/version handling, unknown-message tolerance, bounded post-flush batches, weak live-tree identity and keyed reorder, safe snapshots, custom inspectors/layers, and one corpus over both transports [DVT-2]–[DVT-7] |
+| `scripts/Test-ApplicationLifetimeConsumer.ps1` + `scripts/fixtures/{ComponentLibraryConsumer,ApplicationLifetimeConsumer}` | A base-SDK component library packs with `.viu.css` but without Browser or a WebAssembly workload; isolated Browser-SDK consumers pin library-only and library-before-app link delivery, both `OverrideHtmlAssetPlaceholders` states in Build and Publish, labeled fingerprint resolution plus explicit-href precedence, byte-equivalent identity/gzip/brotli outputs through trimmed and AOT publish, and complete removal of a disabled DevTools package and asset [DVT-1] |
 | `scripts/Test-EndToEnd.ps1`, `scripts/Measure-PublishBudget.ps1`, `scripts/Test-StartupBudget.ps1`, and `scripts/budgets/PublishBudgets.json` | The packaged-consumer publish/startup producers, checkers, and reviewed budget definitions, calibrated against measured `EndToEndBrowserApp` baselines with recorded provenance; the isolated Chromium watch lane uses an explicit non-served HTML utility input to pin CSS replacement, a no-write/no-managed-update semantic no-op, final-rule removal, and mounted `.vue` remount behavior [V01.01.12.05.02] |
 | `benchmarks/baselines/InteropCounts.json` | Interop-call counts; a delta fails the gate [RND-IO-5] |
 | `.github/workflows/area-*.yml` and `benchmarks.yml` | Live per-area CI plus the interop budget gate |
@@ -1973,9 +2081,9 @@ correct-looking values.
 
 ---
 
-## 17. Non-goals and current limits
+## 18. Non-goals and current limits
 
-### 17.1 Non-goals — decisions, not deferrals
+### 18.1 Non-goals — decisions, not deferrals
 
 - **Standalone semantics.** Viu makes no semantic-equivalence guarantee with an external project,
   has no external-precedence rule, and tracks no external project's version as its own contract.
@@ -1994,14 +2102,12 @@ correct-looking values.
   safelist, plugin ABI, or runtime CSS generation; no automatic compatibility past v4.3.3; not
   affiliated with or endorsed by Tailwind Labs [STY-9].
 
-### 17.2 Current limits — implemented partially or not yet
+### 18.2 Current limits — implemented partially or not yet
 
 | Limit | Detail |
 | --- | --- |
 | Suspense hydration | Throws `NotSupportedException` [BLT-12] |
 | Suspense boundary behavior | Timeout and events, fallback-to-reveal choreography, and hidden-branch post-effect delay are absent [BLT-13] |
-| Router | Lazy route components and scroll behavior are not implemented [RTR-8] |
-| DevTools | Area `V01.01.10` has no library in the tree |
 | Per-component-type static fields | Deliberately dropped: per-mount caching already removes repeat render and host work; a process-lifetime field would save only a managed allocation per mount while adding hot-reload lifetime and generator/runtime field-ABI complexity [SFC-OPT-1] |
 | Generalized handler caching | Deliberately dropped: syntax alone cannot prove a member-expression delegate has a stable receiver or infer every delegate arity; caching it could freeze mutable receiver state. Authors can supply an explicitly stable delegate when identity matters |
 | Slot/`v-for` destructuring | Deliberately unsupported: C# lambda parameters cannot represent generalized object/array destructuring without choosing new missing-member, null, and conversion semantics. A single valid C# identifier is accepted; other aliases report a located actionable template diagnostic and emit no invalid C# |
@@ -2009,7 +2115,7 @@ correct-looking values.
 
 ---
 
-## 18. Performance research policy
+## 19. Performance research policy
 
 `[PERF-1]` **Viu's semantics are defined by this document alone.** Viu does, however, treat other
 rendering frameworks — Vue.js in particular, whose compiler-informed rendering strategy Viu's
@@ -2029,7 +2135,7 @@ channel and MUST NOT be raised through it.
 
 ---
 
-## 19. Prior art and influences
+## 20. Prior art and influences
 
 Viu's rendering architecture — hierarchical virtual-node trees with compiler-informed diffing,
 block-scoped collection of dynamic descendants, bitmask patch flags shared between compiler and
@@ -2056,7 +2162,7 @@ doc comments. Viu Utilities already follows this pattern
 
 ---
 
-## 20. Terminology
+## 21. Terminology
 
 | Term | Meaning in Viu |
 | --- | --- |

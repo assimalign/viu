@@ -1015,7 +1015,8 @@ if (-not $HotReload) {
         $expectedPlaywrightVersion = $playwrightPackageNode.Version
         $harnessAssets = Get-Content -Raw -LiteralPath $harnessAssetsPath | ConvertFrom-Json
         $resolvedPlaywrightLibraries = @(
-            $harnessAssets.libraries.PSObject.Properties.Name |
+            $harnessAssets.libraries.PSObject.Properties |
+                ForEach-Object { $_.Name } |
                 Where-Object { $_.StartsWith('Microsoft.Playwright/', [System.StringComparison]::Ordinal) })
         $expectedPlaywrightLibrary = "Microsoft.Playwright/$expectedPlaywrightVersion"
         if ($resolvedPlaywrightLibraries.Count -ne 1 -or

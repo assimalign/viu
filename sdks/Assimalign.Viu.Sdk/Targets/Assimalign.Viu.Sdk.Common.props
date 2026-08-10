@@ -25,6 +25,13 @@
         <ViuServerRendering Condition="'$(ViuServerRendering)' == ''">false</ViuServerRendering>
 
         <!--
+            Runtime inspection is opt-in. The paired targets read the final project-body value
+            and emit a linker feature switch, so the default false path removes guarded runtime
+            hooks from trimmed applications even when the DevTools package is restored.
+        -->
+        <ViuEnableDevTools Condition="'$(ViuEnableDevTools)' == ''">false</ViuEnableDevTools>
+
+        <!--
             The ViuBundleCss MSBuild task ships inside this SDK package at
             Tasks/ (with its parser dependency closure alongside). Presetting
             the assembly path here keeps the packed ComponentStyles.targets'

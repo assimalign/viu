@@ -178,7 +178,8 @@ public sealed class StateStoreRegistryTests
             TaskCompletionSource ready,
             Task release)
         {
-            using IDisposable isolation = StateExecutionIsolation.Enter();
+            using IDisposable reactivityIsolation = Reactive.EnterExecutionFlow();
+            using IDisposable isolation = StateStores.EnterExecutionFlow();
             using StateStoreRegistry registry = StateStoreTestSupport.CreateRegistry();
             StateStores.ActiveRegistry = registry;
             StateStoreDefinition<ConcurrentDisposableStore> definition = StateStores.Define(

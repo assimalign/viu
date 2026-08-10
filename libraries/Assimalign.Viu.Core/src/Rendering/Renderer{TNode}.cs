@@ -129,6 +129,11 @@ public sealed partial class Renderer<TNode>
                 owner: null);
         }
 
+        if (RuntimeInspection.IsEnabled && tree.Root is not null)
+        {
+            NotifyRuntimeInspectionOrder(tree.Root);
+        }
+
         NormalizeTeleportTargetOrder(tree);
         QueueHostCommit();
         Scheduler.FlushAfterSynchronousRender();
@@ -684,6 +689,78 @@ public sealed partial class Renderer<TNode>
                 container,
                 endAnchor,
                 owner);
+    }
+
+    private static void NotifyRuntimeInspectionOrder(MountedNode<TNode> mounted)
+    {
+        List<MountedComponent<TNode>> components = [];
+        CollectDirectRuntimeInspectionComponents(mounted, components);
+        NotifyRuntimeInspectionOrder(components);
+    }
+
+    private static void NotifyRuntimeInspectionOrder(
+        IReadOnlyList<MountedNode<TNode>> children)
+    {
+        List<MountedComponent<TNode>> components = [];
+        for (int index = 0; index < children.Count; index++)
+        {
+            CollectDirectRuntimeInspectionComponents(children[index], components);
+        }
+
+        NotifyRuntimeInspectionOrder(components);
+    }
+
+    private static void NotifyRuntimeInspectionOrder(
+        IReadOnlyList<MountedComponent<TNode>> components)
+    {
+        for (int index = 0; index < components.Count; index++)
+        {
+            RuntimeInspection.NotifyReordered(components[index].Instance, index);
+        }
+    }
+
+    private static void CollectDirectRuntimeInspectionComponents(
+        MountedNode<TNode> mounted,
+        List<MountedComponent<TNode>> components)
+    {
+        switch (mounted)
+        {
+            case MountedComponent<TNode> component:
+                components.Add(component);
+                break;
+            case MountedLazyHydration<TNode> lazyHydration
+                when lazyHydration.ActivatedComponent is { } activated:
+                components.Add(activated);
+                break;
+            case MountedElement<TNode> element:
+                CollectDirectRuntimeInspectionComponents(element.Children, components);
+                break;
+            case MountedRange<TNode> range:
+                CollectDirectRuntimeInspectionComponents(range.Children, components);
+                break;
+            case MountedTeleport<TNode> teleport:
+                CollectDirectRuntimeInspectionComponents(teleport.Children, components);
+                break;
+            case MountedKeepAlive<TNode> keepAlive:
+                CollectDirectRuntimeInspectionComponents(keepAlive.Active, components);
+                break;
+            case MountedSuspense<TNode> suspense:
+                CollectDirectRuntimeInspectionComponents(suspense.ActiveBranch, components);
+                break;
+            case MountedTransition<TNode> transition:
+                CollectDirectRuntimeInspectionComponents(transition.Child, components);
+                break;
+        }
+    }
+
+    private static void CollectDirectRuntimeInspectionComponents(
+        IReadOnlyList<MountedNode<TNode>> children,
+        List<MountedComponent<TNode>> components)
+    {
+        for (int index = 0; index < children.Count; index++)
+        {
+            CollectDirectRuntimeInspectionComponents(children[index], components);
+        }
     }
 
     private List<MountedNode<TNode>> PatchUnkeyedChildren(

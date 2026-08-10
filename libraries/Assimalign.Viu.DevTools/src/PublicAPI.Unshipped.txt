@@ -1,0 +1,47 @@
+#nullable enable
+Assimalign.Viu.DevTools.DevToolsInspectorNode
+Assimalign.Viu.DevTools.DevToolsInspectorNode.Children.get -> System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.DevToolsInspectorNode!>!
+Assimalign.Viu.DevTools.DevToolsInspectorNode.DevToolsInspectorNode(string! identifier, string! label, System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.DevToolsInspectorNode!>? children = null) -> void
+Assimalign.Viu.DevTools.DevToolsInspectorNode.Identifier.get -> string!
+Assimalign.Viu.DevTools.DevToolsInspectorNode.Label.get -> string!
+Assimalign.Viu.DevTools.DevToolsProtocol
+Assimalign.Viu.DevTools.DevToolsSession
+Assimalign.Viu.DevTools.DevToolsSession.DevToolsSession(Assimalign.Viu.DevTools.IDevToolsTransport! transport, Assimalign.Viu.DevTools.DevToolsSessionOptions? options = null) -> void
+Assimalign.Viu.DevTools.DevToolsSession.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.DevToolsSession.RegisterInspector(Assimalign.Viu.DevTools.IDevToolsInspector! inspector) -> System.IDisposable!
+Assimalign.Viu.DevTools.DevToolsSession.RegisterTimelineLayer(Assimalign.Viu.DevTools.DevToolsTimelineLayer! layer) -> System.IDisposable!
+Assimalign.Viu.DevTools.DevToolsSession.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.DevToolsSessionOptions
+Assimalign.Viu.DevTools.DevToolsSessionOptions.BufferCapacity.get -> int
+Assimalign.Viu.DevTools.DevToolsSessionOptions.BufferCapacity.set -> void
+Assimalign.Viu.DevTools.DevToolsSessionOptions.DevToolsSessionOptions() -> void
+Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumCollectionEntries.get -> int
+Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumCollectionEntries.set -> void
+Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumSnapshotDepth.get -> int
+Assimalign.Viu.DevTools.DevToolsSessionOptions.MaximumSnapshotDepth.set -> void
+Assimalign.Viu.DevTools.DevToolsTimelineLayer
+Assimalign.Viu.DevTools.DevToolsTimelineLayer.Color.get -> string?
+Assimalign.Viu.DevTools.DevToolsTimelineLayer.DevToolsTimelineLayer(string! identifier, string! displayName, string? color = null) -> void
+Assimalign.Viu.DevTools.DevToolsTimelineLayer.DisplayName.get -> string!
+Assimalign.Viu.DevTools.DevToolsTimelineLayer.Identifier.get -> string!
+Assimalign.Viu.DevTools.IDevToolsInspector
+Assimalign.Viu.DevTools.IDevToolsInspector.DisplayName.get -> string!
+Assimalign.Viu.DevTools.IDevToolsInspector.GetStateAsync(string! nodeIdentifier, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyDictionary<string!, object?>!>
+Assimalign.Viu.DevTools.IDevToolsInspector.GetTreeAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<Assimalign.Viu.DevTools.DevToolsInspectorNode!>!>
+Assimalign.Viu.DevTools.IDevToolsInspector.Identifier.get -> string!
+Assimalign.Viu.DevTools.IDevToolsTransport
+Assimalign.Viu.DevTools.IDevToolsTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.IDevToolsTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.PostMessageDevToolsTransport
+Assimalign.Viu.DevTools.PostMessageDevToolsTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.PostMessageDevToolsTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.PostMessageDevToolsTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.WebSocketDevToolsTransport
+Assimalign.Viu.DevTools.WebSocketDevToolsTransport.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.WebSocketDevToolsTransport.SendAsync(string! message, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.WebSocketDevToolsTransport.StartAsync(System.Func<string!, System.Threading.Tasks.ValueTask>! receiver, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+Assimalign.Viu.DevTools.WebSocketDevToolsTransport.WebSocketDevToolsTransport(System.Net.WebSockets.WebSocket! webSocket, bool ownsWebSocket = false, int maximumInboundMessageBytes = 1048576) -> void
+const Assimalign.Viu.DevTools.DevToolsProtocol.CurrentVersion = 1 -> int
+const Assimalign.Viu.DevTools.DevToolsProtocol.Name = "assimalign.viu.devtools" -> string!
+static Assimalign.Viu.DevTools.PostMessageDevToolsTransport.CreateAsync(string! targetOrigin, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.DevTools.PostMessageDevToolsTransport!>
+static Assimalign.Viu.DevTools.WebSocketDevToolsTransport.ConnectAsync(System.Uri! endpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Assimalign.Viu.DevTools.WebSocketDevToolsTransport!>

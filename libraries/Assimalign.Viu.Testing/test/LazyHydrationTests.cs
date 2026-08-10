@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 using Shouldly;
@@ -170,7 +171,6 @@ public sealed class LazyHydrationTests
     {
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         AsynchronousComponentDefinition definition =
@@ -192,6 +192,8 @@ public sealed class LazyHydrationTests
         ComponentNode root = definition.CreateComponent();
         ApplicationContext application = CreateApplication(root, components);
         using TestRenderer renderer = CreateRenderer(triggers);
+        using TestSchedulerPump pump = TestSchedulerPump.Install(
+            renderer.SynchronizationContext);
         TestElement container = TestServerMarkup.Parse(
             Marker(HydrationStrategyKind.Idle)
                 + "<button>ready</button>"
@@ -206,11 +208,7 @@ public sealed class LazyHydrationTests
         container.Children[1].ShouldBeSameAs(adopted);
 
         load.SetResult(AsynchronousComponentTarget.From<LazyTargetComponent>());
-        for (int attempt = 0; attempt < 5000 && pump.PendingFlushCount == 0; attempt++)
-        {
-            await Task.Yield();
-        }
-        pump.PendingFlushCount.ShouldBeGreaterThan(0);
+        await WaitForPendingFlushAsync(pump);
         pump.RunUntilIdle();
 
         target.SetupCount.ShouldBe(1);
@@ -225,7 +223,6 @@ public sealed class LazyHydrationTests
     {
         Scheduler.Reset();
         TestHydrationTriggers triggers = new();
-        using TestSchedulerPump pump = TestSchedulerPump.Install();
         TaskCompletionSource<AsynchronousComponentTarget> load = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<Exception> routed = new(
@@ -253,6 +250,8 @@ public sealed class LazyHydrationTests
                 ErrorHandler = (error, _, _) => routed.TrySetResult(error),
             });
         using TestRenderer renderer = CreateRenderer(triggers);
+        using TestSchedulerPump pump = TestSchedulerPump.Install(
+            renderer.SynchronizationContext);
         TestElement container = TestServerMarkup.Parse(
             Marker(HydrationStrategyKind.Idle)
                 + "<p>server</p>"
@@ -267,11 +266,7 @@ public sealed class LazyHydrationTests
         container.Children[1].ShouldBeSameAs(adopted);
 
         Exception routedError = await routed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        for (int attempt = 0; attempt < 5000 && pump.PendingFlushCount == 0; attempt++)
-        {
-            await Task.Yield();
-        }
-        pump.PendingFlushCount.ShouldBeGreaterThan(0);
+        await WaitForPendingFlushAsync(pump);
         pump.RunUntilIdle();
 
         routedError.ShouldBeOfType<TimeoutException>();
@@ -436,6 +431,17 @@ public sealed class LazyHydrationTests
             SnapshotSemantics = true,
             HydrationTriggers = triggers,
         });
+
+    private static async Task WaitForPendingFlushAsync(TestSchedulerPump pump)
+    {
+        Stopwatch elapsed = Stopwatch.StartNew();
+        while (pump.PendingFlushCount == 0 && elapsed.Elapsed < TimeSpan.FromSeconds(5))
+        {
+            await Task.Delay(1);
+        }
+
+        pump.PendingFlushCount.ShouldBeGreaterThan(0);
+    }
 
     private static ComponentNode Register(
         ComponentFactory components,

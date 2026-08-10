@@ -6,4 +6,6 @@
             Condition="Exists('..\Targets\Assimalign.Viu.Sdk.ServerRendering.targets')" />
     <Import Project="..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets"
             Condition="Exists('..\Targets\Assimalign.Viu.Sdk.ComponentStyles.targets')" />
+    <Import Project="..\Targets\Assimalign.Viu.Sdk.RuntimeInspection.targets"
+            Condition="Exists('..\Targets\Assimalign.Viu.Sdk.RuntimeInspection.targets')" />
 </Project>

@@ -17,6 +17,22 @@ namespace Assimalign.Viu.State;
 public static class StateStores
 {
     /// <summary>
+    /// Enters a fresh logical execution flow whose ambient setup context and active registry are
+    /// independent of the caller's flow.
+    /// </summary>
+    /// <returns>
+    /// An idempotent lease that restores the previous ambient state-store values when disposed.
+    /// Nested leases restore their parent flow when disposed in last-in, first-out order.
+    /// </returns>
+    /// <remarks>
+    /// Request-oriented hosts use this seam to prevent independently owned registries and setup
+    /// operations from sharing ambient state. The lease does not create or dispose a registry;
+    /// registry ownership remains explicit. Each entered flow remains single-event-loop and is not
+    /// thread-safe. Specified by <c>[EXE-1]</c> and <c>[CMP-33]</c>.
+    /// </remarks>
+    public static IDisposable EnterExecutionFlow() => StateExecutionIsolation.Enter();
+
+    /// <summary>
     /// Gets or sets the ambient registry used by argument-less resolution and as the fallback after
     /// component services. It is <see langword="null"/> by default. Specified by <c>[STA-4]</c>.
     /// </summary>

@@ -29,6 +29,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     private object? _exposedValue;
 
     internal RuntimeComponentContext(
+        IComponent instance,
         ComponentContract contract,
         ComponentInvocation invocation,
         MountReference? mountReference,
@@ -41,11 +42,13 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
         Action<string>? warnHandler,
         Action<ComponentContext, string, IReadOnlyList<object?>>? eventObserver)
     {
+        ArgumentNullException.ThrowIfNull(instance);
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(invocation);
         ArgumentNullException.ThrowIfNull(lifecycle);
         ArgumentNullException.ThrowIfNull(scope);
 
+        Instance = instance;
         _contract = contract;
         _listeners = invocation.Listeners;
         _errorHandler = errorHandler;
@@ -71,6 +74,8 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     }
 
     internal static RuntimeComponentContext? Current => CoreExecutionIsolation.Current.CurrentComponent;
+
+    internal IComponent Instance { get; }
 
     public override ComponentBindings Bindings => _bindings;
 
@@ -143,6 +148,11 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
             {
                 RouteError(exception, "application event observer");
             }
+        }
+
+        if (RuntimeInspection.IsEnabled)
+        {
+            RuntimeInspection.NotifyEvent(Instance, name, eventArguments);
         }
     }
 

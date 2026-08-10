@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Required by the source-generated browser history [JSImport]/[JSExport] bridge. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <!-- The Router<->DOM click bridge ([V01.01.08.03.01], issue #191): the only package that references
        both the DOM-free Router components and the browser DOM adapter. Browser stays Router-agnostic
@@ -11,5 +13,15 @@
     <ViuProjectReference Include="Assimalign.Viu.Core" />
     <ViuProjectReference Include="Assimalign.Viu.Router" />
     <ViuProjectReference Include="Assimalign.Viu.Browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="wwwroot\viu-history.js"
+          Pack="true"
+          PackagePath="assets\Assimalign.Viu.Browser.Router\viu-history.js"
+          Visible="false" />
+    <None Include="..\..\..\build\Targets\Build.Browser.Router.targets"
+          Pack="true"
+          PackagePath="buildTransitive\Assimalign.Viu.Browser.Router.targets"
+          Visible="false" />
   </ItemGroup>
 </Project>

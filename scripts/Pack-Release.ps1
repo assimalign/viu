@@ -208,6 +208,15 @@ $expectedSymbolPackageFiles = @(
         } |
         ForEach-Object { "$_.$Version.snupkg" }
 )
+# [V01.01.10.01] adds one managed library to the previous 16+11 release set.
+$expectedMainPackageCount = 17
+$expectedSymbolPackageCount = 12
+if ($expectedPackageFiles.Count -ne $expectedMainPackageCount) {
+    throw "The release contract requires $expectedMainPackageCount main packages, but the configured inventory contains $($expectedPackageFiles.Count)."
+}
+if ($expectedSymbolPackageFiles.Count -ne $expectedSymbolPackageCount) {
+    throw "The release contract requires $expectedSymbolPackageCount symbol packages, but the configured inventory requires $($expectedSymbolPackageFiles.Count)."
+}
 $actualPackageFiles = @(
     Get-ChildItem -LiteralPath $packageDirectory -Filter '*.nupkg' -File |
         ForEach-Object Name

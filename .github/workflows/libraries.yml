@@ -53,6 +53,7 @@ jobs:
                         "Assimalign.Viu.Browser.Router",
                         "Assimalign.Viu.Components",
                         "Assimalign.Viu.Core",
+                        "Assimalign.Viu.DevTools",
                         "Assimalign.Viu.Reactivity",
                         "Assimalign.Viu.Router",
                         "Assimalign.Viu.ServerRenderer",

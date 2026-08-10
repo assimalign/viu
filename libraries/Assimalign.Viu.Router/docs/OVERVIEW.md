@@ -7,7 +7,8 @@ Viu's immutable component and reactive contracts (`[RTR-1]`, `[RTR-7]`).
 
 ## Routes and matching
 
-`RouteRecord` associates a ranked path pattern with an immutable `VirtualNode`. `RouteMatcher`
+`RouteRecord` associates a ranked path pattern with an eager immutable `VirtualNode` or a
+`RouteComponentFactory` that asynchronously returns a typed `ComponentNode`. `RouteMatcher`
 tokenizes and ranks records, resolves parameters, and produces value-equal `RouteLocation`
 snapshots. Static segments outrank dynamic segments, optional and repeated parameters retain their
 declared semantics, and matcher failures use the package's typed error surface (`[RTR-1]`,
@@ -18,17 +19,29 @@ return an allow, abort, or redirect result; they never receive a continuation. A
 aborted, superseded, or duplicated returns a typed `NavigationFailure`, while unexpected faults flow
 to the configured error handler (`[RTR-5]`, `[RTR-6]`).
 
+Lazy factories run in the resolve step after record `BeforeEnter` guards and before explicit
+component-associated enter guards. Navigation confirmation waits for the factory. Success is cached
+on the record, while failure flows to `Router.OnError` without poisoning a later retry (`[RTR-8]`).
+
 ## History
 
-`RouterHistory` creates memory, web, and hash histories. Memory history is entirely managed. Web
-and hash histories initialize lazily through `Router.ReadyAsync`, marshal only flat primitive state,
-and consume the packaged `viu-history.js` module. The package owns that module and its
-`buildTransitive` target because the JavaScript exports call the Router assembly's generated
-`JSExport` dispatch surface (`[RTR-3]`).
+`RouterHistory` creates the entirely managed memory history. The Browser.Router leaf owns web and
+hash history construction, generated interop, and the packaged `viu-history.js` module. This keeps
+Router free of Browser, JavaScript interop, and web assets. Environment histories opt into public
+initialization and scroll capabilities; their state/path construction remains private policy
+(`[RTR-3]`, `[RTR-7]`, `[RTR-10]`).
 
 The history state model records navigation position, direction, replacement, and optional scroll
-coordinates. It preserves captured state for a host to consume; automatic scroll restoration is not
-implemented (`[RTR-8]`).
+coordinates. `ScrollBehavior` receives the confirmed destination, previous route, and a saved
+position for back/forward. It returns absolute coordinates, a selector plus offset, or null; its
+task may delay. Host-free histories intentionally no-op because only a host can apply the result
+(`[RTR-9]`).
+
+For applications migrating from the earlier Router-owned browser edge, reference
+`Assimalign.Viu.Browser.Router` and replace `RouterHistory.CreateWeb(...)` or
+`RouterHistory.CreateWebHash(...)` with `BrowserRouterHistory.CreateWeb(...)` or
+`BrowserRouterHistory.CreateWebHash(...)`. `BrowserRouterHistory.InitializeAsync(...)` is the moved
+explicit initializer; normal application startup still initializes through `Router.ReadyAsync`.
 
 ## Route components
 
@@ -53,9 +66,8 @@ left to the host. Browser-specific event translation belongs to `Assimalign.Viu.
 Router owns navigation policy, matching, guard ordering, route components, and history state. It
 does not mount component trees, patch a host, manage application lifetime, or interpret DOM events.
 Route nesting depth is an explicit `RouterView` argument because the component model has no ambient
-hierarchical dependency channel (`[CMP-24]`). Lazy route-component loading and automatic scroll
-behavior are current limits (`[RTR-8]`).
+hierarchical dependency channel (`[CMP-24]`).
 
-All activation is registration-based and all browser interop is source-generated. The package uses
+All activation is registration-based. The package uses
 no runtime constructor discovery, reflection serialization, emitted code, or dynamic activation
 path (`[CMP-6]`, `[EXE-4]`).

@@ -36,7 +36,9 @@ only compatibility contracts without cache metadata receive the legacy capacity.
 `ComponentHost.RenderAsync(ComponentRenderRequest)` returns an
 `IComponentRenderScope` after setup, awaited server prefetch, and one render. Disposing that lease
 aborts the lifetime without client hooks; nested requests use the still-live parent context [SSR-4],
-[SSR-5], and [SSR-10].
+[SSR-5], and [SSR-10]. `ComponentHost.ExecuteAsync` instead invokes one host operation with the
+activated `IComponent`, `ComponentRenderFrame`, and public scope, while Core retains error routing
+and teardown and reports a named success or handled-failure outcome [SSR-TARGET-3].
 
 `RuntimeComponentContext` is the single internal implementation of Components'
 `ComponentContext`. It owns resolved bindings, per-mount defaults and warning suppression,
@@ -50,10 +52,11 @@ start/stop/failure state machine. `Scheduler` orders component and watcher jobs,
 and drains pre-flush, commit, and post-flush phases [APP-1] through [APP-7] and [SCH-1] through
 [SCH-12].
 
-Browser uses one shared single-event-loop execution state. ServerRenderer enters a fresh internal
-Core/Reactivity/State execution state for every runtime-tree or compiled render, so independently
-owned request graphs do not share the current component, scope, tracking/batching state, active
-registry, or scheduler queues [EXE-1]. Individual graphs remain single-event-loop and not thread-safe.
+Browser uses one shared single-event-loop execution state. Request-oriented hosts call the public
+`RuntimeExecution.EnterExecutionFlow` boundary, which composes the public Reactivity and State flow
+boundaries for every runtime-tree or compiled render. Independently owned request graphs therefore
+do not share the current component, scope, tracking/batching state, active registry, or scheduler
+queues [EXE-1]. Individual graphs remain single-event-loop and not thread-safe.
 
 ## Hydration and development updates
 

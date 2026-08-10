@@ -21,8 +21,8 @@ internal static class CoreExecutionIsolation
     {
         CoreExecutionState? previous = IsolatedState.Value;
         IsolatedState.Value = new CoreExecutionState();
-        IDisposable reactivity = ReactivityExecutionIsolation.Enter();
-        IDisposable state = StateExecutionIsolation.Enter();
+        IDisposable reactivity = Reactive.EnterExecutionFlow();
+        IDisposable state = StateStores.EnterExecutionFlow();
         return new IsolationLease(previous, reactivity, state);
     }
 
