@@ -263,6 +263,26 @@ internal static class SingleFileComponentDiagnosticAdapter
         isEnabledByDefault: true,
         helpLinkUri: HelpLink("VIU1403"));
 
+    /// <summary>A static component tag has no generated or in-scope declaration.</summary>
+    internal static readonly DiagnosticDescriptor UnresolvedComponent = new(
+        id: "VIU1404",
+        title: "Component cannot be resolved",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1404"));
+
+    /// <summary>A static component tag matches more than one in-scope declaration.</summary>
+    internal static readonly DiagnosticDescriptor AmbiguousComponent = new(
+        id: "VIU1405",
+        title: "Component name is ambiguous",
+        messageFormat: "{0}",
+        category: Category,
+        defaultSeverity: RoslynDiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink("VIU1405"));
+
     /// <summary>Materializes the Roslyn diagnostic for reporting.</summary>
     /// <param name="info">The projection's value-equatable neutral diagnostic.</param>
     /// <returns>The diagnostic, located on the originating <c>.viu</c> file.</returns>
@@ -298,6 +318,8 @@ internal static class SingleFileComponentDiagnosticAdapter
             "VIU1401" => UnknownComponentParameter,
             "VIU1402" => MissingRequiredComponentParameter,
             "VIU1403" => IncompatibleComponentArgument,
+            "VIU1404" => UnresolvedComponent,
+            "VIU1405" => AmbiguousComponent,
             _ => throw new InvalidOperationException(
                 $"The neutral diagnostic catalog entry '{descriptor.Id}' has no Roslyn descriptor mapping."),
         };

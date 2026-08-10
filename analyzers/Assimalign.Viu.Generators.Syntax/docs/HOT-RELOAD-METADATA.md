@@ -28,9 +28,9 @@ The generator reads two compiler-visible MSBuild properties through `AnalyzerCon
 
 `sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props` publishes both properties as
 `CompilerVisibleProperty` items.
-An ordinary Release or AOT build therefore emits no hot-reload interface, hash getters, property
-implementations, assembly attribute, or forwarding handler. The generator does not wrap dormant members in
-conditional code; it omits them from the generated source.
+An ordinary Release or AOT build therefore emits no hot-reload marker types, registration initializer,
+assembly attribute, or forwarding handler. The generator does not wrap dormant members in conditional
+code; it omits them from the generated source.
 
 ## Generated API
 
@@ -62,12 +62,11 @@ Only the marker for an edited block receives a changed method body. The .NET met
 `updatedTypes` set can therefore classify the delta by type identity without invoking the patched body.
 This avoids reflection, runtime activation, generated revision delegates, and stale-body hash reads.
 
-The generator also emits compiler-owned `internal static string` getters named
-`HotReloadComponentIdentifier`, `HotReloadTemplateContentHash`, `HotReloadScriptContentHash`, and
-`HotReloadStyleContentHash` for deterministic tooling inspection. Marker methods repeat the literals
-because changing a `const` or static-field initializer is an `ENC0011` rude edit. Generated
-`ExtractedStyles` follows the same Debug-getter/Release-constant split so an inline style value can change
-without a field-initializer rude edit.
+The marker methods are the complete per-component hot-reload ABI. The generator deliberately emits no
+revision interface, hash property, static revision field, or inspection getter: changing a `const` or
+static-field initializer is an `ENC0011` rude edit, while changing the body of one marker method gives the
+metadata-update callback the edited block's type identity without requiring Viu to read the patched body.
+Generated style extraction uses an updatable method body for the same reason.
 
 ## Consumer-assembly metadata-update handler
 
@@ -167,9 +166,10 @@ consumer. Neither may change the identifier or hash scheme described here.
 ## Safety and Release boundary
 
 Hashing happens at compile time with integer and string operations only. Per-component generated code
-contains static getter bodies, explicit property getters, and three hash-dependent marker methods; the
-one consumer-assembly source adds only the sanctioned .NET metadata-update attribute and two static
-forwarding methods. Viu performs no reflection, runtime serialization, file access, dynamic code
-generation, or per-rule JavaScript interop. Release/default absence is covered for both `.viu` and
-`.vue`, as are Debug and explicit opt-in emission, handler registration, and independent block
-invalidation.
+contains one registration initializer and three hash-dependent marker methods; the one consumer-assembly
+source adds only the sanctioned .NET metadata-update attribute and two static forwarding methods. Viu
+performs no reflection, runtime serialization, file access, dynamic code generation, or per-rule
+JavaScript interop. Release/default absence is covered for both `.viu` and `.vue`, as are Debug and
+explicit opt-in emission, handler registration, and independent block invalidation. The packaged
+Release and browser-WASM AOT gates additionally inspect generated sources and the consumer assembly so a
+development marker or forwarding handler cannot silently enter production output.

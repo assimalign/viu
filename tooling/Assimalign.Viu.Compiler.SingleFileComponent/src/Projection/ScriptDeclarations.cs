@@ -29,4 +29,12 @@ public readonly record struct ScriptDeclarations(
 
     /// <summary>Whether the block declared any attributed parameter or event.</summary>
     public bool IsEmpty => Parameters.Count == 0 && Events.Count == 0;
+
+    /// <summary>
+    /// Whether the authored block owns a <c>Parameters</c> member. Its values cannot be read statically,
+    /// so component identity remains known while parameter-usage validation bails out ([SFC-USE-5]).
+    /// Kept outside the primary constructor to preserve its existing constructor and deconstruction
+    /// member shapes.
+    /// </summary>
+    public bool DeclaresImperativeParameters { get; init; }
 }

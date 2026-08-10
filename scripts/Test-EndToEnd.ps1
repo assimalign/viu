@@ -21,6 +21,11 @@
 .PARAMETER MeasureStartup
     Adds Chromium boot-to-interactive warm-up and measured runs and writes stable JSON.
 
+.PARAMETER HotReload
+    Runs the isolated packaged Debug .vue and utility-CSS watch scenario instead of the ordinary
+    three-scenario published fixture lane. This mode requires Chromium and owns the complete
+    dotnet-watch process tree for its staged consumer.
+
 .PARAMETER StartupResultsPath
     Destination for startup measurement JSON.
 
@@ -31,7 +36,12 @@
     Fresh-context measured loads. Defaults to ten.
 
 .PARAMETER PublishOnly
-    Stops after publishing EndToEndBrowserApp. No Playwright build, install, serve, or test occurs.
+    Stops after publishing the selected Browser fixture. No Playwright build, install, serve, or
+    test occurs.
+
+.PARAMETER PackagedVuePublish
+    With PublishOnly, publishes the isolated .vue-only Browser consumer and verifies both generated
+    CSS assets. Release and AOT metadata-absence checks then inspect that .vue consumer assembly.
 
 .PARAMETER PublishDirectory
     Exact retained output for PublishOnly. It must be a child of this repository's _out directory.
@@ -60,6 +70,7 @@ param(
     [string[]] $BrowserEngine = @('Chromium'),
     [switch] $Headed,
     [switch] $MeasureStartup,
+    [switch] $HotReload,
     [string] $StartupResultsPath =
         (Join-Path (Split-Path $PSScriptRoot -Parent) '_out/test-results/end-to-end/startup.json'),
     [ValidateRange(1, 100)]
@@ -67,6 +78,7 @@ param(
     [ValidateRange(10, 100)]
     [int] $StartupMeasuredRuns = 10,
     [switch] $PublishOnly,
+    [switch] $PackagedVuePublish,
     [string] $PublishDirectory,
     [switch] $Aot,
     [switch] $SkipPack,
@@ -281,6 +293,18 @@ if ($PublishOnly -and [string]::IsNullOrWhiteSpace($PublishDirectory)) {
     throw '-PublishOnly requires -PublishDirectory.'
 }
 
+if ($PackagedVuePublish -and -not $PublishOnly) {
+    throw '-PackagedVuePublish requires -PublishOnly.'
+}
+
+if ($PackagedVuePublish -and $HotReload) {
+    throw '-PackagedVuePublish cannot be combined with -HotReload.'
+}
+
+if ($PackagedVuePublish -and $Configuration -ne 'Release') {
+    throw '-PackagedVuePublish requires -Configuration Release.'
+}
+
 if (-not $PublishOnly -and -not [string]::IsNullOrWhiteSpace($PublishDirectory)) {
     throw '-PublishDirectory is supported only with -PublishOnly.'
 }
@@ -291,6 +315,22 @@ if ($MeasureStartup -and $PublishOnly) {
 
 if ($MeasureStartup -and -not ($BrowserEngine -contains 'Chromium' -or $BrowserEngine -contains 'All')) {
     throw '-MeasureStartup requires Chromium or All in -BrowserEngine.'
+}
+
+if ($HotReload -and $Configuration -ne 'Debug') {
+    throw '-HotReload requires -Configuration Debug.'
+}
+
+if ($HotReload -and $PublishOnly) {
+    throw '-HotReload cannot be combined with -PublishOnly.'
+}
+
+if ($HotReload -and $MeasureStartup) {
+    throw '-HotReload cannot be combined with -MeasureStartup.'
+}
+
+if ($HotReload -and ($BrowserEngine.Count -ne 1 -or $BrowserEngine[0] -ne 'Chromium')) {
+    throw '-HotReload requires exactly -BrowserEngine Chromium.'
 }
 
 $targetFrameworkProperties = [xml](
@@ -392,10 +432,13 @@ $requiredPackages = @(
     "Assimalign.Viu.Sdk.Browser.$viuVersion.nupkg",
     "Assimalign.Viu.App.Ref.$viuVersion.nupkg",
     "Assimalign.Viu.App.Browser.Ref.$viuVersion.nupkg",
-    "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$viuVersion.nupkg",
-    "Assimalign.Viu.Router.$viuVersion.nupkg",
-    "Assimalign.Viu.Browser.Router.$viuVersion.nupkg",
-    "Assimalign.Viu.ServerRenderer.$viuVersion.nupkg")
+    "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$viuVersion.nupkg")
+if (-not $HotReload -and -not $PackagedVuePublish) {
+    $requiredPackages += @(
+        "Assimalign.Viu.Router.$viuVersion.nupkg",
+        "Assimalign.Viu.Browser.Router.$viuVersion.nupkg",
+        "Assimalign.Viu.ServerRenderer.$viuVersion.nupkg")
+}
 foreach ($requiredPackage in $requiredPackages) {
     $requiredPackagePath = Join-Path $packageDirectoryPath $requiredPackage
     if (-not [System.IO.File]::Exists($requiredPackagePath)) {
@@ -432,11 +475,20 @@ try {
 $fixtureSourceDirectory = Join-Path $PSScriptRoot 'fixtures'
 $fixtureStageDirectory = Join-Path $temporaryRootPath 'fixtures'
 $null = New-Item -ItemType Directory -Path $fixtureStageDirectory
-foreach ($fixtureName in @(
+$fixtureNames = if ($HotReload) {
+    @('EndToEndHotReloadApp')
+}
+elseif ($PackagedVuePublish) {
+    @('PackagedVueBrowserConsumer')
+}
+else {
+    @(
         'EndToEndBrowserApp',
         'EndToEndHydrationApp',
         'EndToEndHydrationShared',
-        'EndToEndServerMarkup')) {
+        'EndToEndServerMarkup')
+}
+foreach ($fixtureName in $fixtureNames) {
     Copy-Item `
         -LiteralPath (Join-Path $fixtureSourceDirectory $fixtureName) `
         -Destination $fixtureStageDirectory `
@@ -560,9 +612,18 @@ if ($SkipPackRestore) {
         [System.Security.SecurityElement]::Escape($browserSdkPropsPath)
     $escapedBrowserSdkTargetsPath =
         [System.Security.SecurityElement]::Escape($browserSdkTargetsPath)
-    foreach ($stagedBrowserProject in @(
+    $stagedBrowserProjects = if ($HotReload) {
+        @((Join-Path $fixtureStageDirectory 'EndToEndHotReloadApp/EndToEndHotReloadApp.csproj'))
+    }
+    elseif ($PackagedVuePublish) {
+        @((Join-Path $fixtureStageDirectory 'PackagedVueBrowserConsumer/PackagedVueBrowserConsumer.csproj'))
+    }
+    else {
+        @(
             (Join-Path $fixtureStageDirectory 'EndToEndBrowserApp/EndToEndBrowserApp.csproj'),
-            (Join-Path $fixtureStageDirectory 'EndToEndHydrationApp/EndToEndHydrationApp.csproj'))) {
+            (Join-Path $fixtureStageDirectory 'EndToEndHydrationApp/EndToEndHydrationApp.csproj'))
+    }
+    foreach ($stagedBrowserProject in $stagedBrowserProjects) {
         $projectContent = [System.IO.File]::ReadAllText($stagedBrowserProject)
         $projectContent = $projectContent.Replace(
             '<Project Sdk="Assimalign.Viu.Sdk.Browser">',
@@ -650,9 +711,17 @@ else {
     $fixtureRestoreArguments += '--ignore-failed-sources'
 }
 
-$browserProject = Join-Path `
-    $fixtureStageDirectory `
+$browserProjectRelativePath = if ($HotReload) {
+    'EndToEndHotReloadApp/EndToEndHotReloadApp.csproj'
+}
+elseif ($PackagedVuePublish) {
+    'PackagedVueBrowserConsumer/PackagedVueBrowserConsumer.csproj'
+}
+else {
     'EndToEndBrowserApp/EndToEndBrowserApp.csproj'
+}
+$browserProject = Join-Path $fixtureStageDirectory $browserProjectRelativePath
+$browserAssemblyName = [System.IO.Path]::GetFileNameWithoutExtension($browserProject)
 $hydrationProject = Join-Path `
     $fixtureStageDirectory `
     'EndToEndHydrationApp/EndToEndHydrationApp.csproj'
@@ -668,21 +737,32 @@ $browserRestoreProperties = @(
     $restoreProperties
     "-p:RunAOTCompilation=$aotValue"
     "-p:ViuRunAotCompilation=$aotValue")
+if ($HotReload) {
+    $browserRestoreProperties += '-p:RuntimeIdentifier=browser-wasm'
+}
 
     Invoke-DotNet `
-        -Description 'Restoring the packaged EndToEndBrowserApp fixture' `
+        -Description "Restoring the packaged $([System.IO.Path]::GetFileNameWithoutExtension($browserProject)) fixture" `
          -Arguments (@(
              'restore',
              $browserProject) + $fixtureRestoreArguments + $browserRestoreProperties)
 
+if (-not $HotReload) {
     $browserPublishDirectory = if ($PublishOnly) {
         Reset-RepositoryOutputDirectory -Path $PublishDirectory
     }
     else {
-        $path = Join-Path $temporaryRootPath 'publish/EndToEndBrowserApp'
+        $path = Join-Path $temporaryRootPath "publish/$browserAssemblyName"
         $null = New-Item -ItemType Directory -Path $path -Force
         $path
     }
+    $browserGeneratedSourceDirectory = Join-Path `
+        $temporaryRootPath `
+        "generated/$browserAssemblyName"
+    $null = New-Item `
+        -ItemType Directory `
+        -Path $browserGeneratedSourceDirectory `
+        -Force
     $browserPublishArguments = @(
         'publish',
         $browserProject,
@@ -693,9 +773,12 @@ $browserRestoreProperties = @(
         '--output',
         $browserPublishDirectory,
         '-p:PublishTrimmed=true',
-        '-p:TrimMode=full') + $browserRestoreProperties
+        '-p:TrimMode=full',
+        '-p:EmitCompilerGeneratedFiles=true',
+        "-p:CompilerGeneratedFilesOutputPath=$browserGeneratedSourceDirectory") +
+        $browserRestoreProperties
     Invoke-DotNet `
-        -Description "Publishing EndToEndBrowserApp (trimmed, AOT=$aotValue)" `
+        -Description "Publishing $browserAssemblyName (trimmed, AOT=$aotValue)" `
         -Arguments $browserPublishArguments
 
     $browserWebRoot = Join-Path $browserPublishDirectory 'wwwroot'
@@ -713,7 +796,112 @@ $browserRestoreProperties = @(
         throw 'The Browser publish did not contain the fingerprinted application boot module.'
     }
 
+    if ($PackagedVuePublish) {
+        $requiredCssAssetNames = @(
+            "$browserAssemblyName.viu.css",
+            "$browserAssemblyName.utilities.css")
+        foreach ($requiredCssAssetName in $requiredCssAssetNames) {
+            $requiredCssAsset = Join-Path $browserWebRoot $requiredCssAssetName
+            if (-not [System.IO.File]::Exists($requiredCssAsset) -or
+                (Get-Item -LiteralPath $requiredCssAsset).Length -eq 0) {
+                throw "The packaged .vue Browser publish is missing a non-empty CSS asset: $requiredCssAsset"
+            }
+        }
+
+        $publishedVueHostPage = [System.IO.File]::ReadAllText(
+            (Join-Path $browserWebRoot 'index.html'))
+        $cssHrefOffsets = @{}
+        foreach ($requiredCssAssetName in $requiredCssAssetNames) {
+            $hrefPattern =
+                'href\s*=\s*["'']' +
+                [System.Text.RegularExpressions.Regex]::Escape($requiredCssAssetName) +
+                '["'']'
+            $hrefMatches = [System.Text.RegularExpressions.Regex]::Matches(
+                $publishedVueHostPage,
+                $hrefPattern,
+                [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if ($hrefMatches.Count -ne 1) {
+                throw "The packaged .vue Browser host page must link '$requiredCssAssetName' exactly once; found $($hrefMatches.Count)."
+            }
+            $cssHrefOffsets[$requiredCssAssetName] = $hrefMatches[0].Index
+        }
+        if ($cssHrefOffsets[$requiredCssAssetNames[0]] -ge
+            $cssHrefOffsets[$requiredCssAssetNames[1]]) {
+            throw 'The packaged .vue Browser host page must link component CSS before utility CSS.'
+        }
+
+        $vueGeneratedSources = @(
+            Get-ChildItem `
+                -LiteralPath $browserGeneratedSourceDirectory `
+                -Recurse `
+                -File `
+                -Filter '*.SingleFileComponent.g.cs')
+        if ($vueGeneratedSources.Count -ne 1) {
+            throw "Expected one .vue generated component in the Browser publish, found $($vueGeneratedSources.Count)."
+        }
+        $vueGeneratedSource = [System.IO.File]::ReadAllText(
+            $vueGeneratedSources[0].FullName)
+        if (-not $vueGeneratedSource.Contains(
+                '"PublishedVuePage.vue"',
+                [System.StringComparison]::Ordinal) -or
+            $vueGeneratedSource.Contains(
+                '"PublishedVuePage.viu"',
+                [System.StringComparison]::Ordinal)) {
+            throw 'The packaged Browser publish did not compile exclusively from its authored .vue source.'
+        }
+
+        Write-Host `
+            'Packaged .vue Browser publish contains component and utility CSS assets.' `
+            -ForegroundColor Green
+    }
+
     if ($Configuration -eq 'Release') {
+        $hotReloadMetadataTokens = @(
+            'SingleFileComponentHotReloadMetadataUpdateHandler',
+            'SingleFileComponentTemplateUpdateMarker',
+            'SingleFileComponentScriptUpdateMarker',
+            'SingleFileComponentStyleUpdateMarker',
+            'ComponentHotReload.Register(')
+        $generatedSourceFiles = @(
+            Get-ChildItem `
+                -LiteralPath $browserGeneratedSourceDirectory `
+                -Recurse `
+                -File `
+                -Filter '*.cs')
+        if ($generatedSourceFiles.Count -eq 0) {
+            throw 'The Release Browser publish emitted no compiler-generated sources to inspect.'
+        }
+        foreach ($generatedSourceFile in $generatedSourceFiles) {
+            $generatedSource = [System.IO.File]::ReadAllText($generatedSourceFile.FullName)
+            foreach ($hotReloadMetadataToken in $hotReloadMetadataTokens) {
+                if ($generatedSource.Contains(
+                        $hotReloadMetadataToken,
+                        [System.StringComparison]::Ordinal)) {
+                    throw "Release generated source contains hot-reload metadata '$hotReloadMetadataToken': $($generatedSourceFile.FullName)"
+                }
+            }
+        }
+
+        $publishedConsumerAssemblies = @(
+            Get-ChildItem `
+                -LiteralPath (Join-Path $browserWebRoot '_framework') `
+                -File `
+                -Filter "$browserAssemblyName*.wasm")
+        if ($publishedConsumerAssemblies.Count -eq 0) {
+            throw 'The Release Browser publish did not expose its consumer assembly for metadata inspection.'
+        }
+        foreach ($publishedConsumerAssembly in $publishedConsumerAssemblies) {
+            $publishedConsumerText = [System.Text.Encoding]::UTF8.GetString(
+                [System.IO.File]::ReadAllBytes($publishedConsumerAssembly.FullName))
+            foreach ($hotReloadMetadataToken in $hotReloadMetadataTokens) {
+                if ($publishedConsumerText.Contains(
+                        $hotReloadMetadataToken,
+                        [System.StringComparison]::Ordinal)) {
+                    throw "Release consumer assembly contains hot-reload metadata '$hotReloadMetadataToken': $($publishedConsumerAssembly.FullName)"
+                }
+            }
+        }
+
         $developmentArtifactFiles = @(
             Get-ChildItem -LiteralPath $browserPublishDirectory -Recurse -File |
                 Where-Object {
@@ -739,7 +927,7 @@ $browserRestoreProperties = @(
             throw 'The Release Browser host page contains a development-loop transport reference.'
         }
 
-        Write-Host 'Release publish contains no development-loop worker or browser-refresh transport.' `
+        Write-Host 'Release publish contains no hot-reload metadata, development worker, or browser-refresh transport.' `
             -ForegroundColor Green
     }
 
@@ -802,6 +990,7 @@ $browserRestoreProperties = @(
     if (-not [System.IO.File]::Exists((Join-Path $hydrationWebRoot 'index.html'))) {
         throw 'The hydration publish did not contain adaptor-generated index.html.'
     }
+}
 
     $harnessProject = Join-Path `
         $repositoryRootPath `
@@ -910,12 +1099,20 @@ $browserRestoreProperties = @(
     $artifactsDirectoryPath = Reset-RepositoryOutputDirectory `
         -Path $ArtifactsDirectory
     $harnessArguments = [System.Collections.Generic.List[string]]::new()
+    $harnessArguments.Add($harnessAssembly)
+    if ($HotReload) {
+        $harnessArguments.Add('--hot-reload-project')
+        $harnessArguments.Add($browserProject)
+        $harnessArguments.Add('--hot-reload-viu-version')
+        $harnessArguments.Add($viuVersion)
+    }
+    else {
+        $harnessArguments.Add('--browser-root')
+        $harnessArguments.Add($browserWebRoot)
+        $harnessArguments.Add('--hydration-root')
+        $harnessArguments.Add($hydrationWebRoot)
+    }
     foreach ($argument in @(
-            $harnessAssembly,
-            '--browser-root',
-            $browserWebRoot,
-            '--hydration-root',
-            $hydrationWebRoot,
             '--artifacts',
             $artifactsDirectoryPath)) {
         $harnessArguments.Add($argument)
@@ -943,8 +1140,14 @@ $browserRestoreProperties = @(
             $StartupMeasuredRuns.ToString([System.Globalization.CultureInfo]::InvariantCulture))
     }
 
+    $harnessDescription = if ($HotReload) {
+        'Running the isolated packaged hot-reload browser scenario'
+    }
+    else {
+        'Running the real-browser end-to-end scenarios'
+    }
     Invoke-DotNet `
-        -Description 'Running the real-browser end-to-end scenarios' `
+        -Description $harnessDescription `
         -Arguments $harnessArguments.ToArray()
 
     if ($MeasureStartup -and -not [System.IO.File]::Exists(

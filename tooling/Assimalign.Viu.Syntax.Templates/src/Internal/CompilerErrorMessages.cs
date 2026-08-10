@@ -115,6 +115,12 @@ internal static class CompilerErrorMessages
 
         // The offending "'<module>' has no member '<member>'." detail is appended by the reporter ([V01.01.05.04.01]).
         [CompilerErrorCode.XViuUnknownCssModuleMember] = "Unknown CSS module member: ",
+        [CompilerErrorCode.XViuUnsupportedForAlias] =
+            "v-for aliases must each be one C# identifier. Generalized destructuring is unsupported; " +
+            "use '(value, key, index) in source'.",
+        [CompilerErrorCode.XViuUnsupportedSlotScopeExpression] =
+            "v-slot scope must be one C# identifier. Generalized destructuring is unsupported; bind the " +
+            "slot dictionary by name and read its values explicitly.",
     };
 
     /// <summary>Gets the message for <paramref name="code"/>, or an empty string when none is defined.</summary>

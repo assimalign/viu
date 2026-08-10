@@ -63,7 +63,8 @@ stale generated method body, while a document reload after an accepted metadata 
 the live delta and restart from stale on-disk assemblies. A post-flush remount guarantees that the
 newly compiled body runs without interleaving with an active patch and retains the current document.
 State-preserving in-place template rerendering requires the later per-block runtime refinement tracked
-by [V01.01.06.05].
+outside [V01.01.06.05]. That work item supplies the stable per-block classification metadata; it does
+not weaken the .NET 10 browser-WASM stale-call-site constraint or promise in-place template rerendering.
 
 The CSS transport is independent of managed component replacement. Consequently, changing a
 utility candidate in template text is not a style-only edit: it changes both the utility stylesheet
@@ -102,6 +103,13 @@ configuration gate. Do not set it for a production publish.
 
 Unit and integration tests pin marker classification, post-flush remount ordering, watch-item
 registration, deterministic no-op writes, final-rule tombstones, worker lifetime, and the Release
-publish budget. A real connected-browser watch test must additionally prove stylesheet replacement,
-navigation identity, and mounted-state survival end to end; until that gate runs, those browser
-observations must be reported as unverified rather than inferred from the MSBuild item graph.
+publish budget. The opt-in
+`scripts/Test-EndToEnd.ps1 -PackagedVuePublish -PublishOnly -Configuration Release` lane publishes
+a `.vue`-only package consumer, requires its component and utility assets, and scans generated and
+published code for absent Debug-only metadata; add `-Aot` to exercise the same boundary after AOT
+compilation. The separate `scripts/Test-EndToEnd.ps1 -HotReload -Configuration Debug` lane starts
+an isolated packaged consumer under `dotnet watch` and uses a connected Chromium page to prove
+utility stylesheet replacement, document identity, mounted-state survival, template/script remount,
+semantic no-op suppression, and final-rule removal. These opt-in modes remain separate from the
+ordinary three-scenario browser matrix because the live lane mutates staged sources and owns a
+long-lived watch process tree.

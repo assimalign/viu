@@ -295,7 +295,18 @@ namespace Demo
             "    </MyButton>\n" +
             "</template>\n";
 
-        var outcome = GeneratorTestHarness.Run($"{ProjectDirectory}/Rich.viu", source, RootNamespace, ProjectDirectory);
+        var outcome = GeneratorTestHarness.RunAll(
+            [
+                ($"{ProjectDirectory}/Rich.viu", source),
+                ($"{ProjectDirectory}/MyButton.viu",
+                    "<template><button><slot></slot></button></template>\n" +
+                    "@script {\n" +
+                    "    using Assimalign.Viu.Components;\n" +
+                    "    [Parameter] public object? Kind { get; set; }\n" +
+                    "}\n"),
+            ],
+            RootNamespace,
+            ProjectDirectory);
 
         outcome.Diagnostics.ShouldBeEmpty();
         var generated = GeneratorTestHarness.GeneratedSource(outcome, "Rich.SingleFileComponent.g.cs");

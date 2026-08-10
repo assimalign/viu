@@ -24,8 +24,10 @@ before a compiled server body (`[CMP-33]`, `[SSR-TARGET-3]`).
 
 The serializer exhaustively dispatches all ten `VirtualNodeKind` values. Elements apply the escaping,
 attribute-name safety, boolean-attribute, casing, class/style, child-override, and raw-HTML rules in
-`[SSR-6]`. Static HTML is emitted only from compiler-trusted `StaticNode` values; static Extensible
-Markup Language payloads are rejected because they require a different serializer.
+`[SSR-6]`. Both HTML and Extensible Markup Language static payloads are emitted verbatim only from
+compiler-trusted `StaticNode` values. The server does not reparse either format, which preserves
+traversal/direct-body byte equality for SVG and MathML chunks selected by `[SFC-OPT-4]`; the closed
+`StaticNode` contract rejects every unsupported format before serialization.
 
 `RenderToStringAsync` accumulates one result. `RenderToStreamAsync` writes to the caller's
 `TextWriter` and flushes after a completed component subtree, so the destination controls

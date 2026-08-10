@@ -321,14 +321,14 @@ public sealed class ServerRendererTests
     }
 
     [Fact]
-    public async Task RenderToStringAsync_ExtensibleMarkupLanguageStaticNode_IsRejected()
+    public async Task RenderToStringAsync_ExtensibleMarkupLanguageStaticNode_WritesTrustedPayloadVerbatim()
     {
-        StaticNode node = new(MarkupFormat.ExtensibleMarkupLanguage, "<node />");
+        const string payload = "<mi mathcolor=\"red\">a &amp; b</mi>";
+        StaticNode node = new(MarkupFormat.ExtensibleMarkupLanguage, payload);
 
-        NotSupportedException exception = await Should.ThrowAsync<NotSupportedException>(
-            async () => await ServerRenderer.RenderToStringAsync(node));
+        string result = await ServerRenderer.RenderToStringAsync(node);
 
-        exception.Message.ShouldContain("non-HTML");
+        result.ShouldBe(payload);
     }
 
     private static ElementNode Element(

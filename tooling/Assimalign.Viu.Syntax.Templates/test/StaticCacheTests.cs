@@ -226,6 +226,91 @@ public class StaticCacheTests
         code.ShouldContain("<div id=\\\"x\\\"></div>");
     }
 
+    [Fact]
+    public void MathMlKnownStaticAttributes_StringifyAsExtensibleMarkupLanguage()
+    {
+        var code = Emit(
+            "<math><mi mathcolor=\"red\">a</mi><mi mathcolor=\"red\">b</mi>" +
+            "<mi mathcolor=\"red\">c</mi><mi mathcolor=\"red\">d</mi>" +
+            "<mi mathcolor=\"red\">e</mi></math>").Code;
+
+        StaticVNodeCount(code).ShouldBe(1);
+        code.ShouldContain("MarkupFormat.ExtensibleMarkupLanguage");
+        code.ShouldContain("<mi mathcolor=\\\"red\\\">a</mi>");
+    }
+
+    [Fact]
+    public void MathMlUnknownStaticAttribute_BailsOutOfStringification()
+    {
+        var code = Emit(
+            "<math><mi future-attribute=\"x\">a</mi><mi future-attribute=\"x\">b</mi>" +
+            "<mi future-attribute=\"x\">c</mi><mi future-attribute=\"x\">d</mi>" +
+            "<mi future-attribute=\"x\">e</mi></math>").Code;
+
+        code.ShouldNotContain(".StaticNode(");
+    }
+
+    [Fact]
+    public void MathMlDynamicKnownAttribute_BailsOutOfStringification()
+    {
+        var code = Emit(
+            "<math><mi :mathcolor=\"color\">a</mi><mi :mathcolor=\"color\">b</mi>" +
+            "<mi :mathcolor=\"color\">c</mi><mi :mathcolor=\"color\">d</mi>" +
+            "<mi :mathcolor=\"color\">e</mi></math>",
+            prefixIdentifiers: true).Code;
+
+        code.ShouldNotContain(".StaticNode(");
+    }
+
+    [Theory]
+    [InlineData("svg", "foreignObject", "")]
+    [InlineData("svg", "desc", "")]
+    [InlineData("svg", "title", "")]
+    [InlineData("math", "mtext", "")]
+    [InlineData("math", "annotation-xml", " encoding=\"text/html\"")]
+    public void ForeignContentHtmlIntegrationPoint_StaticChildrenUseHtmlFragmentFormat(
+        string rootTag,
+        string integrationTag,
+        string integrationAttributes)
+    {
+        string children = string.Concat(Enumerable.Repeat("<span id=\"x\"></span>", 5));
+        string source = string.Concat(
+            "<",
+            rootTag,
+            "><",
+            integrationTag,
+            integrationAttributes,
+            ">",
+            children,
+            "{{ tail }}</",
+            integrationTag,
+            "></",
+            rootTag,
+            ">");
+
+        string code = Emit(source, prefixIdentifiers: true).Code;
+
+        StaticVNodeCount(code).ShouldBe(1);
+        OccurrenceCount(code, "MarkupFormat.Html").ShouldBe(1);
+        OccurrenceCount(code, "MarkupFormat.ExtensibleMarkupLanguage").ShouldBe(0);
+    }
+
+    [Fact]
+    public void AdjacentHtmlAndSvgStaticRuns_AreSplitByFragmentFormat()
+    {
+        string htmlChildren = string.Concat(
+            Enumerable.Repeat("<div id=\"html\"></div>", 5));
+        string svgChildren = string.Concat(
+            Enumerable.Repeat("<svg viewBox=\"0 0 1 1\"></svg>", 5));
+        string code = Emit(
+            string.Concat("<section>", htmlChildren, svgChildren, "{{ tail }}</section>"),
+            prefixIdentifiers: true).Code;
+
+        StaticVNodeCount(code).ShouldBe(2);
+        OccurrenceCount(code, "MarkupFormat.Html").ShouldBe(1);
+        OccurrenceCount(code, "MarkupFormat.ExtensibleMarkupLanguage").ShouldBe(1);
+    }
+
     // ---- slot content bails stringification ----
 
     [Fact]
@@ -370,12 +455,15 @@ public class StaticCacheTests
     private static string WrappedComponent(string unit, int count)
         => "<Comp>" + string.Concat(Enumerable.Repeat(unit, count)) + "</Comp>";
 
-    private static int StaticVNodeCount(string code)
+    private static int StaticVNodeCount(string code) => OccurrenceCount(
+        code,
+        "new global::Assimalign.Viu.Components.StaticNode(");
+
+    private static int OccurrenceCount(string value, string marker)
     {
         var occurrences = 0;
         var index = 0;
-        const string marker = "new global::Assimalign.Viu.Components.StaticNode(";
-        while ((index = code.IndexOf(marker, index, System.StringComparison.Ordinal)) >= 0)
+        while ((index = value.IndexOf(marker, index, System.StringComparison.Ordinal)) >= 0)
         {
             occurrences++;
             index += marker.Length;

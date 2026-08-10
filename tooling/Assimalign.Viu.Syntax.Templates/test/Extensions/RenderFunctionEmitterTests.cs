@@ -243,6 +243,8 @@ public class RenderFunctionEmitterTests
     [InlineData("<component :is=\"viewName\"></component>")]
     [InlineData("<slot name=\"header\"><p>fallback {{ hint }}</p></slot>")]
     [InlineData("<div v-once><span>{{ frozen }}</span></div>")]
+    [InlineData("<div v-memo=\"[message]\">{{ message }}</div>")]
+    [InlineData("<div v-for=\"item in items\" v-memo=\"[item.id]\" :key=\"item.id\">{{ item.label }}</div>")]
     [InlineData("<button @click.stop=\"save($event)\">x</button>")]
     [InlineData("<input v-model.trim.number=\"name\" />")]
     [InlineData("<div v-show=\"visible\">shown</div>")]

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using Microsoft.CodeAnalysis.CSharp;
+
 using Assimalign.Viu.Components;
 
 namespace Assimalign.Viu.Syntax.Templates;
@@ -29,6 +31,11 @@ internal static class VForTransform
         if (parseResult is null)
         {
             context.ReportError(CompilerErrorFactory.Create(CompilerErrorCode.XVForMalformedExpression, directive.Location));
+            return null;
+        }
+
+        if (!ValidateAliases(parseResult, context))
+        {
             return null;
         }
 
@@ -359,4 +366,45 @@ internal static class VForTransform
 
         return result;
     }
+
+    /// <summary>Whether every supplied loop alias is one valid C# identifier.</summary>
+    internal static bool HasSupportedAliases(ForParseResult parseResult)
+        => IsSupportedAlias(parseResult.Value)
+           && IsSupportedAlias(parseResult.Key)
+           && IsSupportedAlias(parseResult.Index);
+
+    /// <summary>Reports the first unsupported loop alias and returns whether all aliases are supported.</summary>
+    internal static bool ValidateAliases(ForParseResult parseResult, TransformContext context)
+    {
+        var unsupported = FirstUnsupportedAlias(parseResult);
+        if (unsupported is null)
+        {
+            return true;
+        }
+
+        context.ReportError(CompilerErrorFactory.Create(
+            CompilerErrorCode.XViuUnsupportedForAlias,
+            unsupported.Location));
+        return false;
+    }
+
+    private static ExpressionNode? FirstUnsupportedAlias(ForParseResult parseResult)
+    {
+        if (!IsSupportedAlias(parseResult.Value))
+        {
+            return parseResult.Value;
+        }
+
+        if (!IsSupportedAlias(parseResult.Key))
+        {
+            return parseResult.Key;
+        }
+
+        return !IsSupportedAlias(parseResult.Index) ? parseResult.Index : null;
+    }
+
+    private static bool IsSupportedAlias(ExpressionNode? alias)
+        => alias is null
+           || alias is SimpleExpressionNode expression
+           && SyntaxFacts.IsValidIdentifier(expression.Content);
 }

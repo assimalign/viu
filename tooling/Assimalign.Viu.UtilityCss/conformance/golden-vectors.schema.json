@@ -6,11 +6,12 @@
   "required": [
     "schemaVersion",
     "compatibilityVersion",
-    "vectors"
+    "vectors",
+    "familyVectors"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "const": 3
     },
     "compatibilityVersion": {
       "const": "4.3.3"
@@ -24,6 +25,142 @@
           "kind",
           "officialReference"
         ]
+      }
+    },
+    "familyVectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "area",
+          "family",
+          "roots",
+          "officialReference",
+          "sourceReference",
+          "declarationContracts",
+          "cases"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "area": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "roots": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "officialReference": {
+            "type": "string",
+            "format": "uri"
+          },
+          "sourceReference": {
+            "const": "https://github.com/tailwindlabs/tailwindcss/blob/v4.3.3/packages/tailwindcss/src/utilities.ts"
+          },
+          "declarationContracts": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "$ref": "#/$defs/declarations"
+            }
+          },
+          "cases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "candidate",
+                "important",
+                "expectedRulePaths"
+              ],
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "candidate": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "important": {
+                  "type": "boolean"
+                },
+                "expectedRulePaths": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "wrappers",
+                      "selector",
+                      "declarationContract"
+                    ],
+                    "properties": {
+                      "wrappers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "declarationContract": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "declarations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "property",
+          "value"
+        ],
+        "properties": {
+          "property": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   }

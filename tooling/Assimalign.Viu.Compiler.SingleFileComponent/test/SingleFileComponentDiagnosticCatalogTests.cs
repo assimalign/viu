@@ -45,6 +45,8 @@ public sealed class SingleFileComponentDiagnosticCatalogTests
             ("VIU1401", SingleFileComponentDiagnosticSeverity.Warning),
             ("VIU1402", SingleFileComponentDiagnosticSeverity.Error),
             ("VIU1403", SingleFileComponentDiagnosticSeverity.Error),
+            ("VIU1404", SingleFileComponentDiagnosticSeverity.Error),
+            ("VIU1405", SingleFileComponentDiagnosticSeverity.Error),
         };
 
         SingleFileComponentDiagnostics.Catalog.Count.ShouldBe(expected.Length);

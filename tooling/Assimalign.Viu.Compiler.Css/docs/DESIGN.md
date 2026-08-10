@@ -75,54 +75,14 @@ Every newline the bundler emits is `\n`; the compiled CSS segments are LF for sc
 blocks (the canonical serializer emits `\n`) and preserve source newlines only for verbatim pass-through
 blocks — matching the generator's constant exactly.
 
-## Non-goals / future
+## Delivery boundary
 
 - **Utility-first CSS generation ([V01.01.12.13]+).** The utility engine is a separate producer with
   its own `ViuBundleUtilityCss` task in the Browser SDK. It does not enter this component-style core;
   the two deterministic stylesheets remain independent assets.
-- **Static-web-asset fingerprinting ([V01.01.12.12.03], #169) — implemented.** For Browser
-  applications, `Build.Css.Bundling.targets` registers the bundle with a content fingerprint through
-  the Browser SDK's `DefineStaticWebAssets` path (the
-  `$(PackageId)#[.{fingerprint}]?.viu.css` RelativePath, the same optional-token form Blazor's scoped-CSS
-  application bundle uses). The SDK derives the fingerprint from a SHA-256 hash of the bundle **content**, so
-  its determinism rides directly on this library's byte-stable output (LF-only, ordinal ordering): identical
-  styles reproduce the same hash across builds, changed styles get a new one, and the `ViuBundleCss` task's
-  no-op-rewrite skip means an unchanged rebuild never perturbs the bytes or the hash. The `?` keeps the plain
-  route (`<AssemblyName>.viu.css`, the file a static WASM host serves) working while registering the
-  fingerprinted route/endpoint (hash + `label` + integrity) that an ASP.NET Core host, a CDN, or the
-  link-injection follow-up resolves for immutable caching.
-- **Host-page `<link>` injection ([V01.01.12.12.01], #167) — implemented.** A consuming WASM app needs no
-  hand-authored link tag: `Build.Css.Bundling.targets` injects `<link rel="stylesheet"
-  href="<AssemblyName>.viu.css">` into the host page (`wwwroot/index.html`) via the
-  `ViuInjectCssBundleLink` MSBuild task shipped in `Assimalign.Viu.Sdk.Browser.Tasks`; `ViuBundleCss`
-  remains in the base task assembly for component-library extraction. The injector is idempotent —
-  a hand-authored link, or a re-run, suppresses a second link — so keeping a manual `<link>` is a supported
-  opt-out (`ViuInjectSingleFileComponentCssLink=false` opts out entirely).
-
-  **Why the earlier in-place attempt broke compression, and how this does not.** #167 records that automatic
-  injection was first attempted as a static-web-asset transformation and it stopped the SDK serving the
-  compressed (gzip/brotli) variants. The .NET SDK computes each compressed variant from an asset's **content**
-  and binds it to that asset's identity + integrity (`Microsoft.NET.Sdk.StaticWebAssets.Compression.targets`:
-  `ResolveCompressedAssets` enumerates `@(StaticWebAsset)`; `ApplyCompressionNegotiation` keys the `.gz`/`.br`
-  endpoints to the primary's integrity). Rewriting the host page **after** that negotiation orphans its
-  compressed variants — the negotiation endpoint still points at the pre-rewrite integrity while the `.gz`/`.br`
-  hold pre-rewrite bytes, so the mismatched pair is dropped. The fix is to mirror the SDK's **own** host-page
-  rewriter (`OverrideHtmlAssetPlaceholders`, which resolves `main#[.{fingerprint}].js`): write the page to an
-  intermediate copy, **re-register** the asset + endpoint with recomputed integrity (`DefineStaticWebAssets`
-  after `RemoveMetadata Integrity;Fingerprint`), and do it **before** compression enumerates — the injector
-  runs `BeforeTargets` `Resolve{Build,Publish}CompressedStaticWebAssetsConfiguration` and, when the SDK's own
-  rewrite is active, `DependsOn` it so it is the last host-page transform. Compression therefore derives from
-  the injected content, and the CSS bundle asset itself is never touched, so its endpoints are undisturbed.
-  Verified against a published app: `dotnet publish` yields an `index.html` (and its `.gz`/`.br`) carrying the
-  link while the CSS bundle keeps identity + gzip + brotli endpoints.
-
-  **Why the plain route, not the fingerprinted one.** The `?` optional fingerprint ([V01.01.12.12.03]) ships
-  only the plain physical file; the fingerprinted route resolves to it **only** through the endpoint manifest
-  (a manifest-aware host — `dotnet run`, ASP.NET Core, a configured CDN). A statically hosted published WASM
-  app has no such middleware, so a hashed href would 404 — the injector therefore writes the plain route
-  `<AssemblyName>.viu.css`, which works everywhere and still revalidates via the endpoint's ETag/integrity. The
-  fingerprinted endpoint stays registered for hosted scenarios; `$(ViuSingleFileComponentCssBundleLinkHref)`
-  overrides the href for a manifest-aware deployment that wants the immutable URL. (Injecting the hashed href
-  by default — e.g. by switching the bundle to the `!` required form so the hashed file physically ships — is
-  the natural hosted-scenario follow-up.)
-```
+- **Browser delivery is not part of this compiler.** Static-web-asset registration, labeled endpoint
+  resolution, component-library route flow, deterministic host-page link ordering, and gzip/brotli-safe
+  injection are Browser SDK responsibilities. Their public contract and switches live in
+  [`sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md`](../../../sdks/Assimalign.Viu.Sdk.Browser/docs/CSS-DELIVERY.md).
+  This core guarantees the deterministic bytes from which those identities and fingerprints are derived;
+  it does not choose a browser URL or mutate a host page.

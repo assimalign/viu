@@ -114,6 +114,17 @@ internal static class DomKnowledgeData
         + "yChannelSelector,z,zoomAndPan";
 
     /// <summary>
+    /// The bounded MathML Core attribute set the template compiler may serialize into an opaque static
+    /// payload. It deliberately excludes event-handler content attributes and names outside MathML Core;
+    /// omitted names take the safe dynamic-node path.
+    /// </summary>
+    internal const string KnownMathMlAttributes =
+        "accent,accentunder,actiontype,alttext,arg,autofocus,class,columnspan,depth,dir,display,"
+        + "displaystyle,encoding,fence,form,height,id,intent,largeop,linethickness,lspace,"
+        + "mathbackground,mathcolor,mathsize,maxsize,minsize,movablelimits,nonce,rowspan,rspace,"
+        + "scriptlevel,selection,separator,stretchy,style,symmetric,tabindex,voffset,width";
+
+    /// <summary>
     /// Characters that make an attribute name unsafe to serialize (SSR): <c>&gt;</c>, <c>/</c>,
     /// <c>=</c>, quotes, tab, newline, form feed, and space.
     /// </summary>

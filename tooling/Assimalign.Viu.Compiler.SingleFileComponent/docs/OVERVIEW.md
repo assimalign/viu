@@ -32,8 +32,13 @@ types remain internal, and only the projection core's own tests receive friend a
   components must add the path-hash discriminator, because Roslyn's `AddSource` treats hint names
   differing only by case as one name (`[SFC-CG-5]`, [V01.01.06.10.01]).
 - **`SingleFileComponentDiagnostics`** — the host-neutral VIU diagnostic catalog (`VIU1001` …
-  `VIU1303`) and the block-to-file position composition; each host materializes at its own edge (the
+  `VIU1405`) and the block-to-file position composition; each host materializes at its own edge (the
   generator's Roslyn adapter, the language service's LSP mapping).
+- **Component identity validation** — the parsed-template usage manifest and compilation-wide declaration
+  catalog preserve PascalCase component precedence over case-colliding native elements, include
+  parameterless declarations, distinguish missing from ambiguous identities, and exempt only explicit
+  runtime selection and configured compiler/runtime built-ins (`[SFC-CG-8]`, `[SFC-USE-5]`,
+  [V01.01.05.11]).
 - **Model records** — `SingleFileComponentModel`, `ScriptRegions`, `ScriptBinding`,
   `ScriptDeclaredMember`, `CssModuleClassEntry`, `CssVariableBindingEntry`, `LocationInfo`,
   `DiagnosticInfo`, `EquatableArray<T>` — all value-equatable so both hosts can cache on them.

@@ -27,3 +27,5 @@ VIU1303 | Assimalign.Viu.Generators.Syntax | Info | Single-file component style 
 VIU1401 | Assimalign.Viu.Generators.Syntax | Warning | Component declares no such parameter
 VIU1402 | Assimalign.Viu.Generators.Syntax | Error | Required component parameter is not supplied
 VIU1403 | Assimalign.Viu.Generators.Syntax | Error | Component argument type is incompatible
+VIU1404 | Assimalign.Viu.Generators.Syntax | Error | Static component cannot be resolved
+VIU1405 | Assimalign.Viu.Generators.Syntax | Error | Static component name is ambiguous

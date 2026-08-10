@@ -439,7 +439,9 @@ internal sealed class FrameRenderCodeWriter
             CodeExpression content = call.Arguments.Count == 0
                 ? CodeExpression.Literal(StringLiteral(string.Empty))
                 : EmitExpression(call.Arguments[0]);
-            return EmitStaticNode(content);
+            var usesExtensibleMarkupLanguage = call.Arguments.Count > 2
+                && call.Arguments[2] is SimpleExpressionNode { Content: "true" };
+            return EmitStaticNode(content, usesExtensibleMarkupLanguage);
         }
 
         if (helper == HelperNames.RenderSlot)
@@ -560,7 +562,7 @@ internal sealed class FrameRenderCodeWriter
         return CodeExpression.Literal(nodeName);
     }
 
-    private CodeExpression EmitStaticNode(CodeExpression content)
+    private CodeExpression EmitStaticNode(CodeExpression content, bool usesExtensibleMarkupLanguage)
     {
         string nodeName = NextName("node");
         BeginLine();
@@ -570,7 +572,9 @@ internal sealed class FrameRenderCodeWriter
         Push(ComponentsNamespace);
         Push(".StaticNode(");
         Push(ComponentsNamespace);
-        Push(".MarkupFormat.Html, ");
+        Push(usesExtensibleMarkupLanguage
+            ? ".MarkupFormat.ExtensibleMarkupLanguage, "
+            : ".MarkupFormat.Html, ");
         AppendExpression(content);
         Push(");");
         EndLine();

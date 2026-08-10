@@ -13,6 +13,7 @@ internal enum CompiledFixtureNodeKind
     Element,
     Text,
     Comment,
+    Static,
 }
 
 /// <summary>Represents one node owned by the DOM-free compiled-fixture host.</summary>
@@ -47,7 +48,7 @@ internal sealed class CompiledFixtureNode
     {
         get
         {
-            if (Kind is CompiledFixtureNodeKind.Text)
+            if (Kind is CompiledFixtureNodeKind.Text or CompiledFixtureNodeKind.Static)
             {
                 return Text ?? string.Empty;
             }
@@ -95,6 +96,12 @@ internal sealed class CompiledFixtureHost : IDisposable
 
     internal int BindingPatchCount { get; private set; }
 
+    internal int StaticInsertionCount { get; private set; }
+
+    internal MarkupFormat? LastStaticFormat { get; private set; }
+
+    internal string? LastStaticContent { get; private set; }
+
     internal Renderer<CompiledFixtureNode> CreateRenderer() =>
         RendererFactory.CreateRenderer(
             new RendererOptions<CompiledFixtureNode>
@@ -116,6 +123,7 @@ internal sealed class CompiledFixtureHost : IDisposable
                 ParentNode = static node => node.Parent,
                 NextSibling = NextSibling,
                 PatchAttribute = PatchBinding,
+                InsertStaticContent = InsertStaticContent,
             });
 
     internal IReadOnlyList<CompiledFixtureNode> FindElements(string localName)
@@ -143,6 +151,7 @@ internal sealed class CompiledFixtureHost : IDisposable
         MoveCount = 0;
         TextChangeCount = 0;
         BindingPatchCount = 0;
+        StaticInsertionCount = 0;
     }
 
     /// <inheritdoc />
@@ -242,6 +251,23 @@ internal sealed class CompiledFixtureHost : IDisposable
         }
 
         BindingPatchCount++;
+    }
+
+    private (CompiledFixtureNode First, CompiledFixtureNode Last) InsertStaticContent(
+        MarkupFormat format,
+        string content,
+        CompiledFixtureNode parent,
+        CompiledFixtureNode? anchor)
+    {
+        var node = new CompiledFixtureNode(
+            CompiledFixtureNodeKind.Static,
+            "static markup",
+            content);
+        Insert(node, parent, anchor);
+        StaticInsertionCount++;
+        LastStaticFormat = format;
+        LastStaticContent = content;
+        return (node, node);
     }
 }
 

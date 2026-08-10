@@ -181,9 +181,11 @@ internal static class ComponentDeclarationReader
 
         if (parameters is null && events is null)
         {
-            return declaresConstructor
-                ? ScriptDeclarations.None with { DeclaresConstructor = true }
-                : ScriptDeclarations.None;
+            return ScriptDeclarations.None with
+            {
+                DeclaresConstructor = declaresConstructor,
+                DeclaresImperativeParameters = explicitParametersMember is not null,
+            };
         }
 
         return new ScriptDeclarations(
@@ -194,7 +196,10 @@ internal static class ComponentDeclarationReader
                 ? EquatableArray<ComponentEventDeclaration>.Empty
                 : new EquatableArray<ComponentEventDeclaration>(events.ToArray()),
             declaresRequiredMember && parameters is not null,
-            declaresConstructor);
+            declaresConstructor)
+        {
+            DeclaresImperativeParameters = explicitParametersMember is not null,
+        };
     }
 
     private static void RecordExplicitMember(

@@ -1,0 +1,21 @@
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>EndToEndHotReloadApp</RootNamespace>
+    <AssemblyName>EndToEndHotReloadApp</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <ViuAppFrameworkVersion>$(ViuConsumerVersion)</ViuAppFrameworkVersion>
+    <ViuBrowserAppFrameworkVersion>$(ViuConsumerVersion)</ViuBrowserAppFrameworkVersion>
+    <ViuCssHotReloadDebounceMilliseconds>75</ViuCssHotReloadDebounceMilliseconds>
+    <ViuCssHotReloadEventLog>$(BaseIntermediateOutputPath)viu/css-hot-reload/events.log</ViuCssHotReloadEventLog>
+    <ViuUtilityCssAutomaticSourceDiscovery>false</ViuUtilityCssAutomaticSourceDiscovery>
+  </PropertyGroup>
+  <ItemGroup>
+    <ViuUtilityCssSource Include="UtilityCandidate.html" />
+    <StaticWebAssetFingerprintPattern Include="JS"
+                                      Pattern="*.js"
+                                      Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+</Project>

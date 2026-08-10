@@ -295,12 +295,16 @@ public static class SingleFileComponentProjection
         ScriptDeclarations script,
         ScriptDeclarations scriptSetup)
     {
-        if (scriptSetup.IsEmpty && !scriptSetup.DeclaresConstructor)
+        if (scriptSetup.IsEmpty &&
+            !scriptSetup.DeclaresConstructor &&
+            !scriptSetup.DeclaresImperativeParameters)
         {
             return script;
         }
 
-        if (script.IsEmpty && !script.DeclaresConstructor)
+        if (script.IsEmpty &&
+            !script.DeclaresConstructor &&
+            !script.DeclaresImperativeParameters)
         {
             return scriptSetup;
         }
@@ -351,7 +355,11 @@ public static class SingleFileComponentProjection
                 ? EquatableArray<ComponentEventDeclaration>.Empty
                 : new EquatableArray<ComponentEventDeclaration>(events.ToArray()),
             script.DeclaresRequiredMember || scriptSetup.DeclaresRequiredMember,
-            script.DeclaresConstructor || scriptSetup.DeclaresConstructor);
+            script.DeclaresConstructor || scriptSetup.DeclaresConstructor)
+        {
+            DeclaresImperativeParameters =
+                script.DeclaresImperativeParameters || scriptSetup.DeclaresImperativeParameters,
+        };
     }
 
     private static void AddParseDiagnostics(
@@ -499,7 +507,10 @@ public static class SingleFileComponentProjection
             // [SFC-USE-1] The component-usage manifest is collected from the PARSED tree, before the
             // transform rewrites it into codegen nodes, so it describes what the developer authored.
             var usages = ComponentUsageCollector.Collect(
-                templateResult.Root, input.FilePath, blockContentStart);
+                templateResult.Root,
+                input.FilePath,
+                blockContentStart,
+                transformOptions.IsBuiltInComponent);
 
             var transformed = Transformer.Transform(templateResult.Root, transformOptions);
             var emitted = RenderFunctionEmitter.Emit(transformed, new RenderFunctionEmitterOptions

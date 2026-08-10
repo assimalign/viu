@@ -386,13 +386,15 @@ public class ExpressionBindingTests
     }
 
     [Fact]
-    public void ProcessExpression_VSlotDestructuredProperties_EnterScope()
+    public void ProcessExpression_VSlotDestructuring_ReportsActionableDiagnosticAndEmitsValidParameters()
     {
-        // A destructured slot prop contributes each name to scope (lenient extraction).
-        SingleInterpolation(
+        var result = TransformPrefixed(
             "<Comp v-slot=\"{ row }\"><span>{{ row }}</span></Comp>",
-            Bindings(("row", BindingType.Data)))
-            .ShouldBe("row");
+            Bindings(("row", BindingType.Data)),
+            out var errors);
+
+        errors.ShouldContain(error => error.Code == CompilerErrorCode.XViuUnsupportedSlotScopeExpression);
+        RenderFunctionEmitter.Emit(result).Code.ShouldNotContain("{ row }");
     }
 
     // ---- expression validation and diagnostics ----

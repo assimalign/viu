@@ -1,10 +1,10 @@
 <template>
 <main class="compiled-router-outlet">
-  <SynchronousTransition>
+  <component :is="TransitionTarget">
     <section :key="CurrentPath" class="compiled-route-frame">
-      <RouterView />
+      <component :is="RouterViewTarget"></component>
     </section>
-  </SynchronousTransition>
+  </component>
 </main>
 </template>
 
@@ -16,6 +16,12 @@ using ViuRouter = Assimalign.Viu.Router.Router;
 private ViuRouter Router { get; set; } = null!;
 
 public string CurrentPath => Router.CurrentRoute.Value.Path;
+
+public object RouterViewTarget =>
+    global::Assimalign.Viu.DynamicComponents.Named("RouterView");
+
+public object TransitionTarget =>
+    global::Assimalign.Viu.DynamicComponents.Named("SynchronousTransition");
 
 partial void OnSetup() =>
     Router = Context!.Services?.GetService(typeof(ViuRouter)) as ViuRouter

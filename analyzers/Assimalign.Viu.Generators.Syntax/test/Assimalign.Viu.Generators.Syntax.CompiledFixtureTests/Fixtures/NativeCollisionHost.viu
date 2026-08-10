@@ -1,0 +1,19 @@
+<template>
+<main>
+  <Button label="component button" @pressed="(string value) => OnButtonPressed(value)"></Button>
+  <Input value="component input" @changed="(string value) => OnInputChanged(value)"></Input>
+  <button>native button</button>
+  <input aria-label="native input">
+  <p>{{ LastEvent }}</p>
+</main>
+</template>
+
+@script {
+using Assimalign.Viu.Reactivity;
+
+public Reference<string> LastEvent = Reactive.Reference("none");
+
+private void OnButtonPressed(string value) => LastEvent.Value = "button:" + value;
+
+private void OnInputChanged(string value) => LastEvent.Value = "input:" + value;
+}

@@ -16,6 +16,9 @@ namespace Assimalign.Viu.Compiler.SingleFileComponent;
 /// enumerate — an argument-less <c>v-bind="…"</c> spread or a dynamic <c>:[name]</c> argument — is
 /// flagged <see cref="ComponentUsage.SuppliesUnknownArguments"/> so the checker stays silent about it
 /// entirely, and a bound value's type is recorded only when the expression is itself a C# literal.
+/// Runtime-resolved identities are also excluded: the generic <c>component</c>/<c>Component</c>
+/// element, compiler/runtime built-ins, and native-tag <c>is="vue:..."</c> casts. The cast target is
+/// deliberately not probed in the static catalog because it can be registered only at run time.
 /// </para>
 /// </summary>
 internal static class ComponentUsageCollector
@@ -28,10 +31,11 @@ internal static class ComponentUsageCollector
     public static EquatableArray<ComponentUsage> Collect(
         RootNode root,
         string filePath,
-        Position blockContentStart)
+        Position blockContentStart,
+        Func<string, RuntimeHelper?>? resolveBuiltInComponent = null)
     {
         List<ComponentUsage>? usages = null;
-        Visit(root.Children, filePath, blockContentStart, ref usages);
+        Visit(root.Children, filePath, blockContentStart, resolveBuiltInComponent, ref usages);
         return usages is null
             ? EquatableArray<ComponentUsage>.Empty
             : new EquatableArray<ComponentUsage>(usages.ToArray());
@@ -41,6 +45,7 @@ internal static class ComponentUsageCollector
         IReadOnlyList<TemplateChildNode> children,
         string filePath,
         Position blockContentStart,
+        Func<string, RuntimeHelper?>? resolveBuiltInComponent,
         ref List<ComponentUsage>? usages)
     {
         foreach (var child in children)
@@ -50,13 +55,18 @@ internal static class ComponentUsageCollector
                 continue;
             }
 
-            if (element.ElementType == ElementType.Component)
+            // The generic component element carries a runtime-selected identity (`:is`/`is`), so no
+            // static declaration can be required for its literal tag name. A `vue:` is cast likewise
+            // resolves its stripped target through the runtime component resolver.
+            if (element.ElementType == ElementType.Component &&
+                !IsCompilerBuiltIn(element.Tag, resolveBuiltInComponent) &&
+                !IsVueIsCast(element))
             {
                 (usages ??= new List<ComponentUsage>()).Add(
                     Describe(element, filePath, blockContentStart));
             }
 
-            Visit(element.Children, filePath, blockContentStart, ref usages);
+            Visit(element.Children, filePath, blockContentStart, resolveBuiltInComponent, ref usages);
         }
     }
 
@@ -261,6 +271,34 @@ internal static class ComponentUsageCollector
     // attribute [CMP-17], so it never participates in parameter validation.
     private static bool IsListenerName(string name)
         => name.Length > 2 && name[0] == 'o' && name[1] == 'n' && char.IsUpper(name[2]);
+
+    // These tags are resolved by template-compiler/runtime helpers, not by the application's generated
+    // component declaration catalog. They must never produce missing-declaration diagnostics.
+    // Keep the generic tag spellings mirrored with TransformElement.IsComponentTag in
+    // Assimalign.Viu.Syntax.Templates; the assembly boundary prevents sharing its private helper.
+    private static bool IsCompilerBuiltIn(
+        string tag,
+        Func<string, RuntimeHelper?>? resolveBuiltInComponent)
+        => (tag is "component" or "Component"
+                or "Teleport" or "teleport"
+                or "Suspense" or "suspense"
+                or "KeepAlive" or "keep-alive"
+                or "BaseTransition" or "base-transition")
+           || resolveBuiltInComponent?.Invoke(tag) is not null;
+
+    private static bool IsVueIsCast(ElementNode element)
+    {
+        foreach (var property in element.Properties)
+        {
+            if (property is AttributeNode { Name: "is", Value: { } value } &&
+                value.Content.StartsWith("vue:", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     // A usage-level diagnostic (a missing required parameter) squiggles the TAG NAME, not the element and
     // everything nested inside it. The element's own range spans its children, so the tag name is

@@ -52,6 +52,28 @@ public sealed class GeneratedComponentFixtureTests
     }
 
     [Fact]
+    public async Task MathMlStaticProbe_CompiledAndTraversalProfiles_AreByteIdentical()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        var registry = new ServerRenderRegistry();
+        ComponentFactory components = CreateFactory(fixtures);
+        var root = new ComponentNode(ComponentReference.ForName("MathStaticProbe"));
+        var application = new ServerRenderApplication(root, components);
+        const string expected =
+            "<math><mi mathcolor=\"red\">a</mi><mi mathcolor=\"red\">b</mi>" +
+            "<mi mathcolor=\"red\">c</mi><mi mathcolor=\"red\">d</mi>" +
+            "<mi mathcolor=\"red\">e</mi><mi mathcolor=\"blue\">dynamic math</mi></math>";
+
+        fixtures.RegisterServerRenders(registry);
+
+        string traversal = await ViuServerRenderer.RenderToStringAsync(application);
+        string compiled = await ViuServerRenderer.RenderToStringAsync(application, registry);
+
+        traversal.ShouldBe(expected);
+        compiled.ShouldBe(traversal);
+    }
+
+    [Fact]
     public void CompiledRoot_AndCodeFirstDefinition_ComposeAndUpdateInOneApplication()
     {
         CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
@@ -558,14 +580,130 @@ public sealed class GeneratedComponentFixtureTests
         host.RunScheduledFlushes();
         host.Container.DescendantText.ShouldNotContain("shown");
 
+        host.ResetOperationCounts();
         SetReferenceValue(instance, "MemoMessage", "memo-blocked");
         host.RunScheduledFlushes();
         host.Container.DescendantText.ShouldContain("memo-first");
         host.Container.DescendantText.ShouldNotContain("memo-blocked");
+        host.TextChangeCount.ShouldBe(0);
+        host.BindingPatchCount.ShouldBe(0);
+        host.MoveCount.ShouldBe(0);
 
+        host.ResetOperationCounts();
         SetReferenceValue(instance, "MemoKey", 2);
         host.RunScheduledFlushes();
         host.Container.DescendantText.ShouldContain("memo-blocked");
+        host.TextChangeCount.ShouldBe(1);
+        host.BindingPatchCount.ShouldBe(0);
+        host.MoveCount.ShouldBe(0);
+
+        host.ResetOperationCounts();
+        SetReferenceValue(
+            instance,
+            "MemoItems",
+            new[] { new KeyValuePair<int, string>(1, "memo-row-other") });
+        host.RunScheduledFlushes();
+        host.Container.DescendantText.ShouldContain("memo-row-first");
+        host.Container.DescendantText.ShouldNotContain("memo-row-other");
+        host.TextChangeCount.ShouldBe(0);
+        host.BindingPatchCount.ShouldBe(0);
+        host.MoveCount.ShouldBe(0);
+
+        host.ResetOperationCounts();
+        SetReferenceValue(
+            instance,
+            "MemoItems",
+            new[] { new KeyValuePair<int, string>(1, "memo-row-updated") });
+        host.RunScheduledFlushes();
+        host.Container.DescendantText.ShouldContain("memo-row-updated");
+        host.TextChangeCount.ShouldBe(1);
+        host.BindingPatchCount.ShouldBe(0);
+        host.MoveCount.ShouldBe(0);
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
+    public void PascalCaseNativeCollisions_CompileMountFlowParametersAndRaiseEvents()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        ComponentNode root = new(ComponentReference.ForName("NativeCollisionHost"));
+        ApplicationContext application = CreateApplication(root, factory);
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+
+        renderer.Render(root, host.Container, application);
+        host.RunScheduledFlushes();
+
+        string[] mountedNames = renderer.GetMountedComponentViews(host.Container)
+            .Select(view => view.Instance.GetType().Name)
+            .ToArray();
+        mountedNames.ShouldContain("NativeCollisionHost");
+        mountedNames.ShouldContain("Button");
+        mountedNames.ShouldContain("Input");
+        host.Container.DescendantText.ShouldContain("component button");
+        host.Container.DescendantText.ShouldContain("component input");
+        host.Container.DescendantText.ShouldContain("native button");
+        host.FindElements("input").ShouldHaveSingleItem()
+            .Bindings["aria-label"].ShouldBe("native input");
+
+        CompiledFixtureNode componentButton = host.FindElements("button")
+            .Single(button => button.DescendantText == "component button");
+        InvokeHostListener(componentButton.Bindings.Values.OfType<Delegate>().ShouldHaveSingleItem());
+        host.RunScheduledFlushes();
+        host.Container.DescendantText.ShouldContain("button:component button");
+
+        CompiledFixtureNode componentInput = host.FindElements("button")
+            .Single(button => button.DescendantText == "component input");
+        InvokeHostListener(componentInput.Bindings.Values.OfType<Delegate>().ShouldHaveSingleItem());
+        host.RunScheduledFlushes();
+        host.Container.DescendantText.ShouldContain("input:component input");
+
+        string generated = fixtures.GeneratedSources
+            .Single(pair => pair.Key.EndsWith(
+                "NativeCollisionHost.SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .Value;
+        generated.ShouldContain("ComponentReference.ForName(\"Button\")");
+        generated.ShouldContain("ComponentReference.ForName(\"Input\")");
+        generated.ShouldContain("QualifiedName(\"button\")");
+        generated.ShouldContain("QualifiedName(\"input\")");
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
+    public void MathMlStaticRun_InsertsOnceAndDynamicSiblingUpdatesWithoutReinsertion()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        ComponentNode root = new(ComponentReference.ForName("MathStaticProbe"));
+        ApplicationContext application = CreateApplication(root, factory);
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+
+        renderer.Render(root, host.Container, application);
+        host.RunScheduledFlushes();
+
+        host.StaticInsertionCount.ShouldBe(1);
+        host.LastStaticFormat.ShouldBe(MarkupFormat.ExtensibleMarkupLanguage);
+        host.LastStaticContent.ShouldNotBeNull()
+            .ShouldContain("<mi mathcolor=\"red\">a</mi>");
+        CompiledFixtureNode dynamicMath = host.FindElements("mi").ShouldHaveSingleItem();
+        dynamicMath.Bindings["mathcolor"].ShouldBe("blue");
+        dynamicMath.DescendantText.ShouldBe("dynamic math");
+
+        object instance = FindInstance(renderer, host, "MathStaticProbe");
+        host.ResetOperationCounts();
+        SetReferenceValue(instance, "Color", "green");
+        SetReferenceValue(instance, "Label", "updated math");
+        host.RunScheduledFlushes();
+
+        host.StaticInsertionCount.ShouldBe(0);
+        host.BindingPatchCount.ShouldBe(1);
+        host.TextChangeCount.ShouldBe(1);
+        host.MoveCount.ShouldBe(0);
+        dynamicMath.Bindings["mathcolor"].ShouldBe("green");
+        dynamicMath.DescendantText.ShouldBe("updated math");
         renderer.Render(null, host.Container);
     }
 
@@ -674,6 +812,39 @@ public sealed class GeneratedComponentFixtureTests
             .ShouldBe(ComponentHotReloadChangeKind.StyleOnly);
         ComponentHotReload.Classify(componentType, [templateMarker])
             .ShouldBe(ComponentHotReloadChangeKind.Template);
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
+    public void VueIsCast_CompiledFixture_RendersThroughRuntimeComponentResolver()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        ComponentFactory factory = CreateFactory(fixtures);
+        factory.Register(
+            ComponentRegistration.Define(
+                "runtime-widget",
+                new ComponentContract(renderCacheSize: 0, displayName: "RuntimeWidget"),
+                _ => _ => new ElementNode(
+                    new QualifiedName("strong"),
+                    children: [new TextNode("resolved at runtime")])));
+        ComponentNode root = new(ComponentReference.ForName("VueRuntimeCastProbe"));
+        ApplicationContext application = CreateApplication(root, factory);
+        using var host = new CompiledFixtureHost();
+        Renderer<CompiledFixtureNode> renderer = host.CreateRenderer();
+
+        renderer.Render(root, host.Container, application);
+        host.RunScheduledFlushes();
+
+        host.Container.DescendantText.ShouldBe("resolved at runtime");
+        renderer.GetMountedComponentViews(host.Container)
+            .Select(view => view.Request.Component.RegisteredName)
+            .ShouldContain("runtime-widget");
+        fixtures.GeneratedSources
+            .Single(pair => pair.Key.EndsWith(
+                "VueRuntimeCastProbe.SingleFileComponent.g.cs",
+                StringComparison.Ordinal))
+            .Value
+            .ShouldContain("ComponentReference.ForName(\"runtime-widget\")");
         renderer.Render(null, host.Container);
     }
 

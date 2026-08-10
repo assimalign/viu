@@ -140,8 +140,11 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         var localDeclarations = results
             .Select(static (result, _) => new ComponentDeclarationEntry(
                 result.Model.ClassName,
-                result.Model.Declarations.Parameters))
-            .Where(static entry => entry.Parameters.Count > 0)
+                result.Model.Declarations.Parameters)
+            {
+                IsParameterSurfaceKnown =
+                    !result.Model.Declarations.DeclaresImperativeParameters,
+            })
             .Collect();
         var symbolDeclarations = context.CompilationProvider.Select(
             static (compilation, cancellationToken) =>
@@ -347,7 +350,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
         SingleFileComponentProjectionResult result,
         ComponentDeclarationCatalog catalog)
     {
-        if (result.ComponentUsages.Count == 0 || catalog.IsEmpty)
+        if (result.ComponentUsages.Count == 0)
         {
             return;
         }

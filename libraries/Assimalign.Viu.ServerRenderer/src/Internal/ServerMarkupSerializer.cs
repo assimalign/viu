@@ -253,12 +253,15 @@ internal static class ServerMarkupSerializer
 
     private static void RenderStatic(SsrRenderState state, StaticNode node)
     {
-        if (node.Format != MarkupFormat.Html)
+        if (node.Format is not MarkupFormat.Html
+            and not MarkupFormat.ExtensibleMarkupLanguage)
         {
             throw new NotSupportedException(
-                "The HTML server renderer cannot consume a non-HTML static payload.");
+                $"The HTML server renderer cannot consume static payload format '{node.Format}'.");
         }
 
+        // Both closed formats contain compiler-trusted markup. The server writes markup rather than
+        // reparsing it, so preserving the payload verbatim also keeps traversal and compiled SSR equal.
         state.Push(node.Content);
     }
 

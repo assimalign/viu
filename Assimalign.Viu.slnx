@@ -156,6 +156,7 @@
 	</Folder>
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/Tasks/">
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj" />
+		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Tasks/test/Assimalign.Viu.Sdk.Browser.Tasks.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/Watch/">
 		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/src/Assimalign.Viu.Sdk.CssHotReload.csproj" />

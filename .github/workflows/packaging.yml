@@ -77,6 +77,9 @@ jobs:
       - name: Build Browser SDK task host (warnings are errors)
         run: dotnet build sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj --configuration Release -warnaserror
 
+      - name: Test Browser SDK CSS host-page injection
+        run: dotnet test sdks/Assimalign.Viu.Sdk.Browser/Tasks/test/Assimalign.Viu.Sdk.Browser.Tasks.Tests.csproj --configuration Release -warnaserror
+
       - name: Pack SDKs and framework packs
         shell: pwsh
         run: ./scripts/Install-Local.ps1
@@ -133,6 +136,10 @@ jobs:
       - name: Validate component-library and Browser package consumers
         shell: pwsh
         run: ./scripts/Test-ApplicationLifetimeConsumer.ps1
+
+      - name: Validate installed-package .vue consumer
+        shell: pwsh
+        run: ./scripts/Test-PackagedVueConsumer.ps1 -SkipPack
 
       - name: Verify standalone utility dependency boundary
         shell: pwsh

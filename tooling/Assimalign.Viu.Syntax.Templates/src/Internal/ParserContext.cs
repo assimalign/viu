@@ -149,11 +149,6 @@ internal sealed class ParserContext : ITokenizerCallbacks
     public void OnCloseTag(int start, int end)
     {
         var name = GetSlice(start, end);
-        if (options.IsVoidTag(name))
-        {
-            return;
-        }
-
         for (var i = 0; i < stack.Count; i++)
         {
             if (!string.Equals(stack[i].Tag, name, StringComparison.OrdinalIgnoreCase))
@@ -173,6 +168,13 @@ internal sealed class ParserContext : ITokenizerCallbacks
                 AddToCurrentChildren(BuildElementNode(element, end, j < i));
             }
 
+            return;
+        }
+
+        // Native void end tags are ignored, while a PascalCase component with the same
+        // case-insensitive spelling is closed by the stack match above.
+        if (options.IsVoidTag(name))
+        {
             return;
         }
 
@@ -472,7 +474,10 @@ internal sealed class ParserContext : ITokenizerCallbacks
             inPre++;
         }
 
-        if (options.IsVoidTag(element.Tag))
+        // Classification precedes HTML void handling: authored PascalCase is a component candidate,
+        // even when its spelling case-insensitively collides with a native void tag such as `input`.
+        // v-pre deliberately keeps authored markup literal, so its tags retain native void behavior.
+        if (options.IsVoidTag(element.Tag) && (inVPre || !IsComponent(element)))
         {
             AddToCurrentChildren(BuildElementNode(element, end, false));
         }

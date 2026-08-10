@@ -1,0 +1,17 @@
+<template>
+<math>
+  <mi mathcolor="red">a</mi>
+  <mi mathcolor="red">b</mi>
+  <mi mathcolor="red">c</mi>
+  <mi mathcolor="red">d</mi>
+  <mi mathcolor="red">e</mi>
+  <mi :mathcolor="Color">{{ Label }}</mi>
+</math>
+</template>
+
+@script {
+using Assimalign.Viu.Reactivity;
+
+public Reference<string> Color = Reactive.Reference("blue");
+public Reference<string> Label = Reactive.Reference("dynamic math");
+}

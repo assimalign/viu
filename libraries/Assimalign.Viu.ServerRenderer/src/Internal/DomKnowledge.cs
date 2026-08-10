@@ -40,6 +40,9 @@ internal static class DomKnowledge
     private static readonly FrozenSet<string> KnownSvgAttributeSet =
         DomKnowledgeData.KnownSvgAttributes.Split(',').ToFrozenSet(StringComparer.Ordinal);
 
+    private static readonly FrozenSet<string> KnownMathMlAttributeSet =
+        DomKnowledgeData.KnownMathMlAttributes.Split(',').ToFrozenSet(StringComparer.Ordinal);
+
     private static readonly FrozenDictionary<string, string> PropertyToAttributeMap = BuildPropertyToAttributeMap();
 
     // Span alternate lookups (net9+): the template compiler tokenizes source text into spans,
@@ -65,6 +68,9 @@ internal static class DomKnowledge
 
     private static readonly FrozenSet<string>.AlternateLookup<ReadOnlySpan<char>> KnownSvgAttributeLookup =
         KnownSvgAttributeSet.GetAlternateLookup<ReadOnlySpan<char>>();
+
+    private static readonly FrozenSet<string>.AlternateLookup<ReadOnlySpan<char>> KnownMathMlAttributeLookup =
+        KnownMathMlAttributeSet.GetAlternateLookup<ReadOnlySpan<char>>();
 
     private static readonly FrozenDictionary<string, string>.AlternateLookup<ReadOnlySpan<char>> PropertyToAttributeLookup =
         PropertyToAttributeMap.GetAlternateLookup<ReadOnlySpan<char>>();
@@ -128,6 +134,15 @@ internal static class DomKnowledge
     /// <inheritdoc cref="IsKnownSvgAttribute(string)"/>
     /// <remarks>Allocation-free for span-shaped tokens (compiler tokenization).</remarks>
     public static bool IsKnownSvgAttribute(ReadOnlySpan<char> attributeName) => KnownSvgAttributeLookup.Contains(attributeName);
+
+    /// <summary>Whether <paramref name="attributeName"/> belongs to Viu's bounded MathML Core attribute table.</summary>
+    /// <param name="attributeName">The attribute name.</param>
+    public static bool IsKnownMathMlAttribute(string attributeName) => KnownMathMlAttributeSet.Contains(attributeName);
+
+    /// <inheritdoc cref="IsKnownMathMlAttribute(string)"/>
+    /// <remarks>Allocation-free for span-shaped tokens (compiler tokenization).</remarks>
+    public static bool IsKnownMathMlAttribute(ReadOnlySpan<char> attributeName)
+        => KnownMathMlAttributeLookup.Contains(attributeName);
 
     /// <summary>
     /// Whether <paramref name="attributeName"/> is safe to serialize in SSR output: names
