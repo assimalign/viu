@@ -74,6 +74,44 @@ public class ScriptUsingDirectiveCompletionTests
     }
 
     [Fact]
+    public void GetCompletions_RootNamespaceSharesReferencedNamespace_PreservesAggregateNamespaceAndTypes()
+    {
+        // The W5.7 regression's real cause was not a missing framework reference: the generated
+        // component's own `Assimalign.*` namespace added one unmapped scaffold location to Roslyn's
+        // aggregate Assimalign namespace symbol, and the scaffold filter discarded the whole symbol
+        // including its referenced Components declarations.
+        var context = ScriptSemanticFixture.CreateContext(
+            "assimalign-root",
+            "Assimalign.Viu.Examples.Showcase",
+            ScriptSemanticFixture.PreprocessorSymbols);
+        var service = CreateService(ComponentSource, context);
+
+        var completions = service.GetCompletions(DocumentUri, UsingDirectivePosition());
+
+        completions.ShouldContain(completion =>
+            completion.Label == "Assimalign" &&
+            completion.Kind == LanguageCompletionItemKind.Module);
+
+        const string referencedTypeSource =
+            "<template>\n  <div>x</div>\n</template>\n" +
+            "@script {\n" +
+            "using Assimalign.Viu.Components.\n" +
+            "}\n";
+        var referencedTypeService = CreateService(referencedTypeSource, context);
+
+        var referencedTypeCompletions = referencedTypeService.GetCompletions(
+            DocumentUri,
+            PositionAfter(referencedTypeSource, "using Assimalign.Viu.Components."));
+
+        referencedTypeCompletions.ShouldContain(completion =>
+            completion.Label == "ParameterAttribute" &&
+            completion.Kind == LanguageCompletionItemKind.Class);
+        referencedTypeCompletions.ShouldContain(completion =>
+            completion.Label == "IComponent" &&
+            completion.Kind == LanguageCompletionItemKind.Class);
+    }
+
+    [Fact]
     public void GetCompletions_UsingDirectiveWithActiveContext_SortsNamespacesAboveTypes()
     {
         var service = CreateService(ComponentSource, ScriptSemanticFixture.CreateContext());

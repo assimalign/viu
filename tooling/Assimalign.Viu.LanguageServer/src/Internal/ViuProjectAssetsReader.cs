@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace Assimalign.Viu.LanguageServer;
@@ -27,8 +28,11 @@ internal static class ViuProjectAssetsReader
     private const string NetCoreApplicationFrameworkName = "Microsoft.NETCore.App";
     private const string NetCoreApplicationTargetingPackName = "Microsoft.NETCore.App.Ref";
 
-    internal static ViuProjectAssets Read(string projectFilePath)
+    internal static ViuProjectAssets Read(
+        string projectFilePath,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var projectDirectory = Path.GetDirectoryName(projectFilePath) ?? string.Empty;
         var objDirectory = Path.Combine(projectDirectory, "obj");
         var assetsFilePath = Path.Combine(objDirectory, "project.assets.json");
@@ -45,6 +49,7 @@ internal static class ViuProjectAssetsReader
         try
         {
             assetsBytes = File.ReadAllBytes(assetsFilePath);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
@@ -63,7 +68,8 @@ internal static class ViuProjectAssetsReader
                 projectDirectory,
                 objDirectory,
                 assetsFilePath,
-                assetsBytes);
+                assetsBytes,
+                cancellationToken);
         }
         catch (JsonException exception)
         {
@@ -135,8 +141,10 @@ internal static class ViuProjectAssetsReader
         string projectDirectory,
         string objDirectory,
         string assetsFilePath,
-        byte[] assetsBytes)
+        byte[] assetsBytes,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         // Target selection: the RID-less entry of targets whose key equals the restored TFM. The
         // RID-specific targets (net10.0/browser-wasm) are ignored — compile assets are identical
         // by construction and the RID-less target always exists.
@@ -183,12 +191,14 @@ internal static class ViuProjectAssetsReader
             projectDirectory,
             targetFramework,
             references,
-            droppedProjectReferences);
+            droppedProjectReferences,
+            cancellationToken);
         failureDetail ??= ResolveFrameworkReferences(
             frameworkElement,
             targetFramework,
             packageFolders,
-            references);
+            references,
+            cancellationToken);
         if (failureDetail is not null)
         {
             return CreateUnresolvable(projectFilePath, failureDetail);
@@ -198,13 +208,17 @@ internal static class ViuProjectAssetsReader
             projectFilePath,
             projectDirectory,
             objDirectory);
-        var (sourceFilePaths, componentFilePaths) = EnumerateSourceCone(projectDirectory);
+        cancellationToken.ThrowIfCancellationRequested();
+        var (sourceFilePaths, componentFilePaths) = EnumerateSourceCone(
+            projectDirectory,
+            cancellationToken);
         var cacheStamp = ComputeCacheStamp(
             assetsBytes,
             rootNamespace,
             resolvedProjectDirectory,
             configuration,
-            sourceFilePaths.Concat(componentFilePaths));
+            sourceFilePaths.Concat(componentFilePaths),
+            cancellationToken);
 
         return new ViuProjectAssets
         {
@@ -257,10 +271,12 @@ internal static class ViuProjectAssetsReader
         string projectDirectory,
         string targetFramework,
         List<string> references,
-        List<string> droppedProjectReferences)
+        List<string> droppedProjectReferences,
+        CancellationToken cancellationToken)
     {
         foreach (var library in targetElement.EnumerateObject())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var libraryType = library.Value.ValueKind == JsonValueKind.Object &&
                 library.Value.TryGetProperty("type", out var typeElement) &&
                 typeElement.ValueKind == JsonValueKind.String
@@ -427,7 +443,8 @@ internal static class ViuProjectAssetsReader
         JsonElement frameworkElement,
         string targetFramework,
         IReadOnlyList<string> packageFolders,
-        List<string> references)
+        List<string> references,
+        CancellationToken cancellationToken)
     {
         if (!TryGetObject(frameworkElement, "frameworkReferences", out var frameworkReferences))
         {
@@ -436,6 +453,7 @@ internal static class ViuProjectAssetsReader
 
         foreach (var frameworkReference in frameworkReferences.EnumerateObject())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var failureDetail = string.Equals(
                 frameworkReference.Name,
                 NetCoreApplicationFrameworkName,
@@ -738,8 +756,8 @@ internal static class ViuProjectAssetsReader
         }
     }
 
-    private static (IReadOnlyList<string> SourceFilePaths, IReadOnlyList<string> ComponentFilePaths)
-        EnumerateSourceCone(string projectDirectory)
+    internal static (IReadOnlyList<string> SourceFilePaths, IReadOnlyList<string> ComponentFilePaths)
+        EnumerateSourceCone(string projectDirectory, CancellationToken cancellationToken)
     {
         // The SDK's default Compile glob (`**\*.cs` minus DefaultItemExcludes) and the Syntax
         // generator's AdditionalFiles glob (`**\*.viu;**\*.vue` minus the same): the excludes are
@@ -747,9 +765,9 @@ internal static class ViuProjectAssetsReader
         // AssemblyInfo — completion never needs it.
         var sourceFilePaths = new List<string>();
         var componentFilePaths = new List<string>();
-        CollectSourceFiles(projectDirectory, "*.cs", sourceFilePaths);
-        CollectSourceFiles(projectDirectory, "*.viu", componentFilePaths);
-        CollectSourceFiles(projectDirectory, "*.vue", componentFilePaths);
+        CollectSourceFiles(projectDirectory, "*.cs", sourceFilePaths, cancellationToken);
+        CollectSourceFiles(projectDirectory, "*.viu", componentFilePaths, cancellationToken);
+        CollectSourceFiles(projectDirectory, "*.vue", componentFilePaths, cancellationToken);
         sourceFilePaths.Sort(StringComparer.OrdinalIgnoreCase);
         componentFilePaths.Sort(StringComparer.OrdinalIgnoreCase);
         return (sourceFilePaths, componentFilePaths);
@@ -758,7 +776,8 @@ internal static class ViuProjectAssetsReader
     private static void CollectSourceFiles(
         string projectDirectory,
         string searchPattern,
-        List<string> results)
+        List<string> results,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -767,6 +786,7 @@ internal static class ViuProjectAssetsReader
                          searchPattern,
                          SearchOption.AllDirectories))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var relativePath = Path.GetRelativePath(projectDirectory, file);
                 if (IsUnderOutputDirectory(relativePath))
                 {
@@ -792,13 +812,15 @@ internal static class ViuProjectAssetsReader
         string rootNamespace,
         string projectDirectory,
         string? configuration,
-        IEnumerable<string> sourceFilePaths)
+        IEnumerable<string> sourceFilePaths,
+        CancellationToken cancellationToken)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         hash.AppendData(assetsBytes);
         AppendText(hash, $"\n{rootNamespace}|{projectDirectory}|{configuration}\n");
         foreach (var filePath in sourceFilePaths)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             long lastWriteTicks = 0;
             long length = 0;
             try

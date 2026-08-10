@@ -70,6 +70,37 @@ internal sealed class LanguageServerHostSession : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Reads framed messages until a matching notification arrives, retaining every notification
+    /// in <see cref="Notifications"/> and returning an independently owned matching clone.
+    /// </summary>
+    internal async Task<JsonDocument> ReadNotificationAsync(
+        string method,
+        Func<JsonElement, bool> matches)
+    {
+        while (true)
+        {
+            var message = await responseReader.ReadAsync().AsTask().WaitAsync(ReadTimeout)
+                ?? throw new InvalidOperationException(
+                    "The host output ended before the awaited notification arrived.");
+            if (!message.RootElement.TryGetProperty("method", out var notificationMethod) ||
+                notificationMethod.ValueKind != JsonValueKind.String)
+            {
+                message.Dispose();
+                throw new InvalidOperationException(
+                    "An unexpected response arrived while awaiting a notification.");
+            }
+
+            notifications.Add(message);
+            if (notificationMethod.GetString() == method &&
+                message.RootElement.TryGetProperty("params", out var parameters) &&
+                matches(parameters))
+            {
+                return JsonDocument.Parse(message.RootElement.GetRawText());
+            }
+        }
+    }
+
     /// <summary>Waits for the host loop to return and yields its exit code.</summary>
     internal Task<int> CompleteAsync() => run.WaitAsync(ReadTimeout);
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading;
 
 using Shouldly;
 
@@ -151,6 +152,27 @@ public class ViuProjectAssetsReaderTests
             assets.ProjectDirectory.ShouldBe(projectDirectory + Path.DirectorySeparatorChar);
             assets.Configuration.ShouldBe("Debug");
             assets.CacheStamp.ShouldNotBeNullOrEmpty();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void EnumerateSourceCone_CanceledScan_ThrowsBeforeCollectingFiles()
+    {
+        var root = CreateFixtureRoot();
+        try
+        {
+            CreateFile(Path.Combine(root, "Component.cs"), "// component");
+            using var cancellationSource = new CancellationTokenSource();
+            cancellationSource.Cancel();
+
+            Should.Throw<OperationCanceledException>(
+                () => ViuProjectAssetsReader.EnumerateSourceCone(
+                    root,
+                    cancellationSource.Token));
         }
         finally
         {

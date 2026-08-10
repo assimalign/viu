@@ -349,6 +349,69 @@ public class ScriptSemanticEngineTests
     }
 
     [Fact]
+    public void GetPublicationSemantics_AllLayersShareOneLiveDocumentFork()
+    {
+        const string siblingSource =
+            "<template><button>{{ Label }}</button></template>\n" +
+            "@script {\n" +
+            "    [Parameter]\n" +
+            "    public string Label { get; set; } = string.Empty;\n" +
+            "}\n";
+        var sibling = new LanguageProjectSourceDocument(
+            "C:\\workspace\\App\\Button.viu",
+            siblingSource,
+            IsComponent: true);
+        var engine = new ScriptSemanticEngine();
+
+        var publication = engine.GetPublicationSemantics(
+            ScriptSemanticFixture.CreateContext(sibling),
+            DocumentFilePath,
+            ComponentSource,
+            includeClassifications: true,
+            includeDiagnostics: true,
+            includeComponentContracts: true,
+            CancellationToken.None);
+
+        publication.ShouldNotBeNull();
+        publication!.Classifications.ShouldNotBeEmpty();
+        publication.ComponentContracts.ShouldNotBeNull();
+        publication.ComponentContracts!.ShouldContain(
+            declaration => declaration.CompilerDeclaration.Name == "Button");
+        engine.LiveDocumentRequestBuildCount.ShouldBe(1);
+        engine.ComponentContractBuildCount.ShouldBe(1);
+        engine.ComponentProjectionBuildCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public void GetDocumentPublication_ProjectionDiagnosticsReuseSemanticLiveProjection()
+    {
+        const string siblingSource =
+            "<template><button>{{ Label }}</button></template>\n" +
+            "@script {\n" +
+            "    [Parameter]\n" +
+            "    public string Label { get; set; } = string.Empty;\n" +
+            "}\n";
+        var sibling = new LanguageProjectSourceDocument(
+            "C:\\workspace\\App\\Button.viu",
+            siblingSource,
+            IsComponent: true);
+        var service = (ViuLanguageService)LanguageServices.Create();
+        service.OpenDocument(DocumentUri, ComponentSource, 1);
+        service.ConfigureProjectContext(
+            DocumentUri,
+            ScriptSemanticFixture.CreateContext(sibling));
+
+        var publication = service.GetDocumentPublication(
+            DocumentUri,
+            includeSemanticClassifications: true,
+            CancellationToken.None);
+
+        publication.ClassificationSnapshot.ShouldNotBeNull();
+        publication.ClassificationSnapshot!.Classifications.ShouldNotBeEmpty();
+        service.ComponentProjectionBuildCount.ShouldBe(2);
+    }
+
+    [Fact]
     public void GetCompletions_UnreadableReferencePath_ReturnsNullMiss()
     {
         var engine = new ScriptSemanticEngine();

@@ -80,6 +80,18 @@ internal sealed class ViuLanguageService :
     // answers unchanged.
     private readonly Dictionary<string, LanguageProjectContext> projectContexts =
         new(StringComparer.OrdinalIgnoreCase);
+    private int standaloneDocumentProjectionBuildCount;
+
+    /// <summary>Gets all component projections built by this workspace.</summary>
+    internal int ComponentProjectionBuildCount
+        => scriptSemantics.ComponentProjectionBuildCount +
+            Volatile.Read(ref standaloneDocumentProjectionBuildCount);
+
+    /// <summary>Gets how many stable component-contract closures this workspace built.</summary>
+    internal int ComponentContractBuildCount => scriptSemantics.ComponentContractBuildCount;
+
+    /// <summary>Gets how many project-scoped semantic states this workspace built.</summary>
+    internal int ProjectStateBuildCount => scriptSemantics.ProjectStateBuildCount;
 
     public void ConfigureProjectContext(
         string documentUri,
@@ -178,8 +190,8 @@ internal sealed class ViuLanguageService :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
 
-        // The engine's per-document state is lock-free, so clearing it outside the service lock
-        // can never stall document synchronization behind a long semantic computation.
+        // Eviction serializes with semantic work. Keep it outside the service lock so close cannot
+        // invert the service/engine lock order while a feature request holds the engine gate.
         scriptSemantics.CloseDocument(documentUri);
         lock (synchronization)
         {
@@ -192,21 +204,133 @@ internal sealed class ViuLanguageService :
     public IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
         string documentUri,
         CancellationToken cancellationToken = default)
+        => GetDocumentPublication(
+            documentUri,
+            includeSemanticClassifications: false,
+            cancellationToken).Diagnostics;
+
+    public LanguageDocumentPublication GetDocumentPublication(
+        string documentUri,
+        bool includeSemanticClassifications,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (document, _) = CaptureSnapshot(documentUri);
-        if (document is null)
+        LanguageDocument? document;
+        LanguageProjectContext? context;
+        lock (synchronization)
         {
-            return Array.Empty<LanguageDiagnostic>();
+            document = documents.TryGet(documentUri, out var openDocument)
+                ? openDocument
+                : null;
+            context = projectContexts.TryGetValue(documentUri, out var configured)
+                ? configured
+                : null;
         }
 
+        if (document is null)
+        {
+            return new LanguageDocumentPublication(
+                ClassificationSnapshot: null,
+                Diagnostics: Array.Empty<LanguageDiagnostic>());
+        }
+
+        // Keep the incremental parser's recovery order and Vue-compatibility contract intact.
+        // Nested compiler diagnostics are appended below instead of replacing this baseline.
         var diagnostics = document.Syntax.Errors
             .Select(ToLanguageDiagnostic)
             .ToList();
         AddVueCompatibilityDiagnostics(document.Syntax, diagnostics);
-        return diagnostics;
+
+        var hasCSharpScript =
+            IsCSharpScript(document.Syntax.Script) ||
+            IsCSharpScript(document.Syntax.ScriptSetup);
+        ScriptSemanticPublication? semanticPublication = null;
+        if (context is not null &&
+            (hasCSharpScript || document.Syntax.Template is not null))
+        {
+            semanticPublication = scriptSemantics.GetPublicationSemantics(
+                context,
+                GetDocumentFilePath(documentUri),
+                document.Text,
+                includeSemanticClassifications && hasCSharpScript,
+                includeDiagnostics: hasCSharpScript,
+                includeComponentContracts: document.Syntax.Template is not null,
+                cancellationToken);
+        }
+
+        ComponentDeclarationCatalog? componentCatalog =
+            semanticPublication?.ComponentContracts is not { } componentContracts
+            ? null
+            : new TemplateComponentCatalog(componentContracts).CompilerCatalog;
+        var projection = semanticPublication?.Projection ??
+            ProjectDocument(document, context, cancellationToken);
+        diagnostics.AddRange(
+            LanguageDiagnosticProvider.GetProjectionDiagnostics(
+                projection,
+                componentCatalog,
+                cancellationToken));
+        if (semanticPublication is not null)
+        {
+            diagnostics.AddRange(semanticPublication.Diagnostics);
+        }
+
+        var classificationSnapshot = includeSemanticClassifications
+            ? new LanguageClassificationSnapshot(
+                document.Version,
+                LanguageTextChecksum.Compute(document.Text),
+                semanticPublication?.Classifications ?? Array.Empty<LanguageClassification>())
+            : null;
+        return new LanguageDocumentPublication(classificationSnapshot, diagnostics);
+    }
+
+    public IReadOnlyList<LanguageClassification> GetClassifications(
+        string documentUri,
+        CancellationToken cancellationToken = default)
+        => GetClassificationSnapshot(documentUri, cancellationToken)?.Classifications
+            ?? Array.Empty<LanguageClassification>();
+
+    public LanguageClassificationSnapshot? GetClassificationSnapshot(
+        string documentUri,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentUri);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        LanguageDocument? document;
+        LanguageProjectContext? context;
+        lock (synchronization)
+        {
+            document = documents.TryGet(documentUri, out var openDocument)
+                ? openDocument
+                : null;
+            context = projectContexts.TryGetValue(documentUri, out var configured)
+                ? configured
+                : null;
+        }
+
+        if (document is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<LanguageClassification> classifications =
+            context is not null &&
+            (IsCSharpScript(document.Syntax.Script) ||
+             IsCSharpScript(document.Syntax.ScriptSetup))
+                ? scriptSemantics.GetClassifications(
+                        context,
+                        GetDocumentFilePath(documentUri),
+                        document.Text,
+                        cancellationToken)
+                    ?? Array.Empty<LanguageClassification>()
+                : Array.Empty<LanguageClassification>();
+
+        return new LanguageClassificationSnapshot(
+            document.Version,
+            LanguageTextChecksum.Compute(document.Text),
+            classifications);
     }
 
     public IReadOnlyList<LanguageCompletionItem> GetCompletions(
@@ -227,26 +351,54 @@ internal sealed class ViuLanguageService :
         var block = FindBlock(document.Syntax, offset);
         var template = block as SingleFileComponentTemplateBlock;
         if (template is not null &&
+            TemplateCompletionProvider.IsInsideComment(
+                template.Content,
+                offset - template.ContentLocation.Start.Offset))
+        {
+            return Array.Empty<LanguageCompletionItem>();
+        }
+
+        if (template is not null &&
             UtilityClassCompletionContext.TryCreate(
                 template.Content,
                 template.ContentLocation.Start.Offset,
                 offset,
                 out var utilityContext))
         {
-            return GetUtilityClassCompletions(
+            var utilityCompletions = GetUtilityClassCompletions(
                 document.Text,
                 utilityContext,
                 stylesheetContext,
                 cancellationToken);
+            return StyleClassCompletionProvider.Merge(
+                document.Text,
+                document.Syntax,
+                utilityContext,
+                utilityCompletions,
+                cancellationToken);
         }
 
-        // docs/UTILITY-CSS-DESIGN.md section 10: completion activates only in supported static
-        // class attributes and literal class-binding strings. Every other attribute value and
-        // every interpolation is a C# expression this service cannot complete, and the line-prefix
-        // heuristics below cannot see the quote: `:class="Shell"` reads as the single token
-        // `:class="Shell` and answers with attribute names while the cursor is inside the value.
-        if (template is not null &&
-            IsExpressionContext(document.Text, template, offset))
+        if (template is not null)
+        {
+            var contextualCompletions = TemplateCompletionProvider.GetCompletions(
+                document,
+                template,
+                offset,
+                scriptDeclarations,
+                scriptSemantics,
+                CaptureProjectContext(documentUri),
+                GetDocumentFilePath(documentUri),
+                cancellationToken);
+            if (contextualCompletions is not null)
+            {
+                return contextualCompletions;
+            }
+        }
+
+        if (block is SingleFileComponentStyleBlock styleBlock &&
+            StyleClassCompletionProvider.IsInsideComment(
+                styleBlock.Content,
+                offset - styleBlock.ContentLocation.Start.Offset))
         {
             return Array.Empty<LanguageCompletionItem>();
         }
@@ -312,7 +464,7 @@ internal sealed class ViuLanguageService :
 
         // Resolution needs only the per-document utility context, never the open document:
         // the label is the complete candidate text, and recomputing against the current
-        // stylesheet context mirrors the hover path exactly, so a stylesheet edit between
+        // stylesheet context is the same one the hover path uses, so a stylesheet edit between
         // completion and resolve can never serve stale documentation.
         var (_, stylesheetContext) = CaptureSnapshot(documentUri);
         var resolution = UtilityRegistry.Resolve(
@@ -450,6 +602,17 @@ internal sealed class ViuLanguageService :
                 offset,
                 out var utilityContext))
         {
+            // Match completion precedence: a class authored in this component owns its name, while
+            // the utility registry remains the emitted-CSS fallback for undeclared class tokens.
+            var styleHover = StyleClassHoverProvider.GetHover(
+                document,
+                utilityContext,
+                cancellationToken);
+            if (styleHover is not null)
+            {
+                return styleHover;
+            }
+
             var utilityHover = GetUtilityClassHover(
                 document.Text,
                 utilityContext,
@@ -467,6 +630,51 @@ internal sealed class ViuLanguageService :
             IsExpressionContext(document.Text, template, offset))
         {
             return null;
+        }
+
+        var projectContext = CaptureProjectContext(documentUri);
+        if (block is SingleFileComponentScriptBlock script &&
+            IsCSharpScript(script) &&
+            projectContext is not null)
+        {
+            var scriptHover = scriptSemantics.GetHover(
+                projectContext,
+                GetDocumentFilePath(documentUri),
+                document.Text,
+                offset,
+                cancellationToken);
+            if (scriptHover is not null)
+            {
+                return scriptHover;
+            }
+        }
+
+        if (template is not null)
+        {
+            if (TemplateCompletionProvider.IsInsideComment(
+                    template.Content,
+                    offset - template.ContentLocation.Start.Offset))
+            {
+                return null;
+            }
+
+            ScriptComponentContractSnapshot? componentContractSnapshot = null;
+            if (projectContext is not null)
+            {
+                componentContractSnapshot = scriptSemantics.GetComponentContractSnapshot(
+                    projectContext,
+                    GetDocumentFilePath(documentUri),
+                    document.Text,
+                    cancellationToken);
+            }
+
+            var projection = componentContractSnapshot?.Projection ??
+                ProjectDocument(document, projectContext, cancellationToken);
+            return TemplateHoverProvider.GetHover(
+                document,
+                projection,
+                new TemplateComponentCatalog(componentContractSnapshot?.Declarations),
+                offset);
         }
 
         var tokenRange = GetTokenRange(document.Text, offset);
@@ -490,6 +698,15 @@ internal sealed class ViuLanguageService :
                 TextCoordinateConverter.GetPosition(document.Text, tokenRange.End)));
     }
 
+    private SingleFileComponentProjectionResult ProjectDocument(
+        LanguageDocument document,
+        LanguageProjectContext? context,
+        CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref standaloneDocumentProjectionBuildCount);
+        return LanguageDocumentProjection.Project(document, context, cancellationToken);
+    }
+
     /// <summary>
     /// Captures the immutable per-document state a read computes over. The lock is held only for
     /// the two dictionary lookups; the compute runs outside it over the immutable
@@ -505,6 +722,16 @@ internal sealed class ViuLanguageService :
                 ? openDocument
                 : null;
             return (document, GetUtilityContext(documentUri));
+        }
+    }
+
+    private LanguageProjectContext? CaptureProjectContext(string documentUri)
+    {
+        lock (synchronization)
+        {
+            return projectContexts.TryGetValue(documentUri, out var context)
+                ? context
+                : null;
         }
     }
 
@@ -608,23 +835,6 @@ internal sealed class ViuLanguageService :
         return Array.Empty<LanguageCompletionItem>();
     }
 
-    private static bool IsExpressionContext(
-        string documentText,
-        SingleFileComponentTemplateBlock template,
-        int offset)
-    {
-        if (UtilityCandidateScanner.IsInsideAttributeValue(
-                template.Content,
-                offset - template.ContentLocation.Start.Offset))
-        {
-            return true;
-        }
-
-        // Mustache interpolations do not nest, so the nearest unmatched opener decides.
-        var prefix = documentText.AsSpan(0, offset);
-        return prefix.LastIndexOf("{{".AsSpan()) > prefix.LastIndexOf("}}".AsSpan());
-    }
-
     private static IReadOnlyList<LanguageCompletionItem> GetTemplateCompletions(string linePrefix)
     {
         var trimmed = linePrefix.TrimStart();
@@ -653,6 +863,23 @@ internal sealed class ViuLanguageService :
         completions.AddRange(ViuCompletionCatalog.TemplateEvents);
         completions.AddRange(ViuCompletionCatalog.TemplateBindings);
         return completions;
+    }
+
+    private static bool IsExpressionContext(
+        string documentText,
+        SingleFileComponentTemplateBlock template,
+        int offset)
+    {
+        if (UtilityCandidateScanner.IsInsideAttributeValue(
+                template.Content,
+                offset - template.ContentLocation.Start.Offset))
+        {
+            return true;
+        }
+
+        // Mustache interpolations do not nest, so the nearest unmatched opener decides.
+        var prefix = documentText.AsSpan(0, offset);
+        return prefix.LastIndexOf("{{".AsSpan()) > prefix.LastIndexOf("}}".AsSpan());
     }
 
     private static IReadOnlyList<LanguageCompletionItem> GetUtilityClassCompletions(
@@ -688,6 +915,7 @@ internal sealed class ViuLanguageService :
             metadataByCandidate);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var colorResolver = UtilityColorValueResolver.Create(stylesheetContext.Theme);
         return metadataByCandidate.Values
             .OrderBy(metadata => metadata.SortOrder)
             .ThenBy(metadata => metadata.CandidateText, StringComparer.Ordinal)
@@ -695,7 +923,8 @@ internal sealed class ViuLanguageService :
             .Select(
                 metadata => CreateUtilityCompletion(
                     metadata,
-                    editRange))
+                    editRange,
+                    colorResolver))
             .ToArray();
     }
 
@@ -793,10 +1022,15 @@ internal sealed class ViuLanguageService :
 
     private static LanguageCompletionItem CreateUtilityCompletion(
         UtilityClassMetadata metadata,
-        LanguageRange editRange) =>
-        new(
+        LanguageRange editRange,
+        UtilityColorValueResolver colorResolver)
+    {
+        var colorValue = colorResolver.Resolve(metadata);
+        return new LanguageCompletionItem(
             metadata.CandidateText,
-            LanguageCompletionItemKind.Property,
+            colorValue is null
+                ? LanguageCompletionItemKind.Property
+                : LanguageCompletionItemKind.Color,
             "Viu utility class",
             // Utility documentation is deferred to ResolveCompletionDocumentation: interpolating
             // and serializing up to 500 CSS bodies per keystroke dominated the completion payload
@@ -806,7 +1040,9 @@ internal sealed class ViuLanguageService :
             IsSnippet: false,
             SortText: $"{metadata.SortOrder:D5}:{metadata.CandidateText}",
             EditRange: editRange,
-            FilterText: metadata.CandidateText);
+            FilterText: metadata.CandidateText,
+            ColorValue: colorValue);
+    }
 
     private static UtilityClassMetadata? FindProjectRule(
         UtilityProjectStylesheetCompilationResult compilation,
@@ -938,6 +1174,11 @@ internal sealed class ViuLanguageService :
         var contextKind = ScriptCompletionContext.Classify(
             script.Content,
             offset - script.ContentLocation.Start.Offset);
+        if (contextKind == ScriptCompletionContextKind.Suppressed)
+        {
+            return Array.Empty<LanguageCompletionItem>();
+        }
+
         var word = GetTrailingIdentifier(linePrefix);
         var semantic = GetScriptSemanticCompletions(
             documentUri,
@@ -1069,6 +1310,11 @@ internal sealed class ViuLanguageService :
         => Uri.TryCreate(documentUri, UriKind.Absolute, out var uri) && uri.IsFile
             ? uri.LocalPath
             : documentUri;
+
+    private static bool IsCSharpScript(SingleFileComponentScriptBlock? script)
+        => script is not null &&
+           (script.Lang is null ||
+            string.Equals(script.Lang, "csharp", StringComparison.Ordinal));
 
     private IReadOnlyList<LanguageCompletionItem> GetSyntaxOnlyScriptCompletions(
         string linePrefix,

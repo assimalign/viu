@@ -18,14 +18,20 @@ namespace Assimalign.Viu.LanguageServer.Tests;
 /// Pins the completion-kind boundary. The host performs no kind translation of its own: the service
 /// already speaks the Language Server Protocol's <c>CompletionItemKind</c> numbering, and the host
 /// serializes that value verbatim. A namespace therefore reaches the editor as <c>Module</c> (9),
-/// the value editors render with the namespace glyph — Visual Studio draws it as <c>{}</c>.
+/// the value editors render with the namespace glyph — Visual Studio draws it as <c>{}</c>. A
+/// utility color reaches it as <c>Color</c> (16) with the computed theme value in item data, so the
+/// value remains available to a Viu-aware client without parsing emitted CSS. Stock clients can use
+/// the standard color-category presentation without interpreting the opaque data
+/// Snippet insert text also crosses unchanged: an escaped dollar sign keeps the authored
+/// <c>$event</c> identifier literal while the numbered placeholder remains active
+/// ([V01.01.12.07.12], #333; [V01.01.12.07.13], #334).
 /// <see href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind">
 /// Language Server Protocol 3.17, <c>CompletionItemKind</c></see>.
 /// </summary>
 public class LanguageServerCompletionKindTests
 {
     [Fact]
-    public async Task RunAsync_NamespaceCompletion_SerializesTheModuleKind()
+    public async Task RunAsync_Completions_SerializeKindsColorPayloadAndSnippetEscape()
     {
         var inputBytes = Encoding.UTF8.GetBytes(
             Frame(
@@ -58,6 +64,17 @@ public class LanguageServerCompletionKindTests
         var items = completion.RootElement.GetProperty("result").GetProperty("items");
         FindItem(items, "System")!.Value.GetProperty("kind").GetInt32().ShouldBe(9);
         FindItem(items, "String")!.Value.GetProperty("kind").GetInt32().ShouldBe(7);
+        var color = FindItem(items, "bg-blue-500")!.Value;
+        color.GetProperty("kind").GetInt32().ShouldBe(16);
+        color.GetProperty("data").GetProperty("colorValue").GetString()
+            .ShouldBe("oklch(62.3% 0.214 259.815)");
+        var eventLambda = FindItem(items, "$event lambda")!.Value;
+        eventLambda.GetProperty("insertText").GetString().ShouldBe("\\$event => $1");
+        eventLambda.GetProperty("insertTextFormat").GetInt32().ShouldBe(2);
+        var asynchronousEventLambda = FindItem(items, "async $event lambda")!.Value;
+        asynchronousEventLambda.GetProperty("insertText").GetString()
+            .ShouldBe("async \\$event => $1");
+        asynchronousEventLambda.GetProperty("insertTextFormat").GetInt32().ShouldBe(2);
 
         foreach (var message in messages)
         {
@@ -89,6 +106,11 @@ public class LanguageServerCompletionKindTests
             CancellationToken cancellationToken = default)
             => Array.Empty<LanguageDiagnostic>();
 
+        public IReadOnlyList<LanguageClassification> GetClassifications(
+            string documentUri,
+            CancellationToken cancellationToken = default)
+            => Array.Empty<LanguageClassification>();
+
         public IReadOnlyList<LanguageCompletionItem> GetCompletions(
             string documentUri,
             LanguagePosition position,
@@ -111,6 +133,31 @@ public class LanguageServerCompletionKindTests
                     "String",
                     IsSnippet: false,
                     SortText: "01:String"),
+                new LanguageCompletionItem(
+                    "bg-blue-500",
+                    LanguageCompletionItemKind.Color,
+                    "Viu utility class",
+                    Documentation: string.Empty,
+                    "bg-blue-500",
+                    IsSnippet: false,
+                    SortText: "02:bg-blue-500",
+                    ColorValue: "oklch(62.3% 0.214 259.815)"),
+                new LanguageCompletionItem(
+                    "$event lambda",
+                    LanguageCompletionItemKind.Snippet,
+                    "Template event lambda",
+                    Documentation: string.Empty,
+                    "\\$event => $1",
+                    IsSnippet: true,
+                    SortText: "03:event-lambda"),
+                new LanguageCompletionItem(
+                    "async $event lambda",
+                    LanguageCompletionItemKind.Snippet,
+                    "Asynchronous template event lambda",
+                    Documentation: string.Empty,
+                    "async \\$event => $1",
+                    IsSnippet: true,
+                    SortText: "04:async-event-lambda"),
             ];
 
         public LanguageHover? GetHover(

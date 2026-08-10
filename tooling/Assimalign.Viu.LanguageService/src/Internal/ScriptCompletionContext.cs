@@ -16,8 +16,11 @@ namespace Assimalign.Viu.LanguageService;
 /// <em>statement</em> inside a method body (depth greater than 0).
 /// </para>
 /// <para>
-/// Only the contexts the service can act on differently are distinguished. Everything that is not a
-/// using directive is <see cref="ScriptCompletionContextKind.Expression"/>, including a
+/// Only the contexts the service can act on differently are distinguished. A cursor inside a comment
+/// or literal text segment is <see cref="ScriptCompletionContextKind.Suppressed"/>; an interpolated
+/// string's expression holes remain <see cref="ScriptCompletionContextKind.Expression"/>. Everything
+/// else that is not a using directive is also <see cref="ScriptCompletionContextKind.Expression"/>,
+/// including a
 /// member-declaration position between members: a field initializer (<c>private int _total = _seed
 /// + 1;</c>) begins on such a line, so the service cannot suppress instance members there without
 /// also breaking the initializer — and the component's own members, private ones included, are
@@ -46,7 +49,22 @@ internal static class ScriptCompletionContext
             return ScriptCompletionContextKind.Expression;
         }
 
-        if (!TryScan(blockContent, contentOffset, out var depth, out var lineStart) || depth != 0)
+        if (!TryScan(
+                blockContent,
+                contentOffset,
+                out var depth,
+                out var lineStart,
+                out var isInterpolationExpression))
+        {
+            return ScriptCompletionContextKind.Suppressed;
+        }
+
+        if (isInterpolationExpression)
+        {
+            return ScriptCompletionContextKind.Expression;
+        }
+
+        if (depth != 0)
         {
             return ScriptCompletionContextKind.Expression;
         }
@@ -107,12 +125,20 @@ internal static class ScriptCompletionContext
         => character is ' ' or '\t';
 
     // Scans the content prefix, reporting the brace depth and current line start at the cursor.
-    // Returns false when the cursor sits inside a comment or a literal, where no completion source
-    // is context-sensitive and the caller keeps its unchanged default.
-    private static bool TryScan(string content, int offset, out int depth, out int lineStart)
+    // Returns false when the cursor sits inside a comment or a literal text segment, where
+    // completion is suppressed rather than leaking the surrounding member/expression catalog into
+    // prose. Interpolation holes are scanned as code and reported separately so they cannot be
+    // mistaken for a top-level using directive even when a verbatim string crosses a line boundary.
+    private static bool TryScan(
+        string content,
+        int offset,
+        out int depth,
+        out int lineStart,
+        out bool isInterpolationExpression)
     {
         depth = 0;
         lineStart = 0;
+        isInterpolationExpression = false;
         var index = 0;
         while (index < offset)
         {
@@ -140,7 +166,9 @@ internal static class ScriptCompletionContext
 
                 case '/' when index + 1 < content.Length && content[index + 1] == '/':
                     index = SkipLineComment(content, index);
-                    if (index > offset)
+                    // The newline is not part of the line comment, but a caret at its offset is
+                    // still immediately before it and therefore still inside the comment.
+                    if (index >= offset)
                     {
                         return false;
                     }
@@ -157,12 +185,18 @@ internal static class ScriptCompletionContext
 
                 case '"':
                 case '\'':
-                case '@' when index + 1 < content.Length && content[index + 1] == '"':
-                case '$' when index + 1 < content.Length &&
-                    content[index + 1] is '"' or '@' or '$':
-                    if (!TrySkipLiteral(content, ref index, ref lineStart) || index > offset)
+                case '@':
+                case '$':
+                    var literalResult = ScanLiteral(content, ref index, ref lineStart, offset);
+                    if (literalResult == LiteralScanResult.CursorInLiteral)
                     {
                         return false;
+                    }
+
+                    if (literalResult == LiteralScanResult.CursorInInterpolation)
+                    {
+                        isInterpolationExpression = true;
+                        return true;
                     }
 
                     continue;
@@ -196,23 +230,30 @@ internal static class ScriptCompletionContext
         return true;
     }
 
-    // Skips one literal: raw (`"""`), verbatim (`@"`), interpolated (any run of `$` and `@`
-    // prefixes), regular, or character. Braces inside a literal — including an interpolation hole's
-    // own braces, which are balanced within the literal — never move the depth, which is why the
-    // whole literal is skipped as a unit.
-    private static bool TrySkipLiteral(string content, ref int index, ref int lineStart)
+    // Scans one literal: raw (`"""`), verbatim (`@"`), interpolated (either `$@"` or `@$"`),
+    // regular, or character. A completed literal advances index so its caller can resume scanning
+    // code. A cursor within literal text is suppressed, while a cursor within an interpolation hole
+    // stays active code. Recursive calls preserve that distinction for strings nested in holes and
+    // interpolated strings nested in those strings.
+    private static LiteralScanResult ScanLiteral(
+        string content,
+        ref int index,
+        ref int lineStart,
+        int offset)
     {
         var start = index;
         var isVerbatim = false;
+        var dollarCount = 0;
         while (index < content.Length && content[index] is '$' or '@')
         {
             isVerbatim |= content[index] == '@';
+            dollarCount += content[index] == '$' ? 1 : 0;
             index++;
         }
 
         if (index >= content.Length)
         {
-            return false;
+            return LiteralScanResult.CursorInLiteral;
         }
 
         var quote = content[index];
@@ -221,21 +262,32 @@ internal static class ScriptCompletionContext
             // A bare `@` or `$` that introduces no literal (a verbatim identifier, most commonly):
             // resume the ordinary scan at the character after the prefix run.
             index = start + 1;
-            return true;
+            return LiteralScanResult.Completed;
         }
 
         if (quote == '"' && !isVerbatim && Matches(content, index, content.Length, "\"\"\""))
         {
-            return TrySkipRawStringLiteral(content, ref index, ref lineStart);
+            return ScanRawStringLiteral(
+                content,
+                ref index,
+                ref lineStart,
+                offset,
+                dollarCount);
         }
 
+        var isInterpolated = quote == '"' && dollarCount > 0;
         index++;
-        while (index < content.Length)
+        while (true)
         {
+            if (index >= offset || index >= content.Length)
+            {
+                return LiteralScanResult.CursorInLiteral;
+            }
+
             var character = content[index];
             if (character == '\\' && !isVerbatim)
             {
-                index += 2;
+                index = Math.Min(index + 2, content.Length);
                 continue;
             }
 
@@ -249,7 +301,59 @@ internal static class ScriptCompletionContext
                 }
 
                 index++;
-                return true;
+                return LiteralScanResult.Completed;
+            }
+
+            if (isInterpolated && character == '{')
+            {
+                var braceEnd = index;
+                while (braceEnd < content.Length && content[braceEnd] == '{')
+                {
+                    braceEnd++;
+                }
+
+                var braceCount = braceEnd - index;
+                if ((braceCount & 1) == 0)
+                {
+                    // Each doubled opening brace is literal text.
+                    index = braceEnd;
+                    continue;
+                }
+
+                // For an odd run, every pair is literal and its final brace opens the hole.
+                // A caret before that final brace remains in literal text; immediately after it is
+                // an expression position.
+                var openingBrace = braceEnd - 1;
+                if (offset <= openingBrace)
+                {
+                    return LiteralScanResult.CursorInLiteral;
+                }
+
+                index = braceEnd;
+                var interpolationResult = ScanInterpolationHole(
+                    content,
+                    ref index,
+                    ref lineStart,
+                    offset,
+                    closingBraceCount: 1);
+                if (interpolationResult != LiteralScanResult.Completed)
+                {
+                    return interpolationResult;
+                }
+
+                continue;
+            }
+
+            if (isInterpolated && character == '}')
+            {
+                // Closing braces in a text segment are escaped in pairs. An unmatched brace is
+                // invalid C#, but it is still literal text for completion-suppression purposes.
+                while (index < content.Length && content[index] == '}')
+                {
+                    index++;
+                }
+
+                continue;
             }
 
             if (character == '\n')
@@ -260,17 +364,20 @@ internal static class ScriptCompletionContext
                     // A single-line literal never crosses a newline; Roslyn's own recovery ends it
                     // at the line break, and so does this scan.
                     index++;
-                    return true;
+                    return LiteralScanResult.Completed;
                 }
             }
 
             index++;
         }
-
-        return false;
     }
 
-    private static bool TrySkipRawStringLiteral(string content, ref int index, ref int lineStart)
+    private static LiteralScanResult ScanRawStringLiteral(
+        string content,
+        ref int index,
+        ref int lineStart,
+        int offset,
+        int dollarCount)
     {
         var quoteCount = 0;
         while (index < content.Length && content[index] == '"')
@@ -279,12 +386,54 @@ internal static class ScriptCompletionContext
             index++;
         }
 
-        while (index < content.Length)
+        while (true)
         {
+            if (index >= offset || index >= content.Length)
+            {
+                return LiteralScanResult.CursorInLiteral;
+            }
+
             if (content[index] == '\n')
             {
                 lineStart = index + 1;
                 index++;
+                continue;
+            }
+
+            if (dollarCount > 0 && content[index] == '{')
+            {
+                var braceEnd = index;
+                while (braceEnd < content.Length && content[braceEnd] == '{')
+                {
+                    braceEnd++;
+                }
+
+                if (braceEnd - index >= dollarCount)
+                {
+                    // In a raw interpolated string, the dollar count is the delimiter width. Any
+                    // preceding braces in the same run are literal text; the final delimiter-width
+                    // braces open the hole.
+                    if (offset < braceEnd)
+                    {
+                        return LiteralScanResult.CursorInLiteral;
+                    }
+
+                    index = braceEnd;
+                    var interpolationResult = ScanInterpolationHole(
+                        content,
+                        ref index,
+                        ref lineStart,
+                        offset,
+                        dollarCount);
+                    if (interpolationResult != LiteralScanResult.Completed)
+                    {
+                        return interpolationResult;
+                    }
+
+                    continue;
+                }
+
+                index = braceEnd;
                 continue;
             }
 
@@ -303,10 +452,104 @@ internal static class ScriptCompletionContext
 
             if (run >= quoteCount)
             {
-                return true;
+                return index > offset
+                    ? LiteralScanResult.CursorInLiteral
+                    : LiteralScanResult.Completed;
             }
         }
+    }
 
-        return false;
+    private static LiteralScanResult ScanInterpolationHole(
+        string content,
+        ref int index,
+        ref int lineStart,
+        int offset,
+        int closingBraceCount)
+    {
+        var braceDepth = 0;
+        while (true)
+        {
+            if (index >= offset || index >= content.Length)
+            {
+                return LiteralScanResult.CursorInInterpolation;
+            }
+
+            var character = content[index];
+            switch (character)
+            {
+                case '\n':
+                    index++;
+                    lineStart = index;
+                    continue;
+
+                case '{':
+                    braceDepth++;
+                    index++;
+                    continue;
+
+                case '}':
+                    if (braceDepth > 0)
+                    {
+                        braceDepth--;
+                        index++;
+                        continue;
+                    }
+
+                    var braceEnd = index;
+                    while (braceEnd < content.Length && content[braceEnd] == '}')
+                    {
+                        braceEnd++;
+                    }
+
+                    if (braceEnd - index < closingBraceCount)
+                    {
+                        index = braceEnd;
+                        continue;
+                    }
+
+                    index += closingBraceCount;
+                    return LiteralScanResult.Completed;
+
+                case '/' when index + 1 < content.Length && content[index + 1] == '/':
+                    index = SkipLineComment(content, index);
+                    if (index >= offset)
+                    {
+                        return LiteralScanResult.CursorInLiteral;
+                    }
+
+                    continue;
+
+                case '/' when index + 1 < content.Length && content[index + 1] == '*':
+                    if (!TrySkipBlockComment(content, ref index) || index > offset)
+                    {
+                        return LiteralScanResult.CursorInLiteral;
+                    }
+
+                    continue;
+
+                case '"':
+                case '\'':
+                case '@':
+                case '$':
+                    var literalResult = ScanLiteral(content, ref index, ref lineStart, offset);
+                    if (literalResult != LiteralScanResult.Completed)
+                    {
+                        return literalResult;
+                    }
+
+                    continue;
+
+                default:
+                    index++;
+                    continue;
+            }
+        }
+    }
+
+    private enum LiteralScanResult
+    {
+        Completed,
+        CursorInLiteral,
+        CursorInInterpolation,
     }
 }

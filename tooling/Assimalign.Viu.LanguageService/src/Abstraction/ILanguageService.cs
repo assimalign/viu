@@ -36,7 +36,11 @@ public interface ILanguageService
     /// <returns><see langword="true"/> when an open document was removed.</returns>
     bool CloseDocument(string documentUri);
 
-    /// <summary>Gets parser diagnostics for an open document.</summary>
+    /// <summary>
+    /// Gets authored-position parser, template, projected C#, style, and component-contract
+    /// diagnostics for an open document. Generated component scaffold spans are suppressed.
+    /// [V01.01.12.07.15]
+    /// </summary>
     /// <param name="documentUri">The document URI used by the editor.</param>
     /// <param name="cancellationToken">
     /// The token that cancels the computation. Cancellation is cooperative; a canceled call throws
@@ -46,6 +50,69 @@ public interface ILanguageService
     IReadOnlyList<LanguageDiagnostic> GetDiagnostics(
         string documentUri,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets semantic classifications for authored C# identifiers in an open document's script
+    /// block. Generated component scaffold spans are suppressed. [V01.01.12.07.11]
+    /// </summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="cancellationToken">
+    /// The token that cancels the computation. Cancellation is cooperative; a canceled call throws
+    /// <see cref="System.OperationCanceledException"/> and leaves no service state modified.
+    /// </param>
+    /// <returns>
+    /// The classifications in authored source order, or an empty list when the document is not open
+    /// or project semantics are unavailable.
+    /// </returns>
+    IReadOnlyList<LanguageClassification> GetClassifications(
+        string documentUri,
+        CancellationToken cancellationToken = default)
+        => [];
+
+    /// <summary>
+    /// Gets semantic classifications and the immutable open-document identity they describe. The
+    /// identity lets an asynchronous editor adapter reject stale spans without loading the language
+    /// parser or Roslyn into the editor process. [V01.01.12.07.11]
+    /// </summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="cancellationToken">
+    /// The token that cancels the computation. Cancellation is cooperative; a canceled call throws
+    /// <see cref="System.OperationCanceledException"/> and leaves no service state modified.
+    /// </param>
+    /// <returns>
+    /// The atomic classification snapshot, or <see langword="null"/> when the document is not open.
+    /// Implementations that do not provide semantic classification snapshots may retain this default.
+    /// </returns>
+    LanguageClassificationSnapshot? GetClassificationSnapshot(
+        string documentUri,
+        CancellationToken cancellationToken = default)
+        => null;
+
+    /// <summary>
+    /// Gets the complete semantic publication for one immutable open-document snapshot. A service
+    /// can share its projection and compilation work across classifications and diagnostics.
+    /// Implementations retaining the default publish diagnostics only; an implementation that
+    /// supplies classifications must override this member so both layers come from one snapshot
+    /// rather than sequentially composing independently captured reads.
+    /// [V01.01.12.07.11] [V01.01.12.07.15]
+    /// </summary>
+    /// <param name="documentUri">The document URI used by the editor.</param>
+    /// <param name="includeSemanticClassifications">
+    /// <see langword="true"/> when the host negotiated semantic-classification publication;
+    /// otherwise, <see langword="false"/> so the service can skip that semantic bind.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// The token that cancels the complete publication computation. Cancellation is cooperative
+    /// and leaves no partially published service state.
+    /// </param>
+    /// <returns>The classifications and diagnostics computed for the captured snapshot.</returns>
+    LanguageDocumentPublication GetDocumentPublication(
+        string documentUri,
+        bool includeSemanticClassifications,
+        CancellationToken cancellationToken = default)
+        => new(
+            ClassificationSnapshot: null,
+            Diagnostics: GetDiagnostics(documentUri, cancellationToken));
 
     /// <summary>Gets context-sensitive completion items at a document position.</summary>
     /// <param name="documentUri">The document URI used by the editor.</param>

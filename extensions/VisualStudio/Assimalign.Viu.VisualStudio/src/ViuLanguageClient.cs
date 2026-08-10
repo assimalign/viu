@@ -13,6 +13,8 @@ using Microsoft.VisualStudio.LanguageServer.Client;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.VisualStudio.Utilities;
 
+using StreamJsonRpc;
+
 namespace Assimalign.Viu.VisualStudio;
 
 /// <summary>
@@ -21,10 +23,11 @@ namespace Assimalign.Viu.VisualStudio;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The client is the whole of what runs in process for semantic features: it resolves the packaged
-/// executable, starts it, and hands Visual Studio the two streams. Every language feature — completion,
-/// hover, document symbols, folding, code actions, and the diagnostics that reach the Error List — is
-/// computed in the server process, so the Viu parsers and Roslyn never load into <c>devenv.exe</c>.
+/// The client and its thin classification adapter are the whole of what runs in process for semantic
+/// features: they start the packaged executable, hand Visual Studio the two streams, and translate
+/// server-authored ranges to classification-type names already registered by the editor. Every
+/// language feature and every classification decision is computed in the server process, so the Viu
+/// parsers and Roslyn never load into <c>devenv.exe</c>.
 /// </para>
 /// <para>
 /// Activation is scoped to the <c>viu</c> content type alone. <c>.vue</c> is deliberately out of scope
@@ -32,19 +35,32 @@ namespace Assimalign.Viu.VisualStudio;
 /// carries a Viu content type — see <see cref="ViuContentTypes"/>.
 /// </para>
 /// <para>
-/// The server's <c>initialize</c> handling reads client capabilities and nothing else — no
-/// initialization options, no workspace folders, no root URI, and no custom handshake — so
-/// <see cref="InitializationOptions"/> is empty by contract rather than by omission. Every project
-/// fact the server needs is derived from the document's own file path: the owning project is found by
-/// walking up from the document, and the restore artifacts are read from there. Nothing about that
-/// path changes when the client moves in process, so the connection needs no compensating message.
+/// The one initialization option opts this client into exact C# classification-name publications.
+/// It carries no project fact: every project input still comes from the document's own file path and
+/// restore artifacts. The adapter stores only authored ranges, text checksums, and editor-owned type
+/// names; the standard semantic-token response remains available to every other client.
 /// </para>
 /// </remarks>
 [Export(typeof(ILanguageClient))]
 [ContentType(ViuContentTypes.Viu)]
-internal sealed class ViuLanguageClient : ILanguageClient, IDisposable
+internal sealed class ViuLanguageClient :
+    ILanguageClient,
+    ILanguageClientCustomMessage2,
+    IDisposable
 {
+    private static readonly IReadOnlyDictionary<string, bool> ServerInitializationOptions =
+        new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            ["semanticClassificationNotifications"] = true,
+        };
+
     private readonly object serverProcessGate = new();
+    private readonly ViuCompletionColorMiddleLayer middleLayer =
+        new(ViuCompletionColorState.Shared);
+    private readonly ViuLanguageClientCustomMessageTarget customMessageTarget =
+        new(
+            new ViuSemanticClassificationReceiver(
+                ViuSemanticClassificationState.Shared));
     private Process? serverProcess;
     private string? activationFailureMessage;
     private bool disposed;
@@ -65,11 +81,16 @@ internal sealed class ViuLanguageClient : ILanguageClient, IDisposable
     /// Gets the value sent as the <c>initialize</c> request's <c>initializationOptions</c>.
     /// </summary>
     /// <remarks>
-    /// Empty by contract: the server's <c>initialize</c> handler captures client capabilities and
-    /// discards the rest of the parameters, and every document is placed in its project by file path
-    /// at open time. Sending options here would be sending a message nothing reads.
+    /// The option enables Viu's exact-classification notification. It deliberately carries no
+    /// project or workspace state; documents are still placed in projects from their file paths.
     /// </remarks>
-    public object? InitializationOptions => null;
+    public object InitializationOptions => ServerInitializationOptions;
+
+    /// <inheritdoc />
+    public object MiddleLayer => this.middleLayer;
+
+    /// <inheritdoc />
+    public object CustomMessageTarget => this.customMessageTarget;
 
     /// <summary>
     /// Gets the glob patterns Visual Studio watches on the server's behalf.
@@ -118,6 +139,8 @@ internal sealed class ViuLanguageClient : ILanguageClient, IDisposable
     {
         token.ThrowIfCancellationRequested();
         Volatile.Write(ref this.activationFailureMessage, null);
+        ViuSemanticClassificationState.Shared.ClearPublications();
+        ViuCompletionColorState.Shared.Clear();
 
         string extensionDirectory = ViuLanguageServerConfiguration.GetExtensionDirectory(
             typeof(ViuLanguageClient).Assembly.Location);
@@ -214,6 +237,9 @@ internal sealed class ViuLanguageClient : ILanguageClient, IDisposable
     /// <inheritdoc />
     public Task OnServerInitializedAsync() => Task.CompletedTask;
 
+    /// <inheritdoc />
+    public Task AttachForCustomMessageAsync(JsonRpc rpc) => Task.CompletedTask;
+
     /// <summary>
     /// Composes the message shown when the server never reached an initialized state.
     /// </summary>
@@ -252,6 +278,9 @@ internal sealed class ViuLanguageClient : ILanguageClient, IDisposable
             this.disposed = true;
             this.TerminateCurrentServerProcess();
         }
+
+        ViuSemanticClassificationState.Shared.ClearPublications();
+        ViuCompletionColorState.Shared.Clear();
     }
 
     private void OnServerProcessExited(object sender, EventArgs arguments)
@@ -277,6 +306,8 @@ internal sealed class ViuLanguageClient : ILanguageClient, IDisposable
         // Process.Close deliberately leaves the redirected reader and writer alone, so releasing the
         // handle here cannot pull the streams out from under a connection Visual Studio still holds.
         process.Dispose();
+        ViuSemanticClassificationState.Shared.ClearPublications();
+        ViuCompletionColorState.Shared.Clear();
     }
 
     // Callers hold serverProcessGate.

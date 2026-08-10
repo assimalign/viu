@@ -89,6 +89,48 @@ internal static class ViuClassificationTypeNames
     /// <summary>Roslyn's method-name classification.</summary>
     public const string MethodName = "method name";
 
+    /// <summary>Roslyn's namespace-name classification.</summary>
+    public const string NamespaceName = "namespace name";
+
+    /// <summary>Roslyn's delegate-name classification.</summary>
+    public const string DelegateName = "delegate name";
+
+    /// <summary>Roslyn's enum-name classification.</summary>
+    public const string EnumName = "enum name";
+
+    /// <summary>Roslyn's interface-name classification.</summary>
+    public const string InterfaceName = "interface name";
+
+    /// <summary>Roslyn's struct-name classification.</summary>
+    public const string StructName = "struct name";
+
+    /// <summary>Roslyn's type-parameter-name classification.</summary>
+    public const string TypeParameterName = "type parameter name";
+
+    /// <summary>Roslyn's property-name classification.</summary>
+    public const string PropertyName = "property name";
+
+    /// <summary>Roslyn's field-name classification.</summary>
+    public const string FieldName = "field name";
+
+    /// <summary>Roslyn's constant-name classification.</summary>
+    public const string ConstantName = "constant name";
+
+    /// <summary>Roslyn's enum-member-name classification.</summary>
+    public const string EnumMemberName = "enum member name";
+
+    /// <summary>Roslyn's event-name classification.</summary>
+    public const string EventName = "event name";
+
+    /// <summary>Roslyn's parameter-name classification.</summary>
+    public const string ParameterName = "parameter name";
+
+    /// <summary>Roslyn's local-name classification.</summary>
+    public const string LocalName = "local name";
+
+    /// <summary>Roslyn's label-name classification.</summary>
+    public const string LabelName = "label name";
+
     /// <summary>
     /// Returns the name of the classification type that colors <paramref name="classificationKind"/>.
     /// </summary>
@@ -147,8 +189,8 @@ internal static class ViuClassificationTypeNames
     /// <returns>The next name to try, or <see langword="null"/>.</returns>
     /// <remarks>
     /// In process these names are all present once the managed-language workload is installed:
-    /// <see cref="Punctuation"/>, <see cref="ClassName"/>, and <see cref="MethodName"/> are contributed
-    /// by Roslyn's editor features rather than by the core editor. Resolving defensively keeps the
+    /// <see cref="Punctuation"/> and the semantic name constants are contributed by Roslyn's editor
+    /// features rather than by the core editor. Resolving defensively keeps the
     /// VSIX independent of any particular workload — a Visual Studio installation without C# still
     /// colors Viu templates, and script spans degrade to plain identifiers instead of losing their
     /// spans entirely. The Viu-owned names need no fallback: this extension registers them itself.
@@ -156,7 +198,21 @@ internal static class ViuClassificationTypeNames
     public static string? GetFallbackClassificationTypeName(string classificationTypeName)
     {
         if (string.Equals(classificationTypeName, MethodName, StringComparison.Ordinal) ||
-            string.Equals(classificationTypeName, ClassName, StringComparison.Ordinal))
+            string.Equals(classificationTypeName, ClassName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, NamespaceName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, DelegateName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, EnumName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, InterfaceName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, StructName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, TypeParameterName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, PropertyName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, FieldName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, ConstantName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, EnumMemberName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, EventName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, ParameterName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, LocalName, StringComparison.Ordinal) ||
+            string.Equals(classificationTypeName, LabelName, StringComparison.Ordinal))
         {
             return Identifier;
         }

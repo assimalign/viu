@@ -112,12 +112,26 @@ public class ViuClassificationTypeNamesTests
     [Theory]
     [InlineData("method name", "identifier")]
     [InlineData("class name", "identifier")]
+    [InlineData("namespace name", "identifier")]
+    [InlineData("delegate name", "identifier")]
+    [InlineData("enum name", "identifier")]
+    [InlineData("interface name", "identifier")]
+    [InlineData("struct name", "identifier")]
+    [InlineData("type parameter name", "identifier")]
+    [InlineData("property name", "identifier")]
+    [InlineData("field name", "identifier")]
+    [InlineData("constant name", "identifier")]
+    [InlineData("enum member name", "identifier")]
+    [InlineData("event name", "identifier")]
+    [InlineData("parameter name", "identifier")]
+    [InlineData("local name", "identifier")]
+    [InlineData("label name", "identifier")]
     [InlineData("punctuation", "operator")]
     public void GetFallbackClassificationTypeName_RoslynContributedNames_DegradeToCoreEditorNames(
         string classificationTypeName,
         string expectedFallback)
     {
-        // These three are contributed by Roslyn's editor features rather than the core editor, so an
+        // These are contributed by Roslyn's editor features rather than the core editor, so an
         // installation without a managed-language workload must still color Viu documents.
         ViuClassificationTypeNames.GetFallbackClassificationTypeName(classificationTypeName)
             .ShouldBe(expectedFallback);

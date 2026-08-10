@@ -30,17 +30,19 @@ namespace Assimalign.Viu.LanguageService;
 /// CompletionService upgrade recorded as a later seam-compatible swap.
 /// </summary>
 /// <remarks>
-/// The base compilation is cached per project and revalidated by the context's
-/// <see cref="LanguageProjectContext.CacheStamp"/>: an equal stamp reuses the cache untouched, a
-/// changed single file swaps only its tree via
-/// <see cref="CSharpCompilation.ReplaceSyntaxTree"/>, and anything else rebuilds. Each request
-/// forks immutably — the open document's live text is projected, emitted, parsed, and added with
-/// <see cref="CSharpCompilation.AddSyntaxTrees"/> — so a keystroke never mutates the cache.
+/// The base compilation is cached per project and excluded live-document path. Sibling text is
+/// compared directly, while root/options and reference path, length, and write-time fingerprints
+/// identify the environment: one changed sibling swaps only its tree via
+/// <see cref="CSharpCompilation.ReplaceSyntaxTree"/>, and an environment change rebuilds. Each
+/// request forks immutably — the open document's live text is projected, emitted, parsed, and
+/// added with <see cref="CSharpCompilation.AddSyntaxTrees"/> — so a keystroke never mutates the
+/// stable cache or reprojects its siblings.
 /// Thread-safe the way <see cref="ScriptDeclarationReader"/> is: language-service reads compute
 /// outside the service lock, so the engine serializes semantic requests under its own gate
 /// (bounded work; concurrent requests wait rather than duplicate a cone build), while the
-/// per-document resolution cache is lock-free so documentation resolution and document close never
-/// wait behind a compile. Every failure that is not a cancellation is an engine miss reported as
+/// per-document resolution cache keeps documentation resolution lock-free. Document close takes the
+/// same gate so it evicts compilation and component-contract state atomically. Every failure that is
+/// not a cancellation is an engine miss reported as
 /// <see langword="null"/> — the caller's fallback is the existing syntax-only path, never an
 /// error. Parse options pin <see cref="LanguageVersion.Preview"/> (the repo-wide language surface)
 /// with the context's <see cref="LanguageProjectContext.PreprocessorSymbols"/>, so members the
@@ -94,16 +96,25 @@ internal sealed class ScriptSemanticEngine
     // A cancellation-aware gate rather than a monitor lock: a request queued behind a cone
     // build honors $/cancelRequest while waiting instead of only after acquisition.
     private readonly SemaphoreSlim gate = new(1, 1);
-    // Keyed like every host path key: ordinal-ignore-case, matching Windows path semantics.
-    private readonly Dictionary<string, ProjectCompilationState> projectStates =
-        new(StringComparer.OrdinalIgnoreCase);
+    // A project context excludes its one live document, so the live path is part of the base-cone
+    // identity. This prevents equal-stamped contexts for two open documents from sharing a base
+    // compilation that contains the wrong disk sibling.
+    private readonly Dictionary<ProjectCompilationKey, ProjectCompilationState> projectStates =
+        new(ProjectCompilationKeyComparer.Instance);
+    // The stable state owns referenced/source/sibling contracts. This second cache adds exactly the
+    // current live component contract and is replaced per live text snapshot.
+    private readonly Dictionary<ProjectCompilationKey, ComponentContractCacheEntry> componentContractCaches =
+        new(ProjectCompilationKeyComparer.Instance);
     // Label -> symbol maps from each document's most recent semantic completion, published
-    // wholesale and read lock-free so ResolveDocumentation and CloseDocument never wait behind a
-    // cone build on the engine gate.
+    // wholesale and read lock-free so ResolveDocumentation never waits behind a cone build on the
+    // engine gate.
     private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, ResolutionEntry>> resolutionCaches =
         new(StringComparer.OrdinalIgnoreCase);
     private int projectStateBuildCount;
     private int sourceTreeBuildCount;
+    private int componentContractBuildCount;
+    private int liveDocumentRequestBuildCount;
+    private int componentProjectionBuildCount;
 
     /// <summary>Gets how many times a project's base compilation was built from scratch.</summary>
     internal int ProjectStateBuildCount
@@ -200,6 +211,310 @@ internal sealed class ScriptSemanticEngine
         }
     }
 
+    /// <summary>Gets how many stable project/reference/sibling contract closures were materialized.</summary>
+    internal int ComponentContractBuildCount
+    {
+        get
+        {
+            gate.Wait();
+            try
+            {
+                return componentContractBuildCount;
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+    }
+
+    /// <summary>Gets how many immutable live-document compilation forks were created.</summary>
+    internal int LiveDocumentRequestBuildCount
+    {
+        get
+        {
+            gate.Wait();
+            try
+            {
+                return liveDocumentRequestBuildCount;
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+    }
+
+    /// <summary>Gets how many single-file-component projections were materialized.</summary>
+    internal int ComponentProjectionBuildCount
+    {
+        get
+        {
+            gate.Wait();
+            try
+            {
+                return componentProjectionBuildCount;
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Classifies authored identifiers in the live document's projected C# tree, or returns
+    /// <see langword="null"/> when project semantics cannot be constructed. [V01.01.12.07.11]
+    /// </summary>
+    internal IReadOnlyList<LanguageClassification>? GetClassifications(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return GetClassificationsCore(
+                    context,
+                    documentFilePath,
+                    documentText,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Semantic classification is additive. Any reference, projection, or binding failure
+            // degrades to the language service's empty semantic layer; lexical color remains.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads every source, projected-component, and referenced-assembly component contract visible
+    /// to the live document's semantic compilation. [V01.01.12.07.12]
+    /// </summary>
+    internal IReadOnlyList<TemplateComponentDeclaration>? GetComponentContracts(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+        => GetComponentContractSnapshot(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken)?.Declarations;
+
+    /// <summary>
+    /// Reads the component contracts and live projection shared by template hover, completion, and
+    /// publication, or returns <see langword="null"/> when semantic construction fails.
+    /// </summary>
+    internal ScriptComponentContractSnapshot? GetComponentContractSnapshot(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var state = GetOrCreateProjectState(
+                    context,
+                    documentFilePath,
+                    cancellationToken);
+                if (TryGetCachedComponentContracts(
+                        state,
+                        documentText,
+                        out var cached))
+                {
+                    return cached;
+                }
+
+                var request = CreateLiveDocumentRequest(
+                    state,
+                    context,
+                    documentFilePath,
+                    documentText,
+                    cancellationToken);
+                return GetOrCreateComponentContracts(
+                    request,
+                    documentText,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Computes the semantic layers for one publication round from a single immutable live-document
+    /// fork. Optional layers stay off when the client or document does not require them.
+    /// [V01.01.12.07.11] [V01.01.12.07.15]
+    /// </summary>
+    internal ScriptSemanticPublication? GetPublicationSemantics(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        bool includeClassifications,
+        bool includeDiagnostics,
+        bool includeComponentContracts,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var state = GetOrCreateProjectState(
+                    context,
+                    documentFilePath,
+                    cancellationToken);
+                var request = CreateLiveDocumentRequest(
+                    state,
+                    context,
+                    documentFilePath,
+                    documentText,
+                    cancellationToken);
+                var classifications = includeClassifications
+                    ? GetClassificationsCore(request, documentText, cancellationToken)
+                    : Array.Empty<LanguageClassification>();
+                var diagnostics = includeDiagnostics
+                    ? GetDiagnosticsCore(request, documentText, cancellationToken)
+                    : Array.Empty<LanguageDiagnostic>();
+                var componentContracts = includeComponentContracts
+                    ? GetOrCreateComponentContracts(
+                        request,
+                        documentText,
+                        cancellationToken)
+                    : null;
+                return new ScriptSemanticPublication(
+                    classifications,
+                    diagnostics,
+                    componentContracts?.Declarations,
+                    request.Projection);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Every semantic publication layer is additive. A failed fork leaves the parser and
+            // projection diagnostics available and lexical classification intact.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets compiler diagnostics whose generated spans map back into the authored C# regions of the
+    /// live document. Generated component scaffold and template-render spans are suppressed.
+    /// [V01.01.12.07.15]
+    /// </summary>
+    internal IReadOnlyList<LanguageDiagnostic>? GetDiagnostics(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return GetDiagnosticsCore(
+                    context,
+                    documentFilePath,
+                    documentText,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Script diagnostics are an additive semantic layer. A reference, projection, or
+            // binding failure leaves the parser/template/style diagnostics available unchanged.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the Roslyn symbol at one authored C# position and returns its signature and source
+    /// or reference-assembly documentation, mapped back to the authored token. [V01.01.12.07.16]
+    /// </summary>
+    internal LanguageHover? GetHover(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            gate.Wait(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return GetHoverCore(
+                    context,
+                    documentFilePath,
+                    documentText,
+                    documentOffset,
+                    cancellationToken);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Hover is additive. A semantic miss lets the caller retain its syntax-only hover path.
+            return null;
+        }
+    }
+
     /// <summary>
     /// Resolves deferred documentation for a label from the document's most recent semantic
     /// completion: the symbol's signature plus its XML documentation summary (source-declared
@@ -221,10 +536,21 @@ internal sealed class ScriptSemanticEngine
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        return FormatSymbolDocumentation(
+            entry.Detail,
+            entry.Symbol,
+            cancellationToken);
+    }
+
+    private static string FormatSymbolDocumentation(
+        string detail,
+        ISymbol symbol,
+        CancellationToken cancellationToken)
+    {
         string? summary = null;
         try
         {
-            var documentationXml = entry.Symbol.GetDocumentationCommentXml(
+            var documentationXml = symbol.GetDocumentationCommentXml(
                 preferredCulture: CultureInfo.InvariantCulture,
                 expandIncludes: false,
                 cancellationToken: cancellationToken);
@@ -240,14 +566,36 @@ internal sealed class ScriptSemanticEngine
         }
 
         return summary is null
-            ? $"```csharp\n{entry.Detail}\n```"
-            : $"```csharp\n{entry.Detail}\n```\n\n{summary}";
+            ? $"```csharp\n{detail}\n```"
+            : $"```csharp\n{detail}\n```\n\n{summary}";
     }
 
-    /// <summary>Clears the per-document state a closed document leaves behind.</summary>
+    /// <summary>Clears the semantic and component-contract state a closed document leaves behind.</summary>
     /// <param name="documentUri">The editor document URI.</param>
     internal void CloseDocument(string documentUri)
-        => resolutionCaches.TryRemove(documentUri, out _);
+    {
+        resolutionCaches.TryRemove(documentUri, out _);
+        var documentFilePath = GetDocumentFilePath(documentUri);
+        gate.Wait();
+        try
+        {
+            var keys = projectStates.Keys
+                .Where(key => string.Equals(
+                    key.LiveDocumentFilePath,
+                    documentFilePath,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            foreach (var key in keys)
+            {
+                projectStates.Remove(key);
+                componentContractCaches.Remove(key);
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
 
     private ScriptSemanticCompletionResult? GetCompletionsCore(
         LanguageProjectContext context,
@@ -259,39 +607,23 @@ internal sealed class ScriptSemanticEngine
         ScriptCompletionContextKind contextKind,
         CancellationToken cancellationToken)
     {
-        var state = GetOrCreateProjectState(context, cancellationToken);
-
-        // Fork-per-request, here and only here: the live text is projected, emitted, parsed, and
-        // added to an immutable fork — the cached base compilation is never mutated per keystroke.
-        var generatedText = EmitComponent(
+        var request = CreateLiveDocumentRequest(
+            context,
             documentFilePath,
             documentText,
-            context,
             cancellationToken);
-        var mapper = GeneratedScriptDocumentMapper.Create(
-            documentText,
-            generatedText,
-            documentFilePath);
-        if (!mapper.TryMapFileOffsetToGenerated(documentOffset, out var generatedPosition))
+        if (!request.Mapper.TryMapFileOffsetToGenerated(documentOffset, out var generatedPosition))
         {
             return null;
         }
 
-        var currentTree = CSharpSyntaxTree.ParseText(
-            generatedText,
-            CreateParseOptions(context),
-            documentFilePath,
-            cancellationToken: cancellationToken);
-        var requestCompilation = state.BaseCompilation.AddSyntaxTrees(currentTree);
-        var semanticModel = requestCompilation.GetSemanticModel(currentTree);
-        var root = currentTree.GetRoot(cancellationToken);
-        if (!TryFindMemberAccessTarget(root, generatedPosition, out var target))
+        if (!TryFindMemberAccessTarget(request.Root, generatedPosition, out var target))
         {
             return null;
         }
 
         var symbols = LookupCompletionSymbols(
-            semanticModel,
+            request.SemanticModel,
             generatedPosition,
             target,
             cancellationToken);
@@ -313,7 +645,7 @@ internal sealed class ScriptSemanticEngine
         var resolutionEntries = new Dictionary<string, ResolutionEntry>(StringComparer.Ordinal);
         var items = CreateCompletionItems(
             symbols,
-            semanticModel,
+            request.SemanticModel,
             generatedPosition,
             typedPrefix,
             contextKind == ScriptCompletionContextKind.UsingDirective,
@@ -330,6 +662,311 @@ internal sealed class ScriptSemanticEngine
             items,
             target is not null,
             target?.ToString());
+    }
+
+    private IReadOnlyList<LanguageClassification> GetClassificationsCore(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        var request = CreateLiveDocumentRequest(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+        return GetClassificationsCore(request, documentText, cancellationToken);
+    }
+
+    private static IReadOnlyList<LanguageClassification> GetClassificationsCore(
+        LiveDocumentRequest request,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        var generated = ScriptSemanticClassifier.Classify(
+            request.SemanticModel,
+            request.Root,
+            cancellationToken);
+        var authored = new List<LanguageClassification>(generated.Count);
+        foreach (var classification in generated)
+        {
+            if (!request.Mapper.TryMapGeneratedSpanToFile(
+                    classification.Span.Start,
+                    classification.Span.Length,
+                    out var fileStart,
+                    out var fileLength))
+            {
+                continue;
+            }
+
+            authored.Add(
+                new LanguageClassification(
+                    new LanguageRange(
+                        TextCoordinateConverter.GetPosition(documentText, fileStart),
+                        TextCoordinateConverter.GetPosition(documentText, fileStart + fileLength)),
+                    classification.ClassificationTypeName));
+        }
+
+        return authored;
+    }
+
+    private IReadOnlyList<LanguageDiagnostic> GetDiagnosticsCore(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        var request = CreateLiveDocumentRequest(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+        return GetDiagnosticsCore(request, documentText, cancellationToken);
+    }
+
+    private static IReadOnlyList<LanguageDiagnostic> GetDiagnosticsCore(
+        LiveDocumentRequest request,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        var generated = request.SemanticModel.GetDiagnostics(
+            cancellationToken: cancellationToken);
+        var authored = new List<LanguageDiagnostic>(generated.Length);
+        foreach (var diagnostic in generated)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!diagnostic.Location.IsInSource ||
+                !ReferenceEquals(diagnostic.Location.SourceTree, request.Tree))
+            {
+                continue;
+            }
+
+            var generatedSpan = diagnostic.Location.SourceSpan;
+            if (!request.Mapper.TryMapGeneratedSpanToFile(
+                    generatedSpan.Start,
+                    generatedSpan.Length,
+                    out var fileStart,
+                    out var fileLength))
+            {
+                continue;
+            }
+
+            authored.Add(
+                new LanguageDiagnostic(
+                    new LanguageRange(
+                        TextCoordinateConverter.GetPosition(documentText, fileStart),
+                        TextCoordinateConverter.GetPosition(documentText, fileStart + fileLength)),
+                    diagnostic.Severity switch
+                    {
+                        Microsoft.CodeAnalysis.DiagnosticSeverity.Error =>
+                            LanguageDiagnosticSeverity.Error,
+                        Microsoft.CodeAnalysis.DiagnosticSeverity.Warning =>
+                            LanguageDiagnosticSeverity.Warning,
+                        Microsoft.CodeAnalysis.DiagnosticSeverity.Info =>
+                            LanguageDiagnosticSeverity.Information,
+                        _ => LanguageDiagnosticSeverity.Hint,
+                    },
+                    diagnostic.Id,
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture),
+                    "csharp"));
+        }
+
+        return authored;
+    }
+
+    private LanguageHover? GetHoverCore(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        int documentOffset,
+        CancellationToken cancellationToken)
+    {
+        var request = CreateLiveDocumentRequest(
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+        if (!request.Mapper.TryMapFileOffsetToGenerated(
+                documentOffset,
+                out var generatedPosition) ||
+            generatedPosition >= request.Root.FullSpan.End)
+        {
+            return null;
+        }
+
+        var token = request.Root.FindToken(generatedPosition);
+        if (!token.Span.Contains(generatedPosition) || token.Span.Length == 0)
+        {
+            return null;
+        }
+
+        var symbol = ResolveHoverSymbol(
+            request.SemanticModel,
+            token,
+            cancellationToken);
+        if (symbol is null)
+        {
+            return null;
+        }
+
+        if (!request.Mapper.TryMapGeneratedSpanToFile(
+                token.Span.Start,
+                token.Span.Length,
+                out var fileStart,
+                out var fileLength))
+        {
+            return null;
+        }
+
+        if (symbol is IAliasSymbol alias)
+        {
+            symbol = alias.Target;
+        }
+
+        var detail = symbol.ToMinimalDisplayString(
+            request.SemanticModel,
+            generatedPosition,
+            DetailFormat);
+        return new LanguageHover(
+            FormatSymbolDocumentation(detail, symbol, cancellationToken),
+            new LanguageRange(
+                TextCoordinateConverter.GetPosition(documentText, fileStart),
+                TextCoordinateConverter.GetPosition(documentText, fileStart + fileLength)));
+    }
+
+    private static ISymbol? ResolveHoverSymbol(
+        SemanticModel semanticModel,
+        SyntaxToken token,
+        CancellationToken cancellationToken)
+    {
+        var declaredSymbol = token.Parent switch
+        {
+            BaseTypeDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            DelegateDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            MethodDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            ConstructorDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            DestructorDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            PropertyDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            EventDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            VariableDeclaratorSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            ParameterSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            TypeParameterSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            EnumMemberDeclarationSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            LocalFunctionStatementSyntax declaration when declaration.Identifier == token =>
+                semanticModel.GetDeclaredSymbol(declaration, cancellationToken),
+            _ => null,
+        };
+        if (declaredSymbol is not null)
+        {
+            return declaredSymbol;
+        }
+
+        for (var node = token.Parent; node is not null; node = node.Parent)
+        {
+            if (node is PredefinedTypeSyntax)
+            {
+                return semanticModel.GetTypeInfo(node, cancellationToken).Type;
+            }
+
+            if (node is not SimpleNameSyntax &&
+                node is not MemberAccessExpressionSyntax &&
+                node is not QualifiedNameSyntax &&
+                node is not AliasQualifiedNameSyntax &&
+                node is not MemberBindingExpressionSyntax &&
+                node is not ObjectCreationExpressionSyntax)
+            {
+                if (node is StatementSyntax or MemberDeclarationSyntax)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            var symbolInformation = semanticModel.GetSymbolInfo(node, cancellationToken);
+            var symbol = symbolInformation.Symbol ??
+                (symbolInformation.CandidateSymbols.Length > 0
+                    ? symbolInformation.CandidateSymbols[0]
+                    : null);
+            if (symbol is not null)
+            {
+                return symbol;
+            }
+
+            if (node is TypeSyntax or ExpressionSyntax)
+            {
+                var type = semanticModel.GetTypeInfo(node, cancellationToken).Type;
+                if (type is not null && type.TypeKind != TypeKind.Error)
+                {
+                    return type;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Creates the immutable per-request projection/compilation used by semantic completion,
+    /// classification, diagnostics, hover, and component-contract reads. The cached base
+    /// compilation is never mutated.
+    /// </summary>
+    private LiveDocumentRequest CreateLiveDocumentRequest(
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+        => CreateLiveDocumentRequest(
+            GetOrCreateProjectState(context, documentFilePath, cancellationToken),
+            context,
+            documentFilePath,
+            documentText,
+            cancellationToken);
+
+    private LiveDocumentRequest CreateLiveDocumentRequest(
+        ProjectCompilationState state,
+        LanguageProjectContext context,
+        string documentFilePath,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        liveDocumentRequestBuildCount++;
+        componentProjectionBuildCount++;
+        var projection = ProjectComponent(
+            documentFilePath,
+            documentText,
+            context,
+            cancellationToken);
+        var generatedText = SingleFileComponentSourceEmitter.Emit(projection.Model);
+        var mapper = GeneratedScriptDocumentMapper.Create(
+            documentText,
+            generatedText,
+            documentFilePath);
+        var tree = CSharpSyntaxTree.ParseText(
+            generatedText,
+            CreateParseOptions(context),
+            documentFilePath,
+            cancellationToken: cancellationToken);
+        var compilation = state.BaseCompilation.AddSyntaxTrees(tree);
+        return new LiveDocumentRequest(
+            state,
+            compilation,
+            tree,
+            compilation.GetSemanticModel(tree),
+            tree.GetRoot(cancellationToken),
+            mapper,
+            projection);
     }
 
     // Classifies the completion position from the parsed generated tree: returns false for a dot
@@ -501,6 +1138,16 @@ internal sealed class ScriptSemanticEngine
         ISymbol symbol,
         SyntaxTree currentTree)
     {
+        // Namespace symbols aggregate every declaration across source and referenced metadata. A
+        // generated component under `Assimalign.*` therefore gives the referenced `Assimalign`
+        // namespace one unmapped scaffold location; treating that aggregate as scaffold removes the
+        // entire namespace from `using ` completion. Only declaration/member symbols can themselves
+        // be generated scaffold. [V01.01.12.07.14]
+        if (symbol is INamespaceSymbol)
+        {
+            return false;
+        }
+
         foreach (Location location in symbol.Locations)
         {
             if (location.IsInSource
@@ -607,18 +1254,15 @@ internal sealed class ScriptSemanticEngine
     // Reads projectStates, so every caller must hold the synchronization gate.
     private ProjectCompilationState GetOrCreateProjectState(
         LanguageProjectContext context,
+        string liveDocumentFilePath,
         CancellationToken cancellationToken)
     {
+        var key = new ProjectCompilationKey(
+            context.ProjectFilePath,
+            liveDocumentFilePath);
         var environmentSignature = ComputeEnvironmentSignature(context);
-        if (projectStates.TryGetValue(context.ProjectFilePath, out var state))
+        if (projectStates.TryGetValue(key, out var state))
         {
-            if (string.Equals(state.CacheStamp, context.CacheStamp, StringComparison.Ordinal))
-            {
-                // Equal stamps make contexts interchangeable (the LanguageProjectContext
-                // contract), so every derived state is reusable untouched.
-                return state;
-            }
-
             if (string.Equals(
                     state.EnvironmentSignature,
                     environmentSignature,
@@ -626,13 +1270,13 @@ internal sealed class ScriptSemanticEngine
                 HasSameDocumentSet(state, context))
             {
                 RefreshChangedTrees(state, context, cancellationToken);
-                state.CacheStamp = context.CacheStamp;
                 return state;
             }
         }
 
-        state = BuildProjectState(context, environmentSignature, cancellationToken);
-        projectStates[context.ProjectFilePath] = state;
+        state = BuildProjectState(key, context, environmentSignature, cancellationToken);
+        projectStates[key] = state;
+        componentContractCaches.Remove(key);
         return state;
     }
 
@@ -665,6 +1309,7 @@ internal sealed class ScriptSemanticEngine
         LanguageProjectContext context,
         CancellationToken cancellationToken)
     {
+        var changed = false;
         foreach (var document in context.SourceDocuments)
         {
             var existing = state.Trees[document.FilePath];
@@ -674,16 +1319,24 @@ internal sealed class ScriptSemanticEngine
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            var tree = CreateSourceTree(document, context, cancellationToken);
-            state.BaseCompilation = state.BaseCompilation.ReplaceSyntaxTree(existing.Tree, tree);
-            state.Trees[document.FilePath] = new SourceTreeState(
-                document.Text,
-                document.IsComponent,
-                tree);
+            if (!changed)
+            {
+                // Invalidate before the first mutable tree swap. A cancellation after one sibling
+                // changes can then leave only an incomplete base cone, never a stale closure over it.
+                InvalidateComponentContracts(state);
+                changed = true;
+            }
+
+            var sourceTree = CreateSourceTreeState(document, context, cancellationToken);
+            state.BaseCompilation = state.BaseCompilation.ReplaceSyntaxTree(
+                existing.Tree,
+                sourceTree.Tree);
+            state.Trees[document.FilePath] = sourceTree;
         }
     }
 
     private ProjectCompilationState BuildProjectState(
+        ProjectCompilationKey key,
         LanguageProjectContext context,
         string environmentSignature,
         CancellationToken cancellationToken)
@@ -696,10 +1349,10 @@ internal sealed class ScriptSemanticEngine
         foreach (var document in context.SourceDocuments)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            trees[document.FilePath] = new SourceTreeState(
-                document.Text,
-                document.IsComponent,
-                CreateSourceTree(document, context, cancellationToken));
+            trees[document.FilePath] = CreateSourceTreeState(
+                document,
+                context,
+                cancellationToken);
         }
 
         var compilation = CSharpCompilation.Create(
@@ -712,7 +1365,7 @@ internal sealed class ScriptSemanticEngine
             context,
             cancellationToken);
         return new ProjectCompilationState(
-            context.CacheStamp,
+            key,
             environmentSignature,
             trees,
             compilation);
@@ -762,20 +1415,39 @@ internal sealed class ScriptSemanticEngine
         return references;
     }
 
-    private SyntaxTree CreateSourceTree(
+    private SourceTreeState CreateSourceTreeState(
         LanguageProjectSourceDocument document,
         LanguageProjectContext context,
         CancellationToken cancellationToken)
     {
         sourceTreeBuildCount++;
-        var text = document.IsComponent
-            ? EmitComponent(document.FilePath, document.Text, context, cancellationToken)
-            : document.Text;
-        return CSharpSyntaxTree.ParseText(
+        SingleFileComponentProjectionResult? projection = null;
+        string text;
+        if (document.IsComponent)
+        {
+            componentProjectionBuildCount++;
+            projection = ProjectComponent(
+                document.FilePath,
+                document.Text,
+                context,
+                cancellationToken);
+            text = SingleFileComponentSourceEmitter.Emit(projection.Value.Model);
+        }
+        else
+        {
+            text = document.Text;
+        }
+
+        var tree = CSharpSyntaxTree.ParseText(
             text,
             CreateParseOptions(context),
             document.FilePath,
             cancellationToken: cancellationToken);
+        return new SourceTreeState(
+            document.Text,
+            document.IsComponent,
+            tree,
+            projection);
     }
 
     // The generator-identical projection: the same facade, emitter, name resolver, and scope-id
@@ -783,7 +1455,7 @@ internal sealed class ScriptSemanticEngine
     // ProjectDirectory/RootNamespace the build publishes — identical generated text by
     // construction. Hot-reload metadata stays off (the deterministic Release shape) and the
     // canonical-peer filter is a multi-file generator concern the projection never reads.
-    private static string EmitComponent(
+    private static SingleFileComponentProjectionResult ProjectComponent(
         string filePath,
         string text,
         LanguageProjectContext context,
@@ -804,8 +1476,120 @@ internal sealed class ScriptSemanticEngine
             StyleScopeId.Resolve(filePath, context.ProjectDirectory),
             HotReloadComponentIdentifier: null,
             HasCanonicalPeer: false);
-        var projection = SingleFileComponentProjection.Project(input, cancellationToken);
-        return SingleFileComponentSourceEmitter.Emit(projection.Model);
+        return SingleFileComponentProjection.Project(input, cancellationToken);
+    }
+
+    private bool TryGetCachedComponentContracts(
+        ProjectCompilationState state,
+        string documentText,
+        out ScriptComponentContractSnapshot snapshot)
+    {
+        if (componentContractCaches.TryGetValue(state.Key, out var cached) &&
+            cached.ProjectContractVersion == state.ComponentContractVersion &&
+            string.Equals(cached.DocumentText, documentText, StringComparison.Ordinal))
+        {
+            snapshot = cached.Snapshot;
+            return true;
+        }
+
+        snapshot = null!;
+        return false;
+    }
+
+    private ScriptComponentContractSnapshot GetOrCreateComponentContracts(
+        LiveDocumentRequest request,
+        string documentText,
+        CancellationToken cancellationToken)
+    {
+        if (TryGetCachedComponentContracts(
+                request.ProjectState,
+                documentText,
+                out var cached))
+        {
+            return cached;
+        }
+
+        var stableDeclarations = GetOrCreateStableComponentContracts(
+            request.ProjectState,
+            cancellationToken);
+        var declarations = new List<TemplateComponentDeclaration>(stableDeclarations.Count + 1);
+        declarations.AddRange(stableDeclarations);
+        AppendProjectedComponentContract(
+            declarations,
+            request.Projection.Model);
+        declarations.Sort(static (left, right) => string.CompareOrdinal(
+            left.CompilerDeclaration.Name,
+            right.CompilerDeclaration.Name));
+        IReadOnlyList<TemplateComponentDeclaration> result = declarations.ToArray();
+        var snapshot = new ScriptComponentContractSnapshot(result, request.Projection);
+        componentContractCaches[request.ProjectState.Key] =
+            new ComponentContractCacheEntry(
+                request.ProjectState.ComponentContractVersion,
+                documentText,
+                snapshot);
+        return snapshot;
+    }
+
+    private IReadOnlyList<TemplateComponentDeclaration> GetOrCreateStableComponentContracts(
+        ProjectCompilationState state,
+        CancellationToken cancellationToken)
+    {
+        if (state.StableComponentContracts is { } cached)
+        {
+            return cached;
+        }
+
+        componentContractBuildCount++;
+        var declarations = new List<TemplateComponentDeclaration>(
+            ScriptComponentContractReader.Read(
+                state.BaseCompilation,
+                cancellationToken));
+        foreach (var sourceTree in state.Trees.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (sourceTree.Projection is { } projection)
+            {
+                AppendProjectedComponentContract(declarations, projection.Model);
+            }
+        }
+
+        declarations.Sort(static (left, right) => string.CompareOrdinal(
+            left.CompilerDeclaration.Name,
+            right.CompilerDeclaration.Name));
+        IReadOnlyList<TemplateComponentDeclaration> result = declarations.ToArray();
+        state.StableComponentContracts = result;
+        return result;
+    }
+
+    private static void AppendProjectedComponentContract(
+        List<TemplateComponentDeclaration> declarations,
+        SingleFileComponentModel model)
+    {
+        var events = new List<TemplateComponentEvent>(model.Declarations.Events.Count);
+        foreach (var componentEvent in model.Declarations.Events)
+        {
+            var modifierPrefix = string.IsNullOrEmpty(componentEvent.Modifiers)
+                ? string.Empty
+                : componentEvent.Modifiers + " ";
+            events.Add(
+                new TemplateComponentEvent(
+                    componentEvent.Name,
+                    modifierPrefix +
+                        "void " +
+                        componentEvent.MethodName +
+                        componentEvent.ParameterList));
+        }
+
+        declarations.Add(
+            new TemplateComponentDeclaration(
+                new ComponentDeclarationEntry(
+                    model.ClassName,
+                    model.Declarations.Parameters)
+                {
+                    IsParameterSurfaceKnown =
+                        !model.Declarations.DeclaresImperativeParameters,
+                },
+                events));
     }
 
     private static SingleFileComponentFormat GetComponentFormat(string filePath)
@@ -819,13 +1603,54 @@ internal sealed class ScriptSemanticEngine
         return lastSeparator >= 0 ? filePath.Substring(lastSeparator + 1) : filePath;
     }
 
+    private static string GetDocumentFilePath(string documentUri)
+        => Uri.TryCreate(documentUri, UriKind.Absolute, out var uri) && uri.IsFile
+            ? uri.LocalPath
+            : documentUri;
+
+    private void InvalidateComponentContracts(ProjectCompilationState state)
+    {
+        state.ComponentContractVersion++;
+        state.StableComponentContracts = null;
+        componentContractCaches.Remove(state.Key);
+    }
+
     private static string ComputeEnvironmentSignature(LanguageProjectContext context)
     {
         var builder = new StringBuilder();
         builder.Append(context.RootNamespace).Append('\n').Append(context.ProjectDirectory);
+        foreach (var symbol in context.PreprocessorSymbols)
+        {
+            builder.Append('\n').Append("symbol|").Append(symbol);
+        }
+
         foreach (var path in context.ReferenceAssemblyPaths)
         {
-            builder.Append('\n').Append(path);
+            long length = 0;
+            long lastWriteTicks = 0;
+            try
+            {
+                var information = new FileInfo(path);
+                length = information.Exists ? information.Length : 0;
+                lastWriteTicks = information.Exists
+                    ? information.LastWriteTimeUtc.Ticks
+                    : 0;
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException)
+            {
+                // An unreadable reference already degrades semantic construction to a miss. Its
+                // zero fingerprint still changes when the host later supplies a readable file.
+            }
+
+            builder
+                .Append('\n')
+                .Append("reference|")
+                .Append(path)
+                .Append('|')
+                .Append(length)
+                .Append('|')
+                .Append(lastWriteTicks);
         }
 
         return builder.ToString();
@@ -896,28 +1721,78 @@ internal sealed class ScriptSemanticEngine
     private sealed class ProjectCompilationState
     {
         internal ProjectCompilationState(
-            string cacheStamp,
+            ProjectCompilationKey key,
             string environmentSignature,
             Dictionary<string, SourceTreeState> trees,
             CSharpCompilation baseCompilation)
         {
-            CacheStamp = cacheStamp;
+            Key = key;
             EnvironmentSignature = environmentSignature;
             Trees = trees;
             BaseCompilation = baseCompilation;
         }
 
-        internal string CacheStamp { get; set; }
+        internal ProjectCompilationKey Key { get; }
 
         internal string EnvironmentSignature { get; }
 
         internal Dictionary<string, SourceTreeState> Trees { get; }
 
         internal CSharpCompilation BaseCompilation { get; set; }
+
+        internal int ComponentContractVersion { get; set; }
+
+        internal IReadOnlyList<TemplateComponentDeclaration>? StableComponentContracts { get; set; }
     }
 
     /// <summary>One sibling document's cached parse.</summary>
-    private sealed record SourceTreeState(string Text, bool IsComponent, SyntaxTree Tree);
+    private sealed record SourceTreeState(
+        string Text,
+        bool IsComponent,
+        SyntaxTree Tree,
+        SingleFileComponentProjectionResult? Projection);
+
+    /// <summary>One live document snapshot's stable-plus-current component-contract closure.</summary>
+    private sealed record ComponentContractCacheEntry(
+        int ProjectContractVersion,
+        string DocumentText,
+        ScriptComponentContractSnapshot Snapshot);
+
+    /// <summary>One immutable live-document semantic fork over a cached project compilation.</summary>
+    private sealed record LiveDocumentRequest(
+        ProjectCompilationState ProjectState,
+        CSharpCompilation Compilation,
+        SyntaxTree Tree,
+        SemanticModel SemanticModel,
+        SyntaxNode Root,
+        GeneratedScriptDocumentMapper Mapper,
+        SingleFileComponentProjectionResult Projection);
+
+    /// <summary>Identifies one project cone after excluding its current live document.</summary>
+    private readonly record struct ProjectCompilationKey(
+        string ProjectFilePath,
+        string LiveDocumentFilePath);
+
+    /// <summary>Compares project and live-document paths using the host's Windows path semantics.</summary>
+    private sealed class ProjectCompilationKeyComparer : IEqualityComparer<ProjectCompilationKey>
+    {
+        internal static ProjectCompilationKeyComparer Instance { get; } = new();
+
+        public bool Equals(ProjectCompilationKey left, ProjectCompilationKey right)
+            => string.Equals(
+                    left.ProjectFilePath,
+                    right.ProjectFilePath,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    left.LiveDocumentFilePath,
+                    right.LiveDocumentFilePath,
+                    StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode(ProjectCompilationKey value)
+            => HashCode.Combine(
+                StringComparer.OrdinalIgnoreCase.GetHashCode(value.ProjectFilePath),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(value.LiveDocumentFilePath));
+    }
 
     /// <summary>One resolvable label from a document's most recent semantic completion.</summary>
     private sealed record ResolutionEntry(string Detail, ISymbol Symbol);

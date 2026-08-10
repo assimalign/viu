@@ -9,9 +9,9 @@ namespace Assimalign.Viu.LanguageService.Tests;
 
 /// <summary>
 /// Pins the completion context model for template markup. Utility completion activates only in static
-/// class attributes and literal class-binding strings (docs/UTILITY-CSS-DESIGN.md section 10); every
-/// other attribute value holds a C# expression this service cannot complete, and answering one with
-/// markup-name completions puts attribute names inside an attribute value.
+/// class attributes and literal class-binding strings (docs/UTILITY-CSS-DESIGN.md section 10).
+/// [V01.01.12.07.12] adds deliberately bounded C# completion for handler values and interpolations;
+/// every other expression value stays suppressed so markup names cannot leak into it.
 /// </summary>
 public class TemplateExpressionContextTests
 {
@@ -30,8 +30,27 @@ public class TemplateExpressionContextTests
     }
 
     [Fact]
-    public void GetCompletions_EventHandlerExpression_ReturnsNoCompletions()
-        => CompleteAfter("    <button @click=\"Increment\"></button>", "Incre").ShouldBeEmpty();
+    public void GetCompletions_EventHandlerExpression_OffersMethodsAndLambdaSnippetsOnly()
+    {
+        var completions = CompleteAfterWithScript(
+            "    <button @click=\"Increment\"></button>",
+            "Incre",
+            "public int Count { get; set; }\npublic void Increment() { }");
+
+        completions.ShouldContain(
+            item => item.Label == "Increment" &&
+                    item.Kind == LanguageCompletionItemKind.Method);
+        var eventLambda = completions.Single(item => item.Label == "$event lambda");
+        eventLambda.Kind.ShouldBe(LanguageCompletionItemKind.Snippet);
+        eventLambda.IsSnippet.ShouldBeTrue();
+        eventLambda.InsertText.ShouldBe("\\$event => $1");
+        var asynchronousEventLambda = completions.Single(
+            item => item.Label == "async $event lambda");
+        asynchronousEventLambda.Kind.ShouldBe(LanguageCompletionItemKind.Snippet);
+        asynchronousEventLambda.IsSnippet.ShouldBeTrue();
+        asynchronousEventLambda.InsertText.ShouldBe("async \\$event => $1");
+        completions.ShouldNotContain(item => item.Label == "Count");
+    }
 
     [Fact]
     public void GetCompletions_DirectiveExpression_ReturnsNoCompletions()
@@ -42,8 +61,17 @@ public class TemplateExpressionContextTests
         => CompleteAfter("    <div title=\"see :class\"></div>", "see :cl").ShouldBeEmpty();
 
     [Fact]
-    public void GetCompletions_TemplateInterpolation_ReturnsNoCompletions()
-        => CompleteAfter("    <p>{{ Count }}</p>", "{{ Cou").ShouldBeEmpty();
+    public void GetCompletions_TemplateInterpolation_OffersScriptMembers()
+    {
+        var completions = CompleteAfterWithScript(
+            "    <p>{{ Count }}</p>",
+            "{{ Cou",
+            "public int Count { get; set; }\npublic void Increment() { }");
+
+        completions.ShouldContain(
+            item => item.Label == "Count" &&
+                    item.Kind == LanguageCompletionItemKind.Property);
+    }
 
     [Fact]
     public void GetCompletions_StaticClassAttribute_StillOffersUtilityCandidates()
@@ -84,6 +112,22 @@ public class TemplateExpressionContextTests
         string typedPrefix)
     {
         var source = $"<template>\n{templateLine}\n</template>\n";
+        var caret = templateLine.IndexOf(typedPrefix, StringComparison.Ordinal) + typedPrefix.Length;
+        caret.ShouldBeGreaterThan(typedPrefix.Length - 1, "the probe text must occur in the line");
+
+        var service = LanguageServices.Create();
+        service.OpenDocument(DocumentUri, source, 1);
+        return service.GetCompletions(DocumentUri, new LanguagePosition(1, caret));
+    }
+
+    private static System.Collections.Generic.IReadOnlyList<LanguageCompletionItem> CompleteAfterWithScript(
+        string templateLine,
+        string typedPrefix,
+        string scriptBody)
+    {
+        var source =
+            $"<template>\n{templateLine}\n</template>\n" +
+            $"@script {{\n{scriptBody}\n}}\n";
         var caret = templateLine.IndexOf(typedPrefix, StringComparison.Ordinal) + typedPrefix.Length;
         caret.ShouldBeGreaterThan(typedPrefix.Length - 1, "the probe text must occur in the line");
 
