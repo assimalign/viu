@@ -1,6 +1,6 @@
-# Packaging lane for the Viu SDK and the shared-framework packs ([V01.01.12.19], generalized by
+# Packaging lane for the Viu SDKs and shared-framework packs ([V01.01.12.19], generalized by
 # [V01.01.12.02.02]). This is the one root that is not a per-project matrix: Install-Local.ps1 packs
-# the whole SDK -> targeting pack -> runtime pack chain as a single artifact set, and the assertions
+# both base SDK -> targeting pack and Browser SDK -> targeting/runtime pack chains as one artifact set,
 # below are about the SHAPE of that set, not about any one project. It replaces area-packaging.yml
 # and absorbs the artifact assertions the standalone area-utility-css.yml used to duplicate.
 #
@@ -51,7 +51,7 @@ concurrency:
 
 jobs:
   pack:
-    name: packaging (SDK + framework)
+    name: packaging (base + Browser SDK/framework)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -70,14 +70,17 @@ jobs:
 
       # Carried over from area-utility-css.yml: Install-Local.ps1 builds the SDK task host on its
       # way to packing it, but not with warnings as errors. This keeps that gate explicit.
-      - name: Build SDK task host (warnings are errors)
+      - name: Build base SDK task host (warnings are errors)
         run: dotnet build sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj --configuration Release -warnaserror
 
-      - name: Pack SDK, runtime pack, and ref pack
+      - name: Build Browser SDK task host (warnings are errors)
+        run: dotnet build sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj --configuration Release -warnaserror
+
+      - name: Pack SDKs and framework packs
         shell: pwsh
         run: ./scripts/Install-Local.ps1
 
-      - name: Compile application-lifetime package consumer
+      - name: Validate component-library and Browser package consumers
         shell: pwsh
         run: ./scripts/Test-ApplicationLifetimeConsumer.ps1
 
@@ -93,11 +96,11 @@ jobs:
       - name: Verify utility artifact shapes
         shell: pwsh
         run: |
-          $sdkPackages = @(
-            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.Sdk.*.nupkg'
+          $browserSdkPackages = @(
+            Get-ChildItem _out/packages -Filter 'Assimalign.Viu.Sdk.Browser.*.nupkg'
           )
-          if ($sdkPackages.Count -ne 1) {
-            throw "Expected exactly one SDK package, found $($sdkPackages.Count)."
+          if ($browserSdkPackages.Count -ne 1) {
+            throw "Expected exactly one Browser SDK package, found $($browserSdkPackages.Count)."
           }
 
           $utilityPackages = @(
@@ -108,31 +111,43 @@ jobs:
           }
 
           ./scripts/Test-UtilityCssArtifactShape.ps1 `
-            -SdkPackage $sdkPackages[0].FullName `
+            -BrowserSdkPackage $browserSdkPackages[0].FullName `
             -UtilityCssPackage $utilityPackages[0].FullName
 
       - name: Assert package shapes
         shell: pwsh
         run: |
           $feed = "_out/packages"
-          $expected = @('Assimalign.Viu.Sdk.*.nupkg', 'Assimalign.Viu.App.Ref.*.nupkg', 'Assimalign.Viu.App.Runtime.browser-wasm.*.nupkg')
+          $expected = @(
+            'Assimalign.Viu.Sdk.*.nupkg',
+            'Assimalign.Viu.Sdk.Browser.*.nupkg',
+            'Assimalign.Viu.App.Ref.*.nupkg',
+            'Assimalign.Viu.App.Browser.Ref.*.nupkg',
+            'Assimalign.Viu.App.Browser.Runtime.browser-wasm.*.nupkg'
+          )
           foreach ($pattern in $expected) {
             if (-not (Get-ChildItem $feed -Filter $pattern)) { throw "Missing package: $pattern" }
           }
 
-          $expectedFrameworkAssemblies = @(
-            'Assimalign.Viu.App',
-            'Assimalign.Viu.Browser',
+          $baseFrameworkAssemblies = @(
             'Assimalign.Viu.Components',
             'Assimalign.Viu.Core',
             'Assimalign.Viu.Reactivity',
             'Assimalign.Viu.State'
           )
-          $expectedFrameworkPackageOverrides = @(
+          $browserReferenceFrameworkAssemblies = @(
+            'Assimalign.Viu.Browser'
+          )
+          $browserRuntimeFrameworkAssemblies = @(
+            $baseFrameworkAssemblies + $browserReferenceFrameworkAssemblies
+          )
+          $baseFrameworkPackageOverrides = @(
             'Assimalign.Viu.Components',
             'Assimalign.Viu.Reactivity',
             'Assimalign.Viu.State',
-            'Assimalign.Viu.Core',
+            'Assimalign.Viu.Core'
+          )
+          $browserFrameworkPackageOverrides = @(
             'Assimalign.Viu.Browser'
           )
 
@@ -142,6 +157,8 @@ jobs:
               [System.IO.FileInfo] $Package,
               [Parameter(Mandatory)]
               [string] $ManifestPath,
+              [Parameter(Mandatory)]
+              [string[]] $ExpectedFrameworkAssemblies,
               [string[]] $ExpectedPackageOverrides = @()
             )
 
@@ -238,25 +255,48 @@ jobs:
             }
           }
 
-          $referencePackage = @(Get-ChildItem $feed -Filter 'Assimalign.Viu.App.Ref.*.nupkg')
-          $runtimePackage = @(Get-ChildItem $feed -Filter 'Assimalign.Viu.App.Runtime.browser-wasm.*.nupkg')
-          $sdkPackage = @(Get-ChildItem $feed -Filter 'Assimalign.Viu.Sdk.*.nupkg')
-          if ($referencePackage.Count -ne 1) { throw "Expected exactly one reference pack, found $($referencePackage.Count)" }
-          if ($runtimePackage.Count -ne 1) { throw "Expected exactly one browser-wasm runtime pack, found $($runtimePackage.Count)" }
-          if ($sdkPackage.Count -ne 1) { throw "Expected exactly one SDK package, found $($sdkPackage.Count)" }
+          function Get-SingleViuPackage {
+            param([Parameter(Mandatory)][string] $PackageId)
+
+            $escapedPackageId = [System.Text.RegularExpressions.Regex]::Escape($PackageId)
+            $packages = @(
+              Get-ChildItem $feed -Filter '*.nupkg' |
+                Where-Object { $_.Name -match "^$escapedPackageId\.(?:0|[1-9][0-9]*)\." }
+            )
+            if ($packages.Count -ne 1) {
+              throw "Expected exactly one $PackageId package, found $($packages.Count)"
+            }
+
+            return $packages[0]
+          }
+
+          $referencePackage = Get-SingleViuPackage -PackageId 'Assimalign.Viu.App.Ref'
+          $browserReferencePackage = Get-SingleViuPackage -PackageId 'Assimalign.Viu.App.Browser.Ref'
+          $runtimePackage = Get-SingleViuPackage -PackageId 'Assimalign.Viu.App.Browser.Runtime.browser-wasm'
+          $sdkPackage = Get-SingleViuPackage -PackageId 'Assimalign.Viu.Sdk'
+          $browserSdkPackage = Get-SingleViuPackage -PackageId 'Assimalign.Viu.Sdk.Browser'
 
           Assert-FrameworkPackage `
-            -Package $referencePackage[0] `
+            -Package $referencePackage `
             -ManifestPath 'data/FrameworkList.xml' `
-            -ExpectedPackageOverrides $expectedFrameworkPackageOverrides
-          Assert-FrameworkPackage -Package $runtimePackage[0] -ManifestPath 'data/RuntimeList.xml'
+            -ExpectedFrameworkAssemblies $baseFrameworkAssemblies `
+            -ExpectedPackageOverrides $baseFrameworkPackageOverrides
+          Assert-FrameworkPackage `
+            -Package $browserReferencePackage `
+            -ManifestPath 'data/FrameworkList.xml' `
+            -ExpectedFrameworkAssemblies $browserReferenceFrameworkAssemblies `
+            -ExpectedPackageOverrides $browserFrameworkPackageOverrides
+          Assert-FrameworkPackage `
+            -Package $runtimePackage `
+            -ManifestPath 'data/RuntimeList.xml' `
+            -ExpectedFrameworkAssemblies $browserRuntimeFrameworkAssemblies
 
           # The ref pack's analyzer payload is the computed ProjectReference closure of the syntax
           # generator ([V01.01.06.11]): the shared projection core must ride along, and Roslyn must
           # not - PackageReference assets never enter _ResolvedProjectReferencePaths, so a
           # Microsoft.CodeAnalysis*.dll here means the closure mechanics regressed (the analyzer
           # host provides Roslyn; shipping a second copy would break generator loading).
-          $referenceArchive = [System.IO.Compression.ZipFile]::OpenRead($referencePackage[0].FullName)
+          $referenceArchive = [System.IO.Compression.ZipFile]::OpenRead($referencePackage.FullName)
           try {
             $analyzerEntries = @(
               $referenceArchive.Entries |
@@ -264,98 +304,333 @@ jobs:
                 ForEach-Object { $_.FullName.Substring('analyzers/dotnet/cs/'.Length) }
             )
             if ($analyzerEntries -notcontains 'Assimalign.Viu.Compiler.SingleFileComponent.dll') {
-              throw "$($referencePackage[0].Name) analyzer payload is missing the shared projection core Assimalign.Viu.Compiler.SingleFileComponent.dll"
+              throw "$($referencePackage.Name) analyzer payload is missing the shared projection core Assimalign.Viu.Compiler.SingleFileComponent.dll"
+            }
+            foreach ($generatorAssembly in @(
+                'Assimalign.Viu.Generators.Reactivity.dll',
+                'Assimalign.Viu.Generators.Syntax.dll')) {
+              if ($analyzerEntries -notcontains $generatorAssembly) {
+                throw "$($referencePackage.Name) analyzer payload is missing $generatorAssembly"
+              }
             }
             $roslynEntries = @($analyzerEntries | Where-Object { $_ -like 'Microsoft.CodeAnalysis*.dll' })
             if ($roslynEntries.Count -ne 0) {
-              throw "$($referencePackage[0].Name) analyzer payload must not carry host-provided Roslyn assemblies: $($roslynEntries -join ', ')"
+              throw "$($referencePackage.Name) analyzer payload must not carry host-provided Roslyn assemblies: $($roslynEntries -join ', ')"
             }
           }
           finally {
             $referenceArchive.Dispose()
           }
 
-          $sdkArchive = [System.IO.Compression.ZipFile]::OpenRead($sdkPackage[0].FullName)
+          $browserReferenceArchive = [System.IO.Compression.ZipFile]::OpenRead($browserReferencePackage.FullName)
           try {
-            $requiredSdkEntries = @(
-              'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
-              'Tasks/Assimalign.Viu.Sdk.Tasks.deps.json',
-              'Tasks/Assimalign.Viu.Syntax.dll',
-              'Tasks/Assimalign.Viu.Syntax.Css.dll',
-              'Tasks/Assimalign.Viu.Syntax.SingleFileComponent.dll',
-              'Tasks/Assimalign.Viu.Syntax.Templates.dll',
-              'Tasks/Assimalign.Viu.Compiler.Css.dll',
-              'Tasks/Assimalign.Viu.UtilityCss.dll',
-              'Targets/Assimalign.Viu.Generators.Syntax.props',
-              'Targets/Assimalign.Viu.Generators.Syntax.targets',
-              'Targets/Assimalign.Viu.Sdk.Css.Bundling.targets',
-              'Targets/Assimalign.Viu.Sdk.UtilityCss.targets'
+            $browserAnalyzerEntries = @(
+              $browserReferenceArchive.Entries |
+                Where-Object { $_.FullName.StartsWith('analyzers/', [System.StringComparison]::Ordinal) }
             )
-            foreach ($entryName in $requiredSdkEntries) {
-              if ($null -eq $sdkArchive.GetEntry($entryName)) {
-                throw "$($sdkPackage[0].Name) is missing $entryName"
+            if ($browserAnalyzerEntries.Count -ne 0) {
+              throw "$($browserReferencePackage.Name) must not duplicate the base targeting pack's analyzers."
+            }
+          }
+          finally {
+            $browserReferenceArchive.Dispose()
+          }
+
+          function Assert-ArchiveEntries {
+            param(
+              [Parameter(Mandatory)] $Archive,
+              [Parameter(Mandatory)] [System.IO.FileInfo] $Package,
+              [Parameter(Mandatory)] [string[]] $EntryNames
+            )
+
+            foreach ($entryName in $EntryNames) {
+              if ($null -eq $Archive.GetEntry($entryName)) {
+                throw "$($Package.Name) is missing $entryName"
               }
             }
+          }
 
-            $forbiddenSdkEntries = @(
-              'Tasks/Microsoft.Build.dll',
-              'Tasks/Microsoft.Build.Framework.dll',
-              'Tasks/Microsoft.Build.Utilities.Core.dll',
-              'Tasks/Microsoft.NET.StringTools.dll',
-              # The shared .viu -> C# projection core ([V01.01.06.11]) belongs to the generator +
-              # language-service graph only. If it ever appears here, a reference leaked into the
-              # Sdk.Tasks/Compiler.Css graph, whose whole OutDir sweeps into the SDK package's
-              # Tasks/ payload.
-              'Tasks/Assimalign.Viu.Compiler.SingleFileComponent.dll',
-              'Targets/Assimalign.Viu.Syntax.Generators.props',
-              'Targets/Assimalign.Viu.Syntax.Generators.targets'
+          function Assert-NoArchiveEntries {
+            param(
+              [Parameter(Mandatory)] $Archive,
+              [Parameter(Mandatory)] [System.IO.FileInfo] $Package,
+              [Parameter(Mandatory)] [string[]] $EntryNames
             )
-            foreach ($entryName in $forbiddenSdkEntries) {
-              if ($null -ne $sdkArchive.GetEntry($entryName)) {
-                throw "$($sdkPackage[0].Name) must not contain stale or host-provided entry $entryName"
+
+            foreach ($entryName in $EntryNames) {
+              if ($null -ne $Archive.GetEntry($entryName)) {
+                throw "$($Package.Name) must not contain $entryName"
               }
             }
+          }
 
-            # Roslyn IS legitimately in the task host's reference graph — Sdk.Tasks -> Compiler.Css ->
-            # Syntax.Templates parses template expressions with the real C# parser — but it is
-            # compile-time-only there ([V01.01.12.19.04]): the ViuBundleCss task composes the style-only parsers and
-            # never dispatches template content (Roslyn-backed expression compilation runs only in
-            # the source generator, where the compiler host supplies Roslyn), so the Tasks csproj
-            # re-declares the whole Roslyn closure with ExcludeAssets=runtime. Any
-            # Microsoft.CodeAnalysis assembly under Tasks/ — satellites included — means that
-            # compile-only pin regressed and the ~26 MB compiler set is back in the SDK package.
-            $taskRoslynEntries = @(
-              $sdkArchive.Entries |
-                Where-Object { $_.FullName.StartsWith('Tasks/', [System.StringComparison]::Ordinal) -and $_.Name -like 'Microsoft.CodeAnalysis*.dll' } |
-                ForEach-Object FullName
+          function Read-PackageNuspec {
+            param(
+              [Parameter(Mandatory)] $Archive,
+              [Parameter(Mandatory)] [System.IO.FileInfo] $Package
             )
-            if ($taskRoslynEntries.Count -ne 0) {
-              throw "$($sdkPackage[0].Name) must not carry the compile-time-only Roslyn closure under Tasks/: $($taskRoslynEntries -join ', ')"
+
+            $nuspecEntries = @(
+              $Archive.Entries |
+                Where-Object { $_.FullName.EndsWith('.nuspec', [System.StringComparison]::OrdinalIgnoreCase) }
+            )
+            if ($nuspecEntries.Count -ne 1) {
+              throw "$($Package.Name) must contain exactly one nuspec, found $($nuspecEntries.Count)"
             }
 
-            $nuspecEntry = @($sdkArchive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [System.StringComparison]::OrdinalIgnoreCase) })
-            if ($nuspecEntry.Count -ne 1) {
-              throw "$($sdkPackage[0].Name) must contain exactly one nuspec, found $($nuspecEntry.Count)"
-            }
-
-            $nuspecReader = [System.IO.StreamReader]::new($nuspecEntry[0].Open())
+            $reader = [System.IO.StreamReader]::new($nuspecEntries[0].Open())
             try {
-              [xml] $nuspec = $nuspecReader.ReadToEnd()
+              return [xml] $reader.ReadToEnd()
             }
             finally {
-              $nuspecReader.Dispose()
+              $reader.Dispose()
+            }
+          }
+
+          function Read-ArchiveEntryText {
+            param(
+              [Parameter(Mandatory)] $Archive,
+              [Parameter(Mandatory)] [System.IO.FileInfo] $Package,
+              [Parameter(Mandatory)] [string] $EntryName
+            )
+
+            $entry = $Archive.GetEntry($EntryName)
+            if ($null -eq $entry) {
+              throw "$($Package.Name) is missing $EntryName"
             }
 
-            $dependencies = @($nuspec.SelectNodes("//*[local-name()='dependency']"))
-            if ($dependencies.Count -ne 0) {
-              throw "$($sdkPackage[0].Name) must not expose build-time implementation dependencies: $($dependencies.id -join ', ')"
+            $reader = [System.IO.StreamReader]::new($entry.Open())
+            try {
+              return $reader.ReadToEnd()
+            }
+            finally {
+              $reader.Dispose()
+            }
+          }
+
+          $sdkArchive = [System.IO.Compression.ZipFile]::OpenRead($sdkPackage.FullName)
+          try {
+            Assert-ArchiveEntries `
+              -Archive $sdkArchive `
+              -Package $sdkPackage `
+              -EntryNames @(
+                'Assimalign.Viu.Sdk.nuspec',
+                'Sdk/Sdk.props',
+                'Sdk/Sdk.targets',
+                'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
+                'Tasks/Assimalign.Viu.Sdk.Tasks.deps.json',
+                'Tasks/Assimalign.Viu.Syntax.dll',
+                'Tasks/Assimalign.Viu.Syntax.Css.dll',
+                'Tasks/Assimalign.Viu.Syntax.SingleFileComponent.dll',
+                'Tasks/Assimalign.Viu.Syntax.Templates.dll',
+                'Tasks/Assimalign.Viu.Compiler.Css.dll',
+                'Targets/Assimalign.Viu.Generators.Syntax.props',
+                'Targets/Assimalign.Viu.Generators.Syntax.targets',
+                'Targets/Assimalign.Viu.Sdk.ComponentStyles.targets'
+              )
+            Assert-NoArchiveEntries `
+              -Archive $sdkArchive `
+              -Package $sdkPackage `
+              -EntryNames @(
+                'Tasks/Assimalign.Viu.UtilityCss.dll',
+                'Targets/Assimalign.Viu.Sdk.UtilityCss.targets',
+                'Targets/Assimalign.Viu.Sdk.Css.HotReload.targets',
+                'Targets/Assimalign.Viu.Sdk.StaticWebAssets.targets',
+                'Targets/Assimalign.Viu.Sdk.WebAssembly.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.Css.Bundling.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.ComponentStyles.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
+                'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.WebAssembly.targets',
+                'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
+                'assets/Assimalign.Viu.Browser/viu-dom.js'
+              )
+
+            $baseBrowserPayload = @(
+              $sdkArchive.Entries |
+                Where-Object {
+                  $_.FullName.StartsWith('Watch/', [System.StringComparison]::Ordinal) -or
+                  $_.FullName.StartsWith('assets/', [System.StringComparison]::Ordinal)
+                }
+            )
+            if ($baseBrowserPayload.Count -ne 0) {
+              throw "$($sdkPackage.Name) must not carry Browser Watch/assets payload."
+            }
+
+            $baseSdkProps = Read-ArchiveEntryText `
+              -Archive $sdkArchive `
+              -Package $sdkPackage `
+              -EntryName 'Sdk/Sdk.props'
+            $baseSdkTargets = Read-ArchiveEntryText `
+              -Archive $sdkArchive `
+              -Package $sdkPackage `
+              -EntryName 'Sdk/Sdk.targets'
+            if (-not $baseSdkProps.Contains(
+                '<Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props"',
+                [System.StringComparison]::Ordinal) -or
+                -not $baseSdkTargets.Contains(
+                '<Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets"',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($sdkPackage.Name) must chain the host-neutral Microsoft.NET.Sdk props and targets."
+            }
+            if ($baseSdkProps.Contains(
+                'Microsoft.NET.Sdk.WebAssembly',
+                [System.StringComparison]::Ordinal) -or
+                $baseSdkTargets.Contains(
+                'Microsoft.NET.Sdk.WebAssembly',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($sdkPackage.Name) must not import Microsoft.NET.Sdk.WebAssembly."
+            }
+
+            $baseNuspec = Read-PackageNuspec -Archive $sdkArchive -Package $sdkPackage
+            $baseDependencies = @($baseNuspec.SelectNodes("//*[local-name()='dependency']"))
+            if ($baseDependencies.Count -ne 0) {
+              throw "$($sdkPackage.Name) must not expose implementation dependencies: $($baseDependencies.id -join ', ')"
             }
           }
           finally {
             $sdkArchive.Dispose()
           }
 
+          $browserSdkArchive = [System.IO.Compression.ZipFile]::OpenRead($browserSdkPackage.FullName)
+          try {
+            Assert-ArchiveEntries `
+              -Archive $browserSdkArchive `
+              -Package $browserSdkPackage `
+              -EntryNames @(
+                'Assimalign.Viu.Sdk.Browser.nuspec',
+                'Sdk/Sdk.props',
+                'Sdk/Sdk.targets',
+                'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.dll',
+                'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.deps.json',
+                'Tasks/Assimalign.Viu.UtilityCss.dll',
+                'Targets/Assimalign.Viu.Sdk.Browser.Css.Bundling.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.ComponentStyles.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
+                'Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets',
+                'Targets/Assimalign.Viu.Sdk.Browser.WebAssembly.targets',
+                'Watch/Assimalign.Viu.Sdk.CssHotReload.dll',
+                'Watch/Assimalign.Viu.Sdk.CssHotReload.deps.json',
+                'Watch/Assimalign.Viu.Sdk.CssHotReload.runtimeconfig.json',
+                'assets/Assimalign.Viu.Browser/viu-dom.js'
+              )
+            Assert-NoArchiveEntries `
+              -Archive $browserSdkArchive `
+              -Package $browserSdkPackage `
+              -EntryNames @(
+                'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
+                'Targets/Assimalign.Viu.Generators.Syntax.props',
+                'Targets/Assimalign.Viu.Generators.Syntax.targets',
+                'Targets/Assimalign.Viu.Sdk.ComponentStyles.targets'
+              )
+
+            $browserSdkProps = Read-ArchiveEntryText `
+              -Archive $browserSdkArchive `
+              -Package $browserSdkPackage `
+              -EntryName 'Sdk/Sdk.props'
+            if (-not $browserSdkProps.Contains(
+                'Assimalign.Viu.Sdk.Browser.FrameworkReference.props',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Sdk.props must import the Browser framework-reference props."
+            }
+            if (-not $browserSdkProps.Contains(
+                '<Import Sdk="Assimalign.Viu.Sdk" Project="Sdk.props"',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Sdk.props must import the base SDK props."
+            }
+
+            $browserSdkTargets = Read-ArchiveEntryText `
+              -Archive $browserSdkArchive `
+              -Package $browserSdkPackage `
+              -EntryName 'Sdk/Sdk.targets'
+            if (-not $browserSdkTargets.Contains(
+                'Assimalign.Viu.Sdk.Browser.FrameworkReference.targets',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Sdk.targets must import the Browser framework-reference targets."
+            }
+            if (-not $browserSdkTargets.Contains(
+                '<Import Sdk="Assimalign.Viu.Sdk" Project="Sdk.targets"',
+                [System.StringComparison]::Ordinal)) {
+              throw "$($browserSdkPackage.Name) Sdk.targets must import the base SDK targets."
+            }
+
+            $browserNuspec = Read-PackageNuspec `
+              -Archive $browserSdkArchive `
+              -Package $browserSdkPackage
+            $browserVersion = $browserNuspec.SelectSingleNode(
+              "//*[local-name()='metadata']/*[local-name()='version']").InnerText
+            $browserDependencies = @($browserNuspec.SelectNodes("//*[local-name()='dependency']"))
+            if ($browserDependencies.Count -ne 1 -or
+                $browserDependencies[0].id -ne 'Assimalign.Viu.Sdk' -or
+                $browserDependencies[0].version -ne "[$browserVersion]") {
+              throw "$($browserSdkPackage.Name) must depend only on exact-version Assimalign.Viu.Sdk [$browserVersion]."
+            }
+          }
+          finally {
+            $browserSdkArchive.Dispose()
+          }
+
+          foreach ($package in @($sdkPackage, $browserSdkPackage)) {
+            $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+            try {
+              Assert-NoArchiveEntries `
+                -Archive $archive `
+                -Package $package `
+                -EntryNames @(
+                  'Tasks/Microsoft.Build.dll',
+                  'Tasks/Microsoft.Build.Framework.dll',
+                  'Tasks/Microsoft.Build.Utilities.Core.dll',
+                  'Tasks/Microsoft.NET.StringTools.dll',
+                  'Tasks/Assimalign.Viu.Compiler.SingleFileComponent.dll',
+                  'Targets/Assimalign.Viu.Syntax.Generators.props',
+                  'Targets/Assimalign.Viu.Syntax.Generators.targets'
+                )
+
+              $taskRoslynEntries = @(
+                $archive.Entries |
+                  Where-Object {
+                    $_.FullName.StartsWith('Tasks/', [System.StringComparison]::Ordinal) -and
+                    $_.Name -like 'Microsoft.CodeAnalysis*.dll'
+                  } |
+                  ForEach-Object FullName
+              )
+              if ($taskRoslynEntries.Count -ne 0) {
+                throw "$($package.Name) must not carry host-provided Roslyn assemblies: $($taskRoslynEntries -join ', ')"
+              }
+            }
+            finally {
+              $archive.Dispose()
+            }
+          }
+
           Get-ChildItem $feed -Filter 'Assimalign.Viu.*.nupkg' | ForEach-Object { Write-Host $_.Name }
+
+  component-library-no-wasm:
+    name: packaging (component library, no wasm workload)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        # actions/checkout v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET (no wasm-tools)
+        uses: ./.github/actions/setup-dotnet-wasm
+
+      - name: Pack the host-neutral SDK/framework path
+        shell: pwsh
+        run: ./scripts/Install-Local.ps1 -BaseOnly -SkipCachePrune
+
+      - name: Build and pack component library
+        shell: pwsh
+        run: ./scripts/Test-ApplicationLifetimeConsumer.ps1 -ComponentLibraryOnly
 
   sdk-tests:
     # The CSS hot-reload worker under sdks/ has a test project that no retired workflow ever ran: it
@@ -374,7 +649,7 @@ jobs:
         uses: ./.github/actions/setup-dotnet-wasm
 
       - name: Build CSS hot-reload worker (warnings are errors)
-        run: dotnet build sdks/Assimalign.Viu.Sdk/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release -warnaserror
+        run: dotnet build sdks/Assimalign.Viu.Sdk.Browser/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release -warnaserror
 
       - name: Test CSS hot-reload worker
-        run: dotnet test sdks/Assimalign.Viu.Sdk/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release --no-build
+        run: dotnet test sdks/Assimalign.Viu.Sdk.Browser/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj --configuration Release --no-build

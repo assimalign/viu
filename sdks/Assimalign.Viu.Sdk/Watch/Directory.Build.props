@@ -1,8 +1,0 @@
-<Project>
-  <!--
-    The watch worker is an SDK build tool, not the SDK package project itself. Import the repository
-    defaults directly so the parent sdks/Directory.Build.props package shape (Library, packable) does
-    not leak into this executable or its tests.
-  -->
-  <Import Project="..\..\..\Directory.Build.props" />
-</Project>

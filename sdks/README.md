@@ -1,11 +1,20 @@
-# Viu SDK
+# Viu SDKs
 
-Viu ships an MSBuild project SDK, **`Assimalign.Viu.Sdk`**, that chains through
-`Microsoft.NET.Sdk.WebAssembly` and delivers the whole framework through a single
-shared-framework reference — the same packaging model as the sibling Cohesion repo
-(`Assimalign.Cohesion.Sdk` / `Assimalign.Cohesion.App`), re-targeted at WASM browser apps.
+Viu ships two compositional MSBuild project SDKs. Choose by consumer shape:
 
-A complete Viu app project is:
+| Project SDK | Consumer | SDK chain | Viu framework |
+| --- | --- | --- | --- |
+| `Assimalign.Viu.Sdk` | Host-neutral component library | `Microsoft.NET.Sdk` | Targeting-only `Assimalign.Viu.App` |
+| `Assimalign.Viu.Sdk.Browser` | Browser WebAssembly application | Imports `Assimalign.Viu.Sdk`, then chains `Microsoft.NET.Sdk.WebAssembly` | Base `Assimalign.Viu.App` plus `Assimalign.Viu.App.Browser` |
+
+The split exists because component-library authors need the `.viu`/`.vue` and `[Reactive]` source
+generators without loading browser build payload or installing the WebAssembly workload. The base SDK
+therefore has no browser assets, `wwwroot` bundling, hot-reload worker, publish-budget hooks, or
+runtime pack. The Browser SDK owns those application behaviors and reuses the base authoring graph.
+
+## Host-neutral component library
+
+A component library uses the base SDK:
 
 ```xml
 <Project Sdk="Assimalign.Viu.Sdk">
@@ -15,51 +24,84 @@ A complete Viu app project is:
 </Project>
 ```
 
-Pin the SDK version inline (`Sdk="Assimalign.Viu.Sdk/10.0.1-preview.2"`) or in
-`global.json`:
+It can contain real `.viu` or compatible `.vue` components and `[Reactive]` types. Building runs the
+generators; packing carries the library's extracted `.viu.css` plus generated `buildTransitive`
+registration so a consuming Browser application can register it as a static web asset. The library
+restore/build closure contains no `Assimalign.Viu.Browser`, does not resolve a Viu runtime pack, and
+does not require `wasm-tools`.
+
+## Browser WebAssembly application
+
+A browser application uses the Browser SDK directly; using the bare base SDK is not an application
+compatibility path:
+
+```xml
+<Project Sdk="Assimalign.Viu.Sdk.Browser">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+</Project>
+```
+
+The Browser SDK imports and declares an exact-version dependency on the base SDK, so application
+projects receive the same generators and can consume packed base-SDK component libraries. It adds
+the WebAssembly build, Browser framework, `viu-dom.js`, application CSS bundling/link injection,
+transitive component-library style flow, CSS hot reload, and publish-budget hooks.
+
+Pin the SDK selected by the project inline, for example
+`Sdk="Assimalign.Viu.Sdk.Browser/10.0.1-preview.2"`, or in `global.json`:
 
 ```json
 {
     "msbuild-sdks": {
-        "Assimalign.Viu.Sdk": "10.0.1-preview.2"
+        "Assimalign.Viu.Sdk": "10.0.1-preview.2",
+        "Assimalign.Viu.Sdk.Browser": "10.0.1-preview.2"
     }
 }
 ```
 
-The SDK is resolved by NuGet's built-in MSBuild SDK resolver — the same machinery
-that handles `Microsoft.NET.Sdk.Web` — so it works in Visual Studio, Rider, and the
-dotnet CLI with no installer and no admin rights.
+The Browser entry point imports the separately packaged base SDK, so pin both to the same version.
+A component-library-only repository pins only `Assimalign.Viu.Sdk`. Both SDKs are resolved by NuGet's
+built-in MSBuild SDK resolver — the same machinery that handles `Microsoft.NET.Sdk.Web` — so they
+work in Visual Studio, Rider, and the dotnet CLI with no installer and no administrator rights.
 
-## What the SDK gives a consumer
+## What each segment gives a consumer
 
-| Piece | Mechanism |
+| Piece | Owner and mechanism |
 | --- | --- |
-| WASM browser app model | `Sdk.props`/`Sdk.targets` chain `Microsoft.NET.Sdk.WebAssembly` |
-| The framework libraries (`Assimalign.Viu.Components`, `.Reactivity`, `.State`, `.Core`, `.Browser`) | Implicit `<FrameworkReference Include="Assimalign.Viu.App" />` via the `KnownFrameworkReference` registration in [Targets/Assimalign.Viu.Sdk.FrameworkReference.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props) |
-| The `[Reactive]` and `.viu`/`.vue` source generators | Shipped inside the `Assimalign.Viu.App.Ref` targeting pack at `analyzers/dotnet/cs/` and listed as `<File Type="Analyzer">` in its `data/FrameworkList.xml` |
-| `.viu` and tag-based `.vue` single-file component compilation | The generator's AdditionalFiles/CompilerVisibleProperty wiring in [Targets/Assimalign.Viu.Generators.Syntax.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props) and [.targets](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.targets) — the single authoritative copy, packed into the SDK's `Targets/` and also imported directly by in-repo projects. `.vue` scripts require explicit `lang="csharp"`; JavaScript is never executed |
-| `.viu`/`.vue` component-style CSS bundling | The `ViuBundleCss` MSBuild task (+ parser closure) in the SDK package's `Tasks/`, driven by the packed `Assimalign.Viu.Sdk.Css.Bundling.targets`. The bundle registers as a **content-fingerprinted** static web asset ([V01.01.12.12.03]) |
-| `.viu`/`.vue` component stylesheet `<link>` | **Injected automatically** — no manual link tag. The `ViuInjectCssBundleLink` task (same `Tasks/` assembly) splices `<link rel="stylesheet" href="<AssemblyName>.viu.css" />` into `wwwroot/index.html` at build, *before* the SDK's compression pipeline so gzip/brotli negotiation stays intact ([V01.01.12.12.01]). The href is the stable plain route a static host serves; a fingerprinted route is also registered for manifest-aware hosts. Opt out with `<ViuInjectSingleFileComponentCssLink>false</ViuInjectSingleFileComponentCssLink>` (a hand-authored link also suppresses injection) |
-| Standalone utility CSS | `ViuBundleUtilityCss` slices `.viu`/`.vue` template regions, scans host `.html`/`.htm` markup, and compiles the frozen Viu-owned Tailwind CSS v4.3.3-compatible manifest to a separate `<PackageId>.utilities.css` static web asset. It has no Tailwind, Node, CLI, or PostCSS dependency. Component CSS and utility CSS can be enabled independently |
-| Utility stylesheet `<link>`, CSS-first configuration, and watch inputs | The utility link is injected through the same compression-safe host-page rewrite. Supported markup sources and the optional singular `@(ViuUtilityCss)` entry flow to `dotnet watch`; the virtual import, source rules, theme, custom utilities, and custom variants configure the same immutable engine used by build generation, completion, and hover. Set `<ViuInjectUtilityCssLink>false</ViuInjectUtilityCssLink>` to author the link manually |
-| `viu-dom.js` interop bridge | Packed under `assets/` and copied to the consumer's `wwwroot/_content/Assimalign.Viu.Browser/` at build |
+| Host-neutral runtime references | The base SDK adds targeting-only `<FrameworkReference Include="Assimalign.Viu.App" />`, resolving Reactivity, Components, State, and Core from `Assimalign.Viu.App.Ref` |
+| The `[Reactive]` and `.viu`/`.vue` source generators | The base `Assimalign.Viu.App.Ref` carries the analyzer and parser closure under `analyzers/dotnet/cs/`, with `<File Type="Analyzer">` entries in `data/FrameworkList.xml` |
+| `.viu` and tag-based `.vue` compilation | The base SDK owns the shared AdditionalFiles/CompilerVisibleProperty wiring in [Targets/Assimalign.Viu.Generators.Syntax.props](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props) and [.targets](Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.targets). `.vue` scripts require explicit `lang="csharp"`; JavaScript is never executed |
+| Component-library styles | The base SDK extracts `.viu.css` during pack and carries it with generated `buildTransitive` registration in the library package; it never registers browser static assets or writes `wwwroot` itself |
+| WASM browser app model and Browser runtime | The Browser SDK chains `Microsoft.NET.Sdk.WebAssembly` and adds `Assimalign.Viu.App.Browser`; its targeting and runtime packs add `Assimalign.Viu.Browser` |
+| Application component CSS | The Browser SDK bundles the app's styles through `ViuBundleCss`, registers the result as a content-fingerprinted static web asset, and injects its link before WebAssembly compression ([V01.01.12.12.01], [V01.01.12.12.03]); packed component-library styles arrive through their `buildTransitive` registrations as additional static web assets |
+| Standalone utility CSS | The Browser SDK runs `ViuBundleUtilityCss` over `.viu`/`.vue` template regions and host `.html`/`.htm`, producing a separate `<PackageId>.utilities.css` asset with no Tailwind, Node, CLI, or PostCSS dependency |
+| CSS watch inputs and hot reload | The Browser SDK owns the project-scoped worker, watch graph, stable link replacement, and utility/component regeneration |
+| `viu-dom.js` interop bridge | The Browser SDK packs the asset and copies it to `wwwroot/_content/Assimalign.Viu.Browser/` at build |
+| Publish budgets | Browser-only publish hooks measure trimmed/AOT payload; base component libraries do not load them |
 
-The framework reference resolves to two NuGet packages (the
-`Microsoft.AspNetCore.App.Ref` / `.Runtime.<rid>` shape):
+The two framework references resolve through three framework packages:
 
 | Package | Contents | When restored |
 | --- | --- | --- |
-| `Assimalign.Viu.App.Ref` | `ref/net10.0/` reference assemblies, `data/FrameworkList.xml`, `data/PackageOverrides.txt` for standalone-package conflict resolution, `analyzers/dotnet/cs/` generators | Compile time |
-| `Assimalign.Viu.App.Runtime.browser-wasm` | `runtimes/browser-wasm/lib/net10.0/` implementation assemblies, `data/RuntimeList.xml` | App build/publish |
+| `Assimalign.Viu.App.Ref` | Reactivity, Components, State, and Core reference assemblies; `data/FrameworkList.xml`; four-entry `data/PackageOverrides.txt`; `analyzers/dotnet/cs/` generator closure | Base and Browser compile time |
+| `Assimalign.Viu.App.Browser.Ref` | Browser reference assembly, `data/FrameworkList.xml`, and the Browser package-override entry | Browser compile time |
+| `Assimalign.Viu.App.Browser.Runtime.browser-wasm` | Base-plus-Browser implementation closure under `runtimes/browser-wasm/lib/net10.0/` plus `data/RuntimeList.xml` | Browser build/publish |
+
+The base framework is deliberately targeting-only and has no runtime package.
+`Assimalign.Viu.ServerRenderer` remains an ordinary opt-in package, not another framework segment.
 
 Opt out / pin independently:
 
 ```xml
 <PropertyGroup>
-    <!-- Skip the implicit FrameworkReference (explicit ones keep working). -->
+    <!-- Skip the implicit base FrameworkReference (explicit ones keep working). -->
     <ViuAutoIncludeAppFramework>false</ViuAutoIncludeAppFramework>
-    <!-- Pin the App framework independently of the SDK version. -->
+    <!-- Browser SDK only: independently skip its Browser FrameworkReference. -->
+    <ViuAutoIncludeBrowserAppFramework>false</ViuAutoIncludeBrowserAppFramework>
+    <!-- Pin base and Browser framework versions independently of the SDK versions. -->
     <ViuAppFrameworkVersion>10.0.2</ViuAppFrameworkVersion>
+    <ViuBrowserAppFrameworkVersion>10.0.2</ViuBrowserAppFrameworkVersion>
     <!-- Keep component compilation but skip CSS bundling / disable component generation entirely. -->
     <ViuBundleSingleFileComponentCss>false</ViuBundleSingleFileComponentCss>
     <EnableSingleFileComponentGeneration>false</EnableSingleFileComponentGeneration>
@@ -69,6 +111,10 @@ Opt out / pin independently:
     <ViuUtilityCssAutomaticSourceDiscovery>false</ViuUtilityCssAutomaticSourceDiscovery>
 </PropertyGroup>
 ```
+
+`ViuBrowserAppFrameworkVersion` defaults to `ViuAppFrameworkVersion`, so the normal path pins only
+the base property and keeps both segments coherent. The Browser auto-include property exists only on
+the Browser SDK path; disabling it does not disable the inherited base framework reference.
 
 Utility source inclusion and exclusion stay in MSBuild:
 
@@ -163,7 +209,7 @@ behavior. It is not affiliated with or endorsed by Tailwind Labs.
 
 ### Stylesheet hot reload
 
-In a Debug `dotnet watch` session, the SDK starts one project-scoped CSS regeneration worker.
+In a Debug `dotnet watch` session, the Browser SDK starts one project-scoped CSS regeneration worker.
 It observes `.viu`, `.vue`, the utility entry, explicit `@(ViuUtilityCssSource)` inputs, supported
 automatically discovered utility markup, transitive `@reference` stylesheets, and markup below
 CSS-first `source(...)`/`@source` roots, including external roots and add, delete, and rename
@@ -179,8 +225,8 @@ does not touch the bundle.
 Starting a watch session with no resolved utilities, or removing the final rule, emits one marked,
 zero-byte development bundle. This pre-registers the stable asset and link before the first utility
 appears and lets the browser unload the old stylesheet after the last utility disappears. A
-subsequent ordinary build or publish deletes that tombstone. The worker is
-an SDK build tool only: it is disabled by default outside Debug and is never copied into the
+subsequent ordinary build or publish deletes that tombstone. The worker is a Browser SDK build tool
+only: it is disabled by default outside Debug and is never copied into the
 application, runtime framework, or publish output. Set
 `<ViuCssHotReloadEnabled>false</ViuCssHotReloadEnabled>` to disable it, or adjust the default
 100-millisecond quiet period with `<ViuCssHotReloadDebounceMilliseconds>...</ViuCssHotReloadDebounceMilliseconds>`.
@@ -197,16 +243,25 @@ the updated generated code, while style-only edits remain mounted.
 `scripts/Install-Local.ps1` packs the complete package set into the repo-local
 feed `_out/packages/`:
 
-1. every independently published library → `Assimalign.Viu.<Name>.<ver>.nupkg` (19 packages)
-2. `dotnet pack sdks/Assimalign.Viu.Sdk/Tasks` → `Assimalign.Viu.Sdk.<ver>.nupkg`
-3. `dotnet pack frameworks/Assimalign.Viu.App.Runtime/src -p:RuntimeIdentifier=browser-wasm` → `Assimalign.Viu.App.Runtime.browser-wasm.<ver>.nupkg`
-4. `dotnet pack frameworks/Assimalign.Viu.App.Refs/src` → `Assimalign.Viu.App.Ref.<ver>.nupkg`
+1. every independently published library → `Assimalign.Viu.<Name>.<ver>.nupkg`;
+2. the base and Browser project SDKs → `Assimalign.Viu.Sdk.<ver>.nupkg` and
+   `Assimalign.Viu.Sdk.Browser.<ver>.nupkg`;
+3. the targeting-only base framework → `Assimalign.Viu.App.Ref.<ver>.nupkg`;
+4. the Browser targeting framework → `Assimalign.Viu.App.Browser.Ref.<ver>.nupkg`; and
+5. the Browser runtime framework for `browser-wasm` →
+   `Assimalign.Viu.App.Browser.Runtime.browser-wasm.<ver>.nupkg`.
+
+For component-library work on a machine without the WebAssembly workload, run
+`pwsh scripts/Install-Local.ps1 -BaseOnly`. That packs standalone libraries, the base SDK, and
+`Assimalign.Viu.App.Ref` only; it does not evaluate or pack the Browser SDK/framework path.
 
 The library set comes from `scripts/modules/ViuPackaging.psm1`, shared with
 `scripts/Pack-Release.ps1`, so the local feed and the release set cannot
 disagree about what ships — and a library added under `libraries/` but missing
 from the inventory fails the pack instead of silently producing a short feed.
-Use `-SkipLibraries`, `-SkipSdk`, or `-SkipFramework` to pack a subset.
+Use `-SkipLibraries`, `-SkipSdk`, or `-SkipFramework` to pack a subset. The packaging module and
+release packer share the same SDK/framework inventory, so neither segment can silently disappear
+from one path.
 
 Cached extracts for the same version are pruned first, so same-version repacks
 always pick up fresh content. Pruning covers the machine-global cache **and any
@@ -229,6 +284,6 @@ A consumer outside this repo points a `nuget.config` at the feed:
 </configuration>
 ```
 
-The in-repo build does **not** consume the SDK — repo projects stay on
+The in-repo build does **not** consume either SDK — repo projects stay on
 `ViuProjectReference` dogfooding (see `.claude/rules/build-system.md`) so the
 framework can be developed without a pack/restore cycle in the loop.

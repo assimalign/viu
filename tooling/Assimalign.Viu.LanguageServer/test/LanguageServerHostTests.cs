@@ -400,7 +400,7 @@ public class LanguageServerHostTests
             File.WriteAllText(
                 Path.Combine(directory, "Application.csproj"),
                 """
-                <Project Sdk="Assimalign.Viu.Sdk">
+                <Project Sdk="Assimalign.Viu.Sdk.Browser">
                   <ItemGroup>
                     <ViuUtilityCss Include="Utilities.css" />
                   </ItemGroup>

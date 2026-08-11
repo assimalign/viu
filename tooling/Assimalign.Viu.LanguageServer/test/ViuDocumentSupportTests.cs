@@ -40,6 +40,30 @@ public class ViuDocumentSupportTests
     }
 
     [Fact]
+    public void IsSupported_VueDocumentUnderViuBrowserProject_IsEnabled()
+    {
+        // [V01.01.12.27] Browser applications use the browser SDK while the
+        // base SDK remains the component-library entry point.
+        WithTemporaryDirectory(
+            directory =>
+            {
+                File.WriteAllText(
+                    Path.Combine(directory, "Application.csproj"),
+                    "<Project Sdk=\"Assimalign.Viu.Sdk.Browser\" />");
+                var componentPath = Path.Combine(
+                    directory,
+                    "Components",
+                    "Card.vue");
+                Directory.CreateDirectory(Path.GetDirectoryName(componentPath)!);
+                File.WriteAllText(componentPath, "<template />");
+
+                ViuDocumentSupport
+                    .IsSupported(new Uri(componentPath).AbsoluteUri)
+                    .ShouldBeTrue();
+            });
+    }
+
+    [Fact]
     public void IsSupported_VueDocumentUnderNearestUnrelatedProject_DoesNotUseAncestorViuProject()
     {
         WithTemporaryDirectory(

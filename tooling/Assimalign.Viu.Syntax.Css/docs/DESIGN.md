@@ -206,9 +206,11 @@ only the scope-id string.
   MSBuild-task follow-up on the [V01.01.06.02] pipeline side — **now landed as [V01.01.12.12]**: the
   `ViuBundleCss` MSBuild task (`sdks/Assimalign.Viu.Sdk/Tasks`) re-runs the *same* deterministic
   `@style` compilation — lifted into the shared `Assimalign.Viu.Compiler.Css` core, which the generator now
-  delegates to — over the same `.viu` inputs, so the physical bundle is byte-identical to `ExtractedStyles`;
-  it writes the bundle under `obj/…/viu/` and registers it as a `StaticWebAsset`. See that library's
-  `docs/DESIGN.md` and `docs/UTILITY-CSS-DESIGN.md` §2.4.
+  delegates to — over the same `.viu` inputs, so the physical bundle is byte-identical to
+  `ExtractedStyles`. The base SDK packs the resulting `.viu.css` and a `buildTransitive`
+  registration for component libraries; the Browser SDK registers application and transitive
+  library styles as static web assets. See that library's `docs/DESIGN.md` and
+  `docs/UTILITY-CSS-DESIGN.md` §2.4.
 - **Legacy deep combinators** `>>>` and `/deep/` — superseded by `:deep()`; not supported.
 - **Deep inside `:is()`/`:where()`/`:not()`** — splitting a selector around a nested `:deep()` and
   recursing into `:is`/`:where` arguments are not implemented; those functional pseudos are treated as

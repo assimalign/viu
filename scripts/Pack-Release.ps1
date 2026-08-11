@@ -3,9 +3,10 @@
     Produces the complete, version-consistent Viu NuGet release set.
 
 .DESCRIPTION
-    Strictly packs every public Viu library plus the SDK, targeting pack, and
-    browser-wasm runtime pack into _out/release/packages. The generated
-    package-order.txt records dependency-safe publication order.
+    Strictly packs every public Viu library plus both SDKs, both targeting
+    packs, and the Browser browser-wasm runtime pack into
+    _out/release/packages. The generated package-order.txt records
+    dependency-safe publication order.
 
 .PARAMETER Version
     The SemVer package version to produce, for example 10.0.1 or
@@ -137,7 +138,7 @@ foreach ($libraryProject in $configuredLibraryProjects) {
 }
 
 $runtimeProject = Join-Path $repositoryDirectory `
-    'frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj'
+    'frameworks/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj'
 Invoke-PackageBuild `
     -Project $runtimeProject `
     -AdditionalArguments @('-p:RuntimeIdentifier=browser-wasm')
@@ -145,6 +146,10 @@ Invoke-PackageBuild `
 $referenceProject = Join-Path $repositoryDirectory `
     'frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj'
 Invoke-PackageBuild -Project $referenceProject
+
+$browserReferenceProject = Join-Path $repositoryDirectory `
+    'frameworks/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj'
+Invoke-PackageBuild -Project $browserReferenceProject
 
 $sdkProject = Join-Path $repositoryDirectory `
     'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
@@ -155,10 +160,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 Invoke-PackageBuild -Project $sdkProject
 
+$browserSdkProject = Join-Path $repositoryDirectory `
+    'sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj'
+Write-Host 'Cleaning the Viu Browser SDK task closure' -ForegroundColor Green
+& dotnet clean $browserSdkProject --configuration $Configuration
+if ($LASTEXITCODE -ne 0) {
+    throw "Cleaning $browserSdkProject failed with exit code $LASTEXITCODE."
+}
+Invoke-PackageBuild -Project $browserSdkProject
+
 $packageIds = $libraryPackageIds + @(
-    'Assimalign.Viu.App.Runtime.browser-wasm',
     'Assimalign.Viu.App.Ref',
-    'Assimalign.Viu.Sdk'
+    'Assimalign.Viu.App.Browser.Runtime.browser-wasm',
+    'Assimalign.Viu.App.Browser.Ref',
+    'Assimalign.Viu.Sdk',
+    'Assimalign.Viu.Sdk.Browser'
 )
 $expectedPackageFiles = @(
     $packageIds |
@@ -178,6 +194,36 @@ $packageDifference = @(
 if ($packageDifference.Count -ne 0) {
     throw "The release package set is incomplete: $($packageDifference | Out-String)"
 }
+
+$baseFrameworkAssemblies = @(
+    'Assimalign.Viu.Reactivity',
+    'Assimalign.Viu.Components',
+    'Assimalign.Viu.State',
+    'Assimalign.Viu.Core'
+)
+$baseFrameworkPackageOverrides = @(
+    'Assimalign.Viu.Reactivity',
+    'Assimalign.Viu.Components',
+    'Assimalign.Viu.State',
+    'Assimalign.Viu.Core'
+)
+$browserFrameworkAssemblies = @('Assimalign.Viu.Browser')
+
+Assert-ViuFrameworkPackage `
+    -PackagePath (Join-Path $packageDirectory "Assimalign.Viu.App.Ref.$Version.nupkg") `
+    -ManifestPath 'data/FrameworkList.xml' `
+    -ExpectedFrameworkAssembly $baseFrameworkAssemblies `
+    -ExpectedPackageOverride $baseFrameworkPackageOverrides
+Assert-ViuFrameworkPackage `
+    -PackagePath (Join-Path $packageDirectory "Assimalign.Viu.App.Browser.Ref.$Version.nupkg") `
+    -ManifestPath 'data/FrameworkList.xml' `
+    -ExpectedFrameworkAssembly $browserFrameworkAssemblies `
+    -ExpectedPackageOverride $browserFrameworkAssemblies
+Assert-ViuFrameworkPackage `
+    -PackagePath (Join-Path $packageDirectory "Assimalign.Viu.App.Browser.Runtime.browser-wasm.$Version.nupkg") `
+    -ManifestPath 'data/RuntimeList.xml' `
+    -ExpectedFrameworkAssembly @($baseFrameworkAssemblies + $browserFrameworkAssemblies)
+Write-Host 'Validated base and Browser framework package manifests.' -ForegroundColor Green
 
 $packageOrderPath = Join-Path $packageDirectory 'package-order.txt'
 $expectedPackageFiles |

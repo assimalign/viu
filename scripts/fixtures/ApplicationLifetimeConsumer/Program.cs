@@ -6,13 +6,8 @@ using Assimalign.Viu.Browser.Router;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Router;
 
-ComponentReference appReference = ComponentReference.ForType(typeof(App));
 ComponentFactory components = new();
-components.Register(
-    new ComponentRegistration(
-        appReference,
-        new ComponentContract(renderCacheSize: 0, displayName: nameof(App)),
-        static _ => new App()));
+ComponentLibraryConsumer.GeneratedViuComponents.Register(components);
 EmptyServiceProvider services = new();
 using IRouterHistory history = RouterHistory.CreateWebHash();
 using Router router = new(
@@ -22,7 +17,8 @@ using Router router = new(
 await new BrowserApplicationBuilder()
     .ConfigureApplication(options =>
     {
-        options.RootComponent = new ComponentNode(appReference);
+        options.RootComponent = new ComponentNode(
+            ComponentReference.ForName("LibraryGreeting"));
         options.Components = components;
         options.Services = services;
         options.ErrorHandler = RecordError;
@@ -39,19 +35,6 @@ static void RecordError(
     _ = exception;
     _ = context;
     _ = source;
-}
-
-internal sealed class App : IComponent
-{
-    public ComponentRenderer Setup(ComponentContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        return static (ComponentRenderFrame frame) =>
-        {
-            ArgumentNullException.ThrowIfNull(frame);
-            return new ElementNode(new QualifiedName("main"));
-        };
-    }
 }
 
 internal sealed class EmptyServiceProvider : IServiceProvider

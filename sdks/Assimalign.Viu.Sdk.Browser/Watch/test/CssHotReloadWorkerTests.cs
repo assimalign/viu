@@ -755,9 +755,12 @@ public sealed class CssHotReloadWorkerTests
         public static TestContext Create(bool includeComponentStyles)
         {
             var repositoryDirectory = FindRepositoryDirectory();
-            var taskAssemblyPath = FindOutputFile(
+            var bundleTaskAssemblyPath = FindOutputFile(
                 repositoryDirectory,
                 "Assimalign.Viu.Sdk.Tasks.dll");
+            var browserTaskAssemblyPath = FindOutputFile(
+                repositoryDirectory,
+                "Assimalign.Viu.Sdk.Browser.Tasks.dll");
             var workerAssemblyPath = FindOutputFile(
                 repositoryDirectory,
                 "Assimalign.Viu.Sdk.CssHotReload.dll");
@@ -804,13 +807,13 @@ public sealed class CssHotReloadWorkerTests
                 "</ViuBundleSingleFileComponentCss>" + Environment.NewLine +
                 "    <ViuBundleUtilityCss>true</ViuBundleUtilityCss>" + Environment.NewLine +
                 "    <ViuBundleCssTaskAssembly>" +
-                EscapeAttribute(taskAssemblyPath) +
+                EscapeAttribute(bundleTaskAssemblyPath) +
                 "</ViuBundleCssTaskAssembly>" + Environment.NewLine +
                 "    <ViuUtilityCssTaskAssembly>" +
-                EscapeAttribute(taskAssemblyPath) +
+                EscapeAttribute(browserTaskAssemblyPath) +
                 "</ViuUtilityCssTaskAssembly>" + Environment.NewLine +
                 "    <ViuCssHotReloadTaskAssembly>" +
-                EscapeAttribute(taskAssemblyPath) +
+                EscapeAttribute(browserTaskAssemblyPath) +
                 "</ViuCssHotReloadTaskAssembly>" + Environment.NewLine +
                 "    <ViuCssHotReloadWorkerAssembly>" +
                 EscapeAttribute(workerAssemblyPath) +

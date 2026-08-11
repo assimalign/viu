@@ -213,13 +213,14 @@ file extension explicitly, so a `.vue` buffer never carries a Viu content type a
 colors nor the language client attach to one.
 
 The language server's own `.vue` admission rules are unchanged and remain live for the hosts that can
-reach them: it accepts a `.vue` file only when its nearest owning project uses `Assimalign.Viu.Sdk`
-or explicitly sets `ViuVisualStudioLanguageServiceEnabled` to `true`, an explicit `false` wins even
-in a Viu SDK project, and collocated Viu and non-Viu project files make ownership ambiguous, so the
-non-evaluating probe fails closed instead of guessing. The gate is re-checked for open, change,
+reach them: it accepts a `.vue` file only when its nearest owning project uses
+`Assimalign.Viu.Sdk`, uses `Assimalign.Viu.Sdk.Browser`, or explicitly sets
+`ViuVisualStudioLanguageServiceEnabled` to `true`; an explicit `false` wins even in a Viu SDK
+project, and collocated Viu and non-Viu project files make ownership ambiguous, so the non-evaluating
+probe fails closed instead of guessing. The gate is re-checked for open, change,
 diagnostics, completion, and hover on every document.
 
-Stylesheet regeneration is an SDK `dotnet watch` feature, not a language-server side effect.
+Stylesheet regeneration is a Browser SDK `dotnet watch` feature, not a language-server side effect.
 During a Debug `dotnet watch` session, Viu's CSS sidecar rebuilds changed component and utility
 stylesheets and lets the .NET browser-refresh client replace their `<link>` URLs. That CSS-only
 boundary preserves the mounted application and browser state. Visual Studio's ordinary Hot Reload

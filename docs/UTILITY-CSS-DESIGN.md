@@ -157,7 +157,7 @@ valid if the same registry can resolve it.
  diagnostics + incremental model              completion + hover + diagnostics
                     \                                    /
                      \                                  /
-                    Assimalign.Viu.Sdk.Tasks + central targets
+             Assimalign.Viu.Sdk.Browser.Tasks + Browser targets
                     filesystem I/O + StaticWebAsset registration
                                       |
                          <PackageId>.utilities.css
@@ -457,7 +457,7 @@ A reference-counted project union ensures that:
 - removing the final use does remove stale CSS;
 - file deletion, rename, root changes, and overlapping roots cannot leave stale candidates.
 
-## 7. Compilation and SDK static-asset pipeline
+## 7. Compilation and Browser SDK static-asset pipeline
 
 The compilation stages are:
 
@@ -475,8 +475,8 @@ Unknown source tokens do not fail a build. Authoring errors in CSS-first directi
 references, or a known family with an incompatible explicit form produce source-located Viu
 diagnostics and recover where possible. Cancellation is the only expected control-flow exception.
 
-The SDK adds a `ViuBundleUtilityCss` task entry point to the existing
-`Assimalign.Viu.Sdk.Tasks` package payload. It calls the same
+The Browser SDK adds a `ViuBundleUtilityCss` task entry point through its
+`Assimalign.Viu.Sdk.Browser.Tasks` build payload. It calls the same
 `Assimalign.Viu.UtilityCss` compiler as the analyzer and writes:
 
 ```text
@@ -493,10 +493,11 @@ Central targets then:
 - copy the static asset into build and publish output for packaged SDK consumers.
 
 The utility asset remains separate from `<PackageId>.viu.css`, the existing component-style bundle.
-Both may be present and both use deterministic content hashes. An external consumer using
-`<Project Sdk="Assimalign.Viu.Sdk">` receives the analyzer, utility core dependency closure, tasks,
-targets, defaults, and built-in CSS data from the SDK/ref-pack packaging path with no project
-reference into this repository.
+Both may be present and both use deterministic content hashes. An external browser application using
+`<Project Sdk="Assimalign.Viu.Sdk.Browser">` receives the analyzer, utility core dependency closure,
+tasks, targets, defaults, and built-in CSS data from the Browser SDK/base-ref-pack composition with no
+project reference into this repository. The host-neutral base SDK does not run this static-web-asset
+pipeline or write to `wwwroot`.
 
 Package-consumer verification is distinct from in-repo tests: pack to `_out/packages`, build a
 consumer from the installed package boundary, confirm the utility asset and link, then run the WASM
@@ -509,10 +510,10 @@ application. AOT publication and trimming checks are separate gates.
 Viu's canonical component format remains `.viu`. Since the hybrid-container pivot
 (**[V01.01.06.10]**, [#257](https://github.com/assimalign/viu/issues/257), 2026-08-02) it uses the
 documented hybrid container — tag-based `<template>` / `<style>` blocks with the component's C# in
-an `@script { }` block, the legacy `@template`/`@style` containers still parsing during a
-migration window — and is discovered by the SDK's `**/*.viu` item. The generator, component-style
-compiler, utility scanner, build tasks, hot-reload metadata, and Visual Studio document support
-share the same source-located descriptor.
+an `@script { }` block, the legacy `@template`/`@style` containers still parsing during a migration
+window — and is discovered by the base SDK's `**/*.viu` item; the Browser SDK inherits that item
+graph. The generator, component-style compiler, utility scanner, build tasks, hot-reload metadata,
+and Visual Studio document support share the same source-located descriptor.
 
 ### 8.2 Tag-based `.vue` compatibility
 
@@ -526,8 +527,8 @@ compatibility surface alongside canonical `.viu`:
    source-located diagnostic;
 3. template code generation, scoped styles, CSS Modules, `v-bind()`, `@reference`, `@apply`,
    source mapping, and utility candidate detection reuse the existing Viu pipeline;
-4. the SDK discovers `.vue` only for Viu projects, while the Visual Studio language server rechecks
-   the owning project before accepting compatibility documents;
+4. both Viu SDKs discover `.vue` only for Viu projects, while the Visual Studio language server
+   rechecks the owning project before accepting compatibility documents;
 5. template and script edits reset/remount through generated, AOT-safe hot-reload marker types so
    .NET 10 browser WebAssembly executes the updated generated code; style edits swap the stylesheet
    without remounting and preserve component state.
@@ -634,7 +635,7 @@ Required independent gates include:
 - manifest completeness and golden conformance;
 - compiler/editor parity tests;
 - incremental add/remove/rename/no-op tests;
-- SDK static-asset, fingerprint, link, compression, and package-consumer tests;
+- Browser SDK static-asset, fingerprint, link, compression, and package-consumer tests;
 - `dotnet watch` browser tests proving managed template/script remounts and style-only mounted-state
   preservation;
 - output-size and warm-build budgets;

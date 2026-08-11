@@ -75,8 +75,9 @@ HTML serialization, the Language Server Protocol — name and link that target. 
   namespaces remain equal to their descriptive assembly ids (`Syntax.*`, `Compiler.*`, `UtilityCss`,
   `LanguageService`, or `LanguageServer`).
 - Examples live in the separate sibling `viu-examples` repository; repo planning docs live in
-  `docs/`; the consumer-facing MSBuild SDK lives in `sdks/` and the `Assimalign.Viu.App`
-  shared-framework pack producers live in `frameworks/` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
+  `docs/`; the base and Browser consumer-facing MSBuild SDKs live in `sdks/`, and the
+  `Assimalign.Viu.App` / `Assimalign.Viu.App.Browser` shared-framework pack producers live in
+  `frameworks/` (see [`.claude/rules/build-system.md`](.claude/rules/build-system.md)).
 
 ### Namespaces
 
@@ -244,7 +245,8 @@ Test project (`test/`):
 ```
 
 Sample apps live in `assimalign/viu-examples` and consume the packaged
-`Assimalign.Viu.Sdk`/framework from `_out/packages`; they must not use `ViuProjectReference`.
+`Assimalign.Viu.Sdk.Browser`/frameworks from `_out/packages`; they must not use
+`ViuProjectReference`. Host-neutral component libraries use `Assimalign.Viu.Sdk`.
 
 ### Versioning and packaging
 
@@ -261,31 +263,33 @@ Sample apps live in `assimalign/viu-examples` and consume the packaged
 2. Add both csprojs to `Assimalign.Viu.slnx`.
 3. Wire a CI workflow entry for the area ([V01.01.12.02]).
 4. No dangling references — when a project is renamed or moved, update every referrer.
-5. If the library is a runtime framework member (ships in every Viu app), add it to
-   `@(ViuFrameworkAssembly)` in `frameworks/Assimalign.Viu.App.props` so the framework packs
-   deliver it.
+5. Add host-neutral runtime framework members to `@(ViuFrameworkAssembly)` in
+   `frameworks/Assimalign.Viu.App.props`; add Browser-only members to
+   `frameworks/Assimalign.Viu.App.Browser.props`. Do not make the base depend on Browser.
 
-### SDK and shared-framework packaging ([V01.01.12.19], #174)
+### SDK and shared-framework packaging ([V01.01.12.19], #174; [V01.01.12.27], #323)
 
-External consumers use `<Project Sdk="Assimalign.Viu.Sdk">` — never `ViuProjectReference`, which is
-the **in-repo dogfooding** mechanism. The packaging layer mirrors `assimalign/cohesion`:
+External consumers use the SDK matching their topology — never `ViuProjectReference`, which is the
+**in-repo dogfooding** mechanism:
 
-- **`frameworks/Assimalign.Viu.App.props`** — the authoritative `@(ViuFrameworkAssembly)` /
-  `@(ViuFrameworkAnalyzer)` manifest, gated on `$(ViuFrameworkName)`.
-- **`frameworks/Assimalign.Viu.App.targets`** — the `ViuWriteFrameworkList` manifest writer and
-  pack layout, branching on `$(ViuFrameworkKind)` = `Ref` (targeting pack: `ref/<tfm>/` +
-  `data/FrameworkList.xml` + the generators and their parser closure at `analyzers/dotnet/cs/`,
-  every DLL listed as an `Analyzer` entry) | `Runtime` (per-RID runtime pack: `runtimes/<rid>/lib/`
-  + `data/RuntimeList.xml`).
-- **`sdks/Assimalign.Viu.Sdk/`** — the SDK package (packable unit: `Tasks/…Tasks.csproj` with
-  `PackageId=Assimalign.Viu.Sdk`). `Sdk.props` chains `Microsoft.NET.Sdk.WebAssembly`, imports a
-  pack-time-frozen `Build.Version.props` snapshot, and registers the `KnownFrameworkReference` for
-  `Assimalign.Viu.App` (`browser-wasm`). The `.viu` AdditionalFiles wiring and
-  `Build.Css.Bundling.targets` are packed **from their in-repo source files**; the `ViuBundleCss`
-  task ships under `Tasks/`; `viu-dom.js` ships under `assets/` and flows into consumer
-  `wwwroot/_content/`.
-- **Local loop**: `scripts/Install-Local.ps1` packs SDK → runtime pack(s) → ref pack into
-  `_out/packages` (gitignored). Consumption docs: `sdks/README.md`.
+- **`Assimalign.Viu.Sdk`** chains `Microsoft.NET.Sdk` for host-neutral component libraries. It owns
+  `.viu`/`.vue` AdditionalFiles, Syntax/Reactivity generators, targeting-only
+  `Assimalign.Viu.App`, and component-style packing (`.viu.css` plus generated `buildTransitive`
+  registration). It has no Browser, WebAssembly workload, browser assets, or runtime pack.
+- **`Assimalign.Viu.Sdk.Browser`** imports and depends exactly on the base SDK, chains
+  `Microsoft.NET.Sdk.WebAssembly`, registers `Assimalign.Viu.App.Browser`, and owns browser assets,
+  application CSS/utility bundling, hot reload, WebAssembly fixes, and publish-budget hooks.
+- **`frameworks/Assimalign.Viu.App.Refs`** produces `Assimalign.Viu.App.Ref`: Reactivity,
+  Components, State, Core, four package overrides, and the generator/parser closure. It is
+  targeting-only.
+- **`frameworks/Assimalign.Viu.App.Browser.Refs`** produces
+  `Assimalign.Viu.App.Browser.Ref` with Browser and its override;
+  **`frameworks/Assimalign.Viu.App.Browser.Runtime`** produces
+  `Assimalign.Viu.App.Browser.Runtime.browser-wasm` with the base-plus-Browser runtime closure.
+- **`frameworks/Assimalign.Viu.App.targets`** is the shared manifest writer/pack implementation;
+  segment props select content. Runtime packs do not carry `PackageOverrides.txt`.
+- **Local loop**: `scripts/Install-Local.ps1` packs both SDKs, two targeting packs, and the one
+  Browser runtime pack into `_out/packages` (gitignored). Consumption docs: `sdks/README.md`.
 - The `frameworks/` csprojs carry documented deviations from the no-raw-`ProjectReference` rule
   (build-order edges needing `ReferenceOutputAssembly=false` + `UndefineProperties` metadata the
   `ViuProjectReference` transform does not carry).

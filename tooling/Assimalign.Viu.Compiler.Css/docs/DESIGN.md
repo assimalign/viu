@@ -13,7 +13,8 @@ serialize deterministically — must be run by **two build-time hosts**:
 1. the `Assimalign.Viu.Generators.Syntax` incremental **source generator**, which emits the `ExtractedStyles`
    constant inside the Roslyn analyzer sandbox (no I/O), and
 2. the `ViuBundleCss` **MSBuild task** (`sdks/Assimalign.Viu.Sdk/Tasks`), which runs *outside* the
-   analyzer sandbox and writes the bundled stylesheet to publish output.
+   analyzer sandbox and writes the bundled stylesheet for a component-library package or Browser
+   application.
 
 If each host had its own copy of that logic, the generated constant and the physical file could drift. So the
 compilation lives **once**, here, and both hosts call it. Running the one deterministic implementation over
@@ -76,12 +77,12 @@ blocks — matching the generator's constant exactly.
 
 ## Non-goals / future
 
-- **Utility-first CSS generation ([V01.01.12.13]+).** The utility engine is the flagship *second* producer of
-  opaque CSS strings for the same `ViuBundleCss` task. The bundler already bundles opaque compiled-CSS text
-  with no utility-specific knowledge, so the utility stylesheet plugs in without changing this contract. The
-  seam is left; the engine is not built here.
-- **Static-web-asset fingerprinting ([V01.01.12.12.03], #169) — implemented.** `Build.Css.Bundling.targets`
-  registers the bundle with a content fingerprint through the SDK's `DefineStaticWebAssets` path (the
+- **Utility-first CSS generation ([V01.01.12.13]+).** The utility engine is a separate producer with
+  its own `ViuBundleUtilityCss` task in the Browser SDK. It does not enter this component-style core;
+  the two deterministic stylesheets remain independent assets.
+- **Static-web-asset fingerprinting ([V01.01.12.12.03], #169) — implemented.** For Browser
+  applications, `Build.Css.Bundling.targets` registers the bundle with a content fingerprint through
+  the Browser SDK's `DefineStaticWebAssets` path (the
   `$(PackageId)#[.{fingerprint}]?.viu.css` RelativePath, the same optional-token form Blazor's scoped-CSS
   application bundle uses). The SDK derives the fingerprint from a SHA-256 hash of the bundle **content**, so
   its determinism rides directly on this library's byte-stable output (LF-only, ordinal ordering): identical
@@ -92,8 +93,9 @@ blocks — matching the generator's constant exactly.
   link-injection follow-up resolves for immutable caching.
 - **Host-page `<link>` injection ([V01.01.12.12.01], #167) — implemented.** A consuming WASM app needs no
   hand-authored link tag: `Build.Css.Bundling.targets` injects `<link rel="stylesheet"
-  href="<AssemblyName>.viu.css">` into the host page (`wwwroot/index.html`) via the `ViuInjectCssBundleLink`
-  MSBuild task (shipped in the same `Assimalign.Viu.Sdk.Tasks` assembly as `ViuBundleCss`). The injector is idempotent —
+  href="<AssemblyName>.viu.css">` into the host page (`wwwroot/index.html`) via the
+  `ViuInjectCssBundleLink` MSBuild task shipped in `Assimalign.Viu.Sdk.Browser.Tasks`; `ViuBundleCss`
+  remains in the base task assembly for component-library extraction. The injector is idempotent —
   a hand-authored link, or a re-run, suppresses a second link — so keeping a manual `<link>` is a supported
   opt-out (`ViuInjectSingleFileComponentCssLink=false` opts out entirely).
 

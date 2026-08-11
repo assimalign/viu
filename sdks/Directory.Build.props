@@ -1,5 +1,10 @@
 <Project>
 	<Import Project="..\Directory.Build.props" />
+	<PropertyGroup>
+		<!-- Directory.Build.props is evaluated before the Tasks csproj body, so
+		     establish the package role here for role-specific package metadata. -->
+		<ViuSdkBrowserPackage Condition="'$(ViuSdkBrowserPackage)' == '' and '$(MSBuildProjectName)' == 'Assimalign.Viu.Sdk.Browser.Tasks'">true</ViuSdkBrowserPackage>
+	</PropertyGroup>
 	<!-- Shared package properties for every SDK Tasks project ([V01.01.12.19], #174 -
 	     the Viu port of cohesion's sdks/Directory.Build.props). -->
 	<PropertyGroup>
@@ -24,8 +29,10 @@
 		<VersionPrefix>$(ViuVersionPrefix)</VersionPrefix>
 		<VersionSuffix Condition="'$(ViuVersionSuffix)' != ''">$(ViuVersionSuffix)</VersionSuffix>
 		<Authors>Assimalign</Authors>
-		<Description>Viu MSBuild SDK: chains Microsoft.NET.Sdk.WebAssembly, references the Assimalign.Viu.App shared framework, and compiles .viu single-file components.</Description>
+		<Description Condition="'$(ViuSdkBrowserPackage)' != 'true'">Viu host-neutral component-library SDK with source generators, targeting framework, and component-style extraction.</Description>
+		<Description Condition="'$(ViuSdkBrowserPackage)' == 'true'">Viu Browser application SDK with WebAssembly hosting, Browser framework, static assets, CSS bundling, and hot reload.</Description>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageTags>Sdk;MSBuild;Viu;WebAssembly</PackageTags>
+		<PackageTags Condition="'$(ViuSdkBrowserPackage)' != 'true'">Sdk;MSBuild;Viu;Components</PackageTags>
+		<PackageTags Condition="'$(ViuSdkBrowserPackage)' == 'true'">Sdk;MSBuild;Viu;WebAssembly;Browser</PackageTags>
 	</PropertyGroup>
 </Project>

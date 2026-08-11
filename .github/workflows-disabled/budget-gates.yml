@@ -113,30 +113,13 @@ jobs:
           repository-path: viu
           install-wasm-tools: 'true'
 
-      # The SDK target packs every shipping library so the showcase's opt-in Router
-      # PackageReferences also resolve from the local feed. The framework packs provide
-      # the implicit Assimalign.Viu.App framework reference used by the app SDK.
-      - name: Pack local SDK, libraries, and framework
+      # Use the same segmented package inventory as the active packaging lane:
+      # Browser applications resolve the Browser SDK/ref/runtime chain, which imports
+      # the targeting-only base SDK/ref chain used by component libraries.
+      - name: Pack local SDKs, libraries, and frameworks
         if: steps.showcase.outputs.available == 'true'
         shell: pwsh
-        run: |
-          $feed = Join-Path $env:GITHUB_WORKSPACE 'viu/_out/packages'
-          dotnet pack ./viu/sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj `
-            --configuration Release `
-            -p:PackViuProjects=true `
-            "-p:PackageOutputPath=$feed"
-          if ($LASTEXITCODE -ne 0) { throw 'SDK and library pack failed.' }
-
-          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj `
-            --configuration Release `
-            -p:RuntimeIdentifier=browser-wasm `
-            "-p:PackageOutputPath=$feed"
-          if ($LASTEXITCODE -ne 0) { throw 'Runtime pack failed.' }
-
-          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj `
-            --configuration Release `
-            "-p:PackageOutputPath=$feed"
-          if ($LASTEXITCODE -ne 0) { throw 'Reference pack failed.' }
+        run: ./viu/scripts/Install-Local.ps1 -SkipCachePrune
 
       # Publishing with warnings as errors makes this both the payload-size gate and
       # the trimming gate. The external project enables PublishTrimmed and full
@@ -201,27 +184,10 @@ jobs:
           repository-path: viu
           install-wasm-tools: 'true'
 
-      - name: Pack local SDK, libraries, and framework
+      - name: Pack local SDKs, libraries, and frameworks
         if: steps.showcase.outputs.available == 'true'
         shell: pwsh
-        run: |
-          $feed = Join-Path $env:GITHUB_WORKSPACE 'viu/_out/packages'
-          dotnet pack ./viu/sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj `
-            --configuration Release `
-            -p:PackViuProjects=true `
-            "-p:PackageOutputPath=$feed"
-          if ($LASTEXITCODE -ne 0) { throw 'SDK and library pack failed.' }
-
-          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj `
-            --configuration Release `
-            -p:RuntimeIdentifier=browser-wasm `
-            "-p:PackageOutputPath=$feed"
-          if ($LASTEXITCODE -ne 0) { throw 'Runtime pack failed.' }
-
-          dotnet pack ./viu/frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj `
-            --configuration Release `
-            "-p:PackageOutputPath=$feed"
-          if ($LASTEXITCODE -ne 0) { throw 'Reference pack failed.' }
+        run: ./viu/scripts/Install-Local.ps1 -SkipCachePrune
 
       - name: Publish showcase with AOT compilation
         if: steps.showcase.outputs.available == 'true'

@@ -1,8 +1,8 @@
 # API surface hardening plan — [V01.01.14]
 
 **Status: COMPLETE. The `[V01.01.15]` component-model arc has landed, every approved
-API-hardening requirement is terminal, and D6 platform segmentation is deliberately deferred until
-the first non-browser host exists.**
+API-hardening requirement is terminal, and D6 platform segmentation was subsequently delivered by
+`[V01.01.12.27]` (#323) under D12.**
 
 This document is the session-independent source of truth for the API-hardening arc. The state table
 uses stable theme identifiers; its status, not the original wave number, determines what remains.
@@ -15,11 +15,12 @@ fresh source-level audit rather than carrying those stale findings forward.
 
 ## Current app-visible and package-visible ground truth
 
-`frameworks/Assimalign.Viu.App.props` currently places these assemblies in the browser shared
-framework: `Assimalign.Viu.App`, `.Components`, `.Reactivity`, `.State`, `.Core`, and `.Browser`.
-The former common-primitives package no longer exists. Components, Reactivity, State, Core, and
-Browser are also packable libraries; D2/G1 requires the framework packs to override those
-same-version package assets.
+The targeting-only `Assimalign.Viu.App` framework contains the host-neutral framework surface:
+Components, Reactivity, State, and Core. The Browser SDK composes the Browser-only
+`Assimalign.Viu.App.Browser` targeting framework beside that base and owns the only Viu runtime pack,
+`Assimalign.Viu.App.Browser.Runtime.browser-wasm`. The former common-primitives package no longer
+exists. Components, Reactivity, State, Core, and Browser are also packable libraries; D2/G1 requires
+each targeting pack to override its same-version standalone package assets.
 
 The Syntax, compiler, UtilityCss, language-service, and language-server assemblies are build/editor
 tooling, not runtime app references. ServerRenderer, Router, Browser.Router, and Testing remain
@@ -45,7 +46,7 @@ Router <- Browser.Router
 | D3/D3a | Delete Syntax.JavaScript; retain Syntax.Html but do not publish it until its runtime dependency/TFM shape is settled. | 2026-08-05 | The retained parser is not yet a restorable runtime package. |
 | D4 | Track the arc through its area epic and this plan; create detailed feature items immediately before execution. | 2026-08-05 | Avoids speculative issue bodies drifting from the live surface. |
 | D5/D5a | Replace application plugins with build-time composition plus lifetime middleware; expose host start/stop and keep mounting host-specific. | 2026-08-05/06 | This is the landed application-lifetime model. |
-| D6 | Segment the SDK and framework by platform. | 2026-08-06 | The current SDK/framework remain browser-coupled; segmentation remains the intended direction when a second host supplies a real topology to validate. |
+| D6 | Segment the SDK and framework by platform. | 2026-08-06 | The original SDK/framework were browser-coupled; D12 records the consumer topology that made the split immediately testable. |
 | D7 | Do not add `Assimalign.Viu.Hosting` here; that boundary belongs to Cohesion. | 2026-08-06 | Prevents two competing host-authoring abstractions. |
 | D8 | `InternalsVisibleTo` is for an assembly's own unit tests only, never for production cross-library sharing. | 2026-08-06 | Assembly boundaries must remain real for runtime and tooling code alike. |
 | D9 | Adopt the frame-based component model recorded by [`COMPONENT-MODEL-PLAN.md`](COMPONENT-MODEL-PLAN.md). | 2026-08-07 | The migration deleted the old helper ABI and superseded T05's old Core seam proposals. |
@@ -56,10 +57,11 @@ Router <- Browser.Router
 | D11-D | No public type repeats a Viu/namespace identity; direct-rename the four listed facades, expose reactive construction through `Reactive`, retain one scope accessor, and de-stutter asynchronous/dynamic facade members. | 2026-08-08 | D1 permits plain renames, one sanctioned facade removes duplicate discovery paths, and generated `.viu`/`.vue` authoring behavior remains unchanged. |
 | D11-E | Defer the D6-A SDK split until a second host platform exists. | 2026-08-08 | A base plus Browser SDK with exactly one real consumer would be speculative, untestable against another host, and likely redesigned when that host arrives. The trigger is the first non-browser host, not another hardening wave. |
 | D11-F | Defer the D6-B framework split until a second host platform exists. | 2026-08-08 | A base plus Browser framework with exactly one real consumer would be speculative, untestable against another host, and likely redesigned when that host arrives. The trigger is the first non-browser host, not another hardening wave. |
+| D12 | Un-defer D6-A and D6-B: split the SDK and shared framework into host-neutral base and Browser segments. | 2026-08-09 | A component library needs `.viu`/`.vue` generators and style extraction without loading the browser SDK payload or requiring the WebAssembly workload. That Day-1 consumer topology exists now and supersedes D11-E/D11-F's second-host trigger. `[V01.01.12.27]` (#323) implements and verifies the split. |
 
 ## State
 
-Every row is terminal: `DONE`, `DONE-BY-DECISION`, `DROPPED`, `SUPERSEDED`, or `DEFERRED`.
+Every row is terminal: `DONE`, `DONE-BY-DECISION`, `DROPPED`, or `SUPERSEDED`.
 
 | Theme | Rescoped outcome after D10 | Status |
 |---|---|---|
@@ -83,9 +85,9 @@ Every row is terminal: `DONE`, `DONE-BY-DECISION`, `DROPPED`, `SUPERSEDED`, or `
 | T14-A | Generic identity and raw-object conversion surface is removed; observably different collection conversions remain. | **DONE** |
 | T14-B | Router history uses flags for listener suppression and a value option for entry data; RouterLink exposes modifier flags; guard results expose an outcome and typed payload; and Testing shares one options record. `BrowserRuntime.CreateRenderer` remains an owning lease. | **DONE** |
 | T17 | Non-subscribing fresh reads and side-effect-free debugger displays are implemented and pinned with dependency run-count tests. | **DONE** |
-| G1 | The Ref pack emits the exact standalone/framework overlap through `data/PackageOverrides.txt`; Runtime excludes it, and an isolated packaged SDK consumer passes build, trimming, AOT, and conflict-resolution evidence checks. | **DONE** |
-| D6-A | The SDK segmentation decision stands; implementation waits for the first non-browser host so two real hosts determine and test payload ownership. It is not an arc completion criterion. | **DEFERRED** |
-| D6-B | The framework segmentation decision stands; implementation waits for the first non-browser host so two real hosts determine and test targeting/runtime topology. It is not an arc completion criterion. | **DEFERRED** |
+| G1 | Each targeting pack emits its exact standalone/framework overlap through `data/PackageOverrides.txt`; the Browser Runtime pack excludes it, and isolated packaged consumers pin conflict resolution at both segment boundaries. | **DONE** |
+| D6-A | D12 and `[V01.01.12.27]` (#323) deliver a host-neutral `Assimalign.Viu.Sdk` for component libraries and a thin `Assimalign.Viu.Sdk.Browser` application SDK that imports the base and owns WebAssembly/browser build payload. | **DONE-BY-DECISION** |
+| D6-B | D12 and `[V01.01.12.27]` (#323) deliver targeting-only `Assimalign.Viu.App` plus a Browser-only targeting pack composed beside it; `Assimalign.Viu.App.Browser.Runtime.browser-wasm` carries the base-plus-Browser runtime closure and is the only Viu runtime pack. ServerRenderer remains opt-in. | **DONE-BY-DECISION** |
 
 ## T05 final disposition
 
@@ -140,11 +142,11 @@ the six decisions remains pending:
 
 ### Packaging and enforcement work
 
-- **G1:** author the overlap list once and pack it as `data/PackageOverrides.txt` into the Ref
-  targeting pack (the .NET consumption contract); assert its absence from Runtime packs, support
-  stable and prerelease versions, assert archive contents, and prove an
-  external Viu-SDK consumer with an explicit same-version package reference resolves the framework
-  asset rather than a duplicate library asset.
+- **G1:** author each segment's overlap list once and pack it as `data/PackageOverrides.txt` into its
+  Ref targeting pack (the .NET consumption contract); assert its absence from the Browser Runtime
+  pack, support stable and prerelease versions, assert archive contents, and prove external base- and
+  Browser-SDK consumers with an explicit same-version package reference resolve the framework asset
+  rather than a duplicate library asset.
 - **T02:** after every preceding surface change, regenerate `PublicAPI.Shipped.txt` and leave only
   intentional additions/removals in `PublicAPI.Unshipped.txt`. RS0016, RS0017, and RS0037 must be
   clean under warning-as-error.
@@ -164,8 +166,10 @@ the six decisions remains pending:
   `RouterHistoryEntryOptions` carries entry scroll input, `RouterLinkModifiers` carries modifier
   keys, `NavigationGuardResult` exposes its outcome and typed payload, and `TestRendererOptions`
   configures both Testing entry points.
-- **D6-A / D6-B:** neither deferred platform split is part of this arc's completion criteria. The
-  first non-browser host reopens both decisions with two real host contracts available for tests.
+- **D6-A / D6-B:** D12 superseded the D11-E/D11-F second-host trigger. `[V01.01.12.27]` (#323)
+  delivered both splits because a host-neutral component library is already a distinct consumer:
+  it needs the `.viu`/`.vue` authoring pipeline without the Browser SDK, WebAssembly workload, browser
+  assets, or a runtime pack.
 
 ## Findings refuted or superseded — do not re-propose
 

@@ -68,13 +68,14 @@
          to the task shipped in the package. Configuration-aware so a Debug or Release build resolves its
          matching task build. -->
     <ViuBundleCssTaskAssembly Condition="'$(ViuBundleCssTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuBundleCssTaskAssembly>
+    <ViuInjectCssBundleLinkTaskAssembly Condition="'$(ViuInjectCssBundleLinkTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuInjectCssBundleLinkTaskAssembly>
 
     <!-- LINK INJECTION master switch ([V01.01.12.12.01], #167): auto-inject the bundle's <link
          rel="stylesheet"> into the WASM host page (wwwroot/index.html) so a consuming app needs no
          hand-authored link tag. Defaults ON wherever bundling is on. Set to false to keep bundling but author
          the <link> by hand (the injector is idempotent, so a hand-authored link is also a working opt-out —
-         it simply suppresses injection). The ViuInjectCssBundleLink task ships in the same Sdk.Tasks
-         assembly as ViuBundleCss, so it resolves through $(ViuBundleCssTaskAssembly) with no extra wiring. -->
+         it simply suppresses injection). The Browser SDK owns ViuInjectCssBundleLink separately from the
+         host-neutral ViuBundleCss task and supplies $(ViuInjectCssBundleLinkTaskAssembly). -->
     <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == '' and '$(ViuBundleSingleFileComponentCss)' == 'true'">true</ViuInjectSingleFileComponentCssLink>
     <ViuInjectSingleFileComponentCssLink Condition="'$(ViuInjectSingleFileComponentCssLink)' == ''">false</ViuInjectSingleFileComponentCssLink>
   </PropertyGroup>
@@ -93,12 +94,12 @@
              AssemblyFile="$(ViuBundleCssTaskAssembly)"
              Condition="'$(ViuBundleSingleFileComponentCss)' == 'true'" />
 
-  <!-- The host-page <link> injector ([V01.01.12.12.01]) ships in the same Sdk.Tasks assembly. Declared
-       unconditionally-of-Exists for the same reason ViuBundleCss is (see above): a UsingTask AssemblyFile is
+  <!-- The host-page <link> injector ([V01.01.12.12.01]) ships in the Browser Tasks assembly. Declared
+       unconditionally-of-Exists for the same lazy UsingTask reason described above: its AssemblyFile is
        resolved lazily on first invocation, and the invoking targets keep their own Exists gate, so the
        in-repo build-order edge is what guarantees the DLL is present by the time the injector runs. -->
-  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink"
-             AssemblyFile="$(ViuBundleCssTaskAssembly)"
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink"
+             AssemblyFile="$(ViuInjectCssBundleLinkTaskAssembly)"
              Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true'" />
 
   <!-- In-repo dogfooding build-order edge ([V01.01.12.12.03]): a consuming project loads ViuBundleCss via
@@ -115,6 +116,13 @@
        frameworks/Assimalign.Viu.App.Refs. -->
   <ItemGroup Condition="'$(ViuBundleSingleFileComponentCss)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj')">
     <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      PrivateAssets="all"
+                      UndefineProperties="TargetFramework;RuntimeIdentifier" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
                       PrivateAssets="all"
@@ -343,7 +351,7 @@
   <!-- BUILD: inject into the build-kind host page before build compression enumerates assets. Mirrors the
        SDK's ResolveHtmlAssetPlaceholdersBuildStaticWebAssets (AssetKind != Publish → recompute as Build). -->
   <Target Name="_ViuInjectSingleFileComponentCssLinkBuild"
-          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
+          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuInjectCssBundleLinkTaskAssembly)')"
           BeforeTargets="ResolveBuildCompressedStaticWebAssetsConfiguration"
           DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkBuildRewriteDependency)">
     <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">
@@ -407,7 +415,7 @@
        the SDK's ResolveHtmlAssetPlaceholdersPublishStaticWebAssets (AssetKind != Build → recompute as
        Publish). This is the path #167's acceptance criterion verifies against a published app. -->
   <Target Name="_ViuInjectSingleFileComponentCssLinkPublish"
-          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuBundleCssTaskAssembly)')"
+          Condition="'$(ViuInjectSingleFileComponentCssLink)' == 'true' and Exists('$(ViuInjectCssBundleLinkTaskAssembly)')"
           BeforeTargets="ResolvePublishCompressedStaticWebAssetsConfiguration"
           DependsOnTargets="_ViuResolveSingleFileComponentCssLinkConfiguration;$(_ViuCssLinkPublishRewriteDependency)">
     <ItemGroup Condition="'$(_ViuCssBundleExists)' == 'true' and Exists('$(_ViuCssBundlePath)')">

@@ -145,8 +145,8 @@ function Get-ViuLibraryProject {
 function Get-ViuPackageId {
     <#
     .SYNOPSIS
-        Every Viu package id a repack can invalidate: the libraries, the SDK, the
-        targeting pack, and one runtime pack per runtime identifier.
+        Every Viu package id a repack can invalidate: the libraries, both SDKs,
+        both targeting packs, and one Browser runtime pack per runtime identifier.
 
     .PARAMETER Rids
         Runtime identifiers whose runtime packs are produced.
@@ -157,8 +157,157 @@ function Get-ViuPackageId {
     )
 
     return @($script:ViuLibraryPackageIds) +
-        @('Assimalign.Viu.Sdk', 'Assimalign.Viu.App.Ref') +
-        @($Rids | ForEach-Object { "Assimalign.Viu.App.Runtime.$_" })
+        @(
+            'Assimalign.Viu.Sdk',
+            'Assimalign.Viu.Sdk.Browser',
+            'Assimalign.Viu.App.Ref',
+            'Assimalign.Viu.App.Browser.Ref'
+        ) +
+        @($Rids | ForEach-Object { "Assimalign.Viu.App.Browser.Runtime.$_" })
+}
+
+function Assert-ViuFrameworkPackage {
+    <#
+    .SYNOPSIS
+        Verifies a Viu targeting or runtime pack against its managed-assembly
+        manifest and targeting-pack package overrides.
+
+    .PARAMETER PackagePath
+        The framework NuGet package to inspect.
+
+    .PARAMETER ManifestPath
+        The manifest entry path: data/FrameworkList.xml or data/RuntimeList.xml.
+
+    .PARAMETER ExpectedFrameworkAssembly
+        The exact managed assembly names expected in the manifest and archive.
+
+    .PARAMETER ExpectedPackageOverride
+        The exact standalone package ids expected in data/PackageOverrides.txt.
+        Runtime packs pass an empty list and are asserted not to carry the file.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $PackagePath,
+
+        [Parameter(Mandatory)]
+        [string] $ManifestPath,
+
+        [Parameter(Mandatory)]
+        [string[]] $ExpectedFrameworkAssembly,
+
+        [string[]] $ExpectedPackageOverride = @()
+    )
+
+    $package = Get-Item -LiteralPath $PackagePath -ErrorAction Stop
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+    try {
+        $manifestEntry = $archive.GetEntry($ManifestPath)
+        if ($null -eq $manifestEntry) {
+            throw "$($package.Name) is missing $ManifestPath."
+        }
+
+        $manifestReader = [System.IO.StreamReader]::new(
+            $manifestEntry.Open())
+        try {
+            [xml] $manifest = $manifestReader.ReadToEnd()
+        }
+        finally {
+            $manifestReader.Dispose()
+        }
+
+        $actualFrameworkAssemblies = @(
+            $manifest.DocumentElement.File |
+                Where-Object Type -eq 'Managed' |
+                ForEach-Object AssemblyName |
+                Sort-Object)
+        $frameworkDifference = @(
+            Compare-Object `
+                ($ExpectedFrameworkAssembly | Sort-Object) `
+                $actualFrameworkAssemblies)
+        if ($frameworkDifference.Count -ne 0) {
+            throw "$($package.Name) managed assembly manifest differs from the framework contract: $($frameworkDifference | Out-String)"
+        }
+
+        foreach ($assemblyName in $ExpectedFrameworkAssembly) {
+            $assemblyFileName = "$assemblyName.dll"
+            $matchingEntries = @(
+                $archive.Entries |
+                    Where-Object {
+                        $_.FullName.EndsWith(
+                            "/$assemblyFileName",
+                            [System.StringComparison]::Ordinal)
+                    })
+            if ($matchingEntries.Count -ne 1) {
+                throw "$($package.Name) must contain exactly one $assemblyFileName, found $($matchingEntries.Count)."
+            }
+        }
+
+        $packageOverridesEntry = $archive.GetEntry(
+            'data/PackageOverrides.txt')
+        if ($ExpectedPackageOverride.Count -eq 0) {
+            if ($null -ne $packageOverridesEntry) {
+                throw "$($package.Name) must not carry targeting-only data/PackageOverrides.txt."
+            }
+
+            return
+        }
+
+        if ($null -eq $packageOverridesEntry) {
+            throw "$($package.Name) is missing data/PackageOverrides.txt."
+        }
+
+        $nuspecEntries = @(
+            $archive.Entries |
+                Where-Object {
+                    $_.FullName.EndsWith(
+                        '.nuspec',
+                        [System.StringComparison]::OrdinalIgnoreCase)
+                })
+        if ($nuspecEntries.Count -ne 1) {
+            throw "$($package.Name) must contain exactly one nuspec, found $($nuspecEntries.Count)."
+        }
+
+        $nuspecReader = [System.IO.StreamReader]::new(
+            $nuspecEntries[0].Open())
+        try {
+            [xml] $nuspec = $nuspecReader.ReadToEnd()
+        }
+        finally {
+            $nuspecReader.Dispose()
+        }
+        $packageVersion = $nuspec.SelectSingleNode(
+            "//*[local-name()='metadata']/*[local-name()='version']").InnerText
+
+        $packageOverridesReader = [System.IO.StreamReader]::new(
+            $packageOverridesEntry.Open())
+        try {
+            $actualPackageOverrides = @(
+                $packageOverridesReader.ReadToEnd() -split '\r?\n' |
+                    Where-Object {
+                        -not [string]::IsNullOrWhiteSpace($_)
+                    } |
+                    Sort-Object)
+        }
+        finally {
+            $packageOverridesReader.Dispose()
+        }
+
+        $expectedPackageOverrides = @(
+            $ExpectedPackageOverride |
+                ForEach-Object { "$_|$packageVersion" } |
+                Sort-Object)
+        $packageOverrideDifference = @(
+            Compare-Object `
+                $expectedPackageOverrides `
+                $actualPackageOverrides)
+        if ($packageOverrideDifference.Count -ne 0) {
+            throw "$($package.Name) package overrides differ from the framework contract: $($packageOverrideDifference | Out-String)"
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
 }
 
 function Get-ViuPackageCacheRoot {
@@ -315,5 +464,6 @@ Export-ModuleMember -Function `
     Get-ViuLibraryPackageId,
     Get-ViuLibraryProject,
     Get-ViuPackageId,
+    Assert-ViuFrameworkPackage,
     Get-ViuPackageCacheRoot,
     Clear-ViuPackageCache

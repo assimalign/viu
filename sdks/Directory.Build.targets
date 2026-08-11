@@ -1,7 +1,8 @@
 <Project>
     <Import Project="..\Directory.Build.targets" />
     <PropertyGroup>
-        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectSdkWatchFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectSdkTaskFiles;CollectShippedVersionProps</TargetsForTfmSpecificContentInPackage>
+        <TargetsForTfmSpecificContentInPackage Condition="'$(ViuSdkBrowserPackage)' == 'true'">$(TargetsForTfmSpecificContentInPackage);CollectSdkWatchFiles</TargetsForTfmSpecificContentInPackage>
     </PropertyGroup>
     <ItemGroup>
         <!-- The SDK-shaped nupkg layout: Sdk/ and Targets/ at package root -
@@ -32,21 +33,25 @@
             and dogfooded consumers share one authoritative source.
         -->
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
-              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Css.Bundling.targets" Visible="false" />
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
+              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Browser.Css.Bundling.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
-              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.UtilityCss.targets" Visible="false" />
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
+              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets" Visible="false" />
         <None Include="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
-              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Css.HotReload.targets" Visible="false" />
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
+              Pack="true" PackagePath="Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets" Visible="false" />
 
         <!--
             Framework static web assets. A FrameworkReference delivers DLLs
             only, so the JS half of the Browser interop bridge rides in the
-            SDK package and Assimalign.Viu.Sdk.StaticWebAssets.targets copies
+            Browser SDK package and Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets copies
             it into the consumer's wwwroot/_content/<library>/ (the same
             /_content/<id>/ URL shape the in-repo
             build/Targets/Build.StaticWebAssets.targets produces).
         -->
         <None Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*"
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               Pack="true" PackagePath="assets/Assimalign.Viu.Browser/%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
 
         <None Include="$(ViuRepositoryDirectory)sdks\README.md" Pack="true" PackagePath="README.md" Visible="false" />
@@ -67,13 +72,16 @@
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkTargetsFile)" DestinationFolder="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.Bundling.targets"
-              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Css.Bundling.targets" />
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
+              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.Css.Bundling.targets" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.UtilityCss.targets"
-              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.UtilityCss.targets" />
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
+              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.UtilityCss.targets" />
         <Copy SourceFiles="$(ViuRepositoryDirectory)build\Targets\Build.Css.HotReload.targets"
-              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Css.HotReload.targets" />
+              Condition="'$(ViuSdkBrowserPackage)' == 'true'"
+              DestinationFiles="$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\Targets\Assimalign.Viu.Sdk.Browser.Css.HotReload.targets" />
         <ItemGroup>
-            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*" />
+            <_ViuSdkAssetFile Include="$(ViuRepositoryDirectory)libraries\Assimalign.Viu.Browser\src\wwwroot\**\*" Condition="'$(ViuSdkBrowserPackage)' == 'true'" />
         </ItemGroup>
         <Copy SourceFiles="@(_ViuSdkAssetFile)"
               DestinationFiles="@(_ViuSdkAssetFile->'$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\$(PackageId)\assets\Assimalign.Viu.Browser\%(RecursiveDir)%(Filename)%(Extension)')" />
@@ -157,7 +165,7 @@
                Text="CollectSdkTaskFiles swept $(OutDir) but the SDK's primary task assembly $(TargetFileName) is not in the collected set, so the package would ship a Tasks/ payload that cannot load. CopyFilesToOutputDirectory is the target that places it there, and it must run before Pack collects the payload: build before packing (do not pass --no-build or -p:NoBuild=true) and do not clean $(OutDir) in between." />
     </Target>
 
-    <Target Name="CollectSdkWatchFiles">
+    <Target Name="CollectSdkWatchFiles" Condition="'$(ViuSdkBrowserPackage)' == 'true'">
         <ItemGroup>
             <!-- Keep the SDK archive platform-neutral and immune to stale apphosts or symbols in
                  the shared output directory. ViuStartCssHotReloadWorker launches the DLL through
@@ -168,6 +176,23 @@
             <TfmSpecificPackageFile Include="@(_ViuSdkWatchFile)">
                 <PackagePath>Watch/%(_ViuSdkWatchFile.RecursiveDir)%(_ViuSdkWatchFile.Filename)%(_ViuSdkWatchFile.Extension)</PackagePath>
             </TfmSpecificPackageFile>
+        </ItemGroup>
+    </Target>
+
+    <!--
+        The Browser SDK composes the base SDK as one product surface, so the
+        two packages must be restored at exactly the same version. NuGet's
+        default project-reference dependency is a minimum version; pin the
+        generated dependency range after Pack has resolved project versions.
+    -->
+    <Target Name="PinBrowserSdkPackageDependency"
+            BeforeTargets="GenerateNuspec"
+            Condition="'$(ViuSdkBrowserPackage)' == 'true'">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)"
+                                            Condition="'%(Filename)' == 'Assimalign.Viu.Sdk.Tasks'">
+                <ProjectVersion>[$(ViuVersion)]</ProjectVersion>
+            </_ProjectReferencesWithVersions>
         </ItemGroup>
     </Target>
 

@@ -1,0 +1,31 @@
+<Project>
+    <!--
+        The base framework is deliberately targeting-only, while the Browser
+        runtime pack carries the complete base + Browser implementation closure.
+        Mono's runtime-component target uses unqualified RuntimePackPath metadata
+        while iterating every ResolvedFrameworkReference, which fails when the
+        targeting-only base item has no such metadata. Give only that resolved
+        item the qualified Microsoft.NETCore.App runtime path as compatibility
+        metadata. This keeps Mono on its own component manifest while registering
+        no base runtime pack ([V01.01.12.27], #323).
+    -->
+    <Target Name="_ViuCompleteBrowserFrameworkReferenceRuntimeMetadata"
+            AfterTargets="ResolveFrameworkReferences"
+            BeforeTargets="_MonoReadAvailableComponentsManifest"
+            Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+        <ItemGroup>
+            <_ViuResolvedMicrosoftNetCoreApp Include="@(ResolvedFrameworkReference)"
+                                             Condition="'%(Identity)' == 'Microsoft.NETCore.App'" />
+        </ItemGroup>
+        <PropertyGroup>
+            <_ViuMicrosoftNetCoreAppRuntimePackPath>@(_ViuResolvedMicrosoftNetCoreApp->'%(RuntimePackPath)')</_ViuMicrosoftNetCoreAppRuntimePackPath>
+        </PropertyGroup>
+        <ItemGroup Condition="'$(_ViuMicrosoftNetCoreAppRuntimePackPath)' != ''">
+            <ResolvedFrameworkReference Update="@(ResolvedFrameworkReference)"
+                                        Condition="'%(ResolvedFrameworkReference.Identity)' == 'Assimalign.Viu.App'">
+                <RuntimePackPath>$(_ViuMicrosoftNetCoreAppRuntimePackPath)</RuntimePackPath>
+            </ResolvedFrameworkReference>
+            <_ViuResolvedMicrosoftNetCoreApp Remove="@(_ViuResolvedMicrosoftNetCoreApp)" />
+        </ItemGroup>
+    </Target>
+</Project>

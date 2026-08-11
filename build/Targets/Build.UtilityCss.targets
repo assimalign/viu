@@ -22,9 +22,8 @@
     <ViuUtilityCssSourcePatterns Condition="'$(ViuUtilityCssSourcePatterns)' == ''">**/*.viu;**/*.vue;**/*.html;**/*.htm</ViuUtilityCssSourcePatterns>
 
     <!-- The task ships beside ViuBundleCss. Packaged consumers receive the preconfigured path from
-         Assimalign.Viu.Sdk.Common.props; in-repo opt-in consumers use the loose SDK layout. -->
-    <ViuUtilityCssTaskAssembly Condition="'$(ViuUtilityCssTaskAssembly)' == '' and '$(ViuBundleCssTaskAssembly)' != ''">$(ViuBundleCssTaskAssembly)</ViuUtilityCssTaskAssembly>
-    <ViuUtilityCssTaskAssembly Condition="'$(ViuUtilityCssTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.dll</ViuUtilityCssTaskAssembly>
+         Assimalign.Viu.Sdk.Browser.Common.props; in-repo opt-in consumers use the loose SDK layout. -->
+    <ViuUtilityCssTaskAssembly Condition="'$(ViuUtilityCssTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuUtilityCssTaskAssembly>
 
     <ViuInjectUtilityCssLink Condition="'$(ViuInjectUtilityCssLink)' == '' and '$(ViuBundleUtilityCss)' == 'true'">true</ViuInjectUtilityCssLink>
     <ViuInjectUtilityCssLink Condition="'$(ViuInjectUtilityCssLink)' == ''">false</ViuInjectUtilityCssLink>
@@ -50,10 +49,10 @@
     <_ViuUtilityCssResolvedSource Include="@(_ViuUtilityCssSourceCandidate)" KeepDuplicates="false" />
   </ItemGroup>
 
-  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuBundleUtilityCss"
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuBundleUtilityCss"
              AssemblyFile="$(ViuUtilityCssTaskAssembly)"
              Condition="'$(ViuBundleUtilityCss)' == 'true'" />
-  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuInjectCssBundleLink"
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuInjectCssBundleLink"
              AssemblyFile="$(ViuUtilityCssTaskAssembly)"
              Condition="'$(ViuInjectUtilityCssLink)' == 'true'" />
 
@@ -63,8 +62,8 @@
     cannot express ReferenceOutputAssembly=false plus UndefineProperties across the app TFM/RID
     boundary. When component CSS is also enabled, its identical edge already supplies the order.
   -->
-  <ItemGroup Condition="'$(ViuBundleUtilityCss)' == 'true' and '$(ViuBundleSingleFileComponentCss)' != 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj')">
-    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk\Tasks\Assimalign.Viu.Sdk.Tasks.csproj"
+  <ItemGroup Condition="'$(ViuBundleUtilityCss)' == 'true' and '$(ViuBundleSingleFileComponentCss)' != 'true' and '$(ViuRepositoryDirectory)' != '' and Exists('$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj')">
+    <ProjectReference Include="$(ViuRepositoryDirectory)sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.csproj"
                       ReferenceOutputAssembly="false"
                       Private="false"
                       PrivateAssets="all"

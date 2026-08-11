@@ -16,14 +16,18 @@ component model and closed virtual-node algebra, compiler-informed block patchin
 reconciliation, browser/server/testing hosts, routing and state conventions, the build-time
 template and single-file-component pipeline, packaging, and editor tooling.
 
-A developer can manually create an external `<Project Sdk="Assimalign.Viu.Sdk">` application;
-author code-first, `.viu`, or compatible `.vue` components; compose services, state, registrations,
-and lifetime middleware; run a reactive browser application; use the router and state libraries;
-render HTML or test components without a browser; and publish a trimmed static WebAssembly site.
+A developer can create a host-neutral component library with
+`<Project Sdk="Assimalign.Viu.Sdk">`.
+A browser application uses
+`<Project Sdk="Assimalign.Viu.Sdk.Browser">`. Both paths support code-first, `.viu`, and compatible
+`.vue` component authoring. Browser applications can compose services, state, registrations, and
+lifetime middleware; run reactively; use the router and state libraries; and publish a trimmed static
+WebAssembly site. Components can also be rendered to HTML or tested without a browser. The
+component-library path needs neither Browser nor the WebAssembly workload.
 The sibling [`assimalign/viu-examples`](https://github.com/assimalign/viu-examples) repository is the
 packaged-consumer showcase for those paths.
 
-The SDK also has a real Debug `dotnet watch` path: stylesheet changes regenerate CSS and refresh
+The Browser SDK also has a real Debug `dotnet watch` path: stylesheet changes regenerate CSS and refresh
 links without discarding browser state, while generated metadata remounts affected components for
 template or C# changes. That path is not yet a separate Viu development-server command, and Visual
 Studio's ordinary Hot Reload command does not invoke the SDK watch-list contract.
@@ -120,25 +124,27 @@ These eight dated decisions define Viu's C# and WebAssembly architecture:
    downstream adapter (Cohesion Web first; ASP.NET Core only if ever wanted), and no
    Assimalign.Viu.* library may reference a web framework (decision reaffirmed and made binding
    2026-07-17).
-8. **SDK-first packaging on Cohesion's shared-framework model (landed 2026-07-19,
-   `V01.01.12.19`/#174).** Viu ships as an MSBuild project SDK — a consumer csproj is just
-   `<Project Sdk="Assimalign.Viu.Sdk">` — chaining `Microsoft.NET.Sdk.WebAssembly`, with the
-   framework delivered as the `Assimalign.Viu.App` shared framework: a `KnownFrameworkReference`
-   registration resolving to the `Assimalign.Viu.App.Ref` targeting pack (compile references +
-   `data/FrameworkList.xml`) and per-RID `Assimalign.Viu.App.Runtime.<rid>` runtime packs
-   (`browser-wasm` today) — the shared-framework packaging layout established in
-   `assimalign/cohesion`'s `sdks/` + `frameworks/`. **Codegen placement decision:** the source
-   generators stay Roslyn incremental generators (moving them into MSBuild tasks would forfeit IDE
-   integration and incrementality) but are *delivered* through the Ref pack's `analyzers/dotnet/cs`
-   with `<File Type="Analyzer">` manifest entries, so SDK consumers get `[Reactive]` and `.viu`
-   compilation with zero wiring; the `ViuBundleCss` MSBuild task and the `.viu`
-   AdditionalFiles/CSS-bundling MSBuild logic ship inside the SDK package (`Tasks/` + `Targets/`,
-   packed from their in-repo sources so they cannot drift). The local loop is
-   `scripts/Install-Local.ps1` → `_out/packages` (see `sdks/README.md`). In-repo projects keep
-   dogfooding via `ViuProjectReference` — the SDK is the *external consumer* surface. This
-   re-scopes `V01.01.12.03` (#92: library packages + feed publishing on top of the pack loop) and
-   delivers `V01.01.12.12.02` (#168: the task now ships in the SDK rather than a standalone
-   package).
+8. **SDK-first packaging with explicit base/Browser segments (packaging foundation landed 2026-07-19 under
+   `V01.01.12.19`/#174; segmented 2026-08-09 under `V01.01.12.27`/#323).** Viu ships two
+   compositional MSBuild project SDKs. `<Project Sdk="Assimalign.Viu.Sdk">` chains
+   `Microsoft.NET.Sdk` for host-neutral component libraries; it supplies `.viu`/`.vue` and
+   reactivity generators, carries component styles through library packing, and references the
+   targeting-only `Assimalign.Viu.App` framework (Reactivity, Components, State, and Core).
+   `<Project Sdk="Assimalign.Viu.Sdk.Browser">` imports that base, chains
+   `Microsoft.NET.Sdk.WebAssembly`, and references `Assimalign.Viu.App.Browser`, whose Browser-only
+   targeting pack is composed with the base and whose
+   `Assimalign.Viu.App.Browser.Runtime.browser-wasm` package owns the runtime payload. Browser assets,
+   CSS bundling into `wwwroot`, hot reload, and publish budgets belong only to the Browser SDK;
+   ServerRenderer remains an opt-in package. This implements API-hardening decision D12: component
+   libraries need build-time component authoring without loading browser payload, which superseded
+   the former second-host trigger. **Codegen placement decision:** the source generators stay Roslyn
+   incremental generators (moving them into MSBuild tasks would forfeit IDE integration and
+   incrementality) and are delivered through `Assimalign.Viu.App.Ref` at `analyzers/dotnet/cs` with
+   `<File Type="Analyzer">` manifest entries. The local loop is `scripts/Install-Local.ps1` →
+   `_out/packages` (see `sdks/README.md`). In-repo projects keep dogfooding via
+   `ViuProjectReference`; the two SDKs are external-consumer surfaces. The packaging model retains
+   the `V01.01.12.03` (#92) feed/release scope and delivers `V01.01.12.12.02` (#168) through the
+   segmented SDK payload.
 
 ## Delivery model
 
@@ -164,10 +170,10 @@ Work is tracked exactly like the sibling Cohesion repo:
 | **W02** | The component/application foundation, watch/reactive collections, keyed reconciliation, browser bootstrap, and test utilities are delivered; every planned feature row is closed | No planned feature row remains |
 | **W03** | The primary compiler, single-file-component, block-patching, directive, and interop-batching paths are delivered | Complete deferred compiler optimizations and diagnostic source attribution, then restore publish-size, trimming, and startup budget enforcement; startup timing still depends on the browser harness |
 | **W04** | Router, State, built-ins, CSS compilation/modules, samples, and the getting-started path are delivered at their main feature boundaries | Close built-in edge cases, generated State/source-map work, hosted and multi-bundle CSS delivery, and the deferred scoped-CSS runtime |
-| **W05** | Browser packaging, hydration foundations, editor hot-reload metadata, and a working `dotnet watch` CSS/component path exist | Finish server compiler/hosting and state hydration, lazy routing, runtime inspection, the browser harness, templates and the productized development loop, release automation, payload accounting, compatibility/conformance gates, and Cohesion hosting integration |
+| **W05** | Host-neutral component-library and Browser SDK/framework segments, browser packaging, hydration foundations, editor hot-reload metadata, and a working `dotnet watch` CSS/component path exist | Finish server compiler/hosting and state hydration, lazy routing, runtime inspection, the browser harness, templates and the productized development loop, release automation, payload accounting, compatibility/conformance gates, and Cohesion hosting integration |
 | **W06** | Utility composition and semantic `@script` language-server work have begun | Deliver complete Suspense, custom elements, static prerendering, persistent State extensions, the DevTools timeline/user interface, remaining editor support, generated API reference, and the documentation site |
 
-This snapshot reconciles the plan with live issue state on 2026-08-08. Newly tracked follow-ups for
+This snapshot reconciles the plan with live issue state on 2026-08-09. Newly tracked follow-ups for
 scoped CSS, budget-gate restoration, and deferred compiler optimization are grouped with their
 closest delivery themes here; Project #15 remains authoritative for their Wave custom fields.
 
@@ -180,9 +186,10 @@ closure, package overrides, XML documentation enforcement, and PublicAPI baselin
 child features are closed, and every row in the
 [`API-HARDENING-PLAN.md`](API-HARDENING-PLAN.md) completion record is terminal.
 
-The D6 SDK/framework platform segmentation decision is intentionally deferred until a first
-non-browser host provides a second real topology to test. That trigger is outside this completed
-arc; it is not an open API-hardening requirement.
+The D6 SDK/framework platform segmentation decision was delivered after the arc by
+`[V01.01.12.27]` (#323). API-hardening decision D12 superseded the second-host trigger because
+component-library authoring already supplies the second real consumer topology: generator and style
+extraction without Browser, WebAssembly, browser assets, or a runtime pack.
 
 ### [V01.01.15] Component model — complete
 
@@ -372,6 +379,7 @@ completed P0–P6 sequence, and verification record remain in
 | `V01.01.12.18` | Rename product naming from Vue/Vuecs to Viu repo-wide | W04 | P002 |
 | `V01.01.12.19` | Adopt Cohesion SDK/shared-framework packaging (Assimalign.Viu.Sdk + Assimalign.Viu.App) | W05 | P003 |
 | `V01.01.12.23` | Provide semantic C# IntelliSense in the @script block through a Roslyn workspace in the language server | W06 | P004 |
+| `V01.01.12.27` | Segment the SDK and shared framework into base and Browser packages | W05 | P003 |
 
 ### [V01.01.13] Framework - Documentation (W02, P003)
 

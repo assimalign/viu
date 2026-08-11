@@ -34,8 +34,7 @@ $viuVersion = "$major.$minor.$patch"
 $feed = Join-Path $repoRoot '_out\packages'
 $requiredPackages = @(
     "Assimalign.Viu.Sdk.$viuVersion.nupkg",
-    "Assimalign.Viu.App.Ref.$viuVersion.nupkg",
-    "Assimalign.Viu.App.Runtime.browser-wasm.$viuVersion.nupkg"
+    "Assimalign.Viu.App.Ref.$viuVersion.nupkg"
 )
 foreach ($requiredPackage in $requiredPackages) {
     if (-not (Test-Path (Join-Path $feed $requiredPackage))) {

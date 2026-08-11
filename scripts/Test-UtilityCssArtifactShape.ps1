@@ -2,8 +2,8 @@
 .SYNOPSIS
     Verifies the Viu Utilities payload embedded in distributable NuGet and VSIX archives.
 
-.PARAMETER SdkPackage
-    Optional Assimalign.Viu.Sdk NuGet package to inspect.
+.PARAMETER BrowserSdkPackage
+    Optional Assimalign.Viu.Sdk.Browser NuGet package to inspect.
 
 .PARAMETER UtilityCssPackage
     Optional Assimalign.Viu.UtilityCss NuGet package to inspect.
@@ -13,17 +13,17 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $SdkPackage = '',
+    [string] $BrowserSdkPackage = '',
     [string] $UtilityCssPackage = '',
     [string] $VisualStudioExtension = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
-if ([string]::IsNullOrWhiteSpace($SdkPackage) -and
+if ([string]::IsNullOrWhiteSpace($BrowserSdkPackage) -and
     [string]::IsNullOrWhiteSpace($UtilityCssPackage) -and
     [string]::IsNullOrWhiteSpace($VisualStudioExtension)) {
-    throw 'Specify at least one SDK package, utility CSS package, or Visual Studio extension.'
+    throw 'Specify at least one Browser SDK package, utility CSS package, or Visual Studio extension.'
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -131,16 +131,16 @@ function Assert-NoForbiddenNuGetDependencies {
     }
 }
 
-if (-not [string]::IsNullOrWhiteSpace($SdkPackage)) {
-    $archive = Open-ArtifactArchive -Path $SdkPackage
+if (-not [string]::IsNullOrWhiteSpace($BrowserSdkPackage)) {
+    $archive = Open-ArtifactArchive -Path $BrowserSdkPackage
     try {
-        $artifactName = [System.IO.Path]::GetFileName($SdkPackage)
+        $artifactName = [System.IO.Path]::GetFileName($BrowserSdkPackage)
         $requiredEntries = @(
-            'Assimalign.Viu.Sdk.nuspec',
+            'Assimalign.Viu.Sdk.Browser.nuspec',
             'Sdk/Sdk.targets',
-            'Targets/Assimalign.Viu.Sdk.UtilityCss.targets',
-            'Targets/Assimalign.Viu.Sdk.Css.HotReload.targets',
-            'Tasks/Assimalign.Viu.Sdk.Tasks.dll',
+            'Targets/Assimalign.Viu.Sdk.Browser.UtilityCss.targets',
+            'Targets/Assimalign.Viu.Sdk.Browser.Css.HotReload.targets',
+            'Tasks/Assimalign.Viu.Sdk.Browser.Tasks.dll',
             'Tasks/Assimalign.Viu.UtilityCss.dll',
             'Tasks/Assimalign.Viu.UtilityCss.THIRD-PARTY-NOTICES.md',
             'Watch/Assimalign.Viu.Sdk.CssHotReload.deps.json',
@@ -157,7 +157,7 @@ if (-not [string]::IsNullOrWhiteSpace($SdkPackage)) {
             -ArtifactName $artifactName
         Assert-NoForbiddenNuGetDependencies `
             -Archive $archive `
-            -EntryName 'Assimalign.Viu.Sdk.nuspec' `
+            -EntryName 'Assimalign.Viu.Sdk.Browser.nuspec' `
             -ArtifactName $artifactName
 
         $expectedWatchEntries = @(

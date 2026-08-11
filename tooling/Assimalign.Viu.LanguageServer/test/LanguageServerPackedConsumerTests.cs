@@ -270,6 +270,10 @@ public class LanguageServerPackedConsumerTests
             <Project Sdk="Assimalign.Viu.Sdk">
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
+                <!-- Some .NET 10.0.3xx SDK installs (CI Windows runners included) ship no prune
+                     data for net10.0 and fail restore with NETSDK1226; the repository's packaged
+                     consumer harnesses apply the same accommodation. -->
+                <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
               </PropertyGroup>
             </Project>
             """);

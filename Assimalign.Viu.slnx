@@ -106,6 +106,7 @@
 	</Folder>
 	<Folder Name="/viu/frameworks/">
 		<File Path="frameworks/Assimalign.Viu.App.props" />
+		<File Path="frameworks/Assimalign.Viu.App.Browser.props" />
 		<File Path="frameworks/Assimalign.Viu.App.targets" />
 		<File Path="frameworks/Directory.Build.props" />
 		<File Path="frameworks/Directory.Build.targets" />
@@ -114,9 +115,13 @@
 	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Refs/src/">
 		<Project Path="frameworks/Assimalign.Viu.App.Refs/src/Assimalign.Viu.App.Refs.csproj" />
 	</Folder>
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Runtime/" />
-	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Runtime/src/">
-		<Project Path="frameworks/Assimalign.Viu.App.Runtime/src/Assimalign.Viu.App.Runtime.csproj" />
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Refs/" />
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Refs/src/">
+		<Project Path="frameworks/Assimalign.Viu.App.Browser.Refs/src/Assimalign.Viu.App.Browser.Refs.csproj" />
+	</Folder>
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/" />
+	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/src/">
+		<Project Path="frameworks/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj" />
 	</Folder>
 	<Folder Name="/viu/sdks/">
 		<File Path="sdks/Directory.Build.props" />
@@ -129,16 +134,28 @@
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.props" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Generators.Syntax.targets" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.Common.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.ComponentStyles.targets" />
 		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.FrameworkReference.props" />
-		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.StaticWebAssets.targets" />
-		<File Path="sdks/Assimalign.Viu.Sdk/Targets/Assimalign.Viu.Sdk.WebAssembly.targets" />
 	</Folder>
 	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Tasks/">
 		<Project Path="sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj" />
 	</Folder>
-	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk/Watch/">
-		<Project Path="sdks/Assimalign.Viu.Sdk/Watch/src/Assimalign.Viu.Sdk.CssHotReload.csproj" />
-		<Project Path="sdks/Assimalign.Viu.Sdk/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj" />
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/">
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Sdk/Sdk.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Sdk/Sdk.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Targets/Assimalign.Viu.Sdk.Browser.Common.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Targets/Assimalign.Viu.Sdk.Browser.ComponentStyles.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.props" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Targets/Assimalign.Viu.Sdk.Browser.FrameworkReference.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Targets/Assimalign.Viu.Sdk.Browser.StaticWebAssets.targets" />
+		<File Path="sdks/Assimalign.Viu.Sdk.Browser/Targets/Assimalign.Viu.Sdk.Browser.WebAssembly.targets" />
+	</Folder>
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/Tasks/">
+		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Tasks/Assimalign.Viu.Sdk.Browser.Tasks.csproj" />
+	</Folder>
+	<Folder Name="/viu/sdks/Assimalign.Viu.Sdk.Browser/Watch/">
+		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/src/Assimalign.Viu.Sdk.CssHotReload.csproj" />
+		<Project Path="sdks/Assimalign.Viu.Sdk.Browser/Watch/test/Assimalign.Viu.Sdk.CssHotReload.Tests.csproj" />
 	</Folder>
 	<Folder Name="/viu/benchmarks/Assimalign.Viu.Testing.Benchmarks/">
 		<Project Path="benchmarks/Assimalign.Viu.Testing.Benchmarks/Assimalign.Viu.Testing.Benchmarks.csproj" />

@@ -9,7 +9,7 @@ using System.Threading;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
-namespace Assimalign.Viu.Sdk.Tasks;
+namespace Assimalign.Viu.Sdk.Browser.Tasks;
 
 /// <summary>
 /// Starts the development-only Viu CSS regeneration worker for a

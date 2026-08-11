@@ -1,32 +1,5 @@
 <Project>
-    <!--
-        Registers the Viu shared framework with the .NET SDK ([V01.01.12.19],
-        #174 - the Viu port of cohesion's
-        Assimalign.Cohesion.Sdk.FrameworkReference.props).
-
-        One framework is registered: Assimalign.Viu.App. The SDK auto-includes
-        <FrameworkReference Include="Assimalign.Viu.App" /> so a consumer
-        compiles against the whole framework (Shared, Core, Browser + the
-        umbrella) and picks up the [Reactive]/.viu source generators from the
-        Ref pack's analyzers/dotnet/cs - with a single
-        one-line SDK reference and no PackageReferences.
-
-        Pack resolution: the .NET SDK looks for the packs locally under
-        $(NetCoreTargetingPackRoot) / packs; not found there (the normal case
-        for third-party frameworks), it restores them from the configured
-        NuGet feeds:
-
-            Assimalign.Viu.App.Ref                   (targeting pack - compile)
-            Assimalign.Viu.App.Runtime.browser-wasm  (runtime pack - app bundle)
-
-        ViuAutoIncludeAppFramework=false disables the implicit
-        <FrameworkReference>. The KnownFrameworkReference registration stays,
-        so explicit <FrameworkReference> entries keep working.
-
-        ViuAppFrameworkVersion lets consumers pin or roll forward the
-        framework independently of the SDK version.
-    -->
-
+    <!-- Targeting-only host-neutral framework registration ([V01.01.12.27], #323). -->
     <PropertyGroup>
         <ViuAppFrameworkVersion Condition="'$(ViuAppFrameworkVersion)' == ''">$(ViuVersion)</ViuAppFrameworkVersion>
     </PropertyGroup>
@@ -34,14 +7,8 @@
     <ItemGroup>
         <KnownFrameworkReference Include="Assimalign.Viu.App"
             TargetFramework="net10.0"
-            RuntimeFrameworkName="Assimalign.Viu.App"
-            DefaultRuntimeFrameworkVersion="$(ViuAppFrameworkVersion)"
-            LatestRuntimeFrameworkVersion="$(ViuAppFrameworkVersion)"
             TargetingPackName="Assimalign.Viu.App.Ref"
-            TargetingPackVersion="$(ViuAppFrameworkVersion)"
-            RuntimePackNamePatterns="Assimalign.Viu.App.Runtime.**RID**"
-            RuntimePackRuntimeIdentifiers="browser-wasm"
-            IsTrimmable="true" />
+            TargetingPackVersion="$(ViuAppFrameworkVersion)" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(ViuAutoIncludeAppFramework)' != 'false'">

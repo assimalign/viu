@@ -187,15 +187,15 @@ jobs:
           VIU_PACKAGE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           $packageDirectory = '_out/release/packages'
-          $sdkPackage = Join-Path `
+          $browserSdkPackage = Join-Path `
             $packageDirectory `
-            "Assimalign.Viu.Sdk.$($env:VIU_PACKAGE_VERSION).nupkg"
+            "Assimalign.Viu.Sdk.Browser.$($env:VIU_PACKAGE_VERSION).nupkg"
           $utilityPackage = Join-Path `
             $packageDirectory `
             "Assimalign.Viu.UtilityCss.$($env:VIU_PACKAGE_VERSION).nupkg"
 
           ./scripts/Test-UtilityCssArtifactShape.ps1 `
-            -SdkPackage $sdkPackage `
+            -BrowserSdkPackage $browserSdkPackage `
             -UtilityCssPackage $utilityPackage
           ./scripts/Test-UtilityCssIndependence.ps1 `
             -Artifact (Get-ChildItem $packageDirectory -Filter '*.nupkg' | ForEach-Object FullName)

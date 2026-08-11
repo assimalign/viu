@@ -1,0 +1,28 @@
+<Project>
+    <Target Name="ViuFlowFrameworkWebAssets"
+            BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
+            Condition="'$(UsingMicrosoftNETSdkWebAssembly)' == 'true'">
+        <ItemGroup>
+            <_ViuSdkFrameworkWebAsset Include="$(MSBuildThisFileDirectory)../assets/**/*" />
+            <_ViuSdkFrameworkWebAssetDestination Include="@(_ViuSdkFrameworkWebAsset->'wwwroot/_content/%(RecursiveDir)%(Filename)%(Extension)')" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_ViuSdkFrameworkWebAsset)"
+              DestinationFiles="@(_ViuSdkFrameworkWebAssetDestination->'%(FullPath)')"
+              SkipUnchangedFiles="true"
+              Condition="'@(_ViuSdkFrameworkWebAsset)' != ''" />
+        <ItemGroup>
+            <!-- See Browser.ComponentStyles.targets: use physical-path matching
+                 so a prior Build's default wwwroot Content item cannot coexist
+                 with this target-time registration during Publish. -->
+            <Content Remove="@(_ViuSdkFrameworkWebAssetDestination)"
+                     MatchOnMetadata="FullPath"
+                     MatchOnMetadataOptions="PathLike" />
+            <Content Include="@(_ViuSdkFrameworkWebAssetDestination)">
+                <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+                <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+            </Content>
+            <_ViuSdkFrameworkWebAsset Remove="@(_ViuSdkFrameworkWebAsset)" />
+            <_ViuSdkFrameworkWebAssetDestination Remove="@(_ViuSdkFrameworkWebAssetDestination)" />
+        </ItemGroup>
+    </Target>
+</Project>

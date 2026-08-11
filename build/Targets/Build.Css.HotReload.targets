@@ -18,12 +18,12 @@
     <ViuCssHotReloadEnabled Condition="'$(ViuCssHotReloadEnabled)' == ''">false</ViuCssHotReloadEnabled>
     <ViuCssHotReloadLaunchWorker Condition="'$(ViuCssHotReloadLaunchWorker)' == ''">true</ViuCssHotReloadLaunchWorker>
     <ViuCssHotReloadDebounceMilliseconds Condition="'$(ViuCssHotReloadDebounceMilliseconds)' == ''">100</ViuCssHotReloadDebounceMilliseconds>
-    <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuBundleCssTaskAssembly)</ViuCssHotReloadTaskAssembly>
-    <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
+    <ViuCssHotReloadTaskAssembly Condition="'$(ViuCssHotReloadTaskAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Tasks\Assimalign.Viu.Sdk.Browser.Tasks.dll</ViuCssHotReloadTaskAssembly>
+    <ViuCssHotReloadWorkerAssembly Condition="'$(ViuCssHotReloadWorkerAssembly)' == ''">$(ViuOutputPathForSdk)\$(NETCoreSdkVersion)\sdks\Assimalign.Viu.Sdk.Browser\Watch\Assimalign.Viu.Sdk.CssHotReload.dll</ViuCssHotReloadWorkerAssembly>
     <ViuCssHotReloadStateFile Condition="'$(ViuCssHotReloadStateFile)' == ''">$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)viu\css-hot-reload\worker.state'))</ViuCssHotReloadStateFile>
   </PropertyGroup>
 
-  <UsingTask TaskName="Assimalign.Viu.Sdk.Tasks.ViuStartCssHotReloadWorker"
+  <UsingTask TaskName="Assimalign.Viu.Sdk.Browser.Tasks.ViuStartCssHotReloadWorker"
              AssemblyFile="$(ViuCssHotReloadTaskAssembly)"
              Condition="'$(ViuCssHotReloadEnabled)' == 'true'" />
 

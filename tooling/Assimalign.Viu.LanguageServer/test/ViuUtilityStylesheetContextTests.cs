@@ -20,7 +20,7 @@ public sealed class ViuUtilityStylesheetContextTests
                 File.WriteAllText(
                     Path.Combine(directory, "Application.csproj"),
                     """
-                    <Project Sdk="Assimalign.Viu.Sdk">
+                    <Project Sdk="Assimalign.Viu.Sdk.Browser">
                       <ItemGroup>
                         <ViuUtilityCss Include="Styles/Utilities.css" />
                       </ItemGroup>
@@ -56,7 +56,7 @@ public sealed class ViuUtilityStylesheetContextTests
                 File.WriteAllText(
                     Path.Combine(directory, "Application.csproj"),
                     """
-                    <Project Sdk="Assimalign.Viu.Sdk">
+                    <Project Sdk="Assimalign.Viu.Sdk.Browser">
                       <ItemGroup>
                         <ViuUtilityCss Include="Styles/Utilities.css" />
                       </ItemGroup>
@@ -96,7 +96,7 @@ public sealed class ViuUtilityStylesheetContextTests
                 File.WriteAllText(
                     Path.Combine(directory, "Application.csproj"),
                     """
-                    <Project Sdk="Assimalign.Viu.Sdk">
+                    <Project Sdk="Assimalign.Viu.Sdk.Browser">
                       <ItemGroup>
                         <ViuUtilityCss Include="$(UtilityRoot)/Utilities.css" />
                       </ItemGroup>
