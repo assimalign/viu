@@ -11,27 +11,31 @@
 		<TargetFramework>$(TargetFrameworkForSdks)</TargetFramework>
 		<OutputType>Library</OutputType>
 		<GenerateDependencyFile>false</GenerateDependencyFile>
-		<!-- The Tasks DLL ships under Tasks/ in the nupkg, never under lib/. -->
+		<!--
+		     SDK packages are MSBuild distribution containers, not application/runtime packages.
+		     Keep task and watch-tool debugging at the repository/build-log boundary rather than
+		     publishing their implementation symbols to the public symbol feed. This deliberate
+		     policy makes Tasks/ the only packaged build-tool payload and produces no SDK .snupkg.
+		-->
+		<ViuContainerPackage>true</ViuContainerPackage>
 		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<IncludeSymbols>false</IncludeSymbols>
+		<!-- NuGet's legacy package analyzer assumes managed assemblies belong under lib/ and
+		     reports NU5100/NU5128 for a valid MSBuild SDK Tasks/ layout. The release package
+		     validator checks this container's physical shape instead. -->
 		<NoPackageAnalysis>true</NoPackageAnalysis>
 		<!-- Pull the ViuBundleCss task and its parser closure into $(OutDir) so
 		     CollectSdkTaskFiles can sweep the whole dependency set into Tasks/. -->
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<IsPackable>true</IsPackable>
 		<AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+		<!-- The Browser SDK imports the base SDK as one composed product surface. -->
+		<ViuPackageDependencyVersionRange Condition="'$(ViuSdkBrowserPackage)' == 'true'">[$(ViuVersion)]</ViuPackageDependencyVersionRange>
 	</PropertyGroup>
 	<!-- Package metadata -->
 	<PropertyGroup>
-		<!-- VersionPrefix/VersionSuffix split (not <Version> directly): a prerelease
-		     semver handed straight to <Version> propagates to AssemblyVersion and
-		     trips CS7034. The SDK composes Version at the end, which becomes
-		     PackageVersion via the default. -->
-		<VersionPrefix>$(ViuVersionPrefix)</VersionPrefix>
-		<VersionSuffix Condition="'$(ViuVersionSuffix)' != ''">$(ViuVersionSuffix)</VersionSuffix>
-		<Authors>Assimalign</Authors>
 		<Description Condition="'$(ViuSdkBrowserPackage)' != 'true'">Viu host-neutral component-library SDK with source generators, targeting framework, and component-style extraction.</Description>
 		<Description Condition="'$(ViuSdkBrowserPackage)' == 'true'">Viu Browser application SDK with WebAssembly hosting, Browser framework, static assets, CSS bundling, and hot reload.</Description>
-		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags Condition="'$(ViuSdkBrowserPackage)' != 'true'">Sdk;MSBuild;Viu;Components</PackageTags>
 		<PackageTags Condition="'$(ViuSdkBrowserPackage)' == 'true'">Sdk;MSBuild;Viu;WebAssembly;Browser</PackageTags>
 	</PropertyGroup>

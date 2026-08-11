@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -10,10 +11,19 @@ namespace Assimalign.Viu.ServerRenderer;
 internal sealed class SsrWriter
 {
     private readonly StringBuilder _builder = new();
+    private readonly List<string>? _recordedFlushChunks;
     private readonly TextWriter? _sink;
 
     internal SsrWriter()
     {
+    }
+
+    internal SsrWriter(bool recordFlushBoundaries)
+    {
+        if (recordFlushBoundaries)
+        {
+            _recordedFlushChunks = [];
+        }
     }
 
     internal SsrWriter(TextWriter sink)
@@ -24,8 +34,26 @@ internal sealed class SsrWriter
 
     internal void Append(string chunk) => _builder.Append(chunk);
 
+    internal IReadOnlyList<string> RecordedFlushChunks =>
+        _recordedFlushChunks is null
+            ? Array.Empty<string>()
+            : _recordedFlushChunks;
+
     internal async Task FlushAsync(CancellationToken cancellationToken)
     {
+        if (_recordedFlushChunks is not null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_builder.Length == 0)
+            {
+                return;
+            }
+
+            _recordedFlushChunks.Add(_builder.ToString());
+            _builder.Clear();
+            return;
+        }
+
         if (_sink is null || _builder.Length == 0)
         {
             return;

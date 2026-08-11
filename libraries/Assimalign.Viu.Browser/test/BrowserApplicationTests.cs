@@ -102,43 +102,54 @@ public sealed class BrowserApplicationTests
     }
 
     [Fact]
-    public async Task ScriptHotReload_WhileMounted_RequestsOneFullReloadAndUnsubscribesOnStop()
+    public async Task ScriptHotReload_WhileMounted_RemountsPostFlushWithoutRequestingDocumentReload()
     {
-        var host = new BrowserRendererHost((_, _) => []);
-        host.ObserveForeignHandle(300);
-        Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
-        ApplicationContext context = CreateContext(new TextNode("mounted"));
-        int reloadCount = 0;
-        var application = BrowserApplication.CreateEmbedded(
-            renderer,
-            context,
-            initialize: _ => Task.CompletedTask,
-            clearContainer: _ => { },
-            requestFullReload: () => reloadCount++);
-        ComponentHotReload.Register(
-            typeof(HotReloadComponent),
-            "browser-application-hot-reload",
-            typeof(TemplateMarker),
-            typeof(ScriptMarker),
-            typeof(StyleMarker));
-        ComponentHotReload.Register(
-            typeof(SecondHotReloadComponent),
-            "browser-application-second-hot-reload",
-            typeof(SecondTemplateMarker),
-            typeof(SecondScriptMarker),
-            typeof(SecondStyleMarker));
-        await application.MountAsync(300);
+        Scheduler.Reset();
+        Queue<Action> scheduledFlushes = [];
+        using IDisposable dispatcher = Scheduler.UseFlushDispatcher(scheduledFlushes.Enqueue);
+        try
+        {
+            var host = new BrowserRendererHost((_, _) => []);
+            host.ObserveForeignHandle(300);
+            Renderer<int> renderer = RendererFactory.CreateRenderer(host.Options);
+            HotReloadComponentSource source = new();
+            ComponentNode root = new(
+                ComponentReference.ForType(typeof(HotReloadComponent)));
+            ApplicationContext context = CreateHotReloadContext(root, source);
+            var application = BrowserApplication.CreateEmbedded(
+                renderer,
+                context,
+                initialize: _ => Task.CompletedTask,
+                clearContainer: _ => { });
+            ComponentHotReload.Register(
+                typeof(HotReloadComponent),
+                "browser-application-hot-reload",
+                typeof(TemplateMarker),
+                typeof(ScriptMarker),
+                typeof(StyleMarker));
+            await application.MountAsync(300);
+            RunScheduledFlushes(scheduledFlushes);
+            HotReloadComponent previous = source.Instances[0];
 
-        ComponentHotReload.ApplyUpdates(
-            [typeof(ScriptMarker), typeof(SecondScriptMarker)]);
+            // A BrowserDomBridge document-reload request throws in this DOM-free test process, so
+            // the no-throw assertion pins that accepted script deltas remain in-process.
+            Should.NotThrow(
+                () => ComponentHotReload.ApplyUpdates([typeof(ScriptMarker)]));
 
-        reloadCount.ShouldBe(1);
+            source.Instances.Count.ShouldBe(1);
+            previous.IsDisposed.ShouldBeFalse();
+            RunScheduledFlushes(scheduledFlushes);
+            source.Instances.Count.ShouldBe(2);
+            previous.IsDisposed.ShouldBeTrue();
 
-        await application.StopAsync();
-        ComponentHotReload.ApplyUpdates([typeof(ScriptMarker)]);
-
-        reloadCount.ShouldBe(1);
-        await application.DisposeAsync();
+            await application.StopAsync();
+            RunScheduledFlushes(scheduledFlushes);
+            await application.DisposeAsync();
+        }
+        finally
+        {
+            Scheduler.Reset();
+        }
     }
 
     [Fact]
@@ -189,9 +200,56 @@ public sealed class BrowserApplicationTests
             });
     }
 
-    private sealed class HotReloadComponent;
+    private static ApplicationContext CreateHotReloadContext(
+        ComponentNode root,
+        HotReloadComponentSource source)
+    {
+        var components = new ComponentFactory();
+        components.Register(
+            new ComponentRegistration(
+                root.Component,
+                new ComponentContract(),
+                _ => source.Create()));
+        return new ApplicationContext(
+            new ApplicationOptions
+            {
+                RootComponent = root,
+                Components = components,
+            });
+    }
 
-    private sealed class SecondHotReloadComponent;
+    private static void RunScheduledFlushes(Queue<Action> scheduledFlushes)
+    {
+        while (scheduledFlushes.Count > 0)
+        {
+            scheduledFlushes.Dequeue()();
+        }
+    }
+
+    private sealed class HotReloadComponentSource
+    {
+        internal List<HotReloadComponent> Instances { get; } = [];
+
+        internal HotReloadComponent Create()
+        {
+            var component = new HotReloadComponent();
+            Instances.Add(component);
+            return component;
+        }
+    }
+
+    private sealed class HotReloadComponent : IComponent, IDisposable
+    {
+        internal bool IsDisposed { get; private set; }
+
+        public ComponentRenderer Setup(ComponentContext context) =>
+            _ => new TextNode("mounted");
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
 
     private sealed class TemplateMarker;
 
@@ -199,9 +257,4 @@ public sealed class BrowserApplicationTests
 
     private sealed class StyleMarker;
 
-    private sealed class SecondTemplateMarker;
-
-    private sealed class SecondScriptMarker;
-
-    private sealed class SecondStyleMarker;
 }

@@ -1,8 +1,7 @@
 # Build+test lane for the developer-tooling libraries ([V01.01.12.02.02]): the Syntax parser cluster,
 # the shared .viu -> C# projection and CSS composition cores, the Viu Utilities engine, and the editor
 # pair (language service + language server). None ships into a Viu app's runtime. Only the Viu
-# Utilities engine is independently packable and publishes from a main push; the parser, compiler,
-# and editor projects declare IsPackable=false, so the shared build action skips their pack step.
+# Utilities engine is independently packable; release.yml alone packs and publishes it.
 name: Tooling
 
 on:
@@ -37,7 +36,6 @@ on:
 
 permissions:
     contents: read
-    packages: write
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
@@ -75,5 +73,3 @@ jobs:
               with:
                   area: "tooling"
                   project: ${{ matrix.projects }}
-                  publish-packages: "true"
-                  github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -54,7 +54,6 @@
               Condition="'$(ViuSdkBrowserPackage)' == 'true'"
               Pack="true" PackagePath="assets/Assimalign.Viu.Browser/%(RecursiveDir)%(Filename)%(Extension)" Visible="false" />
 
-        <None Include="$(ViuRepositoryDirectory)sdks\README.md" Pack="true" PackagePath="README.md" Visible="false" />
     </ItemGroup>
 
     <!-- #region Loose local-SDK layout copies under $(ViuOutputPathForSdk) -->
@@ -152,8 +151,10 @@
     -->
     <Target Name="CollectSdkTaskFiles">
         <ItemGroup>
+            <!-- SDK containers intentionally publish no .snupkg; exclude every PDB from the main
+                 package together so the Tasks/ closure cannot drift into a partial symbol set. -->
             <TfmSpecificPackageFile Include="$(OutDir)**\*"
-                                    Exclude="$(OutDir)**\*.nupkg;$(OutDir)**\*.snupkg;$(OutDir)**\*.nuspec;$(OutDir)Assimalign.Viu.Sdk.CssHotReload.*">
+                                    Exclude="$(OutDir)**\*.nupkg;$(OutDir)**\*.snupkg;$(OutDir)**\*.nuspec;$(OutDir)**\*.pdb;$(OutDir)Assimalign.Viu.Sdk.CssHotReload.*">
                 <PackagePath>Tasks</PackagePath>
             </TfmSpecificPackageFile>
             <!-- Filtered out of the collected set itself, not probed on disk: this is the
@@ -187,6 +188,7 @@
     -->
     <Target Name="PinBrowserSdkPackageDependency"
             BeforeTargets="GenerateNuspec"
+            AfterTargets="ApplyViuPackageDependencyRanges"
             Condition="'$(ViuSdkBrowserPackage)' == 'true'">
         <ItemGroup>
             <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)"

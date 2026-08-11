@@ -17,11 +17,13 @@ bookkeeping. Parallel request-owned graphs therefore cannot exchange ambient com
 effects, batch queues, active registries, or scheduled jobs; sharing graph objects between requests
 remains unsupported [EXE-1], [SSR-9].
 
-The serializer dispatches all ten `VirtualNodeKind` values. Component nodes execute only through
-`ComponentHost.RenderAsync`; it holds the returned `IComponentRenderScope` while consuming
-`scope.Tree`, passes that active scope as the parent of nested requests, and disposes the scope after
-the subtree and its streaming boundary complete. This is the complete one-shot host seam: there is
-no friend access, mounted-engine access, context downcast, or capability probe.
+The serializer dispatches all ten `VirtualNodeKind` values. Component nodes always resolve and
+activate through the ordinary component factory. Without a compiled registration,
+`ComponentHost.RenderAsync` supplies the tree and live parent scope. With an explicitly supplied
+`IServerRenderRegistry`, ServerRenderer uses Core's narrow friend activation seam to run the same
+setup and server-prefetch path without first executing the client renderer, then invokes the
+compiler-known direct-markup delegate inside the same lease. Neither path reaches the persistent
+mounted engine, downcasts a public context, or probes a hidden capability.
 
 Serialization owns the HTML-specific rules required by `[SSR-6]`: the five-character escape set,
 repeated comment-terminator removal, void and boolean elements, safe dynamic attribute names,
@@ -45,6 +47,12 @@ unsupported binding shapes fall back to a local virtual tree on that same render
 `CompiledServerRender` seam supplies renderer-owned cancellation, component leases, streaming,
 teleports, state capture, and final flush. Differential fixtures execute both paths and require
 ordinal byte equality (`[SSR-COMPILE-1]` through `[SSR-COMPILE-4]`).
+
+Projects select that fast path once with `ViuServerRendering=true` under the base or Browser SDK.
+The generator retains the client body, adds the server body, and emits
+`GeneratedViuServerRenders.Register(ServerRenderRegistry)`. A host supplies the populated registry
+to `ServerRenderAdaptor<TContext>`; absent entries retain traversal. Client-only projects emit no
+server catalog or server references (`[SSR-TARGET-1]` through `[SSR-TARGET-3]`).
 
 A non-immediate component invocation is serialized inside Core's fixed lazy-hydration markers.
 Server rendering still resolves the authored subtree; the client may then adopt the complete range

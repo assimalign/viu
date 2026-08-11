@@ -37,6 +37,18 @@ public sealed class ComponentHotReloadTests
             .ShouldBe(ComponentHotReloadChangeKind.ScriptReset);
         ComponentHotReload.Classify(
             typeof(ClassificationComponent),
+            [typeof(ClassificationComponent), typeof(ClassificationStyleMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.StyleOnly);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(ClassificationComponent), typeof(ClassificationTemplateMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.Template);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
+            [typeof(ClassificationComponent), typeof(ClassificationScriptMarker)])
+            .ShouldBe(ComponentHotReloadChangeKind.ScriptReset);
+        ComponentHotReload.Classify(
+            typeof(ClassificationComponent),
             [typeof(ClassificationComponent)])
             .ShouldBe(ComponentHotReloadChangeKind.ScriptReset);
         ComponentHotReload.Classify(typeof(ClassificationComponent), null)
@@ -45,39 +57,6 @@ public sealed class ComponentHotReloadTests
             typeof(ClassificationComponent),
             [typeof(UnrelatedMarker)])
             .ShouldBe(ComponentHotReloadChangeKind.None);
-    }
-
-    [Fact]
-    public void ApplyUpdates_ScriptMarker_RaisesOneResetNotificationForRegisteredComponent()
-    {
-        ComponentHotReload.Register(
-            typeof(NotificationComponent),
-            "notification-component",
-            typeof(NotificationTemplateMarker),
-            typeof(NotificationScriptMarker),
-            typeof(NotificationStyleMarker));
-        List<(string Identifier, Type ComponentType)> notifications = [];
-        ComponentScriptUpdateResetHandler handler = (identifier, componentType) =>
-        {
-            if (componentType == typeof(NotificationComponent))
-            {
-                notifications.Add((identifier, componentType));
-            }
-        };
-        ComponentHotReload.ScriptUpdateRequiresReset += handler;
-
-        try
-        {
-            ComponentHotReload.ApplyUpdates([typeof(NotificationScriptMarker)]);
-        }
-        finally
-        {
-            ComponentHotReload.ScriptUpdateRequiresReset -= handler;
-        }
-
-        notifications.ShouldHaveSingleItem();
-        notifications[0].Identifier.ShouldBe("notification-component");
-        notifications[0].ComponentType.ShouldBe(typeof(NotificationComponent));
     }
 
     [Fact]
@@ -111,6 +90,46 @@ public sealed class ComponentHotReloadTests
     }
 
     [Fact]
+    public void ApplyUpdates_TemplateChange_RemountsPostFlushAndCommitsOnce()
+    {
+        using var host = new RendererParityHost();
+        HotReloadProbeSource source = new();
+        ComponentNode request = CreateProbeRequest();
+        Renderer<RendererParityNode> renderer = host.CreateRenderer();
+        RegisterProbeMetadata();
+        renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+        host.ResetOperationCounts();
+        int instancesObservedBeforeRemount = 0;
+        int commitsObservedBeforeRemount = 0;
+
+        Scheduler.QueuePostFlushCallback(
+            new SchedulerJob(
+                () =>
+                {
+                    instancesObservedBeforeRemount = source.Instances.Count;
+                    commitsObservedBeforeRemount = host.CommitCount;
+                })
+            {
+                Name = "hot-reload post-flush ordering probe",
+            });
+        Scheduler.QueueJob(
+            new SchedulerJob(
+                () => ComponentHotReload.ApplyUpdates([typeof(ProbeTemplateMarker)]))
+            {
+                Name = "hot-reload update application probe",
+            });
+
+        host.RunScheduledFlushes();
+
+        instancesObservedBeforeRemount.ShouldBe(1);
+        commitsObservedBeforeRemount.ShouldBe(0);
+        source.Instances.Count.ShouldBe(2);
+        host.CommitCount.ShouldBe(1);
+
+        renderer.Render(null, host.Container);
+    }
+
+    [Fact]
     public void ApplyUpdates_StyleOnlyChange_DoesNoMountedComponentWork()
     {
         using var host = new RendererParityHost();
@@ -133,53 +152,32 @@ public sealed class ComponentHotReloadTests
     }
 
     [Fact]
-    public void ApplyUpdates_MixedMarkers_ScriptResetTakesPrecedenceAndNotifiesOnce()
+    public void ApplyUpdates_MixedMarkers_ScriptResetTakesPrecedenceAndRemountsOnce()
     {
         using var host = new RendererParityHost();
         HotReloadProbeSource source = new();
         ComponentNode request = CreateProbeRequest();
         Renderer<RendererParityNode> renderer = host.CreateRenderer();
         RegisterProbeMetadata();
-        List<(string Identifier, Type ComponentType)> notifications = [];
-        ComponentScriptUpdateResetHandler handler = (identifier, componentType) =>
-        {
-            if (componentType == typeof(HotReloadProbeComponent))
-            {
-                notifications.Add((identifier, componentType));
-            }
-        };
-        ComponentHotReload.ScriptUpdateRequiresReset += handler;
+        renderer.Render(request, host.Container, CreateProbeApplication(request, source));
+        HotReloadProbeComponent previous = source.Instances.Single();
+        previous.State = 9;
+        source.Label = "script-after";
 
-        try
-        {
-            renderer.Render(request, host.Container, CreateProbeApplication(request, source));
-            HotReloadProbeComponent previous = source.Instances.Single();
-            previous.State = 9;
-            source.Label = "script-after";
+        ComponentHotReload.ApplyUpdates(
+        [
+            typeof(ProbeStyleMarker),
+            typeof(ProbeTemplateMarker),
+            typeof(ProbeScriptMarker),
+        ]);
+        host.RunScheduledFlushes();
 
-            ComponentHotReload.ApplyUpdates(
-            [
-                typeof(ProbeStyleMarker),
-                typeof(ProbeTemplateMarker),
-                typeof(ProbeScriptMarker),
-            ]);
-            host.RunScheduledFlushes();
+        source.Instances.Count.ShouldBe(2);
+        previous.IsDisposed.ShouldBeTrue();
+        previous.ScopeWasDisposed.ShouldBeTrue();
+        host.Container.DescendantText.ShouldBe("script-after:0");
 
-            notifications.ShouldBe(
-            [
-                ("hot-reload-probe", typeof(HotReloadProbeComponent)),
-            ]);
-            source.Instances.Count.ShouldBe(2);
-            previous.IsDisposed.ShouldBeTrue();
-            previous.ScopeWasDisposed.ShouldBeTrue();
-            host.Container.DescendantText.ShouldBe("script-after:0");
-
-            renderer.Render(null, host.Container);
-        }
-        finally
-        {
-            ComponentHotReload.ScriptUpdateRequiresReset -= handler;
-        }
+        renderer.Render(null, host.Container);
     }
 
     [Fact]
@@ -307,11 +305,6 @@ public sealed class ComponentHotReloadTests
         public ComponentRenderer Setup(ComponentContext context) => _ => null;
     }
 
-    private sealed class NotificationComponent : IComponent
-    {
-        public ComponentRenderer Setup(ComponentContext context) => _ => null;
-    }
-
     private sealed class HotReloadProbeSource
     {
         internal string Label { get; set; } = "before";
@@ -372,18 +365,6 @@ public sealed class ComponentHotReloadTests
     }
 
     private sealed class ClassificationStyleMarker
-    {
-    }
-
-    private sealed class NotificationTemplateMarker
-    {
-    }
-
-    private sealed class NotificationScriptMarker
-    {
-    }
-
-    private sealed class NotificationStyleMarker
     {
     }
 

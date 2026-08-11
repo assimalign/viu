@@ -78,6 +78,15 @@ public readonly record struct SingleFileComponentModel(
     EquatableArray<CssVariableBindingEntry> CssVariableBindings)
 {
     /// <summary>
+    /// The compiled direct-markup render body when the project declares server rendering, or
+    /// <see langword="null"/> for client-only projects and renderless components. The body is emitted
+    /// alongside, never instead of, <see cref="RenderBody"/> so a dual-target project retains one
+    /// deterministic client profile and one deterministic server profile. Specified by
+    /// <c>[SSR-TARGET-2]</c>.
+    /// </summary>
+    public string? ServerRenderBody { get; init; }
+
+    /// <summary>
     /// The tag-based C# <c>&lt;script setup&gt;</c> block's emission regions. Viu treats this explicitly
     /// C# block as partial-class member shorthand; JavaScript setup macros and runtime evaluation remain
     /// unsupported. <see cref="ScriptRegions.None"/> for canonical <c>.viu</c> files and tag-based

@@ -142,21 +142,23 @@ These are deterministic change detectors, not security or integrity signatures.
 
 ## Update granularity
 
-A downstream host classifies the runtime's changed marker types for the same `ComponentIdentifier`:
+Core classifies the runtime's changed marker types for each registered component:
 
 | Changed markers | Required action |
 | --- | --- |
-| Template only | Remount affected instances so .NET 10 browser WebAssembly executes the updated generated render body; reset component-local state |
-| Script | Reload the component definition and reset component state |
+| Template only | Remount affected instances in the post-flush phase so .NET 10 browser WebAssembly executes the updated generated render body; reset component-local state |
+| Script | Remount affected instances in the post-flush phase while retaining the Browser document; reset component-local state |
 | Style only | Replace the component stylesheet in one batched update; perform no component work |
-| Template and style | Remount the component and replace the stylesheet |
+| Template and style | Remount affected instances in the post-flush phase and replace the stylesheet |
 | None | No operation |
 
-A script change is dominant for component work so the host receives the script-reset notification once.
-A simultaneous style change still requires the independent stylesheet replacement. Viu chooses reliable
-updated-code execution over in-place state preservation for template edits: on the supported .NET 10
-browser-WASM runtime, preserving state would require re-entering a generated body that may already be
-stale, and Viu has no reflection or dynamic-code path available to resolve the newer one.
+A script change is dominant for component work, so Core queues one component-local `ScriptReset`
+remount for each affected mounted instance. Browser does not upgrade that accepted update to a
+full-page reload; the .NET watch host owns rebuild and restart when a rude edit is rejected by metadata
+update. A simultaneous style change still requires the independent stylesheet replacement. Viu chooses
+reliable updated-code execution over in-place state preservation for template edits: on the supported
+.NET 10 browser-WASM runtime, preserving state would require re-entering a generated body that may
+already be stale, and Viu has no reflection or dynamic-code path available to resolve the newer one.
 
 The source generator owns both this metadata and the consumer-assembly forwarding handler. Core owns the
 mounted-instance registry and update classification; the development-server transport is a downstream

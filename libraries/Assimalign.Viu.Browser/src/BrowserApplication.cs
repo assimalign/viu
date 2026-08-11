@@ -34,7 +34,6 @@ public sealed class BrowserApplication : IApplication
     private readonly Func<CancellationToken, Task> _initialize;
     private readonly Action<int> _clearContainer;
     private readonly Func<string, int> _resolveContainer;
-    private readonly Action _requestFullReload;
     private readonly string _mountTargetSelector;
     private CancellationTokenRegistration _startCancellationRegistration;
     private IDisposable? _bufferedOperationsActivation;
@@ -44,8 +43,6 @@ public sealed class BrowserApplication : IApplication
     private int _container;
     private bool _isDirectMount;
     private bool _isDisposed;
-    private bool _isFullReloadRequested;
-    private bool _isHotReloadSubscribed;
 
     internal BrowserApplication(
         Renderer<int> renderer,
@@ -55,8 +52,7 @@ public sealed class BrowserApplication : IApplication
         Func<CancellationToken, Task>? initialize = null,
         Action<int>? clearContainer = null,
         Func<string, int>? resolveContainer = null,
-        string mountTargetSelector = DefaultMountTargetSelector,
-        Action? requestFullReload = null)
+        string mountTargetSelector = DefaultMountTargetSelector)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(context);
@@ -70,7 +66,6 @@ public sealed class BrowserApplication : IApplication
         _clearContainer = clearContainer ?? BrowserRuntime.ClearContainer;
         _resolveContainer = resolveContainer ?? BrowserRuntime.QuerySelector;
         _mountTargetSelector = mountTargetSelector;
-        _requestFullReload = requestFullReload ?? BrowserDomBridge.ReloadPage;
         void HandleEventError(Exception exception)
         {
             Action<Exception, ComponentContext?, string>? handler =
@@ -256,7 +251,6 @@ public sealed class BrowserApplication : IApplication
         }
         finally
         {
-            UnsubscribeHotReload();
             _startCancellationRegistration.Dispose();
             _lifetime.Dispose();
             GC.SuppressFinalize(this);
@@ -296,7 +290,6 @@ public sealed class BrowserApplication : IApplication
     /// <param name="initialize">The optional asynchronous host initializer.</param>
     /// <param name="clearContainer">The optional non-hydrating container reset.</param>
     /// <param name="resolveContainer">The optional selector resolver.</param>
-    /// <param name="requestFullReload">The optional development full-reload signal.</param>
     /// <param name="mountTargetSelector">The top-level pipeline mount selector.</param>
     /// <returns>A single-use persistent Browser application.</returns>
     /// <remarks>
@@ -312,7 +305,6 @@ public sealed class BrowserApplication : IApplication
         Func<CancellationToken, Task>? initialize = null,
         Action<int>? clearContainer = null,
         Func<string, int>? resolveContainer = null,
-        Action? requestFullReload = null,
         string mountTargetSelector = DefaultMountTargetSelector)
     {
         return new BrowserApplication(
@@ -323,8 +315,7 @@ public sealed class BrowserApplication : IApplication
             initialize,
             clearContainer,
             resolveContainer,
-            mountTargetSelector,
-            requestFullReload);
+            mountTargetSelector);
     }
 
     /// <summary>
@@ -335,7 +326,6 @@ public sealed class BrowserApplication : IApplication
     /// <param name="hydrate">Whether the first mount adopts server-rendered nodes.</param>
     /// <param name="initialize">The optional asynchronous host initializer.</param>
     /// <param name="resolveContainer">The optional selector resolver.</param>
-    /// <param name="requestFullReload">The optional development full-reload signal.</param>
     /// <param name="mountTargetSelector">The top-level pipeline mount selector.</param>
     /// <returns>A single-use persistent Browser application owning the host activation lease.</returns>
     /// <remarks>
@@ -350,7 +340,6 @@ public sealed class BrowserApplication : IApplication
         bool hydrate = false,
         Func<CancellationToken, Task>? initialize = null,
         Func<string, int>? resolveContainer = null,
-        Action? requestFullReload = null,
         string mountTargetSelector = DefaultMountTargetSelector)
     {
         ArgumentNullException.ThrowIfNull(host);
@@ -363,8 +352,7 @@ public sealed class BrowserApplication : IApplication
             initialize,
             clearContainer: null,
             resolveContainer,
-            mountTargetSelector,
-            requestFullReload);
+            mountTargetSelector);
     }
 
     private ValueTask<ComponentContext?> MountResolvedAsync(
@@ -701,10 +689,7 @@ public sealed class BrowserApplication : IApplication
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         _isDirectMount = isDirectMount;
-        _isFullReloadRequested = false;
         _lifetime.StartExecution();
-        ComponentHotReload.ScriptUpdateRequiresReset += HandleScriptUpdateRequiresReset;
-        _isHotReloadSubscribed = true;
     }
 
     private void TransitionToRunning() => _lifetime.SignalRunning();
@@ -712,38 +697,10 @@ public sealed class BrowserApplication : IApplication
     private void CompleteStopping()
     {
         _lifetime.CompleteStopping();
-        UnsubscribeHotReload();
     }
 
     private void Fail(Exception exception)
     {
         _lifetime.Fail(exception, RootContext);
-        UnsubscribeHotReload();
-    }
-
-    private void HandleScriptUpdateRequiresReset(
-        string componentIdentifier,
-        Type componentType)
-    {
-        _ = componentIdentifier;
-        _ = componentType;
-        if (_isFullReloadRequested)
-        {
-            return;
-        }
-
-        _isFullReloadRequested = true;
-        _requestFullReload();
-    }
-
-    private void UnsubscribeHotReload()
-    {
-        if (!_isHotReloadSubscribed)
-        {
-            return;
-        }
-
-        ComponentHotReload.ScriptUpdateRequiresReset -= HandleScriptUpdateRequiresReset;
-        _isHotReloadSubscribed = false;
     }
 }

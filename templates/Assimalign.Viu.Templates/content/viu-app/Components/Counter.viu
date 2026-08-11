@@ -1,0 +1,72 @@
+<template>
+    <main class="application-shell">
+        <section class="counter" aria-labelledby="counter-heading">
+            <p class="eyebrow">Viu Browser WebAssembly</p>
+            <h1 id="counter-heading">Reactive counter</h1>
+            <output class="count" aria-live="polite">{{ CountLabel }}</output>
+            <button type="button" @click="Increment">Increment</button>
+        </section>
+    </main>
+</template>
+
+@script {
+    using Assimalign.Viu.Reactivity;
+
+    private readonly Reference<int> CountReference = Reactive.Reference(0);
+
+    public string CountLabel => CountReference.Value == 1
+        ? "1 click"
+        : $"{CountReference.Value} clicks";
+
+    private void Increment() => CountReference.Value++;
+}
+
+<style>
+:root {
+    color-scheme: light dark;
+    font-family: system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+}
+
+.application-shell {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.counter {
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    border-radius: 1rem;
+    display: grid;
+    gap: 1rem;
+    max-width: 26rem;
+    padding: 2rem;
+    text-align: center;
+}
+
+.counter h1,
+.counter p {
+    margin: 0;
+}
+
+.eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.count {
+    font-size: 2rem;
+    font-variant-numeric: tabular-nums;
+}
+
+button {
+    cursor: pointer;
+    font: inherit;
+    padding: 0.65rem 1rem;
+}
+</style>

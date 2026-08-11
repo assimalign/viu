@@ -91,6 +91,37 @@ The two framework references resolve through three framework packages:
 The base framework is deliberately targeting-only and has no runtime package.
 `Assimalign.Viu.ServerRenderer` remains an ordinary opt-in package, not another framework segment.
 
+### Server-targeted and dual-target projects
+
+Set one project-level property when the assembly must expose compiler-produced server renders:
+
+```xml
+<PropertyGroup>
+    <ViuServerRendering>true</ViuServerRendering>
+</PropertyGroup>
+```
+
+The property works with the base SDK and with the derived Browser SDK. The SDK adds the exact-version
+ordinary `Assimalign.Viu.ServerRenderer` package and the generator emits both the normal client
+virtual-node body and the direct server-markup body. It also emits the reflection-free assembly
+catalog `GeneratedViuServerRenders`. A host composes the two generated catalogs explicitly:
+
+```csharp
+ComponentFactory components = new();
+GeneratedViuComponents.Register(components);
+
+ServerRenderRegistry serverRenders = new();
+GeneratedViuServerRenders.Register(serverRenders);
+
+ServerRenderAdaptor<RequestContext> adaptor = new(requestScopeFactory, serverRenders);
+```
+
+The declaration is deliberately not a per-file item and does not create another shared-framework
+segment. Leaving it unset is the client-only path: generated sources contain no ServerRenderer type,
+method, delegate, or registration. A Browser project may set it to produce a deterministic dual-target
+assembly while retaining the ordinary Browser profile. Specified by `[SSR-TARGET-1]` through
+`[SSR-TARGET-3]`.
+
 Opt out / pin independently:
 
 ```xml

@@ -9,7 +9,11 @@ namespace Assimalign.Viu.Generators.Syntax;
 /// <param name="EmitHotReloadMetadata">
 /// Whether generated components carry the development-only [V01.01.06.05] identity and block hashes.
 /// </param>
+/// <param name="EmitServerRendering">
+/// Whether the project-level SDK contract requests deterministic server-markup emission.
+/// </param>
 internal readonly record struct ProjectOptions(
     string? RootNamespace,
     string? ProjectDirectory,
-    bool EmitHotReloadMetadata);
+    bool EmitHotReloadMetadata,
+    bool EmitServerRendering);

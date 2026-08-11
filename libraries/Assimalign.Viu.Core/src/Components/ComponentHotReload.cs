@@ -20,16 +20,6 @@ public static class ComponentHotReload
     private static readonly Dictionary<Type, List<ComponentHotReloadUpdateRegistration>>
         UpdateHandlers = [];
 
-    /// <summary>
-    /// Occurs once per affected component type before mounted instances process a script reset.
-    /// </summary>
-    /// <remarks>
-    /// A host may use this advance notice to replace component-local resets with an application
-    /// reload. Application code must not use this development-only event.
-    /// </remarks>
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static event ComponentScriptUpdateResetHandler? ScriptUpdateRequiresReset;
-
     /// <summary>Registers generated marker identities for one component type.</summary>
     /// <param name="componentType">The generated component type.</param>
     /// <param name="identifier">The stable generated source identifier.</param>
@@ -49,9 +39,10 @@ public static class ComponentHotReload
         Type scriptMarker,
         Type styleMarker)
     {
+        ArgumentNullException.ThrowIfNull(componentType);
+        ArgumentException.ThrowIfNullOrEmpty(identifier);
         ComponentHotReloadMetadata metadata = new(
             componentType,
-            identifier,
             templateMarker,
             scriptMarker,
             styleMarker);
@@ -100,13 +91,6 @@ public static class ComponentHotReload
                 or ComponentHotReloadChangeKind.StyleOnly)
             {
                 continue;
-            }
-
-            if (change == ComponentHotReloadChangeKind.ScriptReset)
-            {
-                ScriptUpdateRequiresReset?.Invoke(
-                    metadata.ComponentIdentifier,
-                    metadata.ComponentType);
             }
 
             NotifyUpdateHandlers(metadata.ComponentType, change);

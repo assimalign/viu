@@ -24,7 +24,8 @@ public sealed class SsrRenderState
         SsrContext context,
         IApplicationContext application,
         ComponentHost componentHost,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IServerRenderRegistry? serverRenders = null)
     {
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(context);
@@ -35,10 +36,16 @@ public sealed class SsrRenderState
         Application = application;
         ComponentHost = componentHost;
         CancellationToken = cancellationToken;
+        ServerRenders = serverRenders;
     }
 
-    /// <summary>Gets the context shared by the root and every nested or teleported subtree.</summary>
-    /// <remarks>Specified by <c>[SSR-7]</c>.</remarks>
+    /// <summary>Gets the render context visible to this serialization state.</summary>
+    /// <remarks>
+    /// Ordinary traversal exposes the request-owned context. A registry-selected direct-markup
+    /// body instead sees a transaction-local child context whose teleport and state contributions
+    /// commit to the request context only after the body succeeds. Specified by <c>[SSR-7]</c> and
+    /// <c>[SSR-TARGET-3]</c>.
+    /// </remarks>
     public SsrContext Context { get; }
 
     /// <summary>Gets the immutable borrowed application composition for this render.</summary>
@@ -50,6 +57,8 @@ public sealed class SsrRenderState
     public CancellationToken CancellationToken { get; }
 
     internal ComponentHost ComponentHost { get; }
+
+    internal IServerRenderRegistry? ServerRenders { get; }
 
     /// <summary>Appends an already escaped or deliberately raw HTML fragment.</summary>
     /// <param name="chunk">The non-null serialized fragment.</param>
@@ -63,11 +72,22 @@ public sealed class SsrRenderState
         }
     }
 
-    /// <summary>Flushes the current streaming chunk and awaits destination backpressure.</summary>
-    /// <returns>A task completing when the backing writer has flushed, or immediately in string mode.</returns>
-    /// <remarks>Completed component subtrees call this boundary under <c>[SSR-1]</c>.</remarks>
+    /// <summary>Requests a streaming boundary for the current chunk.</summary>
+    /// <returns>
+    /// A task completing after a direct-markup transaction records the boundary, after the backing
+    /// writer flushes for ordinary streaming, or immediately in string mode. Recorded boundaries
+    /// are replayed after the direct body succeeds and before later chunks are committed.
+    /// </returns>
+    /// <remarks>
+    /// Deferred transaction boundaries preserve ordering and destination backpressure without
+    /// exposing output from a body that may still fail. Specified by <c>[SSR-1]</c> and
+    /// <c>[SSR-TARGET-3]</c>.
+    /// </remarks>
     public Task FlushAsync() => _writer.FlushAsync(CancellationToken);
 
     internal SsrRenderState CreateBuffer(SsrWriter writer) =>
-        new(writer, Context, Application, ComponentHost, CancellationToken);
+        new(writer, Context, Application, ComponentHost, CancellationToken, ServerRenders);
+
+    internal SsrRenderState CreateBuffer(SsrWriter writer, SsrContext context) =>
+        new(writer, context, Application, ComponentHost, CancellationToken, ServerRenders);
 }

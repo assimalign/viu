@@ -18,6 +18,7 @@ using Assimalign.Viu.Components;
 using Assimalign.Viu.Generators.Syntax;
 using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Router;
+using Assimalign.Viu.ServerRenderer;
 
 namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 
@@ -67,6 +68,24 @@ internal sealed class CompiledFixtureAssembly
         register.Invoke(null, [factory]);
     }
 
+    internal void RegisterServerRenders(ServerRenderRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        Type catalog = Assembly.GetType(
+            string.Concat(FixtureNamespace, ".GeneratedViuServerRenders"))
+            ?? throw new InvalidOperationException(
+                "The generated server-render catalog was not emitted.");
+        MethodInfo register = catalog.GetMethod(
+            "Register",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: [typeof(ServerRenderRegistry)],
+            modifiers: null)
+            ?? throw new InvalidOperationException(
+                "GeneratedViuServerRenders.Register(ServerRenderRegistry) was not emitted.");
+        register.Invoke(null, [registry]);
+    }
+
     private static CompiledFixtureAssembly Compile()
     {
         string[] fixtureNames =
@@ -107,6 +126,7 @@ internal sealed class CompiledFixtureAssembly
             ["build_property.ProjectDir"] = "C:/fixture/",
             ["build_property.Configuration"] = "Debug",
             ["build_property.ViuEmitHotReloadMetadata"] = "true",
+            ["build_property.ViuServerRendering"] = "true",
         };
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [new SingleFileComponentGenerator().AsSourceGenerator()],
@@ -183,6 +203,7 @@ internal sealed class CompiledFixtureAssembly
         paths.Add(typeof(Reactive).Assembly.Location);
         paths.Add(typeof(RouterView).Assembly.Location);
         paths.Add(typeof(ModelBinding).Assembly.Location);
+        paths.Add(typeof(ServerRenderRegistry).Assembly.Location);
         return paths
             .Select(path => MetadataReference.CreateFromFile(path))
             .ToArray();

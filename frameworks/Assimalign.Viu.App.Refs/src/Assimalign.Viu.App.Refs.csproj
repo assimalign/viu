@@ -19,7 +19,6 @@
 
 		<PackageId>Assimalign.Viu.App.Ref</PackageId>
 		<IsPackable>true</IsPackable>
-		<IncludeBuildOutput>false</IncludeBuildOutput>
 		<!-- CS2008: this project deliberately compiles no sources - it only
 		     assembles the targeting pack from referenced framework outputs. -->
 		<NoWarn>$(NoWarn);NU5128;NU5100;NU5131;CS2008</NoWarn>

@@ -1184,7 +1184,11 @@ base class**. A component with no template block stays a plain partial class wit
 When development metadata emission is enabled, a generated module initializer calls hidden
 `ComponentHotReload.Register` with the component type, stable identifier, and generated
 template/script/style marker types. The generator gates emission from configuration; authored
-components implement no public hot-reload metadata interface.
+components implement no public hot-reload metadata interface. For an accepted template or script
+metadata update, mounted renderers MUST remount only affected component instances in the post-flush
+phase; the Browser host MUST retain the current document so the applied in-memory managed delta is
+not discarded by booting stale on-disk assemblies. Rude edits rejected by metadata update remain the
+.NET watch host's rebuild/restart responsibility.
 
 `[SFC-CG-5]` **Generated-file identity.** Each emitted component occupies exactly one `AddSource` hint
 name, derived from its path alone as
@@ -1526,6 +1530,33 @@ uses the ordinary context target buffer and unchanged marker protocol.
 create renderer-owned request state, preserve cancellation, component-fallback flushes, teleports,
 state capture, and the final flush. Executed differential fixtures MUST byte-match the runtime-tree
 serializer, including escaping, normalization, fallback regions, and hydration markers.
+
+`[SSR-TARGET-1]` A project declares server-render targeting once with
+`<ViuServerRendering>true</ViuServerRendering>` under either `Assimalign.Viu.Sdk` or the derived
+`Assimalign.Viu.Sdk.Browser`. The declaration adds the exact-version ordinary
+`Assimalign.Viu.ServerRenderer` package and is surfaced to the single-file-component compiler. It is
+project-wide: a source file has no switch that can select or suppress a render profile.
+
+`[SSR-TARGET-2]` A server-targeted compilation emits the ordinary `VirtualNodeTree` body and a
+deterministic `ServerMarkup` body for every template-bearing generated component. It also emits one
+`GeneratedViuServerRenders.Register(ServerRenderRegistry)` catalog for the consumer assembly. The
+catalog contains compiler-known delegates and component references only; it performs no assembly
+scan, method discovery, dynamic activation, or reflection. A project that does not declare
+`ViuServerRendering` emits none of these server types, method bodies, registrations, or references.
+
+`[SSR-TARGET-3]` A server host explicitly populates a `ServerRenderRegistry` from the generated
+catalog and supplies it to `ServerRenderAdaptor<TContext>`. After the ordinary component factory
+resolves a node reference, the renderer activates and prefetches the component once, invokes the
+registered direct-markup body inside the same lease, and preserves subtree-local virtual-node
+fallback, teardown, teleport, hydration, and error-routing semantics. The body writes through a
+transaction-local `SsrRenderState` and child `SsrContext`. On success, the renderer commits context
+changes and replays every requested flush boundary in order while awaiting destination backpressure;
+no direct-body output reaches the destination before that commit. An exception routes through the
+same ancestor error-capture chain and terminal application handler as an ordinary component-render
+exception. The failed attempt commits none of its buffered markup, teleport contributions, or state
+changes; a handled exception emits `<!---->`, while an unhandled exception is rethrown unchanged. A
+component without a server registration uses ordinary tree traversal; the runtime never searches for
+a replacement.
 
 ### 11.2 The hydration marker protocol
 

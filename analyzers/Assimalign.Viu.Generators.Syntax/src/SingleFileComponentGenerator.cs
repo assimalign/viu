@@ -51,6 +51,7 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
     private const string ProjectDirectoryProperty = "build_property.ProjectDir";
     private const string ConfigurationProperty = "build_property.Configuration";
     private const string EmitHotReloadMetadataProperty = "build_property.ViuEmitHotReloadMetadata";
+    private const string ServerRenderingProperty = "build_property.ViuServerRendering";
 
     /// <summary>Pipeline step tracking name for the file-read transform (used by incremental-cache tests).</summary>
     public const string FileTrackingName = "SingleFileComponentFile";
@@ -69,10 +70,12 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             provider.GlobalOptions.TryGetValue(ProjectDirectoryProperty, out var projectDirectory);
             provider.GlobalOptions.TryGetValue(ConfigurationProperty, out var configuration);
             provider.GlobalOptions.TryGetValue(EmitHotReloadMetadataProperty, out var emitHotReloadMetadata);
+            provider.GlobalOptions.TryGetValue(ServerRenderingProperty, out var serverRendering);
             return new ProjectOptions(
                 rootNamespace,
                 projectDirectory,
-                ShouldEmitHotReloadMetadata(configuration, emitHotReloadMetadata));
+                ShouldEmitHotReloadMetadata(configuration, emitHotReloadMetadata),
+                IsEnabled(serverRendering));
         });
 
         // The multi-file view: .vue shadowing [VUE-7] and hint-name case collisions [SFC-CG-5] are both
@@ -119,7 +122,8 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
             .Select(static (result, _) => new GeneratedComponentRegistration(
                 result.Model.Namespace,
                 result.Model.ClassName,
-                result.Model.FilePath))
+                result.Model.FilePath,
+                result.Model.ServerRenderBody is not null))
             .Collect();
         var assemblyEmission = generatedComponents.Combine(
             projectOptions.Select(static (options, _) => options.RootNamespace));
@@ -216,7 +220,10 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
                     additionalText.Path,
                     options.ProjectDirectory)
                 : null,
-            HasCanonicalPeer(format, additionalText.Path, fileSet));
+            HasCanonicalPeer(format, additionalText.Path, fileSet))
+        {
+            EmitServerRendering = options.EmitServerRendering,
+        };
     }
 
     private static bool ShouldEmitHotReloadMetadata(
@@ -230,6 +237,9 @@ public sealed class SingleFileComponentGenerator : IIncrementalGenerator
 
         return string.Equals(configuration, "Debug", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsEnabled(string? configuredValue) =>
+        string.Equals(configuredValue, "true", StringComparison.OrdinalIgnoreCase);
 
     // Resolves the two cross-file facts for one compilation's component files: the canonical .viu base
     // paths a .vue peer is shadowed by [VUE-7], and the components whose readable hint names would

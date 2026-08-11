@@ -266,12 +266,12 @@ test host and execute it through the production compiled-body seam against equiv
 including escaping, attribute order, forms, scope ids, structural markers, and both dynamic-component
 and property-spread fallbacks.
 
-The profile is currently an explicit compiler facade rather than the default single-file-component
-projection. Automatic dual emission needs a server-targeting SDK/reference contract first: the base and
-Browser targeting frameworks intentionally do not expose `Assimalign.Viu.ServerRenderer`, so emitting
-server helper references unconditionally would break otherwise valid component libraries and add the
-server serializer to Browser applications. That integration must select the server profile only where
-the generated runtime helper contract is present.
+The public compiler facade keeps explicit profile selection for tooling and tests. The
+single-file-component generator selects dual emission automatically only when the consuming base or
+Browser SDK project declares `ViuServerRendering=true`. That declaration adds the exact ordinary
+ServerRenderer package and produces a generated registration catalog; client-only projects retain the
+single virtual-node profile and emit no server helper reference (`[SSR-TARGET-1]` through
+`[SSR-TARGET-3]`).
 
 ### Browser directive integration ([V01.01.04.09])
 

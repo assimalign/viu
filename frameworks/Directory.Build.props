@@ -4,17 +4,18 @@
     <!--
         Framework Ref/Runtime pack producers ([V01.01.12.19], #174).
 
-        TargetFramework comes from the central alias. VersionPrefix/VersionSuffix
-        are forced here because Microsoft.NET.Sdk pre-seeds VersionPrefix=1.0.0
-        early in evaluation; build/Targets/Build.Version.props handles that
-        default for ordinary projects, but framework pack versions must never
-        drift from $(ViuVersion), so the split is pinned explicitly (prefix
-        feeds AssemblyVersion/FileVersion - numeric only per CS7034; suffix
-        feeds PackageVersion/InformationalVersion).
+        TargetFramework and the one canonical package version come from the
+        central build aliases. Framework producers only select their container
+        shape and exact dependency policy here.
     -->
     <PropertyGroup>
         <TargetFramework>$(TargetFrameworkForFrameworks)</TargetFramework>
-        <VersionPrefix>$(ViuVersionPrefix)</VersionPrefix>
-        <VersionSuffix Condition="'$(ViuVersionSuffix)' != ''">$(ViuVersionSuffix)</VersionSuffix>
+        <!-- NuGet only invokes its symbol collection graph when IncludeBuildOutput=true. Runtime
+             packs keep it and the owning targets remove the empty producer assembly; Ref packs
+             override it to false because they deliberately publish no symbol package. -->
+        <ViuContainerPackage>true</ViuContainerPackage>
+        <IncludeBuildOutput>true</IncludeBuildOutput>
+        <!-- Shared-framework manifests and copied assets form one lockstep release. -->
+        <ViuPackageDependencyVersionRange>[$(ViuVersion)]</ViuPackageDependencyVersionRange>
     </PropertyGroup>
 </Project>

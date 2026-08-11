@@ -6,7 +6,6 @@
         <GenerateDependencyFile>false</GenerateDependencyFile>
         <PackageId>Assimalign.Viu.App.Browser.Ref</PackageId>
         <IsPackable>true</IsPackable>
-        <IncludeBuildOutput>false</IncludeBuildOutput>
         <NoWarn>$(NoWarn);NU5128;NU5100;NU5131;CS2008</NoWarn>
         <ViuFrameworkName>Assimalign.Viu.App.Browser</ViuFrameworkName>
         <ViuFrameworkKind>Ref</ViuFrameworkKind>

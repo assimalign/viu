@@ -20,11 +20,14 @@ multiple selections use the same authored handler shape as the in-memory Testing
 (`[V01.01.11.06]`).
 
 `BrowserApplication` uses Core's public `ApplicationLifetime` for the platform-invariant state
-machine and keeps only Browser initialization, selector resolution, mounting, hydration, and
-full-page hot-reload signaling. Browser directives are available through the default application
-directive resolver, and CSS transitions consume the public transition-node contract. Top-level
-startup is asynchronous; lower-level mount APIs deliberately bypass lifetime middleware as specified
-by `[APP-1]`, `[APP-2]`, `[APP-6]`, and `[APP-7]`.
+machine and keeps only Browser initialization, selector resolution, mounting, and hydration.
+Accepted template and script metadata updates remain in Core:
+affected component instances remount in the post-flush phase while the Browser document remains
+loaded. The .NET watch host owns rebuild, restart, and browser refresh for rejected rude edits.
+Browser directives are available through the default application directive resolver, and CSS
+transitions consume the public transition-node contract. Top-level startup is asynchronous;
+lower-level mount APIs deliberately bypass lifetime middleware as specified by `[APP-1]`, `[APP-2]`,
+`[APP-6]`, and `[APP-7]`.
 
 Scoped-style identifiers need no Browser-specific path: compiled virtual trees carry the stable
 `data-v-*` value as an ordinary attribute, so the same buffered binding operation used for authored

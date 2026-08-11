@@ -39,7 +39,38 @@ public static class ServerRenderer
             application,
             writer,
             context ?? new SsrContext(),
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            serverRenders: null).ConfigureAwait(false);
+        return writer.ToStringResult();
+    }
+
+    /// <summary>Renders one configured application through an explicit generated server catalog.</summary>
+    /// <param name="application">The immutable per-render application composition.</param>
+    /// <param name="serverRenders">The host-populated compiler-produced render registry.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for component prefetch and rendering.</param>
+    /// <returns>The completed WHATWG HTML serialization.</returns>
+    /// <remarks>
+    /// Registered component subtrees use their direct-markup bodies; missing registrations retain
+    /// ordinary virtual-tree traversal. Resolution is explicit and reflection-free. Specified by
+    /// <c>[SSR-TARGET-2]</c> and <c>[SSR-TARGET-3]</c>.
+    /// </remarks>
+    public static async Task<string> RenderToStringAsync(
+        ServerRenderApplication application,
+        IServerRenderRegistry serverRenders,
+        SsrContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(serverRenders);
+
+        SsrWriter writer = new();
+        await RenderCoreAsync(
+            application,
+            writer,
+            context ?? new SsrContext(),
+            cancellationToken,
+            serverRenders).ConfigureAwait(false);
         return writer.ToStringResult();
     }
 
@@ -89,7 +120,40 @@ public static class ServerRenderer
             application,
             new SsrWriter(writer),
             context ?? new SsrContext(),
-            cancellationToken);
+            cancellationToken,
+            serverRenders: null);
+    }
+
+    /// <summary>
+    /// Streams one configured application through an explicit generated server catalog.
+    /// </summary>
+    /// <param name="application">The immutable per-render application composition.</param>
+    /// <param name="writer">The externally owned destination writer.</param>
+    /// <param name="serverRenders">The host-populated compiler-produced render registry.</param>
+    /// <param name="context">The per-render state handoff context, or null to create one.</param>
+    /// <param name="cancellationToken">Cancellation for prefetch, writes, and flushing.</param>
+    /// <returns>A task completing after generated and fallback content has flushed.</returns>
+    /// <remarks>
+    /// Direct and fallback paths share request state and component leases. The registry is consulted
+    /// only after the ordinary component reference resolves, so name normalization remains owned by
+    /// the component factory. Specified by <c>[SSR-TARGET-2]</c> and <c>[SSR-TARGET-3]</c>.
+    /// </remarks>
+    public static Task RenderToStreamAsync(
+        ServerRenderApplication application,
+        TextWriter writer,
+        IServerRenderRegistry serverRenders,
+        SsrContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(serverRenders);
+        return RenderCoreAsync(
+            application,
+            new SsrWriter(writer),
+            context ?? new SsrContext(),
+            cancellationToken,
+            serverRenders);
     }
 
     /// <summary>
@@ -128,7 +192,8 @@ public static class ServerRenderer
         ServerRenderApplication application,
         SsrWriter writer,
         SsrContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IServerRenderRegistry? serverRenders)
     {
         using IDisposable executionIsolation = CoreExecutionIsolation.Enter();
         cancellationToken.ThrowIfCancellationRequested();
@@ -147,7 +212,8 @@ public static class ServerRenderer
             context,
             applicationContext,
             componentHost,
-            cancellationToken);
+            cancellationToken,
+            serverRenders);
 
         await ServerMarkupSerializer.RenderAsync(
             state,

@@ -234,28 +234,90 @@ public sealed class ServerRendererTests
     }
 
     [Fact]
-    public async Task RenderToStringAsync_HandledRenderFailure_EmitsStableEmptyComment()
+    public async Task RenderToStringAsync_HandledRenderFailure_IsByteIdenticalAcrossTraversalAndCompiledBodies()
     {
         ComponentReference reference = ComponentReference.ForName("failure");
         List<string> diagnostics = [];
+        InvalidOperationException failure = new("failure");
         ComponentFactory components = new();
         components.Register(
             new ComponentRegistration(
                 reference,
                 new ComponentContract(),
                 _ => new InlineComponent(
-                    _ => _ => throw new InvalidOperationException("failure"))));
-        ServerRenderApplication application = ServerRenderApplication
-            .CreateBuilder(new ComponentNode(reference), components)
-            .ConfigureApplication(
-                options => options.ErrorHandler = (_, _, diagnosticInformation) =>
+                    _ => _ => throw failure)));
+        ServerRenderRegistry serverRenders = new();
+        serverRenders.Register(new ServerRenderRegistration(
+            reference,
+            async (state, _, _, _) =>
+            {
+                state.Push("<strong>discarded</strong>");
+                await ServerRender.SsrRenderTeleportAsync(
+                    state,
+                    teleportState =>
+                    {
+                        teleportState.Push("<span>discarded</span>");
+                        return Task.CompletedTask;
+                    },
+                    "#discarded",
+                    disabled: false);
+                await state.FlushAsync();
+                throw failure;
+            }));
+        ComponentNode root = new(reference);
+        SsrContext traversalContext = new();
+        SsrContext compiledContext = new();
+
+        ServerRenderApplication CreateApplication() => ServerRenderApplication
+            .CreateBuilder(root, components)
+            .ConfigureApplication(options =>
+                options.ErrorHandler = (_, _, diagnosticInformation) =>
                     diagnostics.Add(diagnosticInformation))
             .Build();
 
-        string html = await ServerRenderer.RenderToStringAsync(application);
+        string traversed = await ServerRenderer.RenderToStringAsync(
+            CreateApplication(),
+            traversalContext);
+        string compiled = await ServerRenderer.RenderToStringAsync(
+            CreateApplication(),
+            serverRenders,
+            compiledContext);
 
-        html.ShouldBe(HydrationMarkers.EmptyComment);
-        diagnostics.ShouldBe(["component render"]);
+        traversed.ShouldBe(HydrationMarkers.EmptyComment);
+        compiled.ShouldBe(traversed);
+        traversalContext.Teleports.ShouldBeEmpty();
+        compiledContext.Teleports.ShouldBeEmpty();
+        diagnostics.ShouldBe(["component render", "component render"]);
+    }
+
+    [Fact]
+    public async Task RenderToStringAsync_UnhandledRenderFailure_HasSameExceptionAcrossTraversalAndCompiledBodies()
+    {
+        ComponentReference reference = ComponentReference.ForName("unhandled-failure");
+        InvalidOperationException failure = new("unhandled failure");
+        ComponentFactory components = new();
+        components.Register(
+            new ComponentRegistration(
+                reference,
+                new ComponentContract(),
+                _ => new InlineComponent(
+                    _ => _ => throw failure)));
+        ServerRenderRegistry serverRenders = new();
+        serverRenders.Register(new ServerRenderRegistration(
+            reference,
+            (_, _, _, _) => Task.FromException(failure)));
+        ComponentNode root = new(reference);
+
+        InvalidOperationException traversed = await Should.ThrowAsync<InvalidOperationException>(
+            async () => await ServerRenderer.RenderToStringAsync(
+                new ServerRenderApplication(root, components)));
+        InvalidOperationException compiled = await Should.ThrowAsync<InvalidOperationException>(
+            async () => await ServerRenderer.RenderToStringAsync(
+                new ServerRenderApplication(root, components),
+                serverRenders));
+
+        traversed.ShouldBeSameAs(failure);
+        compiled.ShouldBeSameAs(traversed);
     }
 
     [Fact]

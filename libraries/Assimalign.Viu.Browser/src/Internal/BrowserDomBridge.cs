@@ -407,19 +407,6 @@ internal static partial class BrowserDomBridge
         }
     }
 
-    /// <summary>Requests a full document reload after a component script update.</summary>
-    internal static void ReloadPage()
-    {
-        try
-        {
-            Imports.ReloadPage();
-        }
-        catch (JSException exception)
-        {
-            throw Translate("reloadPage", 0, exception);
-        }
-    }
-
     // --- transitions ([V01.01.04.07]) -----------------------------------------------------------
     // classList add/remove, the double-rAF next frame, the forced reflow, transition-end detection,
     // and the FLIP getBoundingClientRect/transform ops. The rAF/listener scheduling stays JS-side and
@@ -585,9 +572,6 @@ internal static partial class BrowserDomBridge
 
     private static partial class Imports
     {
-        [JSImport("globalThis.location.reload")]
-        internal static partial void ReloadPage();
-
         [JSImport("dom.querySelector", ModuleName)]
         internal static partial int QuerySelector(string selector);
 

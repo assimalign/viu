@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(TargetFrameworkForLibraries)</TargetFramework>
+    <PackageId>Assimalign.Viu.Templates</PackageId>
+    <PackageType>Template</PackageType>
+    <Description>Project templates for Viu Browser WebAssembly applications and host-neutral component libraries.</Description>
+    <PackageTags>dotnet-new;templates;Viu;WebAssembly;Components</PackageTags>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- A content-only dotnet-new pack has no PDB payload from which NuGet could create a snupkg. -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);CollectViuVersionedTemplateFiles</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="content\**\*"
+          Exclude="content\**\bin\**;content\**\obj\**;content\viu-app\global.json;content\viu-lib\global.json"
+          Pack="true"
+          PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!--
+    A project SDK reference requires an exact version before NuGet restore can evaluate the
+    project. Generate the two global.json files at pack time from the same central ViuVersion that
+    versions the template, SDK, targeting, and runtime packages. This keeps a released template
+    self-consistent without hard-coding or reflection-based version discovery. [V01.01.12.04]
+  -->
+  <Target Name="CollectViuVersionedTemplateFiles">
+    <PropertyGroup>
+      <_ViuVersionedTemplateDirectory>$(IntermediateOutputPath)versioned-template-content\</_ViuVersionedTemplateDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ViuApplicationGlobalJsonLine Remove="@(_ViuApplicationGlobalJsonLine)" />
+      <_ViuLibraryGlobalJsonLine Remove="@(_ViuLibraryGlobalJsonLine)" />
+    </ItemGroup>
+
+    <ReadLinesFromFile File="$(MSBuildProjectDirectory)\content\viu-app\global.json">
+      <Output TaskParameter="Lines" ItemName="_ViuApplicationGlobalJsonLine" />
+    </ReadLinesFromFile>
+    <ReadLinesFromFile File="$(MSBuildProjectDirectory)\content\viu-lib\global.json">
+      <Output TaskParameter="Lines" ItemName="_ViuLibraryGlobalJsonLine" />
+    </ReadLinesFromFile>
+
+    <ItemGroup>
+      <_ViuApplicationGlobalJsonLine Update="@(_ViuApplicationGlobalJsonLine)">
+        <VersionedText>$([System.String]::Copy('%(Identity)').Replace('__VIU_VERSION__', '$(ViuVersion)'))</VersionedText>
+      </_ViuApplicationGlobalJsonLine>
+      <_ViuLibraryGlobalJsonLine Update="@(_ViuLibraryGlobalJsonLine)">
+        <VersionedText>$([System.String]::Copy('%(Identity)').Replace('__VIU_VERSION__', '$(ViuVersion)'))</VersionedText>
+      </_ViuLibraryGlobalJsonLine>
+    </ItemGroup>
+
+    <MakeDir Directories="$(_ViuVersionedTemplateDirectory)viu-app;$(_ViuVersionedTemplateDirectory)viu-lib" />
+    <WriteLinesToFile File="$(_ViuVersionedTemplateDirectory)viu-app\global.json"
+                      Lines="@(_ViuApplicationGlobalJsonLine->'%(VersionedText)')"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+    <WriteLinesToFile File="$(_ViuVersionedTemplateDirectory)viu-lib\global.json"
+                      Lines="@(_ViuLibraryGlobalJsonLine->'%(VersionedText)')"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_ViuVersionedTemplateDirectory)viu-app\global.json">
+        <PackagePath>content/viu-app/global.json</PackagePath>
+      </TfmSpecificPackageFile>
+      <TfmSpecificPackageFile Include="$(_ViuVersionedTemplateDirectory)viu-lib\global.json">
+        <PackagePath>content/viu-lib/global.json</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+</Project>

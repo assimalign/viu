@@ -21,6 +21,7 @@ public sealed class ServerRenderAdaptor<TContext>
     where TContext : notnull
 {
     private readonly IServerRenderRequestScopeFactory<TContext> _requestScopeFactory;
+    private readonly IServerRenderRegistry? _serverRenders;
 
     /// <summary>Initializes the adaptor with the host's request-scope factory.</summary>
     /// <param name="requestScopeFactory">The factory invoked exactly once per render request.</param>
@@ -28,6 +29,28 @@ public sealed class ServerRenderAdaptor<TContext>
     {
         ArgumentNullException.ThrowIfNull(requestScopeFactory);
         _requestScopeFactory = requestScopeFactory;
+    }
+
+    /// <summary>
+    /// Initializes the adaptor with the host's request-scope factory and generated server catalog.
+    /// </summary>
+    /// <param name="requestScopeFactory">The factory invoked exactly once per render request.</param>
+    /// <param name="serverRenders">
+    /// The registry populated by the consumer assembly's generated server-registration surface.
+    /// </param>
+    /// <remarks>
+    /// Supplying the catalog selects compiler-produced bodies for registered component subtrees and
+    /// preserves traversal for unregistered values. The adaptor performs no assembly discovery.
+    /// Specified by <c>[SSR-TARGET-2]</c> and <c>[SSR-TARGET-3]</c>.
+    /// </remarks>
+    public ServerRenderAdaptor(
+        IServerRenderRequestScopeFactory<TContext> requestScopeFactory,
+        IServerRenderRegistry serverRenders)
+    {
+        ArgumentNullException.ThrowIfNull(requestScopeFactory);
+        ArgumentNullException.ThrowIfNull(serverRenders);
+        _requestScopeFactory = requestScopeFactory;
+        _serverRenders = serverRenders;
     }
 
     /// <summary>
@@ -80,11 +103,23 @@ public sealed class ServerRenderAdaptor<TContext>
             }
 
             writer = new ServerRenderOutputTextWriter(output);
-            await ServerRenderer.RenderToStreamAsync(
-                application,
-                writer,
-                context,
-                cancellationToken).ConfigureAwait(false);
+            if (_serverRenders is null)
+            {
+                await ServerRenderer.RenderToStreamAsync(
+                    application,
+                    writer,
+                    context,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await ServerRenderer.RenderToStreamAsync(
+                    application,
+                    writer,
+                    _serverRenders,
+                    context,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {

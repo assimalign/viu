@@ -2,8 +2,9 @@
 
 Viu is a standalone C#/.NET user-interface framework that runs in the browser through the .NET
 WebAssembly build tools. This guide takes you from an empty folder to a running, publishable Viu app
-using the packaged **`Assimalign.Viu.Sdk.Browser`**. Host-neutral component libraries use the base
-`Assimalign.Viu.Sdk`; browser applications use the Browser SDK shown throughout this guide.
+using the `viu-app` project template and packaged **`Assimalign.Viu.Sdk.Browser`**. Host-neutral
+component libraries use the `viu-lib` template and base `Assimalign.Viu.Sdk`; browser applications
+use the Browser SDK shown throughout this guide.
 
 Three decisions shape everything below (they are the
 [founding design decisions](../PLAN.md#founding-design-decisions-cwasm-divergences), and
@@ -22,9 +23,9 @@ guarantees):
   templates are compiled by source generators during the build
   ([ADR-0005](../adr/0005-no-runtime-template-compilation.md)).
 
-> **Preview status.** Viu is pre-release. There is **no `dotnet new` template yet** — that lands with
-> [V01.01.12.04] (wave W05), so this guide creates the project by hand. Package versions and the local
-> feed below reflect the current preview; once Viu publishes to nuget.org the feed step goes away.
+> **Preview status.** Viu is pre-release. Package versions and the local feed below reflect the
+> current preview; once Viu publishes to nuget.org the feed step goes away. The manual project anatomy
+> remains after the template walkthrough so every generated file and SDK choice stays explicit.
 
 ## Prerequisites
 
@@ -71,6 +72,52 @@ This produces both project SDKs, `Assimalign.Viu.App.Ref`,
 `Assimalign.Viu.App.Browser.Runtime.browser-wasm` (see the
 [local development loop](../../sdks/README.md#local-development-loop)). Your app points a
 `nuget.config` at that folder, shown below.
+
+## Create the project from the template
+
+Install the template pack from the same feed as the SDK and framework packages. During the preview,
+run this from a directory whose `nuget.config` contains the `viu-local` source shown in the manual
+walkthrough below:
+
+```sh
+dotnet new install Assimalign.Viu.Templates --nuget-source C:\Source\repos\assimalign\viu\_out\packages
+dotnet new list viu
+```
+
+Create and enter a Browser WebAssembly application:
+
+```sh
+dotnet new viu-app --name HelloViu
+cd HelloViu
+dotnet run
+```
+
+The generated application uses `Assimalign.Viu.Sdk.Browser`, pins both Viu project SDKs to the
+template package's version, enables nullable reference types and full trimming, and contains a
+compiled `.viu` reactive counter. Pass `--nullable false` only when the project deliberately disables
+nullable analysis. A host-neutral, packable component library with a passing generated-catalog test
+project is equally small:
+
+```sh
+dotnet new viu-lib --name Contoso.Components
+cd Contoso.Components
+dotnet test
+dotnet pack -c Release
+```
+
+The library template uses `Assimalign.Viu.Sdk` and never pulls in Browser or the WebAssembly workload.
+For a Browser application with a server-rendering host, enable the explicit template option:
+
+```sh
+dotnet new viu-app --name HelloViu --ssr
+dotnet run --project HelloViu/Server/HelloViu.Server.csproj
+```
+
+That variant moves the counter into a host-neutral component project, declares
+`ViuServerRendering=true`, and adds an ASP.NET host. The Browser and server projects share the same
+compiled component assembly; the host explicitly registers `GeneratedViuComponents` and
+`GeneratedViuServerRenders`, so server selection performs no reflection or assembly scanning.
+Specified by `[SSR-TARGET-1]` through `[SSR-TARGET-3]` and [V01.01.12.28].
 
 ## Create the project by hand
 
@@ -537,10 +584,8 @@ That folder is a static site — host it on any static web host.
 ## Not yet available
 
 The component examples in this guide describe the shipping `[V01.01.15]` surface. Remaining
-documentation and project-creation work includes:
+documentation work includes:
 
-- **A `dotnet new` project template** — [V01.01.12.04] (W05); until then, create the project by hand as
-  above.
 - **A template-syntax reference and the API reference site** — the Documentation area
   [V01.01.13](https://github.com/assimalign/viu/issues/97).
 

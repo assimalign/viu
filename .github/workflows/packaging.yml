@@ -4,8 +4,7 @@
 # below are about the SHAPE of that set, not about any one project. It replaces area-packaging.yml
 # and absorbs the artifact assertions the standalone area-utility-css.yml used to duplicate.
 #
-# Nothing here pushes: publishing is release.yml's job (the checksummed, uniquely versioned beta and
-# stable sets), and the per-project canonical-version push lives in .github/actions/build.
+# Nothing here pushes: release.yml is the sole publisher of the checksummed, validated set.
 name: Packaging
 
 on:
@@ -14,6 +13,7 @@ on:
     paths:
       - 'sdks/**'
       - 'frameworks/**'
+      - 'templates/**'
       - 'scripts/**'
       - 'libraries/**'
       - 'tooling/**'
@@ -30,6 +30,7 @@ on:
     paths:
       - 'sdks/**'
       - 'frameworks/**'
+      - 'templates/**'
       - 'scripts/**'
       - 'libraries/**'
       - 'tooling/**'
@@ -80,6 +81,55 @@ jobs:
         shell: pwsh
         run: ./scripts/Install-Local.ps1
 
+      - name: Install and validate the Viu project templates
+        shell: pwsh
+        run: ./scripts/Test-Templates.ps1 -SkipPack
+
+      - name: Validate release package metadata, ranges, analyzers, and symbols
+        shell: pwsh
+        run: |
+          $sdkProject = 'sdks/Assimalign.Viu.Sdk/Tasks/Assimalign.Viu.Sdk.Tasks.csproj'
+          $version = (& dotnet msbuild $sdkProject -nologo -getProperty:ViuVersion) -join "`n"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Reading the canonical Viu version failed with exit code $LASTEXITCODE."
+          }
+          ./scripts/Test-Packages.ps1 -PackageDirectory _out/packages -Version $version.Trim()
+
+      - name: Validate deterministic package payloads
+        shell: pwsh
+        run: |
+          $project = 'libraries/Assimalign.Viu.Components/src/Assimalign.Viu.Components.csproj'
+          $commit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Resolving the repository commit failed.'
+          }
+          $first = Join-Path $PWD '_out/determinism/first'
+          $second = Join-Path $PWD '_out/determinism/second'
+          foreach ($output in @($first, $second)) {
+            & dotnet clean $project --configuration Release
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Cleaning the determinism canary failed.'
+            }
+            & dotnet pack $project `
+              --configuration Release `
+              --no-restore `
+              -warnaserror `
+              -p:ContinuousIntegrationBuild=true `
+              "-p:RepositoryCommit=$commit" `
+              "-p:PackageOutputPath=$output"
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Packing the determinism canary failed.'
+            }
+          }
+          $mainName = (Get-ChildItem $first -Filter '*.nupkg' -File).Name
+          $symbolName = (Get-ChildItem $first -Filter '*.snupkg' -File).Name
+          ./scripts/Test-PackageDeterminism.ps1 `
+            -FirstPackage (Join-Path $first $mainName) `
+            -SecondPackage (Join-Path $second $mainName)
+          ./scripts/Test-PackageDeterminism.ps1 `
+            -FirstPackage (Join-Path $first $symbolName) `
+            -SecondPackage (Join-Path $second $symbolName)
+
       - name: Validate component-library and Browser package consumers
         shell: pwsh
         run: ./scripts/Test-ApplicationLifetimeConsumer.ps1
@@ -123,7 +173,8 @@ jobs:
             'Assimalign.Viu.Sdk.Browser.*.nupkg',
             'Assimalign.Viu.App.Ref.*.nupkg',
             'Assimalign.Viu.App.Browser.Ref.*.nupkg',
-            'Assimalign.Viu.App.Browser.Runtime.browser-wasm.*.nupkg'
+            'Assimalign.Viu.App.Browser.Runtime.browser-wasm.*.nupkg',
+            'Assimalign.Viu.Templates.*.nupkg'
           )
           foreach ($pattern in $expected) {
             if (-not (Get-ChildItem $feed -Filter $pattern)) { throw "Missing package: $pattern" }

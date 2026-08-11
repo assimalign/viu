@@ -146,7 +146,8 @@ function Get-ViuPackageId {
     <#
     .SYNOPSIS
         Every Viu package id a repack can invalidate: the libraries, both SDKs,
-        both targeting packs, and one Browser runtime pack per runtime identifier.
+        both targeting packs, one Browser runtime pack per runtime identifier, and
+        the dotnet-new template pack.
 
     .PARAMETER Rids
         Runtime identifiers whose runtime packs are produced.
@@ -163,7 +164,429 @@ function Get-ViuPackageId {
             'Assimalign.Viu.App.Ref',
             'Assimalign.Viu.App.Browser.Ref'
         ) +
-        @($Rids | ForEach-Object { "Assimalign.Viu.App.Browser.Runtime.$_" })
+        @($Rids | ForEach-Object { "Assimalign.Viu.App.Browser.Runtime.$_" }) +
+        @('Assimalign.Viu.Templates')
+}
+
+function Test-ViuPackageContainsManagedAssembly {
+    <#
+    .SYNOPSIS
+        Reports whether a main package carries a managed assembly payload.
+
+    .DESCRIPTION
+        Executable library/runtime packages with managed assemblies normally require a portable-PDB
+        symbol package. Content-only packages contain no managed payload, while the release validator
+        separately names the deliberate Ref/SDK container exceptions. This helper reports archive
+        content only; it does not decide the symbol-package policy.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $PackagePath
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead(
+        [System.IO.Path]::GetFullPath($PackagePath))
+    try {
+        return @(
+            $archive.Entries |
+                Where-Object {
+                    $_.Name.EndsWith(
+                        '.dll',
+                        [System.StringComparison]::OrdinalIgnoreCase)
+                }).Count -gt 0
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
+function Test-ViuPackageRequiresSymbolPackage {
+    <#
+    .SYNOPSIS
+        Reports whether a release package must have a companion .snupkg.
+
+    .DESCRIPTION
+        Applies Viu's symbol-publication policy to the physical main package. Executable
+        library/runtime packages with managed assemblies require symbols. The two targeting packs
+        and two SDK distribution containers deliberately do not publish implementation symbols.
+
+    .PARAMETER PackageId
+        Package id whose distribution role selects any explicit container exception.
+
+    .PARAMETER PackagePath
+        Main .nupkg inspected for a managed assembly payload.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $PackageId,
+
+        [Parameter(Mandatory)]
+        [string] $PackagePath
+    )
+
+    $packageIdWithoutSymbolPackage = @(
+        'Assimalign.Viu.App.Ref',
+        'Assimalign.Viu.App.Browser.Ref',
+        'Assimalign.Viu.Sdk',
+        'Assimalign.Viu.Sdk.Browser')
+    if ($packageIdWithoutSymbolPackage -contains $PackageId) {
+        return $false
+    }
+
+    return Test-ViuPackageContainsManagedAssembly -PackagePath $PackagePath
+}
+
+function Assert-ViuSymbolPackageMatchesMainPackage {
+    <#
+    .SYNOPSIS
+        Verifies that every symbol-package PDB maps to a main-package managed PE.
+
+    .DESCRIPTION
+        nuget.org accepts a portable PDB only when the corresponding DLL, EXE, or WinMD exists in
+        the main package at the same relative archive path. This assertion applies that publication
+        contract to custom Viu package layouts as well as conventional lib/<tfm>/ packages.
+
+    .PARAMETER MainPackagePath
+        Main .nupkg whose managed PE entries own the symbols.
+
+    .PARAMETER SymbolPackagePath
+        Companion .snupkg whose PDB entries must mirror the main package.
+
+    .PARAMETER PackageId
+        Package id used in validation errors.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $MainPackagePath,
+
+        [Parameter(Mandatory)]
+        [string] $SymbolPackagePath,
+
+        [Parameter(Mandatory)]
+        [string] $PackageId
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    $managedPortableExecutablePath = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase)
+    $mainArchive = [System.IO.Compression.ZipFile]::OpenRead(
+        [System.IO.Path]::GetFullPath($MainPackagePath))
+    try {
+        foreach ($entry in $mainArchive.Entries) {
+            if ($entry.Name.EndsWith(
+                    '.dll',
+                    [System.StringComparison]::OrdinalIgnoreCase) -or
+                $entry.Name.EndsWith(
+                    '.exe',
+                    [System.StringComparison]::OrdinalIgnoreCase) -or
+                $entry.Name.EndsWith(
+                    '.winmd',
+                    [System.StringComparison]::OrdinalIgnoreCase)) {
+                $null = $managedPortableExecutablePath.Add($entry.FullName)
+            }
+        }
+    }
+    finally {
+        $mainArchive.Dispose()
+    }
+
+    $symbolArchive = [System.IO.Compression.ZipFile]::OpenRead(
+        [System.IO.Path]::GetFullPath($SymbolPackagePath))
+    try {
+        $portableSymbols = @(
+            $symbolArchive.Entries |
+                Where-Object {
+                    $_.Name.EndsWith(
+                        '.pdb',
+                        [System.StringComparison]::OrdinalIgnoreCase)
+                })
+        if ($portableSymbols.Count -eq 0) {
+            throw "$PackageId symbol package contains no portable PDB."
+        }
+
+        foreach ($portableSymbol in $portableSymbols) {
+            $matchedPortableExecutable = $false
+            foreach ($extension in @('.dll', '.exe', '.winmd')) {
+                $portableExecutablePath = [System.IO.Path]::ChangeExtension(
+                    $portableSymbol.FullName,
+                    $extension)
+                if ($managedPortableExecutablePath.Contains($portableExecutablePath)) {
+                    $matchedPortableExecutable = $true
+                    break
+                }
+            }
+            if (-not $matchedPortableExecutable) {
+                throw "$PackageId symbol package PDB '$($portableSymbol.FullName)' does not have a managed PE at the same relative path in its main package."
+            }
+        }
+    }
+    finally {
+        $symbolArchive.Dispose()
+    }
+}
+
+function Assert-ViuReleasePackageSet {
+    <#
+    .SYNOPSIS
+        Validates the complete Viu release package set before publication.
+
+    .DESCRIPTION
+        Enforces the [V01.01.12.03] package contract over the physical archives:
+        coherent versions, required NuGet metadata and embedded files, bounded
+        intra-Viu dependency ranges, the deliberate symbol-package inventory, exact PDB-to-PE
+        relative-path matches for every .snupkg, and
+        a targeting-pack analyzer manifest that exactly matches the
+        analyzers/dotnet/cs payload. The function is deliberately shared by the
+        local validator and release packer so publication cannot bypass it.
+
+    .PARAMETER PackageDirectory
+        Directory containing only the release .nupkg and .snupkg files.
+
+    .PARAMETER Version
+        Exact SemVer expected in every package.
+
+    .PARAMETER ExpectedPackageId
+        Exact release inventory. Defaults to Get-ViuPackageId.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $PackageDirectory,
+
+        [Parameter(Mandatory)]
+        [string] $Version,
+
+        [string[]] $ExpectedPackageId = @(Get-ViuPackageId)
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    $resolvedPackageDirectory = [System.IO.Path]::GetFullPath($PackageDirectory)
+    if (-not (Test-Path -LiteralPath $resolvedPackageDirectory -PathType Container)) {
+        throw "The package directory does not exist: $resolvedPackageDirectory"
+    }
+
+    $versionMatch = [System.Text.RegularExpressions.Regex]::Match(
+        $Version,
+        '^(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$')
+    if (-not $versionMatch.Success) {
+        throw "Package-set version '$Version' is not supported SemVer."
+    }
+    $nextMajorVersion = ([int] $versionMatch.Groups['major'].Value) + 1
+    $compatibleRange = "[$Version,$nextMajorVersion.0.0)"
+    $exactRange = "[$Version]"
+
+    $expectedMainPackageFile = @(
+        $ExpectedPackageId |
+            ForEach-Object { "$($_).$Version.nupkg" } |
+            Sort-Object)
+    $actualMainPackageFile = @(
+        Get-ChildItem -LiteralPath $resolvedPackageDirectory -Filter '*.nupkg' -File |
+            Where-Object {
+                $_.Name.EndsWith(
+                    ".$Version.nupkg",
+                    [System.StringComparison]::OrdinalIgnoreCase) -and
+                -not $_.Name.EndsWith(
+                    '.symbols.nupkg',
+                    [System.StringComparison]::OrdinalIgnoreCase)
+            } |
+            ForEach-Object Name |
+            Sort-Object)
+    $actualSymbolPackageFile = @(
+        Get-ChildItem -LiteralPath $resolvedPackageDirectory -Filter '*.snupkg' -File |
+            Where-Object {
+                $_.Name.EndsWith(
+                    ".$Version.snupkg",
+                    [System.StringComparison]::OrdinalIgnoreCase)
+            } |
+            ForEach-Object Name |
+            Sort-Object)
+
+    $mainPackageDifference = @(
+        Compare-Object $expectedMainPackageFile $actualMainPackageFile)
+    if ($mainPackageDifference.Count -ne 0) {
+        throw "The main release package inventory differs from the contract: $($mainPackageDifference | Out-String)"
+    }
+
+    $expectedSymbolPackageId = @(
+        $ExpectedPackageId |
+            Where-Object {
+                Test-ViuPackageRequiresSymbolPackage `
+                    -PackageId $_ `
+                    -PackagePath (Join-Path $resolvedPackageDirectory "$($_).$Version.nupkg")
+            })
+    $expectedSymbolPackageFile = @(
+        $expectedSymbolPackageId |
+            ForEach-Object { "$($_).$Version.snupkg" } |
+            Sort-Object)
+    $symbolPackageDifference = @(
+        Compare-Object $expectedSymbolPackageFile $actualSymbolPackageFile)
+    if ($symbolPackageDifference.Count -ne 0) {
+        throw "The symbol release package inventory differs from the contract: $($symbolPackageDifference | Out-String)"
+    }
+
+    $exactDependencyPackageId = @(
+        'Assimalign.Viu.App.Ref',
+        'Assimalign.Viu.App.Browser.Ref',
+        'Assimalign.Viu.App.Browser.Runtime.browser-wasm',
+        'Assimalign.Viu.Sdk.Browser')
+
+    foreach ($packageId in $ExpectedPackageId) {
+        $packagePath = Join-Path $resolvedPackageDirectory "$packageId.$Version.nupkg"
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($packagePath)
+        try {
+            $nuspecEntry = @(
+                $archive.Entries |
+                    Where-Object {
+                        $_.FullName.EndsWith(
+                            '.nuspec',
+                            [System.StringComparison]::OrdinalIgnoreCase)
+                    })
+            if ($nuspecEntry.Count -ne 1) {
+                throw "$packageId must contain exactly one nuspec, found $($nuspecEntry.Count)."
+            }
+
+            $nuspecReader = [System.IO.StreamReader]::new($nuspecEntry[0].Open())
+            try {
+                [xml] $nuspec = $nuspecReader.ReadToEnd()
+            }
+            finally {
+                $nuspecReader.Dispose()
+            }
+            $metadata = $nuspec.package.metadata
+
+            if ([string] $metadata.id -ne $packageId) {
+                throw "$packagePath declares package id '$($metadata.id)' instead of '$packageId'."
+            }
+            if ([string] $metadata.version -ne $Version) {
+                throw "$packageId declares version '$($metadata.version)' instead of '$Version'."
+            }
+            foreach ($requiredText in @(
+                    @{ Name = 'authors'; Value = [string] $metadata.authors },
+                    @{ Name = 'description'; Value = [string] $metadata.description },
+                    @{ Name = 'tags'; Value = [string] $metadata.tags })) {
+                if ([string]::IsNullOrWhiteSpace($requiredText.Value)) {
+                    throw "$packageId is missing required $($requiredText.Name) metadata."
+                }
+            }
+            $license = $metadata.SelectSingleNode("./*[local-name()='license']")
+            if ($null -eq $license -or
+                $license.GetAttribute('type') -ne 'file' -or
+                $license.InnerText -ne 'LICENSE' -or
+                $null -eq $archive.GetEntry('LICENSE')) {
+                throw "$packageId must declare and embed LICENSE as its package license."
+            }
+            $readme = $metadata.SelectSingleNode("./*[local-name()='readme']")
+            $readmePath = if ($null -eq $readme) { '' } else { $readme.InnerText }
+            if ([string]::IsNullOrWhiteSpace($readmePath) -or
+                $null -eq $archive.GetEntry($readmePath)) {
+                throw "$packageId must declare and embed a package README."
+            }
+
+            $repository = $metadata.repository
+            if ([string] $repository.type -ne 'git' -or
+                [string] $repository.url -ne 'https://github.com/assimalign/viu' -or
+                [string] $repository.commit -notmatch '^[0-9a-fA-F]{40,64}$') {
+                throw "$packageId must carry git repository URL and commit metadata."
+            }
+
+            $mainPackageSymbols = @(
+                $archive.Entries |
+                    Where-Object { $_.Name.EndsWith('.pdb', [System.StringComparison]::OrdinalIgnoreCase) })
+            if ($mainPackageSymbols.Count -ne 0) {
+                throw "$packageId main package must not contain portable PDBs; symbol-bearing packages place them in the required .snupkg, while symbol-less containers omit them."
+            }
+
+            $expectedDependencyRange = $compatibleRange
+            if ($exactDependencyPackageId -contains $packageId) {
+                $expectedDependencyRange = $exactRange
+            }
+            $dependencies = @(
+                $metadata.SelectNodes(".//*[local-name()='dependency']") |
+                    Where-Object {
+                        ([string] $_.id).StartsWith(
+                            'Assimalign.Viu.',
+                            [System.StringComparison]::Ordinal)
+                    })
+            foreach ($dependency in $dependencies) {
+                if ($ExpectedPackageId -notcontains [string] $dependency.id) {
+                    throw "$packageId has an unknown Viu dependency '$($dependency.id)'."
+                }
+                $actualDependencyRange = ([string] $dependency.version) -replace '\s', ''
+                if ($actualDependencyRange -ne $expectedDependencyRange) {
+                    throw "$packageId dependency '$($dependency.id)' uses '$($dependency.version)'; expected '$expectedDependencyRange'."
+                }
+            }
+
+            if ($packageId -eq 'Assimalign.Viu.App.Ref') {
+                $manifestEntry = $archive.GetEntry('data/FrameworkList.xml')
+                if ($null -eq $manifestEntry) {
+                    throw "$packageId is missing data/FrameworkList.xml."
+                }
+                $manifestReader = [System.IO.StreamReader]::new($manifestEntry.Open())
+                try {
+                    [xml] $manifest = $manifestReader.ReadToEnd()
+                }
+                finally {
+                    $manifestReader.Dispose()
+                }
+                $manifestAnalyzerPath = @(
+                    $manifest.DocumentElement.File |
+                        Where-Object Type -eq 'Analyzer' |
+                        ForEach-Object Path |
+                        Sort-Object)
+                $archiveAnalyzerPath = @(
+                    $archive.Entries |
+                        Where-Object {
+                            $_.FullName.StartsWith(
+                                'analyzers/dotnet/cs/',
+                                [System.StringComparison]::Ordinal)
+                        } |
+                        ForEach-Object FullName |
+                        Sort-Object)
+                $analyzerDifference = @(
+                    Compare-Object $manifestAnalyzerPath $archiveAnalyzerPath)
+                if ($analyzerDifference.Count -ne 0) {
+                    throw "$packageId analyzer archive and FrameworkList.xml differ: $($analyzerDifference | Out-String)"
+                }
+                foreach ($requiredGenerator in @(
+                        'analyzers/dotnet/cs/Assimalign.Viu.Generators.Reactivity.dll',
+                        'analyzers/dotnet/cs/Assimalign.Viu.Generators.Syntax.dll')) {
+                    if ($archiveAnalyzerPath -notcontains $requiredGenerator) {
+                        throw "$packageId is missing required generator $requiredGenerator."
+                    }
+                }
+                $hostRoslynAssembly = @(
+                    $archiveAnalyzerPath |
+                        Where-Object {
+                            [System.IO.Path]::GetFileName($_).StartsWith(
+                                'Microsoft.CodeAnalysis',
+                                [System.StringComparison]::Ordinal)
+                        })
+                if ($hostRoslynAssembly.Count -ne 0) {
+                    throw "$packageId must not carry host-provided Roslyn assemblies: $($hostRoslynAssembly -join ', ')."
+                }
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
+
+        if ($expectedSymbolPackageId -contains $packageId) {
+            $symbolPackagePath = Join-Path $resolvedPackageDirectory "$packageId.$Version.snupkg"
+            Assert-ViuSymbolPackageMatchesMainPackage `
+                -MainPackagePath $packagePath `
+                -SymbolPackagePath $symbolPackagePath `
+                -PackageId $packageId
+        }
+    }
+
+    Write-Host "Validated $($ExpectedPackageId.Count) Viu packages and $($expectedSymbolPackageId.Count) symbol packages at $Version." -ForegroundColor Green
 }
 
 function Assert-ViuFrameworkPackage {
@@ -464,6 +887,10 @@ Export-ModuleMember -Function `
     Get-ViuLibraryPackageId,
     Get-ViuLibraryProject,
     Get-ViuPackageId,
+    Test-ViuPackageContainsManagedAssembly,
+    Test-ViuPackageRequiresSymbolPackage,
+    Assert-ViuSymbolPackageMatchesMainPackage,
+    Assert-ViuReleasePackageSet,
     Assert-ViuFrameworkPackage,
     Get-ViuPackageCacheRoot,
     Clear-ViuPackageCache

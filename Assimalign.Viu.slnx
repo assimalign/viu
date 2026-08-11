@@ -123,6 +123,10 @@
 	<Folder Name="/viu/frameworks/Assimalign.Viu.App.Browser.Runtime/src/">
 		<Project Path="frameworks/Assimalign.Viu.App.Browser.Runtime/src/Assimalign.Viu.App.Browser.Runtime.csproj" />
 	</Folder>
+	<Folder Name="/viu/templates/" />
+	<Folder Name="/viu/templates/Assimalign.Viu.Templates/">
+		<Project Path="templates/Assimalign.Viu.Templates/Assimalign.Viu.Templates.csproj" />
+	</Folder>
 	<Folder Name="/viu/sdks/">
 		<File Path="sdks/Directory.Build.props" />
 		<File Path="sdks/Directory.Build.targets" />
@@ -169,6 +173,7 @@
 	<Folder Name="/viu/scripts/">
 		<File Path="scripts/Install-Local.ps1" />
 		<File Path="scripts/Measure-PublishBudget.ps1" />
+		<File Path="scripts/Test-Templates.ps1" />
 		<File Path="scripts/Test-UtilityCssIndependence.ps1" />
 	</Folder>
 	<Folder Name="/viu/scripts/budgets/">

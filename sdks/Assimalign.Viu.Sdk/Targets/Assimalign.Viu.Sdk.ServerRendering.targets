@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    [SSR-TARGET-1] ViuServerRendering is evaluated after the consumer project body so one explicit
+    project-level declaration controls both compiler emission and the ordinary opt-in runtime
+    package. Deviates from the repository by-name package-reference rule per [V01.01.12.28]: this
+    raw PackageReference is consumer-facing SDK output, while ViuProjectReference is an
+    in-repository build item that cannot be emitted into an external project evaluation. The exact
+    range keeps the compiler-generated ABI and ServerRenderer runtime on one Viu release.
+  -->
+  <ItemGroup Condition="'$(ViuServerRendering)' == 'true'">
+    <PackageReference Include="Assimalign.Viu.ServerRenderer"
+                      Version="[$(ViuVersion)]" />
+  </ItemGroup>
+</Project>

@@ -13,8 +13,10 @@ using Assimalign.Viu.Browser;
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
 using Assimalign.Viu.Router;
+using Assimalign.Viu.ServerRenderer;
 
 using ViuRouter = Assimalign.Viu.Router.Router;
+using ViuServerRenderer = Assimalign.Viu.ServerRenderer.ServerRenderer;
 
 namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 
@@ -26,6 +28,29 @@ namespace Assimalign.Viu.Generators.Syntax.CompiledFixtureTests;
 /// </summary>
 public sealed class GeneratedComponentFixtureTests
 {
+    [Fact]
+    public async Task ServerTargetedFixture_CompiledAndTraversalProfiles_AreByteIdentical()
+    {
+        CompiledFixtureAssembly fixtures = CompiledFixtureAssembly.Instance;
+        var registry = new ServerRenderRegistry();
+        ComponentFactory components = CreateFactory(fixtures);
+        var root = new ComponentNode(ComponentReference.ForName("TargetedTextProbe"));
+        var application = new ServerRenderApplication(root, components);
+
+        fixtures.RegisterServerRenders(registry);
+
+        registry.TryResolve(
+                ComponentReference.ForName("TargetedTextProbe"),
+                out ServerRenderRegistration? registration)
+            .ShouldBeTrue();
+        registration.ShouldNotBeNull();
+
+        string traversal = await ViuServerRenderer.RenderToStringAsync(application);
+        string compiled = await ViuServerRenderer.RenderToStringAsync(application, registry);
+
+        compiled.ShouldBe(traversal);
+    }
+
     [Fact]
     public void CompiledRoot_AndCodeFirstDefinition_ComposeAndUpdateInOneApplication()
     {
@@ -327,7 +352,9 @@ public sealed class GeneratedComponentFixtureTests
                 "RouterAliasedSlotHost.SingleFileComponent.g.cs",
                 StringComparison.Ordinal))
             .Value;
-        Regex.Matches(hostGenerated, @"frame\.Track\(slotNode\d+\)").Count.ShouldBe(2);
+        // [SSR-TARGET-2] The fixture is dual-targeted: each deterministic profile tracks the same
+        // two authored slot nodes, so the combined generated partial contains four calls.
+        Regex.Matches(hostGenerated, @"frame\.Track\(slotNode\d+\)").Count.ShouldBe(4);
 
         (await router.PushAsync("/first")).ShouldBeNull();
         host.RunScheduledFlushes();

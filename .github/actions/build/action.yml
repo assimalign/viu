@@ -1,6 +1,5 @@
 # The one build recipe every generic Viu pipeline runs ([V01.01.12.02.02]): restore, build with
-# warnings as errors, test, and — on a main push, from Linux, for a packable project — pack and
-# publish to GitHub Packages. The workflows under .github/workflows stay thin (a path filter, a
+# warnings as errors, and test. The workflows under .github/workflows stay thin (a path filter, a
 # matrix of project folder names, and a call to this action), so the build logic exists once
 # instead of once per area, and adding a project is a one-line matrix edit.
 #
@@ -8,8 +7,7 @@
 # the repository that contains it is checked out.
 name: Viu Build
 description: >-
-  Restores, builds (warnings as errors), and tests one Viu project from a code root, and on a push
-  to main from Linux packs it and publishes it to GitHub Packages when the project is packable.
+  Restores, builds (warnings as errors), and tests one Viu project from a code root.
 
 inputs:
   area:
@@ -35,24 +33,6 @@ inputs:
       Viu library targets browser-wasm directly, so library and tooling lanes leave this off.
     required: false
     default: 'false'
-  publish-packages:
-    description: >-
-      Whether this code root publishes NuGet packages. Even when true, the pack and push only run
-      for a push to main, from a Linux runner, and for a project that is actually packable
-      (a project declaring IsPackable=false is skipped, matching the inventory guard in
-      scripts/modules/ViuPackaging.psm1).
-    required: false
-    default: 'false'
-  package-feed:
-    description: The NuGet feed a publishable package is pushed to.
-    required: false
-    default: 'https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json'
-  github-token:
-    description: >-
-      Token used to push to the package feed. A composite action cannot read secrets, so the calling
-      workflow passes secrets.GITHUB_TOKEN and grants the job packages:write.
-    required: false
-    default: ''
 
 runs:
   using: composite
@@ -114,22 +94,14 @@ runs:
             }
         )
 
-        # Same predicate the packaging inventory guard uses (Test-ViuProjectPackable in
-        # scripts/modules/ViuPackaging.psm1): packable unless the project literally opts out.
-        $projectXml = [xml](Get-Content -LiteralPath $sourceProject[0].FullName -Raw)
-        $isPackable = $projectXml.SelectSingleNode('/Project/PropertyGroup/IsPackable')
-        $packable = -not ($isPackable -and $isPackable.InnerText.Trim() -eq 'false')
-
         @(
           "VIU_SOURCE_PROJECT=$($sourceProject[0].FullName)"
           "VIU_TEST_PROJECTS=$(($testProject | ForEach-Object FullName) -join ';')"
           "VIU_RUNNABLE_TEST_PROJECTS=$(($runnableTestProject | ForEach-Object FullName) -join ';')"
-          "VIU_IS_PACKABLE=$($packable.ToString().ToLowerInvariant())"
         ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
         Write-Host "Shipping project: $($sourceProject[0].FullName)"
         Write-Host "Test projects: $($testProject.Count) ($($runnableTestProject.Count) runnable)"
-        Write-Host "Packable: $packable"
 
     - name: Build ${{ inputs.project }} (warnings are errors)
       shell: pwsh
@@ -156,64 +128,5 @@ runs:
           & dotnet test $project --configuration Release --no-build
           if ($LASTEXITCODE -ne 0) {
             throw "Testing $project failed with exit code $LASTEXITCODE."
-          }
-        }
-
-    # Publishing is deliberately narrow. release.yml remains the authoritative publisher: it packs
-    # the complete, checksummed, uniquely versioned beta set (<canonical>-beta.<run>) on a merged
-    # pull request and pushes all of it under one concurrency group. This step maintains the
-    # canonical-version stream instead, so a freshly bumped $(ViuVersion) reaches the feed as soon as
-    # it lands on main. --skip-duplicate makes a same-version re-push a no-op rather than an error,
-    # which is what keeps repeated main pushes idempotent.
-    - name: Pack and publish ${{ inputs.project }}
-      if: >-
-        inputs.publish-packages == 'true' &&
-        runner.os == 'Linux' &&
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main'
-      shell: pwsh
-      env:
-        VIU_REPOSITORY_PATH: ${{ inputs.repository-path }}
-        VIU_PACKAGE_FEED: ${{ inputs.package-feed }}
-        VIU_PACKAGE_TOKEN: ${{ inputs.github-token }}
-      run: |
-        if ($env:VIU_IS_PACKABLE -ne 'true') {
-          Write-Host "$env:VIU_SOURCE_PROJECT declares IsPackable=false; nothing to publish."
-          return
-        }
-        if ([string]::IsNullOrWhiteSpace($env:VIU_PACKAGE_TOKEN)) {
-          throw 'publish-packages is true but no github-token was supplied. Pass secrets.GITHUB_TOKEN and grant the job packages:write.'
-        }
-
-        # An ABSOLUTE output path. A relative -p:PackageOutputPath resolves against the PROJECT
-        # directory, not the working directory, which is how the retired area-utility-css workflow
-        # packed into tooling/.../src/_out and then failed asserting on an empty _out at the root.
-        $packageDirectory = Join-Path `
-          (Resolve-Path -LiteralPath $env:VIU_REPOSITORY_PATH).Path `
-          '_out/packages'
-        New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
-
-        & dotnet pack $env:VIU_SOURCE_PROJECT `
-          --configuration Release `
-          --no-build `
-          "-p:PackageOutputPath=$packageDirectory"
-        if ($LASTEXITCODE -ne 0) {
-          throw "Packing $env:VIU_SOURCE_PROJECT failed with exit code $LASTEXITCODE."
-        }
-
-        $packages = @(
-          Get-ChildItem -LiteralPath $packageDirectory -Filter '*.nupkg' -File
-        )
-        if ($packages.Count -eq 0) {
-          throw "Packing $env:VIU_SOURCE_PROJECT produced no package in $packageDirectory."
-        }
-
-        foreach ($package in $packages) {
-          & dotnet nuget push $package.FullName `
-            --source $env:VIU_PACKAGE_FEED `
-            --api-key $env:VIU_PACKAGE_TOKEN `
-            --skip-duplicate
-          if ($LASTEXITCODE -ne 0) {
-            throw "Publishing $($package.Name) failed with exit code $LASTEXITCODE."
           }
         }

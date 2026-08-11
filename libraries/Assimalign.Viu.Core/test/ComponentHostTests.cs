@@ -409,13 +409,14 @@ public sealed class ComponentHostTests
     public async Task RenderAsync_UnhandledRenderFailure_PropagatesAfterAbortingTheLease()
     {
         ComponentReference reference = ComponentReference.ForType(
-            typeof(ThrowingRenderComponent));
+            typeof(ThrowingLifecycleRenderComponent));
         ComponentFactory components = new();
+        LifecycleProbe probe = new();
         components.Register(
             new ComponentRegistration(
                 reference,
                 new ComponentContract(),
-                _ => new ThrowingRenderComponent()));
+                _ => new ThrowingLifecycleRenderComponent(probe)));
         ComponentHost host = new(
             new ComponentRuntimeOptions(components, new ImmediateWatchScheduler()));
 
@@ -424,6 +425,9 @@ public sealed class ComponentHostTests
                 new ComponentRenderRequest(new ComponentNode(reference))));
 
         exception.Message.ShouldBe("render failure");
+        probe.LifetimeToken.IsCancellationRequested.ShouldBeTrue();
+        probe.TeardownOrder.ShouldBe(["lifetime", "scope", "instance"]);
+        probe.ClientHookRuns.ShouldBe(0);
     }
 
     private sealed class GreetingComponent : IComponent
@@ -484,6 +488,28 @@ public sealed class ComponentHostTests
     {
         public ComponentRenderer Setup(ComponentContext context) =>
             _ => throw new InvalidOperationException("render failure");
+    }
+
+    private sealed class ThrowingLifecycleRenderComponent : IComponent, IDisposable
+    {
+        private readonly LifecycleProbe _probe;
+
+        internal ThrowingLifecycleRenderComponent(LifecycleProbe probe)
+        {
+            _probe = probe;
+        }
+
+        public ComponentRenderer Setup(ComponentContext context)
+        {
+            RegisterClientHooks(context.Lifecycle, _probe);
+            _probe.LifetimeToken = context.Lifecycle.CancellationToken;
+            context.Lifecycle.CancellationToken.Register(
+                () => _probe.TeardownOrder.Add("lifetime"));
+            Reactive.OnScopeDispose(() => _probe.TeardownOrder.Add("scope"));
+            return _ => throw new InvalidOperationException("render failure");
+        }
+
+        public void Dispose() => _probe.TeardownOrder.Add("instance");
     }
 
     private sealed class LifecycleComponent : IComponent, IDisposable
