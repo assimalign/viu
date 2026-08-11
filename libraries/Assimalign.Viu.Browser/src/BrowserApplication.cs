@@ -278,6 +278,11 @@ public sealed class BrowserApplication : IApplication
             context,
             operations,
             hydrate,
+            initialize: hydrate && context.State is { } state
+                ? cancellationToken => BrowserStateHydration.InitializeAsync(
+                    state,
+                    cancellationToken)
+                : null,
             mountTargetSelector: mountTargetSelector);
     }
 

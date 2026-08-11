@@ -31,6 +31,28 @@ public sealed class AsynchronousComponentsTests
     }
 
     [Fact]
+    public void Definition_HydrationDefault_CopiedUnlessInvocationOverridesIt()
+    {
+        HydrationStrategy defaultStrategy = HydrationStrategy.OnIdle(100);
+        AsynchronousComponentDefinition definition =
+            AsynchronousComponents.Define<WrapperIdentityComponent>(
+                new AsynchronousComponentOptions
+                {
+                    Loader = _ => Task.FromResult(
+                        AsynchronousComponentTarget.From<TargetComponent>()),
+                    HydrationStrategy = defaultStrategy,
+                });
+
+        ComponentNode defaultNode = definition.CreateComponent();
+        HydrationStrategy explicitStrategy = HydrationStrategy.OnVisible("20px");
+        ComponentNode explicitNode = definition.CreateComponent(
+            new ComponentInvocation(hydrationStrategy: explicitStrategy));
+
+        defaultNode.Invocation.HydrationStrategy.ShouldBeSameAs(defaultStrategy);
+        explicitNode.Invocation.HydrationStrategy.ShouldBeSameAs(explicitStrategy);
+    }
+
+    [Fact]
     public async Task ConcurrentMounts_SharedSuccessfulLoad_ProduceFreshTargetNodesWithRawInvocation()
     {
         int loadRuns = 0;

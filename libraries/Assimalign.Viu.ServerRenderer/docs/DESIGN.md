@@ -28,6 +28,13 @@ Markup Language payloads are rejected because they require a different serialize
 `TextWriter` and flushes after a completed component subtree, so the destination controls
 backpressure. The renderer borrows the writer and never closes or disposes it (`[SSR-1]`).
 
+The compiler's `ServerMarkup` target lowers a proven static/native region to direct
+`SsrRenderState.Push` calls. Dynamic values use ServerRenderer's public escaping and normalization
+helpers; components and unsupported binding shapes build only their local fallback subtree. The
+public compiled-render entry point owns exactly the same cancellation, component-scope, teleport,
+state, streaming, and flush protocol as the tree path. Executed differential fixtures, rather than
+source snapshots alone, pin ordinal byte equality (`[SSR-COMPILE-1]` through `[SSR-COMPILE-4]`).
+
 Ordinary client lifecycle hooks do not run. Core awaits every `OnServerPrefetch` callback before the
 first render, and cancellation interrupts that wait. Suspense serializes its resolved default branch;
 KeepAlive and Transition serialize their lazy content without client-only behavior.
@@ -40,8 +47,17 @@ consumes those values directly so server output and client hydration cannot drif
 
 An enabled teleport emits origin anchors and buffers its children plus the target anchor. A disabled
 teleport renders children at the origin and contributes only the target anchor. `SsrContext` owns
-those per-render buffers and a free-form state handoff bag; the serializer does not interpret the
-state values (`[SSR-7]`).
+those per-render buffers and a `StateStorePayload` whose fixed schema is
+`{"version":1,"stores":{"store-key":state}}`. After traversal, ServerRenderer captures only the
+request registry's materialized stores and appends an inert `script[data-viu-state]` island. Store
+definitions, not ServerRenderer, own the source-generated serializers (`[SSR-7]`,
+`[V01.01.09.03]`, `[EXE-4]`).
+
+A component invocation with a non-immediate hydration strategy receives one fixed opening marker
+and `LazyHydrationEnd` after its fully rendered subtree. Marker text carries only the strategy kind;
+strategy parameters remain invocation metadata used by the client host. An asynchronous definition
+owns the outer marker and strips the strategy from its resolved target, preventing nested duplicate
+boundaries (`[SSR-MARKERS-1]`, `[HYD-LAZY-1]`, `[HYD-LAZY-2]`).
 
 ## Composition, ownership, and AOT
 
@@ -51,12 +67,46 @@ one application per request when those dependencies are request-scoped (`[CMP-9]
 Viu library references a web framework; a web adapter is downstream and maps its request, response,
 services, abort token, and state separately (`[SSR-8]`).
 
+`ServerRenderAdaptor<TContext>` makes that downstream boundary executable without naming an HTTP
+stack. A typed `ServerRenderRequest<TContext>` carries the root plus the host's own request context;
+`IServerRenderRequestScopeFactory<TContext>` must return an async-disposable scope containing a fresh
+`ServerRenderApplication` and `SsrContext`. The adaptor invokes the factory once, consumes both weak
+identities before validating that the application uses the requested root, streams through
+`IServerRenderOutput`, and disposes the scope on success, failure, or cancellation. Consuming both
+identities matters because a rejected scope is disposed and neither object may safely reappear.
+Weak identity tracking prevents reuse without retaining completed requests (`[V01.01.07.04]`).
+
+Both renderer entry paths enter `CoreExecutionIsolation` before user component code. That internal
+lease supplies independent component-current, scheduler, reactive tracking/batching/scope, and State
+setup/active-registry bookkeeping across asynchronous continuations, then restores the caller's
+logical state. This closes ambient cross-request races without making a request graph itself
+thread-safe (`[EXE-1]`, `[SSR-9]`).
+
+`ServerRenderResult` separates render execution from host policy. It reports the exception and
+whether content started, allowing a downstream server to choose its own status and error page.
+Request cancellation remains an `OperationCanceledException`, because it belongs to the host's
+abort path rather than its failure-response path. The output's `WriteAsync` and `FlushAsync` are both
+awaited; component-subtree flush boundaries therefore preserve progressive delivery and the host's
+backpressure.
+
+The generic hydration handoff is `SsrStateIsland`. It accepts only explicitly serialized JSON,
+normalizes it through reflection-free System.Text.Json metadata, and emits
+`<script type="application/json" data-viu-state>...</script>`. Client hosts locate
+`SsrStateIsland.Selector` and deserialize through a caller-supplied `JsonTypeInfo<T>` before
+hydration. Store schema, capture, and restoration belong to State; the island transport has no store
+dependency (`[EXE-4]`, `[V01.01.07.04]`).
+
 Component activation is explicit and registration-based. Serialization dispatches known node kinds
 and binding forms without runtime type discovery, reflection-based serialization, emitted code, or
-dynamic activation (`[EXE-4]`).
+dynamic activation. State payload capture requires an `IStateStorePayloadRegistry`; a custom
+registry that materializes stores without that contract fails instead of emitting an incomplete
+payload (`[EXE-4]`).
 
 ## Non-goals
 
-ServerRenderer does not own request scopes, web responses, browser application lifetime, DOM
-hydration, client directives, transition timing, persistent mounted state, or dependency disposal.
-Scoped style stamping is absent while scoped CSS is deferred (`[STY-1]`).
+The low-level render entry points do not own request scopes. The host adaptor owns only the
+factory-returned scope for one invocation; it never owns the output or prescribes an HTTP response.
+ServerRenderer does not own browser application lifetime, DOM hydration, client directives,
+transition timing, or persistent mounted state. The runtime-tree entry point has no compiled
+scope-identifier input; scoped identifiers are emitted only by the server compiler profile
+(`[SSR-COMPILE-3]`).

@@ -11,8 +11,6 @@ namespace Assimalign.Viu;
 
 internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousComponentRuntime
 {
-    private static RuntimeComponentContext? _current;
-
     private readonly ComponentContract _contract;
     private readonly Dictionary<string, ComponentEvent> _eventAliases =
         new(StringComparer.Ordinal);
@@ -72,7 +70,7 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
 
     }
 
-    internal static RuntimeComponentContext? Current => _current;
+    internal static RuntimeComponentContext? Current => CoreExecutionIsolation.Current.CurrentComponent;
 
     public override ComponentBindings Bindings => _bindings;
 
@@ -246,30 +244,32 @@ internal sealed class RuntimeComponentContext : ComponentContext, IAsynchronousC
     internal void Run(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        RuntimeComponentContext? previous = _current;
-        _current = this;
+        CoreExecutionState executionState = CoreExecutionIsolation.Current;
+        RuntimeComponentContext? previous = executionState.CurrentComponent;
+        executionState.CurrentComponent = this;
         try
         {
             action();
         }
         finally
         {
-            _current = previous;
+            executionState.CurrentComponent = previous;
         }
     }
 
     internal TResult Run<TResult>(Func<TResult> function)
     {
         ArgumentNullException.ThrowIfNull(function);
-        RuntimeComponentContext? previous = _current;
-        _current = this;
+        CoreExecutionState executionState = CoreExecutionIsolation.Current;
+        RuntimeComponentContext? previous = executionState.CurrentComponent;
+        executionState.CurrentComponent = this;
         try
         {
             return function();
         }
         finally
         {
-            _current = previous;
+            executionState.CurrentComponent = previous;
         }
     }
 

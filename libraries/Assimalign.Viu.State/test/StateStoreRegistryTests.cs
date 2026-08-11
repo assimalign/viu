@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Shouldly;
 using Xunit;
@@ -160,6 +164,84 @@ public sealed class StateStoreRegistryTests
     }
 
     [Fact]
+    public async Task GetOrCreate_ConcurrentIsolatedSetups_RestoreAmbientStateAndDisposeOnlyOwnedStores()
+    {
+        using Barrier setupBarrier = new(2);
+        ConcurrentQueue<string> disposedStores = new();
+        TaskCompletionSource firstReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource secondReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseFirst = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseSecond = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task RunRequestAsync(
+            string requestName,
+            TaskCompletionSource ready,
+            Task release)
+        {
+            using IDisposable isolation = StateExecutionIsolation.Enter();
+            using StateStoreRegistry registry = StateStoreTestSupport.CreateRegistry();
+            StateStores.ActiveRegistry = registry;
+            StateStoreDefinition<ConcurrentDisposableStore> definition = StateStores.Define(
+                requestName,
+                context =>
+                {
+                    setupBarrier.SignalAndWait(TimeSpan.FromSeconds(5));
+                    StateStoreSetupRuntime.Current.ShouldBeSameAs(context);
+                    StateStores.ActiveRegistry.ShouldBeSameAs(registry);
+                    return new ConcurrentDisposableStore(requestName, disposedStores);
+                });
+
+            definition.Use(registry);
+            ready.SetResult();
+            await release.ConfigureAwait(false);
+        }
+
+        Task first = Task.Run(
+            () => RunRequestAsync("first", firstReady, releaseFirst.Task));
+        Task second = Task.Run(
+            () => RunRequestAsync("second", secondReady, releaseSecond.Task));
+        await Task.WhenAll(firstReady.Task, secondReady.Task)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        releaseFirst.SetResult();
+        await first.WaitAsync(TimeSpan.FromSeconds(10));
+        disposedStores.ToArray().ShouldBe(["first"]);
+
+        releaseSecond.SetResult();
+        await second.WaitAsync(TimeSpan.FromSeconds(10));
+        disposedStores.ToArray().ShouldBe(["first", "second"]);
+        StateStores.ActiveRegistry.ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetOrCreate_StagedRestoreThrows_DisposesNewStoreAndPreservesRestoreFailure()
+    {
+        TestReactiveEffectScopeFactory effectScopes = new();
+        using StateStoreRegistry registry = new(
+            services: null,
+            effectScopes);
+        StateStorePayload payload = StateStorePayload.Parse(
+            "{\"version\":1,\"stores\":{\"restore-failure\":{}}}");
+        ThrowingDisposableStore? createdStore = null;
+        StateStoreDefinition<ThrowingDisposableStore> definition = StateStores.Define(
+            "restore-failure",
+            () => createdStore = new ThrowingDisposableStore(),
+            new ThrowingRestoreSerializer());
+        registry.RestorePayload(payload);
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => definition.Use(registry));
+
+        exception.Message.ShouldBe("restore failure");
+        createdStore.ShouldNotBeNull();
+        createdStore.DisposeCount.ShouldBe(1);
+        registry.Count.ShouldBe(0);
+        effectScopes.CreatedScopes.Count.ShouldBe(2);
+        effectScopes.CreatedScopes[0].IsActive.ShouldBeTrue();
+        effectScopes.CreatedScopes[1].IsActive.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Remove_StopsOnlySelectedStoreAndNextUseCreatesFreshInstance()
     {
         using StateStoreRegistry registry =
@@ -244,6 +326,46 @@ public sealed class StateStoreRegistryTests
         internal bool IsDisposed { get; private set; }
 
         public void Dispose() => IsDisposed = true;
+    }
+
+    private sealed class ConcurrentDisposableStore : IDisposable
+    {
+        private readonly ConcurrentQueue<string> _disposedStores;
+        private readonly string _requestName;
+
+        internal ConcurrentDisposableStore(
+            string requestName,
+            ConcurrentQueue<string> disposedStores)
+        {
+            _requestName = requestName;
+            _disposedStores = disposedStores;
+        }
+
+        public void Dispose() => _disposedStores.Enqueue(_requestName);
+    }
+
+    private sealed class ThrowingDisposableStore : IDisposable
+    {
+        internal int DisposeCount { get; private set; }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            throw new InvalidOperationException("dispose failure");
+        }
+    }
+
+    private sealed class ThrowingRestoreSerializer :
+        IStateStoreSerializer<ThrowingDisposableStore>
+    {
+        public void Serialize(Utf8JsonWriter writer, ThrowingDisposableStore stateStore)
+        {
+            writer.WriteStartObject();
+            writer.WriteEndObject();
+        }
+
+        public void Restore(ThrowingDisposableStore stateStore, JsonElement state) =>
+            throw new InvalidOperationException("restore failure");
     }
 
     private sealed class MessageService

@@ -51,14 +51,23 @@ internal sealed class FrameRenderCodeWriter
 
     /// <summary>Emits one frame-taking render-method body.</summary>
     public string EmitRenderBody()
+        => EmitRenderBody(result.CodegenNode);
+
+    /// <summary>
+    /// Emits a frame-taking render-method body for one subtree. Server code generation uses this
+    /// narrow seam for regions that must preserve virtual-tree behavior.
+    /// </summary>
+    /// <param name="root">The transformed subtree or its code-generation node.</param>
+    /// <returns>The complete local-function body, including its return statement.</returns>
+    internal string EmitRenderBody(object? root)
     {
-        CodeExpression root = result.CodegenNode is null
+        CodeExpression value = root is null
             ? CodeExpression.Literal("null")
-            : EmitVirtualValue(result.CodegenNode);
+            : EmitVirtualValue(root);
 
         BeginLine();
         Push("return ");
-        AppendExpression(root);
+        AppendExpression(value);
         Push(";");
         EndLine();
 
@@ -140,6 +149,7 @@ internal sealed class FrameRenderCodeWriter
     private CodeExpression EmitElementNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ElementPropertyEmission properties = EmitElementProperties(node.Properties);
+        AppendScopeBinding(properties);
         CodeExpression children = EmitChildren(node.Children);
         CodeExpression directives = EmitDirectiveInvocations(node.Directives);
         CodeExpression dynamicBindingIndices = EmitDynamicBindingIndices(
@@ -299,11 +309,12 @@ internal sealed class FrameRenderCodeWriter
     private CodeExpression EmitDynamicNode(VirtualNodeCall node, VirtualNodeTag tag)
     {
         ElementPropertyEmission elementProperties = EmitElementProperties(node.Properties);
+        AppendScopeBinding(elementProperties);
         ComponentInvocationEmission componentInvocation = EmitComponentInvocation(
             node.Properties,
             node.Children,
             node.Directives);
-        CodeExpression children = EmitChildren(node.Children);
+        CodeExpression children = EmitDynamicElementChildren(node.Children);
         CodeExpression directives = EmitDirectiveInvocations(node.Directives);
         CodeExpression renderPlan = EmitRenderPlan(node, CodeExpression.Literal("null"));
         string nodeName = NextName("node");
@@ -334,6 +345,67 @@ internal sealed class FrameRenderCodeWriter
 
         TrackIfRequired(node, nodeName);
         return CodeExpression.Literal(nodeName);
+    }
+
+    private CodeExpression EmitDynamicElementChildren(object? slotsNode)
+    {
+        if (TryGetDefaultSlotFunction(slotsNode, out FunctionExpression defaultSlot))
+        {
+            return EmitChildren(defaultSlot.Returns);
+        }
+
+        // A dynamic selector can resolve to a native element or a component. Slot objects describe
+        // component invocation and are not themselves virtual children; only their default slot has
+        // an element-child spelling.
+        return slotsNode is ObjectExpression
+            ? CodeExpression.Literal("null")
+            : EmitChildren(slotsNode);
+    }
+
+    private static bool TryGetDefaultSlotFunction(
+        object? slotsNode,
+        out FunctionExpression defaultSlot)
+    {
+        if (slotsNode is CallExpression call
+            && call.Callee is RuntimeHelper helper
+            && helper == HelperNames.CreateSlots
+            && call.Arguments.Count > 0)
+        {
+            slotsNode = call.Arguments[0];
+        }
+
+        if (slotsNode is ObjectExpression slots)
+        {
+            for (int index = 0; index < slots.Properties.Count; index++)
+            {
+                ObjectProperty property = slots.Properties[index];
+                if (property.Key is SimpleExpressionNode
+                    {
+                        IsStatic: true,
+                        Content: "default",
+                    }
+                    && property.Value is FunctionExpression function)
+                {
+                    defaultSlot = function;
+                    return true;
+                }
+            }
+        }
+
+        defaultSlot = null!;
+        return false;
+    }
+
+    private void AppendScopeBinding(ElementPropertyEmission properties)
+    {
+        if (string.IsNullOrEmpty(result.ScopeId))
+        {
+            return;
+        }
+
+        AppendStatement(
+            $"{properties.BindingsName}.Add({ComponentsNamespace}.ElementBinding.Attribute(new "
+            + $"{ComponentsNamespace}.QualifiedName({StringLiteral(result.ScopeId!)}), string.Empty));");
     }
 
     private CodeExpression EmitCallAsVirtualValue(CallExpression call)
@@ -2303,7 +2375,7 @@ internal sealed class FrameRenderCodeWriter
         return name;
     }
 
-    private static string MapRawLiteral(string raw)
+    internal static string MapRawLiteral(string raw)
     {
         switch (raw)
         {
@@ -2511,7 +2583,7 @@ internal sealed class FrameRenderCodeWriter
     private static bool IsQuotedString(string value) =>
         value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"';
 
-    private static string StringLiteral(string value) =>
+    internal static string StringLiteral(string value) =>
         SymbolDisplay.FormatLiteral(value, quote: true);
 
     private enum PropertyValuePurpose

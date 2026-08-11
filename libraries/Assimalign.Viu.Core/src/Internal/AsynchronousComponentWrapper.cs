@@ -19,6 +19,8 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
     private AsynchronousComponentTarget _target;
     private IDisposable? _delayTimer;
     private IDisposable? _timeoutTimer;
+    private Task _hydrationReadiness = Task.CompletedTask;
+    private TaskCompletionSource? _hydrationReadinessCompletion;
     private bool _hasTarget;
     private bool _isActive;
     private bool _suspenseControlled;
@@ -57,6 +59,10 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         else
         {
             Task<AsynchronousComponentTarget> pendingLoad = _load.PendingLoad;
+            TaskCompletionSource hydrationReadiness = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _hydrationReadinessCompletion = hydrationReadiness;
+            _hydrationReadiness = hydrationReadiness.Task;
             if (options.Suspensible && runtime is not null)
             {
                 _suspenseControlled = runtime.RegisterAsynchronousDependency(
@@ -78,6 +84,8 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
 
         return Render;
     }
+
+    internal Task HydrationReadiness => _hydrationReadiness;
 
     private static ComponentInvocation CreateFallbackInvocation(ComponentContext context)
     {
@@ -165,6 +173,7 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         finally
         {
             runtime?.SettleAsynchronousDependency(pendingLoad);
+            SignalHydrationReadiness();
         }
     }
 
@@ -176,17 +185,29 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         }
 
         _error!.Value = error;
-        _runtime?.RouteAsynchronousError(
-            error,
-            rethrowIfUnhandled: _definition.Options.ErrorComponent is null);
+        try
+        {
+            _runtime?.RouteAsynchronousError(
+                error,
+                rethrowIfUnhandled: _definition.Options.ErrorComponent is null);
+        }
+        finally
+        {
+            SignalHydrationReadiness();
+        }
     }
+
+    private void SignalHydrationReadiness() =>
+        _hydrationReadinessCompletion?.TrySetResult();
 
     private VirtualNode? Render(ComponentRenderFrame frame)
     {
         if (_loaded!.Value && _hasTarget)
         {
             ComponentInvocation invocation = _runtime?.Invocation ?? _fallbackInvocation;
-            return _target.CreateComponent(invocation, _runtime?.MountReference);
+            return _target.CreateComponent(
+                WithoutDeferredHydration(invocation),
+                _runtime?.MountReference);
         }
 
         if (_error!.Value is { } error)
@@ -209,6 +230,22 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         return new CommentNode(string.Empty);
     }
 
+    private static ComponentInvocation WithoutDeferredHydration(
+        ComponentInvocation invocation)
+    {
+        if (invocation.HydrationStrategy is not { Kind: not HydrationStrategyKind.Immediate })
+        {
+            return invocation;
+        }
+
+        return new ComponentInvocation(
+            invocation.Arguments,
+            invocation.Slots,
+            invocation.Listeners,
+            invocation.Directives,
+            invocation.SlotStability);
+    }
+
     public void Dispose()
     {
         if (!_isActive)
@@ -217,6 +254,7 @@ internal sealed class AsynchronousComponentWrapper : IComponent, IDisposable
         }
 
         _isActive = false;
+        SignalHydrationReadiness();
         _delayTimer?.Dispose();
         _delayTimer = null;
         _timeoutTimer?.Dispose();

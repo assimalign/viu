@@ -33,6 +33,18 @@ internal static partial class BrowserDomBridge
         }
     }
 
+    internal static string ConsumeTextContent(string selector)
+    {
+        try
+        {
+            return Imports.ConsumeTextContent(selector);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("consumeTextContent", 0, exception);
+        }
+    }
+
     internal static int CreateElement(string tagName, string? namespaceName)
     {
         try
@@ -150,6 +162,56 @@ internal static partial class BrowserDomBridge
         catch (JSException exception)
         {
             throw Translate("snapshotHydration", containerHandle, exception);
+        }
+    }
+
+    internal static int ScheduleHydrationTrigger(
+        int startHandle,
+        int endHandle,
+        int strategyKind,
+        int timeoutMilliseconds,
+        string? condition,
+        string[] eventNames,
+        Action trigger)
+    {
+        try
+        {
+            return Imports.ScheduleHydrationTrigger(
+                startHandle,
+                endHandle,
+                strategyKind,
+                timeoutMilliseconds,
+                condition,
+                eventNames,
+                trigger);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("scheduleHydrationTrigger", startHandle, exception);
+        }
+    }
+
+    internal static void CompleteHydrationTrigger(int token)
+    {
+        try
+        {
+            Imports.CompleteHydrationTrigger(token);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("completeHydrationTrigger", token, exception);
+        }
+    }
+
+    internal static void CancelHydrationTrigger(int token)
+    {
+        try
+        {
+            Imports.CancelHydrationTrigger(token);
+        }
+        catch (JSException exception)
+        {
+            throw Translate("cancelHydrationTrigger", token, exception);
         }
     }
 
@@ -529,6 +591,9 @@ internal static partial class BrowserDomBridge
         [JSImport("dom.querySelector", ModuleName)]
         internal static partial int QuerySelector(string selector);
 
+        [JSImport("dom.consumeTextContent", ModuleName)]
+        internal static partial string ConsumeTextContent(string selector);
+
         [JSImport("dom.createElement", ModuleName)]
         internal static partial int CreateElement(string tagName, string? namespaceName);
 
@@ -558,6 +623,22 @@ internal static partial class BrowserDomBridge
 
         [JSImport("dom.snapshotHydration", ModuleName)]
         internal static partial string SnapshotHydration(int containerHandle);
+
+        [JSImport("dom.scheduleHydrationTrigger", ModuleName)]
+        internal static partial int ScheduleHydrationTrigger(
+            int startHandle,
+            int endHandle,
+            int strategyKind,
+            int timeoutMilliseconds,
+            string? condition,
+            [JSMarshalAs<JSType.Array<JSType.String>>] string[] eventNames,
+            [JSMarshalAs<JSType.Function>] Action trigger);
+
+        [JSImport("dom.completeHydrationTrigger", ModuleName)]
+        internal static partial void CompleteHydrationTrigger(int token);
+
+        [JSImport("dom.cancelHydrationTrigger", ModuleName)]
+        internal static partial void CancelHydrationTrigger(int token);
 
         [JSImport("dom.insertStaticContent", ModuleName)]
         internal static partial int[] InsertStaticContent(string content, int parentHandle, int anchorHandle, string? namespaceName);

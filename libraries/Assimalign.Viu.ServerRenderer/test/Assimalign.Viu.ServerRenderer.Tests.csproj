@@ -8,6 +8,7 @@
     <None Remove="Assimalign.Viu.ServerRenderer.DomKnowledgeFixture/**" />
   </ItemGroup>
   <ItemGroup>
+    <ViuPackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <ViuPackageReference Include="Microsoft.NET.Test.Sdk" />
     <ViuPackageReference Include="xunit" />
     <ViuPackageReference Include="xunit.runner.visualstudio" />
@@ -19,5 +20,7 @@
     <ViuProjectReference Include="Assimalign.Viu.Reactivity" />
     <ViuProjectReference Include="Assimalign.Viu.ServerRenderer" />
     <ViuProjectReference Include="Assimalign.Viu.ServerRenderer.DomKnowledgeFixture" />
+    <ViuProjectReference Include="Assimalign.Viu.State" />
+    <ViuProjectReference Include="Assimalign.Viu.Syntax.Templates" />
   </ItemGroup>
 </Project>

@@ -67,6 +67,7 @@ public static class AsynchronousComponents
         ArgumentNullException.ThrowIfNull(componentType);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(options.Loader);
+        ArgumentNullException.ThrowIfNull(options.HydrationStrategy);
         if (name is not null)
         {
             ArgumentException.ThrowIfNullOrEmpty(name);

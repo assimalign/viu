@@ -48,6 +48,22 @@ Browser snapshots the live DOM once and exposes it through Core's generic hydrat
 owns tree matching and mismatch recovery; Browser owns node classification, property reads, and
 foreign-handle registration (`[HYD-1]`, `[HYD-2]`).
 
+Deferred component ranges use the optional host trigger operation. Idle registrations use
+`requestIdleCallback` when available and a cancelable timer otherwise; visibility observes every
+top-level element between the markers; media registrations subscribe through `matchMedia`; and
+interaction registrations capture the first configured event within the range. The JavaScript side
+delivers every trigger asynchronously after registration, disconnects observers and listeners on
+fire or cancellation, and replays a cloned interaction only after Core reports activation complete
+(`[HYD-LAZY-3]` through `[HYD-LAZY-5]`).
+
+When hydration has application state, Browser performs one `textContent` interop operation that
+consumes and removes `script[data-viu-state]` after the bridge is ready and before mount-target
+resolution. It parses the versioned State payload without reflection and restores the composed
+registry before component setup. Removal occurs before Core snapshots the mount container, so the
+transport cannot appear as an extra root sibling. A missing island or a registry without
+`IStateStorePayloadRegistry` fails startup before the first render, preventing a default-state
+hydration mismatch ([HYD-8], [V01.01.09.03], [EXE-4]).
+
 Browser directives are registered through the application's public directive resolver. The model
 directives, `VShow`, and transition operations use host elements and browser events without adding
 members to `ComponentContext`. Transition nodes remain host-neutral descriptions; Browser supplies
@@ -65,5 +81,6 @@ serialization, runtime member discovery, emitted code, or dynamically generated 
 
 Browser does not own the virtual-node vocabulary, mounted diff engine, component activation,
 application composition dependencies, routing, server serialization, or scoped-CSS rewriting.
-Routing joins through Browser.Router. Scoped style compilation and host stamping remain deferred
-with the scoped-CSS work (`[STY-1]`, `[STY-6]`).
+Routing joins through Browser.Router. Generated scope identifiers arrive as ordinary attributes;
+host-driven scope stamping and reactive style-variable application remain absent (`[STY-1]`,
+`[STY-6]`).

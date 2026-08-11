@@ -9,21 +9,21 @@ namespace Assimalign.Viu.State;
 /// ambient application registry. Specified by <c>[STA-1]</c> through <c>[STA-4]</c>.
 /// </summary>
 /// <remarks>
-/// Ambient registry state is not thread-safe and targets Viu's single-threaded event-loop model.
-/// Server and multi-request hosts should pass an explicit request-owned registry.
+/// An individual registry remains single-event-loop and is not thread-safe. Browser uses one shared
+/// ambient value; ServerRenderer selects a logical-flow-local value for each request. Other
+/// multi-request hosts should pass an explicit request-owned registry. Specified by
+/// <c>[EXE-1]</c>.
 /// </remarks>
 public static class StateStores
 {
-    private static IStateStoreRegistry? _activeRegistry;
-
     /// <summary>
     /// Gets or sets the ambient registry used by argument-less resolution and as the fallback after
     /// component services. It is <see langword="null"/> by default. Specified by <c>[STA-4]</c>.
     /// </summary>
     public static IStateStoreRegistry? ActiveRegistry
     {
-        get => _activeRegistry;
-        set => _activeRegistry = value;
+        get => StateExecutionIsolation.Current.ActiveRegistry;
+        set => StateExecutionIsolation.Current.ActiveRegistry = value;
     }
 
     /// <summary>
@@ -32,7 +32,7 @@ public static class StateStores
     /// </summary>
     /// <param name="registry">The registry to make active, or <see langword="null"/>.</param>
     public static void SetActiveRegistry(IStateStoreRegistry? registry)
-        => _activeRegistry = registry;
+        => StateExecutionIsolation.Current.ActiveRegistry = registry;
 
     /// <summary>
     /// Defines a context-aware state store without reflection-backed activation. Specified by
@@ -49,6 +49,25 @@ public static class StateStores
         => new(key, setup);
 
     /// <summary>
+    /// Defines a context-aware state store with an explicit AOT-safe payload serializer. Specified
+    /// by <c>[STA-9]</c> and <c>[EXE-4]</c>.
+    /// </summary>
+    /// <typeparam name="TStore">The state store type.</typeparam>
+    /// <param name="key">The non-empty application-unique state-store key.</param>
+    /// <param name="setup">The explicit AOT-safe setup delegate.</param>
+    /// <param name="serializer">The explicit AOT-safe state serializer.</param>
+    /// <returns>Reusable registry-independent store metadata.</returns>
+    public static StateStoreDefinition<TStore> Define<TStore>(
+        string key,
+        StateStoreActivator<TStore> setup,
+        IStateStoreSerializer<TStore> serializer)
+        where TStore : class
+    {
+        ArgumentNullException.ThrowIfNull(serializer);
+        return new StateStoreDefinition<TStore>(key, setup, serializer);
+    }
+
+    /// <summary>
     /// Defines a parameterless state store without reflection-backed activation. Specified by
     /// <c>[STA-1]</c>.
     /// </summary>
@@ -63,6 +82,26 @@ public static class StateStores
     {
         ArgumentNullException.ThrowIfNull(setup);
         return new StateStoreDefinition<TStore>(key, _ => setup());
+    }
+
+    /// <summary>
+    /// Defines a parameterless state store with an explicit AOT-safe payload serializer. Specified
+    /// by <c>[STA-9]</c> and <c>[EXE-4]</c>.
+    /// </summary>
+    /// <typeparam name="TStore">The state store type.</typeparam>
+    /// <param name="key">The non-empty application-unique state-store key.</param>
+    /// <param name="setup">The explicit AOT-safe setup delegate.</param>
+    /// <param name="serializer">The explicit AOT-safe state serializer.</param>
+    /// <returns>Reusable registry-independent store metadata.</returns>
+    public static StateStoreDefinition<TStore> Define<TStore>(
+        string key,
+        Func<TStore> setup,
+        IStateStoreSerializer<TStore> serializer)
+        where TStore : class
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        ArgumentNullException.ThrowIfNull(serializer);
+        return new StateStoreDefinition<TStore>(key, _ => setup(), serializer);
     }
 
     /// <summary>

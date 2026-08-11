@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading.Tasks;
 
 using Assimalign.Viu.Components;
 using Assimalign.Viu.Reactivity;
@@ -399,6 +400,186 @@ public sealed partial class Renderer<TNode>
         TNode container,
         RuntimeComponentContext? owner)
     {
+        HydrationStrategy? strategy = value.Invocation.HydrationStrategy;
+        if (strategy is not null
+            && strategy.Kind != HydrationStrategyKind.Immediate)
+        {
+            return HydrateLazyComponent(
+                tree,
+                reader,
+                node,
+                value,
+                container,
+                owner,
+                strategy);
+        }
+
+        return HydrateComponentImmediately(
+            tree,
+            reader,
+            node,
+            value,
+            container,
+            owner);
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateLazyComponent(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        ComponentNode value,
+        TNode container,
+        RuntimeComponentContext? owner,
+        HydrationStrategy strategy)
+    {
+        string openingMarker = HydrationMarkers.GetLazyHydrationStartData(strategy.Kind);
+        if (!IsCommentMarker(reader, node, openingMarker))
+        {
+            return HydrateMismatch(tree, reader, node, value, container, owner);
+        }
+
+        TNode? closing = FindLazyHydrationClosingMarker(reader, node);
+        if (!HasHostNode(closing))
+        {
+            return HydrateMismatch(tree, reader, node, value, container, owner);
+        }
+
+        _ = _options.ScheduleHydrationTrigger
+            ?? throw new NotSupportedException(
+                "The active host does not provide deferred hydration triggers.");
+        TNode boundaryContainer = HasHostNode(reader.ParentNode(node))
+            ? reader.ParentNode(node)!
+            : container;
+        MountedLazyHydration<TNode> mounted = new(
+            value,
+            reader,
+            boundaryContainer,
+            node,
+            closing!,
+            owner);
+        ScheduleLazyHydrationTrigger(tree, mounted, strategy);
+        Register(tree, value, mounted);
+        return (mounted, reader.NextSibling(closing!));
+    }
+
+    private void ActivateLazyHydration(
+        MountedTree<TNode> tree,
+        MountedLazyHydration<TNode> mounted)
+    {
+        if (mounted.IsUnmounted || mounted.ActivatedComponent is not null)
+        {
+            return;
+        }
+
+        TNode? first = mounted.Reader.NextSibling(mounted.StartAnchor);
+        if (!HasHostNode(first) || NodeComparer.Equals(first!, mounted.EndAnchor))
+        {
+            ReportHydrationWarning(
+                tree,
+                "Lazy hydration boundary had no server-rendered component subtree.");
+            return;
+        }
+
+        ComponentActivation activation;
+        int componentIdentifier;
+        if (mounted.PendingActivation is { } pendingActivation)
+        {
+            activation = pendingActivation;
+            componentIdentifier = mounted.PendingComponentIdentifier;
+        }
+        else
+        {
+            (activation, componentIdentifier) = CreateHydrationActivation(
+                tree,
+                (ComponentNode)mounted.Value,
+                mounted.Owner);
+            if (activation.Instance is AsynchronousComponentWrapper asynchronousComponent
+                && !asynchronousComponent.HydrationReadiness.IsCompleted)
+            {
+                mounted.PendingActivation = activation;
+                mounted.PendingComponentIdentifier = componentIdentifier;
+                _ = ResumeLazyHydrationWhenReadyAsync(
+                    asynchronousComponent.HydrationReadiness,
+                    mounted,
+                    mounted.ActivationJob!);
+                return;
+            }
+        }
+
+        mounted.PendingActivation = null;
+        mounted.PendingComponentIdentifier = 0;
+        (MountedNode<TNode> activatedNode, TNode? next) = HydrateActivatedComponentImmediately(
+            tree,
+            mounted.Reader,
+            first!,
+            (ComponentNode)mounted.Value,
+            mounted.Container,
+            mounted.Owner,
+            activation,
+            componentIdentifier);
+        MountedComponent<TNode> activated = (MountedComponent<TNode>)activatedNode;
+        if (!HasHostNode(next) || !NodeComparer.Equals(next!, mounted.EndAnchor))
+        {
+            ReportHydrationWarning(
+                tree,
+                "Lazy hydration boundary contained extra server-rendered nodes.");
+            TNode? cursor = next;
+            while (HasHostNode(cursor)
+                && !NodeComparer.Equals(cursor!, mounted.EndAnchor))
+            {
+                TNode current = cursor!;
+                cursor = mounted.Reader.NextSibling(current);
+                _options.Remove(current);
+            }
+        }
+
+        mounted.ActivatedComponent = activated;
+        mounted.ActivationJob = null;
+        QueueHostCommit();
+        IHydrationTriggerRegistration? registration = mounted.TriggerRegistration;
+        mounted.TriggerRegistration = null;
+        registration?.Complete();
+    }
+
+    private static async Task ResumeLazyHydrationWhenReadyAsync(
+        Task readiness,
+        MountedLazyHydration<TNode> mounted,
+        SchedulerJob activationJob)
+    {
+        await readiness.ConfigureAwait(false);
+        if (!mounted.IsUnmounted && !activationJob.IsDisposed)
+        {
+            Scheduler.QueuePostFlushCallback(activationJob);
+        }
+    }
+
+    private (MountedNode<TNode> Mounted, TNode? Next) HydrateComponentImmediately(
+        MountedTree<TNode> tree,
+        HydrationNodeReader<TNode> reader,
+        TNode node,
+        ComponentNode value,
+        TNode container,
+        RuntimeComponentContext? owner)
+    {
+        (ComponentActivation activation, int componentIdentifier) =
+            CreateHydrationActivation(tree, value, owner);
+        return HydrateActivatedComponentImmediately(
+            tree,
+            reader,
+            node,
+            value,
+            container,
+            owner,
+            activation,
+            componentIdentifier);
+    }
+
+    private (ComponentActivation Activation, int ComponentIdentifier)
+        CreateHydrationActivation(
+            MountedTree<TNode> tree,
+            ComponentNode value,
+            RuntimeComponentContext? owner)
+    {
         IApplicationContext application = tree.Application
             ?? throw new InvalidOperationException(
                 "Hydrating an authored component requires an application context.");
@@ -417,7 +598,20 @@ public sealed partial class Renderer<TNode>
             owner,
             watchScheduler,
             suspenseBoundary: _activeSuspenseBoundary);
+        return (activation, componentIdentifier);
+    }
 
+    private (MountedNode<TNode> Mounted, TNode? Next)
+        HydrateActivatedComponentImmediately(
+            MountedTree<TNode> tree,
+            HydrationNodeReader<TNode> reader,
+            TNode node,
+            ComponentNode value,
+            TNode container,
+            RuntimeComponentContext? owner,
+            ComponentActivation activation,
+            int componentIdentifier)
+    {
         MountedComponent<TNode>? mounted = null;
         VirtualNode? initialTree = null;
         ReactiveEffect? renderEffect = null;
@@ -898,7 +1092,10 @@ public sealed partial class Renderer<TNode>
         }
 
         string start = reader.Data(first);
-        string? end = start switch
+        bool isLazyHydrationRange = HydrationMarkers.IsLazyHydrationStartData(start);
+        string? end = isLazyHydrationRange
+            ? HydrationMarkers.LazyHydrationEndData
+            : start switch
         {
             HydrationMarkers.FragmentStartData => HydrationMarkers.FragmentEndData,
             HydrationMarkers.TeleportStartData => HydrationMarkers.TeleportEndData,
@@ -918,7 +1115,9 @@ public sealed partial class Renderer<TNode>
             if (reader.Kind(current) == HydrationNodeKind.Comment)
             {
                 string data = reader.Data(current);
-                if (string.Equals(data, start, StringComparison.Ordinal))
+                if (isLazyHydrationRange
+                        ? HydrationMarkers.IsLazyHydrationStartData(data)
+                        : string.Equals(data, start, StringComparison.Ordinal))
                 {
                     depth++;
                 }
@@ -1128,7 +1327,8 @@ public sealed partial class Renderer<TNode>
         || string.Equals(
             data,
             HydrationMarkers.TeleportStartData,
-            StringComparison.Ordinal);
+            StringComparison.Ordinal)
+        || HydrationMarkers.IsLazyHydrationStartData(data);
 
     private static bool IsCommentMarker(
         HydrationNodeReader<TNode> reader,
@@ -1175,6 +1375,42 @@ public sealed partial class Renderer<TNode>
                     depth++;
                 }
                 else if (string.Equals(data, closingMarker, StringComparison.Ordinal))
+                {
+                    if (depth == 0)
+                    {
+                        return current;
+                    }
+
+                    depth--;
+                }
+            }
+
+            cursor = reader.NextSibling(current);
+        }
+
+        return default;
+    }
+
+    private static TNode? FindLazyHydrationClosingMarker(
+        HydrationNodeReader<TNode> reader,
+        TNode start)
+    {
+        int depth = 0;
+        TNode? cursor = reader.NextSibling(start);
+        while (HasHostNode(cursor))
+        {
+            TNode current = cursor!;
+            if (reader.Kind(current) == HydrationNodeKind.Comment)
+            {
+                string data = reader.Data(current);
+                if (HydrationMarkers.IsLazyHydrationStartData(data))
+                {
+                    depth++;
+                }
+                else if (string.Equals(
+                    data,
+                    HydrationMarkers.LazyHydrationEndData,
+                    StringComparison.Ordinal))
                 {
                     if (depth == 0)
                     {

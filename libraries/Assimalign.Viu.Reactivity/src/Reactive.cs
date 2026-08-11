@@ -7,8 +7,10 @@ namespace Assimalign.Viu.Reactivity;
 /// <summary>
 /// The static entry-point facade for Viu's reactivity system: references, computeds, effects,
 /// effect scopes, watches, tracking control, and batching. This is the whole discoverable surface
-/// — the ratified member list is <c>[RCT-5]</c>. All ambient state is static and NOT thread-safe
-/// by design — the runtime targets the single-threaded JS event-loop model (browser WASM).
+/// — the ratified member list is <c>[RCT-5]</c>. One application graph remains single-event-loop
+/// and not thread-safe; ServerRenderer selects execution-flow-local ambient bookkeeping so distinct
+/// request-owned graphs cannot share tracking, batching, or scope state. Specified by
+/// <c>[EXE-1]</c>.
 /// </summary>
 public static class Reactive
 {

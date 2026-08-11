@@ -1,22 +1,28 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 
 namespace Assimalign.Viu.Reactivity;
 
 /// <summary>
-/// Ambient (static) reactivity state: the active subscriber, the should-track switch, the global
-/// version counter, and the batch queues. This type is NOT thread-safe by design — the runtime
-/// targets the single-threaded JS event-loop model (browser WASM), so plain static fields are used
-/// deliberately and no synchronization is performed.
+/// Ambient reactivity state: the active subscriber, the should-track switch, the global version
+/// counter, and the batch queues. Browser execution uses one shared single-event-loop state;
+/// request-oriented hosts select an execution-flow-local state before running user code.
 /// </summary>
 internal static class ReactivityState
 {
     /// <summary>The subscriber currently collecting dependencies, if any.</summary>
-    internal static Subscriber? ActiveSubscriber;
+    internal static Subscriber? ActiveSubscriber
+    {
+        get => ReactivityExecutionIsolation.Current.ActiveSubscriber;
+        set => ReactivityExecutionIsolation.Current.ActiveSubscriber = value;
+    }
 
     /// <summary>Whether dependency tracking is currently enabled.</summary>
-    internal static bool ShouldTrack = true;
+    internal static bool ShouldTrack
+    {
+        get => ReactivityExecutionIsolation.Current.ShouldTrack;
+        set => ReactivityExecutionIsolation.Current.ShouldTrack = value;
+    }
 
     /// <summary>
     /// Whether a read right now would establish a dependency (there is an active subscriber and
@@ -29,42 +35,44 @@ internal static class ReactivityState
     /// Incremented on every reactive mutation anywhere; lets computeds skip dependency traversal
     /// entirely when nothing anywhere in the graph has changed.
     /// </summary>
-    internal static int GlobalVersion;
-
-    private static readonly Stack<bool> TrackStack = new();
-    private static int _batchDepth;
-    private static Subscriber? _batchedSubscriber;
-    private static Subscriber? _batchedComputed;
+    internal static int GlobalVersion
+    {
+        get => ReactivityExecutionIsolation.Current.GlobalVersion;
+        set => ReactivityExecutionIsolation.Current.GlobalVersion = value;
+    }
 
     /// <summary>Pushes the current tracking state and disables tracking.</summary>
     internal static void PauseTracking()
     {
-        TrackStack.Push(ShouldTrack);
-        ShouldTrack = false;
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
+        state.TrackStack.Push(state.ShouldTrack);
+        state.ShouldTrack = false;
     }
 
     /// <summary>Pops the previously pushed tracking state (re-enables tracking when the stack is empty).</summary>
     internal static void ResetTracking()
     {
-        ShouldTrack = TrackStack.Count == 0 || TrackStack.Pop();
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
+        state.ShouldTrack = state.TrackStack.Count == 0 || state.TrackStack.Pop();
     }
 
     /// <summary>Queues a notified subscriber for execution when the outermost batch ends.</summary>
     internal static void Batch(Subscriber subscriber, bool isComputed)
     {
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
         subscriber.Flags |= SubscriberFlags.Notified;
         if (isComputed)
         {
-            subscriber.NextBatched = _batchedComputed;
-            _batchedComputed = subscriber;
+            subscriber.NextBatched = state.BatchedComputed;
+            state.BatchedComputed = subscriber;
             return;
         }
-        subscriber.NextBatched = _batchedSubscriber;
-        _batchedSubscriber = subscriber;
+        subscriber.NextBatched = state.BatchedSubscriber;
+        state.BatchedSubscriber = subscriber;
     }
 
     /// <summary>Increments the batch depth; triggers are queued until the matching <see cref="EndBatch"/>.</summary>
-    internal static void StartBatch() => _batchDepth++;
+    internal static void StartBatch() => ReactivityExecutionIsolation.Current.BatchDepth++;
 
     /// <summary>
     /// Decrements the batch depth and, when it reaches zero, flushes queued subscribers. Computeds
@@ -75,18 +83,19 @@ internal static class ReactivityState
     /// <exception cref="InvalidOperationException">There is no open batch to close.</exception>
     internal static void EndBatch()
     {
-        if (_batchDepth == 0)
+        ReactivityExecutionState state = ReactivityExecutionIsolation.Current;
+        if (state.BatchDepth == 0)
         {
             throw new InvalidOperationException("EndBatch called without a matching StartBatch.");
         }
-        if (--_batchDepth > 0)
+        if (--state.BatchDepth > 0)
         {
             return;
         }
-        if (_batchedComputed is not null)
+        if (state.BatchedComputed is not null)
         {
-            var computed = _batchedComputed;
-            _batchedComputed = null;
+            Subscriber? computed = state.BatchedComputed;
+            state.BatchedComputed = null;
             while (computed is not null)
             {
                 var next = computed.NextBatched;
@@ -96,10 +105,10 @@ internal static class ReactivityState
             }
         }
         ExceptionDispatchInfo? error = null;
-        while (_batchedSubscriber is not null)
+        while (state.BatchedSubscriber is not null)
         {
-            var subscriber = _batchedSubscriber;
-            _batchedSubscriber = null;
+            Subscriber? subscriber = state.BatchedSubscriber;
+            state.BatchedSubscriber = null;
             while (subscriber is not null)
             {
                 var next = subscriber.NextBatched;

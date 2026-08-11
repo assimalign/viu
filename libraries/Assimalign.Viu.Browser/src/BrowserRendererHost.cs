@@ -41,6 +41,39 @@ public sealed class BrowserRendererHost
         Func<int, int>? parentNode = null,
         Func<int, int>? nextSibling = null,
         Func<int, string>? snapshotHydration = null)
+        : this(
+            applyCommandFrame,
+            parentNode,
+            nextSibling,
+            snapshotHydration,
+            scheduleHydrationTrigger: null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a DOM-less buffered host with explicit hydration snapshot and trigger seams.
+    /// </summary>
+    /// <param name="applyCommandFrame">
+    /// The operation that applies one complete frame and reports released handles.
+    /// </param>
+    /// <param name="parentNode">The nullable forced-flush parent read.</param>
+    /// <param name="nextSibling">The nullable forced-flush next-sibling read.</param>
+    /// <param name="snapshotHydration">The nullable serialized hydration snapshot operation.</param>
+    /// <param name="scheduleHydrationTrigger">
+    /// The nullable host-neutral deferred-hydration trigger seam.
+    /// </param>
+    /// <remarks>
+    /// Trigger delivery and interaction replay must be asynchronous, and disposing the returned
+    /// registration must release all host observers and listeners. Specified by
+    /// <c>[HYD-LAZY-3]</c> through <c>[HYD-LAZY-5]</c>.
+    /// </remarks>
+    public BrowserRendererHost(
+        BrowserCommandFrameApplier applyCommandFrame,
+        Func<int, int>? parentNode,
+        Func<int, int>? nextSibling,
+        Func<int, string>? snapshotHydration,
+        Func<HydrationTriggerRequest<int>, IHydrationTriggerRegistration>?
+            scheduleHydrationTrigger)
     {
         ArgumentNullException.ThrowIfNull(applyCommandFrame);
         _operations = new BufferedBrowserNodeOperations(
@@ -49,7 +82,8 @@ public sealed class BrowserRendererHost
             parentNode ?? (static _ => 0),
             nextSibling ?? (static _ => 0),
             insertStaticContent: null,
-            snapshotHydration);
+            snapshotHydration,
+            scheduleHydrationTrigger);
         Options = _operations.Create();
     }
 

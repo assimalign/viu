@@ -67,6 +67,14 @@ post-flush watches, commits hosts at defined boundaries, and restores requeueabl
 (`[SCH-1]` through `[SCH-12]`). Scheduling policy belongs to Core; host batching crosses only the
 per-renderer `Commit` delegate.
 
+The default Browser path retains one shared event-loop state. `CoreExecutionIsolation` is the
+internal request-host boundary: it selects fresh Core, Reactivity, State, and scheduler bookkeeping
+for one asynchronous render and restores the caller's state afterward. Scheduler continuations
+capture that logical execution context even when the thread pool dispatches them; a per-flow gate
+also serializes that continuation with the synchronous-render flush. This permits distinct
+request-owned graphs to render concurrently and prevents Core from racing its own scheduler, without
+making any individual graph thread-safe (`[EXE-1]`, `[EXE-3]`).
+
 ## Structural built-ins and hydration
 
 Teleport, KeepAlive, Suspense, and Transition are internal executors for their Components-owned
@@ -77,6 +85,14 @@ host contract.
 Core owns the `HydrationMarkers` wire vocabulary and the generic hydration walk. A host supplies a
 snapshot reader; Core adopts matching nodes and remounts only the smallest mismatched range
 (`[SSR-MARKERS-1]` through `[SSR-MARKERS-3]`, `[HYD-1]` through `[HYD-7]`).
+
+Deferred hydration is marker-range bookkeeping, not a second renderer. Core validates and adopts
+the range as opaque host state, registers the invocation's data-only strategy through
+`ScheduleHydrationTrigger`, and creates the ordinary mounted component only from a post-flush job.
+Unmount cancels both the host registration and any queued or pending asynchronous activation.
+Nested boundaries remain undiscovered until their parent activates; asynchronous wrappers wait for
+their resolved target or terminal error and remove the strategy before forwarding the target, so
+one authored definition owns one boundary (`[HYD-LAZY-1]` through `[HYD-LAZY-5]`).
 
 ## Generated-code and AOT constraints
 

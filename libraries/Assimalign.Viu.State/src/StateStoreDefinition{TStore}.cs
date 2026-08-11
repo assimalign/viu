@@ -28,6 +28,24 @@ public sealed class StateStoreDefinition<TStore>
     }
 
     /// <summary>
+    /// Creates reusable metadata for a serializable state store. The serializer is invoked only
+    /// for registry payload capture and restore and must remain reflection-free. Specified by
+    /// <c>[STA-9]</c> and <c>[EXE-4]</c>.
+    /// </summary>
+    /// <param name="key">The non-empty application-unique state-store key.</param>
+    /// <param name="setup">The explicit AOT-safe store setup delegate.</param>
+    /// <param name="serializer">The explicit AOT-safe state serializer.</param>
+    public StateStoreDefinition(
+        string key,
+        StateStoreActivator<TStore> setup,
+        IStateStoreSerializer<TStore> serializer)
+        : this(key, setup)
+    {
+        ArgumentNullException.ThrowIfNull(serializer);
+        Serializer = serializer;
+    }
+
+    /// <summary>
     /// Gets the application-unique store key used for ordinal collision detection. Specified by
     /// <c>[STA-1]</c> and <c>[STA-2]</c>.
     /// </summary>
@@ -45,6 +63,13 @@ public sealed class StateStoreDefinition<TStore>
     /// Specified by <c>[STA-1]</c>.
     /// </summary>
     public StateStoreActivator<TStore> Setup { get; }
+
+    /// <summary>
+    /// Gets the optional explicit serializer used by registry payload capture and restore. A
+    /// materialized definition without one fails actionably when a payload operation includes it.
+    /// </summary>
+    /// <remarks>Specified by <c>[STA-9]</c> and constrained by <c>[EXE-4]</c>.</remarks>
+    public IStateStoreSerializer<TStore>? Serializer { get; }
 
     /// <summary>
     /// Gets the registry-owned store for this definition, creating it on first use. Different

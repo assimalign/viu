@@ -2,7 +2,8 @@
 
 The Viu template language front end: it tokenizes
 and parses template markup into a located AST, runs the transform pipeline (structural and
-directive transforms, expression binding, static optimization), and generates a **C# render method**.
+directive transforms, expression binding, static optimization), and generates **C# render method
+bodies** for either the interactive virtual-node tree or direct server markup.
 The platform-neutral template language and its DOM directive set live in this one project.
 It is a build-time library that runs inside the source generator ([V01.01.05.05]/[V01.01.06.02]);
 there is no runtime compilation (`[SFC-1]`, and see
@@ -27,16 +28,19 @@ detailed in [DESIGN.md](DESIGN.md); this page is the surface map.
 - **Binding** (`Binding/`) — `BindingMetadata`, `BindingType`, `BindingRewriteMode`, and the CSS
   module accessors (`CssModuleAccessor`, `CssModuleAccessors`) that let the compiler resolve
   `$style.x`.
-- **Code generation** (`CodeGeneration/`) — `RenderFunctionEmitter`, its
-  options/result, `RenderSourceMapping` (the `#line` correspondence), and the code-generation IR.
+- **Code generation** (`CodeGeneration/`) — `RenderFunctionEmitter`, its options/result,
+  `RenderFunctionTargetProfile` (`VirtualNodeTree` or `ServerMarkup`), `RenderSourceMapping` (the
+  `#line` correspondence), and the code-generation IR. The server profile writes static structure and
+  interpolations directly to `SsrRenderState`; subtrees it cannot prove safe retain a local
+  virtual-node fallback.
 - **Diagnostics** (`Diagnostics/`) — `CompilerError` and `CompilerErrorCode`, whose numeric bands are
   a frozen contract.
 
 ## Boundaries
 
 - Roots on **`Assimalign.Viu.Syntax`** only. It does **not** reference the runtime: emitted render
-  statements name the Components frame/node contracts and typed Browser operations directly, so the
-  contract flows one way (see
+  statements name the Components frame/node contracts, typed Browser operations, and public
+  ServerRenderer serialization helpers directly, so the contract flows one way (see
   [`Assimalign.Viu.Core/docs/OVERVIEW.md`](../../Assimalign.Viu.Core/docs/OVERVIEW.md)).
 - Build-time library on the netstandard2.0 analyzer TFM; runs in Roslyn generator hosts.
 - Everything a parse or transform produces is value-equatable to preserve the incremental-generator

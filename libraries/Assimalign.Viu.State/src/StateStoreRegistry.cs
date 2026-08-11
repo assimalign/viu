@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
+using System.Text.Json;
 
 using Assimalign.Viu.Reactivity;
 
@@ -17,7 +18,7 @@ namespace Assimalign.Viu.State;
 /// while an asynchronous-only store remains responsible for an explicit host-owned lifetime. The
 /// registry never blocks the host loop waiting for asynchronous disposal.
 /// </remarks>
-public sealed class StateStoreRegistry : IStateStoreRegistry
+public sealed class StateStoreRegistry : IStateStoreRegistry, IStateStorePayloadRegistry
 {
     private readonly Dictionary<string, StateStoreEntry> _entries =
         new(StringComparer.Ordinal);
@@ -25,6 +26,7 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
     private readonly IReactiveEffectScope _rootScope;
     private readonly IServiceProvider? _services;
     private readonly IReactiveWatchScheduler? _watchScheduler;
+    private StateStorePayload? _restorePayload;
 
     /// <summary>
     /// Creates a registry with an explicit reactive scope factory. The factory creates one detached
@@ -79,6 +81,7 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
 
         IReactiveEffectScope scope =
             _rootScope.Run(() => _effectScopes.Create(isDetached: false));
+        StateStoreEntry? createdEntry = null;
         try
         {
             StateContext context = new(
@@ -92,9 +95,27 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
                 TStore store = scope.Run(() => definition.Setup(context))
                     ?? throw new InvalidOperationException(
                         $"State store setup for \"{definition.Key}\" returned null.");
-                _entries.Add(
+                IStateStoreSerializer<TStore>? serializer = definition.Serializer;
+                createdEntry = new StateStoreEntry(
                     definition.Key,
-                    new StateStoreEntry(definition, store, scope));
+                    definition,
+                    store,
+                    scope,
+                    serializer is null
+                        ? null
+                        : writer => serializer.Serialize(writer, store),
+                    serializer is null
+                        ? null
+                        : state => serializer.Restore(store, state));
+                if (_restorePayload is { } restorePayload
+                    && restorePayload.TryGetState(
+                        definition.Key,
+                        out JsonElement state))
+                {
+                    createdEntry.RestoreState(state);
+                }
+
+                _entries.Add(definition.Key, createdEntry);
                 return store;
             }
             finally
@@ -102,9 +123,26 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
                 StateStoreSetupRuntime.Current = previousContext;
             }
         }
-        catch
+        catch (Exception exception)
         {
-            scope.Stop();
+            ExceptionDispatchInfo failure = ExceptionDispatchInfo.Capture(exception);
+            try
+            {
+                if (createdEntry is null)
+                {
+                    scope.Stop();
+                }
+                else
+                {
+                    createdEntry.Dispose();
+                }
+            }
+            catch
+            {
+                // Preserve the setup or restore failure after completing best-effort teardown.
+            }
+
+            failure.Throw();
             throw;
         }
     }
@@ -125,6 +163,30 @@ public sealed class StateStoreRegistry : IStateStoreRegistry
         _entries.Remove(definition.Key);
         entry.Dispose();
         return true;
+    }
+
+    /// <inheritdoc />
+    public StateStorePayload CapturePayload()
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        return StateStorePayload.Create(_entries);
+    }
+
+    /// <inheritdoc />
+    public void RestorePayload(StateStorePayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+
+        foreach (KeyValuePair<string, StateStoreEntry> entry in _entries)
+        {
+            if (payload.TryGetState(entry.Key, out JsonElement state))
+            {
+                entry.Value.RestoreState(state);
+            }
+        }
+
+        _restorePayload = payload;
     }
 
     /// <summary>

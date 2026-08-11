@@ -76,6 +76,34 @@ public sealed class BrowserRendererHostTests
     }
 
     [Fact]
+    public void Options_ExplicitHydrationTriggerSeam_ForwardsTheMarkerBoundedRequest()
+    {
+        HydrationTriggerRequest<int>? received = null;
+        var registration = new TrackingHydrationTriggerRegistration();
+        var host = new BrowserRendererHost(
+            (_, _) => [],
+            parentNode: null,
+            nextSibling: null,
+            snapshotHydration: null,
+            scheduleHydrationTrigger: request =>
+            {
+                received = request;
+                return registration;
+            });
+        HydrationTriggerRequest<int> request = new(
+            HydrationStrategy.OnIdle(25),
+            startAnchor: 7,
+            endAnchor: 11,
+            trigger: static () => { });
+
+        IHydrationTriggerRegistration actual =
+            host.Options.ScheduleHydrationTrigger!(request);
+
+        received.ShouldBeSameAs(request);
+        actual.ShouldBeSameAs(registration);
+    }
+
+    [Fact]
     public void Activate_SecondHost_RejectsUntilFirstLeaseIsDisposed()
     {
         var firstHost = new BrowserRendererHost((_, _) => []);
@@ -600,6 +628,18 @@ public sealed class BrowserRendererHostTests
             return static _ => new ElementNode(
                 new QualifiedName("span"),
                 children: [new TextNode("kept alive")]);
+        }
+    }
+
+    private sealed class TrackingHydrationTriggerRegistration :
+        IHydrationTriggerRegistration
+    {
+        public void Complete()
+        {
+        }
+
+        public void Dispose()
+        {
         }
     }
 

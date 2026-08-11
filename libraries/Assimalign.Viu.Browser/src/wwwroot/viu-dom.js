@@ -245,6 +245,80 @@ function getTransitionInfo(el, expectedType) {
     return { type, timeout, propCount, hasTransform }
 }
 
+// Deferred hydration registrations ([V01.01.07.03.01]): Core supplies marker handles and immutable
+// strategy data. Browser owns observers/listeners and releases them on activation or cancellation.
+// The numeric kinds are the stable HydrationStrategyKind values emitted by managed code.
+const HYDRATE_ON_IDLE = 1
+const HYDRATE_ON_VISIBLE = 2
+const HYDRATE_ON_MEDIA_QUERY = 3
+const HYDRATE_ON_INTERACTION = 4
+let nextHydrationTriggerToken = 1
+const hydrationTriggers = new Map()
+
+function enqueueMicrotask(callback) {
+    if (typeof globalThis.queueMicrotask === 'function') {
+        globalThis.queueMicrotask(callback)
+    } else {
+        Promise.resolve().then(callback)
+    }
+}
+
+function boundaryContainsTarget(start, end, target) {
+    let current = start.nextSibling
+    while (current && current !== end) {
+        if (current === target ||
+            (current.nodeType === Node.ELEMENT_NODE && current.contains(target))) {
+            return true
+        }
+        current = current.nextSibling
+    }
+    return false
+}
+
+function boundaryElements(start, end) {
+    const elements = []
+    let current = start.nextSibling
+    while (current && current !== end) {
+        if (current.nodeType === Node.ELEMENT_NODE) {
+            elements.push(current)
+        }
+        current = current.nextSibling
+    }
+    return elements
+}
+
+function fireHydrationTrigger(registration) {
+    if (registration.fired || registration.cancelled || typeof registration.trigger !== 'function') {
+        return
+    }
+
+    registration.fired = true
+    registration.cleanup()
+    registration.cleanup = () => {}
+    const trigger = registration.trigger
+    registration.trigger = null
+    enqueueMicrotask(trigger)
+}
+
+function replayInteraction(interaction) {
+    if (!interaction || !interaction.target.isConnected) {
+        return
+    }
+
+    const source = interaction.event
+    let replay
+    try {
+        replay = new source.constructor(source.type, source)
+    } catch {
+        replay = new Event(source.type, {
+            bubbles: source.bubbles,
+            cancelable: source.cancelable,
+            composed: source.composed
+        })
+    }
+    interaction.target.dispatchEvent(replay)
+}
+
 export async function initialize() {
     // Bind the single .NET dispatch entry point ([V01.01.04.03]): one JSExport carries the
     // whole typed payload as primitives and returns stop/prevent flags for the live event.
@@ -261,6 +335,153 @@ export const dom = {
         }
 
         return registerNode(node)
+    },
+
+    consumeTextContent: selector => {
+        const node = document.querySelector(selector)
+        if (!node) {
+            return ''
+        }
+
+        const textContent = node.textContent ?? ''
+        node.remove()
+        return textContent
+    },
+
+    scheduleHydrationTrigger: (
+        startHandle,
+        endHandle,
+        strategyKind,
+        timeoutMilliseconds,
+        condition,
+        eventNames,
+        trigger) => {
+        const start = getNode('scheduleHydrationTrigger', startHandle)
+        const end = getNode('scheduleHydrationTrigger', endHandle)
+        if (!start.parentNode || start.parentNode !== end.parentNode) {
+            fail('scheduleHydrationTrigger', startHandle, 'boundary markers do not share a parent')
+        }
+
+        const token = nextHydrationTriggerToken++
+        const registration = {
+            cancelled: false,
+            cleanup: () => {},
+            fired: false,
+            pendingInteraction: null,
+            trigger
+        }
+        hydrationTriggers.set(token, registration)
+
+        try {
+            if (strategyKind === HYDRATE_ON_IDLE) {
+                if (typeof globalThis.requestIdleCallback === 'function') {
+                    const options = timeoutMilliseconds >= 0
+                        ? { timeout: timeoutMilliseconds }
+                        : undefined
+                    const idleToken = globalThis.requestIdleCallback(
+                        () => fireHydrationTrigger(registration),
+                        options)
+                    registration.cleanup = () => globalThis.cancelIdleCallback?.(idleToken)
+                } else {
+                    const delay = timeoutMilliseconds >= 0 ? timeoutMilliseconds : 1
+                    const timeoutToken = globalThis.setTimeout(
+                        () => fireHydrationTrigger(registration),
+                        delay)
+                    registration.cleanup = () => globalThis.clearTimeout(timeoutToken)
+                }
+            } else if (strategyKind === HYDRATE_ON_VISIBLE) {
+                const elements = boundaryElements(start, end)
+                if (elements.length === 0 || typeof globalThis.IntersectionObserver !== 'function') {
+                    enqueueMicrotask(() => fireHydrationTrigger(registration))
+                } else {
+                    const observer = new globalThis.IntersectionObserver(entries => {
+                        if (entries.some(entry => entry.isIntersecting)) {
+                            fireHydrationTrigger(registration)
+                        }
+                    }, { rootMargin: condition || '0px' })
+                    for (const element of elements) {
+                        observer.observe(element)
+                    }
+                    registration.cleanup = () => observer.disconnect()
+                }
+            } else if (strategyKind === HYDRATE_ON_MEDIA_QUERY) {
+                const media = globalThis.matchMedia(condition)
+                const onChange = event => {
+                    if (event.matches) {
+                        fireHydrationTrigger(registration)
+                    }
+                }
+                if (typeof media.addEventListener === 'function') {
+                    media.addEventListener('change', onChange)
+                    registration.cleanup = () => media.removeEventListener('change', onChange)
+                } else {
+                    media.addListener(onChange)
+                    registration.cleanup = () => media.removeListener(onChange)
+                }
+                if (media.matches) {
+                    enqueueMicrotask(() => fireHydrationTrigger(registration))
+                }
+            } else if (strategyKind === HYDRATE_ON_INTERACTION) {
+                const parent = start.parentNode
+                const onInteraction = event => {
+                    if (!boundaryContainsTarget(start, end, event.target)) {
+                        return
+                    }
+
+                    if (event.cancelable) {
+                        event.preventDefault()
+                    }
+                    event.stopImmediatePropagation()
+                    registration.pendingInteraction = { event, target: event.target }
+                    fireHydrationTrigger(registration)
+                }
+                for (const eventName of eventNames) {
+                    parent.addEventListener(eventName, onInteraction, true)
+                }
+                registration.cleanup = () => {
+                    for (const eventName of eventNames) {
+                        parent.removeEventListener(eventName, onInteraction, true)
+                    }
+                }
+            } else {
+                fail('scheduleHydrationTrigger', startHandle, `unknown strategy kind ${strategyKind}`)
+            }
+        } catch (error) {
+            registration.cleanup()
+            hydrationTriggers.delete(token)
+            if (String(error.message).startsWith('viu-dom|')) {
+                throw error
+            }
+            fail('scheduleHydrationTrigger', startHandle, error.message)
+        }
+
+        return token
+    },
+
+    completeHydrationTrigger: token => {
+        const registration = hydrationTriggers.get(token)
+        if (!registration) {
+            return
+        }
+
+        registration.cleanup()
+        hydrationTriggers.delete(token)
+        const interaction = registration.pendingInteraction
+        registration.pendingInteraction = null
+        enqueueMicrotask(() => replayInteraction(interaction))
+    },
+
+    cancelHydrationTrigger: token => {
+        const registration = hydrationTriggers.get(token)
+        if (!registration) {
+            return
+        }
+
+        registration.cleanup()
+        registration.cancelled = true
+        registration.pendingInteraction = null
+        registration.trigger = null
+        hydrationTriggers.delete(token)
     },
 
     createElement: (tagName, namespaceName) => {
